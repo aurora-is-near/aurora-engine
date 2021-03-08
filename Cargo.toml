@@ -1,0 +1,20 @@
+[package]
+name = "aurora-engine"
+version = "0.0.0"
+authors = ["NEAR <hello@near.org>"]
+edition = "2018"
+description = ""
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "CC0-1.0"
+
+[dependencies]
+
+[dev-dependencies]
+
+[features]
+default = ["std"]
+std = []
+contract = []
