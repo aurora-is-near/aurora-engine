@@ -9,6 +9,21 @@ extern crate core;
 
 #[cfg(feature = "contract")]
 mod contract {
+    #[global_allocator]
+    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+    #[panic_handler]
+    #[no_mangle]
+    pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
+        ::core::intrinsics::abort();
+    }
+
+    #[alloc_error_handler]
+    #[no_mangle]
+    pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
+        ::core::intrinsics::abort();
+    }
+
     #[no_mangle]
     pub extern "C" fn deploy_code() {}
 
