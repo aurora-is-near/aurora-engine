@@ -26,11 +26,12 @@ codegen-units = 1
 rpath = false
 
 [dependencies]
+evm = { git = "https://github.com/aurora-is-near/sputnikvm", rev = "8e9f459", default-features = false }
 wee_alloc = { version = "0.4.5", default-features = false }
 
 [dev-dependencies]
 
 [features]
 default = ["std"]
-std = []
+std = ["evm/std"]
 contract = []
