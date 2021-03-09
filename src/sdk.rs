@@ -152,6 +152,7 @@ mod exports {
     }
 }
 
+#[allow(dead_code)]
 pub fn read_input() -> Vec<u8> {
     unsafe {
         exports::input(0);
@@ -161,6 +162,7 @@ pub fn read_input() -> Vec<u8> {
     }
 }
 
+#[allow(dead_code)]
 pub fn read_input_arr20() -> [u8; 20] {
     unsafe {
         exports::input(0);
@@ -170,12 +172,14 @@ pub fn read_input_arr20() -> [u8; 20] {
     }
 }
 
+#[allow(dead_code)]
 pub fn return_output(value: &[u8]) {
     unsafe {
         exports::value_return(value.len() as u64, value.as_ptr() as u64);
     }
 }
 
+#[allow(dead_code)]
 pub fn read_storage(key: &[u8]) -> Option<Vec<u8>> {
     unsafe {
         if exports::storage_read(key.len() as u64, key.as_ptr() as u64, 0) == 1 {
@@ -188,6 +192,7 @@ pub fn read_storage(key: &[u8]) -> Option<Vec<u8>> {
     }
 }
 
+#[allow(dead_code)]
 pub fn write_storage(key: &[u8], value: &[u8]) {
     unsafe {
         exports::storage_write(
@@ -200,16 +205,19 @@ pub fn write_storage(key: &[u8], value: &[u8]) {
     }
 }
 
+#[allow(dead_code)]
 pub fn remove_storage(key: &[u8]) {
     unsafe {
         exports::storage_remove(key.len() as u64, key.as_ptr() as u64, 0);
     }
 }
 
+#[allow(dead_code)]
 pub fn block_timestamp() -> u64 {
     unsafe { exports::block_timestamp() }
 }
 
+#[allow(dead_code)]
 pub fn block_index() -> u64 {
     unsafe { exports::block_index() }
 }
@@ -226,12 +234,14 @@ pub fn panic_utf8(bytes: &[u8]) {
     }
 }
 
+#[allow(dead_code)]
 pub fn log_utf8(bytes: &[u8]) {
     unsafe {
         exports::log_utf8(bytes.len() as u64, bytes.as_ptr() as u64);
     }
 }
 
+#[allow(dead_code)]
 pub fn predecessor_account_id() -> Vec<u8> {
     unsafe {
         exports::predecessor_account_id(1);
@@ -242,6 +252,7 @@ pub fn predecessor_account_id() -> Vec<u8> {
 }
 
 /// Calls environment keccak256 on given data.
+#[allow(dead_code)]
 pub fn keccak(data: &[u8]) -> H256 {
     unsafe {
         exports::keccak256(data.len() as u64, data.as_ptr() as u64, 1);
@@ -252,6 +263,7 @@ pub fn keccak(data: &[u8]) -> H256 {
 }
 
 /// Calls environment panic with data encoded in hex as panic message.
+#[allow(dead_code)]
 pub fn panic_hex(data: &[u8]) -> ! {
     let message = crate::types::bytes_to_hex(data).into_bytes();
     unsafe { exports::panic_utf8(message.len() as _, message.as_ptr() as _) }

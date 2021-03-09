@@ -1,7 +1,7 @@
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec, vec::Vec};
+use alloc::{string::String, vec::Vec};
 #[cfg(feature = "std")]
-use std::{string::String, vec, vec::Vec};
+use std::{string::String, vec::Vec};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
