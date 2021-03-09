@@ -2,16 +2,19 @@ CARGO = cargo
 
 all: release
 
-release: target/wasm32-unknown-unknown/release/aurora_engine.wasm
+release: release.wasm
 
-target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml src/lib.rs src/sdk.rs
+release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
+	ln -sf $< $@
+
+target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml $(wildcard src/*.rs)
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=contract -Z avoid-dev-deps
 
 format:
 	$(CARGO) fmt
 
 clean:
-	@rm -Rf target *~
+	@rm -Rf release.wasm target *~
 
 .PHONY: format clean
 
