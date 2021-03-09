@@ -30,6 +30,11 @@ mod contract {
     }
 
     #[no_mangle]
+    pub extern "C" fn get_version() {
+        crate::sdk::return_output("0.0.0".as_bytes())
+    }
+
+    #[no_mangle]
     pub extern "C" fn deploy_code() {}
 
     #[no_mangle]
