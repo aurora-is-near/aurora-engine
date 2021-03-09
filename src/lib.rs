@@ -7,6 +7,11 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+pub mod types;
+
+#[cfg(feature = "contract")]
+mod sdk;
+
 #[cfg(feature = "contract")]
 mod contract {
     #[global_allocator]
