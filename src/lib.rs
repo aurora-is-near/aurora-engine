@@ -60,4 +60,10 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_storage_at() {}
+
+    #[no_mangle]
+    pub extern "C" fn begin_chain() {}
+
+    #[no_mangle]
+    pub extern "C" fn begin_block() {}
 }
