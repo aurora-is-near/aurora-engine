@@ -50,6 +50,11 @@ mod contract {
     }
 
     #[no_mangle]
+    pub extern "C" fn get_chain_id() {
+        sdk::return_output(&CHAIN_ID.to_le_bytes())
+    }
+
+    #[no_mangle]
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
         let mut engine = Engine::new(CHAIN_ID, predecessor_address());
@@ -70,14 +75,14 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn raw_call() {
         let _input = sdk::read_input();
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/3
+        todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/3
         sdk::return_output(&[])
     }
 
     #[no_mangle]
     pub extern "C" fn meta_call() {
         let _input = sdk::read_input();
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/4
+        todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/4
         sdk::return_output(&[])
     }
 
@@ -122,14 +127,14 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn begin_chain() {
         let _input = sdk::read_input();
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
+        todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
         sdk::return_output(&[])
     }
 
     #[no_mangle]
     pub extern "C" fn begin_block() {
         let _input = sdk::read_input();
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
+        todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
         sdk::return_output(&[])
     }
 
