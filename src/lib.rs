@@ -43,8 +43,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_version() {
         let version = match option_env!("NEAR_EVM_VERSION") {
-          Some(v) => v.as_bytes(),
-          None => include_bytes!("../VERSION")
+            Some(v) => v.as_bytes(),
+            None => include_bytes!("../VERSION"),
         };
         sdk::return_output(version)
     }
@@ -76,14 +76,12 @@ mod contract {
     pub extern "C" fn raw_call() {
         let _input = sdk::read_input();
         todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/3
-        sdk::return_output(&[])
     }
 
     #[no_mangle]
     pub extern "C" fn meta_call() {
         let _input = sdk::read_input();
         todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/4
-        sdk::return_output(&[])
     }
 
     #[no_mangle]
@@ -128,14 +126,12 @@ mod contract {
     pub extern "C" fn begin_chain() {
         let _input = sdk::read_input();
         todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
-        sdk::return_output(&[])
     }
 
     #[no_mangle]
     pub extern "C" fn begin_block() {
         let _input = sdk::read_input();
         todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
-        sdk::return_output(&[])
     }
 
     fn predecessor_address() -> H160 {
