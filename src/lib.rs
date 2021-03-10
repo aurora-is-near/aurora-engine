@@ -42,7 +42,10 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_version() {
-        let version = include_bytes!("../VERSION");
+        let version = match option_env!("NEAR_EVM_VERSION") {
+          Some(v) => v.as_bytes(),
+          None => include_bytes!("../VERSION")
+        };
         sdk::return_output(version)
     }
 
