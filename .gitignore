@@ -9,5 +9,4 @@
 
 # Rust artifacts
 /*.wasm
-Cargo.lock
-target/
+/target/
