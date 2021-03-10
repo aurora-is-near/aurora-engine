@@ -42,7 +42,8 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_version() {
-        sdk::return_output(b"0.0.0")
+        let version = include_bytes!("../VERSION");
+        sdk::return_output(version)
     }
 
     #[no_mangle]
