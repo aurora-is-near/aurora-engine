@@ -10,10 +10,20 @@ extern crate core;
 pub mod types;
 
 #[cfg(feature = "contract")]
+mod engine;
+#[cfg(feature = "contract")]
 mod sdk;
 
 #[cfg(feature = "contract")]
 mod contract {
+    use crate::engine::Engine;
+    use crate::sdk;
+    use crate::types::{near_account_to_evm_address, GetStorageAtArgs, ViewCallArgs};
+    use borsh::BorshDeserialize;
+    use primitive_types::{H160, H256};
+
+    const CHAIN_ID: u64 = 1313161556; // FIXME
+
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
@@ -31,39 +41,92 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_version() {
-        crate::sdk::return_output("0.0.0".as_bytes())
+        sdk::return_output("0.0.0".as_bytes())
     }
 
     #[no_mangle]
-    pub extern "C" fn deploy_code() {}
+    pub extern "C" fn deploy_code() {
+        let _input = sdk::read_input();
+        let mut _backend = Engine::new(CHAIN_ID, predecessor_address());
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn call() {}
+    pub extern "C" fn call() {
+        let _input = sdk::read_input();
+        let mut _backend = Engine::new(CHAIN_ID, predecessor_address());
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn raw_call() {}
+    pub extern "C" fn raw_call() {
+        let _input = sdk::read_input();
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn meta_call() {}
+    pub extern "C" fn meta_call() {
+        let _input = sdk::read_input();
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn view() {}
+    pub extern "C" fn view() {
+        let input = sdk::read_input();
+        let args = ViewCallArgs::try_from_slice(&input).unwrap();
+        let mut _backend = Engine::new(CHAIN_ID, H160::from_slice(&args.sender));
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn get_code() {}
+    pub extern "C" fn get_code() {
+        let _address = sdk::read_input_arr20();
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn get_balance() {}
+    pub extern "C" fn get_balance() {
+        let _address = sdk::read_input_arr20();
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn get_nonce() {}
+    pub extern "C" fn get_nonce() {
+        let _address = sdk::read_input_arr20();
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn get_storage_at() {}
+    pub extern "C" fn get_storage_at() {
+        let input = sdk::read_input();
+        let _args = GetStorageAtArgs::try_from_slice(&input).unwrap();
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn begin_chain() {}
+    pub extern "C" fn begin_chain() {
+        let _input = sdk::read_input();
+        // TODO
+        sdk::return_output(&[]);
+    }
 
     #[no_mangle]
-    pub extern "C" fn begin_block() {}
+    pub extern "C" fn begin_block() {
+        let _input = sdk::read_input();
+        // TODO
+        sdk::return_output(&[]);
+    }
+
+    fn predecessor_address() -> H160 {
+        near_account_to_evm_address(&sdk::predecessor_account_id())
+    }
 }
