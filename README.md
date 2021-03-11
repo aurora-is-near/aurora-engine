@@ -1,5 +1,8 @@
 # Aurora Engine
 
+[![Project license](https://img.shields.io/badge/license-Public%20Domain-blue.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
+[![Discord](https://img.shields.io/discord/490367152054992913?label=discord)](https://discord.gg/jNjHYUF8vw)
+
 ## Prerequisites
 
 - Rust nightly (2021-01-30) with the WebAssembly toolchain
