@@ -43,3 +43,11 @@ near call evm.test.near get_version --account-id evm.test.near
 near state evm.test.near
 http post http://localhost:3030 jsonrpc=2.0 id=1 method=query params:='{"request_type": "view_state", "account_id": "evm.test.near", "prefix_base64": "", "finality": "final"}'
 ```
+
+If you have [Ruby] installed, get more useful and readable output as follows:
+
+```sh
+rake dump
+```
+
+[Ruby]: https://www.ruby-lang.org
