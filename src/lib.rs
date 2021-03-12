@@ -142,8 +142,8 @@ mod contract {
         match reason {
             ExitReason::Succeed(_) => sdk::return_output(return_value),
             ExitReason::Revert(_) => sdk::panic_hex(&return_value),
-            ExitReason::Error(error) => sdk::panic_utf8(b"error"), // TODO
-            ExitReason::Fatal(error) => sdk::panic_utf8(b"fatal error"), // TODO
+            ExitReason::Error(_error) => sdk::panic_utf8(b"error"), // TODO
+            ExitReason::Fatal(_error) => sdk::panic_utf8(b"fatal error"), // TODO
         }
     }
 }
