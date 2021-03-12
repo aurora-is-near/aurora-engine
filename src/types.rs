@@ -44,7 +44,18 @@ pub struct BeginChainArgs {
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct BeginBlockArgs {}
+pub struct BeginBlockArgs {
+    /// The current block's beneficiary address.
+    pub coinbase: RawU256,
+    /// The current block's timestamp (in seconds since the Unix epoch).
+    pub timestamp: RawU256,
+    /// The current block's number (the genesis block is number zero).
+    pub number: RawU256,
+    /// The current block's difficulty.
+    pub difficulty: RawU256,
+    /// The current block's gas limit.
+    pub gaslimit: RawU256,
+}
 
 pub enum KeyPrefix {
     Config = 0x0,
