@@ -38,6 +38,14 @@ pub struct GetStorageAtArgs {
     pub key: RawH256,
 }
 
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct BeginChainArgs {
+    pub chain_id: RawU256,
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct BeginBlockArgs {}
+
 pub enum KeyPrefix {
     Code = 0x0,
     Balance = 0x1,

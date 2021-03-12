@@ -35,6 +35,7 @@ near deploy --account-id=evm.test.near --wasm-file=release.wasm
 
 ```sh
 near call evm.test.near get_version --account-id evm.test.near
+near call evm.test.near get_chain_id --account-id evm.test.near
 ```
 
 ### Inspecting the contract state

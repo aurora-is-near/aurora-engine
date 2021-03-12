@@ -18,15 +18,24 @@ mod sdk;
 mod contract {
     use crate::engine::Engine;
     use crate::sdk;
-    use crate::types::{near_account_to_evm_address, u256_to_arr, GetStorageAtArgs, ViewCallArgs};
+    use crate::types::{
+        near_account_to_evm_address, u256_to_arr, BeginBlockArgs, BeginChainArgs, GetStorageAtArgs,
+        ViewCallArgs,
+    };
     use borsh::BorshDeserialize;
     use evm::ExitReason;
-    use primitive_types::{H160, H256};
-
-    const CHAIN_ID: u64 = 1313161556; // FIXME
+    use primitive_types::{H160, H256, U256};
 
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+    const CHAIN_ID: U256 = U256::zero(); // FIXME
+
+    fn chain_id() -> U256 {
+        sdk::read_storage(b"\0chain_id")
+            .map(|value| U256::from_big_endian(value.as_slice()))
+            .unwrap_or(CHAIN_ID)
+    }
 
     #[panic_handler]
     #[no_mangle]
@@ -51,13 +60,15 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
-        sdk::return_output(&CHAIN_ID.to_le_bytes())
+        let mut result = [0u8; 32];
+        chain_id().to_big_endian(&mut result);
+        sdk::return_output(&result)
     }
 
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
-        let mut engine = Engine::new(CHAIN_ID, predecessor_address());
+        let mut engine = Engine::new(chain_id(), predecessor_address());
         let (reason, return_value) = Engine::deploy_code(&mut engine, &input);
         // TODO: charge for storage
         process_exit_reason(reason, &return_value.0)
@@ -66,7 +77,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn call() {
         let input = sdk::read_input();
-        let mut engine = Engine::new(CHAIN_ID, predecessor_address());
+        let mut engine = Engine::new(chain_id(), predecessor_address());
         let (reason, return_value) = Engine::call(&mut engine, &input);
         // TODO: charge for storage
         process_exit_reason(reason, &return_value)
@@ -75,7 +86,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn raw_call() {
         let _input = sdk::read_input();
-        todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/3
+        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/3
     }
 
     #[no_mangle]
@@ -88,7 +99,7 @@ mod contract {
     pub extern "C" fn view() {
         let input = sdk::read_input();
         let args = ViewCallArgs::try_from_slice(&input).unwrap();
-        let mut engine = Engine::new(CHAIN_ID, H160::from_slice(&args.sender));
+        let mut engine = Engine::new(chain_id(), H160::from_slice(&args.sender));
         let (reason, return_value) = Engine::view(&mut engine, args);
         process_exit_reason(reason, &return_value)
     }
@@ -124,14 +135,17 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn begin_chain() {
-        let _input = sdk::read_input();
-        todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
+        let input = sdk::read_input();
+        let args = BeginChainArgs::try_from_slice(&input).unwrap();
+        sdk::write_storage(b"\0chain_id", &args.chain_id)
+        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
     }
 
     #[no_mangle]
     pub extern "C" fn begin_block() {
-        let _input = sdk::read_input();
-        todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
+        let input = sdk::read_input();
+        let _args = BeginBlockArgs::try_from_slice(&input).unwrap();
+        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 
     fn predecessor_address() -> H160 {

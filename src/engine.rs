@@ -22,11 +22,8 @@ pub struct Engine {
 const CONFIG: &'static Config = &Config::istanbul(); // TODO: upgrade to Berlin HF
 
 impl Engine {
-    pub fn new(chain_id: u64, origin: H160) -> Self {
-        Self {
-            chain_id: U256::from(chain_id),
-            origin,
-        }
+    pub fn new(chain_id: U256, origin: H160) -> Self {
+        Self { chain_id, origin }
     }
 
     pub fn set_code(address: &H160, code: &[u8]) {
