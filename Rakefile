@@ -12,6 +12,7 @@ task :dump do |t|
    result['values'].each do |record|
      record_key, record_val = Base64.decode64(record['key']), Base64.decode64(record['value']).freeze
      record_type, evm_address, sstore_key = decode_evm_key(record_key)
+     next if record_type == :config
      evm_account = evm_state[evm_address] ||= EVMAccount.new(evm_address)
      case record_type
        when :storage then evm_account.storage[sstore_key] = record_val
@@ -45,10 +46,11 @@ end
 
 def decode_evm_key(key)
   case key[0].ord
-    when 0 then [:code, key[1..]]
-    when 1 then [:balance, key[1..]]
-    when 2 then [:nonce, key[1..]]
-    when 3 then [:storage, key[1..20], key[21..]]
+    when 0 then [:config, key[1..]]
+    when 1 then [:nonce, key[1..]]
+    when 2 then [:balance, key[1..]]
+    when 3 then [:code, key[1..]]
+    when 4 then [:storage, key[1..20], key[21..]]
   end
 end
 

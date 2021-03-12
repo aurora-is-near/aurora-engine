@@ -47,10 +47,11 @@ pub struct BeginChainArgs {
 pub struct BeginBlockArgs {}
 
 pub enum KeyPrefix {
-    Code = 0x0,
-    Balance = 0x1,
-    Nonce = 0x2,
-    Storage = 0x3,
+    Config = 0x0,
+    Nonce = 0x1,
+    Balance = 0x2,
+    Code = 0x3,
+    Storage = 0x4,
 }
 
 pub fn address_to_key(prefix: KeyPrefix, address: &H160) -> [u8; 21] {
