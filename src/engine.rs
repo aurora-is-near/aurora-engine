@@ -10,13 +10,16 @@ use crate::types::{
 };
 use borsh::BorshDeserialize;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::{ExitReason, ExitSucceed};
+use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
+use evm::{Config, CreateScheme, ExitReason};
 use primitive_types::{H160, H256, U256};
 
 pub struct Engine {
     chain_id: U256,
     origin: H160,
 }
+
+const CONFIG: &'static Config = &Config::istanbul(); // TODO: upgrade to Berlin HF
 
 impl Engine {
     pub fn new(chain_id: u64, origin: H160) -> Self {
@@ -117,22 +120,59 @@ impl Engine {
         }
     }
 
-    pub fn deploy_code(&self, _input: &[u8]) -> (ExitReason, H160) {
-        let _origin = self.origin();
-        let _value = U256::zero();
-        (ExitReason::Succeed(ExitSucceed::Stopped), H160::zero()) // TODO
+    pub fn deploy_code(&mut self, input: &[u8]) -> (ExitReason, H160) {
+        let origin = self.origin();
+        let value = U256::zero();
+
+        let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
+        let state = MemoryStackState::new(metadata, self);
+        let mut executor = StackExecutor::new(state, &CONFIG);
+
+        let address = executor.create_address(CreateScheme::Legacy { caller: origin });
+        let (reason, return_value) = (
+            executor.transact_create(origin, value, Vec::from(input), u64::max_value()),
+            address,
+        );
+        let (values, logs) = executor.into_state().deconstruct();
+        self.apply(values, logs, true);
+        (reason, return_value)
     }
 
-    pub fn call(&self, input: &[u8]) -> (ExitReason, Vec<u8>) {
-        let _args = FunctionCallArgs::try_from_slice(&input).unwrap();
-        let _origin = self.origin();
-        let _value = U256::zero();
-        (ExitReason::Succeed(ExitSucceed::Stopped), [].to_vec()) // TODO
+    pub fn call(&mut self, input: &[u8]) -> (ExitReason, Vec<u8>) {
+        let args = FunctionCallArgs::try_from_slice(&input).unwrap();
+        let origin = self.origin();
+        let value = U256::zero();
+
+        let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
+        let state = MemoryStackState::new(metadata, self);
+        let mut executor = StackExecutor::new(state, &CONFIG);
+
+        let (reason, return_value) = executor.transact_call(
+            origin,
+            H160(args.contract),
+            value,
+            args.input,
+            u64::max_value(),
+        );
+        let (values, logs) = executor.into_state().deconstruct();
+        self.apply(values, logs, true);
+        (reason, return_value)
     }
 
     pub fn view(&self, args: ViewCallArgs) -> (ExitReason, Vec<u8>) {
-        let _value = U256::from_big_endian(&args.amount);
-        (ExitReason::Succeed(ExitSucceed::Stopped), [].to_vec()) // TODO
+        let value = U256::from_big_endian(&args.amount);
+
+        let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
+        let state = MemoryStackState::new(metadata, self);
+        let mut executor = StackExecutor::new(state, &CONFIG);
+
+        executor.transact_call(
+            H160::from_slice(&args.sender),
+            H160::from_slice(&args.address),
+            value,
+            args.input,
+            u64::max_value(),
+        )
     }
 }
 
