@@ -39,5 +39,5 @@ hex = "0.4.3"
 
 [features]
 default = ["std"]
-std = ["borsh/std", "evm/std", "lazy_static/std", "primitive-types/std", "rlp/std", "sha3/std"]
+std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std"]
 contract = ["lazy_static/spin_no_std"]
