@@ -24,17 +24,20 @@ mod contract {
     };
     use borsh::BorshDeserialize;
     use evm::ExitReason;
+    use lazy_static::lazy_static;
     use primitive_types::{H160, H256, U256};
 
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-    const CHAIN_ID: U256 = U256::zero(); // FIXME
-
-    fn chain_id() -> U256 {
-        sdk::read_storage(b"\0chain_id")
-            .map(|value| U256::from_big_endian(value.as_slice()))
-            .unwrap_or(CHAIN_ID)
+    lazy_static! {
+        static ref CHAIN_ID: U256 = match sdk::read_storage(b"\0chain_id") {
+            Some(v) => U256::from_big_endian(v.as_slice()),
+            None => match option_env!("NEAR_EVM_CHAIN") {
+                Some(v) => U256::from_dec_str(v).unwrap_or_else(|_| U256::zero()),
+                None => U256::from(1313161556), // NEAR BetaNet
+            },
+        };
     }
 
     #[panic_handler]
@@ -61,14 +64,14 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
         let mut result = [0u8; 32];
-        chain_id().to_big_endian(&mut result);
+        (*CHAIN_ID).to_big_endian(&mut result);
         sdk::return_output(&result)
     }
 
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
-        let mut engine = Engine::new(chain_id(), predecessor_address());
+        let mut engine = Engine::new(*CHAIN_ID, predecessor_address());
         let (reason, return_value) = Engine::deploy_code(&mut engine, &input);
         // TODO: charge for storage
         process_exit_reason(reason, &return_value.0)
@@ -77,7 +80,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn call() {
         let input = sdk::read_input();
-        let mut engine = Engine::new(chain_id(), predecessor_address());
+        let mut engine = Engine::new(*CHAIN_ID, predecessor_address());
         let (reason, return_value) = Engine::call(&mut engine, &input);
         // TODO: charge for storage
         process_exit_reason(reason, &return_value)
@@ -99,7 +102,7 @@ mod contract {
     pub extern "C" fn view() {
         let input = sdk::read_input();
         let args = ViewCallArgs::try_from_slice(&input).unwrap();
-        let mut engine = Engine::new(chain_id(), H160::from_slice(&args.sender));
+        let mut engine = Engine::new(*CHAIN_ID, H160::from_slice(&args.sender));
         let (reason, return_value) = Engine::view(&mut engine, args);
         process_exit_reason(reason, &return_value)
     }
