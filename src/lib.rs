@@ -7,6 +7,7 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+mod precompiles;
 pub mod types;
 
 #[cfg(feature = "contract")]

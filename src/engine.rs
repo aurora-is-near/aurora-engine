@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::vec::Vec;
 
+use crate::precompiles;
 use crate::sdk;
 use crate::types::{
     address_to_key, bytes_to_hex, log_to_bytes, storage_to_key, u256_to_arr, FunctionCallArgs,
@@ -11,7 +12,7 @@ use crate::types::{
 use borsh::BorshDeserialize;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm::{Config, Context, CreateScheme, ExitError, ExitReason, ExitSucceed};
+use evm::{Config, CreateScheme, ExitReason};
 use primitive_types::{H160, H256, U256};
 
 pub struct Engine {
@@ -20,15 +21,6 @@ pub struct Engine {
 }
 
 const CONFIG: &'static Config = &Config::istanbul(); // TODO: upgrade to Berlin HF
-
-fn no_precompile(
-    _address: H160,
-    _input: &[u8],
-    _target_gas: Option<u64>,
-    _context: &Context,
-) -> Option<Result<(ExitSucceed, Vec<u8>, u64), ExitError>> {
-    None // TODO: implement Istanbul precompiles
-}
 
 impl Engine {
     pub fn new(chain_id: U256, origin: H160) -> Self {
@@ -175,7 +167,7 @@ impl Engine {
     fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {
         let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
         let state = MemoryStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, &CONFIG, no_precompile)
+        StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
     }
 }
 
