@@ -11,7 +11,7 @@ use crate::types::{
 use borsh::BorshDeserialize;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm::{Config, CreateScheme, ExitReason};
+use evm::{Config, Context, CreateScheme, ExitError, ExitReason, ExitSucceed};
 use primitive_types::{H160, H256, U256};
 
 pub struct Engine {
@@ -20,6 +20,15 @@ pub struct Engine {
 }
 
 const CONFIG: &'static Config = &Config::istanbul(); // TODO: upgrade to Berlin HF
+
+fn no_precompile(
+    _address: H160,
+    _input: &[u8],
+    _target_gas: Option<u64>,
+    _context: &Context,
+) -> Option<Result<(ExitSucceed, Vec<u8>, u64), ExitError>> {
+    None // TODO: implement Istanbul precompiles
+}
 
 impl Engine {
     pub fn new(chain_id: U256, origin: H160) -> Self {
@@ -121,10 +130,7 @@ impl Engine {
         let origin = self.origin();
         let value = U256::zero();
 
-        let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
-        let state = MemoryStackState::new(metadata, self);
-        let mut executor = StackExecutor::new(state, &CONFIG);
-
+        let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (reason, return_value) = (
             executor.transact_create(origin, value, Vec::from(input), u64::max_value()),
@@ -140,10 +146,7 @@ impl Engine {
         let origin = self.origin();
         let value = U256::zero();
 
-        let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
-        let state = MemoryStackState::new(metadata, self);
-        let mut executor = StackExecutor::new(state, &CONFIG);
-
+        let mut executor = self.make_executor();
         let (reason, return_value) = executor.transact_call(
             origin,
             H160(args.contract),
@@ -159,10 +162,7 @@ impl Engine {
     pub fn view(&self, args: ViewCallArgs) -> (ExitReason, Vec<u8>) {
         let value = U256::from_big_endian(&args.amount);
 
-        let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
-        let state = MemoryStackState::new(metadata, self);
-        let mut executor = StackExecutor::new(state, &CONFIG);
-
+        let mut executor = self.make_executor();
         executor.transact_call(
             H160::from_slice(&args.sender),
             H160::from_slice(&args.address),
@@ -170,6 +170,12 @@ impl Engine {
             args.input,
             u64::max_value(),
         )
+    }
+
+    fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {
+        let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
+        let state = MemoryStackState::new(metadata, self);
+        StackExecutor::new_with_precompile(state, &CONFIG, no_precompile)
     }
 }
 
