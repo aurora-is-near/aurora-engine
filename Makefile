@@ -1,4 +1,5 @@
 CARGO = cargo
+NEAR  = near
 
 all: release
 
@@ -9,6 +10,9 @@ release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 
 target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=contract -Z avoid-dev-deps
+
+deploy: release.wasm
+	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),evm.test.near) --wasm-file=$<
 
 format:
 	$(CARGO) fmt
