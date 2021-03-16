@@ -19,7 +19,8 @@ rustup target add wasm32-unknown-unknown --toolchain nightly-2021-01-30
 ### Building the contract
 
 ```sh
-make release  # produces release.wasm
+make release  # produces release.wasm (300+ KiB)
+make debug    # produces debug.wasm (1+ MiB), which includes symbols
 ```
 
 ### Deploying the contract

@@ -25,6 +25,17 @@ incremental = false
 codegen-units = 1
 rpath = false
 
+[profile.dev]
+opt-level = "z"
+debug = false
+debug-assertions = true
+overflow-checks = true
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
 [dependencies]
 borsh = { version = "0.8.2", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm", rev = "85631ce", default-features = false }
