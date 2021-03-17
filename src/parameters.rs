@@ -14,7 +14,7 @@ pub struct FunctionCallArgs {
 }
 
 /// Borsh-encoded parameters for the `view` function.
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
 pub struct ViewCallArgs {
     pub sender: RawAddress,
     pub address: RawAddress,
@@ -53,4 +53,25 @@ pub struct BeginBlockArgs {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_view_call_fail() {
+        let bytes = [0; 71];
+        let _ = ViewCallArgs::try_from_slice(&bytes).unwrap_err();
+    }
+
+    #[test]
+    fn test_roundtrip_view_call() {
+        let x = ViewCallArgs {
+            sender: [1; 20],
+            address: [2; 20],
+            amount: [3; 32],
+            input: vec![1, 2, 3],
+        };
+        let bytes = x.try_to_vec().unwrap();
+        let res = ViewCallArgs::try_from_slice(&bytes).unwrap();
+        assert_eq!(x, res);
+    }
+}
