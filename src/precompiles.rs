@@ -23,5 +23,59 @@ pub fn istanbul_precompiles(
     None // TODO: implement Istanbul precompiles
 }
 
+/// See: https://ethereum.github.io/yellowpaper/paper.pdf
+#[allow(dead_code)]
+fn ecrecover(_hash: H256, _v: u8, _r: H256, _s: H256) -> Address {
+    Address::zero() // TODO: implement ECRECOVER
+}
+
+/// See: https://ethereum.github.io/yellowpaper/paper.pdf
+#[allow(dead_code)]
+fn sha256(_input: Vec<u8>) -> H256 {
+    H256::zero() // TODO: implement SHA-256
+}
+
+/// See: https://ethereum.github.io/yellowpaper/paper.pdf
+#[allow(dead_code)]
+fn ripemd160(_input: Vec<u8>) -> H160 {
+    H160::zero() // TODO: implement RIPEMD-160
+}
+
+/// See: https://ethereum.github.io/yellowpaper/paper.pdf
+#[allow(dead_code)]
+fn identity(input: Vec<u8>) -> Vec<u8> {
+    input
+}
+
+/// See: https://eips.ethereum.org/EIPS/eip-198
+#[allow(dead_code)]
+fn modexp(_base: U256, _exponent: U256, _modulus: U256) -> U256 {
+    U256::zero() // TODO: implement MODEXP
+}
+
+/// See: https://eips.ethereum.org/EIPS/eip-196
+#[allow(dead_code)]
+fn alt_bn128_add(_ax: U256, _ay: U256, _bx: U256, _by: U256) {
+    // TODO: implement alt_bn128_add
+}
+
+/// See: https://eips.ethereum.org/EIPS/eip-196
+#[allow(dead_code)]
+fn alt_bn128_mul(_x: U256, _y: U256, _scalar: U256) {
+    // TODO: implement alt_bn128_mul
+}
+
+/// See: https://eips.ethereum.org/EIPS/eip-197
+#[allow(dead_code)]
+fn alt_bn128_pair(_input: Vec<u8>) -> U256 {
+    U256::zero() // TODO: implement alt_bn128_pairing
+}
+
+/// See: https://eips.ethereum.org/EIPS/eip-152
+#[allow(dead_code)]
+fn blake2f(_rounds: u32, _h: [U256; 2], _m: [U256; 4], _t: [u64; 2], _f: bool) -> [U256; 2] {
+    [U256::zero(), U256::zero()] // TODO: implement BLAKE2f
+}
+
 #[cfg(test)]
 mod tests {}
