@@ -19,8 +19,13 @@ debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
 	$(CARGO) build --target wasm32-unknown-unknown --no-default-features --features=contract -Z avoid-dev-deps
 
+.PHONY: all release debug
+
 deploy: release.wasm
 	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),evm.test.near) --wasm-file=$<
+
+check:
+	$(CARGO) test
 
 format:
 	$(CARGO) fmt
@@ -28,7 +33,7 @@ format:
 clean:
 	@rm -Rf release.wasm target *~
 
-.PHONY: format clean
+.PHONY: deploy check format clean
 
 .SECONDARY:
 .SUFFIXES:

@@ -23,6 +23,14 @@ make release  # produces release.wasm (300+ KiB)
 make debug    # produces debug.wasm (1+ MiB), which includes symbols
 ```
 
+### Running unit tests
+
+```sh
+make check
+```
+
+## Deployment
+
 ### Deploying the contract
 
 ```sh
@@ -32,12 +40,16 @@ near create-account evm.test.near --master-account=test.near --initial-balance 1
 near deploy --account-id=evm.test.near --wasm-file=release.wasm
 ```
 
+## Usage
+
 ### Calling the contract
 
 ```sh
 near call evm.test.near get_version --account-id evm.test.near
 near call evm.test.near get_chain_id --account-id evm.test.near
 ```
+
+## Debugging
 
 ### Inspecting the contract state
 
