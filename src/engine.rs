@@ -1,6 +1,6 @@
 use crate::parameters::{FunctionCallArgs, ViewCallArgs};
 use crate::precompiles;
-use crate::prelude::{Vec, H160, H256, U256};
+use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
 use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr};
@@ -11,81 +11,81 @@ use evm::{Config, CreateScheme, ExitReason};
 
 pub struct Engine {
     chain_id: U256,
-    origin: H160,
+    origin: Address,
 }
 
 const CONFIG: &'static Config = &Config::istanbul(); // TODO: upgrade to Berlin HF
 
 impl Engine {
-    pub fn new(chain_id: U256, origin: H160) -> Self {
+    pub fn new(chain_id: U256, origin: Address) -> Self {
         Self { chain_id, origin }
     }
 
-    pub fn set_code(address: &H160, code: &[u8]) {
+    pub fn set_code(address: &Address, code: &[u8]) {
         sdk::write_storage(&address_to_key(KeyPrefix::Code, address), code);
     }
 
-    pub fn remove_code(address: &H160) {
+    pub fn remove_code(address: &Address) {
         sdk::remove_storage(&address_to_key(KeyPrefix::Code, address))
     }
 
-    pub fn get_code(address: &H160) -> Vec<u8> {
+    pub fn get_code(address: &Address) -> Vec<u8> {
         sdk::read_storage(&address_to_key(KeyPrefix::Code, address)).unwrap_or_else(Vec::new)
     }
 
-    pub fn get_code_size(address: &H160) -> usize {
+    pub fn get_code_size(address: &Address) -> usize {
         Engine::get_code(&address).len()
     }
 
-    pub fn set_nonce(address: &H160, nonce: &U256) {
+    pub fn set_nonce(address: &Address, nonce: &U256) {
         sdk::write_storage(
             &address_to_key(KeyPrefix::Nonce, address),
             &u256_to_arr(nonce),
         );
     }
 
-    pub fn remove_nonce(address: &H160) {
+    pub fn remove_nonce(address: &Address) {
         sdk::remove_storage(&address_to_key(KeyPrefix::Nonce, address))
     }
 
-    pub fn get_nonce(address: &H160) -> U256 {
+    pub fn get_nonce(address: &Address) -> U256 {
         sdk::read_storage(&address_to_key(KeyPrefix::Nonce, address))
             .map(|value| U256::from_big_endian(&value))
             .unwrap_or_else(U256::zero)
     }
 
-    pub fn set_balance(address: &H160, balance: &U256) {
+    pub fn set_balance(address: &Address, balance: &U256) {
         sdk::write_storage(
             &address_to_key(KeyPrefix::Balance, address),
             &u256_to_arr(balance),
         );
     }
 
-    pub fn remove_balance(address: &H160) {
+    pub fn remove_balance(address: &Address) {
         sdk::remove_storage(&address_to_key(KeyPrefix::Balance, address))
     }
 
-    pub fn get_balance(address: &H160) -> U256 {
+    pub fn get_balance(address: &Address) -> U256 {
         sdk::read_storage(&address_to_key(KeyPrefix::Balance, address))
             .map(|value| U256::from_big_endian(&value))
             .unwrap_or_else(U256::zero)
     }
 
-    pub fn remove_storage(address: &H160, key: &H256) {
+    pub fn remove_storage(address: &Address, key: &H256) {
         sdk::remove_storage(&storage_to_key(address, key));
     }
 
-    pub fn set_storage(address: &H160, key: &H256, value: &H256) {
+    pub fn set_storage(address: &Address, key: &H256, value: &H256) {
         sdk::write_storage(&storage_to_key(address, key), &value.0);
     }
 
-    pub fn get_storage(address: &H160, key: &H256) -> H256 {
+    pub fn get_storage(address: &Address, key: &H256) -> H256 {
         sdk::read_storage(&storage_to_key(address, key))
             .map(|value| H256::from_slice(&value))
             .unwrap_or_else(H256::default)
     }
 
-    pub fn is_account_empty(address: &H160) -> bool {
+    pub fn is_account_empty(address: &Address) -> bool {
         let balance = Self::get_balance(address);
         let nonce = Self::get_nonce(address);
         let code_len = Self::get_code_size(address);
@@ -93,12 +93,12 @@ impl Engine {
     }
 
     /// Removes all storage for the given address.
-    pub fn remove_all_storage(_address: &H160) {
+    pub fn remove_all_storage(_address: &Address) {
         // FIXME: there is presently no way to prefix delete trie state.
     }
 
     /// Removes an account.
-    pub fn remove_account(address: &H160) {
+    pub fn remove_account(address: &Address) {
         Self::remove_nonce(address);
         Self::remove_balance(address);
         Self::remove_code(address);
@@ -106,13 +106,13 @@ impl Engine {
     }
 
     /// Removes an account if it is empty.
-    pub fn remove_account_if_empty(address: &H160) {
+    pub fn remove_account_if_empty(address: &Address) {
         if Self::is_account_empty(address) {
             Self::remove_account(address);
         }
     }
 
-    pub fn deploy_code(&mut self, input: &[u8]) -> (ExitReason, H160) {
+    pub fn deploy_code(&mut self, input: &[u8]) -> (ExitReason, Address) {
         let origin = self.origin();
         let value = U256::zero();
 
@@ -135,7 +135,7 @@ impl Engine {
         let mut executor = self.make_executor();
         let (reason, return_value) = executor.transact_call(
             origin,
-            H160(args.contract),
+            Address(args.contract),
             value,
             args.input,
             u64::max_value(),
@@ -150,8 +150,8 @@ impl Engine {
 
         let mut executor = self.make_executor();
         executor.transact_call(
-            H160::from_slice(&args.sender),
-            H160::from_slice(&args.address),
+            Address::from_slice(&args.sender),
+            Address::from_slice(&args.address),
             value,
             args.input,
             u64::max_value(),
@@ -170,7 +170,7 @@ impl evm::backend::Backend for Engine {
         U256::zero()
     }
 
-    fn origin(&self) -> H160 {
+    fn origin(&self) -> Address {
         self.origin
     }
 
@@ -182,8 +182,8 @@ impl evm::backend::Backend for Engine {
         U256::from(sdk::block_index())
     }
 
-    fn block_coinbase(&self) -> H160 {
-        H160::zero()
+    fn block_coinbase(&self) -> Address {
+        Address::zero()
     }
 
     fn block_timestamp(&self) -> U256 {
@@ -202,26 +202,26 @@ impl evm::backend::Backend for Engine {
         self.chain_id
     }
 
-    fn exists(&self, address: H160) -> bool {
+    fn exists(&self, address: Address) -> bool {
         !Engine::is_account_empty(&address)
     }
 
-    fn basic(&self, address: H160) -> Basic {
+    fn basic(&self, address: Address) -> Basic {
         Basic {
             nonce: Engine::get_nonce(&address),
             balance: Engine::get_balance(&address),
         }
     }
 
-    fn code(&self, address: H160) -> Vec<u8> {
+    fn code(&self, address: Address) -> Vec<u8> {
         Engine::get_code(&address)
     }
 
-    fn storage(&self, address: H160, index: H256) -> H256 {
+    fn storage(&self, address: Address, index: H256) -> H256 {
         Engine::get_storage(&address, &index)
     }
 
-    fn original_storage(&self, _address: H160, _index: H256) -> Option<H256> {
+    fn original_storage(&self, _address: Address, _index: H256) -> Option<H256> {
         None
     }
 }

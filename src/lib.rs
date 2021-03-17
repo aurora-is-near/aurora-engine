@@ -22,7 +22,7 @@ mod sdk;
 mod contract {
     use crate::engine::Engine;
     use crate::parameters::{BeginBlockArgs, BeginChainArgs, GetStorageAtArgs, ViewCallArgs};
-    use crate::prelude::{H160, H256, U256};
+    use crate::prelude::{Address, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
     use borsh::BorshDeserialize;
@@ -104,7 +104,7 @@ mod contract {
     pub extern "C" fn view() {
         let input = sdk::read_input();
         let args = ViewCallArgs::try_from_slice(&input).unwrap();
-        let mut engine = Engine::new(*CHAIN_ID, H160::from_slice(&args.sender));
+        let mut engine = Engine::new(*CHAIN_ID, Address::from_slice(&args.sender));
         let (reason, return_value) = Engine::view(&mut engine, args);
         process_exit_reason(reason, &return_value)
     }
@@ -112,21 +112,21 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_code() {
         let address = sdk::read_input_arr20();
-        let code = Engine::get_code(&H160(address));
+        let code = Engine::get_code(&Address(address));
         sdk::return_output(&code)
     }
 
     #[no_mangle]
     pub extern "C" fn get_balance() {
         let address = sdk::read_input_arr20();
-        let balance = Engine::get_balance(&H160(address));
+        let balance = Engine::get_balance(&Address(address));
         sdk::return_output(&u256_to_arr(&balance))
     }
 
     #[no_mangle]
     pub extern "C" fn get_nonce() {
         let address = sdk::read_input_arr20();
-        let nonce = Engine::get_nonce(&H160(address));
+        let nonce = Engine::get_nonce(&Address(address));
         sdk::return_output(&u256_to_arr(&nonce))
     }
 
@@ -134,7 +134,7 @@ mod contract {
     pub extern "C" fn get_storage_at() {
         let input = sdk::read_input();
         let args = GetStorageAtArgs::try_from_slice(&input).unwrap();
-        let value = Engine::get_storage(&H160(args.address), &H256(args.key));
+        let value = Engine::get_storage(&Address(args.address), &H256(args.key));
         sdk::return_output(&value.0)
     }
 
@@ -153,7 +153,7 @@ mod contract {
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 
-    fn predecessor_address() -> H160 {
+    fn predecessor_address() -> Address {
         near_account_to_evm_address(&sdk::predecessor_account_id())
     }
 

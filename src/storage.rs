@@ -1,4 +1,4 @@
-use crate::prelude::{H160, H256};
+use crate::prelude::{Address, H256};
 
 #[allow(dead_code)]
 pub enum KeyPrefix {
@@ -10,7 +10,7 @@ pub enum KeyPrefix {
 }
 
 #[allow(dead_code)]
-pub fn address_to_key(prefix: KeyPrefix, address: &H160) -> [u8; 21] {
+pub fn address_to_key(prefix: KeyPrefix, address: &Address) -> [u8; 21] {
     let mut result = [0u8; 21];
     result[0] = prefix as u8;
     result[1..].copy_from_slice(&address.0);
@@ -18,7 +18,7 @@ pub fn address_to_key(prefix: KeyPrefix, address: &H160) -> [u8; 21] {
 }
 
 #[allow(dead_code)]
-pub fn storage_to_key(address: &H160, key: &H256) -> [u8; 53] {
+pub fn storage_to_key(address: &Address, key: &H256) -> [u8; 53] {
     let mut result = [0u8; 53];
     result[0] = KeyPrefix::Storage as u8;
     result[1..21].copy_from_slice(&address.0);

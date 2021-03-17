@@ -1,4 +1,4 @@
-use crate::prelude::{vec, H160, H256, String, U256, Vec};
+use crate::prelude::{vec, Address, String, Vec, H256, U256};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
@@ -53,8 +53,8 @@ pub fn keccak(data: &[u8]) -> H256 {
 }
 
 #[allow(dead_code)]
-pub fn near_account_to_evm_address(addr: &[u8]) -> H160 {
-    H160::from_slice(&keccak(addr)[12..])
+pub fn near_account_to_evm_address(addr: &[u8]) -> Address {
+    Address::from_slice(&keccak(addr)[12..])
 }
 
 #[cfg(test)]
