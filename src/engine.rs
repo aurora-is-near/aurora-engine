@@ -1,19 +1,13 @@
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
-#[cfg(feature = "std")]
-use std::vec::Vec;
-
+use crate::parameters::{FunctionCallArgs, ViewCallArgs};
 use crate::precompiles;
+use crate::prelude::{Vec, H160, H256, U256};
 use crate::sdk;
-use crate::types::{
-    address_to_key, bytes_to_hex, log_to_bytes, storage_to_key, u256_to_arr, FunctionCallArgs,
-    KeyPrefix, ViewCallArgs,
-};
+use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
+use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr};
 use borsh::BorshDeserialize;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::{Config, CreateScheme, ExitReason};
-use primitive_types::{H160, H256, U256};
 
 pub struct Engine {
     chain_id: U256,
@@ -279,3 +273,6 @@ impl ApplyBackend for Engine {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {}

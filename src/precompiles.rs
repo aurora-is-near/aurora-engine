@@ -1,10 +1,5 @@
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
-#[cfg(feature = "std")]
-use std::vec::Vec;
-
+use crate::prelude::{H160, H256, U256, Vec};
 use evm::{Context, ExitError, ExitSucceed};
-use primitive_types::H160;
 
 type PrecompileResult = Result<(ExitSucceed, Vec<u8>, u64), ExitError>;
 
@@ -27,3 +22,6 @@ pub fn istanbul_precompiles(
 ) -> Option<PrecompileResult> {
     None // TODO: implement Istanbul precompiles
 }
+
+#[cfg(test)]
+mod tests {}

@@ -7,8 +7,11 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+mod parameters;
 mod precompiles;
-pub mod types;
+mod prelude;
+mod storage;
+mod types;
 
 #[cfg(feature = "contract")]
 mod engine;
@@ -18,15 +21,13 @@ mod sdk;
 #[cfg(feature = "contract")]
 mod contract {
     use crate::engine::Engine;
+    use crate::parameters::{BeginBlockArgs, BeginChainArgs, GetStorageAtArgs, ViewCallArgs};
+    use crate::prelude::{H160, H256, U256};
     use crate::sdk;
-    use crate::types::{
-        near_account_to_evm_address, u256_to_arr, BeginBlockArgs, BeginChainArgs, GetStorageAtArgs,
-        ViewCallArgs,
-    };
+    use crate::types::{near_account_to_evm_address, u256_to_arr};
     use borsh::BorshDeserialize;
     use evm::ExitReason;
     use lazy_static::lazy_static;
-    use primitive_types::{H160, H256, U256};
 
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
