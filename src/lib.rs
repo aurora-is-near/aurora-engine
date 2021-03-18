@@ -11,6 +11,7 @@ mod parameters;
 mod precompiles;
 mod prelude;
 mod storage;
+mod transaction;
 mod types;
 
 #[cfg(feature = "contract")]
