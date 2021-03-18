@@ -4,10 +4,9 @@ use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
 use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr};
-use borsh::BorshDeserialize;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm::{Config, CreateScheme, ExitReason};
+use evm::{Config, CreateScheme, ExitFatal, ExitReason};
 
 pub struct Engine {
     chain_id: U256,
@@ -112,48 +111,75 @@ impl Engine {
         }
     }
 
-    pub fn deploy_code(&mut self, input: &[u8]) -> (ExitReason, Address) {
+    pub fn transfer(&mut self, _sender: Address, _receiver: Address, _value: U256) -> ExitReason {
+        ExitReason::Fatal(ExitFatal::NotSupported) // TODO: implement balance transfers
+    }
+
+    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> (ExitReason, Address) {
         let origin = self.origin();
         let value = U256::zero();
+        self.deploy_code(origin, value, input)
+    }
 
+    pub fn deploy_code(
+        &mut self,
+        origin: Address,
+        value: U256,
+        input: &[u8],
+    ) -> (ExitReason, Address) {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
-        let (reason, return_value) = (
+        let (status, result) = (
             executor.transact_create(origin, value, Vec::from(input), u64::max_value()),
             address,
         );
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
-        (reason, return_value)
+        (status, result)
     }
 
-    pub fn call(&mut self, input: &[u8]) -> (ExitReason, Vec<u8>) {
-        let args = FunctionCallArgs::try_from_slice(&input).unwrap();
+    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> (ExitReason, Vec<u8>) {
         let origin = self.origin();
+        let contract = Address(args.contract);
         let value = U256::zero();
+        self.call(origin, contract, value, args.input)
+    }
 
+    pub fn call(
+        &mut self,
+        origin: Address,
+        contract: Address,
+        value: U256,
+        input: Vec<u8>,
+    ) -> (ExitReason, Vec<u8>) {
         let mut executor = self.make_executor();
-        let (reason, return_value) = executor.transact_call(
-            origin,
-            Address(args.contract),
-            value,
-            args.input,
-            u64::max_value(),
-        );
+        let (status, result) =
+            executor.transact_call(origin, contract, value, input, u64::max_value());
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
-        (reason, return_value)
+        (status, result)
     }
 
-    pub fn view(&self, args: ViewCallArgs) -> (ExitReason, Vec<u8>) {
+    pub fn view_with_args(&self, args: ViewCallArgs) -> (ExitReason, Vec<u8>) {
+        let origin = Address::from_slice(&args.sender);
+        let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
+        self.view(origin, contract, value, args.input)
+    }
 
+    pub fn view(
+        &self,
+        origin: Address,
+        contract: Address,
+        value: U256,
+        input: Vec<u8>,
+    ) -> (ExitReason, Vec<u8>) {
         let mut executor = self.make_executor();
         executor.transact_call(
-            Address::from_slice(&args.sender),
-            Address::from_slice(&args.address),
+            origin,
+            contract,
             value,
-            args.input,
+            input,
             u64::max_value(),
         )
     }

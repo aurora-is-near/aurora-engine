@@ -22,8 +22,10 @@ mod sdk;
 #[cfg(feature = "contract")]
 mod contract {
     use crate::engine::Engine;
-    use crate::parameters::{BeginBlockArgs, BeginChainArgs, GetStorageAtArgs, ViewCallArgs};
-    use crate::prelude::{Address, H256, U256};
+    use crate::parameters::{
+        BeginBlockArgs, BeginChainArgs, FunctionCallArgs, GetStorageAtArgs, ViewCallArgs,
+    };
+    use crate::prelude::{vec, Address, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
     use borsh::BorshDeserialize;
@@ -75,24 +77,67 @@ mod contract {
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
         let mut engine = Engine::new(*CHAIN_ID, predecessor_address());
-        let (reason, return_value) = Engine::deploy_code(&mut engine, &input);
+        let (status, result) = Engine::deploy_code_with_input(&mut engine, &input);
         // TODO: charge for storage
-        process_exit_reason(reason, &return_value.0)
+        process_exit_reason(status, &result.0)
     }
 
     #[no_mangle]
     pub extern "C" fn call() {
         let input = sdk::read_input();
+        let args = FunctionCallArgs::try_from_slice(&input).unwrap();
         let mut engine = Engine::new(*CHAIN_ID, predecessor_address());
-        let (reason, return_value) = Engine::call(&mut engine, &input);
+        let (status, result) = Engine::call_with_args(&mut engine, args);
         // TODO: charge for storage
-        process_exit_reason(reason, &return_value)
+        process_exit_reason(status, &result)
     }
 
     #[no_mangle]
     pub extern "C" fn raw_call() {
-        let _input = sdk::read_input();
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/3
+        use crate::transaction::EthSignedTransaction;
+        use rlp::{Decodable, Rlp};
+
+        let input = sdk::read_input();
+        let signed_transaction = EthSignedTransaction::decode(&Rlp::new(&input))
+            .or_else(|_| Err(sdk::panic_utf8(b"invalid transaction")))
+            .unwrap();
+
+        // Validate the chain ID, if provided inside the signature:
+        if let Some(chain_id) = signed_transaction.chain_id() {
+            if U256::from(chain_id) != *CHAIN_ID {
+                return sdk::panic_utf8(b"invalid chain ID");
+            }
+        }
+
+        // Retrieve the signer of the transaction:
+        let sender = match signed_transaction.sender() {
+            Some(sender) => sender,
+            None => return sdk::panic_utf8(b"invalid ECDSA signature"),
+        };
+
+        // Figure out what kind of a transaction this is, and execute it:
+        let mut engine = Engine::new(*CHAIN_ID, predecessor_address());
+        let value = signed_transaction.transaction.value;
+        let data = signed_transaction.transaction.data;
+        if let Some(receiver) = signed_transaction.transaction.to {
+            let (status, result) = if data.is_empty() {
+                // Execute a balance transfer:
+                (
+                    Engine::transfer(&mut engine, sender, receiver, value),
+                    vec![],
+                )
+            } else {
+                // Execute a contract call:
+                Engine::call(&mut engine, sender, receiver, value, data)
+                // TODO: charge for storage
+            };
+            process_exit_reason(status, &result)
+        } else {
+            // Execute a contract deployment:
+            let (status, result) = Engine::deploy_code(&mut engine, sender, value, &data);
+            // TODO: charge for storage
+            process_exit_reason(status, &result.0)
+        }
     }
 
     #[no_mangle]
@@ -106,8 +151,8 @@ mod contract {
         let input = sdk::read_input();
         let args = ViewCallArgs::try_from_slice(&input).unwrap();
         let mut engine = Engine::new(*CHAIN_ID, Address::from_slice(&args.sender));
-        let (reason, return_value) = Engine::view(&mut engine, args);
-        process_exit_reason(reason, &return_value)
+        let (status, result) = Engine::view_with_args(&mut engine, args);
+        process_exit_reason(status, &result)
     }
 
     #[no_mangle]
@@ -158,10 +203,10 @@ mod contract {
         near_account_to_evm_address(&sdk::predecessor_account_id())
     }
 
-    fn process_exit_reason(reason: ExitReason, return_value: &[u8]) {
-        match reason {
-            ExitReason::Succeed(_) => sdk::return_output(return_value),
-            ExitReason::Revert(_) => sdk::panic_hex(&return_value),
+    fn process_exit_reason(status: ExitReason, result: &[u8]) {
+        match status {
+            ExitReason::Succeed(_) => sdk::return_output(result),
+            ExitReason::Revert(_) => sdk::panic_hex(&result),
             ExitReason::Error(_error) => sdk::panic_utf8(b"error"), // TODO
             ExitReason::Fatal(_error) => sdk::panic_utf8(b"fatal error"), // TODO
         }
