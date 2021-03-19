@@ -175,13 +175,7 @@ impl Engine {
         input: Vec<u8>,
     ) -> (ExitReason, Vec<u8>) {
         let mut executor = self.make_executor();
-        executor.transact_call(
-            origin,
-            contract,
-            value,
-            input,
-            u64::max_value(),
-        )
+        executor.transact_call(origin, contract, value, input, u64::max_value())
     }
 
     fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {

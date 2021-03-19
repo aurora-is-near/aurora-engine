@@ -15,12 +15,32 @@ pub fn no_precompiles(
 
 #[allow(dead_code)]
 pub fn istanbul_precompiles(
-    _address: Address,
+    address: Address,
     _input: &[u8],
     _target_gas: Option<u64>,
     _context: &Context,
 ) -> Option<PrecompileResult> {
-    None // TODO: implement Istanbul precompiles
+    if address == Address::from_low_u64_be(1) {
+        None // TODO: implement ecrecover()
+    } else if address == Address::from_low_u64_be(2) {
+        None // TODO: implement sha256()
+    } else if address == Address::from_low_u64_be(3) {
+        None // TODO: implement ripemd160()
+    } else if address == Address::from_low_u64_be(4) {
+        None // TODO: implement identity()
+    } else if address == Address::from_low_u64_be(5) {
+        None // TODO: implement modexp()
+    } else if address == Address::from_low_u64_be(6) {
+        None // TODO: implement alt_bn128_add()
+    } else if address == Address::from_low_u64_be(7) {
+        None // TODO: implement alt_bn128_mul()
+    } else if address == Address::from_low_u64_be(8) {
+        None // TODO: implement alt_bn128_pair()
+    } else if address == Address::from_low_u64_be(9) {
+        None // TODO: implement blake2f()
+    } else {
+        None // not supported
+    }
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
