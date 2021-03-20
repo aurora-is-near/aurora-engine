@@ -21,23 +21,31 @@ pub fn istanbul_precompiles(
     _context: &Context,
 ) -> Option<PrecompileResult> {
     if address == Address::from_low_u64_be(1) {
-        None // TODO: implement ecrecover()
+        todo!() // TODO: implement ecrecover()
     } else if address == Address::from_low_u64_be(2) {
-        Some(Ok((ExitSucceed::Returned, sha256(input).as_bytes().to_vec(), 0)))
+        Some(Ok((
+            ExitSucceed::Returned,
+            sha256(input).as_bytes().to_vec(),
+            0,
+        )))
     } else if address == Address::from_low_u64_be(3) {
-        Some(Ok((ExitSucceed::Returned, ripemd160(input).as_bytes().to_vec(), 0)))
+        Some(Ok((
+            ExitSucceed::Returned,
+            ripemd160(input).as_bytes().to_vec(),
+            0,
+        )))
     } else if address == Address::from_low_u64_be(4) {
-        None // TODO: implement identity()
+        Some(Ok((ExitSucceed::Returned, identity(input).to_vec(), 0)))
     } else if address == Address::from_low_u64_be(5) {
-        None // TODO: implement modexp()
+        todo!() // TODO: implement modexp()
     } else if address == Address::from_low_u64_be(6) {
-        None // TODO: implement alt_bn128_add()
+        todo!() // TODO: implement alt_bn128_add()
     } else if address == Address::from_low_u64_be(7) {
-        None // TODO: implement alt_bn128_mul()
+        todo!() // TODO: implement alt_bn128_mul()
     } else if address == Address::from_low_u64_be(8) {
-        None // TODO: implement alt_bn128_pair()
+        todo!() // TODO: implement alt_bn128_pair()
     } else if address == Address::from_low_u64_be(9) {
-        None // TODO: implement blake2f()
+        todo!() // TODO: implement blake2f()
     } else {
         None // not supported
     }
@@ -53,14 +61,12 @@ fn ecrecover(_hash: H256, _v: u8, _r: H256, _s: H256) -> Address {
 /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
 /// See: https://etherscan.io/address/0x0000000000000000000000000000000000000002
 #[cfg(not(feature = "contract"))]
-#[allow(dead_code)]
 fn sha256(input: &[u8]) -> H256 {
     use sha2::Digest;
     let hash = sha2::Sha256::digest(input);
     H256::from_slice(&hash)
 }
 #[cfg(feature = "contract")]
-#[allow(dead_code)]
 fn sha256(input: &[u8]) -> H256 {
     use crate::sdk;
     sdk::sha256(input)
@@ -69,7 +75,6 @@ fn sha256(input: &[u8]) -> H256 {
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
 /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
 /// See: https://etherscan.io/address/0x0000000000000000000000000000000000000003
-#[allow(dead_code)]
 fn ripemd160(input: &[u8]) -> H160 {
     use ripemd160::Digest;
     let hash = ripemd160::Ripemd160::digest(input);
@@ -77,8 +82,7 @@ fn ripemd160(input: &[u8]) -> H160 {
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
-#[allow(dead_code)]
-fn identity(input: Vec<u8>) -> Vec<u8> {
+fn identity(input: &[u8]) -> &[u8] {
     input
 }
 
@@ -120,7 +124,10 @@ mod tests {
     fn test_sha256() {
         assert_eq!(
             sha256(b""),
-            H256::from_slice(&hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855").unwrap())
+            H256::from_slice(
+                &hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+                    .unwrap()
+            )
         );
     }
 
@@ -130,5 +137,10 @@ mod tests {
             ripemd160(b""),
             H160::from_slice(&hex::decode("9c1185a5c5e9fc54612808977ee8f548b2258d31").unwrap())
         );
+    }
+
+    #[test]
+    fn test_identity() {
+        assert_eq!(identity(b""), b"")
     }
 }
