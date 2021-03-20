@@ -42,7 +42,9 @@ evm = { git = "https://github.com/aurora-is-near/sputnikvm", rev = "85631ce", de
 lazy_static = { version = "1.4.0", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
 primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }
+ripemd160 = { version = "0.9.1", default-features = false }
 rlp = { version = "0.5.0", default-features = false }
+sha2 = { version = "0.9.3", default-features = false, optional = true }
 sha3 = { version = "0.9.1", default-features = false }
 wee_alloc = { version = "0.4.5", default-features = false }
 
@@ -50,6 +52,6 @@ wee_alloc = { version = "0.4.5", default-features = false }
 hex = { version = "0.4.3", default-features = false }
 
 [features]
-default = ["std"]
+default = ["sha2", "std"]
 std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std"]
 contract = ["lazy_static/spin_no_std"]

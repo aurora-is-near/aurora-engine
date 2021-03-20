@@ -33,7 +33,7 @@ mod exports {
         // # Math API #
         // ############
         fn random_seed(register_id: u64);
-        fn sha256(value_len: u64, value_ptr: u64, register_id: u64);
+        pub(crate) fn sha256(value_len: u64, value_ptr: u64, register_id: u64);
         pub(crate) fn keccak256(value_len: u64, value_ptr: u64, register_id: u64);
         // #####################
         // # Miscellaneous API #
@@ -249,11 +249,22 @@ pub fn predecessor_account_id() -> Vec<u8> {
     }
 }
 
-/// Calls environment keccak256 on given data.
+/// Calls environment sha256 on given input.
 #[allow(dead_code)]
-pub fn keccak(data: &[u8]) -> H256 {
+pub fn sha256(input: &[u8]) -> H256 {
     unsafe {
-        exports::keccak256(data.len() as u64, data.as_ptr() as u64, 1);
+        exports::sha256(input.len() as u64, input.as_ptr() as u64, 1);
+        let bytes = H256::zero();
+        exports::read_register(1, bytes.0.as_ptr() as *const u64 as u64);
+        bytes
+    }
+}
+
+/// Calls environment keccak256 on given input.
+#[allow(dead_code)]
+pub fn keccak(input: &[u8]) -> H256 {
+    unsafe {
+        exports::keccak256(input.len() as u64, input.as_ptr() as u64, 1);
         let bytes = H256::zero();
         exports::read_register(1, bytes.0.as_ptr() as *const u64 as u64);
         bytes

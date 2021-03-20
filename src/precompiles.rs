@@ -16,16 +16,16 @@ pub fn no_precompiles(
 #[allow(dead_code)]
 pub fn istanbul_precompiles(
     address: Address,
-    _input: &[u8],
+    input: &[u8],
     _target_gas: Option<u64>,
     _context: &Context,
 ) -> Option<PrecompileResult> {
     if address == Address::from_low_u64_be(1) {
         None // TODO: implement ecrecover()
     } else if address == Address::from_low_u64_be(2) {
-        None // TODO: implement sha256()
+        Some(Ok((ExitSucceed::Returned, sha256(input).as_bytes().to_vec(), 0)))
     } else if address == Address::from_low_u64_be(3) {
-        None // TODO: implement ripemd160()
+        Some(Ok((ExitSucceed::Returned, ripemd160(input).as_bytes().to_vec(), 0)))
     } else if address == Address::from_low_u64_be(4) {
         None // TODO: implement identity()
     } else if address == Address::from_low_u64_be(5) {
@@ -50,15 +50,30 @@ fn ecrecover(_hash: H256, _v: u8, _r: H256, _s: H256) -> Address {
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
+/// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
+/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000002
+#[cfg(not(feature = "contract"))]
 #[allow(dead_code)]
-fn sha256(_input: Vec<u8>) -> H256 {
-    H256::zero() // TODO: implement SHA-256
+fn sha256(input: &[u8]) -> H256 {
+    use sha2::Digest;
+    let hash = sha2::Sha256::digest(input);
+    H256::from_slice(&hash)
+}
+#[cfg(feature = "contract")]
+#[allow(dead_code)]
+fn sha256(input: &[u8]) -> H256 {
+    use crate::sdk;
+    sdk::sha256(input)
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
+/// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
+/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000003
 #[allow(dead_code)]
-fn ripemd160(_input: Vec<u8>) -> H160 {
-    H160::zero() // TODO: implement RIPEMD-160
+fn ripemd160(input: &[u8]) -> H160 {
+    use ripemd160::Digest;
+    let hash = ripemd160::Ripemd160::digest(input);
+    H160::from_slice(&hash)
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
@@ -98,4 +113,22 @@ fn blake2f(_rounds: u32, _h: [U256; 2], _m: [U256; 4], _t: [u64; 2], _f: bool) -
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sha256() {
+        assert_eq!(
+            sha256(b""),
+            H256::from_slice(&hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_ripemd160() {
+        assert_eq!(
+            ripemd160(b""),
+            H160::from_slice(&hex::decode("9c1185a5c5e9fc54612808977ee8f548b2258d31").unwrap())
+        );
+    }
+}
