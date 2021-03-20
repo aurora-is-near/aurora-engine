@@ -1,10 +1,24 @@
-use crate::prelude::Vec;
-
 use borsh::{BorshDeserialize, BorshSerialize};
+
+use crate::prelude::Vec;
+use crate::types::AccountId;
 
 pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32];
 pub type RawH256 = [u8; 32];
+
+/// Borsh-encoded parameters for the `new` function.
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct NewCallArgs {
+    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    pub chain_id: RawU256,
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
+    /// Account of the bridge prover.
+    /// Use empty to not use base token as bridged asset.
+    pub bridge_prover_id: AccountId,
+}
 
 /// Borsh-encoded parameters for the `call` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -31,9 +45,7 @@ pub struct GetStorageAtArgs {
 
 /// Borsh-encoded parameters for the `begin_chain` function.
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct BeginChainArgs {
-    pub chain_id: RawU256,
-}
+pub struct BeginChainArgs {}
 
 /// Borsh-encoded parameters for the `begin_block` function.
 #[derive(BorshSerialize, BorshDeserialize)]

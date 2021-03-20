@@ -21,29 +21,20 @@ mod sdk;
 
 #[cfg(feature = "contract")]
 mod contract {
+    use borsh::BorshDeserialize;
+    use evm::ExitReason;
+
     use crate::engine::Engine;
     use crate::parameters::{
-        BeginBlockArgs, BeginChainArgs, FunctionCallArgs, GetStorageAtArgs, ViewCallArgs,
+        BeginBlockArgs, BeginChainArgs, FunctionCallArgs, GetStorageAtArgs, NewCallArgs,
+        ViewCallArgs,
     };
     use crate::prelude::{vec, Address, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
-    use borsh::BorshDeserialize;
-    use evm::ExitReason;
-    use lazy_static::lazy_static;
 
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-    lazy_static! {
-        static ref CHAIN_ID: U256 = match sdk::read_storage(b"\0chain_id") {
-            Some(v) => U256::from_big_endian(v.as_slice()),
-            None => match option_env!("NEAR_EVM_CHAIN") {
-                Some(v) => U256::from_dec_str(v).unwrap_or_else(|_| U256::zero()),
-                None => U256::from(1313161556), // NEAR BetaNet
-            },
-        };
-    }
 
     #[panic_handler]
     #[no_mangle]
@@ -57,6 +48,15 @@ mod contract {
         ::core::intrinsics::abort();
     }
 
+    /// Sets the configuration for the Engine.
+    /// Should be called on deployment.
+    #[no_mangle]
+    pub extern "C" fn new() {
+        let args = NewCallArgs::try_from_slice(&sdk::read_input()).expect("ERR_ARG_PARSE");
+        Engine::set_state(args.into());
+    }
+
+    /// Get version of the contract.
     #[no_mangle]
     pub extern "C" fn get_version() {
         let version = match option_env!("NEAR_EVM_VERSION") {
@@ -66,32 +66,53 @@ mod contract {
         sdk::return_output(version)
     }
 
+    /// Get owner account id for this contract.
     #[no_mangle]
-    pub extern "C" fn get_chain_id() {
-        let mut result = [0u8; 32];
-        (*CHAIN_ID).to_big_endian(&mut result);
-        sdk::return_output(&result)
+    pub extern "C" fn get_owner() {
+        let state = Engine::get_state();
+        sdk::return_output(state.owner_id.as_bytes());
     }
 
+    /// Get bridge prover id for this contract.
+    #[no_mangle]
+    pub extern "C" fn get_bridge_provider() {
+        let state = Engine::get_state();
+        sdk::return_output(state.bridge_prover_id.as_bytes());
+    }
+
+    /// Get chain id for this contract.
+    #[no_mangle]
+    pub extern "C" fn get_chain_id() {
+        sdk::return_output(&Engine::get_state().chain_id)
+    }
+
+    ///
+    /// EVM METHODS
+    ///
+
+    /// Deploy code into the EVM.
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
-        let mut engine = Engine::new(*CHAIN_ID, predecessor_address());
+        let mut engine = Engine::new(predecessor_address());
         let (status, result) = Engine::deploy_code_with_input(&mut engine, &input);
         // TODO: charge for storage
         process_exit_reason(status, &result.0)
     }
 
+    /// Call method on the EVM contract.
     #[no_mangle]
     pub extern "C" fn call() {
         let input = sdk::read_input();
         let args = FunctionCallArgs::try_from_slice(&input).unwrap();
-        let mut engine = Engine::new(*CHAIN_ID, predecessor_address());
+        let mut engine = Engine::new(predecessor_address());
         let (status, result) = Engine::call_with_args(&mut engine, args);
         // TODO: charge for storage
         process_exit_reason(status, &result)
     }
 
+    /// Process signed Ethereum transaction.
+    /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
     pub extern "C" fn raw_call() {
         use crate::transaction::EthSignedTransaction;
@@ -99,24 +120,26 @@ mod contract {
 
         let input = sdk::read_input();
         let signed_transaction = EthSignedTransaction::decode(&Rlp::new(&input))
-            .or_else(|_| Err(sdk::panic_utf8(b"invalid transaction")))
+            .or_else(|_| Err(sdk::panic_utf8(b"ERR_INVALID_TX")))
             .unwrap();
+
+        let state = Engine::get_state();
 
         // Validate the chain ID, if provided inside the signature:
         if let Some(chain_id) = signed_transaction.chain_id() {
-            if U256::from(chain_id) != *CHAIN_ID {
-                return sdk::panic_utf8(b"invalid chain ID");
+            if U256::from(chain_id) != U256::from(state.chain_id) {
+                return sdk::panic_utf8(b"ERR_INVALID_CHAIN_ID");
             }
         }
 
         // Retrieve the signer of the transaction:
         let sender = match signed_transaction.sender() {
             Some(sender) => sender,
-            None => return sdk::panic_utf8(b"invalid ECDSA signature"),
+            None => return sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
         };
 
         // Figure out what kind of a transaction this is, and execute it:
-        let mut engine = Engine::new(*CHAIN_ID, predecessor_address());
+        let mut engine = Engine::new_with_state(state, predecessor_address());
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
         if let Some(receiver) = signed_transaction.transaction.to {
@@ -146,11 +169,15 @@ mod contract {
         todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/4
     }
 
+    ///
+    /// Reading data from EVM
+    ///
+
     #[no_mangle]
     pub extern "C" fn view() {
         let input = sdk::read_input();
         let args = ViewCallArgs::try_from_slice(&input).unwrap();
-        let mut engine = Engine::new(*CHAIN_ID, Address::from_slice(&args.sender));
+        let mut engine = Engine::new(Address::from_slice(&args.sender));
         let (status, result) = Engine::view_with_args(&mut engine, args);
         process_exit_reason(status, &result)
     }
@@ -184,11 +211,14 @@ mod contract {
         sdk::return_output(&value.0)
     }
 
+    ///
+    /// Methods for testing.
+    ///
+
     #[no_mangle]
     pub extern "C" fn begin_chain() {
         let input = sdk::read_input();
-        let args = BeginChainArgs::try_from_slice(&input).unwrap();
-        sdk::write_storage(b"\0chain_id", &args.chain_id)
+        let _args = BeginChainArgs::try_from_slice(&input).unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
     }
 
@@ -198,6 +228,10 @@ mod contract {
         let _args = BeginBlockArgs::try_from_slice(&input).unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
+
+    ///
+    /// Utility methods.
+    ///
 
     fn predecessor_address() -> Address {
         near_account_to_evm_address(&sdk::predecessor_account_id())

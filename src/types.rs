@@ -8,6 +8,8 @@ use evm::backend::Log;
 #[cfg(feature = "contract")]
 use crate::sdk;
 
+pub type AccountId = String;
+
 #[allow(dead_code)]
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {
     let mut result = [0u8; 32];

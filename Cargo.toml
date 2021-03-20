@@ -39,7 +39,6 @@ rpath = false
 [dependencies]
 borsh = { version = "0.8.2", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm", rev = "85631ce", default-features = false }
-lazy_static = { version = "1.4.0", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
 primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }
 rlp = { version = "0.5.0", default-features = false }
@@ -52,4 +51,4 @@ hex = { version = "0.4.3", default-features = false }
 [features]
 default = ["std"]
 std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std"]
-contract = ["lazy_static/spin_no_std"]
+contract = []
