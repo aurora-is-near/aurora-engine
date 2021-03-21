@@ -108,7 +108,9 @@ dependencies = [
  "near-sdk",
  "near-sdk-sim",
  "primitive-types 0.9.0",
+ "ripemd160",
  "rlp",
+ "sha2",
  "sha3 0.9.1",
  "wee_alloc",
 ]
@@ -2669,6 +2671,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "ripemd160"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eca4ecc81b7f313189bf73ce724400a07da2a6dac19588b03c8bd76a2dcc251"
+dependencies = [
+ "block-buffer 0.9.0",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
 ]
 
 [[package]]
