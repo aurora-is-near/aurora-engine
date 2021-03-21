@@ -47,6 +47,11 @@ wee_alloc = { version = "0.4.5", default-features = false }
 
 [dev-dependencies]
 hex = { version = "0.4.3", default-features = false }
+ethabi = { git = "https://github.com/rust-ethereum/ethabi", rev = "649d11774b43b33a9c3c4570401886698885e8b7" }
+ethabi-contract = { git = "https://github.com/rust-ethereum/ethabi", rev = "649d11774b43b33a9c3c4570401886698885e8b7" }
+ethabi-derive = { git = "https://github.com/rust-ethereum/ethabi", rev = "649d11774b43b33a9c3c4570401886698885e8b7" }
+near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }
+near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }
 
 [features]
 default = ["std"]

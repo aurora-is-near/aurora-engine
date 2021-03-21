@@ -18,6 +18,8 @@ pub struct NewCallArgs {
     /// Account of the bridge prover.
     /// Use empty to not use base token as bridged asset.
     pub bridge_prover_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
 }
 
 /// Borsh-encoded parameters for the `call` function.

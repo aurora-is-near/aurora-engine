@@ -22,6 +22,8 @@ pub struct EngineState {
     /// Account of the bridge prover.
     /// Use empty to not use base token as bridged asset.
     pub bridge_prover_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -30,6 +32,7 @@ impl From<NewCallArgs> for EngineState {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
             bridge_prover_id: args.bridge_prover_id,
+            upgrade_delay_blocks: args.upgrade_delay_blocks,
         }
     }
 }
