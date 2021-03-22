@@ -20,34 +20,26 @@ pub fn istanbul_precompiles(
     _target_gas: Option<u64>,
     _context: &Context,
 ) -> Option<PrecompileResult> {
-    if address == Address::from_low_u64_be(1) {
-        todo!() // TODO: implement ecrecover()
-    } else if address == Address::from_low_u64_be(2) {
-        Some(Ok((
+    match address.to_low_u64_be() {
+        1 => todo!(), // TODO: implement ecrecover(),
+        2 => Some(Ok((
             ExitSucceed::Returned,
             sha256(input).as_bytes().to_vec(),
             0,
-        )))
-    } else if address == Address::from_low_u64_be(3) {
-        Some(Ok((
+        ))),
+        3 => Some(Ok((
             ExitSucceed::Returned,
             ripemd160(input).as_bytes().to_vec(),
             0,
-        )))
-    } else if address == Address::from_low_u64_be(4) {
-        Some(Ok((ExitSucceed::Returned, identity(input).to_vec(), 0)))
-    } else if address == Address::from_low_u64_be(5) {
-        todo!() // TODO: implement modexp()
-    } else if address == Address::from_low_u64_be(6) {
-        todo!() // TODO: implement alt_bn128_add()
-    } else if address == Address::from_low_u64_be(7) {
-        todo!() // TODO: implement alt_bn128_mul()
-    } else if address == Address::from_low_u64_be(8) {
-        todo!() // TODO: implement alt_bn128_pair()
-    } else if address == Address::from_low_u64_be(9) {
-        todo!() // TODO: implement blake2f()
-    } else {
-        None // not supported
+        ))),
+        4 => Some(Ok((ExitSucceed::Returned, identity(input).to_vec(), 0))),
+        5 => todo!(), // TODO: implement modexp()
+        6 => todo!(), // TODO: implement alt_bn128_add()
+        7 => todo!(), // TODO: implement alt_bn128_mul()
+        8 => todo!(), // TODO: implement alt_bn128_pair()
+        9 => todo!(), // TODO: implement blake2f()
+        // Not supported.
+        _ => None,
     }
 }
 

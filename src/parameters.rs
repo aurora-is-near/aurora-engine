@@ -1,11 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::prelude::Vec;
-use crate::types::AccountId;
-
-pub type RawAddress = [u8; 20];
-pub type RawU256 = [u8; 32];
-pub type RawH256 = [u8; 32];
+use crate::prelude::{String, Vec};
+use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -20,6 +16,20 @@ pub struct NewCallArgs {
     pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
+}
+
+/// Borsh-encoded parameters for the `meta_call` function.
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct MetaCallArgs {
+    pub signature: [u8; 64],
+    pub v: u8,
+    pub nonce: RawU256,
+    pub fee_amount: RawU256,
+    pub fee_address: RawAddress,
+    pub contract_address: RawAddress,
+    pub value: RawU256,
+    pub method_def: String,
+    pub args: Vec<u8>,
 }
 
 /// Borsh-encoded parameters for the `call` function.

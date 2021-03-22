@@ -9,6 +9,30 @@ use evm::backend::Log;
 use crate::sdk;
 
 pub type AccountId = String;
+pub type RawAddress = [u8; 20];
+pub type RawU256 = [u8; 32];
+pub type RawH256 = [u8; 32];
+
+/// Internal args format for meta call.
+pub struct InternalMetaCallArgs {
+    pub sender: Address,
+    pub nonce: U256,
+    pub fee_amount: U256,
+    pub fee_address: Address,
+    pub contract_address: Address,
+    pub value: U256,
+    pub input: Vec<u8>,
+}
+
+/// Internal errors to propagate up and format in the single place.
+pub enum ErrorKind {
+    ArgumentParseError,
+    InvalidMetaTransactionMethodName,
+    InvalidMetaTransactionFunctionArg,
+    InvalidEcRecoverSignature,
+}
+
+pub type Result<T> = core::result::Result<T, ErrorKind>;
 
 #[allow(dead_code)]
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {

@@ -148,7 +148,7 @@ fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
 type RawHash = [u8; 32];
 
 /// Given signature and data, validates that signature is valid for given data and returns ecrecover address.
-fn ecrecover_address(hash: &RawHash, signature: &[u8; 65]) -> Option<Address> {
+pub(crate) fn ecrecover_address(hash: &RawHash, signature: &[u8; 65]) -> Option<Address> {
     use sha3::Digest;
 
     let hash = secp256k1::Message::parse(&H256::from_slice(hash).0);

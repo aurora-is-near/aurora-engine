@@ -305,6 +305,16 @@ pub fn panic_hex(data: &[u8]) -> ! {
     unreachable!()
 }
 
+/// Returns account id of the current account.
+pub fn current_account_id() -> Vec<u8> {
+    unsafe {
+        exports::current_account_id(1);
+        let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
+        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
+        bytes
+    }
+}
+
 /// Deploy code from given key in place of the current key.
 pub fn self_deploy(code_key: &[u8]) {
     unsafe {

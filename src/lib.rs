@@ -7,12 +7,13 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+pub mod meta_parsing;
 pub mod parameters;
 mod precompiles;
-mod prelude;
+pub mod prelude;
 mod storage;
 mod transaction;
-mod types;
+pub mod types;
 
 #[cfg(feature = "contract")]
 mod engine;
@@ -171,7 +172,7 @@ mod contract {
         };
 
         // Figure out what kind of a transaction this is, and execute it:
-        let mut engine = Engine::new_with_state(state, predecessor_address());
+        let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
         if let Some(receiver) = signed_transaction.transaction.to {
@@ -197,8 +198,28 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn meta_call() {
-        let _input = sdk::read_input();
-        todo!(); // TODO: https://github.com/aurora-is-near/aurora-engine/issues/4
+        let input = sdk::read_input();
+        let state = Engine::get_state();
+        let domain_separator = crate::meta_parsing::near_erc712_domain(U256::from(state.chain_id));
+        let meta_call_args = match crate::meta_parsing::parse_meta_call(
+            &domain_separator,
+            &sdk::current_account_id(),
+            input,
+        ) {
+            Ok(args) => args,
+            Err(_error_kind) => {
+                sdk::panic_utf8(b"ERR_META_TX_PARSE");
+                return;
+            }
+        };
+        let mut engine = Engine::new_with_state(state, meta_call_args.sender);
+        let (status, result) = engine.call(
+            meta_call_args.sender,
+            meta_call_args.contract_address,
+            meta_call_args.value,
+            meta_call_args.input,
+        );
+        process_exit_reason(status, &result);
     }
 
     ///
