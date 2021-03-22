@@ -1,4 +1,5 @@
 use crate::prelude::{Address, Vec, H160, H256, U256};
+use crate::transaction::ecrecover_address;
 use evm::{Context, ExitError, ExitSucceed};
 
 type PrecompileResult = Result<(ExitSucceed, Vec<u8>, u64), ExitError>;
@@ -21,7 +22,11 @@ pub fn istanbul_precompiles(
     _context: &Context,
 ) -> Option<PrecompileResult> {
     match address.to_low_u64_be() {
-        1 => todo!(), // TODO: implement ecrecover(),
+        1 => Some(Ok((
+            ExitSucceed::Returned,
+            ecrecover(input).as_bytes().to_vec(),
+            0,
+        ))),
         2 => Some(Ok((
             ExitSucceed::Returned,
             sha256(input).as_bytes().to_vec(),
@@ -44,9 +49,12 @@ pub fn istanbul_precompiles(
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
-#[allow(dead_code)]
-fn ecrecover(_hash: H256, _v: u8, _r: H256, _s: H256) -> Address {
-    Address::zero() // TODO: implement ECRECOVER
+fn ecrecover(input: &[u8]) -> Address {
+    let mut hash = [0; 32];
+    hash.copy_from_slice(&input[..32]);
+    let mut signature = [0; 65];
+    signature.copy_from_slice(&input[63..]);
+    ecrecover_address(&hash, &signature).unwrap_or_else(|| Address::zero())
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
