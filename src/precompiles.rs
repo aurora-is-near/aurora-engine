@@ -54,7 +54,7 @@ fn ecrecover(input: &[u8]) -> Address {
     hash.copy_from_slice(&input[..32]);
     let mut signature = [0; 65];
     signature.copy_from_slice(&input[63..]);
-    ecrecover_address(&hash, &signature).unwrap_or_else(|| Address::zero())
+    ecrecover_address(&hash, &signature).unwrap_or_else(Address::zero)
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
