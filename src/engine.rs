@@ -1,23 +1,73 @@
-use crate::parameters::{FunctionCallArgs, ViewCallArgs};
-use crate::precompiles;
-use crate::prelude::{Address, Vec, H256, U256};
-use crate::sdk;
-use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
-use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr};
+use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::{Config, CreateScheme, ExitFatal, ExitReason};
 
+use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
+use crate::precompiles;
+use crate::prelude::{Address, Vec, H256, U256};
+use crate::sdk;
+use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
+use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
+
+/// Engine internal state, mostly configuration.
+/// Should not contain anything large or enumerable.
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct EngineState {
+    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    pub chain_id: [u8; 32],
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
+    /// Account of the bridge prover.
+    /// Use empty to not use base token as bridged asset.
+    pub bridge_prover_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
+}
+
+impl From<NewCallArgs> for EngineState {
+    fn from(args: NewCallArgs) -> Self {
+        EngineState {
+            chain_id: args.chain_id,
+            owner_id: args.owner_id,
+            bridge_prover_id: args.bridge_prover_id,
+            upgrade_delay_blocks: args.upgrade_delay_blocks,
+        }
+    }
+}
+
 pub struct Engine {
-    chain_id: U256,
+    state: EngineState,
     origin: Address,
 }
 
-const CONFIG: &'static Config = &Config::istanbul(); // TODO: upgrade to Berlin HF
+// TODO: upgrade to Berlin HF
+const CONFIG: &'static Config = &Config::istanbul();
+
+/// Key for storing the state of the engine.
+const STATE_KEY: &[u8; 6] = b"\0STATE";
 
 impl Engine {
-    pub fn new(chain_id: U256, origin: Address) -> Self {
-        Self { chain_id, origin }
+    pub fn new(origin: Address) -> Self {
+        Self::new_with_state(Engine::get_state(), origin)
+    }
+
+    pub fn new_with_state(state: EngineState, origin: Address) -> Self {
+        Self { state, origin }
+    }
+
+    /// Saves state into the storage.
+    pub fn set_state(state: EngineState) {
+        sdk::write_storage(STATE_KEY, &state.try_to_vec().expect("ERR_SER"));
+    }
+
+    /// Fails if state is not found.
+    pub fn get_state() -> EngineState {
+        EngineState::try_from_slice(
+            &sdk::read_storage(STATE_KEY).expect("ERR_STATE_NOT_INITIALIZED"),
+        )
+        .expect("ERR_DESER")
     }
 
     pub fn set_code(address: &Address, code: &[u8]) {
@@ -219,7 +269,7 @@ impl evm::backend::Backend for Engine {
     }
 
     fn chain_id(&self) -> U256 {
-        self.chain_id
+        U256::from(self.state.chain_id)
     }
 
     fn exists(&self, address: Address) -> bool {
