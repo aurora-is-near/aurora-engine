@@ -4,6 +4,7 @@
   "description": "Aurora Engine client for JavaScript.",
   "type": "module",
   "module": "engine.js",
+  "main": "engine.js",
   "types": "engine.d.ts",
   "files": [
     "AUTHORS",
