@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "declaration": true,
+    "strict": true
+  },
+  "files": ["engine.ts"]
+}

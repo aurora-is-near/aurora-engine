@@ -1,0 +1,33 @@
+{
+  "name": "@aurora-is-near/engine",
+  "version": "0.0.0",
+  "description": "Aurora Engine client for JavaScript.",
+  "type": "module",
+  "module": "engine.js",
+  "types": "engine.d.ts",
+  "files": [
+    "AUTHORS",
+    "CHANGES.md",
+    "README.md",
+    "LICENSE",
+    "VERSION",
+    "package.json",
+    "engine.js",
+    "engine.d.ts"
+  ],
+  "scripts": {
+    "test": "make check"
+  },
+  "keywords": [],
+  "author": "Arto Bendiken <arto@near.org> (https://ar.to)",
+  "license": "CC0-1.0",
+  "homepage": "https://github.com/aurora-is-near/aurora-engine",
+  "bugs": "https://github.com/aurora-is-near/aurora-engine/issues",
+  "repository": "https://github.com/aurora-is-near/aurora-engine.git",
+  "dependencies": {
+    "near-api-js": "^0.39.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.2.3"
+  }
+}
