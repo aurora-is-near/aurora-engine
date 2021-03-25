@@ -8,7 +8,7 @@ all: engine.js
 
 # Rules for development:
 
-engine.js: engine.ts
+engine.js: engine.ts tsconfig.json
 	$(TSC)
 
 engine.d.ts: engine.js

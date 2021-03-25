@@ -1,6 +1,6 @@
 /* This is free and unencumbered software released into the public domain. */
 
-const nearAPI = require('near-api-js');
+import nearAPI from 'near-api-js';
 
 abstract class Assignable {
   constructor(properties: any) {

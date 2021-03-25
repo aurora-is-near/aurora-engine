@@ -2,7 +2,9 @@
   "compilerOptions": {
     "target": "es6",
     "declaration": true,
-    "strict": true
+    "strict": true,
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node"
   },
   "files": ["engine.ts"]
 }
