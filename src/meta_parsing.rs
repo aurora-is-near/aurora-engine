@@ -4,8 +4,8 @@ use lunarity_lexer::{Lexer, Token};
 use rlp::{Decodable, DecoderError, Rlp};
 
 use crate::parameters::MetaCallArgs;
-use crate::prelude::{vec, Address, Box, HashMap, String, ToOwned, ToString, Vec, U256};
-use crate::transaction::ecrecover_address;
+use crate::precompiles::ecrecover;
+use crate::prelude::{vec, Address, Box, HashMap, String, ToOwned, ToString, Vec, H256, U256};
 use crate::types::{keccak, u256_to_arr, ErrorKind, InternalMetaCallArgs, RawU256, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -545,12 +545,12 @@ pub fn parse_meta_call(
     let mut signature: [u8; 65] = [0; 65];
     signature[0] = meta_tx.v;
     signature[1..].copy_from_slice(&meta_tx.signature);
-    match ecrecover_address(&msg, &signature) {
-        Some(sender) => {
+    match ecrecover(H256::from_slice(&msg), &signature) {
+        Ok(sender) => {
             result.sender = sender;
             result.input = input;
             Ok(result)
         }
-        None => Err(ErrorKind::InvalidEcRecoverSignature),
+        Err(_) => Err(ErrorKind::InvalidEcRecoverSignature),
     }
 }

@@ -1,4 +1,5 @@
-use crate::prelude::{Address, Vec, H256, U256};
+use crate::precompiles::ecrecover;
+use crate::prelude::{Address, Vec, U256};
 use crate::types::keccak;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
@@ -65,7 +66,7 @@ impl EthSignedTransaction {
         self.transaction
             .rlp_append_unsigned(&mut rlp_stream, chain_id);
         let message_hash = keccak(rlp_stream.as_raw());
-        ecrecover_address(&message_hash.into(), &vrs_to_arr(rec_id, self.r, self.s))
+        ecrecover(message_hash, &vrs_to_arr(rec_id, self.r, self.s)).ok()
     }
 
     /// Returns chain id encoded in `v` parameter of the signature if that was done, otherwise None.
@@ -138,45 +139,11 @@ impl Decodable for EthSignedTransaction {
 }
 
 fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
-    let mut result = [0u8; 65];
-    result[0] = v;
-    r.to_big_endian(&mut result[1..33]);
-    s.to_big_endian(&mut result[33..65]);
+    let mut result = [0u8; 65]; // (r, s, v), typed (uint256, uint256, uint8)
+    r.to_big_endian(&mut result[0..32]);
+    s.to_big_endian(&mut result[32..64]);
+    result[64] = v;
     result
-}
-
-type RawHash = [u8; 32];
-
-/// Given signature and data, validates that signature is valid for given data and returns ecrecover address.
-pub(crate) fn ecrecover_address(hash: &RawHash, signature: &[u8; 65]) -> Option<Address> {
-    use sha3::Digest;
-
-    let hash = secp256k1::Message::parse(&H256::from_slice(hash).0);
-    let v = signature[0];
-    let bit = match v {
-        0..=26 => v,
-        _ => v - 27,
-    };
-
-    let mut sig = [0u8; 64];
-    sig.copy_from_slice(&signature[1..65]);
-    let s = secp256k1::Signature::parse(&sig);
-
-    if let Ok(rec_id) = secp256k1::RecoveryId::parse(bit) {
-        if let Ok(p) = secp256k1::recover(&hash, &s, &rec_id) {
-            // recover returns the 65-byte key, but addresses come from the raw 64-byte key
-            let r = sha3::Keccak256::digest(&p.serialize()[1..]);
-            return Some(address_from_arr(&r[12..]));
-        }
-    }
-    None
-}
-
-fn address_from_arr(arr: &[u8]) -> Address {
-    assert_eq!(arr.len(), 20);
-    let mut address = [0u8; 20];
-    address.copy_from_slice(&arr);
-    Address::from(address)
 }
 
 #[cfg(test)]
@@ -218,5 +185,12 @@ mod tests {
             tx.sender().unwrap(),
             address_from_arr(&hex::decode("2c7536e3605d9c16a7a3d7b1898e529396a65c23").unwrap())
         );
+    }
+
+    fn address_from_arr(arr: &[u8]) -> Address {
+        assert_eq!(arr.len(), 20);
+        let mut address = [0u8; 20];
+        address.copy_from_slice(&arr);
+        Address::from(address)
     }
 }
