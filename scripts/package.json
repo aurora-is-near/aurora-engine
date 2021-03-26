@@ -1,0 +1,14 @@
+{
+  "type": "module",
+  "scripts": {
+    "deploy": "node deploy.js"
+  },
+  "dependencies": {
+    "@aurora-is-near/engine": "../clients/js",
+    "@ethersproject/abi": "^5.0.7",
+    "@ethersproject/bytes": "^5.0.11",
+    "bn.js": "^5.1.2",
+    "commander": "^7.2.0",
+    "near-api-js": "^0.36.2"
+  }
+}
