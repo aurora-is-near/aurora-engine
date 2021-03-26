@@ -54,20 +54,17 @@ fn ecrecover_raw(input: &[u8]) -> Address {
     let mut hash = [0; 32];
     hash.copy_from_slice(&input[0..32]);
 
-    let mut signature = [0; 65];  // signature is (r, s, v), typed (uint256, uint256, uint8)
-    signature[0..32].copy_from_slice(&input[64..]);  // r
+    let mut signature = [0; 65]; // signature is (r, s, v), typed (uint256, uint256, uint8)
+    signature[0..32].copy_from_slice(&input[64..]); // r
     signature[32..64].copy_from_slice(&input[96..]); // s
-    signature[64] = input[63];                       // v
+    signature[64] = input[63]; // v
 
     ecrecover(H256::from_slice(&hash), &signature).unwrap_or_else(|_| Address::zero())
 }
 
 #[allow(dead_code)]
 pub(crate) fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
-    match ecrecover(hash, signature) {
-        Ok(s) if s == signer => true,
-        _ => false,
-    }
+    matches!(ecrecover(hash, signature), Ok(s) if s == signer)
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
