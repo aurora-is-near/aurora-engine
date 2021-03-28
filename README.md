@@ -3,6 +3,8 @@
 [![Project license](https://img.shields.io/badge/license-Public%20Domain-blue.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
 [![Discord](https://img.shields.io/discord/490367152054992913?label=discord)](https://discord.gg/jNjHYUF8vw)
 [![Lints](https://github.com/aurora-is-near/aurora-engine/actions/workflows/lints.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/lints.yml)
+[![Tests](https://github.com/aurora-is-near/aurora-engine/actions/workflows/tests.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/tests.yml)
+[![Builds](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml)
 
 ## Prerequisites
 
