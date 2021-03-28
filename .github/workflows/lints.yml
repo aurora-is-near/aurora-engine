@@ -3,27 +3,37 @@
 on: [push, pull_request]
 name: Lints
 jobs:
-  combo:
-    name: Clippy + rustfmt
+  fmt:
+    name: rustfmt
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources
+      - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Install nightly toolchain
+      - name: Install the toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: nightly-2021-01-30
           override: true
-          components: rustfmt, clippy
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
+          components: rustfmt
+      - uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
-      - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Install the toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly-2021-01-30
+          override: true
+          components: clippy
+      - uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: -- -D warnings
-
