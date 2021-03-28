@@ -1,10 +1,9 @@
-# See: https://github.com/actions-rs/example/blob/master/.github/workflows/nightly_lints.yml
 ---
-on: [push, pull_request]
-name: Lints
+on: [push]
+name: Builds
 jobs:
-  fmt:
-    name: rustfmt
+  release:
+    name: Release
     runs-on: ubuntu-latest
     steps:
       - name: Clone the repository
@@ -15,14 +14,15 @@ jobs:
           profile: minimal
           toolchain: nightly-2021-01-30
           override: true
-          components: rustfmt
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
+      - run: make release
+      - run: ls -lH release.wasm
+      - name: Upload release.wasm
+        uses: actions/upload-artifact@v2
         with:
-          command: fmt
-          args: --all -- --check
-  clippy:
-    name: Clippy
+          name: release.wasm
+          path: release.wasm
+  debug:
+    name: Debug
     runs-on: ubuntu-latest
     steps:
       - name: Clone the repository
@@ -33,9 +33,10 @@ jobs:
           profile: minimal
           toolchain: nightly-2021-01-30
           override: true
-          components: clippy
-      - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
+      - run: make debug
+      - run: ls -lH debug.wasm
+      - name: Upload debug.wasm
+        uses: actions/upload-artifact@v2
         with:
-          command: clippy
-          args: -- -D warnings
+          name: debug.wasm
+          path: debug.wasm

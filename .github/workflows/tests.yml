@@ -14,7 +14,8 @@ jobs:
           profile: minimal
           toolchain: nightly-2021-01-30
           override: true
-      - uses: actions-rs/cargo@v1
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
         with:
           command: test
           args: --verbose
