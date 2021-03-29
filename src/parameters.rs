@@ -56,12 +56,14 @@ pub struct GetStorageAtArgs {
 }
 
 /// Borsh-encoded parameters for the `begin_chain` function.
+#[cfg(feature = "evm_bully")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct BeginChainArgs {
     pub chain_id: RawU256,
 }
 
 /// Borsh-encoded parameters for the `begin_block` function.
+#[cfg(feature = "evm_bully")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct BeginBlockArgs {
     /// The current block's hash (for replayer use).
