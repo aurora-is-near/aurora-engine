@@ -75,4 +75,52 @@ If you have [Ruby] installed, get more useful and readable output as follows:
 rake dump
 ```
 
+## Interface
+
+### Administrative methods
+
+#### `new`
+
+#### `get_version`
+
+#### `get_owner`
+
+#### `get_bridge_provider`
+
+#### `get_chain_id`
+
+#### `get_upgrade_index`
+
+#### `stage_upgrade`
+
+#### `deploy_upgrade`
+
+### Mutative methods
+
+#### `deploy_code`
+
+#### `call`
+
+#### `raw_call`
+
+#### `meta_call`
+
+### Nonmutative methods
+
+#### `view`
+
+#### `get_code`
+
+#### `get_balance`
+
+#### `get_nonce`
+
+#### `get_storage_at`
+
+### Benchmarking methods
+
+#### `begin_chain`
+
+#### `begin_block`
+
 [Ruby]: https://www.ruby-lang.org

@@ -52,6 +52,10 @@ mod contract {
         ::core::intrinsics::abort();
     }
 
+    ///
+    /// ADMINISTRATIVE METHODS
+    ///
+
     /// Sets the configuration for the Engine.
     /// Should be called on deployment.
     #[no_mangle]
@@ -90,6 +94,13 @@ mod contract {
         sdk::return_output(&Engine::get_state().chain_id)
     }
 
+    #[no_mangle]
+    pub extern "C" fn get_upgrade_index() {
+        let state = Engine::get_state();
+        let index = sdk::read_u64(CODE_STAGE_KEY).expect("ERR_NO_UPGRADE");
+        sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
+    }
+
     /// Stage new code for deployment.
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
@@ -99,13 +110,6 @@ mod contract {
         }
         sdk::read_input_and_store(CODE_KEY);
         sdk::write_storage(CODE_STAGE_KEY, &sdk::block_index().to_le_bytes());
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_upgrade_index() {
-        let state = Engine::get_state();
-        let index = sdk::read_u64(CODE_STAGE_KEY).expect("ERR_NO_UPGRADE");
-        sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
 
     /// Deploy staged upgrade.
@@ -120,7 +124,7 @@ mod contract {
     }
 
     ///
-    /// EVM METHODS
+    /// MUTATIVE METHODS
     ///
 
     /// Deploy code into the EVM.
@@ -223,7 +227,7 @@ mod contract {
     }
 
     ///
-    /// Reading data from EVM
+    /// NONMUTATIVE METHODS
     ///
 
     #[no_mangle]
@@ -265,7 +269,7 @@ mod contract {
     }
 
     ///
-    /// Methods for testing.
+    /// BENCHMARKING METHODS
     ///
 
     #[no_mangle]
