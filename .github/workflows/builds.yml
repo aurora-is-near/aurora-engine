@@ -1,5 +1,8 @@
 ---
-on: [push]
+on:
+  push:
+    branches:
+      - master
 name: Builds
 jobs:
   release:
@@ -16,11 +19,20 @@ jobs:
           override: true
       - run: make release
       - run: ls -lH release.wasm
-      - name: Upload release.wasm
+      - name: Upload the release.wasm artifact
         uses: actions/upload-artifact@v2
         with:
           name: release.wasm
           path: release.wasm
+      - name: Update the latest release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          tag: latest
+          file: release.wasm
+          overwrite: true
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update the latest tag
+        uses: EndBug/latest-tag@latest
   debug:
     name: Debug
     runs-on: ubuntu-latest
@@ -35,8 +47,17 @@ jobs:
           override: true
       - run: make debug
       - run: ls -lH debug.wasm
-      - name: Upload debug.wasm
+      - name: Upload the debug.wasm artifact
         uses: actions/upload-artifact@v2
         with:
           name: debug.wasm
           path: debug.wasm
+      - name: Update the latest release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          tag: latest
+          file: debug.wasm
+          overwrite: true
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update the latest tag
+        uses: EndBug/latest-tag@latest
