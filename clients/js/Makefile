@@ -2,19 +2,19 @@ TSC = npx tsc
 
 # The default target:
 
-all: engine.js
+all: index.js schema.js
 
 .PHONY: all
 
 # Rules for development:
 
-engine.js: engine.ts tsconfig.json
+%.js: %.ts tsconfig.json
 	$(TSC)
 
-engine.d.ts: engine.js
+%.d.ts: %.js
 
 clean:
-	@rm -Rf engine.js engine.d.ts *~
+	@rm -Rf *.js *.d.ts *~
 
 distclean: clean
 

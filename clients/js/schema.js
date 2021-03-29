@@ -14,7 +14,7 @@ class Assignable {
         };
     }
 }
-// Borsh-encoded parameters for the `new` function.
+// Borsh-encoded parameters for the `new` method.
 export class NewCallArgs extends Assignable {
     constructor(chainID, ownerID, bridgeProverID, upgradeDelayBlocks) {
         super();
@@ -27,7 +27,14 @@ export class NewCallArgs extends Assignable {
         return 'new';
     }
 }
-// Borsh-encoded parameters for the `meta_call` function.
+// Borsh-encoded parameters for the `get_chain_id` method.
+export class GetChainID extends Assignable {
+    constructor() { super(); }
+    functionName() {
+        return 'get_chain_id';
+    }
+}
+// Borsh-encoded parameters for the `meta_call` method.
 export class MetaCallArgs extends Assignable {
     constructor(signature, v, nonce, feeAmount, feeAddress, contractAddress, value, methodDef, args) {
         super();
@@ -45,7 +52,7 @@ export class MetaCallArgs extends Assignable {
         return 'meta_call';
     }
 }
-// Borsh-encoded parameters for the `call` function.
+// Borsh-encoded parameters for the `call` method.
 export class FunctionCallArgs extends Assignable {
     constructor(contract, input) {
         super();
@@ -56,7 +63,7 @@ export class FunctionCallArgs extends Assignable {
         return 'call';
     }
 }
-// Borsh-encoded parameters for the `view` function.
+// Borsh-encoded parameters for the `view` method.
 export class ViewCallArgs extends Assignable {
     constructor(sender, address, amount, input) {
         super();
@@ -69,7 +76,7 @@ export class ViewCallArgs extends Assignable {
         return 'view';
     }
 }
-// Borsh-encoded parameters for the `get_storage_at` function.
+// Borsh-encoded parameters for the `get_storage_at` method.
 export class GetStorageAtArgs extends Assignable {
     constructor(address, key) {
         super();
@@ -80,7 +87,7 @@ export class GetStorageAtArgs extends Assignable {
         return 'get_storage_at';
     }
 }
-// Borsh-encoded parameters for the `begin_chain` function.
+// Borsh-encoded parameters for the `begin_chain` method.
 export class BeginChainArgs extends Assignable {
     constructor(chainID) {
         super();
@@ -90,7 +97,7 @@ export class BeginChainArgs extends Assignable {
         return 'begin_chain';
     }
 }
-// Borsh-encoded parameters for the `begin_block` function.
+// Borsh-encoded parameters for the `begin_block` method.
 export class BeginBlockArgs extends Assignable {
     constructor(hash, coinbase, timestamp, number, difficulty, gaslimit) {
         super();
@@ -112,6 +119,7 @@ const SCHEMA = new Map([
                 ['bridgeProverID', 'string'],
                 ['upgradeDelayBlocks', 'u64'],
             ] }],
+    [GetChainID, { kind: 'struct', fields: [] }],
     [MetaCallArgs, { kind: 'struct', fields: [
                 ['signature', [64]],
                 ['v', 'u8'],

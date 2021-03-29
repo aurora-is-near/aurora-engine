@@ -3,9 +3,9 @@
   "version": "0.0.0",
   "description": "Aurora Engine client for JavaScript.",
   "type": "module",
-  "module": "engine.js",
-  "main": "engine.js",
-  "types": "engine.d.ts",
+  "module": "index.js",
+  "main": "index.js",
+  "types": "index.d.ts",
   "files": [
     "AUTHORS",
     "CHANGES.md",
@@ -13,8 +13,10 @@
     "LICENSE",
     "VERSION",
     "package.json",
-    "engine.js",
-    "engine.d.ts"
+    "index.js",
+    "index.d.ts",
+    "schema.js",
+    "schema.d.ts"
   ],
   "scripts": {
     "test": "make check"

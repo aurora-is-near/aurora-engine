@@ -20,7 +20,7 @@ abstract class Assignable {
   }
 }
 
-// Borsh-encoded parameters for the `new` function.
+// Borsh-encoded parameters for the `new` method.
 export class NewCallArgs extends Assignable {
   constructor(
       public chainID: Uint8Array,
@@ -35,7 +35,16 @@ export class NewCallArgs extends Assignable {
   }
 }
 
-// Borsh-encoded parameters for the `meta_call` function.
+// Borsh-encoded parameters for the `get_chain_id` method.
+export class GetChainID extends Assignable {
+  constructor() { super(); }
+
+  functionName(): string {
+    return 'get_chain_id';
+  }
+}
+
+// Borsh-encoded parameters for the `meta_call` method.
 export class MetaCallArgs extends Assignable {
   constructor(
       public signature: Uint8Array,
@@ -55,7 +64,7 @@ export class MetaCallArgs extends Assignable {
   }
 }
 
-// Borsh-encoded parameters for the `call` function.
+// Borsh-encoded parameters for the `call` method.
 export class FunctionCallArgs extends Assignable {
   constructor(
       public contract: Uint8Array,
@@ -68,7 +77,7 @@ export class FunctionCallArgs extends Assignable {
   }
 }
 
-// Borsh-encoded parameters for the `view` function.
+// Borsh-encoded parameters for the `view` method.
 export class ViewCallArgs extends Assignable {
   constructor(
       public sender: Uint8Array,
@@ -83,7 +92,7 @@ export class ViewCallArgs extends Assignable {
   }
 }
 
-// Borsh-encoded parameters for the `get_storage_at` function.
+// Borsh-encoded parameters for the `get_storage_at` method.
 export class GetStorageAtArgs extends Assignable {
   constructor(
       public address: Uint8Array,
@@ -96,7 +105,7 @@ export class GetStorageAtArgs extends Assignable {
   }
 }
 
-// Borsh-encoded parameters for the `begin_chain` function.
+// Borsh-encoded parameters for the `begin_chain` method.
 export class BeginChainArgs extends Assignable {
   constructor(
       public chainID: Uint8Array) {
@@ -108,7 +117,7 @@ export class BeginChainArgs extends Assignable {
   }
 }
 
-// Borsh-encoded parameters for the `begin_block` function.
+// Borsh-encoded parameters for the `begin_block` method.
 export class BeginBlockArgs extends Assignable {
   constructor(
       public hash: Uint8Array,
@@ -132,6 +141,7 @@ const SCHEMA = new Map<Function, any>([
     ['bridgeProverID', 'string'],
     ['upgradeDelayBlocks', 'u64'],
   ]}],
+  [GetChainID, {kind: 'struct', fields: []}],
   [MetaCallArgs, {kind: 'struct', fields: [
     ['signature', [64]],
     ['v', 'u8'],

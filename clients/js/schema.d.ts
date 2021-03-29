@@ -12,6 +12,10 @@ export declare class NewCallArgs extends Assignable {
     constructor(chainID: Uint8Array, ownerID: string, bridgeProverID: string, upgradeDelayBlocks: number | BN);
     functionName(): string;
 }
+export declare class GetChainID extends Assignable {
+    constructor();
+    functionName(): string;
+}
 export declare class MetaCallArgs extends Assignable {
     signature: Uint8Array;
     v: number;

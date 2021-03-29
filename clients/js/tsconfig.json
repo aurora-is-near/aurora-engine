@@ -6,5 +6,5 @@
     "allowSyntheticDefaultImports": true,
     "moduleResolution": "node"
   },
-  "files": ["engine.ts"]
+  "files": ["index.ts", "schema.ts"]
 }
