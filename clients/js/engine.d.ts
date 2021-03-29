@@ -1,3 +1,4 @@
+import BN from 'bn.js';
 declare abstract class Assignable {
     abstract functionName(): string;
     encode(): Uint8Array;
@@ -7,32 +8,56 @@ export declare class NewCallArgs extends Assignable {
     chainID: Uint8Array;
     ownerID: string;
     bridgeProverID: string;
-    upgradeDelayBlocks: number;
-    constructor(chainID: Uint8Array, ownerID: string, bridgeProverID: string, upgradeDelayBlocks: number);
+    upgradeDelayBlocks: number | BN;
+    constructor(chainID: Uint8Array, ownerID: string, bridgeProverID: string, upgradeDelayBlocks: number | BN);
     functionName(): string;
 }
 export declare class MetaCallArgs extends Assignable {
-    constructor();
+    signature: Uint8Array;
+    v: number;
+    nonce: Uint8Array;
+    feeAmount: Uint8Array;
+    feeAddress: Uint8Array;
+    contractAddress: Uint8Array;
+    value: Uint8Array;
+    methodDef: string;
+    args: Uint8Array;
+    constructor(signature: Uint8Array, v: number, nonce: Uint8Array, feeAmount: Uint8Array, feeAddress: Uint8Array, contractAddress: Uint8Array, value: Uint8Array, methodDef: string, args: Uint8Array);
     functionName(): string;
 }
 export declare class FunctionCallArgs extends Assignable {
-    constructor();
+    contract: Uint8Array;
+    input: Uint8Array;
+    constructor(contract: Uint8Array, input: Uint8Array);
     functionName(): string;
 }
 export declare class ViewCallArgs extends Assignable {
-    constructor();
+    sender: Uint8Array;
+    address: Uint8Array;
+    amount: Uint8Array;
+    input: Uint8Array;
+    constructor(sender: Uint8Array, address: Uint8Array, amount: Uint8Array, input: Uint8Array);
     functionName(): string;
 }
 export declare class GetStorageAtArgs extends Assignable {
-    constructor();
+    address: Uint8Array;
+    key: Uint8Array;
+    constructor(address: Uint8Array, key: Uint8Array);
     functionName(): string;
 }
 export declare class BeginChainArgs extends Assignable {
-    constructor();
+    chainID: Uint8Array;
+    constructor(chainID: Uint8Array);
     functionName(): string;
 }
 export declare class BeginBlockArgs extends Assignable {
-    constructor();
+    hash: Uint8Array;
+    coinbase: Uint8Array;
+    timestamp: Uint8Array;
+    number: Uint8Array;
+    difficulty: Uint8Array;
+    gaslimit: Uint8Array;
+    constructor(hash: Uint8Array, coinbase: Uint8Array, timestamp: Uint8Array, number: Uint8Array, difficulty: Uint8Array, gaslimit: Uint8Array);
     functionName(): string;
 }
 export {};

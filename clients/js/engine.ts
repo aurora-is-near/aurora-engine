@@ -26,7 +26,7 @@ export class NewCallArgs extends Assignable {
       public chainID: Uint8Array,
       public ownerID: string,
       public bridgeProverID: string,
-      public upgradeDelayBlocks: number) {
+      public upgradeDelayBlocks: number | BN) {
     super();
   }
 
@@ -37,7 +37,16 @@ export class NewCallArgs extends Assignable {
 
 // Borsh-encoded parameters for the `meta_call` function.
 export class MetaCallArgs extends Assignable {
-  constructor() { // TODO
+  constructor(
+      public signature: Uint8Array,
+      public v: number,
+      public nonce: Uint8Array,
+      public feeAmount: Uint8Array,
+      public feeAddress: Uint8Array,
+      public contractAddress: Uint8Array,
+      public value: Uint8Array,
+      public methodDef: string,
+      public args: Uint8Array) {
     super();
   }
 
@@ -48,7 +57,9 @@ export class MetaCallArgs extends Assignable {
 
 // Borsh-encoded parameters for the `call` function.
 export class FunctionCallArgs extends Assignable {
-  constructor() { // TODO
+  constructor(
+      public contract: Uint8Array,
+      public input: Uint8Array) {
     super();
   }
 
@@ -59,7 +70,11 @@ export class FunctionCallArgs extends Assignable {
 
 // Borsh-encoded parameters for the `view` function.
 export class ViewCallArgs extends Assignable {
-  constructor() { // TODO
+  constructor(
+      public sender: Uint8Array,
+      public address: Uint8Array,
+      public amount: Uint8Array,
+      public input: Uint8Array) {
     super();
   }
 
@@ -70,7 +85,9 @@ export class ViewCallArgs extends Assignable {
 
 // Borsh-encoded parameters for the `get_storage_at` function.
 export class GetStorageAtArgs extends Assignable {
-  constructor() { // TODO
+  constructor(
+      public address: Uint8Array,
+      public key: Uint8Array) {
     super();
   }
 
@@ -81,7 +98,8 @@ export class GetStorageAtArgs extends Assignable {
 
 // Borsh-encoded parameters for the `begin_chain` function.
 export class BeginChainArgs extends Assignable {
-  constructor() {
+  constructor(
+      public chainID: Uint8Array) {
     super();
   }
 
@@ -92,7 +110,13 @@ export class BeginChainArgs extends Assignable {
 
 // Borsh-encoded parameters for the `begin_block` function.
 export class BeginBlockArgs extends Assignable {
-  constructor() { // TODO
+  constructor(
+      public hash: Uint8Array,
+      public coinbase: Uint8Array,
+      public timestamp: Uint8Array,
+      public number: Uint8Array,
+      public difficulty: Uint8Array,
+      public gaslimit: Uint8Array) {
     super();
   }
 
@@ -109,21 +133,39 @@ const SCHEMA = new Map<Function, any>([
     ['upgradeDelayBlocks', 'u64'],
   ]}],
   [MetaCallArgs, {kind: 'struct', fields: [
-    // TODO
+    ['signature', [64]],
+    ['v', 'u8'],
+    ['nonce', [32]],
+    ['feeAmount', [32]],
+    ['feeAddress', [20]],
+    ['contractAddress', [20]],
+    ['value', [32]],
+    ['methodDef', 'string'],
+    ['args', ['u8']],
   ]}],
   [FunctionCallArgs, {kind: 'struct', fields: [
-    // TODO
+    ['contract', [20]],
+    ['input', ['u8']],
   ]}],
   [ViewCallArgs, {kind: 'struct', fields: [
-    // TODO
+    ['sender', [20]],
+    ['address', [20]],
+    ['amount', [32]],
+    ['input', ['u8']],
   ]}],
   [GetStorageAtArgs, {kind: 'struct', fields: [
-    // TODO
+    ['address', [20]],
+    ['key', [32]],
   ]}],
   [BeginChainArgs, {kind: 'struct', fields: [
-    // TODO
+    ['chainID', [32]],
   ]}],
   [BeginBlockArgs, {kind: 'struct', fields: [
-    // TODO
+    ['hash', [32]],
+    ['coinbase', [32]],
+    ['timestamp', [32]],
+    ['number', [32]],
+    ['difficulty', [32]],
+    ['gaslimit', [32]],
   ]}],
 ]);

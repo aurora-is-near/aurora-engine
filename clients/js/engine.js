@@ -29,8 +29,17 @@ export class NewCallArgs extends Assignable {
 }
 // Borsh-encoded parameters for the `meta_call` function.
 export class MetaCallArgs extends Assignable {
-    constructor() {
+    constructor(signature, v, nonce, feeAmount, feeAddress, contractAddress, value, methodDef, args) {
         super();
+        this.signature = signature;
+        this.v = v;
+        this.nonce = nonce;
+        this.feeAmount = feeAmount;
+        this.feeAddress = feeAddress;
+        this.contractAddress = contractAddress;
+        this.value = value;
+        this.methodDef = methodDef;
+        this.args = args;
     }
     functionName() {
         return 'meta_call';
@@ -38,8 +47,10 @@ export class MetaCallArgs extends Assignable {
 }
 // Borsh-encoded parameters for the `call` function.
 export class FunctionCallArgs extends Assignable {
-    constructor() {
+    constructor(contract, input) {
         super();
+        this.contract = contract;
+        this.input = input;
     }
     functionName() {
         return 'call';
@@ -47,8 +58,12 @@ export class FunctionCallArgs extends Assignable {
 }
 // Borsh-encoded parameters for the `view` function.
 export class ViewCallArgs extends Assignable {
-    constructor() {
+    constructor(sender, address, amount, input) {
         super();
+        this.sender = sender;
+        this.address = address;
+        this.amount = amount;
+        this.input = input;
     }
     functionName() {
         return 'view';
@@ -56,8 +71,10 @@ export class ViewCallArgs extends Assignable {
 }
 // Borsh-encoded parameters for the `get_storage_at` function.
 export class GetStorageAtArgs extends Assignable {
-    constructor() {
+    constructor(address, key) {
         super();
+        this.address = address;
+        this.key = key;
     }
     functionName() {
         return 'get_storage_at';
@@ -65,8 +82,9 @@ export class GetStorageAtArgs extends Assignable {
 }
 // Borsh-encoded parameters for the `begin_chain` function.
 export class BeginChainArgs extends Assignable {
-    constructor() {
+    constructor(chainID) {
         super();
+        this.chainID = chainID;
     }
     functionName() {
         return 'begin_chain';
@@ -74,8 +92,14 @@ export class BeginChainArgs extends Assignable {
 }
 // Borsh-encoded parameters for the `begin_block` function.
 export class BeginBlockArgs extends Assignable {
-    constructor() {
+    constructor(hash, coinbase, timestamp, number, difficulty, gaslimit) {
         super();
+        this.hash = hash;
+        this.coinbase = coinbase;
+        this.timestamp = timestamp;
+        this.number = number;
+        this.difficulty = difficulty;
+        this.gaslimit = gaslimit;
     }
     functionName() {
         return 'begin_block';
@@ -89,21 +113,39 @@ const SCHEMA = new Map([
                 ['upgradeDelayBlocks', 'u64'],
             ] }],
     [MetaCallArgs, { kind: 'struct', fields: [
-            // TODO
+                ['signature', [64]],
+                ['v', 'u8'],
+                ['nonce', [32]],
+                ['feeAmount', [32]],
+                ['feeAddress', [20]],
+                ['contractAddress', [20]],
+                ['value', [32]],
+                ['methodDef', 'string'],
+                ['args', ['u8']],
             ] }],
     [FunctionCallArgs, { kind: 'struct', fields: [
-            // TODO
+                ['contract', [20]],
+                ['input', ['u8']],
             ] }],
     [ViewCallArgs, { kind: 'struct', fields: [
-            // TODO
+                ['sender', [20]],
+                ['address', [20]],
+                ['amount', [32]],
+                ['input', ['u8']],
             ] }],
     [GetStorageAtArgs, { kind: 'struct', fields: [
-            // TODO
+                ['address', [20]],
+                ['key', [32]],
             ] }],
     [BeginChainArgs, { kind: 'struct', fields: [
-            // TODO
+                ['chainID', [32]],
             ] }],
     [BeginBlockArgs, { kind: 'struct', fields: [
-            // TODO
+                ['hash', [32]],
+                ['coinbase', [32]],
+                ['timestamp', [32]],
+                ['number', [32]],
+                ['difficulty', [32]],
+                ['gaslimit', [32]],
             ] }],
 ]);
