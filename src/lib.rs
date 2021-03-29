@@ -271,7 +271,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn begin_chain() {
         let input = sdk::read_input();
-        let _args = BeginChainArgs::try_from_slice(&input).unwrap();
+        let args = BeginChainArgs::try_from_slice(&input).unwrap();
+        let mut state = Engine::get_state();
+        state.chain_id = args.chain_id;
+        Engine::set_state(state);
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
     }
 

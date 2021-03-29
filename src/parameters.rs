@@ -57,7 +57,9 @@ pub struct GetStorageAtArgs {
 
 /// Borsh-encoded parameters for the `begin_chain` function.
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct BeginChainArgs {}
+pub struct BeginChainArgs {
+    pub chain_id: RawU256,
+}
 
 /// Borsh-encoded parameters for the `begin_block` function.
 #[derive(BorshSerialize, BorshDeserialize)]
