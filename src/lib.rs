@@ -26,10 +26,9 @@ mod contract {
     use evm::ExitReason;
 
     use crate::engine::Engine;
-    use crate::parameters::{
-        BeginBlockArgs, BeginChainArgs, FunctionCallArgs, GetStorageAtArgs, NewCallArgs,
-        ViewCallArgs,
-    };
+    #[cfg(feature = "evm_bully")]
+    use crate::parameters::{BeginBlockArgs, BeginChainArgs};
+    use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
     use crate::prelude::{vec, Address, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
@@ -272,6 +271,7 @@ mod contract {
     /// BENCHMARKING METHODS
     ///
 
+    #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_chain() {
         let input = sdk::read_input();
@@ -282,6 +282,7 @@ mod contract {
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
     }
 
+    #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_block() {
         let input = sdk::read_input();
