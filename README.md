@@ -75,6 +75,14 @@ If you have [Ruby] installed, get more useful and readable output as follows:
 rake dump
 ```
 
+## Networks
+
+Network | Chain ID
+------- | ----------
+BetaNet | 1313161556
+TestNet | 1313161555
+MainNet | 1313161554
+
 ## Interface
 
 ### Administrative methods
