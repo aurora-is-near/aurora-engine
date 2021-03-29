@@ -1,9 +1,5 @@
-import { NewCallArgs } from '@aurora-is-near/engine';
-import { defaultAbiCoder } from '@ethersproject/abi';
-import { arrayify } from '@ethersproject/bytes';
-import BN from 'bn.js';
+import { Engine } from '@aurora-is-near/engine';
 import { program } from 'commander';
-import nearAPI from 'near-api-js';
 
 main(process.argv, process.env);
 
@@ -123,11 +119,4 @@ async function main(argv, env) {
     });
 
   program.parse(process.argv);
-}
-
-async function rawFunctionCall(signer, contractID, args) {
-  const action = new nearAPI.transactions.Action({
-    functionCall: new nearAPI.transactions.FunctionCall(args.toFunctionCall())
-  });
-  return signer.signAndSendTransaction(contractID, [action]);
 }

@@ -28,6 +28,8 @@
   "bugs": "https://github.com/aurora-is-near/aurora-engine/issues",
   "repository": "https://github.com/aurora-is-near/aurora-engine.git",
   "dependencies": {
+    "@ethersproject/abi": "^5.0.7",
+    "@ethersproject/bytes": "^5.0.11",
     "bn.js": "^5.0.0",
     "near-api-js": "^0.39.0"
   },

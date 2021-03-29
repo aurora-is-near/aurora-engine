@@ -1,9 +1,5 @@
-import { NewCallArgs } from '@aurora-is-near/engine';
-import { defaultAbiCoder } from '@ethersproject/abi';
-import { arrayify } from '@ethersproject/bytes';
-import BN from 'bn.js';
+import { Engine } from '@aurora-is-near/engine';
 import { program } from 'commander';
-import nearAPI from 'near-api-js';
 
 main(process.argv, process.env);
 
@@ -20,30 +16,8 @@ async function main(argv, env) {
     .opts();
   if (options.debug) console.debug(options);
 
-  const near = await nearAPI.connect({
-    deps: {keyStore: new nearAPI.keyStores.InMemoryKeyStore()},
-    networkId: env.NEAR_ENV || 'local',
-    nodeUrl: 'http://localhost:3030',
-    keyPath: `${env.HOME}/.near/validator_key.json`,
-    contractName: options.evm,
-  });
-  const signer = await near.account(options.signer);
+  const engine = await Engine.connect(options, env);
 
-  let newCall = new NewCallArgs(
-    arrayify(defaultAbiCoder.encode(['uint256'], [options.chain])),
-    options.owner,
-    options.bridgeProver,
-    options.upgradeDelay
-  );
-  if (options.debug) console.debug(newCall);
-
-  let outcome = await rawFunctionCall(signer, options.evm, newCall);
+  const outcome = await engine.initialize(options);
   if (options.debug) console.debug(outcome);
-}
-
-async function rawFunctionCall(signer, contractID, args) {
-  const action = new nearAPI.transactions.Action({
-    functionCall: new nearAPI.transactions.FunctionCall(args.toFunctionCall())
-  });
-  return signer.signAndSendTransaction(contractID, [action]);
 }
