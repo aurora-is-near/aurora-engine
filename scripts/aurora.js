@@ -69,7 +69,7 @@ async function main(argv, env) {
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
       const chainID = await engine.getChainID();
-      console.log(chainID);
+      console.log(chainID.toString());
     });
 
   program
@@ -149,7 +149,7 @@ async function main(argv, env) {
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
       const balance = await engine.getBalance(address);
-      console.log(balance);
+      console.log(balance.toString());
     });
 
   program
@@ -160,7 +160,7 @@ async function main(argv, env) {
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
       const nonce = await engine.getNonce(address);
-      console.log(nonce);
+      console.log(nonce.toString());
     });
 
   program
