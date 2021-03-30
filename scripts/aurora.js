@@ -94,10 +94,14 @@ async function main(argv, env) {
     });
 
   program
-    .command('deploy-code')
+    .command('deploy-code <bytecode>')
     .alias('deploy_code')
-    .action(async (_options, _command) => {
-      // TODO
+    .action(async (input, options, command) => {
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
+      const address = await engine.deployCode(input);
+      console.log(address);
     });
 
   program

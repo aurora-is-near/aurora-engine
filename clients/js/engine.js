@@ -10,11 +10,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 import { GetStorageAtArgs, NewCallArgs } from './schema.js';
 import { defaultAbiCoder } from '@ethersproject/abi';
-import { getAddress } from '@ethersproject/address';
-import { arrayify } from '@ethersproject/bytes';
+import { getAddress as parseAddress } from '@ethersproject/address';
+import { arrayify as parseHexString } from '@ethersproject/bytes';
 import { toBigIntBE } from 'bigint-buffer';
 import BN from 'bn.js';
 import NEAR from 'near-api-js';
+export { getAddress as parseAddress } from '@ethersproject/address';
+export { arrayify as parseHexString } from '@ethersproject/bytes';
 export class Engine {
     constructor(near, signer, contract) {
         this.near = near;
@@ -35,7 +37,7 @@ export class Engine {
     }
     initialize(options) {
         return __awaiter(this, void 0, void 0, function* () {
-            const args = new NewCallArgs(arrayify(defaultAbiCoder.encode(['uint256'], [options.chain || 0])), options.owner || '', options.bridgeProver || '', new BN(options.upgradeDelay || 0));
+            const args = new NewCallArgs(parseHexString(defaultAbiCoder.encode(['uint256'], [options.chain || 0])), options.owner || '', options.bridgeProver || '', new BN(options.upgradeDelay || 0));
             return yield this.callMutativeFunction('new', args.encode());
         });
     }
@@ -60,29 +62,36 @@ export class Engine {
             return toBigIntBE(result);
         });
     }
+    deployCode(bytecode) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const args = parseHexString(bytecode);
+            const result = yield this.callMutativeFunction('deploy_code', args);
+            return parseAddress(result.toString('hex'));
+        });
+    }
     getCode(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const args = arrayify(getAddress(address));
+            const args = parseHexString(parseAddress(address));
             return yield this.callFunction('get_code', args);
         });
     }
     getBalance(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const args = arrayify(getAddress(address));
+            const args = parseHexString(parseAddress(address));
             const result = yield this.callFunction('get_balance', args);
             return toBigIntBE(result);
         });
     }
     getNonce(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const args = arrayify(getAddress(address));
+            const args = parseHexString(parseAddress(address));
             const result = yield this.callFunction('get_nonce', args);
             return toBigIntBE(result);
         });
     }
     getStorageAt(address, key) {
         return __awaiter(this, void 0, void 0, function* () {
-            const args = new GetStorageAtArgs(arrayify(getAddress(address)), arrayify(defaultAbiCoder.encode(['uint256'], [key])));
+            const args = new GetStorageAtArgs(parseHexString(parseAddress(address)), parseHexString(defaultAbiCoder.encode(['uint256'], [key])));
             return yield this.callFunction('get_storage_at', args.encode());
         });
     }
@@ -102,7 +111,11 @@ export class Engine {
     }
     callMutativeFunction(methodName, args = null) {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.signer.functionCall(this.contract, methodName, args || Buffer.alloc(0));
+            const result = yield this.signer.functionCall(this.contract, methodName, args || Buffer.alloc(0));
+            if (typeof result.status === 'object' && typeof result.status.SuccessValue === 'string') {
+                return Buffer.from(result.status.SuccessValue, 'base64');
+            }
+            return null; // TODO: throw error
         });
     }
 }

@@ -2,11 +2,14 @@
 
 import { GetStorageAtArgs, NewCallArgs } from './schema.js';
 import { defaultAbiCoder } from '@ethersproject/abi';
-import { getAddress } from '@ethersproject/address';
-import { arrayify } from '@ethersproject/bytes';
+import { getAddress as parseAddress } from '@ethersproject/address';
+import { arrayify as parseHexString } from '@ethersproject/bytes';
 import { toBigIntBE } from 'bigint-buffer';
 import BN from 'bn.js';
 import NEAR from 'near-api-js';
+
+export { getAddress as parseAddress } from '@ethersproject/address';
+export { arrayify as parseHexString } from '@ethersproject/bytes';
 
 export class Engine {
   constructor(
@@ -27,7 +30,7 @@ export class Engine {
 
   async initialize(options: any): Promise<any> {
     const args = new NewCallArgs(
-      arrayify(defaultAbiCoder.encode(['uint256'], [options.chain || 0])),
+      parseHexString(defaultAbiCoder.encode(['uint256'], [options.chain || 0])),
       options.owner || '',
       options.bridgeProver || '',
       new BN(options.upgradeDelay || 0)
@@ -52,27 +55,33 @@ export class Engine {
     return toBigIntBE(result);
   }
 
+  async deployCode(bytecode: string | Uint8Array): Promise<string> {
+    const args = parseHexString(bytecode);
+    const result = await this.callMutativeFunction('deploy_code', args);
+    return parseAddress(result.toString('hex'));
+  }
+
   async getCode(address: string): Promise<Uint8Array> {
-    const args = arrayify(getAddress(address));
+    const args = parseHexString(parseAddress(address));
     return await this.callFunction('get_code', args);
   }
 
   async getBalance(address: string): Promise<bigint> {
-    const args = arrayify(getAddress(address));
+    const args = parseHexString(parseAddress(address));
     const result = await this.callFunction('get_balance', args);
     return toBigIntBE(result);
   }
 
   async getNonce(address: string): Promise<bigint> {
-    const args = arrayify(getAddress(address));
+    const args = parseHexString(parseAddress(address));
     const result = await this.callFunction('get_nonce', args);
     return toBigIntBE(result);
   }
 
   async getStorageAt(address: string, key: string): Promise<Uint8Array> {
     const args = new GetStorageAtArgs(
-      arrayify(getAddress(address)),
-      arrayify(defaultAbiCoder.encode(['uint256'], [key])),
+      parseHexString(parseAddress(address)),
+      parseHexString(defaultAbiCoder.encode(['uint256'], [key])),
     );
     return await this.callFunction('get_storage_at', args.encode());
   }
@@ -90,6 +99,10 @@ export class Engine {
   }
 
   async callMutativeFunction(methodName: string, args: Uint8Array | null = null): Promise<any> {
-    return await this.signer.functionCall(this.contract, methodName, args || Buffer.alloc(0));
+    const result = await this.signer.functionCall(this.contract, methodName, args || Buffer.alloc(0));
+    if (typeof result.status === 'object' && typeof result.status.SuccessValue === 'string') {
+      return Buffer.from(result.status.SuccessValue, 'base64');
+    }
+    return null; // TODO: throw error
   }
 }

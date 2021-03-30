@@ -131,9 +131,9 @@ mod contract {
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
         let mut engine = Engine::new(predecessor_address());
-        let (status, result) = Engine::deploy_code_with_input(&mut engine, &input);
+        let (status, address) = Engine::deploy_code_with_input(&mut engine, &input);
         // TODO: charge for storage
-        process_exit_reason(status, &result.0)
+        process_exit_reason(status, &address.0)
     }
 
     /// Call method on the EVM contract.
