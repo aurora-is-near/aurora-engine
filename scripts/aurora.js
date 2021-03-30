@@ -12,109 +12,118 @@ async function main(argv, env) {
 
   program
     .command('get_version')
-    .action((_options, _command) => {
-      // TODO
+    .action(async (_options, command) => {
+      const engine = await Engine.connect(command.parent.opts(), env);
+      const result = await engine.getVersion();
+      const version = result.toString('utf8', 0, result.length - 1);
+      console.log(version);
     });
 
   program
     .command('get_owner')
-    .action((_options, _command) => {
-      // TODO
+    .action(async (_options, _command) => {
+      const engine = await Engine.connect(command.parent.opts(), env);
+      const result = await engine.getOwner();
+      console.log(result);
     });
 
   program
     .command('get_bridge_provider')
-    .action((_options, _command) => {
-      // TODO
+    .action(async (_options, _command) => {
+      const engine = await Engine.connect(command.parent.opts(), env);
+      const result = await engine.getBridgeProvider();
+      console.log(result);
     });
 
   program
     .command('get_chain_id')
-    .action((_options, _command) => {
-      // TODO
+    .action(async (options, command) => {
+      const engine = await Engine.connect(command.parent.opts(), env);
+      const chainID = await engine.getChainID();
+      console.log(chainID);
     });
 
   program
     .command('get_upgrade_index')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('stage_upgrade')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('deploy_upgrade')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('deploy_code')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('call')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('raw_call')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('meta_call')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('view')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('get_code')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('get_balance')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('get_nonce')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('get_storage_at')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('begin_chain')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 
   program
     .command('begin_block')
-    .action((_options, _command) => {
+    .action(async (_options, _command) => {
       // TODO
     });
 

@@ -11,12 +11,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 import { NewCallArgs } from './schema.js';
 import { defaultAbiCoder } from '@ethersproject/abi';
 import { arrayify } from '@ethersproject/bytes';
-import BN from 'bn.js';
 import NEAR from 'near-api-js';
 export class Engine {
-    constructor(near, signer) {
+    constructor(near, signer, contract) {
         this.near = near;
         this.signer = signer;
+        this.contract = contract;
     }
     static connect(options, env) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -27,18 +27,34 @@ export class Engine {
                 keyPath: `${env.HOME}/.near/validator_key.json`,
             });
             const signer = yield near.account(options.signer);
-            return new Engine(near, signer);
+            return new Engine(near, signer, options.evm);
         });
     }
     initialize(options) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = new NewCallArgs(arrayify(defaultAbiCoder.encode(['uint256'], [options.chain])), options.owner, options.bridgeProver, options.upgradeDelay);
-            return yield this.signer.functionCall(options.evm, 'new', args.encode());
+            return yield this.signer.functionCall(this.contract, 'new', args.encode());
+        });
+    }
+    getVersion() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.signer.viewFunction(this.contract, 'get_version', {}, { parse: (x) => x });
+        });
+    }
+    getOwner() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.signer.viewFunction(this.contract, 'get_owner', {}, { parse: (x) => x });
+        });
+    }
+    getBridgeProvider() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.signer.viewFunction(this.contract, 'get_bridge_provider', {}, { parse: (x) => x });
         });
     }
     getChainID() {
         return __awaiter(this, void 0, void 0, function* () {
-            return new BN(0);
+            const result = yield this.signer.viewFunction(this.contract, 'get_chain_id', {}, { parse: (x) => x });
+            return result.readUInt32BE(28);
         });
     }
 }
