@@ -2,9 +2,13 @@
 
 import { NewCallArgs } from './schema.js';
 import { defaultAbiCoder } from '@ethersproject/abi';
+import { getAddress } from '@ethersproject/address';
 import { arrayify } from '@ethersproject/bytes';
+import { toBigIntBE } from 'bigint-buffer';
 import BN from 'bn.js';
 import NEAR from 'near-api-js';
+
+const noParse = { parse: (x: any): any => x };
 
 export class Engine {
   constructor(
@@ -28,25 +32,31 @@ export class Engine {
       arrayify(defaultAbiCoder.encode(['uint256'], [options.chain || 0])),
       options.owner || '',
       options.bridgeProver || '',
-      options.upgradeDelay || 0
+      new BN(options.upgradeDelay || 0)
     );
     return await this.signer!.functionCall(this.contract, 'new', args.encode());
   }
 
   async getVersion(): Promise<string> {
-    return await this.signer!.viewFunction(this.contract, 'get_version', {}, { parse: (x: any): any => x });
+    return await this.signer!.viewFunction(this.contract, 'get_version', {}, noParse);
   }
 
   async getOwner(): Promise<string> {
-    return await this.signer!.viewFunction(this.contract, 'get_owner', {}, { parse: (x: any): any => x });
+    return await this.signer!.viewFunction(this.contract, 'get_owner', {}, noParse);
   }
 
   async getBridgeProvider(): Promise<string> {
-    return await this.signer!.viewFunction(this.contract, 'get_bridge_provider', {}, { parse: (x: any): any => x });
+    return await this.signer!.viewFunction(this.contract, 'get_bridge_provider', {}, noParse);
   }
 
-  async getChainID(): Promise<BN> {
-    const result = await this.signer!.viewFunction(this.contract, 'get_chain_id', {}, { parse: (x: any): any => x });
-    return result.readUInt32BE(28);
+  async getChainID(): Promise<bigint> {
+    const result = await this.signer!.viewFunction(this.contract, 'get_chain_id', {}, noParse);
+    return toBigIntBE(result);
+  }
+
+  async getBalance(address: string): Promise<bigint> {
+    const args = arrayify(getAddress(address));
+    const result = await this.signer!.viewFunction(this.contract, 'get_balance', args, noParse);
+    return toBigIntBE(result);
   }
 }

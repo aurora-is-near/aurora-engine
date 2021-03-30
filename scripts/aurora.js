@@ -6,15 +6,15 @@ main(process.argv, process.env);
 async function main(argv, env) {
   program
     .option('-d, --debug', 'enable debug output')
-    .option("--signer <ACCOUNT>", "specify signer master account ID", env.NEAR_MASTER_ACCOUNT || 'test.near')
-    .option("--evm <ACCOUNT>", "specify EVM contract account ID", env.NEAR_EVM_ACCOUNT || 'evm.test.near')
-    .option("--chain <ID>", "specify chain ID", 0);
+    .option("--signer <account>", "specify signer master account ID", env.NEAR_MASTER_ACCOUNT || 'test.near')
+    .option("--evm <account>", "specify EVM contract account ID", env.NEAR_EVM_ACCOUNT || 'evm.test.near')
+    .option("--chain <id>", "specify EVM chain ID", 0);
 
   program
     .command('init')
-    .option("--owner <ACCOUNT>", "specify owner account ID", null)
-    .option("--bridge-prover <ACCOUNT>", "specify bridge prover account ID", null)
-    .option("--upgrade-delay <BLOCKS>", "specify upgrade delay block count", 0)
+    .option("--owner <account>", "specify owner account ID", null)
+    .option("--bridge-prover <account>", "specify bridge prover account ID", null)
+    .option("--upgrade-delay <blocks>", "specify upgrade delay block count", 0)
     .action(async (options, command) => {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
@@ -24,7 +24,8 @@ async function main(argv, env) {
     });
 
   program
-    .command('get_version')
+    .command('get-version')
+    .alias('get_version')
     .action(async (options, command) => {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
@@ -35,7 +36,8 @@ async function main(argv, env) {
     });
 
   program
-    .command('get_owner')
+    .command('get-owner')
+    .alias('get_owner')
     .action(async (options, command) => {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
@@ -46,7 +48,8 @@ async function main(argv, env) {
     });
 
   program
-    .command('get_bridge_provider')
+    .command('get-bridge-provider')
+    .alias('get_bridge_provider')
     .action(async (options, command) => {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
@@ -57,7 +60,10 @@ async function main(argv, env) {
     });
 
   program
-    .command('get_chain_id')
+    .command('get-chain-id')
+    .alias('get_chain_id')
+    .alias('get-chain')
+    .alias('get_chain')
     .action(async (options, command) => {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
@@ -67,25 +73,29 @@ async function main(argv, env) {
     });
 
   program
-    .command('get_upgrade_index')
+    .command('get-upgrade-index')
+    .alias('get_upgrade_index')
     .action(async (_options, _command) => {
       // TODO
     });
 
   program
-    .command('stage_upgrade')
+    .command('stage-upgrade')
+    .alias('stage_upgrade')
     .action(async (_options, _command) => {
       // TODO
     });
 
   program
-    .command('deploy_upgrade')
+    .command('deploy-upgrade')
+    .alias('deploy_upgrade')
     .action(async (_options, _command) => {
       // TODO
     });
 
   program
-    .command('deploy_code')
+    .command('deploy-code')
+    .alias('deploy_code')
     .action(async (_options, _command) => {
       // TODO
     });
@@ -97,13 +107,15 @@ async function main(argv, env) {
     });
 
   program
-    .command('raw_call')
+    .command('raw-call')
+    .alias('raw_call')
     .action(async (_options, _command) => {
       // TODO
     });
 
   program
-    .command('meta_call')
+    .command('meta-call')
+    .alias('meta_call')
     .action(async (_options, _command) => {
       // TODO
     });
@@ -115,38 +127,48 @@ async function main(argv, env) {
     });
 
   program
-    .command('get_code')
-    .action(async (_options, _command) => {
+    .command('get-code <address>')
+    .alias('get_code')
+    .action(async (address, options, command) => {
       // TODO
     });
 
   program
-    .command('get_balance')
-    .action(async (_options, _command) => {
+    .command('get-balance <address>')
+    .alias('get_balance')
+    .action(async (address, options, command) => {
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
+      const balance = await engine.getBalance(address);
+      console.log(balance);
+    });
+
+  program
+    .command('get-nonce <address>')
+    .alias('get_nonce')
+    .action(async (address, options, command) => {
       // TODO
     });
 
   program
-    .command('get_nonce')
-    .action(async (_options, _command) => {
+    .command('get-storage-at <address> <key>')
+    .alias('get_storage_at')
+    .action(async (address, key, options, command) => {
       // TODO
     });
 
   program
-    .command('get_storage_at')
-    .action(async (_options, _command) => {
+    .command('begin-chain <id>')
+    .alias('begin_chain')
+    .action(async (chain_id, options, command) => {
       // TODO
     });
 
   program
-    .command('begin_chain')
-    .action(async (_options, _command) => {
-      // TODO
-    });
-
-  program
-    .command('begin_block')
-    .action(async (_options, _command) => {
+    .command('begin-block <hash>')
+    .alias('begin_block')
+    .action(async (hash, options, command) => {
       // TODO
     });
 

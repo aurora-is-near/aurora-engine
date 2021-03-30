@@ -8,7 +8,7 @@ all: index.js engine.js schema.js
 
 # Rules for development:
 
-%.js: %.ts tsconfig.json
+%.js: %.ts tsconfig.json package.json package-lock.json
 	$(TSC)
 
 %.d.ts: %.js

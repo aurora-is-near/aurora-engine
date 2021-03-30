@@ -1,4 +1,3 @@
-import BN from 'bn.js';
 import NEAR from 'near-api-js';
 export declare class Engine {
     near: NEAR.Near;
@@ -10,5 +9,6 @@ export declare class Engine {
     getVersion(): Promise<string>;
     getOwner(): Promise<string>;
     getBridgeProvider(): Promise<string>;
-    getChainID(): Promise<BN>;
+    getChainID(): Promise<bigint>;
+    getBalance(address: string): Promise<bigint>;
 }

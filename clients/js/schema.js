@@ -1,9 +1,9 @@
 /* This is free and unencumbered software released into the public domain. */
 import BN from 'bn.js';
-import nearAPI from 'near-api-js';
+import NEAR from 'near-api-js';
 class Assignable {
     encode() {
-        return nearAPI.utils.serialize.serialize(SCHEMA, this);
+        return NEAR.utils.serialize.serialize(SCHEMA, this);
     }
     toFunctionCall() {
         return {
