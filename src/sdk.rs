@@ -1,4 +1,6 @@
-use crate::prelude::{vec, Vec, H256};
+use crate::prelude::{vec, Vec, H256, String};
+use borsh::{BorshSerialize, BorshDeserialize};
+use crate::types::STORAGE_PRICE_PER_BYTE;
 
 mod exports {
 
@@ -21,13 +23,13 @@ mod exports {
         pub(crate) fn block_index() -> u64;
         pub(crate) fn block_timestamp() -> u64;
         fn epoch_height() -> u64;
-        fn storage_usage() -> u64;
+        pub(crate) fn storage_usage() -> u64;
         // #################
         // # Economics API #
         // #################
         fn account_balance(balance_ptr: u64);
-        fn attached_deposit(balance_ptr: u64);
-        fn prepaid_gas() -> u64;
+        pub(crate) fn attached_deposit(balance_ptr: u64);
+        pub(crate) fn prepaid_gas() -> u64;
         fn used_gas() -> u64;
         // ############
         // # Math API #
@@ -47,7 +49,7 @@ mod exports {
         // ################
         // # Promises API #
         // ################
-        fn promise_create(
+        pub(crate) fn promise_create(
             account_id_len: u64,
             account_id_ptr: u64,
             method_name_len: u64,
@@ -57,7 +59,7 @@ mod exports {
             amount_ptr: u64,
             gas: u64,
         ) -> u64;
-        fn promise_then(
+        pub(crate) fn promise_then(
             promise_index: u64,
             account_id_len: u64,
             account_id_ptr: u64,
@@ -89,7 +91,7 @@ mod exports {
             amount_ptr: u64,
             gas: u64,
         );
-        fn promise_batch_action_transfer(promise_index: u64, amount_ptr: u64);
+        pub(crate) fn promise_batch_action_transfer(promise_index: u64, amount_ptr: u64);
         fn promise_batch_action_stake(
             promise_index: u64,
             amount_ptr: u64,
@@ -126,9 +128,9 @@ mod exports {
         // #######################
         // # Promise API results #
         // #######################
-        fn promise_results_count() -> u64;
-        fn promise_result(result_idx: u64, register_id: u64) -> u64;
-        fn promise_return(promise_id: u64);
+        pub(crate) fn promise_results_count() -> u64;
+        pub(crate) fn promise_result(result_idx: u64, register_id: u64) -> u64;
+        pub(crate) fn promise_return(promise_id: u64);
         // ###############
         // # Storage API #
         // ###############
@@ -141,7 +143,7 @@ mod exports {
         ) -> u64;
         pub(crate) fn storage_read(key_len: u64, key_ptr: u64, register_id: u64) -> u64;
         pub(crate) fn storage_remove(key_len: u64, key_ptr: u64, register_id: u64) -> u64;
-        fn storage_has_key(key_len: u64, key_ptr: u64) -> u64;
+        pub(crate) fn storage_has_key(key_len: u64, key_ptr: u64) -> u64;
         fn storage_iter_prefix(prefix_len: u64, prefix_ptr: u64) -> u64;
         fn storage_iter_range(start_len: u64, start_ptr: u64, end_len: u64, end_ptr: u64) -> u64;
         fn storage_iter_next(iterator_id: u64, key_register_id: u64, value_register_id: u64)
@@ -326,4 +328,139 @@ pub fn self_deploy(code_key: &[u8]) {
         exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1);
         exports::promise_batch_action_deploy_contract(promise_id, u64::MAX as _, 1);
     }
+}
+
+pub fn save_contract<T: BorshSerialize>(key: &str, data: &T) {
+    write_storage(key.as_bytes(), &data.try_to_vec().unwrap()[..]);
+}
+
+pub fn get_contract_data<T: BorshDeserialize>(key: &str) -> T {
+    let data = read_storage(key.as_bytes()).expect("Failed read storage");
+    T::try_from_slice(&data[..]).unwrap()
+}
+
+pub fn log(data: String) {
+    log_utf8(data.as_bytes())
+}
+
+pub fn storage_usage() -> u64 {
+    unsafe { exports::storage_usage() }
+}
+
+pub fn prepaid_gas() -> u64 {
+    unsafe { exports::prepaid_gas() }
+}
+
+pub fn promise_create(
+    account_id: String,
+    method_name: &[u8],
+    arguments: &[u8],
+    amount: u128,
+    gas: u64,
+) -> u64 {
+    let account_id = account_id.as_bytes();
+    unsafe {
+        exports::promise_create(
+            account_id.len() as _,
+            account_id.as_ptr() as _,
+            method_name.len() as _,
+            method_name.as_ptr() as _,
+            arguments.len() as _,
+            arguments.as_ptr() as _,
+            &amount as *const u128 as _,
+            gas,
+        )
+    }
+}
+
+pub fn promise_then(
+    promise_idx: u64,
+    account_id: String,
+    method_name: &[u8],
+    arguments: &[u8],
+    amount: u128,
+    gas: u64,
+) -> u64 {
+    let account_id = account_id.as_bytes();
+    unsafe {
+        exports::promise_then(
+            promise_idx,
+            account_id.len() as _,
+            account_id.as_ptr() as _,
+            method_name.len() as _,
+            method_name.as_ptr() as _,
+            arguments.len() as _,
+            arguments.as_ptr() as _,
+            &amount as *const u128 as _,
+            gas,
+        )
+    }
+}
+
+pub fn promise_return(promise_idx: u64) {
+    unsafe {
+        exports::promise_return(promise_idx);
+    }
+}
+
+pub fn promise_results_count() -> u64 {
+    unsafe { exports::promise_results_count() }
+}
+
+/*pub fn promise_result(result_idx: u64) -> PromiseResult {
+    unsafe {
+        match exports::promise_result(result_idx, 0) {
+            0 => PromiseResult::NotReady,
+            1 => {
+                let bytes: Vec<u8> = vec![0; exports::register_len(0) as usize];
+                exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
+                PromiseResult::Successful(bytes)
+            }
+            2 => PromiseResult::Failed,
+            _ => panic!("{}", RETURN_CODE_ERR),
+        }
+    }
+}*/
+
+pub fn assert_private_call() {
+    assert_eq!(
+        predecessor_account_id(),
+        current_account_id(),
+        "Function is private"
+    );
+}
+
+pub fn attached_deposit() -> u128 {
+    use core::intrinsics::size_of;
+    unsafe {
+        let data = [0u8; size_of::<u128>()];
+        exports::attached_deposit(data.as_ptr() as u64);
+        u128::from_le_bytes(data)
+    }
+}
+
+pub fn assert_one_yocto() {
+    assert_eq!(
+        attached_deposit(),
+        1,
+        "Requires attached deposit of exactly 1 yoctoNEAR"
+    )
+}
+
+pub fn promise_batch_action_transfer(promise_index: u64, amount: u128) {
+    unsafe {
+        exports::promise_batch_action_transfer(promise_index, &amount as *const u128 as _);
+    }
+}
+
+pub fn storage_byte_cost() -> u128 {
+    STORAGE_PRICE_PER_BYTE
+}
+
+pub fn promise_batch_create(account_id: String) -> u64 {
+    unsafe { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) }
+}
+
+pub fn storage_has_key(key: &str) -> bool {
+    unsafe { exports::storage_has_key(key.len() as u64, key.as_ptr() as u64) == 1 }
 }
