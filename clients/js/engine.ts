@@ -8,8 +8,6 @@ import { toBigIntBE } from 'bigint-buffer';
 import BN from 'bn.js';
 import NEAR from 'near-api-js';
 
-const noParse = { parse: (x: any): any => x };
-
 export class Engine {
   constructor(
     public near: NEAR.Near,
@@ -38,44 +36,56 @@ export class Engine {
   }
 
   async getVersion(): Promise<string> {
-    return await this.signer.viewFunction(this.contract, 'get_version', {}, noParse);
+    return await this.viewFunction('get_version');
   }
 
   async getOwner(): Promise<string> {
-    return await this.signer.viewFunction(this.contract, 'get_owner', {}, noParse);
+    return await this.viewFunction('get_owner');
   }
 
   async getBridgeProvider(): Promise<string> {
-    return await this.signer.viewFunction(this.contract, 'get_bridge_provider', {}, noParse);
+    return await this.viewFunction('get_bridge_provider');
   }
 
   async getChainID(): Promise<bigint> {
-    const result = await this.signer.viewFunction(this.contract, 'get_chain_id', {}, noParse);
+    const result = await this.viewFunction('get_chain_id');
     return toBigIntBE(result);
   }
 
-  async getCode(address: string): Promise<Buffer> {
+  async getCode(address: string): Promise<Uint8Array> {
     const args = arrayify(getAddress(address));
-    return await this.signer.viewFunction(this.contract, 'get_code', args, noParse);
+    return await this.viewFunction('get_code', args);
   }
 
   async getBalance(address: string): Promise<bigint> {
     const args = arrayify(getAddress(address));
-    const result = await this.signer.viewFunction(this.contract, 'get_balance', args, noParse);
+    const result = await this.viewFunction('get_balance', args);
     return toBigIntBE(result);
   }
 
   async getNonce(address: string): Promise<bigint> {
     const args = arrayify(getAddress(address));
-    const result = await this.signer.viewFunction(this.contract, 'get_nonce', args, noParse);
+    const result = await this.viewFunction('get_nonce', args);
     return toBigIntBE(result);
   }
 
-  async getStorageAt(address: string, key: string): Promise<Buffer> {
+  async getStorageAt(address: string, key: string): Promise<Uint8Array> {
     const args = new GetStorageAtArgs(
       arrayify(getAddress(address)),
       arrayify(defaultAbiCoder.encode(['uint256'], [key])),
     );
-    return await this.signer.viewFunction(this.contract, 'get_storage_at', args.encode(), noParse);
+    return await this.viewFunction('get_storage_at', args.encode());
+  }
+
+  async viewFunction(methodName: string, args: Uint8Array | null = null): Promise<any> {
+    const result = await this.signer.connection.provider.query({
+      request_type: 'call_function',
+      account_id: this.contract,
+      method_name: methodName,
+      args_base64: (args ? Buffer.from(args!) : Buffer.alloc(0)).toString('base64'),
+      finality: 'optimistic',
+    });
+    if (result.logs && result.logs.length > 0) console.debug(result.logs); // TODO
+    return Buffer.from(result.result);
   }
 }

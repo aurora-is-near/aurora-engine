@@ -15,7 +15,6 @@ import { arrayify } from '@ethersproject/bytes';
 import { toBigIntBE } from 'bigint-buffer';
 import BN from 'bn.js';
 import NEAR from 'near-api-js';
-const noParse = { parse: (x) => x };
 export class Engine {
     constructor(near, signer, contract) {
         this.near = near;
@@ -42,49 +41,63 @@ export class Engine {
     }
     getVersion() {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.signer.viewFunction(this.contract, 'get_version', {}, noParse);
+            return yield this.viewFunction('get_version');
         });
     }
     getOwner() {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.signer.viewFunction(this.contract, 'get_owner', {}, noParse);
+            return yield this.viewFunction('get_owner');
         });
     }
     getBridgeProvider() {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.signer.viewFunction(this.contract, 'get_bridge_provider', {}, noParse);
+            return yield this.viewFunction('get_bridge_provider');
         });
     }
     getChainID() {
         return __awaiter(this, void 0, void 0, function* () {
-            const result = yield this.signer.viewFunction(this.contract, 'get_chain_id', {}, noParse);
+            const result = yield this.viewFunction('get_chain_id');
             return toBigIntBE(result);
         });
     }
     getCode(address) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = arrayify(getAddress(address));
-            return yield this.signer.viewFunction(this.contract, 'get_code', args, noParse);
+            return yield this.viewFunction('get_code', args);
         });
     }
     getBalance(address) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = arrayify(getAddress(address));
-            const result = yield this.signer.viewFunction(this.contract, 'get_balance', args, noParse);
+            const result = yield this.viewFunction('get_balance', args);
             return toBigIntBE(result);
         });
     }
     getNonce(address) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = arrayify(getAddress(address));
-            const result = yield this.signer.viewFunction(this.contract, 'get_nonce', args, noParse);
+            const result = yield this.viewFunction('get_nonce', args);
             return toBigIntBE(result);
         });
     }
     getStorageAt(address, key) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = new GetStorageAtArgs(arrayify(getAddress(address)), arrayify(defaultAbiCoder.encode(['uint256'], [key])));
-            return yield this.signer.viewFunction(this.contract, 'get_storage_at', args.encode(), noParse);
+            return yield this.viewFunction('get_storage_at', args.encode());
+        });
+    }
+    viewFunction(methodName, args = null) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const result = yield this.signer.connection.provider.query({
+                request_type: 'call_function',
+                account_id: this.contract,
+                method_name: methodName,
+                args_base64: (args ? Buffer.from(args) : Buffer.alloc(0)).toString('base64'),
+                finality: 'optimistic',
+            });
+            if (result.logs && result.logs.length > 0)
+                console.debug(result.logs); // TODO
+            return Buffer.from(result.result);
         });
     }
 }

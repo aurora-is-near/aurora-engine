@@ -140,7 +140,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn call() {
         let input = sdk::read_input();
-        let args = FunctionCallArgs::try_from_slice(&input).unwrap();
+        let args = FunctionCallArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         let mut engine = Engine::new(predecessor_address());
         let (status, result) = Engine::call_with_args(&mut engine, args);
         // TODO: charge for storage
@@ -232,7 +232,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn view() {
         let input = sdk::read_input();
-        let args = ViewCallArgs::try_from_slice(&input).unwrap();
+        let args = ViewCallArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         let mut engine = Engine::new(Address::from_slice(&args.sender));
         let (status, result) = Engine::view_with_args(&mut engine, args);
         process_exit_reason(status, &result)
@@ -262,7 +262,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
         let input = sdk::read_input();
-        let args = GetStorageAtArgs::try_from_slice(&input).unwrap();
+        let args = GetStorageAtArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         let value = Engine::get_storage(&Address(args.address), &H256(args.key));
         sdk::return_output(&value.0)
     }
@@ -275,7 +275,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn begin_chain() {
         let input = sdk::read_input();
-        let args = BeginChainArgs::try_from_slice(&input).unwrap();
+        let args = BeginChainArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         let mut state = Engine::get_state();
         state.chain_id = args.chain_id;
         Engine::set_state(state);
@@ -286,7 +286,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn begin_block() {
         let input = sdk::read_input();
-        let _args = BeginBlockArgs::try_from_slice(&input).unwrap();
+        let _args = BeginBlockArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 

@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import NEAR from 'near-api-js';
 export declare class Engine {
     near: NEAR.Near;
@@ -11,8 +10,9 @@ export declare class Engine {
     getOwner(): Promise<string>;
     getBridgeProvider(): Promise<string>;
     getChainID(): Promise<bigint>;
-    getCode(address: string): Promise<Buffer>;
+    getCode(address: string): Promise<Uint8Array>;
     getBalance(address: string): Promise<bigint>;
     getNonce(address: string): Promise<bigint>;
-    getStorageAt(address: string, key: string): Promise<Buffer>;
+    getStorageAt(address: string, key: string): Promise<Uint8Array>;
+    viewFunction(methodName: string, args?: Uint8Array | null): Promise<any>;
 }
