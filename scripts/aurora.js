@@ -162,8 +162,14 @@ async function main(argv, env) {
   program
     .command('get-storage-at <address> <key>')
     .alias('get_storage_at')
+    .alias('get-storage')
+    .alias('get_storage')
     .action(async (address, key, options, command) => {
-      // TODO
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
+      const value = await engine.getStorageAt(address, key);
+      console.log(`0x${value ? value.toString('hex') : ''}`);
     });
 
   program

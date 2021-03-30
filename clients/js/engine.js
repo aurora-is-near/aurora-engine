@@ -8,7 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { NewCallArgs } from './schema.js';
+import { GetStorageAtArgs, NewCallArgs } from './schema.js';
 import { defaultAbiCoder } from '@ethersproject/abi';
 import { getAddress } from '@ethersproject/address';
 import { arrayify } from '@ethersproject/bytes';
@@ -64,8 +64,7 @@ export class Engine {
     getCode(address) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = arrayify(getAddress(address));
-            const result = yield this.signer.viewFunction(this.contract, 'get_code', args, noParse);
-            return result;
+            return yield this.signer.viewFunction(this.contract, 'get_code', args, noParse);
         });
     }
     getBalance(address) {
@@ -80,6 +79,12 @@ export class Engine {
             const args = arrayify(getAddress(address));
             const result = yield this.signer.viewFunction(this.contract, 'get_nonce', args, noParse);
             return toBigIntBE(result);
+        });
+    }
+    getStorageAt(address, key) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const args = new GetStorageAtArgs(arrayify(getAddress(address)), arrayify(defaultAbiCoder.encode(['uint256'], [key])));
+            return yield this.signer.viewFunction(this.contract, 'get_storage_at', args.encode(), noParse);
         });
     }
 }

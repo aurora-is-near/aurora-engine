@@ -14,4 +14,5 @@ export declare class Engine {
     getCode(address: string): Promise<Buffer>;
     getBalance(address: string): Promise<bigint>;
     getNonce(address: string): Promise<bigint>;
+    getStorageAt(address: string, key: string): Promise<Buffer>;
 }
