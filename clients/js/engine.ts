@@ -25,10 +25,10 @@ export class Engine {
 
   async initialize(options: any): Promise<any> {
     const args = new NewCallArgs(
-      arrayify(defaultAbiCoder.encode(['uint256'], [options.chain])),
-      options.owner,
-      options.bridgeProver,
-      options.upgradeDelay
+      arrayify(defaultAbiCoder.encode(['uint256'], [options.chain || 0])),
+      options.owner || '',
+      options.bridgeProver || '',
+      options.upgradeDelay || 0
     );
     return await this.signer!.functionCall(this.contract, 'new', args.encode());
   }

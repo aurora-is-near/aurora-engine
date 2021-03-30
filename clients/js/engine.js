@@ -32,7 +32,7 @@ export class Engine {
     }
     initialize(options) {
         return __awaiter(this, void 0, void 0, function* () {
-            const args = new NewCallArgs(arrayify(defaultAbiCoder.encode(['uint256'], [options.chain])), options.owner, options.bridgeProver, options.upgradeDelay);
+            const args = new NewCallArgs(arrayify(defaultAbiCoder.encode(['uint256'], [options.chain || 0])), options.owner || '', options.bridgeProver || '', options.upgradeDelay || 0);
             return yield this.signer.functionCall(this.contract, 'new', args.encode());
         });
     }

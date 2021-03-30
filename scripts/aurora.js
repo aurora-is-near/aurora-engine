@@ -11,9 +11,24 @@ async function main(argv, env) {
     .option("--chain <ID>", "specify chain ID", 0);
 
   program
+    .command('init')
+    .option("--owner <ACCOUNT>", "specify owner account ID", null)
+    .option("--bridge-prover <ACCOUNT>", "specify bridge prover account ID", null)
+    .option("--upgrade-delay <BLOCKS>", "specify upgrade delay block count", 0)
+    .action(async (options, command) => {
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
+      const outcome = await engine.initialize(config);
+      if (config.debug) console.debug("Outcome:", outcome);
+    });
+
+  program
     .command('get_version')
-    .action(async (_options, command) => {
-      const engine = await Engine.connect(command.parent.opts(), env);
+    .action(async (options, command) => {
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
       const result = await engine.getVersion();
       const version = result.toString('utf8', 0, result.length - 1);
       console.log(version);
@@ -21,24 +36,32 @@ async function main(argv, env) {
 
   program
     .command('get_owner')
-    .action(async (_options, _command) => {
-      const engine = await Engine.connect(command.parent.opts(), env);
+    .action(async (options, command) => {
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
       const result = await engine.getOwner();
-      console.log(result);
+      const accountID = result.toString('utf8');
+      console.log(accountID);
     });
 
   program
     .command('get_bridge_provider')
-    .action(async (_options, _command) => {
-      const engine = await Engine.connect(command.parent.opts(), env);
+    .action(async (options, command) => {
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
       const result = await engine.getBridgeProvider();
-      console.log(result);
+      const accountID = result.toString('utf8');
+      console.log(accountID);
     });
 
   program
     .command('get_chain_id')
     .action(async (options, command) => {
-      const engine = await Engine.connect(command.parent.opts(), env);
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
       const chainID = await engine.getChainID();
       console.log(chainID);
     });
