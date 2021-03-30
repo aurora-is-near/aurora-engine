@@ -31,7 +31,7 @@ async function main(argv, env) {
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
       const result = await engine.getVersion();
-      const version = result.toString('utf8', 0, result.length - 1);
+      const version = result.substring(0, result.length - 1);
       console.log(version);
     });
 
@@ -42,8 +42,7 @@ async function main(argv, env) {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
-      const result = await engine.getOwner();
-      const accountID = result.toString('utf8');
+      const accountID = await engine.getOwner();
       console.log(accountID);
     });
 
@@ -54,8 +53,7 @@ async function main(argv, env) {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
-      const result = await engine.getBridgeProvider();
-      const accountID = result.toString('utf8');
+      const accountID = await engine.getBridgeProvider();
       console.log(accountID);
     });
 
@@ -173,7 +171,7 @@ async function main(argv, env) {
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
       const value = await engine.getStorageAt(address, key);
-      console.log(`0x${value ? value.toString('hex') : ''}`);
+      console.log(value.toString());
     });
 
   program

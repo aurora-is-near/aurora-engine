@@ -1,22 +1,30 @@
+/// <reference types="node" />
 import NEAR from 'near-api-js';
 export { getAddress as parseAddress } from '@ethersproject/address';
 export { arrayify as parseHexString } from '@ethersproject/bytes';
+export declare type AccountID = string;
+export declare type Address = string;
+export declare type Bytecode = Uint8Array;
+export declare type Bytecodeish = Bytecode | string;
+export declare type ChainID = bigint;
+export declare type U256 = bigint;
 export declare class Engine {
     near: NEAR.Near;
     signer: NEAR.Account;
-    contract: string;
-    constructor(near: NEAR.Near, signer: NEAR.Account, contract: string);
+    contract: AccountID;
+    constructor(near: NEAR.Near, signer: NEAR.Account, contract: AccountID);
     static connect(options: any, env: any): Promise<Engine>;
     initialize(options: any): Promise<any>;
     getVersion(): Promise<string>;
-    getOwner(): Promise<string>;
-    getBridgeProvider(): Promise<string>;
-    getChainID(): Promise<bigint>;
-    deployCode(bytecode: string | Uint8Array): Promise<string>;
-    getCode(address: string): Promise<Uint8Array>;
-    getBalance(address: string): Promise<bigint>;
-    getNonce(address: string): Promise<bigint>;
-    getStorageAt(address: string, key: string): Promise<Uint8Array>;
-    callFunction(methodName: string, args?: Uint8Array | null): Promise<any>;
-    callMutativeFunction(methodName: string, args?: Uint8Array | null): Promise<any>;
+    getOwner(): Promise<AccountID>;
+    getBridgeProvider(): Promise<AccountID>;
+    getChainID(): Promise<ChainID>;
+    deployCode(bytecode: Bytecodeish): Promise<Address>;
+    getCode(address: Address): Promise<Bytecode>;
+    getBalance(address: Address): Promise<U256>;
+    getNonce(address: Address): Promise<U256>;
+    getStorageAt(address: Address, key: U256 | string): Promise<U256>;
+    protected callFunction(methodName: string, args?: Uint8Array): Promise<Buffer>;
+    protected callMutativeFunction(methodName: string, args?: Uint8Array): Promise<Buffer>;
+    private prepareInput;
 }

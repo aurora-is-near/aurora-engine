@@ -43,17 +43,17 @@ export class Engine {
     }
     getVersion() {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.callFunction('get_version');
+            return (yield this.callFunction('get_version')).toString();
         });
     }
     getOwner() {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.callFunction('get_owner');
+            return (yield this.callFunction('get_owner')).toString();
         });
     }
     getBridgeProvider() {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.callFunction('get_bridge_provider');
+            return (yield this.callFunction('get_bridge_provider')).toString();
         });
     }
     getChainID() {
@@ -92,16 +92,17 @@ export class Engine {
     getStorageAt(address, key) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = new GetStorageAtArgs(parseHexString(parseAddress(address)), parseHexString(defaultAbiCoder.encode(['uint256'], [key])));
-            return yield this.callFunction('get_storage_at', args.encode());
+            const result = yield this.callFunction('get_storage_at', args.encode());
+            return toBigIntBE(result);
         });
     }
-    callFunction(methodName, args = null) {
+    callFunction(methodName, args) {
         return __awaiter(this, void 0, void 0, function* () {
             const result = yield this.signer.connection.provider.query({
                 request_type: 'call_function',
                 account_id: this.contract,
                 method_name: methodName,
-                args_base64: (args ? Buffer.from(args) : Buffer.alloc(0)).toString('base64'),
+                args_base64: this.prepareInput(args).toString('base64'),
                 finality: 'optimistic',
             });
             if (result.logs && result.logs.length > 0)
@@ -109,13 +110,16 @@ export class Engine {
             return Buffer.from(result.result);
         });
     }
-    callMutativeFunction(methodName, args = null) {
+    callMutativeFunction(methodName, args) {
         return __awaiter(this, void 0, void 0, function* () {
-            const result = yield this.signer.functionCall(this.contract, methodName, args || Buffer.alloc(0));
+            const result = yield this.signer.functionCall(this.contract, methodName, this.prepareInput(args));
             if (typeof result.status === 'object' && typeof result.status.SuccessValue === 'string') {
                 return Buffer.from(result.status.SuccessValue, 'base64');
             }
-            return null; // TODO: throw error
+            throw new Error(result.toString()); // TODO
         });
+    }
+    prepareInput(args) {
+        return args ? Buffer.from(args) : Buffer.alloc(0);
     }
 }

@@ -11,11 +11,18 @@ import NEAR from 'near-api-js';
 export { getAddress as parseAddress } from '@ethersproject/address';
 export { arrayify as parseHexString } from '@ethersproject/bytes';
 
+export type AccountID = string;
+export type Address = string;
+export type Bytecode = Uint8Array;
+export type Bytecodeish = Bytecode | string;
+export type ChainID = bigint;
+export type U256 = bigint;
+
 export class Engine {
   constructor(
     public near: NEAR.Near,
     public signer: NEAR.Account,
-    public contract: string) {}
+    public contract: AccountID) {}
 
   static async connect(options: any, env: any): Promise<Engine> {
     const near = await NEAR.connect({
@@ -39,70 +46,75 @@ export class Engine {
   }
 
   async getVersion(): Promise<string> {
-    return await this.callFunction('get_version');
+    return (await this.callFunction('get_version')).toString();
   }
 
-  async getOwner(): Promise<string> {
-    return await this.callFunction('get_owner');
+  async getOwner(): Promise<AccountID> {
+    return (await this.callFunction('get_owner')).toString();
   }
 
-  async getBridgeProvider(): Promise<string> {
-    return await this.callFunction('get_bridge_provider');
+  async getBridgeProvider(): Promise<AccountID> {
+    return (await this.callFunction('get_bridge_provider')).toString();
   }
 
-  async getChainID(): Promise<bigint> {
+  async getChainID(): Promise<ChainID> {
     const result = await this.callFunction('get_chain_id');
     return toBigIntBE(result);
   }
 
-  async deployCode(bytecode: string | Uint8Array): Promise<string> {
+  async deployCode(bytecode: Bytecodeish): Promise<Address> {
     const args = parseHexString(bytecode);
     const result = await this.callMutativeFunction('deploy_code', args);
     return parseAddress(result.toString('hex'));
   }
 
-  async getCode(address: string): Promise<Uint8Array> {
+  async getCode(address: Address): Promise<Bytecode> {
     const args = parseHexString(parseAddress(address));
     return await this.callFunction('get_code', args);
   }
 
-  async getBalance(address: string): Promise<bigint> {
+  async getBalance(address: Address): Promise<U256> {
     const args = parseHexString(parseAddress(address));
     const result = await this.callFunction('get_balance', args);
     return toBigIntBE(result);
   }
 
-  async getNonce(address: string): Promise<bigint> {
+  async getNonce(address: Address): Promise<U256> {
     const args = parseHexString(parseAddress(address));
     const result = await this.callFunction('get_nonce', args);
     return toBigIntBE(result);
   }
 
-  async getStorageAt(address: string, key: string): Promise<Uint8Array> {
+  async getStorageAt(address: Address, key: U256 | string): Promise<U256> {
     const args = new GetStorageAtArgs(
       parseHexString(parseAddress(address)),
       parseHexString(defaultAbiCoder.encode(['uint256'], [key])),
     );
-    return await this.callFunction('get_storage_at', args.encode());
+    const result = await this.callFunction('get_storage_at', args.encode());
+    return toBigIntBE(result);
   }
 
-  async callFunction(methodName: string, args: Uint8Array | null = null): Promise<any> {
+  protected async callFunction(methodName: string, args?: Uint8Array): Promise<Buffer> {
     const result = await this.signer.connection.provider.query({
       request_type: 'call_function',
       account_id: this.contract,
       method_name: methodName,
-      args_base64: (args ? Buffer.from(args!) : Buffer.alloc(0)).toString('base64'),
+      args_base64: this.prepareInput(args).toString('base64'),
       finality: 'optimistic',
     });
     if (result.logs && result.logs.length > 0) console.debug(result.logs); // TODO
     return Buffer.from(result.result);
   }
 
-  async callMutativeFunction(methodName: string, args: Uint8Array | null = null): Promise<any> {
-    const result = await this.signer.functionCall(this.contract, methodName, args || Buffer.alloc(0));
+  protected async callMutativeFunction(methodName: string, args?: Uint8Array): Promise<Buffer> {
+    const result = await this.signer.functionCall(this.contract, methodName, this.prepareInput(args));
     if (typeof result.status === 'object' && typeof result.status.SuccessValue === 'string') {
       return Buffer.from(result.status.SuccessValue, 'base64');
     }
-    return null; // TODO: throw error
+    throw new Error(result.toString()); // TODO
+  }
+
+  private prepareInput(args?: Uint8Array): Buffer {
+    return args ? Buffer.from(args) : Buffer.alloc(0);
   }
 }
