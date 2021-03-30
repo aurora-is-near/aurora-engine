@@ -1,10 +1,10 @@
 /* This is free and unencumbered software released into the public domain. */
 
-import { GetStorageAtArgs, NewCallArgs } from './schema.js';
+import { GetStorageAtArgs, NewCallArgs, ViewCallArgs } from './schema.js';
 import { defaultAbiCoder } from '@ethersproject/abi';
 import { getAddress as parseAddress } from '@ethersproject/address';
 import { arrayify as parseHexString } from '@ethersproject/bytes';
-import { toBigIntBE } from 'bigint-buffer';
+import { toBigIntBE, toBufferBE } from 'bigint-buffer';
 import BN from 'bn.js';
 import NEAR from 'near-api-js';
 
@@ -13,6 +13,7 @@ export { arrayify as parseHexString } from '@ethersproject/bytes';
 
 export type AccountID = string;
 export type Address = string;
+export type Amount = bigint | number;
 export type Bytecode = Uint8Array;
 export type Bytecodeish = Bytecode | string;
 export type ChainID = bigint;
@@ -68,6 +69,16 @@ export class Engine {
     return parseAddress(result.toString('hex'));
   }
 
+  async view(sender: Address, address: Address, amount: Amount, input: Uint8Array | string): Promise<Uint8Array> {
+    const args = new ViewCallArgs(
+      parseHexString(parseAddress(sender)),
+      parseHexString(parseAddress(address)),
+      toBufferBE(BigInt(amount), 32),
+      this.prepareInput(input),
+    );
+    return (await this.callFunction('view', args.encode()));
+  }
+
   async getCode(address: Address): Promise<Bytecode> {
     const args = parseHexString(parseAddress(address));
     return await this.callFunction('get_code', args);
@@ -85,7 +96,7 @@ export class Engine {
     return toBigIntBE(result);
   }
 
-  async getStorageAt(address: Address, key: U256 | string): Promise<U256> {
+  async getStorageAt(address: Address, key: U256 | number | string): Promise<U256> {
     const args = new GetStorageAtArgs(
       parseHexString(parseAddress(address)),
       parseHexString(defaultAbiCoder.encode(['uint256'], [key])),
@@ -102,7 +113,8 @@ export class Engine {
       args_base64: this.prepareInput(args).toString('base64'),
       finality: 'optimistic',
     });
-    if (result.logs && result.logs.length > 0) console.debug(result.logs); // TODO
+    if (result.logs && result.logs.length > 0)
+      console.debug(result.logs); // TODO
     return Buffer.from(result.result);
   }
 
@@ -114,7 +126,11 @@ export class Engine {
     throw new Error(result.toString()); // TODO
   }
 
-  private prepareInput(args?: Uint8Array): Buffer {
-    return args ? Buffer.from(args) : Buffer.alloc(0);
+  private prepareInput(args?: Uint8Array | string): Buffer {
+    if (typeof args === 'undefined')
+      return Buffer.alloc(0);
+    if (typeof args === 'string')
+      return Buffer.from(parseHexString(args as string));
+    return Buffer.from(args);
   }
 }

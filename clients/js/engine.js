@@ -8,11 +8,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { GetStorageAtArgs, NewCallArgs } from './schema.js';
+import { GetStorageAtArgs, NewCallArgs, ViewCallArgs } from './schema.js';
 import { defaultAbiCoder } from '@ethersproject/abi';
 import { getAddress as parseAddress } from '@ethersproject/address';
 import { arrayify as parseHexString } from '@ethersproject/bytes';
-import { toBigIntBE } from 'bigint-buffer';
+import { toBigIntBE, toBufferBE } from 'bigint-buffer';
 import BN from 'bn.js';
 import NEAR from 'near-api-js';
 export { getAddress as parseAddress } from '@ethersproject/address';
@@ -69,6 +69,12 @@ export class Engine {
             return parseAddress(result.toString('hex'));
         });
     }
+    view(sender, address, amount, input) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const args = new ViewCallArgs(parseHexString(parseAddress(sender)), parseHexString(parseAddress(address)), toBufferBE(BigInt(amount), 32), this.prepareInput(input));
+            return (yield this.callFunction('view', args.encode()));
+        });
+    }
     getCode(address) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = parseHexString(parseAddress(address));
@@ -120,6 +126,10 @@ export class Engine {
         });
     }
     prepareInput(args) {
-        return args ? Buffer.from(args) : Buffer.alloc(0);
+        if (typeof args === 'undefined')
+            return Buffer.alloc(0);
+        if (typeof args === 'string')
+            return Buffer.from(parseHexString(args));
+        return Buffer.from(args);
     }
 }

@@ -123,9 +123,15 @@ async function main(argv, env) {
     });
 
   program
-    .command('view')
-    .action(async (_options, _command) => {
-      // TODO
+    .command('view <address> <input>')
+    .option("--sender <address>", "specify the sender address", '0x0000000000000000000000000000000000000000') // TODO
+    .option("--amount <value>", "attach an ETH amount", 0)
+    .action(async (address, input, options, command) => {
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
+      const output = await engine.view(options.sender, address, BigInt(config.amount), input);
+      console.log(`0x${output ? output.toString('hex') : ''}`);
     });
 
   program
