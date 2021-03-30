@@ -1,6 +1,6 @@
 /* This is free and unencumbered software released into the public domain. */
 
-import { GetStorageAtArgs, NewCallArgs, ViewCallArgs } from './schema.js';
+import { FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs } from './schema.js';
 import { defaultAbiCoder } from '@ethersproject/abi';
 import { getAddress as parseAddress } from '@ethersproject/address';
 import { arrayify as parseHexString } from '@ethersproject/bytes';
@@ -67,6 +67,14 @@ export class Engine {
     const args = parseHexString(bytecode);
     const result = await this.callMutativeFunction('deploy_code', args);
     return parseAddress(result.toString('hex'));
+  }
+
+  async call(contract: Address, input: Uint8Array | string): Promise<Uint8Array> {
+    const args = new FunctionCallArgs(
+      parseHexString(parseAddress(contract)),
+      this.prepareInput(input),
+    );
+    return (await this.callMutativeFunction('call', args.encode()));
   }
 
   async view(sender: Address, address: Address, amount: Amount, input: Uint8Array | string): Promise<Uint8Array> {

@@ -21,6 +21,7 @@ export declare class Engine {
     getBridgeProvider(): Promise<AccountID>;
     getChainID(): Promise<ChainID>;
     deployCode(bytecode: Bytecodeish): Promise<Address>;
+    call(contract: Address, input: Uint8Array | string): Promise<Uint8Array>;
     view(sender: Address, address: Address, amount: Amount, input: Uint8Array | string): Promise<Uint8Array>;
     getCode(address: Address): Promise<Bytecode>;
     getBalance(address: Address): Promise<U256>;

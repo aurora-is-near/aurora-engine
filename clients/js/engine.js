@@ -8,7 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { GetStorageAtArgs, NewCallArgs, ViewCallArgs } from './schema.js';
+import { FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs } from './schema.js';
 import { defaultAbiCoder } from '@ethersproject/abi';
 import { getAddress as parseAddress } from '@ethersproject/address';
 import { arrayify as parseHexString } from '@ethersproject/bytes';
@@ -67,6 +67,12 @@ export class Engine {
             const args = parseHexString(bytecode);
             const result = yield this.callMutativeFunction('deploy_code', args);
             return parseAddress(result.toString('hex'));
+        });
+    }
+    call(contract, input) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const args = new FunctionCallArgs(parseHexString(parseAddress(contract)), this.prepareInput(input));
+            return (yield this.callMutativeFunction('call', args.encode()));
         });
     }
     view(sender, address, amount, input) {

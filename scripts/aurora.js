@@ -103,9 +103,13 @@ async function main(argv, env) {
     });
 
   program
-    .command('call')
-    .action(async (_options, _command) => {
-      // TODO
+    .command('call <address> <input>')
+    .action(async (address, input, options, command) => {
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
+      const output = await engine.call(address, input);
+      console.log(`0x${output ? output.toString('hex') : ''}`);
     });
 
   program
