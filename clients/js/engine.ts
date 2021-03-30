@@ -54,6 +54,12 @@ export class Engine {
     return toBigIntBE(result);
   }
 
+  async getCode(address: string): Promise<Buffer> {
+    const args = arrayify(getAddress(address));
+    const result = await this.signer!.viewFunction(this.contract, 'get_code', args, noParse);
+    return result;
+  }
+
   async getBalance(address: string): Promise<bigint> {
     const args = arrayify(getAddress(address));
     const result = await this.signer!.viewFunction(this.contract, 'get_balance', args, noParse);

@@ -130,7 +130,11 @@ async function main(argv, env) {
     .command('get-code <address>')
     .alias('get_code')
     .action(async (address, options, command) => {
-      // TODO
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
+      const code = await engine.getCode(address);
+      console.log(`0x${code ? code.toString('hex') : ''}`);
     });
 
   program

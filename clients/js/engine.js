@@ -61,6 +61,13 @@ export class Engine {
             return toBigIntBE(result);
         });
     }
+    getCode(address) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const args = arrayify(getAddress(address));
+            const result = yield this.signer.viewFunction(this.contract, 'get_code', args, noParse);
+            return result;
+        });
+    }
     getBalance(address) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = arrayify(getAddress(address));
