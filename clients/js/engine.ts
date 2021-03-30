@@ -59,4 +59,10 @@ export class Engine {
     const result = await this.signer!.viewFunction(this.contract, 'get_balance', args, noParse);
     return toBigIntBE(result);
   }
+
+  async getNonce(address: string): Promise<bigint> {
+    const args = arrayify(getAddress(address));
+    const result = await this.signer!.viewFunction(this.contract, 'get_nonce', args, noParse);
+    return toBigIntBE(result);
+  }
 }

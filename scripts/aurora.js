@@ -148,7 +148,11 @@ async function main(argv, env) {
     .command('get-nonce <address>')
     .alias('get_nonce')
     .action(async (address, options, command) => {
-      // TODO
+      const config = {...command.parent.opts(), ...options};
+      if (config.debug) console.debug("Options:", config);
+      const engine = await Engine.connect(config, env);
+      const nonce = await engine.getNonce(address);
+      console.log(nonce);
     });
 
   program

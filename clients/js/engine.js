@@ -68,4 +68,11 @@ export class Engine {
             return toBigIntBE(result);
         });
     }
+    getNonce(address) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const args = arrayify(getAddress(address));
+            const result = yield this.signer.viewFunction(this.contract, 'get_nonce', args, noParse);
+            return toBigIntBE(result);
+        });
+    }
 }

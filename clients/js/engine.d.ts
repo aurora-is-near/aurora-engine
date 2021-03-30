@@ -11,4 +11,5 @@ export declare class Engine {
     getBridgeProvider(): Promise<string>;
     getChainID(): Promise<bigint>;
     getBalance(address: string): Promise<bigint>;
+    getNonce(address: string): Promise<bigint>;
 }
