@@ -14,5 +14,6 @@ export declare class Engine {
     getBalance(address: string): Promise<bigint>;
     getNonce(address: string): Promise<bigint>;
     getStorageAt(address: string, key: string): Promise<Uint8Array>;
-    viewFunction(methodName: string, args?: Uint8Array | null): Promise<any>;
+    callFunction(methodName: string, args?: Uint8Array | null): Promise<any>;
+    callMutativeFunction(methodName: string, args?: Uint8Array | null): Promise<any>;
 }

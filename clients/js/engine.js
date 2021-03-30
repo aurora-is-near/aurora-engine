@@ -36,57 +36,57 @@ export class Engine {
     initialize(options) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = new NewCallArgs(arrayify(defaultAbiCoder.encode(['uint256'], [options.chain || 0])), options.owner || '', options.bridgeProver || '', new BN(options.upgradeDelay || 0));
-            return yield this.signer.functionCall(this.contract, 'new', args.encode());
+            return yield this.callMutativeFunction('new', args.encode());
         });
     }
     getVersion() {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.viewFunction('get_version');
+            return yield this.callFunction('get_version');
         });
     }
     getOwner() {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.viewFunction('get_owner');
+            return yield this.callFunction('get_owner');
         });
     }
     getBridgeProvider() {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.viewFunction('get_bridge_provider');
+            return yield this.callFunction('get_bridge_provider');
         });
     }
     getChainID() {
         return __awaiter(this, void 0, void 0, function* () {
-            const result = yield this.viewFunction('get_chain_id');
+            const result = yield this.callFunction('get_chain_id');
             return toBigIntBE(result);
         });
     }
     getCode(address) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = arrayify(getAddress(address));
-            return yield this.viewFunction('get_code', args);
+            return yield this.callFunction('get_code', args);
         });
     }
     getBalance(address) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = arrayify(getAddress(address));
-            const result = yield this.viewFunction('get_balance', args);
+            const result = yield this.callFunction('get_balance', args);
             return toBigIntBE(result);
         });
     }
     getNonce(address) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = arrayify(getAddress(address));
-            const result = yield this.viewFunction('get_nonce', args);
+            const result = yield this.callFunction('get_nonce', args);
             return toBigIntBE(result);
         });
     }
     getStorageAt(address, key) {
         return __awaiter(this, void 0, void 0, function* () {
             const args = new GetStorageAtArgs(arrayify(getAddress(address)), arrayify(defaultAbiCoder.encode(['uint256'], [key])));
-            return yield this.viewFunction('get_storage_at', args.encode());
+            return yield this.callFunction('get_storage_at', args.encode());
         });
     }
-    viewFunction(methodName, args = null) {
+    callFunction(methodName, args = null) {
         return __awaiter(this, void 0, void 0, function* () {
             const result = yield this.signer.connection.provider.query({
                 request_type: 'call_function',
@@ -98,6 +98,11 @@ export class Engine {
             if (result.logs && result.logs.length > 0)
                 console.debug(result.logs); // TODO
             return Buffer.from(result.result);
+        });
+    }
+    callMutativeFunction(methodName, args = null) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.signer.functionCall(this.contract, methodName, args || Buffer.alloc(0));
         });
     }
 }

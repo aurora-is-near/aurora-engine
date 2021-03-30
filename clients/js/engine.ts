@@ -32,40 +32,40 @@ export class Engine {
       options.bridgeProver || '',
       new BN(options.upgradeDelay || 0)
     );
-    return await this.signer.functionCall(this.contract, 'new', args.encode());
+    return await this.callMutativeFunction('new', args.encode());
   }
 
   async getVersion(): Promise<string> {
-    return await this.viewFunction('get_version');
+    return await this.callFunction('get_version');
   }
 
   async getOwner(): Promise<string> {
-    return await this.viewFunction('get_owner');
+    return await this.callFunction('get_owner');
   }
 
   async getBridgeProvider(): Promise<string> {
-    return await this.viewFunction('get_bridge_provider');
+    return await this.callFunction('get_bridge_provider');
   }
 
   async getChainID(): Promise<bigint> {
-    const result = await this.viewFunction('get_chain_id');
+    const result = await this.callFunction('get_chain_id');
     return toBigIntBE(result);
   }
 
   async getCode(address: string): Promise<Uint8Array> {
     const args = arrayify(getAddress(address));
-    return await this.viewFunction('get_code', args);
+    return await this.callFunction('get_code', args);
   }
 
   async getBalance(address: string): Promise<bigint> {
     const args = arrayify(getAddress(address));
-    const result = await this.viewFunction('get_balance', args);
+    const result = await this.callFunction('get_balance', args);
     return toBigIntBE(result);
   }
 
   async getNonce(address: string): Promise<bigint> {
     const args = arrayify(getAddress(address));
-    const result = await this.viewFunction('get_nonce', args);
+    const result = await this.callFunction('get_nonce', args);
     return toBigIntBE(result);
   }
 
@@ -74,10 +74,10 @@ export class Engine {
       arrayify(getAddress(address)),
       arrayify(defaultAbiCoder.encode(['uint256'], [key])),
     );
-    return await this.viewFunction('get_storage_at', args.encode());
+    return await this.callFunction('get_storage_at', args.encode());
   }
 
-  async viewFunction(methodName: string, args: Uint8Array | null = null): Promise<any> {
+  async callFunction(methodName: string, args: Uint8Array | null = null): Promise<any> {
     const result = await this.signer.connection.provider.query({
       request_type: 'call_function',
       account_id: this.contract,
@@ -87,5 +87,9 @@ export class Engine {
     });
     if (result.logs && result.logs.length > 0) console.debug(result.logs); // TODO
     return Buffer.from(result.result);
+  }
+
+  async callMutativeFunction(methodName: string, args: Uint8Array | null = null): Promise<any> {
+    return await this.signer.functionCall(this.contract, methodName, args || Buffer.alloc(0));
   }
 }
