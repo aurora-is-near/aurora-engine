@@ -1,7 +1,7 @@
 # Aurora Engine
 
-[![Project license](https://img.shields.io/badge/license-Public%20Domain-blue.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
-[![Discord](https://img.shields.io/discord/490367152054992913?label=discord)](https://discord.gg/jNjHYUF8vw)
+[![Project license](https://img.shields.io/badge/License-Public%20Domain-blue.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
+[![Discord](https://img.shields.io/discord/490367152054992913?label=Discord)](https://discord.gg/jNjHYUF8vw)
 [![Lints](https://github.com/aurora-is-near/aurora-engine/actions/workflows/lints.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/lints.yml)
 [![Tests](https://github.com/aurora-is-near/aurora-engine/actions/workflows/tests.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/tests.yml)
 [![Builds](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml)
@@ -18,7 +18,7 @@ rustup install nightly-2021-01-30
 rustup target add wasm32-unknown-unknown --toolchain nightly-2021-01-30
 ```
 
-### Prerequisites for Deploying
+### Prerequisites for Development
 
 - Node.js (v14+)
 
@@ -39,6 +39,12 @@ make check
 
 ## Deployment
 
+### Installing the CLI
+
+```sh
+npm install -g aurora-is-near/aurora-cli
+```
+
 ### Deploying the contract
 
 ```sh
@@ -46,7 +52,7 @@ export NEAR_ENV=local
 near delete aurora.test.near test.near  # if needed
 near create-account aurora.test.near --master-account=test.near --initial-balance 100000
 near deploy --account-id=aurora.test.near --wasm-file=release.wasm
-node scripts/aurora.js init --chain 1313161556
+aurora init --chain 1313161556 --owner test.near
 ```
 
 ## Usage
@@ -54,10 +60,10 @@ node scripts/aurora.js init --chain 1313161556
 ### Calling the contract
 
 ```sh
-near call aurora.test.near get_version --account-id test.near
-near call aurora.test.near get_owner --account-id test.near
-near call aurora.test.near get_bridge_provider --account-id test.near
-near call aurora.test.near get_chain_id --account-id test.near
+aurora get-version
+aurora get-owner
+aurora get-bridge-provider
+aurora get-chain-id
 ```
 
 ## Debugging
@@ -66,13 +72,7 @@ near call aurora.test.near get_chain_id --account-id test.near
 
 ```sh
 near state aurora.test.near
-http post http://localhost:3030 jsonrpc=2.0 id=1 method=query params:='{"request_type": "view_state", "account_id": "aurora.test.near", "prefix_base64": "", "finality": "final"}'
-```
-
-If you have [Ruby] installed, get more useful and readable output as follows:
-
-```sh
-rake dump
+aurora dump-storage
 ```
 
 ## Networks
