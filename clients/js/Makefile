@@ -2,13 +2,13 @@ TSC = npx tsc
 
 # The default target:
 
-all: index.js schema.js
+all: index.js engine.js schema.js
 
 .PHONY: all
 
 # Rules for development:
 
-%.js: %.ts tsconfig.json
+%.js: %.ts tsconfig.json package.json package-lock.json
 	$(TSC)
 
 %.d.ts: %.js

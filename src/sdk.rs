@@ -330,27 +330,33 @@ pub fn self_deploy(code_key: &[u8]) {
     }
 }
 
+#[allow(dead_code)]
 pub fn save_contract<T: BorshSerialize>(key: &str, data: &T) {
     write_storage(key.as_bytes(), &data.try_to_vec().unwrap()[..]);
 }
 
+#[allow(dead_code)]
 pub fn get_contract_data<T: BorshDeserialize>(key: &str) -> T {
     let data = read_storage(key.as_bytes()).expect("Failed read storage");
     T::try_from_slice(&data[..]).unwrap()
 }
 
+#[allow(dead_code)]
 pub fn log(data: String) {
     log_utf8(data.as_bytes())
 }
 
+#[allow(dead_code)]
 pub fn storage_usage() -> u64 {
     unsafe { exports::storage_usage() }
 }
 
+#[allow(dead_code)]
 pub fn prepaid_gas() -> u64 {
     unsafe { exports::prepaid_gas() }
 }
 
+#[allow(dead_code)]
 pub fn promise_create(
     account_id: String,
     method_name: &[u8],
@@ -373,6 +379,7 @@ pub fn promise_create(
     }
 }
 
+#[allow(dead_code)]
 pub fn promise_then(
     promise_idx: u64,
     account_id: String,
@@ -397,12 +404,14 @@ pub fn promise_then(
     }
 }
 
+#[allow(dead_code)]
 pub fn promise_return(promise_idx: u64) {
     unsafe {
         exports::promise_return(promise_idx);
     }
 }
 
+#[allow(dead_code)]
 pub fn promise_results_count() -> u64 {
     unsafe { exports::promise_results_count() }
 }
@@ -422,6 +431,7 @@ pub fn promise_results_count() -> u64 {
     }
 }*/
 
+#[allow(dead_code)]
 pub fn assert_private_call() {
     assert_eq!(
         predecessor_account_id(),
@@ -439,6 +449,7 @@ pub fn attached_deposit() -> u128 {
     }
 }
 
+#[allow(dead_code)]
 pub fn assert_one_yocto() {
     assert_eq!(
         attached_deposit(),
@@ -447,20 +458,24 @@ pub fn assert_one_yocto() {
     )
 }
 
+#[allow(dead_code)]
 pub fn promise_batch_action_transfer(promise_index: u64, amount: u128) {
     unsafe {
         exports::promise_batch_action_transfer(promise_index, &amount as *const u128 as _);
     }
 }
 
+#[allow(dead_code)]
 pub fn storage_byte_cost() -> u128 {
     STORAGE_PRICE_PER_BYTE
 }
 
+#[allow(dead_code)]
 pub fn promise_batch_create(account_id: String) -> u64 {
     unsafe { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) }
 }
 
+#[allow(dead_code)]
 pub fn storage_has_key(key: &str) -> bool {
     unsafe { exports::storage_has_key(key.len() as u64, key.as_ptr() as u64) == 1 }
 }

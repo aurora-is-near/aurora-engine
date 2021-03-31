@@ -46,7 +46,7 @@ export NEAR_ENV=local
 near delete evm.test.near test.near  # if needed
 near create-account evm.test.near --master-account=test.near --initial-balance 100000
 near deploy --account-id=evm.test.near --wasm-file=release.wasm
-node scripts/deploy.js -d
+node scripts/aurora.js init --chain 1313161556
 ```
 
 ## Usage
