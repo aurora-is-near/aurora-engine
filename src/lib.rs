@@ -18,6 +18,8 @@ pub mod types;
 #[cfg(feature = "contract")]
 mod engine;
 #[cfg(feature = "contract")]
+mod log_entry;
+#[cfg(feature = "contract")]
 mod sdk;
 
 #[cfg(feature = "contract")]
