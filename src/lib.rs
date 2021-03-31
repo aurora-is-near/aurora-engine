@@ -27,7 +27,7 @@ mod contract {
     use borsh::BorshDeserialize;
     use evm::ExitReason;
 
-    use crate::engine::Engine;
+    use crate::engine::{Engine, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
@@ -61,6 +61,10 @@ mod contract {
     /// Should be called on deployment.
     #[no_mangle]
     pub extern "C" fn new() {
+        let state = Engine::get_state();
+        if !state.owner_id.is_empty() {
+            require_owner_only(state);
+        }
         let args = NewCallArgs::try_from_slice(&sdk::read_input()).expect("ERR_ARG_PARSE");
         Engine::set_state(args.into());
     }
@@ -106,9 +110,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
         let state = Engine::get_state();
-        if state.owner_id.as_bytes() != sdk::predecessor_account_id() {
-            sdk::panic_utf8(b"ERR_NOT_ALLOWED");
-        }
+        require_owner_only(state);
         sdk::read_input_and_store(CODE_KEY);
         sdk::write_storage(CODE_STAGE_KEY, &sdk::block_index().to_le_bytes());
     }
@@ -276,9 +278,10 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_chain() {
+        let mut state = Engine::get_state();
+        require_owner_only(state);
         let input = sdk::read_input();
         let args = BeginChainArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
-        let mut state = Engine::get_state();
         state.chain_id = args.chain_id;
         Engine::set_state(state);
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
@@ -287,6 +290,8 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_block() {
+        let state = Engine::get_state();
+        require_owner_only(state);
         let input = sdk::read_input();
         let _args = BeginBlockArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
@@ -295,6 +300,12 @@ mod contract {
     ///
     /// Utility methods.
     ///
+
+    fn require_owner_only(state: EngineState) {
+        if state.owner_id.as_bytes() != sdk::predecessor_account_id() {
+            sdk::panic_utf8(b"ERR_NOT_ALLOWED");
+        }
+    }
 
     fn predecessor_address() -> Address {
         near_account_to_evm_address(&sdk::predecessor_account_id())

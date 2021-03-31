@@ -12,7 +12,7 @@ use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, Default)]
 pub struct EngineState {
     /// Chain id, according to the EIP-115 / ethereum-lists spec.
     pub chain_id: [u8; 32],
@@ -64,10 +64,10 @@ impl Engine {
 
     /// Fails if state is not found.
     pub fn get_state() -> EngineState {
-        EngineState::try_from_slice(
-            &sdk::read_storage(STATE_KEY).expect("ERR_STATE_NOT_INITIALIZED"),
-        )
-        .expect("ERR_DESER")
+        match sdk::read_storage(STATE_KEY) {
+          None => Default::default(),
+          Some(bytes) => EngineState::try_from_slice(&bytes).expect("ERR_DESER")
+        }
     }
 
     pub fn set_code(address: &Address, code: &[u8]) {
