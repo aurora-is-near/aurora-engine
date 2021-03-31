@@ -1,5 +1,6 @@
 import { Engine } from '@aurora-is-near/engine';
 import { program } from 'commander';
+import { readFileSync } from 'fs';
 
 main(process.argv, process.env);
 
@@ -7,11 +8,11 @@ async function main(argv, env) {
   program
     .option('-d, --debug', 'enable debug output')
     .option("--signer <account>", "specify signer master account ID", env.NEAR_MASTER_ACCOUNT || 'test.near')
-    .option("--evm <account>", "specify EVM contract account ID", env.NEAR_EVM_ACCOUNT || 'evm.test.near')
-    .option("--chain <id>", "specify EVM chain ID", 0);
+    .option("--evm <account>", "specify EVM contract account ID", env.NEAR_EVM_ACCOUNT || 'evm.test.near');
 
   program
     .command('init')
+    .option("--chain <id>", "specify EVM chain ID", 0)
     .option("--owner <account>", "specify owner account ID", null)
     .option("--bridge-prover <account>", "specify bridge prover account ID", null)
     .option("--upgrade-delay <blocks>", "specify upgrade delay block count", 0)
@@ -98,7 +99,7 @@ async function main(argv, env) {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
-      const address = await engine.deployCode(input);
+      const address = await engine.deployCode(readInput(input));
       console.log(address);
     });
 
@@ -108,19 +109,19 @@ async function main(argv, env) {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
-      const output = await engine.call(address, input);
+      const output = await engine.call(readInput(address), readInput(input));
       console.log(`0x${output ? output.toString('hex') : ''}`);
     });
 
   program
-    .command('raw-call')
+    .command('raw-call <input>')
     .alias('raw_call')
-    .action(async (_options, _command) => {
+    .action(async (_input, _options, _command) => {
       // TODO
     });
 
   program
-    .command('meta-call')
+    .command('meta-call') // TODO
     .alias('meta_call')
     .action(async (_options, _command) => {
       // TODO
@@ -134,7 +135,7 @@ async function main(argv, env) {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
-      const output = await engine.view(options.sender, address, BigInt(config.amount), input);
+      const output = await engine.view(options.sender, readInput(address), BigInt(config.amount), readInput(input));
       console.log(`0x${output ? output.toString('hex') : ''}`);
     });
 
@@ -145,7 +146,7 @@ async function main(argv, env) {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
-      const code = await engine.getCode(address);
+      const code = await engine.getCode(readInput(address));
       console.log(`0x${code ? code.toString('hex') : ''}`);
     });
 
@@ -156,7 +157,7 @@ async function main(argv, env) {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
-      const balance = await engine.getBalance(address);
+      const balance = await engine.getBalance(readInput(address));
       console.log(balance.toString());
     });
 
@@ -167,7 +168,7 @@ async function main(argv, env) {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
-      const nonce = await engine.getNonce(address);
+      const nonce = await engine.getNonce(readInput(address));
       console.log(nonce.toString());
     });
 
@@ -180,7 +181,7 @@ async function main(argv, env) {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
       const engine = await Engine.connect(config, env);
-      const value = await engine.getStorageAt(address, key);
+      const value = await engine.getStorageAt(readInput(address), key);
       console.log(value.toString());
     });
 
@@ -192,11 +193,20 @@ async function main(argv, env) {
     });
 
   program
-    .command('begin-block <hash>')
+    .command('begin-block <hash>') // TODO
     .alias('begin_block')
     .action(async (hash, options, command) => {
       // TODO
     });
 
   program.parse(process.argv);
+}
+
+function readInput(input) {
+  try {
+    return (input[0] == '@') ? readFileSync(input.substring(1), 'ascii').trim() : input;
+  } catch (err) {
+    console.error(err.toString());
+    process.exit(-1);
+  }
 }
