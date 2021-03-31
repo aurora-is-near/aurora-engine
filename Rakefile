@@ -1,4 +1,4 @@
-EVM_ACCOUNT  = ENV['NEAR_EVM_ACCOUNT'] || 'evm.test.near'
+EVM_ACCOUNT  = ENV['NEAR_EVM_ACCOUNT'] || 'aurora.test.near'
 RPC_ENDPOINT = ENV['NEAR_URL'] || 'http://localhost:3030'
 EVM_VERSION  = File.read('VERSION').chomp
 

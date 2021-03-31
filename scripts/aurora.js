@@ -8,7 +8,7 @@ async function main(argv, env) {
   program
     .option('-d, --debug', 'enable debug output')
     .option("--signer <account>", "specify signer master account ID", env.NEAR_MASTER_ACCOUNT || 'test.near')
-    .option("--evm <account>", "specify EVM contract account ID", env.NEAR_EVM_ACCOUNT || 'evm.test.near');
+    .option("--evm <account>", "specify EVM contract account ID", env.NEAR_EVM_ACCOUNT || 'aurora.test.near');
 
   program
     .command('init')

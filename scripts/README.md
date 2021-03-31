@@ -19,7 +19,7 @@ Usage: aurora [options] [command]
 Options:
   -d, --debug                                    enable debug output
   --signer <account>                             specify signer master account ID (default: "test.near")
-  --evm <account>                                specify EVM contract account ID (default: "evm.test.near")
+  --evm <account>                                specify EVM contract account ID (default: "aurora.test.near")
   -h, --help                                     display help for command
 
 Commands:

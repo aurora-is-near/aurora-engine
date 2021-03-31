@@ -27,7 +27,7 @@ target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(
 .PHONY: all release debug
 
 deploy: release.wasm
-	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),evm.test.near) --wasm-file=$<
+	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),aurora.test.near) --wasm-file=$<
 
 check:
 	$(CARGO) test

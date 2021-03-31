@@ -43,9 +43,9 @@ make check
 
 ```sh
 export NEAR_ENV=local
-near delete evm.test.near test.near  # if needed
-near create-account evm.test.near --master-account=test.near --initial-balance 100000
-near deploy --account-id=evm.test.near --wasm-file=release.wasm
+near delete aurora.test.near test.near  # if needed
+near create-account aurora.test.near --master-account=test.near --initial-balance 100000
+near deploy --account-id=aurora.test.near --wasm-file=release.wasm
 node scripts/aurora.js init --chain 1313161556
 ```
 
@@ -54,10 +54,10 @@ node scripts/aurora.js init --chain 1313161556
 ### Calling the contract
 
 ```sh
-near call evm.test.near get_version --account-id evm.test.near
-near call evm.test.near get_owner --account-id evm.test.near
-near call evm.test.near get_bridge_provider --account-id evm.test.near
-near call evm.test.near get_chain_id --account-id evm.test.near
+near call aurora.test.near get_version --account-id test.near
+near call aurora.test.near get_owner --account-id test.near
+near call aurora.test.near get_bridge_provider --account-id test.near
+near call aurora.test.near get_chain_id --account-id test.near
 ```
 
 ## Debugging
@@ -65,8 +65,8 @@ near call evm.test.near get_chain_id --account-id evm.test.near
 ### Inspecting the contract state
 
 ```sh
-near state evm.test.near
-http post http://localhost:3030 jsonrpc=2.0 id=1 method=query params:='{"request_type": "view_state", "account_id": "evm.test.near", "prefix_base64": "", "finality": "final"}'
+near state aurora.test.near
+http post http://localhost:3030 jsonrpc=2.0 id=1 method=query params:='{"request_type": "view_state", "account_id": "aurora.test.near", "prefix_base64": "", "finality": "final"}'
 ```
 
 If you have [Ruby] installed, get more useful and readable output as follows:
