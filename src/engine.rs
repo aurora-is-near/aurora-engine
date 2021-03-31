@@ -65,8 +65,8 @@ impl Engine {
     /// Fails if state is not found.
     pub fn get_state() -> EngineState {
         match sdk::read_storage(STATE_KEY) {
-          None => Default::default(),
-          Some(bytes) => EngineState::try_from_slice(&bytes).expect("ERR_DESER")
+            None => Default::default(),
+            Some(bytes) => EngineState::try_from_slice(&bytes).expect("ERR_DESER"),
         }
     }
 
