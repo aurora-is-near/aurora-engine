@@ -60,9 +60,7 @@ async function main(argv, env) {
 
   program
     .command('get-chain-id')
-    .alias('get_chain_id')
-    .alias('get-chain')
-    .alias('get_chain')
+    .aliases(['get_chain_id', 'get-chain', 'get_chain'])
     .action(async (options, command) => {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
@@ -174,9 +172,7 @@ async function main(argv, env) {
 
   program
     .command('get-storage-at <address> <key>')
-    .alias('get_storage_at')
-    .alias('get-storage')
-    .alias('get_storage')
+    .aliases(['get_storage_at', 'get-storage', 'get_storage'])
     .action(async (address, key, options, command) => {
       const config = {...command.parent.opts(), ...options};
       if (config.debug) console.debug("Options:", config);
