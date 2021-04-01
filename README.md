@@ -6,16 +6,18 @@
 [![Tests](https://github.com/aurora-is-near/aurora-engine/actions/workflows/tests.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/tests.yml)
 [![Builds](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml)
 
+Aurora Engine implements an Ethereum Virtual Machine (EVM) on the NEAR Protocol.
+
 ## Prerequisites
 
 ### Prerequisites for Building
 
-- Rust nightly (2021-01-30) with the WebAssembly toolchain
+- Rust nightly (2021-03-25) with the WebAssembly toolchain
 - GNU Make (3.81+)
 
 ```sh
-rustup install nightly-2021-01-30
-rustup target add wasm32-unknown-unknown --toolchain nightly-2021-01-30
+rustup install nightly-2021-03-25
+rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
 ```
 
 ### Prerequisites for Development
@@ -130,5 +132,3 @@ MainNet | 1313161554
 #### `begin_chain`
 
 #### `begin_block`
-
-[Ruby]: https://www.ruby-lang.org

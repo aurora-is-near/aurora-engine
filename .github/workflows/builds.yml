@@ -15,7 +15,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2021-01-30
+          toolchain: nightly-2021-03-25
           override: true
       - run: make release
       - run: ls -lH release.wasm
@@ -43,7 +43,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2021-01-30
+          toolchain: nightly-2021-03-25
           override: true
       - run: make debug
       - run: ls -lH debug.wasm
