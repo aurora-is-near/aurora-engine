@@ -7,6 +7,8 @@
 [![Builds](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml)
 
 Aurora Engine implements an Ethereum Virtual Machine (EVM) on the NEAR Protocol.
+See [NEAR docs](https://docs.near.org/docs/develop/evm/introduction)for
+additional documentation.
 
 ## Deployments
 
