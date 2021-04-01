@@ -254,10 +254,11 @@ pub fn panic() {
 }
 
 #[allow(dead_code)]
-pub fn panic_utf8(bytes: &[u8]) {
+pub fn panic_utf8(bytes: &[u8]) -> ! {
     unsafe {
         exports::panic_utf8(bytes.len() as u64, bytes.as_ptr() as u64);
     }
+    unreachable!()
 }
 
 #[allow(dead_code)]

@@ -18,6 +18,8 @@ pub mod types;
 #[cfg(feature = "contract")]
 mod engine;
 #[cfg(feature = "contract")]
+mod json;
+#[cfg(feature = "contract")]
 mod log_entry;
 #[cfg(feature = "contract")]
 mod sdk;
@@ -160,22 +162,22 @@ mod contract {
 
         let input = sdk::read_input();
         let signed_transaction = EthSignedTransaction::decode(&Rlp::new(&input))
-            .or_else(|_| Err(sdk::panic_utf8(b"ERR_INVALID_TX")))
-            .unwrap();
+            .or_else(|_| Err(()))
+            .expect("ERR_INVALID_TX");
 
         let state = Engine::get_state();
 
         // Validate the chain ID, if provided inside the signature:
         if let Some(chain_id) = signed_transaction.chain_id() {
             if U256::from(chain_id) != U256::from(state.chain_id) {
-                return sdk::panic_utf8(b"ERR_INVALID_CHAIN_ID");
+                sdk::panic_utf8(b"ERR_INVALID_CHAIN_ID");
             }
         }
 
         // Retrieve the signer of the transaction:
         let sender = match signed_transaction.sender() {
             Some(sender) => sender,
-            None => return sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
+            None => sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
         };
 
         // Figure out what kind of a transaction this is, and execute it:
@@ -216,7 +218,6 @@ mod contract {
             Ok(args) => args,
             Err(_error_kind) => {
                 sdk::panic_utf8(b"ERR_META_TX_PARSE");
-                return;
             }
         };
         let mut engine = Engine::new_with_state(state, meta_call_args.sender);
