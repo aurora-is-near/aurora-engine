@@ -47,14 +47,21 @@ make check
 npm install -g aurora-is-near/aurora-cli
 ```
 
-### Deploying the contract
+### Deploying the contract with the CLI
+
+```sh
+export NEAR_ENV=local
+aurora install --chain 1313161556 --owner test.near release.wasm
+```
+
+### Deploying the contract without the CLI
 
 ```sh
 export NEAR_ENV=local
 near delete aurora.test.near test.near  # if needed
-near create-account aurora.test.near --master-account=test.near --initial-balance 100000
+near create-account aurora.test.near --master-account=test.near --initial-balance 1000000
 near deploy --account-id=aurora.test.near --wasm-file=release.wasm
-aurora init --chain 1313161556 --owner test.near
+aurora initialize --chain 1313161556 --owner test.near
 ```
 
 ## Usage
@@ -79,11 +86,12 @@ aurora dump-storage
 
 ## Networks
 
-Network | Chain ID
-------- | ----------
-BetaNet | 1313161556
-TestNet | 1313161555
-MainNet | 1313161554
+Network | Contract ID        | Chain ID   | Status
+------- | ------------------ | ---------- | ------
+MainNet | `aurora`           | 1313161554 | ❌
+TestNet | `aurora`           | 1313161555 | ❌
+BetaNet | `aurora`           | 1313161556 | ❌
+Local   | `aurora.test.near` | 1313161556 | ✅
 
 ## Interface
 
