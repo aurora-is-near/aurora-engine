@@ -179,7 +179,7 @@ impl Arg {
         let t = parse_type(&type_raw)?;
         let remains = consume(remains, ' ')?;
         let (name, remains) = parse_ident(remains)?;
-        Ok((Arg { type_raw, t, name }, remains))
+        Ok((Arg { name, type_raw, t }, remains))
     }
 
     fn parse_args(text: &str) -> Result<(Vec<Arg>, &str)> {

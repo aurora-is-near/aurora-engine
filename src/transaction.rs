@@ -125,8 +125,8 @@ impl Decodable for EthSignedTransaction {
         Ok(Self {
             transaction: EthTransaction {
                 nonce,
-                gas,
                 gas_price,
+                gas,
                 to,
                 value,
                 data,
