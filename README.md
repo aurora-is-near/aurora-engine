@@ -13,8 +13,8 @@ Aurora Engine implements an Ethereum Virtual Machine (EVM) on the NEAR Protocol.
 Network | Contract ID         | Chain ID   | Status
 ------- | ------------------- | ---------- | ------
 MainNet | [`aurora`][MainNet] | 1313161554 | ❌
-TestNet | [`aurora`][TestNet] | 1313161555 | ❌
-BetaNet | [`aurora`][BetaNet] | 1313161556 | ❌
+TestNet | [`aurora`][TestNet] | 1313161555 | 🚧
+BetaNet | [`aurora`][BetaNet] | 1313161556 | 🚧
 Local   | `aurora.test.near`  | 1313161556 | ✅
 
 [MainNet]: https://explorer.near.org/accounts/aurora
