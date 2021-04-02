@@ -73,6 +73,7 @@ pub fn public_key_to_address(public_key: PublicKey) -> Address {
     }
 }
 
+#[ignore]
 #[test]
 fn test_meta_parsing() {
     let chain_id = 1313161555;
