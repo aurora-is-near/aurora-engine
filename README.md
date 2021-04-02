@@ -54,6 +54,12 @@ make check
 
 ## Deployment
 
+### Downloading the latest EVM release
+
+```sh
+wget https://github.com/aurora-is-near/aurora-engine/releases/download/latest/release.wasm
+```
+
 ### Installing the Aurora CLI tool
 
 ```sh
