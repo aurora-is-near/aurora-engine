@@ -3,8 +3,6 @@ use crate::json::{self, FAILED_PARSE};
 use crate::prelude::{vec, Address, String, Vec, H256, U256};
 #[cfg(feature = "contract")]
 use alloc::str;
-#[cfg(feature = "contract")]
-use borsh::{BorshDeserialize, BorshSerialize};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
@@ -114,47 +112,12 @@ pub struct StorageDepositCallArgs {
     pub registration_only: Option<bool>,
 }
 
-/// withdraw result for eth-connector
-#[cfg(feature = "contract")]
-#[derive(BorshSerialize)]
-pub struct WithdrawResult {
-    pub amount: Balance,
-    pub recipient_id: RawAddress,
-    pub eth_custodian_address: RawAddress,
-}
-
-/// ft_on_transfer eth-connector call args
-#[cfg(feature = "contract")]
-#[derive(BorshSerialize)]
-pub struct FtOnTransfer {
-    pub amount: Balance,
-    pub msg: String,
-    pub receiver_id: AccountId,
-}
-
-/// ft_resolve_transfer eth-connector call args
-#[cfg(feature = "contract")]
-#[derive(BorshSerialize)]
-pub struct FtResolveTransfer {
-    pub receiver_id: AccountId,
-    pub amount: Balance,
-    pub current_account_id: AccountId,
-}
-
 /// promise results structure
 #[cfg(feature = "contract")]
 pub enum PromiseResult {
     NotReady,
     Successful(Vec<u8>),
     Failed,
-}
-
-/// function call args for eth-connector
-#[cfg(feature = "contract")]
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct FunctionCallArgs {
-    pub contract: RawAddress,
-    pub input: Vec<u8>,
 }
 
 /// ft_resolve_transfer result of eth-connector

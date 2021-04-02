@@ -1,6 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::prelude::{String, Vec};
+#[cfg(feature = "contract")]
+use crate::types::Balance;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 
 /// Borsh-encoded parameters for the `new` function.
@@ -78,6 +80,33 @@ pub struct BeginBlockArgs {
     pub difficulty: RawU256,
     /// The current block's gas limit.
     pub gaslimit: RawU256,
+}
+
+/// withdraw result for eth-connector
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize)]
+pub struct WithdrawResult {
+    pub amount: Balance,
+    pub recipient_id: RawAddress,
+    pub eth_custodian_address: RawAddress,
+}
+
+/// ft_on_transfer eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize)]
+pub struct FtOnTransfer {
+    pub amount: Balance,
+    pub msg: String,
+    pub receiver_id: AccountId,
+}
+
+/// ft_resolve_transfer eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize)]
+pub struct FtResolveTransfer {
+    pub receiver_id: AccountId,
+    pub amount: Balance,
+    pub current_account_id: AccountId,
 }
 
 #[cfg(test)]
