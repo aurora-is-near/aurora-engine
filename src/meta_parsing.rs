@@ -228,7 +228,7 @@ impl MethodAndTypes {
         let mut parsed_types = HashMap::new();
         let mut type_sequences = vec![];
         let (method, mut types) = Method::parse(method_def)?;
-        while types.is_empty() {
+        while !types.is_empty() {
             let (ty, remains) = Method::parse(types)?;
             type_sequences.push(ty.name.clone());
             parsed_types.insert(ty.name.clone(), ty);
@@ -543,8 +543,8 @@ pub fn parse_meta_call(
     let (msg, input) =
         prepare_meta_call_args(domain_separator, account_id, meta_tx.method_def, &result)?;
     let mut signature: [u8; 65] = [0; 65];
-    signature[0] = meta_tx.v;
-    signature[1..].copy_from_slice(&meta_tx.signature);
+    signature[64] = meta_tx.v;
+    signature[..64].copy_from_slice(&meta_tx.signature);
     match ecrecover(H256::from_slice(&msg), &signature) {
         Ok(sender) => {
             result.sender = sender;

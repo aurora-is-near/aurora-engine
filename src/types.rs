@@ -16,6 +16,7 @@ pub type RawH256 = [u8; 32];
 pub const STORAGE_PRICE_PER_BYTE: u128 = 100_000_000_000_000_000_000; // 1e20yN, 0.0001N
 
 /// Internal args format for meta call.
+#[derive(Debug)]
 pub struct InternalMetaCallArgs {
     pub sender: Address,
     pub nonce: U256,
