@@ -69,7 +69,7 @@ pub(crate) fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
 /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
-/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000001
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000001
 #[allow(dead_code)]
 pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     use sha3::Digest;
@@ -95,7 +95,7 @@ pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitErr
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
 /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
-/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000002
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000002
 #[cfg(not(feature = "contract"))]
 fn sha256(input: &[u8]) -> H256 {
     use sha2::Digest;
@@ -110,7 +110,7 @@ fn sha256(input: &[u8]) -> H256 {
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
 /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
-/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000003
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000003
 fn ripemd160(input: &[u8]) -> H160 {
     use ripemd160::Digest;
     let hash = ripemd160::Ripemd160::digest(input);
@@ -118,44 +118,51 @@ fn ripemd160(input: &[u8]) -> H160 {
 }
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
-/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000004
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000004
 fn identity(input: &[u8]) -> &[u8] {
     input
 }
 
 /// See: https://eips.ethereum.org/EIPS/eip-198
-/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000005
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000005
 #[allow(dead_code)]
 fn modexp(_base: U256, _exponent: U256, _modulus: U256) -> U256 {
     U256::zero() // TODO: implement MODEXP
 }
 
 /// See: https://eips.ethereum.org/EIPS/eip-196
-/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000006
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000006
 #[allow(dead_code)]
 fn alt_bn128_add(_ax: U256, _ay: U256, _bx: U256, _by: U256) {
     // TODO: implement alt_bn128_add
 }
 
 /// See: https://eips.ethereum.org/EIPS/eip-196
-/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000007
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000007
 #[allow(dead_code)]
 fn alt_bn128_mul(_x: U256, _y: U256, _scalar: U256) {
     // TODO: implement alt_bn128_mul
 }
 
 /// See: https://eips.ethereum.org/EIPS/eip-197
-/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000008
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000008
 #[allow(dead_code)]
 fn alt_bn128_pair(_input: Vec<u8>) -> U256 {
     U256::zero() // TODO: implement alt_bn128_pairing
 }
 
 /// See: https://eips.ethereum.org/EIPS/eip-152
-/// See: https://etherscan.io/address/0x0000000000000000000000000000000000000009
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000009
 #[allow(dead_code)]
-fn blake2f(_rounds: u32, _h: [U256; 2], _m: [U256; 4], _t: [u64; 2], _f: bool) -> [U256; 2] {
-    [U256::zero(), U256::zero()] // TODO: implement BLAKE2f
+fn blake2f(rounds: u32, h: [u64; 8], m: [u64; 16], t: [u64; 2], f: bool) -> [U256; 2] {
+    let res = &*blake2::blake2b_f(rounds, h, m, t, f);
+
+    let mut l = [0u8; 32];
+    let mut h = [0u8; 32];
+    l.copy_from_slice(&res[..32]);
+    h.copy_from_slice(&res[32..64]);
+
+    [U256::from(l), U256::from(h)]
 }
 
 #[cfg(test)]
@@ -193,6 +200,48 @@ mod tests {
             ripemd160(b""),
             H160::from_slice(&hex::decode("9c1185a5c5e9fc54612808977ee8f548b2258d31").unwrap())
         );
+    }
+    
+    #[test]
+    fn test_blake2f() {
+        let rounds = 12;
+        let h: [u64; 8] = [
+            0x6a09e667f2bdc948,
+            0xbb67ae8584caa73b,
+            0x3c6ef372fe94f82b,
+            0xa54ff53a5f1d36f1,
+            0x510e527fade682d1,
+            0x9b05688c2b3e6c1f,
+            0x1f83d9abfb41bd6b,
+            0x5be0cd19137e2179,
+        ];
+        let m: [u64; 16] = [
+            0x0000000000636261,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+            0x0000000000000000,
+        ];
+        let t: [u64; 2] = [3, 0];
+        let f_bool = true;
+
+        let output: [U256; 2] = [
+            U256::from(&*hex::decode("ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d1").unwrap()),
+            U256::from(&*hex::decode("7d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923").unwrap()),
+        ];
+        let res = blake2f(rounds, h, m, t, f_bool);
+        assert_eq!(res, output);
     }
 
     #[test]

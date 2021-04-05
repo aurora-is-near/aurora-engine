@@ -37,6 +37,7 @@ codegen-units = 1
 rpath = false
 
 [dependencies]
+blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1" }
 borsh = { version = "0.8.2", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm", rev = "2a8a3e9", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }

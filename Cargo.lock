@@ -100,6 +100,7 @@ dependencies = [
 name = "aurora-engine"
 version = "0.0.0"
 dependencies = [
+ "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh",
  "ethabi",
  "evm",
@@ -200,6 +201,16 @@ dependencies = [
  "radium",
  "tap",
  "wyz",
+]
+
+[[package]]
+name = "blake2"
+version = "0.9.1"
+source = "git+https://github.com/near/near-blake2.git#736ff607cc8160af87ffa697c14ebef85050138f"
+dependencies = [
+ "crypto-mac",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
 ]
 
 [[package]]
@@ -1704,7 +1715,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb14bec070cfd808438712cda5d54703001b9cf1196c8afaeadc9514e06d00a3"
 dependencies = [
  "arrayref",
- "blake2",
+ "blake2 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "borsh",
  "bs58",
  "c2-chacha",
