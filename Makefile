@@ -36,7 +36,7 @@ format:
 	$(CARGO) fmt
 
 clean:
-	@rm -Rf release.wasm target *~
+	@rm -Rf *.wasm target *~
 
 .PHONY: deploy check format clean
 

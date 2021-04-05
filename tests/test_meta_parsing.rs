@@ -45,7 +45,7 @@ pub fn encode_meta_call_function_args(
             MetaCallArgs {
                 signature,
                 // Add 27 to align eth-sig-util signature format
-                v: array[64] + 27,
+                v: 27,
                 nonce: u256_to_arr(&nonce),
                 fee_amount: u256_to_arr(&fee_amount),
                 fee_address: fee_address.0,
@@ -97,7 +97,7 @@ fn test_meta_parsing() {
     // assert signature same as eth-sig-util, which also implies msg before sign (constructed by prepare_meta_call_args, follow eip-712) same
     assert_eq!(hex::encode(&meta_tx[0..65]), "4066a42cf17d167d33ef62c8cee82d3748de0e804569212a839257dafdbb9d09084bd910f16ddb9643e98a0787cdf0137cad109687a00106c701e430657ae99a1b");
     let result = parse_meta_call(&domain_separator, "evm".as_bytes(), meta_tx)
-        .unwrap_or_else(|_| panic!("Fail"));
+        .unwrap_or_else(|_| panic!("Fail meta_tx"));
     assert_eq!(result.sender, signer_addr);
 
     let meta_tx3 = encode_meta_call_function_args(
@@ -114,6 +114,6 @@ fn test_meta_parsing() {
     );
     assert_eq!(hex::encode(&meta_tx3[0..65]), "d5fc0804e27c7ee36178b5ce1f0ef97e9f9317855743f16a38cc2ec81eb852dc58f76aaebb8f0264eeb6a61ba5d094a546fa95efcded4d507708c1d96a3c06561b");
     let result = parse_meta_call(&domain_separator, "evm".as_bytes(), meta_tx3)
-        .unwrap_or_else(|_| panic!("Fail"));
+        .unwrap_or_else(|_| panic!("Fail meta_tx3"));
     assert_eq!(result.sender, signer_addr);
 }

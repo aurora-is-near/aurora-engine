@@ -21,7 +21,7 @@ pub struct NewCallArgs {
 }
 
 /// Borsh-encoded parameters for the `meta_call` function.
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct MetaCallArgs {
     pub signature: [u8; 64],
     pub v: u8,
