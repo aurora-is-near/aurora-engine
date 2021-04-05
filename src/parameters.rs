@@ -109,6 +109,14 @@ pub struct FtResolveTransfer {
     pub current_account_id: AccountId,
 }
 
+/// Fungible token storage balance
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize)]
+pub struct StorageBalance {
+    pub total: Balance,
+    pub available: Balance,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

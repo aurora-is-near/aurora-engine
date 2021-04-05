@@ -18,6 +18,8 @@ pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32];
 pub type RawH256 = [u8; 32];
 pub type EthAddress = [u8; 20];
+pub type Gas = u64;
+pub type StorageUsage = u64;
 
 pub const STORAGE_PRICE_PER_BYTE: u128 = 100_000_000_000_000_000_000; // 1e20yN, 0.0001N
 
@@ -111,6 +113,11 @@ pub struct StorageWithdrawCallArgs {
 pub struct StorageDepositCallArgs {
     pub account_id: Option<AccountId>,
     pub registration_only: Option<bool>,
+}
+
+pub struct StorageBalanceBounds {
+    pub min: Balance,
+    pub max: Option<Balance>,
 }
 
 /// promise results structure

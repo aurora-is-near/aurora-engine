@@ -1,5 +1,5 @@
 use crate::prelude::{vec, String, Vec, H256};
-use crate::types::STORAGE_PRICE_PER_BYTE;
+use crate::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 mod exports {
@@ -332,8 +332,8 @@ pub fn self_deploy(code_key: &[u8]) {
 }
 
 #[allow(dead_code)]
-pub fn save_contract<T: BorshSerialize>(key: &str, data: &T) {
-    write_storage(key.as_bytes(), &data.try_to_vec().unwrap()[..]);
+pub fn save_contract<T: BorshSerialize>(key: &[u8], data: &T) {
+    write_storage(key, &data.try_to_vec().unwrap()[..]);
 }
 
 #[allow(dead_code)]
@@ -359,13 +359,12 @@ pub fn prepaid_gas() -> u64 {
 
 #[allow(dead_code)]
 pub fn promise_create(
-    account_id: String,
+    account_id: &[u8],
     method_name: &[u8],
     arguments: &[u8],
     amount: u128,
     gas: u64,
 ) -> u64 {
-    let account_id = account_id.as_bytes();
     unsafe {
         exports::promise_create(
             account_id.len() as _,
@@ -383,13 +382,12 @@ pub fn promise_create(
 #[allow(dead_code)]
 pub fn promise_then(
     promise_idx: u64,
-    account_id: String,
+    account_id: &[u8],
     method_name: &[u8],
     arguments: &[u8],
     amount: u128,
     gas: u64,
 ) -> u64 {
-    let account_id = account_id.as_bytes();
     unsafe {
         exports::promise_then(
             promise_idx,
@@ -405,7 +403,6 @@ pub fn promise_then(
     }
 }
 
-#[allow(dead_code)]
 pub fn promise_return(promise_idx: u64) {
     unsafe {
         exports::promise_return(promise_idx);
@@ -417,7 +414,7 @@ pub fn promise_results_count() -> u64 {
     unsafe { exports::promise_results_count() }
 }
 
-/*pub fn promise_result(result_idx: u64) -> PromiseResult {
+pub fn promise_result(result_idx: u64) -> PromiseResult {
     unsafe {
         match exports::promise_result(result_idx, 0) {
             0 => PromiseResult::NotReady,
@@ -427,17 +424,17 @@ pub fn promise_results_count() -> u64 {
                 PromiseResult::Successful(bytes)
             }
             2 => PromiseResult::Failed,
-            _ => panic!("{}", RETURN_CODE_ERR),
+            _ => panic_utf8(b"ERR_PROMISE_RETURN_CODE"),
         }
     }
-}*/
+}
 
 #[allow(dead_code)]
 pub fn assert_private_call() {
     assert_eq!(
         predecessor_account_id(),
         current_account_id(),
-        "Function is private"
+        "ERR_PRIVATE_CALL"
     );
 }
 
@@ -452,14 +449,9 @@ pub fn attached_deposit() -> u128 {
 
 #[allow(dead_code)]
 pub fn assert_one_yocto() {
-    assert_eq!(
-        attached_deposit(),
-        1,
-        "Requires attached deposit of exactly 1 yoctoNEAR"
-    )
+    assert_eq!(attached_deposit(), 1, "ERR_1YOCTO_ATTACH")
 }
 
-#[allow(dead_code)]
 pub fn promise_batch_action_transfer(promise_index: u64, amount: u128) {
     unsafe {
         exports::promise_batch_action_transfer(promise_index, &amount as *const u128 as _);
@@ -471,12 +463,10 @@ pub fn storage_byte_cost() -> u128 {
     STORAGE_PRICE_PER_BYTE
 }
 
-#[allow(dead_code)]
-pub fn promise_batch_create(account_id: String) -> u64 {
+pub fn promise_batch_create(account_id: &[u8]) -> u64 {
     unsafe { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) }
 }
 
-#[allow(dead_code)]
-pub fn storage_has_key(key: &str) -> bool {
-    unsafe { exports::storage_has_key(key.len() as u64, key.as_ptr() as u64) == 1 }
+pub fn storage_has_key(key: &[u8]) -> bool {
+    unsafe { exports::storage_has_key(key.len() as _, key.as_ptr() as _) == 1 }
 }

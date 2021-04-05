@@ -16,7 +16,11 @@ mod transaction;
 pub mod types;
 
 #[cfg(feature = "contract")]
+mod connector;
+#[cfg(feature = "contract")]
 mod engine;
+#[cfg(feature = "contract")]
+mod fungible_token;
 #[cfg(feature = "contract")]
 mod json;
 #[cfg(feature = "contract")]
