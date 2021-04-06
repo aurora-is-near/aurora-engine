@@ -5,6 +5,7 @@ use crate::types::*;
 
 use crate::deposit_event::*;
 use crate::json::{parse_json, FAILED_PARSE};
+use crate::prelude::{Address, U256};
 use crate::prover::{validate_eth_address, Proof};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -233,6 +234,16 @@ impl EthConnectorContract {
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         self.mint_near(predecessor_account_id, data.fee);
         // Save new contract data
+        self.save_contract();
+    }
+
+    pub(crate) fn internal_deposit_eth(&mut self, address: &Address, amount: &U256) {
+        self.ft.internal_deposit_eth(address.0, amount.as_u128());
+        self.save_contract();
+    }
+
+    pub(crate) fn internal_remove_eth(&mut self, address: &Address, amount: &U256) {
+        self.ft.internal_withdraw_eth(address.0, amount.as_u128());
         self.save_contract();
     }
 

@@ -9,9 +9,9 @@ use crate::prelude::{String, Vec};
 use crate::prover::Proof;
 #[cfg(feature = "contract")]
 use crate::types::str_from_slice;
+use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 #[cfg(feature = "contract")]
-use crate::types::Balance;
-use crate::types::{AccountId, EthAddress, RawAddress, RawH256, RawU256};
+use crate::types::{Balance, EthAddress};
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(BorshSerialize, BorshDeserialize)]

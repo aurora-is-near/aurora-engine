@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 use super::*;
 use crate::connector::{CONTRACT_FT_KEY, NO_DEPOSIT};
+use crate::engine::Engine;
 use crate::parameters::*;
+use crate::prelude;
+use crate::prelude::U256;
 use crate::types::*;
 use alloc::{
     string::{String, ToString},
@@ -43,6 +46,7 @@ impl FungibleToken {
         }
     }
 
+    /// Balance of NEAR tokens
     pub fn internal_unwrap_balance_of(&self, account_id: AccountId) -> Balance {
         match self.accounts_get(account_id) {
             Some(balance) => u128::try_from_slice(&balance[..]).unwrap(),
@@ -50,32 +54,84 @@ impl FungibleToken {
         }
     }
 
+    /// Balance of ETH tokens
+    pub fn internal_unwrap_balance_of_eth(&self, address: EthAddress) -> Balance {
+        Engine::get_balance(&prelude::Address(address)).as_u128()
+    }
+
+    /// Internal deposit NEAR (nETH) FT
     pub fn internal_deposit(&mut self, account_id: AccountId, amount: Balance) {
         let balance = self.internal_unwrap_balance_of(account_id.clone());
         if let Some(new_balance) = balance.checked_add(amount) {
             self.accounts_insert(account_id, new_balance);
+            self.total_supply_near = self
+                .total_supply_near
+                .checked_add(amount)
+                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
             self.total_supply = self
                 .total_supply
                 .checked_add(amount)
-                .expect("Total supply overflow");
+                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
         } else {
             sdk::panic_utf8(b"ERR_BALANCE_OVERFLOW");
         }
     }
 
+    /// Internal deposit ETH FT
+    pub fn internal_deposit_eth(&mut self, address: EthAddress, amount: Balance) {
+        let balance = self.internal_unwrap_balance_of_eth(address.clone());
+        if let Some(new_balance) = balance.checked_add(amount) {
+            Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
+            self.total_supply_eth = self
+                .total_supply_eth
+                .checked_add(amount)
+                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
+            self.total_supply = self
+                .total_supply
+                .checked_add(amount)
+                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
+        } else {
+            sdk::panic_utf8(b"ERR_BALANCE_OVERFLOW");
+        }
+    }
+
+    /// Withdraw NEAR tokens
     pub fn internal_withdraw(&mut self, account_id: AccountId, amount: Balance) {
         let balance = self.internal_unwrap_balance_of(account_id.clone());
         if let Some(new_balance) = balance.checked_sub(amount) {
             self.accounts_insert(account_id, new_balance);
+            self.total_supply_near = self
+                .total_supply_near
+                .checked_sub(amount)
+                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
             self.total_supply = self
                 .total_supply
                 .checked_sub(amount)
-                .expect("Total supply overflow");
+                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
         } else {
             sdk::panic_utf8(b"ERR_NOT_ENOUGH_BALANCE");
         }
     }
 
+    /// Withdraw ETH tokens
+    pub fn internal_withdraw_eth(&mut self, address: EthAddress, amount: Balance) {
+        let balance = self.internal_unwrap_balance_of_eth(address.clone());
+        if let Some(new_balance) = balance.checked_sub(amount) {
+            Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
+            self.total_supply_eth = self
+                .total_supply_eth
+                .checked_sub(amount)
+                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
+            self.total_supply = self
+                .total_supply
+                .checked_sub(amount)
+                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
+        } else {
+            sdk::panic_utf8(b"ERR_NOT_ENOUGH_BALANCE");
+        }
+    }
+
+    /// Transfer NEAR tokens
     pub fn internal_transfer(
         &mut self,
         sender_id: &str,
