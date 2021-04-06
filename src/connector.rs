@@ -88,10 +88,7 @@ impl EthConnectorContract {
             event.eth_custodian_address, self.contract.eth_custodian_address,
             "ERR_WRONG_EVENT_ADDRESS",
         );
-        assert!(
-            event.amount > event.fee,
-            "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"
-        );
+        assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
         let account_id = sdk::current_account_id();
         let proof_1 = proof.try_to_vec().unwrap();
         #[cfg(feature = "log")]
