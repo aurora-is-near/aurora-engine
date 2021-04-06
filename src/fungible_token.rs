@@ -17,6 +17,12 @@ pub struct FungibleToken {
     /// Total supply of the all token.
     pub total_supply: Balance,
 
+    /// Total supply of the all NEAR token.
+    pub total_supply_near: Balance,
+
+    /// Total supply of the all ETH token.
+    pub total_supply_eth: Balance,
+
     /// The storage size in bytes for one account.
     pub account_storage_usage: StorageUsage,
 }
@@ -31,6 +37,8 @@ impl FungibleToken {
     pub fn new() -> Self {
         Self {
             total_supply: 0,
+            total_supply_near: 0,
+            total_supply_eth: 0,
             account_storage_usage: 0,
         }
     }
@@ -38,7 +46,7 @@ impl FungibleToken {
     pub fn internal_unwrap_balance_of(&self, account_id: AccountId) -> Balance {
         match self.accounts_get(account_id) {
             Some(balance) => u128::try_from_slice(&balance[..]).unwrap(),
-            None => sdk::panic_utf8("The account is not registered".as_bytes()),
+            None => sdk::panic_utf8(b"ERR_ACCOUNT_NOT_EXIST"),
         }
     }
 
@@ -51,7 +59,7 @@ impl FungibleToken {
                 .checked_add(amount)
                 .expect("Total supply overflow");
         } else {
-            sdk::panic_utf8("Balance overflow".as_bytes());
+            sdk::panic_utf8(b"ERR_BALANCE_OVERFLOW");
         }
     }
 
@@ -64,7 +72,7 @@ impl FungibleToken {
                 .checked_sub(amount)
                 .expect("Total supply overflow");
         } else {
-            sdk::panic_utf8("The account doesn't have enough balance".as_bytes());
+            sdk::panic_utf8(b"ERR_NOT_ENOUGH_BALANCE");
         }
     }
 
@@ -108,8 +116,24 @@ impl FungibleToken {
         self.total_supply
     }
 
+    pub fn ft_total_supply_near(&self) -> u128 {
+        self.total_supply_near
+    }
+
+    pub fn ft_total_supply_eth(&self) -> u128 {
+        self.total_supply_eth
+    }
+
     pub fn ft_balance_of(&self, account_id: AccountId) -> u128 {
         if let Some(data) = self.accounts_get(account_id) {
+            u128::try_from_slice(&data[..]).unwrap()
+        } else {
+            0
+        }
+    }
+
+    pub fn ft_balance_of_eth(&self, account_id: AccountId) -> u128 {
+        if let Some(data) = self.accounts_get_eth(account_id) {
             u128::try_from_slice(&data[..]).unwrap()
         } else {
             0
@@ -255,10 +279,7 @@ impl FungibleToken {
                 sdk::promise_batch_action_transfer(promise0, amount);
                 Some((account_id, balance))
             } else {
-                sdk::panic_utf8(
-                    "Can't unregister the account with the positive balance without force"
-                        .as_bytes(),
-                )
+                sdk::panic_utf8(b"ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE")
             }
         } else {
             #[cfg(feature = "log")]
@@ -312,9 +333,7 @@ impl FungibleToken {
             let min_balance = self.storage_balance_bounds().min;
             if amount < min_balance {
                 #[cfg(feature = "log")]
-                sdk::panic_utf8(
-                    "The attached deposit is less than the minimum storage balance".as_bytes(),
-                );
+                sdk::panic_utf8(b"ERR_ATTACHED_DEPOSIT_NOT_ENOUGH");
             }
 
             self.internal_register_account(account_id.clone());
@@ -363,6 +382,11 @@ impl FungibleToken {
     }
 
     pub fn accounts_get(&self, account_id: AccountId) -> Option<Vec<u8>> {
+        sdk::read_storage(&self.ft_key(account_id)[..])
+    }
+
+    pub fn accounts_get_eth(&self, account_id: AccountId) -> Option<Vec<u8>> {
+        // TODO: modify
         sdk::read_storage(&self.ft_key(account_id)[..])
     }
 }

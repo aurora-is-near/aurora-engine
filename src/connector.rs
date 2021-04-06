@@ -62,7 +62,7 @@ impl EthConnectorContract {
         .save_contract();
     }
 
-    pub fn deposit(&self) {
+    pub fn deposit_near(&self) {
         #[cfg(feature = "log")]
         sdk::log("[Deposit tokens]".into());
 
@@ -123,7 +123,11 @@ impl EthConnectorContract {
         sdk::promise_return(promise1);
     }
 
-    pub fn finish_deposit(&mut self) {
+    pub fn deposit_eth(&self) {
+        // TODO: modify
+    }
+
+    pub fn finish_deposit_near(&mut self) {
         sdk::assert_private_call();
         let data: FinishDepositCallArgs =
             FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
@@ -147,6 +151,10 @@ impl EthConnectorContract {
         self.mint(predecessor_account_id, data.fee);
         // Save new contract data
         self.save_contract();
+    }
+
+    pub fn finish_deposit_eth(&mut self) {
+        // TODO: modify
     }
 
     fn record_proof(&mut self, key: String) -> Balance {
@@ -182,7 +190,7 @@ impl EthConnectorContract {
         self.ft.internal_withdraw(owner_id, amount);
     }
 
-    pub fn withdraw(&mut self) {
+    pub fn withdraw_near(&mut self) {
         #[cfg(feature = "log")]
         sdk::log("Start withdraw".into());
         let args: WithdrawCallArgs = WithdrawCallArgs::from(
@@ -204,6 +212,11 @@ impl EthConnectorContract {
         sdk::return_output(&res[..]);
     }
 
+    pub fn withdraw_eth(&mut self) {
+        // TODO: modify
+    }
+
+    // Return total supply of NEAR + ETH
     pub fn ft_total_supply(&self) {
         let total_supply = self.ft.ft_total_supply();
         sdk::return_output(&total_supply.to_string().as_bytes());
@@ -211,6 +224,23 @@ impl EthConnectorContract {
         sdk::log(format!("Total supply: {}", total_supply));
     }
 
+    // Return total supply of NEAR
+    pub fn ft_total_supply_near(&self) {
+        let total_supply = self.ft.ft_total_supply_near();
+        sdk::return_output(&total_supply.to_string().as_bytes());
+        #[cfg(feature = "log")]
+        sdk::log(format!("Total supply NEAR: {}", total_supply));
+    }
+
+    // Return total supply of ETH
+    pub fn ft_total_supply_eth(&self) {
+        let total_supply = self.ft.ft_total_supply_eth();
+        sdk::return_output(&total_supply.to_string().as_bytes());
+        #[cfg(feature = "log")]
+        sdk::log(format!("Total supply ETH: {}", total_supply));
+    }
+
+    /// Return balance of NEAR
     pub fn ft_balance_of(&self) {
         let args = BalanceOfCallArgs::from(
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
@@ -218,7 +248,21 @@ impl EthConnectorContract {
         let balance = self.ft.ft_balance_of(args.account_id.clone());
         sdk::return_output(&balance.to_string().as_bytes());
         #[cfg(feature = "log")]
-        sdk::log(format!("Balance [{}]: {}", args.account_id, balance));
+        sdk::log(format!(
+            "Balance of NEAR [{}]: {}",
+            args.account_id, balance
+        ));
+    }
+
+    /// Return balance of ETH
+    pub fn ft_balance_of_eth(&self) {
+        let args = BalanceOfCallArgs::from(
+            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
+        );
+        let balance = self.ft.ft_balance_of_eth(args.account_id.clone());
+        sdk::return_output(&balance.to_string().as_bytes());
+        #[cfg(feature = "log")]
+        sdk::log(format!("Balance of ETH [{}]: {}", args.account_id, balance));
     }
 
     pub fn ft_transfer(&mut self) {

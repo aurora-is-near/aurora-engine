@@ -313,18 +313,33 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn deposit() {
-        EthConnectorContract::new().deposit()
+    pub extern "C" fn deposit_near() {
+        EthConnectorContract::new().deposit_near()
     }
 
     #[no_mangle]
-    pub extern "C" fn withdraw() {
-        EthConnectorContract::new().withdraw()
+    pub extern "C" fn withdraw_near() {
+        EthConnectorContract::new().withdraw_near()
     }
 
     #[no_mangle]
-    pub extern "C" fn finish_deposit() {
-        EthConnectorContract::new().finish_deposit();
+    pub extern "C" fn deposit_eth() {
+        EthConnectorContract::new().deposit_eth()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn withdraw_eth() {
+        EthConnectorContract::new().withdraw_eth()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn finish_deposit_near() {
+        EthConnectorContract::new().finish_deposit_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn finish_deposit_eth() {
+        EthConnectorContract::new().finish_deposit_eth();
     }
 
     #[no_mangle]
@@ -333,8 +348,23 @@ mod contract {
     }
 
     #[no_mangle]
+    pub extern "C" fn ft_total_supply_near() {
+        EthConnectorContract::new().ft_total_supply_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_total_supply_eth() {
+        EthConnectorContract::new().ft_total_supply_eth();
+    }
+
+    #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         EthConnectorContract::new().ft_balance_of();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_balance_of_eth() {
+        EthConnectorContract::new().ft_balance_of_eth();
     }
 
     #[no_mangle]
