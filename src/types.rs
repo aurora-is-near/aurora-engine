@@ -56,22 +56,6 @@ pub struct TransferCallArgs {
     pub memo: Option<String>,
 }
 
-/// eth-connector specific data
-#[cfg(feature = "contract")]
-pub struct EthConnector {
-    pub prover_account: AccountId,
-    pub eth_custodian_address: EthAddress,
-}
-
-/// Finish deposit eth-connector call args
-#[cfg(feature = "contract")]
-pub struct FinishDepositCallArgs {
-    pub new_owner_id: AccountId,
-    pub amount: Balance,
-    pub fee: Balance,
-    //pub proof: Proof,
-}
-
 /// withdraw eth-connector call args
 #[cfg(feature = "contract")]
 pub struct WithdrawCallArgs {
@@ -86,14 +70,6 @@ pub struct TransferCallCallArgs {
     pub amount: Balance,
     pub memo: Option<String>,
     pub msg: String,
-}
-
-/// resolve_transfer eth-connector call args
-#[cfg(feature = "contract")]
-pub struct ResolveTransferCallArgs {
-    pub sender_id: AccountId,
-    pub receiver_id: AccountId,
-    pub amount: Balance,
 }
 
 /// storage_balance_of eth-connector call args
@@ -281,17 +257,6 @@ impl From<json::JsonValue> for TransferCallArgs {
             receiver_id: v.string("receiver_id").expect(str_from_slice(FAILED_PARSE)),
             amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
             memo: v.string("memo").ok(),
-        }
-    }
-}
-
-#[cfg(feature = "contract")]
-impl From<json::JsonValue> for ResolveTransferCallArgs {
-    fn from(v: json::JsonValue) -> Self {
-        Self {
-            sender_id: v.string("sender_id").expect(str_from_slice(FAILED_PARSE)),
-            receiver_id: v.string("receiver_id").expect(str_from_slice(FAILED_PARSE)),
-            amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
         }
     }
 }

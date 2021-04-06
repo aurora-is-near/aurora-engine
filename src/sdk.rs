@@ -185,7 +185,6 @@ pub fn read_input_and_store(key: &[u8]) {
     }
 }
 
-#[allow(dead_code)]
 pub fn return_output(value: &[u8]) {
     unsafe {
         exports::value_return(value.len() as u64, value.as_ptr() as u64);

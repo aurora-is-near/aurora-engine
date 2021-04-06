@@ -18,6 +18,8 @@ pub mod types;
 #[cfg(feature = "contract")]
 mod connector;
 #[cfg(feature = "contract")]
+mod deposit_event;
+#[cfg(feature = "contract")]
 mod engine;
 #[cfg(feature = "contract")]
 mod fungible_token;
@@ -35,6 +37,7 @@ mod contract {
     use borsh::BorshDeserialize;
     use evm::ExitReason;
 
+    use crate::connector::EthConnectorContract;
     use crate::engine::{Engine, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -302,6 +305,66 @@ mod contract {
         let input = sdk::read_input();
         let _args = BeginBlockArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
+    }
+
+    #[no_mangle]
+    pub extern "C" fn new_eth_connector() {
+        EthConnectorContract::init_contract()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn deposit() {
+        EthConnectorContract::new().deposit()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn withdraw() {
+        EthConnectorContract::new().withdraw()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn finish_deposit() {
+        EthConnectorContract::new().finish_deposit();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_total_supply() {
+        EthConnectorContract::new().ft_total_supply();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_balance_of() {
+        EthConnectorContract::new().ft_balance_of();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_transfer() {
+        EthConnectorContract::new().ft_transfer();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_resolve_transfer() {
+        EthConnectorContract::new().ft_resolve_transfer();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_transfer_call() {
+        EthConnectorContract::new().ft_transfer_call();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_deposit() {
+        EthConnectorContract::new().storage_deposit()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_withdraw() {
+        EthConnectorContract::new().storage_withdraw()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_balance_of() {
+        EthConnectorContract::new().storage_balance_of()
     }
 
     ///

@@ -1,6 +1,14 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
+#[cfg(feature = "contract")]
+use crate::json;
+#[cfg(feature = "contract")]
+use crate::json::FAILED_PARSE;
 use crate::prelude::{String, Vec};
+#[cfg(feature = "contract")]
+use crate::prover::Proof;
+#[cfg(feature = "contract")]
+use crate::types::str_from_slice;
 #[cfg(feature = "contract")]
 use crate::types::Balance;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
@@ -115,6 +123,36 @@ pub struct FtResolveTransfer {
 pub struct StorageBalance {
     pub total: Balance,
     pub available: Balance,
+}
+
+/// resolve_transfer eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct ResolveTransferCallArgs {
+    pub sender_id: AccountId,
+    pub receiver_id: AccountId,
+    pub amount: Balance,
+}
+
+/// Finish deposit eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct FinishDepositCallArgs {
+    pub new_owner_id: AccountId,
+    pub amount: Balance,
+    pub fee: Balance,
+    pub proof: Proof,
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for ResolveTransferCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            sender_id: v.string("sender_id").expect(str_from_slice(FAILED_PARSE)),
+            receiver_id: v.string("receiver_id").expect(str_from_slice(FAILED_PARSE)),
+            amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
+        }
+    }
 }
 
 #[cfg(test)]
