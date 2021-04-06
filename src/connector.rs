@@ -65,7 +65,6 @@ impl EthConnectorContract {
     pub fn deposit(&self) {
         #[cfg(feature = "log")]
         sdk::log("[Deposit tokens]".into());
-        use core::ops::Sub;
 
         let proof: Proof = Proof::from(parse_json(&sdk::read_input()).unwrap());
         let event = EthDepositedEvent::from_log_entry_data(&proof.log_entry_data);
@@ -90,7 +89,7 @@ impl EthConnectorContract {
             "ERR_WRONG_EVENT_ADDRESS",
         );
         assert!(
-            event.amount.sub(event.fee).as_u128() > 0,
+            event.amount > event.fee,
             "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"
         );
         let account_id = sdk::current_account_id();
