@@ -3,7 +3,7 @@ use crate::parameters::*;
 use crate::sdk;
 use crate::types::*;
 
-use crate::deposit_event::EthDepositedEvent;
+use crate::deposit_event::*;
 use crate::json::{parse_json, FAILED_PARSE};
 use crate::prover::{validate_eth_address, Proof};
 use alloc::string::{String, ToString};
@@ -64,10 +64,10 @@ impl EthConnectorContract {
 
     pub fn deposit_near(&self) {
         #[cfg(feature = "log")]
-        sdk::log("[Deposit tokens]".into());
+        sdk::log("[Deposit NEAR tokens]".into());
 
         let proof: Proof = Proof::from(parse_json(&sdk::read_input()).unwrap());
-        let event = EthDepositedEvent::from_log_entry_data(&proof.log_entry_data);
+        let event = EthDepositedNearEvent::from_log_entry_data(&proof.log_entry_data);
         #[cfg(feature = "log")]
         sdk::log(format!(
             "Deposit started: from {} ETH to {} NEAR with amount: {:?} and fee {:?}",
@@ -115,7 +115,7 @@ impl EthConnectorContract {
         let promise1 = sdk::promise_then(
             promise0,
             &account_id,
-            b"finish_deposit",
+            b"finish_deposit_near",
             &data[..],
             NO_DEPOSIT,
             GAS_FOR_FINISH_DEPOSIT,
@@ -124,7 +124,64 @@ impl EthConnectorContract {
     }
 
     pub fn deposit_eth(&self) {
-        // TODO: modify
+        #[cfg(feature = "log")]
+        sdk::log("[Deposit ETH tokens]".into());
+
+        let proof: Proof = Proof::from(parse_json(&sdk::read_input()).unwrap());
+        let event = EthDepositedEthEvent::from_log_entry_data(&proof.log_entry_data);
+        #[cfg(feature = "log")]
+        sdk::log(format!(
+            "Deposit started: from {} ETH to {} NEAR with amount: {:?} and fee {:?}",
+            hex::encode(event.sender),
+            hex::encode(event.recipient),
+            event.amount.as_u128(),
+            event.fee.as_u128()
+        ));
+
+        #[cfg(feature = "log")]
+        sdk::log(format!(
+            "Event's address {}, custodian address {}",
+            hex::encode(&event.eth_custodian_address),
+            hex::encode(&self.contract.eth_custodian_address),
+        ));
+
+        assert_eq!(
+            event.eth_custodian_address, self.contract.eth_custodian_address,
+            "ERR_WRONG_EVENT_ADDRESS",
+        );
+        assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
+        let account_id = sdk::current_account_id();
+        let proof_1 = proof.try_to_vec().unwrap();
+        #[cfg(feature = "log")]
+        sdk::log(format!(
+            "Deposit verify_log_entry for prover: {}",
+            self.contract.prover_account,
+        ));
+        let promise0 = sdk::promise_create(
+            self.contract.prover_account.as_bytes(),
+            b"verify_log_entry",
+            &proof_1[..],
+            NO_DEPOSIT,
+            GAS_FOR_VERIFY_LOG_ENTRY,
+        );
+        let data = FinishDepositEthCallArgs {
+            new_owner_id: event.recipient,
+            amount: event.amount.as_u128(),
+            fee: event.fee.as_u128(),
+            proof,
+        }
+        .try_to_vec()
+        .unwrap();
+
+        let promise1 = sdk::promise_then(
+            promise0,
+            &account_id,
+            b"finish_deposit_eth",
+            &data[..],
+            NO_DEPOSIT,
+            GAS_FOR_FINISH_DEPOSIT,
+        );
+        sdk::promise_return(promise1);
     }
 
     pub fn finish_deposit_near(&mut self) {
@@ -132,7 +189,7 @@ impl EthConnectorContract {
         let data: FinishDepositCallArgs =
             FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
         #[cfg(feature = "log")]
-        sdk::log(format!("Finish deposit amount: {}", data.amount));
+        sdk::log(format!("Finish deposit NEAR amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
         let data0: Vec<u8> = match sdk::promise_result(0) {
             PromiseResult::Successful(x) => x,
@@ -145,16 +202,38 @@ impl EthConnectorContract {
         self.record_proof(data.proof.get_key());
 
         // Mint tokens to recipient minus fee
-        self.mint(data.new_owner_id, data.amount - data.fee);
+        self.mint_near(data.new_owner_id, data.amount - data.fee);
         // Mint fee for Predecessor
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-        self.mint(predecessor_account_id, data.fee);
+        self.mint_near(predecessor_account_id, data.fee);
         // Save new contract data
         self.save_contract();
     }
 
     pub fn finish_deposit_eth(&mut self) {
-        // TODO: modify
+        sdk::assert_private_call();
+        let data: FinishDepositCallArgs =
+            FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+        #[cfg(feature = "log")]
+        sdk::log(format!("Finish deposit NEAR amount: {}", data.amount));
+        assert_eq!(sdk::promise_results_count(), 1);
+        let data0: Vec<u8> = match sdk::promise_result(0) {
+            PromiseResult::Successful(x) => x,
+            _ => sdk::panic_utf8(b"ERR_PROMISE_INDEX"),
+        };
+        #[cfg(feature = "log")]
+        sdk::log("Check verification_success".into());
+        let verification_success: bool = bool::try_from_slice(&data0).unwrap();
+        assert!(verification_success, "ERR_VERIFY_PROOF");
+        self.record_proof(data.proof.get_key());
+
+        // Mint tokens to recipient minus fee
+        self.mint_near(data.new_owner_id, data.amount - data.fee);
+        // Mint fee for Predecessor
+        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        self.mint_near(predecessor_account_id, data.fee);
+        // Save new contract data
+        self.save_contract();
     }
 
     fn record_proof(&mut self, key: String) -> Balance {
@@ -172,7 +251,8 @@ impl EthConnectorContract {
         attached_deposit - required_deposit
     }
 
-    fn mint(&mut self, owner_id: AccountId, amount: Balance) {
+    ///  Mint NEAR tokens
+    fn mint_near(&mut self, owner_id: AccountId, amount: Balance) {
         #[cfg(feature = "log")]
         sdk::log(format!("Mint {} tokens for: {}", amount, owner_id));
 
@@ -278,6 +358,14 @@ impl EthConnectorContract {
             "Transfer amount {} to {} success with memo: {:?}",
             args.amount, args.receiver_id, args.memo
         ));
+    }
+
+    pub fn ft_transfer_near(&mut self) {
+        // TODO: modify
+    }
+
+    pub fn ft_transfer_eth(&mut self) {
+        // TODO: modify
     }
 
     pub fn ft_resolve_transfer(&mut self) {

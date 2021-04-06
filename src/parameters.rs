@@ -11,7 +11,7 @@ use crate::prover::Proof;
 use crate::types::str_from_slice;
 #[cfg(feature = "contract")]
 use crate::types::Balance;
-use crate::types::{AccountId, RawAddress, RawH256, RawU256};
+use crate::types::{AccountId, EthAddress, RawAddress, RawH256, RawU256};
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -134,11 +134,21 @@ pub struct ResolveTransferCallArgs {
     pub amount: Balance,
 }
 
-/// Finish deposit eth-connector call args
+/// Finish deposit NEAR eth-connector call args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FinishDepositCallArgs {
     pub new_owner_id: AccountId,
+    pub amount: Balance,
+    pub fee: Balance,
+    pub proof: Proof,
+}
+
+/// Finish deposit NEAR eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct FinishDepositEthCallArgs {
+    pub new_owner_id: EthAddress,
     pub amount: Balance,
     pub fee: Balance,
     pub proof: Proof,
