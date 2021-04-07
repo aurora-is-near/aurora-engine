@@ -45,7 +45,7 @@ pub fn istanbul_precompiles(
         6 => todo!(), // TODO: implement alt_bn128_add()
         7 => todo!(), // TODO: implement alt_bn128_mul()
         8 => todo!(), // TODO: implement alt_bn128_pair()
-        9 => todo!(), // TODO: implement blake2f()
+        9 => Some(Ok((ExitSucceed::Returned, blake2f(input), 0))),
         // Not supported.
         _ => None,
     }
@@ -253,16 +253,48 @@ fn alt_bn128_pair(_input: Vec<u8>) -> U256 {
 
 /// See: https://eips.ethereum.org/EIPS/eip-152
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
+/// NOTE: Shouldn't there be gas checks here?
 #[allow(dead_code)]
-fn blake2f(rounds: u32, h: [u64; 8], m: [u64; 16], t: [u64; 2], f: bool) -> [U256; 2] {
-    let res = &*blake2::blake2b_f(rounds, h, m, t, f);
+fn blake2f(input: &[u8]) -> Vec<u8> {
+    let mut rounds_bytes = [0u8; 4];
+    rounds_bytes.copy_from_slice(&input[0..4]);
+    let rounds = u32::from_be_bytes(rounds_bytes);
 
+    let mut h = [0u64; 8];
+    for (mut x, value) in h.iter_mut().enumerate() {
+        let mut word: [u8; 8] = [0u8; 8];
+        x = x * 8 + 4;
+        word.copy_from_slice(&input[x..(x + 8)]);
+        *value = u64::from_be_bytes(word);
+    }
+
+    let mut m = [0u64; 16];
+    for (mut x, value) in m.iter_mut().enumerate() {
+        let mut word: [u8; 8] = [0u8; 8];
+        x = x * 8 + 68;
+        word.copy_from_slice(&input[x..(x + 8)]);
+        *value = u64::from_be_bytes(word);
+    }
+
+    let mut t: [u64; 2] = [0u64; 2];
+    for (mut x, value) in t.iter_mut().enumerate() {
+        let mut word: [u8; 8] = [0u8; 8];
+        x = x * 8 + 196;
+        word.copy_from_slice(&input[x..(x + 8)]);
+        *value = u64::from_be_bytes(word);
+    }
+
+    let finished = input[212] != 0;
+
+    let res = &*blake2::blake2b_f(rounds, h, m, t, finished);
     let mut l = [0u8; 32];
     let mut h = [0u8; 32];
     l.copy_from_slice(&res[..32]);
     h.copy_from_slice(&res[32..64]);
 
-    [U256::from(l), U256::from(h)]
+    let mut res = l.to_vec();
+    res.extend_from_slice(&h.to_vec());
+    res
 }
 
 #[cfg(test)]
@@ -311,7 +343,7 @@ mod tests {
             0000000000000000000000000000000000000000000000000000000000000020\
             03\
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e\
-            fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
+            fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
         )
         .unwrap();
         let res = U256::from_big_endian(&modexp(&test_input1, None).unwrap());
@@ -348,7 +380,10 @@ mod tests {
             07",
         )
         .unwrap();
-        let expected = U256::from_big_endian(&hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab").unwrap());
+        let expected = U256::from_big_endian(
+            &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
+                .unwrap(),
+        );
         let res = U256::from_big_endian(&modexp(&test_input4, None).unwrap());
         assert_eq!(res, expected);
 
@@ -361,14 +396,19 @@ mod tests {
             80",
         )
         .unwrap();
-        let expected = U256::from_big_endian(&hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab").unwrap());
+        let expected = U256::from_big_endian(
+            &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
+                .unwrap(),
+        );
         let res = U256::from_big_endian(&modexp(&test_input5, None).unwrap());
         assert_eq!(res, expected);
     }
 
     #[test]
     fn test_blake2f() {
-        let rounds = 12;
+        let mut v = [0u8; 213];
+        let rounds: [u8; 4] = 12u32.to_be_bytes();
+        v[..4].copy_from_slice(&rounds);
         let h: [u64; 8] = [
             0x6a09e667f2bdc948,
             0xbb67ae8584caa73b,
@@ -379,6 +419,13 @@ mod tests {
             0x1f83d9abfb41bd6b,
             0x5be0cd19137e2179,
         ];
+        for (mut x, value) in h.iter().enumerate() {
+            let value: [u8; 8] = value.to_be_bytes();
+            x = x * 8 + 4;
+
+            v[x..(x + 8)].copy_from_slice(&value);
+        }
+
         let m: [u64; 16] = [
             0x0000000000636261,
             0x0000000000000000,
@@ -397,21 +444,29 @@ mod tests {
             0x0000000000000000,
             0x0000000000000000,
         ];
-        let t: [u64; 2] = [3, 0];
-        let f_bool = true;
+        for (mut x, value) in m.iter().enumerate() {
+            let value: [u8; 8] = value.to_be_bytes();
+            x = x * 8 + 68;
+            v[x..(x + 8)].copy_from_slice(&value);
+        }
 
-        let output: [U256; 2] = [
-            U256::from(
-                &*hex::decode("ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d1")
-                    .unwrap(),
-            ),
-            U256::from(
-                &*hex::decode("7d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923")
-                    .unwrap(),
-            ),
-        ];
-        let res = blake2f(rounds, h, m, t, f_bool);
-        assert_eq!(res, output);
+        let t: [u64; 2] = [3, 0];
+        for (mut x, value) in t.iter().enumerate() {
+            let value: [u8; 8] = value.to_be_bytes();
+            x = x * 8 + 196;
+            v[x..(x + 8)].copy_from_slice(&value);
+        }
+
+        let bool = 1;
+        v[212] = bool;
+
+        let expected = &*hex::decode(
+            "ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d1\
+                7d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923",
+        )
+        .unwrap();
+        let res = blake2f(&v);
+        assert_eq!(res, expected);
     }
 
     #[test]
