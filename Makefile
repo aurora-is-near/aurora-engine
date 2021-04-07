@@ -29,11 +29,17 @@ target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(
 deploy: release.wasm
 	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),aurora.test.near) --wasm-file=$<
 
-check:
+check: test check-format
+
+# test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
+test: release
 	$(CARGO) test
 
 format:
 	$(CARGO) fmt
+
+check-format:
+	$(CARGO) fmt -- --check
 
 clean:
 	@rm -Rf *.wasm target *~
