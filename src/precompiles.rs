@@ -51,7 +51,6 @@ pub fn istanbul_precompiles(
     }
 }
 
-#[allow(dead_code)]
 fn ecrecover_raw(input: &[u8]) -> Address {
     assert_eq!(input.len(), 128); // input is (hash, v, r, s), each typed as a uint256
 
@@ -74,7 +73,6 @@ pub(crate) fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
 /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000001
-#[allow(dead_code)]
 pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     use sha3::Digest;
     assert_eq!(signature.len(), 65);
@@ -129,7 +127,6 @@ fn identity(input: &[u8]) -> &[u8] {
 
 /// See: https://eips.ethereum.org/EIPS/eip-198
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
-#[allow(dead_code)]
 fn modexp(input: &[u8], target_gas: Option<u64>) -> Result<Vec<u8>, ExitError> {
     fn adj_exp_len(exp_len: U256, base_len: U256, bytes: &[u8]) -> U256 {
         let mut exp32_bytes = Vec::with_capacity(32);
@@ -254,7 +251,6 @@ fn alt_bn128_pair(_input: Vec<u8>) -> U256 {
 /// See: https://eips.ethereum.org/EIPS/eip-152
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
 /// NOTE: Shouldn't there be gas checks here?
-#[allow(dead_code)]
 fn blake2f(input: &[u8]) -> Vec<u8> {
     let mut rounds_bytes = [0u8; 4];
     rounds_bytes.copy_from_slice(&input[0..4]);
