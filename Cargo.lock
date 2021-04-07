@@ -110,6 +110,7 @@ dependencies = [
  "near-crypto",
  "near-sdk",
  "near-sdk-sim",
+ "num-bigint 0.4.0",
  "primitive-types",
  "ripemd160",
  "rjson",
@@ -1871,7 +1872,7 @@ dependencies = [
  "near-vm-errors 4.0.0-pre.1",
  "near-vm-logic 4.0.0-pre.1",
  "near-vm-runner",
- "num-bigint",
+ "num-bigint 0.3.2",
  "num-rational",
  "num-traits",
  "rand 0.7.3",
@@ -2094,6 +2095,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e0d047c1062aa51e256408c560894e5251f08925980e53cf1aa5bd00eec6512"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-integer"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2110,7 +2122,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12ac428b1cb17fce6f731001d307d351ec70a6d202fc2e60f7d4c5e42d8f4f07"
 dependencies = [
  "autocfg",
- "num-bigint",
+ "num-bigint 0.3.2",
  "num-integer",
  "num-traits",
  "serde",
