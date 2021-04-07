@@ -373,13 +373,13 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_transfer_near() {
-        EthConnectorContract::new().ft_transfer_near();
+    pub extern "C" fn transfer_near() {
+        EthConnectorContract::new().transfer_near();
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_transfer_eth() {
-        EthConnectorContract::new().ft_transfer_eth();
+    pub extern "C" fn transfer_eth() {
+        EthConnectorContract::new().transfer_eth();
     }
 
     #[no_mangle]

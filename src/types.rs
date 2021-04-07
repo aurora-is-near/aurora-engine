@@ -56,6 +56,14 @@ pub struct TransferCallArgs {
     pub memo: Option<String>,
 }
 
+/// transfer ETH->NEAR args for json invocation
+#[cfg(feature = "contract")]
+pub struct TransferEthCallArgs {
+    pub address: EthAddress,
+    pub amount: Balance,
+    pub memo: Option<String>,
+}
+
 /// withdraw eth-connector call args
 #[cfg(feature = "contract")]
 pub struct WithdrawCallArgs {
@@ -255,6 +263,20 @@ impl From<json::JsonValue> for TransferCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
             receiver_id: v.string("receiver_id").expect(str_from_slice(FAILED_PARSE)),
+            amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
+            memo: v.string("memo").ok(),
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for TransferEthCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        use crate::prover::validate_eth_address;
+
+        let address = v.string("address").expect(str_from_slice(FAILED_PARSE));
+        Self {
+            address: validate_eth_address(address),
             amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
             memo: v.string("memo").ok(),
         }

@@ -39,7 +39,7 @@ impl EthConnectorContract {
     }
 
     pub fn init_contract() {
-        //assert_eq!(sdk::current_account_id(), sdk::predecessor_account_id());
+        assert_eq!(sdk::current_account_id(), sdk::predecessor_account_id());
         assert!(
             !sdk::storage_has_key(CONTRACT_NAME_KEY.as_bytes()),
             "ERR_CONTRACT_INITIALIZED"
@@ -281,9 +281,10 @@ impl EthConnectorContract {
         sdk::log("Mint ETH success".into());
     }
 
-    fn burn(&mut self, owner_id: AccountId, amount: Balance) {
+    /// Burn NEAR tokens
+    fn burn_near(&mut self, owner_id: AccountId, amount: Balance) {
         #[cfg(feature = "log")]
-        sdk::log(format!("Burn {} tokens for: {}", amount, owner_id));
+        sdk::log(format!("Burn NEAR {} tokens for: {}", amount, owner_id));
         self.ft.internal_withdraw(owner_id, amount);
     }
 
@@ -303,7 +304,7 @@ impl EthConnectorContract {
         .unwrap();
         // Burn tokens to recipient
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-        self.burn(predecessor_account_id, args.amount);
+        self.burn_near(predecessor_account_id, args.amount);
         // Save new contract data
         self.save_contract();
         sdk::return_output(&res[..]);
@@ -377,12 +378,29 @@ impl EthConnectorContract {
         ));
     }
 
-    pub fn ft_transfer_near(&mut self) {
+    /// Transfer tokens from ETH account to NEAR account
+    pub fn transfer_near(&mut self) {
         // TODO: modify
     }
 
-    pub fn ft_transfer_eth(&mut self) {
-        // TODO: modify
+    /// Transfer tokens from NEAR account to ETH account
+    pub fn transfer_eth(&mut self) {
+        let args: TransferEthCallArgs = TransferEthCallArgs::from(
+            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
+        );
+
+        let sender_id = str_from_slice(&sdk::predecessor_account_id()).into();
+        self.ft.internal_withdraw(sender_id, args.amount);
+        self.ft.internal_deposit_eth(args.address, args.amount);
+        self.save_contract();
+
+        #[cfg(feature = "log")]
+        sdk::log(format!(
+            "Transfer NEAR tokens {} amount to {} ETH success with memo: {:?}",
+            args.amount,
+            hex::encode(args.address),
+            args.memo
+        ));
     }
 
     pub fn ft_resolve_transfer(&mut self) {
