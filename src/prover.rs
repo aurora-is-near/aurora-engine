@@ -117,3 +117,10 @@ impl From<json::JsonValue> for Proof {
         }
     }
 }
+
+/// Encode EIP712 data
+pub fn encode_eip712(eth_recipient: EthAddress, amount: U256, fee: U256) -> Vec<u8> {
+    // ethabi::encode()
+    // ethabi::
+    vec![]
+}

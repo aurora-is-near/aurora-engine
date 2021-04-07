@@ -290,7 +290,7 @@ impl EthConnectorContract {
 
     pub fn withdraw_near(&mut self) {
         #[cfg(feature = "log")]
-        sdk::log("Start withdraw".into());
+        sdk::log("Start withdraw NEAR".into());
         let args: WithdrawCallArgs = WithdrawCallArgs::from(
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
         );
@@ -310,8 +310,14 @@ impl EthConnectorContract {
         sdk::return_output(&res[..]);
     }
 
+    /// Withdraw ETH tokens
     pub fn withdraw_eth(&mut self) {
         // TODO: modify
+        #[cfg(feature = "log")]
+        sdk::log("Start withdraw ETH".into());
+        let _args: WithdrawEthCallArgs = WithdrawEthCallArgs::from(
+            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
+        );
     }
 
     // Return total supply of NEAR + ETH
