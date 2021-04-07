@@ -175,8 +175,9 @@ fn modexp(input: &[u8], target_gas: Option<u64>) -> Result<Vec<u8>, ExitError> {
     let exp_len = U256::from(&input[32..64]);
     let mod_len = U256::from(&input[64..96]);
 
-    let mul = mult_complexity(std::cmp::max(mod_len, base_len))?;
-    let adj = std::cmp::max(adj_exp_len(exp_len, base_len, &input), U256::from(1)) / U256::from(20);
+    let mul = mult_complexity(core::cmp::max(mod_len, base_len))?;
+    let adj =
+        core::cmp::max(adj_exp_len(exp_len, base_len, &input), U256::from(1)) / U256::from(20);
     let (gas_val, overflow) = mul.overflowing_mul(adj);
     if overflow {
         return Err(ExitError::OutOfGas);
