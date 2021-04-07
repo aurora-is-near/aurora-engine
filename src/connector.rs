@@ -213,10 +213,10 @@ impl EthConnectorContract {
 
     pub fn finish_deposit_eth(&mut self) {
         sdk::assert_private_call();
-        let data: FinishDepositCallArgs =
-            FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+        let data: FinishDepositEthCallArgs =
+            FinishDepositEthCallArgs::try_from_slice(&sdk::read_input()).unwrap();
         #[cfg(feature = "log")]
-        sdk::log(format!("Finish deposit NEAR amount: {}", data.amount));
+        sdk::log(format!("Finish deposit ETH amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
         let data0: Vec<u8> = match sdk::promise_result(0) {
             PromiseResult::Successful(x) => x,
@@ -229,10 +229,7 @@ impl EthConnectorContract {
         self.record_proof(data.proof.get_key());
 
         // Mint tokens to recipient minus fee
-        self.mint_near(data.new_owner_id, data.amount - data.fee);
-        // Mint fee for Predecessor
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-        self.mint_near(predecessor_account_id, data.fee);
+        self.mint_eth(data.new_owner_id, data.amount - data.fee);
         // Save new contract data
         self.save_contract();
     }
@@ -265,14 +262,23 @@ impl EthConnectorContract {
     ///  Mint NEAR tokens
     fn mint_near(&mut self, owner_id: AccountId, amount: Balance) {
         #[cfg(feature = "log")]
-        sdk::log(format!("Mint {} tokens for: {}", amount, owner_id));
+        sdk::log(format!("Mint NEAR {} tokens for: {}", amount, owner_id));
 
         if self.ft.accounts_get(owner_id.clone()).is_none() {
             self.ft.accounts_insert(owner_id.clone(), 0);
         }
         self.ft.internal_deposit(owner_id, amount);
         #[cfg(feature = "log")]
-        sdk::log("Mint success".into());
+        sdk::log("Mint NEAR success".into());
+    }
+
+    ///  Mint ETH tokens
+    fn mint_eth(&mut self, owner_id: EthAddress, amount: Balance) {
+        #[cfg(feature = "log")]
+        sdk::log(format!("Mint ETH {} tokens for: {}", amount, owner_id));
+        self.ft.internal_deposit_eth(owner_id, amount);
+        #[cfg(feature = "log")]
+        sdk::log("Mint ETH success".into());
     }
 
     fn burn(&mut self, owner_id: AccountId, amount: Balance) {
