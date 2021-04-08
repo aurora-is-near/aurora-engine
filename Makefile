@@ -42,7 +42,7 @@ check-format:
 	$(CARGO) fmt -- --check
 
 clippy:
-	$(CARGO) clippy -- -D warnings
+	$(CARGO) +nightly clippy -- -D warnings
 
 clean:
 	@rm -Rf *.wasm target *~
