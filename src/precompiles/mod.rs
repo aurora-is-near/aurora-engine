@@ -1,0 +1,75 @@
+mod hash;
+mod secp256k1;
+mod modexp;
+mod blake2;
+mod bn128;
+
+use crate::prelude::{Address, Vec, U256};
+use evm::{Context, ExitError, ExitSucceed};
+use num_bigint::BigUint;
+pub(crate) use crate::precompiles::secp256k1::ecrecover;
+
+type PrecompileResult = Result<(ExitSucceed, Vec<u8>, u64), ExitError>;
+
+#[allow(dead_code)]
+pub fn no_precompiles(
+    _address: Address,
+    _input: &[u8],
+    _target_gas: Option<u64>,
+    _context: &Context,
+) -> Option<PrecompileResult> {
+    None // no precompiles supported
+}
+
+#[allow(dead_code)]
+pub fn istanbul_precompiles(
+    address: Address,
+    input: &[u8],
+    target_gas: Option<u64>,
+    _context: &Context,
+) -> Option<PrecompileResult> {
+    match address.to_low_u64_be() {
+        1 => Some(Ok((
+            ExitSucceed::Returned,
+            secp256k1::ecrecover_raw(input).as_bytes().to_vec(),
+            0,
+        ))),
+        2 => Some(Ok((
+            ExitSucceed::Returned,
+            hash::sha256(input).as_bytes().to_vec(),
+            0,
+        ))),
+        3 => Some(Ok((
+            ExitSucceed::Returned,
+            hash::ripemd160(input).as_bytes().to_vec(),
+            0,
+        ))),
+        4 => Some(Ok((ExitSucceed::Returned, identity(input).to_vec(), 0))),
+        5 => match modexp::modexp(input, target_gas) {
+            Ok(r) => Some(Ok((ExitSucceed::Returned, r, 0))),
+            Err(e) => Some(Err(e)),
+        },
+        6 => todo!(), // TODO: implement alt_bn128_add()
+        7 => todo!(), // TODO: implement alt_bn128_mul()
+        8 => todo!(), // TODO: implement alt_bn128_pair()
+        9 => Some(Ok((ExitSucceed::Returned, blake2::blake2f(input), 0))),
+        // Not supported.
+        _ => None,
+    }
+}
+
+/// See: https://ethereum.github.io/yellowpaper/paper.pdf
+/// See: https://etherscan.io/address/0000000000000000000000000000000000000004
+fn identity(input: &[u8]) -> &[u8] {
+    input
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_identity() {
+        assert_eq!(identity(b""), b"")
+    }
+}
