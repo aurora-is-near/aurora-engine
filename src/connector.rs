@@ -169,6 +169,7 @@ impl EthConnectorContract {
             new_owner_id: event.recipient,
             amount: event.amount.as_u128(),
             fee: event.fee.as_u128(),
+            relayer_eth_account: event.recipient,
             proof,
         }
         .try_to_vec()
@@ -230,6 +231,8 @@ impl EthConnectorContract {
 
         // Mint tokens to recipient minus fee
         self.mint_eth(data.new_owner_id, data.amount - data.fee);
+        // Mint tokens fee to Relayer
+        self.mint_eth(data.relayer_eth_account, data.fee);
         // Save new contract data
         self.save_contract();
     }
@@ -312,7 +315,6 @@ impl EthConnectorContract {
 
     /// Withdraw ETH tokens
     pub fn withdraw_eth(&mut self) {
-        // TODO: modify
         #[cfg(feature = "log")]
         sdk::log("Start withdraw ETH".into());
         let _args: WithdrawEthCallArgs = WithdrawEthCallArgs::from(
@@ -369,6 +371,7 @@ impl EthConnectorContract {
         sdk::log(format!("Balance of ETH [{}]: {}", args.account_id, balance));
     }
 
+    /// Transfer between NEAR accounts
     pub fn ft_transfer(&mut self) {
         let args: TransferCallArgs = TransferCallArgs::from(
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),

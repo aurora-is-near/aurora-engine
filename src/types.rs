@@ -78,6 +78,7 @@ pub struct WithdrawEthCallArgs {
     pub eth_recipient: EthAddress,
     pub amount: U256,
     pub fee: U256,
+    pub relayer_eth_account: EthAddress,
     pub eip712_signature: Vec<u8>,
 }
 
@@ -309,11 +310,16 @@ impl From<json::JsonValue> for WithdrawEthCallArgs {
             .array("eip712_signature", json::JsonValue::parse_u8)
             .expect(str_from_slice(FAILED_PARSE));
 
+        let relayer_eth_account = v
+            .string("relayer_eth_account")
+            .expect(str_from_slice(FAILED_PARSE));
+
         Self {
             sender: validate_eth_address(sender),
             eth_recipient: validate_eth_address(eth_recipient),
             amount: U256::from_str(amount.as_str()).expect(str_from_slice(FAILED_PARSE)),
             fee: U256::from_str(fee.as_str()).expect(str_from_slice(FAILED_PARSE)),
+            relayer_eth_account: validate_eth_address(relayer_eth_account),
             eip712_signature,
         }
     }

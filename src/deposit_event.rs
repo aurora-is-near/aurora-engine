@@ -25,6 +25,7 @@ pub struct EthDepositedEthEvent {
     pub recipient: EthAddress,
     pub amount: U128,
     pub fee: U128,
+    pub relayer_eth_account: EthAddress,
 }
 
 impl EthDepositedNearEvent {
@@ -81,6 +82,7 @@ impl EthDepositedEthEvent {
             ("ethRecipientOnNear".to_string(), ParamType::Address, false),
             ("amount".to_string(), ParamType::Uint(256), false),
             ("fee".to_string(), ParamType::Uint(256), false),
+            ("relayerEthAccount".to_string(), ParamType::Address, true),
         ]
     }
 
@@ -108,12 +110,14 @@ impl EthDepositedEthEvent {
                 .unwrap()
                 .as_u128(),
         );
+        let relayer_eth_account = event.log.params[4].value.clone().into_address().unwrap().0;
         Self {
             eth_custodian_address: event.eth_custodian_address,
             sender,
             recipient,
             amount,
             fee,
+            relayer_eth_account,
         }
     }
 }

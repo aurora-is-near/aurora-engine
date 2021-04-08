@@ -151,6 +151,7 @@ pub struct FinishDepositEthCallArgs {
     pub new_owner_id: EthAddress,
     pub amount: Balance,
     pub fee: Balance,
+    pub relayer_eth_account: EthAddress,
     pub proof: Proof,
 }
 
