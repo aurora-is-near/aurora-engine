@@ -333,7 +333,12 @@ impl EthConnectorContract {
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
         );
         assert!(
-            prover::verify_withdraw_eip712(args.eth_recipient, args.amount, args.eip712_signature),
+            prover::verify_withdraw_eip712(
+                args.sender,
+                args.eth_recipient,
+                args.amount,
+                args.eip712_signature
+            ),
             "ERR_WRONG_EIP712_MSG"
         );
 

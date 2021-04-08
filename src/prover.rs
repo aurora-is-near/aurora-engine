@@ -2,6 +2,7 @@ use super::prelude::*;
 use super::sdk;
 use crate::json::{self, FAILED_PARSE};
 use crate::log_entry::LogEntry;
+use crate::precompiles::ecrecover;
 use crate::types::{str_from_slice, AccountId, EthAddress};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
@@ -118,21 +119,45 @@ impl From<json::JsonValue> for Proof {
     }
 }
 
+const DOMAIN_TYPEHASH: &str =
+    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)";
+
 /// Encode EIP712 data
 #[allow(unused_variables)]
 #[allow(dead_code)]
 pub fn encode_eip712(eth_recipient: EthAddress, amount: U256, fee: U256) -> Vec<u8> {
-    // ethabi::encode()
-    // ethabi::
+    use ethabi::Token;
+
+    let domain = Token::Bytes("Aurora-Engine domain".as_bytes().to_vec());
+    let version = Token::Bytes("1.0".as_bytes().to_vec());
+    let chain_id = Token::Bytes("133111".as_bytes().to_vec());
+    let custodian_address = Token::Bytes("some_custodian_address".as_bytes().to_vec());
+    let encoded = ethabi::encode(&[domain, version, chain_id, custodian_address]);
+    let digest = sdk::keccak(&encoded);
+
+    let domain_typehash = sdk::keccak(&ethabi::encode(&[Token::Bytes(
+        DOMAIN_TYPEHASH.as_bytes().to_vec(),
+    )]));
+    ethabi::encode(&[
+        Token::FixedBytes(digest.as_bytes().to_vec()),
+        Token::FixedBytes(domain_typehash.as_bytes().to_vec()),
+    ]);
+    // TODO: modify
     vec![]
 }
 
 #[allow(unused_variables)]
 pub fn verify_withdraw_eip712(
+    sender: EthAddress,
     eth_recipient: EthAddress,
     amount: U256,
     eip712_signature: Vec<u8>,
 ) -> bool {
+    use sha3::Digest;
+    let digest = sha3::Keccak256::digest(&[]);
+    let h = H256::from_low_u64_be(0);
+    // TODO: modify
+    let _ = ecrecover(h, &eip712_signature[..]);
     true
 }
 
@@ -143,5 +168,6 @@ pub fn verify_transfer_eip712(
     amount: U256,
     eip712_signature: Vec<u8>,
 ) -> bool {
+    // TODO: modify
     true
 }

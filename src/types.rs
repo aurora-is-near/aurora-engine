@@ -74,6 +74,7 @@ pub struct WithdrawCallArgs {
 /// withdraw ETH eth-connector call args
 #[cfg(feature = "contract")]
 pub struct WithdrawEthCallArgs {
+    pub sender: EthAddress,
     pub eth_recipient: EthAddress,
     pub amount: U256,
     pub eip712_signature: Vec<u8>,
@@ -328,6 +329,7 @@ impl From<json::JsonValue> for WithdrawEthCallArgs {
         use crate::prover::validate_eth_address;
         use alloc::str::FromStr;
 
+        let sender = v.string("sender").expect(str_from_slice(FAILED_PARSE));
         let eth_recipient = v
             .string("eth_recipient")
             .expect(str_from_slice(FAILED_PARSE));
@@ -337,6 +339,7 @@ impl From<json::JsonValue> for WithdrawEthCallArgs {
             .expect(str_from_slice(FAILED_PARSE));
 
         Self {
+            sender: validate_eth_address(sender),
             eth_recipient: validate_eth_address(eth_recipient),
             amount: U256::from_str(amount.as_str()).expect(str_from_slice(FAILED_PARSE)),
             eip712_signature,
