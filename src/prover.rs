@@ -2,7 +2,7 @@ use super::prelude::*;
 use super::sdk;
 use crate::json::{self, FAILED_PARSE};
 use crate::log_entry::LogEntry;
-use crate::types::{str_from_slice, EthAddress};
+use crate::types::{str_from_slice, AccountId, EthAddress};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
@@ -125,4 +125,23 @@ pub fn encode_eip712(eth_recipient: EthAddress, amount: U256, fee: U256) -> Vec<
     // ethabi::encode()
     // ethabi::
     vec![]
+}
+
+#[allow(unused_variables)]
+pub fn verify_withdraw_eip712(
+    eth_recipient: EthAddress,
+    amount: U256,
+    eip712_signature: Vec<u8>,
+) -> bool {
+    true
+}
+
+#[allow(unused_variables)]
+pub fn verify_transfer_eip712(
+    sender: EthAddress,
+    near_recipient: AccountId,
+    amount: U256,
+    eip712_signature: Vec<u8>,
+) -> bool {
+    true
 }

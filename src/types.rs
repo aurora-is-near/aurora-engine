@@ -74,11 +74,17 @@ pub struct WithdrawCallArgs {
 /// withdraw ETH eth-connector call args
 #[cfg(feature = "contract")]
 pub struct WithdrawEthCallArgs {
-    pub sender: EthAddress,
     pub eth_recipient: EthAddress,
     pub amount: U256,
-    pub fee: U256,
-    pub relayer_eth_account: EthAddress,
+    pub eip712_signature: Vec<u8>,
+}
+
+/// Transfer from NEAR to ETH account
+#[cfg(feature = "contract")]
+pub struct TransferNearCallArgs {
+    pub sender: EthAddress,
+    pub near_recipient: AccountId,
+    pub amount: U256,
     pub eip712_signature: Vec<u8>,
 }
 
@@ -295,31 +301,44 @@ impl From<json::JsonValue> for TransferEthCallArgs {
 }
 
 #[cfg(feature = "contract")]
-impl From<json::JsonValue> for WithdrawEthCallArgs {
+impl From<json::JsonValue> for TransferNearCallArgs {
     fn from(v: json::JsonValue) -> Self {
         use crate::prover::validate_eth_address;
         use alloc::str::FromStr;
 
         let sender = v.string("sender").expect(str_from_slice(FAILED_PARSE));
+        let amount = v.string("amount").expect(str_from_slice(FAILED_PARSE));
+        let eip712_signature: Vec<u8> = v
+            .array("eip712_signature", json::JsonValue::parse_u8)
+            .expect(str_from_slice(FAILED_PARSE));
+        Self {
+            sender: validate_eth_address(sender),
+            near_recipient: v
+                .string("near_recipient")
+                .expect(str_from_slice(FAILED_PARSE)),
+            amount: U256::from_str(amount.as_str()).expect(str_from_slice(FAILED_PARSE)),
+            eip712_signature,
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for WithdrawEthCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        use crate::prover::validate_eth_address;
+        use alloc::str::FromStr;
+
         let eth_recipient = v
             .string("eth_recipient")
             .expect(str_from_slice(FAILED_PARSE));
         let amount = v.string("amount").expect(str_from_slice(FAILED_PARSE));
-        let fee = v.string("fee").expect(str_from_slice(FAILED_PARSE));
         let eip712_signature: Vec<u8> = v
             .array("eip712_signature", json::JsonValue::parse_u8)
             .expect(str_from_slice(FAILED_PARSE));
 
-        let relayer_eth_account = v
-            .string("relayer_eth_account")
-            .expect(str_from_slice(FAILED_PARSE));
-
         Self {
-            sender: validate_eth_address(sender),
             eth_recipient: validate_eth_address(eth_recipient),
             amount: U256::from_str(amount.as_str()).expect(str_from_slice(FAILED_PARSE)),
-            fee: U256::from_str(fee.as_str()).expect(str_from_slice(FAILED_PARSE)),
-            relayer_eth_account: validate_eth_address(relayer_eth_account),
             eip712_signature,
         }
     }

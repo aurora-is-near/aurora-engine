@@ -291,6 +291,17 @@ impl EthConnectorContract {
         self.ft.internal_withdraw(owner_id, amount);
     }
 
+    /// Burn ETH tokens
+    fn burn_eth(&mut self, address: EthAddress, amount: Balance) {
+        #[cfg(feature = "log")]
+        sdk::log(format!(
+            "Burn ETH {} tokens for: {}",
+            amount,
+            hex::encode(address)
+        ));
+        self.ft.internal_withdraw_eth(address, amount);
+    }
+
     pub fn withdraw_near(&mut self) {
         #[cfg(feature = "log")]
         sdk::log("Start withdraw NEAR".into());
@@ -315,11 +326,29 @@ impl EthConnectorContract {
 
     /// Withdraw ETH tokens
     pub fn withdraw_eth(&mut self) {
+        use crate::prover;
         #[cfg(feature = "log")]
         sdk::log("Start withdraw ETH".into());
-        let _args: WithdrawEthCallArgs = WithdrawEthCallArgs::from(
+        let args: WithdrawEthCallArgs = WithdrawEthCallArgs::from(
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
         );
+        assert!(
+            prover::verify_withdraw_eip712(args.eth_recipient, args.amount, args.eip712_signature),
+            "ERR_WRONG_EIP712_MSG"
+        );
+
+        let res = WithdrawResult {
+            recipient_id: args.eth_recipient,
+            amount: args.amount.as_u128(),
+            eth_custodian_address: self.contract.eth_custodian_address,
+        }
+        .try_to_vec()
+        .unwrap();
+        // Burn tokens to recipient
+        self.burn_eth(args.eth_recipient, args.amount.as_u128());
+        // Save new contract data
+        self.save_contract();
+        sdk::return_output(&res[..]);
     }
 
     // Return total supply of NEAR + ETH
@@ -389,7 +418,32 @@ impl EthConnectorContract {
 
     /// Transfer tokens from ETH account to NEAR account
     pub fn transfer_near(&mut self) {
-        // TODO: modify
+        use crate::prover;
+        let args: TransferNearCallArgs = TransferNearCallArgs::from(
+            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
+        );
+        assert!(
+            prover::verify_transfer_eip712(
+                args.sender,
+                args.near_recipient.clone(),
+                args.amount,
+                args.eip712_signature
+            ),
+            "ERR_WRONG_EIP712_MSG"
+        );
+
+        let amoubt = args.amount.as_u128();
+        self.ft.internal_withdraw_eth(args.sender, amoubt);
+        self.ft.internal_deposit(args.near_recipient, amoubt);
+        self.save_contract();
+
+        #[cfg(feature = "log")]
+        sdk::log(format!(
+            "Transfer ETH tokens {} amount to {} NEAR success with memo: {:?}",
+            args.amount,
+            hex::encode(args.address),
+            args.memo
+        ));
     }
 
     /// Transfer tokens from NEAR account to ETH account
