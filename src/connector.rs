@@ -336,6 +336,7 @@ impl EthConnectorContract {
             prover::verify_withdraw_eip712(
                 args.sender,
                 args.eth_recipient,
+                self.contract.eth_custodian_address,
                 args.amount,
                 args.eip712_signature
             ),

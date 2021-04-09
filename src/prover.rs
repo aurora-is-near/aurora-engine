@@ -1,5 +1,6 @@
 use super::prelude::*;
 use super::sdk;
+use crate::engine::Engine;
 use crate::json::{self, FAILED_PARSE};
 use crate::log_entry::LogEntry;
 use crate::precompiles::ecrecover;
@@ -151,9 +152,16 @@ const DOMAIN_TYPEHASH: &str =
     "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)";
 
 const WITHDRAW_FROM_EVM_TYPEHASH: &str = "WithdrawFromEVMRequest(address recipient,uint256 amount,uint256 nonce,address verifyingContract)";
+const AURORA_DOMAIN: &str = "Aurora-Engine domain";
+const DOMAIN_VERSION: &str = "1.0";
 
 /// Encode EIP712 withdraw message data
-pub fn encode_withdraw_eip712(eth_recipient: EthAddress, amount: U256) -> H256 {
+pub fn encode_withdraw_eip712(
+    eth_recipient: EthAddress,
+    amount: U256,
+    custodian_address: EthAddress,
+) -> H256 {
+    let chain_id = Engine::get_state().chain_id;
     let domain_separator = sdk::keccak(&ethabi::encode(&[
         Token::FixedBytes(
             sdk::keccak(&encode_packed(&[Token::Bytes(
@@ -165,13 +173,13 @@ pub fn encode_withdraw_eip712(eth_recipient: EthAddress, amount: U256) -> H256 {
         Token::FixedBytes(
             sdk::keccak(&encode_packed(&[
                 // Domain
-                Token::Bytes("Aurora-Engine domain".as_bytes().to_vec()),
+                Token::Bytes(AURORA_DOMAIN.as_bytes().to_vec()),
                 // Version
-                Token::Bytes("1.0".as_bytes().to_vec()),
+                Token::Bytes(DOMAIN_VERSION.as_bytes().to_vec()),
                 // ChainID
-                Token::Bytes("133111".as_bytes().to_vec()),
+                Token::Bytes(chain_id.to_vec()),
                 // Custodian address
-                Token::Bytes("some_custodian_address".as_bytes().to_vec()),
+                Token::Address(H160::from(custodian_address)),
             ]))
             .as_bytes()
             .to_vec(),
@@ -198,12 +206,13 @@ pub fn encode_withdraw_eip712(eth_recipient: EthAddress, amount: U256) -> H256 {
 pub fn verify_withdraw_eip712(
     sender: EthAddress,
     eth_recipient: EthAddress,
+    custodian_address: EthAddress,
     amount: U256,
     eip712_signature: Vec<u8>,
 ) -> bool {
     H160::from(sender)
         == ecrecover(
-            encode_withdraw_eip712(eth_recipient, amount),
+            encode_withdraw_eip712(eth_recipient, amount, custodian_address),
             &eip712_signature[..],
         )
         .expect("ERR_FAILED_RECOVER_ADDRESS")
