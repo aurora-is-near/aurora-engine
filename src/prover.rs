@@ -150,13 +150,13 @@ impl From<json::JsonValue> for Proof {
 const DOMAIN_TYPEHASH: &str =
     "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)";
 
-/// Encode EIP712 data
-#[allow(unused_variables)]
-#[allow(dead_code)]
-pub fn encode_eip712(eth_recipient: EthAddress, amount: U256, fee: U256) -> Vec<u8> {
+const WITHDRAW_FROM_EVM_TYPEHASH: &str = "WithdrawFromEVMRequest(address recipient,uint256 amount,uint256 nonce,address verifyingContract)";
+
+/// Encode EIP712 withdraw message data
+pub fn encode_withdraw_eip712(eth_recipient: EthAddress, amount: U256) -> H256 {
     let domain_separator = sdk::keccak(&ethabi::encode(&[
         Token::FixedBytes(
-            sdk::keccak(&ethabi::encode(&[Token::Bytes(
+            sdk::keccak(&encode_packed(&[Token::Bytes(
                 DOMAIN_TYPEHASH.as_bytes().to_vec(),
             )]))
             .as_bytes()
@@ -177,23 +177,36 @@ pub fn encode_eip712(eth_recipient: EthAddress, amount: U256, fee: U256) -> Vec<
             .to_vec(),
         ),
     ]));
-    // TODO: modify
-    vec![]
+
+    let struct_hash = sdk::keccak(&ethabi::encode(&[Token::FixedBytes(
+        sdk::keccak(&encode_packed(&[
+            Token::Bytes(WITHDRAW_FROM_EVM_TYPEHASH.as_bytes().to_vec()),
+            Token::Address(H160::from(eth_recipient)),
+            Token::Uint(amount),
+        ]))
+        .as_bytes()
+        .to_vec(),
+    )]));
+
+    sdk::keccak(&encode_packed(&[
+        Token::Bytes("1901".as_bytes().to_vec()),
+        Token::FixedBytes(domain_separator.as_bytes().to_vec()),
+        Token::FixedBytes(struct_hash.as_bytes().to_vec()),
+    ]))
 }
 
-#[allow(unused_variables)]
 pub fn verify_withdraw_eip712(
     sender: EthAddress,
     eth_recipient: EthAddress,
     amount: U256,
     eip712_signature: Vec<u8>,
 ) -> bool {
-    use sha3::Digest;
-    let digest = sha3::Keccak256::digest(&[]);
-    let h = H256::from_low_u64_be(0);
-    // TODO: modify
-    let _ = ecrecover(h, &eip712_signature[..]);
-    true
+    H160::from(sender)
+        == ecrecover(
+            encode_withdraw_eip712(eth_recipient, amount),
+            &eip712_signature[..],
+        )
+        .expect("ERR_FAILED_RECOVER_ADDRESS")
 }
 
 #[allow(unused_variables)]
