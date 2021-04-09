@@ -5,7 +5,7 @@ use crate::log_entry::LogEntry;
 use crate::precompiles::ecrecover;
 use crate::types::{str_from_slice, AccountId, EthAddress};
 use borsh::{BorshDeserialize, BorshSerialize};
-use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
+use ethabi::{Bytes, Event, EventParam, Hash, Log, ParamType, RawLog, Token};
 
 /// Validate Etherium address from string and return EthAddress
 #[allow(dead_code)]
@@ -15,6 +15,34 @@ pub fn validate_eth_address(address: String) -> EthAddress {
     let mut result = [0u8; 20];
     result.copy_from_slice(&data);
     result
+}
+
+/// Encodes vector of tokens using non-standard Packed mode into ABI.encodePacked() compliant vector of bytes.
+pub fn encode_packed(tokens: &[Token]) -> Bytes {
+    tokens.iter().flat_map(encode_token_packed).collect()
+}
+
+fn encode_token_packed(token: &Token) -> Vec<u8> {
+    match *token {
+        Token::Address(ref address) => address.as_ref().to_vec(),
+        Token::Bytes(ref bytes) => bytes.to_vec(),
+        Token::String(ref s) => s.as_bytes().to_vec(),
+        Token::FixedBytes(ref bytes) => bytes.to_vec(),
+        Token::Int(int) => {
+            let data: [u8; 32] = int.into();
+            (data[..]).to_vec()
+        }
+        Token::Uint(uint) => {
+            let data: [u8; 32] = uint.into();
+            (data[..]).to_vec()
+        }
+        Token::Bool(b) => {
+            vec![b.into()]
+        }
+        Token::Array(_) | Token::FixedArray(_) | Token::Tuple(_) => {
+            panic!("These token types are not supported in packed mode");
+        }
+    }
 }
 
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
@@ -126,22 +154,29 @@ const DOMAIN_TYPEHASH: &str =
 #[allow(unused_variables)]
 #[allow(dead_code)]
 pub fn encode_eip712(eth_recipient: EthAddress, amount: U256, fee: U256) -> Vec<u8> {
-    use ethabi::Token;
-
-    let domain = Token::Bytes("Aurora-Engine domain".as_bytes().to_vec());
-    let version = Token::Bytes("1.0".as_bytes().to_vec());
-    let chain_id = Token::Bytes("133111".as_bytes().to_vec());
-    let custodian_address = Token::Bytes("some_custodian_address".as_bytes().to_vec());
-    let encoded = ethabi::encode(&[domain, version, chain_id, custodian_address]);
-    let digest = sdk::keccak(&encoded);
-
-    let domain_typehash = sdk::keccak(&ethabi::encode(&[Token::Bytes(
-        DOMAIN_TYPEHASH.as_bytes().to_vec(),
-    )]));
-    ethabi::encode(&[
-        Token::FixedBytes(digest.as_bytes().to_vec()),
-        Token::FixedBytes(domain_typehash.as_bytes().to_vec()),
-    ]);
+    let domain_separator = sdk::keccak(&ethabi::encode(&[
+        Token::FixedBytes(
+            sdk::keccak(&ethabi::encode(&[Token::Bytes(
+                DOMAIN_TYPEHASH.as_bytes().to_vec(),
+            )]))
+            .as_bytes()
+            .to_vec(),
+        ),
+        Token::FixedBytes(
+            sdk::keccak(&encode_packed(&[
+                // Domain
+                Token::Bytes("Aurora-Engine domain".as_bytes().to_vec()),
+                // Version
+                Token::Bytes("1.0".as_bytes().to_vec()),
+                // ChainID
+                Token::Bytes("133111".as_bytes().to_vec()),
+                // Custodian address
+                Token::Bytes("some_custodian_address".as_bytes().to_vec()),
+            ]))
+            .as_bytes()
+            .to_vec(),
+        ),
+    ]));
     // TODO: modify
     vec![]
 }
