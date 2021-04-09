@@ -6,6 +6,8 @@ use crate::parameters::*;
 use crate::prelude;
 use crate::prelude::U256;
 use crate::types::*;
+#[cfg(feature = "log")]
+use alloc::format;
 use alloc::{
     string::{String, ToString},
     vec::Vec,

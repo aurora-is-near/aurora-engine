@@ -5,6 +5,7 @@ use crate::json::{self, FAILED_PARSE};
 use crate::log_entry::LogEntry;
 use crate::precompiles::ecrecover;
 use crate::types::{str_from_slice, AccountId, EthAddress};
+use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::{Bytes, Event, EventParam, Hash, Log, ParamType, RawLog, Token};
 
@@ -185,6 +186,11 @@ pub fn encode_withdraw_eip712(
             .to_vec(),
         ),
     ]));
+    sdk::log(format!(
+        "chain_id: {:?}; domain_separator: {}",
+        chain_id,
+        hex::encode(domain_separator)
+    ));
 
     let struct_hash = sdk::keccak(&ethabi::encode(&[Token::FixedBytes(
         sdk::keccak(&encode_packed(&[
@@ -195,12 +201,15 @@ pub fn encode_withdraw_eip712(
         .as_bytes()
         .to_vec(),
     )]));
+    sdk::log(format!("struct_hash: {}", hex::encode(struct_hash)));
 
-    sdk::keccak(&encode_packed(&[
+    let digest = sdk::keccak(&encode_packed(&[
         Token::Bytes("1901".as_bytes().to_vec()),
         Token::FixedBytes(domain_separator.as_bytes().to_vec()),
         Token::FixedBytes(struct_hash.as_bytes().to_vec()),
-    ]))
+    ]));
+    sdk::log(format!("digest: {}", hex::encode(digest)));
+    digest
 }
 
 pub fn verify_withdraw_eip712(
@@ -210,6 +219,13 @@ pub fn verify_withdraw_eip712(
     amount: U256,
     eip712_signature: Vec<u8>,
 ) -> bool {
+    let ec = ecrecover(
+        encode_withdraw_eip712(eth_recipient, amount, custodian_address),
+        &eip712_signature[..],
+    )
+    .expect("ERR_FAILED_RECOVER_ADDRESS");
+    sdk::log(format!("ecrecover: {}", hex::encode(ec)));
+
     H160::from(sender)
         == ecrecover(
             encode_withdraw_eip712(eth_recipient, amount, custodian_address),

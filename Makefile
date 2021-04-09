@@ -1,6 +1,6 @@
 CARGO = cargo
 NEAR  = near
-FEATURES = contract
+FEATURES = contract,log
 
 ifeq ($(evm-bully),yes)
   FEATURES := $(FEATURES),evm_bully

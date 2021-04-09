@@ -7,6 +7,8 @@ use crate::deposit_event::*;
 use crate::json::{parse_json, FAILED_PARSE};
 use crate::prelude::{Address, U256};
 use crate::prover::{validate_eth_address, Proof};
+#[cfg(feature = "log")]
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -278,7 +280,11 @@ impl EthConnectorContract {
     ///  Mint ETH tokens
     fn mint_eth(&mut self, owner_id: EthAddress, amount: Balance) {
         #[cfg(feature = "log")]
-        sdk::log(format!("Mint ETH {} tokens for: {}", amount, owner_id));
+        sdk::log(format!(
+            "Mint ETH {} tokens for: {}",
+            amount,
+            hex::encode(owner_id)
+        ));
         self.ft.internal_deposit_eth(owner_id, amount);
         #[cfg(feature = "log")]
         sdk::log("Mint ETH success".into());
@@ -440,15 +446,14 @@ impl EthConnectorContract {
 
         let amoubt = args.amount.as_u128();
         self.ft.internal_withdraw_eth(args.sender, amoubt);
-        self.ft.internal_deposit(args.near_recipient, amoubt);
+        self.ft
+            .internal_deposit(args.near_recipient.clone(), amoubt);
         self.save_contract();
 
         #[cfg(feature = "log")]
         sdk::log(format!(
-            "Transfer ETH tokens {} amount to {} NEAR success with memo: {:?}",
-            args.amount,
-            hex::encode(args.address),
-            args.memo
+            "Transfer ETH tokens {} amount to {} NEAR success",
+            args.amount, args.near_recipient,
         ));
     }
 
