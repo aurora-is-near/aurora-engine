@@ -334,10 +334,12 @@ impl From<json::JsonValue> for WithdrawEthCallArgs {
             .string("eth_recipient")
             .expect(str_from_slice(FAILED_PARSE));
         let amount = v.string("amount").expect(str_from_slice(FAILED_PARSE));
-        let eip712_signature: Vec<u8> = v
-            .array("eip712_signature", json::JsonValue::parse_u8)
-            .expect(str_from_slice(FAILED_PARSE));
-
+        sdk::log("4".into());
+        let eip712_signature: Vec<u8> = hex::decode(
+            v.string("eip712_signature")
+                .expect(str_from_slice(FAILED_PARSE)),
+        )
+        .expect("ETH_ADDRESS_FAILED");
         Self {
             sender: validate_eth_address(sender),
             eth_recipient: validate_eth_address(eth_recipient),

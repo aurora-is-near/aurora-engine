@@ -335,6 +335,7 @@ impl EthConnectorContract {
         use crate::prover;
         #[cfg(feature = "log")]
         sdk::log("Start withdraw ETH".into());
+
         let args: WithdrawEthCallArgs = WithdrawEthCallArgs::from(
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
         );
