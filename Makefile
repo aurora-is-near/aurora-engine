@@ -29,7 +29,13 @@ target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(
 deploy: release.wasm
 	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),aurora.test.near) --wasm-file=$<
 
-check: test clippy check-format
+check: test check-format check-clippy
+
+check-format:
+	$(CARGO) fmt -- --check
+
+check-clippy:
+	$(CARGO) +nightly clippy -- -D warnings
 
 # test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
 test: release
@@ -38,16 +44,10 @@ test: release
 format:
 	$(CARGO) fmt
 
-check-format:
-	$(CARGO) fmt -- --check
-
-clippy:
-	$(CARGO) +nightly clippy -- -D warnings
-
 clean:
 	@rm -Rf *.wasm target *~
 
-.PHONY: deploy check format clean
+.PHONY: deploy check check-format check-clippy test format clean
 
 .SECONDARY:
 .SUFFIXES:
