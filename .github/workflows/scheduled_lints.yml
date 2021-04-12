@@ -1,0 +1,24 @@
+---
+on:
+  schedule:
+    - cron: '27 8 * * 1,4'
+name: Scheduled_Lints
+jobs:
+  clippy:
+    name: Nightly_Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Install the toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: clippy
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
