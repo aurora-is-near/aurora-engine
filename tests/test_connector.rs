@@ -58,7 +58,7 @@ fn test_withdraw_eth() {
     let eip712_signature = "9b97c6fd1428f77ce4dc680415e87b1379bebfdbbefeb2c87e891d3e9b771ed509bfd0910da0c673a72105d44331762d8dba6e700ea3e0395410a1458c79daea1c";
     */
     let (master_account, _contract_account) = init();
-    master_account
+    let res = master_account
         .call(
             CONTRACT_ACC.to_string(),
             "withdraw_eth",
@@ -72,6 +72,9 @@ fn test_withdraw_eth() {
             .as_bytes(),
             DEFAULT_GAS,
             0,
-        )
-        .assert_success();
+        );
+    res.assert_success();
+    for s in res.logs().iter() {
+        println!("[log] {}", s);
+    }
 }

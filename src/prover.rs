@@ -163,7 +163,7 @@ pub fn encode_withdraw_eip712(
     custodian_address: EthAddress,
 ) -> H256 {
     let chain_id = Engine::get_state().chain_id;
-    let domain_separator = sdk::keccak(&ethabi::encode(&[
+    let domain_separator_encoded = ethabi::encode(&[
         Token::FixedBytes(
             sdk::keccak(&encode_packed(&[Token::Bytes(
                 DOMAIN_TYPEHASH.as_bytes().to_vec(),
@@ -185,14 +185,20 @@ pub fn encode_withdraw_eip712(
             .as_bytes()
             .to_vec(),
         ),
-    ]));
+    ]);
+    sdk::log(format!(
+        "domain_separator_encoded: {}",
+        hex::encode(domain_separator_encoded.clone())
+    ));
+
+    let domain_separator = sdk::keccak(&domain_separator_encoded);
     sdk::log(format!(
         "chain_id: {:?}; domain_separator: {}",
         hex::encode(chain_id),
         hex::encode(domain_separator)
     ));
 
-    let struct_hash = sdk::keccak(&ethabi::encode(&[Token::FixedBytes(
+    let struct_hash_encoded = ethabi::encode(&[Token::FixedBytes(
         sdk::keccak(&encode_packed(&[
             Token::Bytes(WITHDRAW_FROM_EVM_TYPEHASH.as_bytes().to_vec()),
             Token::Address(H160::from(eth_recipient)),
@@ -200,14 +206,26 @@ pub fn encode_withdraw_eip712(
         ]))
         .as_bytes()
         .to_vec(),
-    )]));
+    )]);
+    sdk::log(format!(
+        "struct_hash_encoded: {}",
+        hex::encode(struct_hash_encoded.clone())
+    ));
+
+    let struct_hash = sdk::keccak(&struct_hash_encoded);
     sdk::log(format!("struct_hash: {}", hex::encode(struct_hash)));
 
-    let digest = sdk::keccak(&encode_packed(&[
+    let digest_encoded = encode_packed(&[
         Token::Bytes("1901".as_bytes().to_vec()),
         Token::FixedBytes(domain_separator.as_bytes().to_vec()),
         Token::FixedBytes(struct_hash.as_bytes().to_vec()),
-    ]));
+    ]);
+    sdk::log(format!(
+        "digest_encoded: {}",
+        hex::encode(digest_encoded.clone())
+    ));
+
+    let digest = sdk::keccak(&digest_encoded);
     sdk::log(format!("digest: {}", hex::encode(digest)));
     digest
 }
