@@ -41,7 +41,7 @@ impl EthConnectorContract {
     }
 
     pub fn init_contract() {
-        assert_eq!(sdk::current_account_id(), sdk::predecessor_account_id());
+        //assert_eq!(sdk::current_account_id(), sdk::predecessor_account_id());
         assert!(
             !sdk::storage_has_key(CONTRACT_NAME_KEY.as_bytes()),
             "ERR_CONTRACT_INITIALIZED"
@@ -349,7 +349,7 @@ impl EthConnectorContract {
             ),
             "ERR_WRONG_EIP712_MSG"
         );
-
+        /*
         let res = WithdrawResult {
             recipient_id: args.eth_recipient,
             amount: args.amount.as_u128(),
@@ -361,7 +361,7 @@ impl EthConnectorContract {
         self.burn_eth(args.eth_recipient, args.amount.as_u128());
         // Save new contract data
         self.save_contract();
-        sdk::return_output(&res[..]);
+        sdk::return_output(&res[..]);*/
     }
 
     // Return total supply of NEAR + ETH
