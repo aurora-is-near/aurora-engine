@@ -43,12 +43,14 @@ mod contract {
     const CODE_KEY: &[u8; 5] = b"\0CODE";
     const CODE_STAGE_KEY: &[u8; 11] = b"\0CODE_STAGE";
 
+    #[cfg(target_arch = "wasm32")]
     #[panic_handler]
     #[no_mangle]
     pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
         ::core::intrinsics::abort();
     }
 
+    #[cfg(target_arch = "wasm32")]
     #[alloc_error_handler]
     #[no_mangle]
     pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
@@ -162,7 +164,7 @@ mod contract {
 
         let input = sdk::read_input();
         let signed_transaction = EthSignedTransaction::decode(&Rlp::new(&input))
-            .or_else(|_| Err(()))
+            .map_err(|_| ())
             .expect("ERR_INVALID_TX");
 
         let state = Engine::get_state();
@@ -238,8 +240,8 @@ mod contract {
     pub extern "C" fn view() {
         let input = sdk::read_input();
         let args = ViewCallArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
-        let mut engine = Engine::new(Address::from_slice(&args.sender));
-        let (status, result) = Engine::view_with_args(&mut engine, args);
+        let engine = Engine::new(Address::from_slice(&args.sender));
+        let (status, result) = Engine::view_with_args(&engine, args);
         process_exit_reason(status, &result)
     }
 
