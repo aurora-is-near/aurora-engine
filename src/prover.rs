@@ -163,6 +163,8 @@ pub fn encode_withdraw_eip712(
     custodian_address: EthAddress,
 ) -> H256 {
     let chain_id = Engine::get_state().chain_id;
+    sdk::log(format!("chain_id: {:?}", hex::encode(chain_id),));
+
     let domain_separator_encoded = ethabi::encode(&[
         Token::FixedBytes(
             sdk::keccak(&encode_packed(&[Token::Bytes(
@@ -193,8 +195,7 @@ pub fn encode_withdraw_eip712(
 
     let domain_separator = sdk::keccak(&domain_separator_encoded);
     sdk::log(format!(
-        "chain_id: {:?}; domain_separator: {}",
-        hex::encode(chain_id),
+        "domain_separator: {}",
         hex::encode(domain_separator)
     ));
 
@@ -216,7 +217,7 @@ pub fn encode_withdraw_eip712(
     sdk::log(format!("struct_hash: {}", hex::encode(struct_hash)));
 
     let digest_encoded = encode_packed(&[
-        Token::Bytes("1901".as_bytes().to_vec()),
+        Token::Bytes([0x19, 0x01].to_vec()),
         Token::FixedBytes(domain_separator.as_bytes().to_vec()),
         Token::FixedBytes(struct_hash.as_bytes().to_vec()),
     ]);
@@ -238,16 +239,9 @@ pub fn verify_withdraw_eip712(
     eip712_signature: Vec<u8>,
 ) -> bool {
     let res = encode_withdraw_eip712(eth_recipient, amount, custodian_address);
-    sdk::log("encode_withdraw_eip712 success".into());
     let ec = ecrecover(res, &eip712_signature[..]);
-    sdk::log(format!("ecrecover: success"));
-    sdk::log(format!(
-        "sender: {} [{}]; ecrecover: {}",
-        hex::encode(sender),
-        H160::from(sender),
-        ec.unwrap()
-    ));
-    //sdk::log(format!("ecrecover: {}", hex::encode(ec)));
+    sdk::log(format!("sender: {}", hex::encode(sender)));
+    sdk::log(format!("ecrecover: {}", hex::encode(ec.unwrap())));
     /*
     H160::from(sender)
         == ecrecover(
