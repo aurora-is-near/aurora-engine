@@ -327,7 +327,6 @@ impl From<json::JsonValue> for TransferNearCallArgs {
 impl From<json::JsonValue> for WithdrawEthCallArgs {
     fn from(v: json::JsonValue) -> Self {
         use crate::prover::validate_eth_address;
-        use alloc::str::FromStr;
 
         let sender = v.string("sender").expect(str_from_slice(FAILED_PARSE));
         let eth_recipient = v
@@ -343,7 +342,7 @@ impl From<json::JsonValue> for WithdrawEthCallArgs {
         Self {
             sender: validate_eth_address(sender),
             eth_recipient: validate_eth_address(eth_recipient),
-            amount: U256::from_str(amount.as_str()).expect(str_from_slice(FAILED_PARSE)),
+            amount: U256::from_str_radix(amount.as_str(), 10).expect(str_from_slice(FAILED_PARSE)),
             eip712_signature,
         }
     }

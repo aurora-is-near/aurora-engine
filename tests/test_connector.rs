@@ -125,8 +125,8 @@ fn test_withdraw_eth() {
             json!({
                 "sender": "891B2749238B27fF58e951088e55b04de71Dc374", 
                 "eth_recipient": "891B2749238B27fF58e951088e55b04de71Dc374", 
-                "amount": "7654321", 
-                "eip712_signature": "9b97c6fd1428f77ce4dc680415e87b1379bebfdbbefeb2c87e891d3e9b771ed509bfd0910da0c673a72105d44331762d8dba6e700ea3e0395410a1458c79daea1c"
+                "amount": "7654321",
+                "eip712_signature": "0ee8223be471739764d5ea0bff0b26bcb876d4367d55126cd790453dd7c467794e789cbe6d796e32e88e59d52b6c51fbf7a58ac4021c6eb9de2dd5f12de9c4231c"
             })
             .to_string()
             .as_bytes(),
