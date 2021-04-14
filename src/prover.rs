@@ -26,17 +26,21 @@ pub fn encode_packed(tokens: &[Token]) -> Bytes {
 
 fn encode_token_packed(token: &Token) -> Vec<u8> {
     match *token {
-        Token::Address(ref address) => address.as_ref().to_vec(),
+        Token::Address(ref address) => {
+            let mut padded = [0u8; 32];
+            padded[12..].copy_from_slice(address.as_ref());
+            padded[..].to_vec()
+        },
         Token::Bytes(ref bytes) => bytes.to_vec(),
         Token::String(ref s) => s.as_bytes().to_vec(),
         Token::FixedBytes(ref bytes) => bytes.to_vec(),
         Token::Int(int) => {
             let data: [u8; 32] = int.into();
-            (data[..]).to_vec()
+            data[..].to_vec()
         }
         Token::Uint(uint) => {
             let data: [u8; 32] = uint.into();
-            (data[..]).to_vec()
+            data[..].to_vec()
         }
         Token::Bool(b) => {
             vec![b.into()]
@@ -149,12 +153,12 @@ impl From<json::JsonValue> for Proof {
     }
 }
 
-const DOMAIN_TYPEHASH: &str =
+const EIP_712_MSG_PREFIX: &[u8] = &[0x19, 0x01];
+const EIP_712_DOMAIN_TYPEHASH: &str =
     "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)";
-
-const WITHDRAW_FROM_EVM_TYPEHASH: &str = "WithdrawFromEVMRequest(address recipient,uint256 amount,uint256 nonce,address verifyingContract)";
-const AURORA_DOMAIN: &str = "Aurora-Engine domain";
-const DOMAIN_VERSION: &str = "1.0";
+const AURORA_DOMAIN_NAME: &str = "Aurora-Engine domain";
+const AURORA_DOMAIN_VERSION: &str = "1.0";
+const WITHDRAW_FROM_EVM_TYPEHASH: &str = "WithdrawFromEVMRequest(address ethRecipient,uint256 amount,address verifyingContract)";
 
 /// Encode EIP712 withdraw message data
 pub fn encode_withdraw_eip712(
@@ -162,64 +166,68 @@ pub fn encode_withdraw_eip712(
     amount: U256,
     custodian_address: EthAddress,
 ) -> H256 {
-    let chain_id = Engine::get_state().chain_id;
-    sdk::log(format!("chain_id: {:?}", hex::encode(chain_id),));
+    let chain_id = U256::from(Engine::get_state().chain_id);
 
-    let domain_separator_encoded = ethabi::encode(&[
-        Token::FixedBytes(
-            sdk::keccak(&encode_packed(&[Token::Bytes(
-                DOMAIN_TYPEHASH.as_bytes().to_vec(),
-            )]))
-            .as_bytes()
-            .to_vec(),
-        ),
+    let domain_separator_encoded = encode_packed(&[
         Token::FixedBytes(
             sdk::keccak(&encode_packed(&[
-                // Domain
-                Token::Bytes(AURORA_DOMAIN.as_bytes().to_vec()),
-                // Version
-                Token::Bytes(DOMAIN_VERSION.as_bytes().to_vec()),
-                // ChainID
-                Token::Bytes(chain_id.to_vec()),
-                // Custodian address
-                Token::Address(H160::from(custodian_address)),
+                Token::Bytes(EIP_712_DOMAIN_TYPEHASH.as_bytes().to_vec())
             ]))
             .as_bytes()
             .to_vec(),
         ),
+        Token::FixedBytes(
+            encode_packed(&[
+                // Domain
+                Token::Bytes(sdk::keccak(AURORA_DOMAIN_NAME.as_bytes()).as_bytes().to_vec()),
+                // Version
+                Token::Bytes(sdk::keccak(AURORA_DOMAIN_VERSION.as_bytes()).as_bytes().to_vec()),
+                // ChainID
+                Token::Uint(chain_id),
+                // Custodian address
+                Token::Address(H160::from(custodian_address)),
+            ])
+        ),
     ]);
     sdk::log(format!(
-        "domain_separator_encoded: {}",
+        "Domain_separator encoded: {}",
         hex::encode(domain_separator_encoded.clone())
     ));
 
     let domain_separator = sdk::keccak(&domain_separator_encoded);
     sdk::log(format!(
-        "domain_separator: {}",
+        "Domain_separator hash: {}",
         hex::encode(domain_separator)
     ));
 
-    let struct_hash_encoded = ethabi::encode(&[Token::FixedBytes(
-        sdk::keccak(&encode_packed(&[
-            Token::Bytes(WITHDRAW_FROM_EVM_TYPEHASH.as_bytes().to_vec()),
-            Token::Address(H160::from(eth_recipient)),
-            Token::Uint(amount),
-        ]))
-        .as_bytes()
-        .to_vec(),
-    )]);
+    let withdraw_from_evm_struct_encoded = encode_packed(&[
+        Token::FixedBytes(
+            sdk::keccak(&encode_packed(&[
+                Token::Bytes(WITHDRAW_FROM_EVM_TYPEHASH.as_bytes().to_vec()),
+            ]))
+            .as_bytes()
+            .to_vec(),
+        ),
+        Token::FixedBytes(
+            encode_packed(&[
+                Token::Address(H160::from(eth_recipient)),
+                Token::Uint(amount),
+                Token::Address(H160::from(custodian_address)),
+            ])
+        ),
+    ]);
     sdk::log(format!(
-        "struct_hash_encoded: {}",
-        hex::encode(struct_hash_encoded.clone())
+        "WithdrawFromEVM struct encoded: {}",
+        hex::encode(withdraw_from_evm_struct_encoded.clone()),
     ));
 
-    let struct_hash = sdk::keccak(&struct_hash_encoded);
-    sdk::log(format!("struct_hash: {}", hex::encode(struct_hash)));
+    let withdraw_from_evm_struct_hash = sdk::keccak(&withdraw_from_evm_struct_encoded);
+    sdk::log(format!("WithdrawFromEVM struct hash: {}", hex::encode(withdraw_from_evm_struct_hash)));
 
     let digest_encoded = encode_packed(&[
-        Token::Bytes([0x19, 0x01].to_vec()),
+        Token::Bytes(EIP_712_MSG_PREFIX.to_vec()),
         Token::FixedBytes(domain_separator.as_bytes().to_vec()),
-        Token::FixedBytes(struct_hash.as_bytes().to_vec()),
+        Token::FixedBytes(withdraw_from_evm_struct_hash.as_bytes().to_vec()),
     ]);
     sdk::log(format!(
         "digest_encoded: {}",
@@ -239,18 +247,11 @@ pub fn verify_withdraw_eip712(
     eip712_signature: Vec<u8>,
 ) -> bool {
     let res = encode_withdraw_eip712(eth_recipient, amount, custodian_address);
-    let ec = ecrecover(res, &eip712_signature[..]);
+    let withdraw_msg_signer = ecrecover(res, &eip712_signature[..]).unwrap();
     sdk::log(format!("sender: {}", hex::encode(sender)));
-    sdk::log(format!("ecrecover: {}", hex::encode(ec.unwrap())));
-    /*
-    H160::from(sender)
-        == ecrecover(
-            encode_withdraw_eip712(eth_recipient, amount, custodian_address),
-            &eip712_signature[..],
-        )
-        .expect("ERR_FAILED_RECOVER_ADDRESS")
-    */
-    true
+    sdk::log(format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
+
+    H160::from(sender) == withdraw_msg_signer
 }
 
 #[allow(unused_variables)]
