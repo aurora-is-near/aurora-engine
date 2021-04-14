@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(core_intrinsics))]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![cfg_attr(feature = "log", feature(panic_info_message))]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -53,8 +54,24 @@ mod contract {
     const CODE_STAGE_KEY: &[u8; 11] = b"\0CODE_STAGE";
 
     #[panic_handler]
+    #[cfg_attr(not(feature = "log"), allow(unused_variables))]
     #[no_mangle]
-    pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
+    pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
+        #[cfg(feature = "log")]
+        {
+            use alloc::string::ToString;
+            if let Some(msg) = info.message() {
+                let msg = if let Some(log) = info.location() {
+                    [msg.to_string(), " [".into(), log.to_string(), "]".into()].join("")
+                } else {
+                    msg.to_string()
+                };
+                sdk::log(msg);
+            } else if let Some(log) = info.location() {
+                sdk::log(log.to_string());
+            }
+        }
+
         ::core::intrinsics::abort();
     }
 
@@ -405,6 +422,16 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_balance_of() {
         EthConnectorContract::new().storage_balance_of()
+    }
+
+    /// TODO: will be removed - for eth-prover tests only
+    #[no_mangle]
+    pub extern "C" fn verify_log_entry() {
+        use borsh::BorshSerialize;
+        #[cfg(feature = "log")]
+        sdk::log("Call from verify_log_entry".into());
+        let data = true.try_to_vec().unwrap();
+        sdk::return_output(&data[..]);
     }
 
     ///

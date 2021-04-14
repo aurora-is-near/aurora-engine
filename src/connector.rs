@@ -249,19 +249,13 @@ impl EthConnectorContract {
         self.save_contract();
     }
 
-    fn record_proof(&mut self, key: String) -> Balance {
+    fn record_proof(&mut self, key: String) {
         #[cfg(feature = "log")]
         sdk::log("Record proof".into());
-        let initial_storage = sdk::storage_usage();
         let key = key.as_str();
 
         assert!(!self.check_used_event(key), "ERR_PROOF_EXIST");
         self.save_used_event(key);
-        let current_storage = sdk::storage_usage();
-        let attached_deposit = sdk::attached_deposit();
-        let required_deposit =
-            Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
-        attached_deposit - required_deposit
     }
 
     ///  Mint NEAR tokens
