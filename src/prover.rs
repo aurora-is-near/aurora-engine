@@ -160,12 +160,15 @@ const AURORA_DOMAIN_NAME: &str = "Aurora-Engine domain";
 const AURORA_DOMAIN_VERSION: &str = "1.0";
 const WITHDRAW_FROM_EVM_TYPEHASH: &str =
     "WithdrawFromEVMRequest(address ethRecipient,uint256 amount,address verifyingContract)";
+const TRANSFER_FROM_EVM_TO_NEAR_TYPEHASH: &str =
+    "TransferFromEVMtoNearRequest(string nearRecipient,uint256 amount,uint256 fee)";
 
 /// Encode EIP712 withdraw message data
-pub fn encode_withdraw_eip712(
+pub fn encode_eip712(
     eth_recipient: EthAddress,
     amount: U256,
     custodian_address: EthAddress,
+    type_hash: &str,
 ) -> H256 {
     let chain_id = U256::from(Engine::get_state().chain_id);
 
@@ -210,7 +213,7 @@ pub fn encode_withdraw_eip712(
     let withdraw_from_evm_struct_encoded = encode_packed(&[
         Token::FixedBytes(
             sdk::keccak(&encode_packed(&[Token::Bytes(
-                WITHDRAW_FROM_EVM_TYPEHASH.as_bytes().to_vec(),
+                type_hash.as_bytes().to_vec(),
             )]))
             .as_bytes()
             .to_vec(),
@@ -254,22 +257,34 @@ pub fn verify_withdraw_eip712(
     amount: U256,
     eip712_signature: Vec<u8>,
 ) -> bool {
-    let res = encode_withdraw_eip712(eth_recipient, amount, custodian_address);
+    let res = encode_eip712(eth_recipient, amount, custodian_address, WITHDRAW_FROM_EVM_TYPEHASH);
     let withdraw_msg_signer = ecrecover(res, &eip712_signature[..]).unwrap();
     sdk::log(format!("sender: {}", hex::encode(sender)));
     sdk::log(format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
+    sdk::log(format!(
+        "ecrecover: {}",
+        H160::from(sender) == withdraw_msg_signer
+    ));
 
-    //H160::from(sender) == withdraw_msg_signer
-    true
+    H160::from(sender) == withdraw_msg_signer
 }
 
 #[allow(unused_variables)]
 pub fn verify_transfer_eip712(
     sender: EthAddress,
     near_recipient: AccountId,
+    custodian_address: EthAddress,
     amount: U256,
     eip712_signature: Vec<u8>,
 ) -> bool {
-    // TODO: modify
-    true
+    let res = encode_eip712(near_recipient, amount, custodian_address, TRANSFER_FROM_EVM_TO_NEAR_TYPEHASH);
+    let withdraw_msg_signer = ecrecover(res, &eip712_signature[..]).unwrap();
+    sdk::log(format!("sender: {}", hex::encode(sender)));
+    sdk::log(format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
+    sdk::log(format!(
+        "ecrecover: {}",
+        H160::from(sender) == withdraw_msg_signer
+    ));
+
+    H160::from(sender) == withdraw_msg_signer
 }

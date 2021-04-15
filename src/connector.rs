@@ -398,13 +398,13 @@ impl EthConnectorContract {
 
     /// Return balance of ETH
     pub fn ft_balance_of_eth(&self) {
-        let args = BalanceOfCallArgs::from(
+        let args = BalanceOfEthCallArgs::from(
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
         );
-        let balance = self.ft.ft_balance_of_eth(args.account_id.clone());
-        sdk::return_output(&balance.to_string().as_bytes());
+        let balance = self.ft.internal_unwrap_balance_of_eth(args.address.clamp());
         #[cfg(feature = "log")]
         sdk::log(format!("Balance of ETH [{}]: {}", args.account_id, balance));
+        sdk::return_output(&balance.to_string().as_bytes());
     }
 
     /// Transfer between NEAR accounts

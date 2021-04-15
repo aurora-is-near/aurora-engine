@@ -48,6 +48,11 @@ pub struct BalanceOfCallArgs {
     pub account_id: AccountId,
 }
 
+#[cfg(feature = "contract")]
+pub struct BalanceOfEthCallArgs {
+    pub address: EthAddress,
+}
+
 /// transfer args for json invocation
 #[cfg(feature = "contract")]
 pub struct TransferCallArgs {
@@ -206,6 +211,18 @@ impl From<json::JsonValue> for BalanceOfCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
             account_id: v.string("account_id").expect(str_from_slice(FAILED_PARSE)),
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for BalanceOfEthCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        use crate::prover::validate_eth_address;
+        
+        let address = v.string("address").expect(str_from_slice(FAILED_PARSE));
+        Self {
+            address: validate_eth_address(address), 
         }
     }
 }

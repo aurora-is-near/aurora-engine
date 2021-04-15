@@ -190,14 +190,6 @@ impl FungibleToken {
         }
     }
 
-    pub fn ft_balance_of_eth(&self, account_id: AccountId) -> u128 {
-        if let Some(data) = self.accounts_get_eth(account_id) {
-            u128::try_from_slice(&data[..]).unwrap()
-        } else {
-            0
-        }
-    }
-
     pub fn ft_transfer_call(
         &mut self,
         receiver_id: AccountId,
