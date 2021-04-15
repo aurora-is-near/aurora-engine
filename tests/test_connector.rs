@@ -47,6 +47,7 @@ fn init() -> (UserAccount, UserAccount) {
             json!({
                 "prover_account": PROVER_ACCOUNT,
                 "eth_custodian_address": CUSTODIAN_ADDRESS,
+                //"eth_custodian_address": "88657f6D4c4bbDB193C2b0B78DD74cD38479f819",
             })
             .to_string()
             .as_bytes(),
@@ -123,6 +124,7 @@ fn test_withdraw_eth() {
                 "eth_recipient": "891B2749238B27fF58e951088e55b04de71Dc374", 
                 "amount": "7654321",
                 "eip712_signature": "0ee8223be471739764d5ea0bff0b26bcb876d4367d55126cd790453dd7c467794e789cbe6d796e32e88e59d52b6c51fbf7a58ac4021c6eb9de2dd5f12de9c4231c"
+                //"eip712_signature": "51ea7c8a54da3ffc1f6af82f9e535e156577583583d3e9de375139b41443ab5f4bddc25f69134a2d0fba2aa701da1532a94a013dd811d6c7edbbe94542a62ba41c"
             }).to_string().as_bytes(),
             DEFAULT_GAS,
             0,
