@@ -283,7 +283,6 @@ pub fn verify_withdraw_eip712(
     H160::from(sender) == withdraw_msg_signer
 }
 
-#[allow(unused_variables)]
 pub fn verify_transfer_eip712(
     sender: EthAddress,
     near_recipient: AccountId,

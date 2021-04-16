@@ -82,7 +82,6 @@ impl EthDepositedEthEvent {
             ("ethRecipientOnNear".to_string(), ParamType::Address, false),
             ("amount".to_string(), ParamType::Uint(256), false),
             ("fee".to_string(), ParamType::Uint(256), false),
-            ("relayerEthAccount".to_string(), ParamType::Address, true),
         ]
     }
 
