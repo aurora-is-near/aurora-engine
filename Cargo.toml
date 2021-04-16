@@ -63,3 +63,4 @@ std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "et
 contract = []
 evm_bully = []
 log = []
+integration-test = ["log"]

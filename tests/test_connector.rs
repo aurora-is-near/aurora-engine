@@ -230,3 +230,72 @@ fn test_withdraw_eth() {
         println!("[log] {}", s);
     }
 }
+
+#[test]
+fn test_ft_transfer() {
+    let (master_account, _contract) = init();
+    call_deposit_near(&master_account);
+
+    let transfer_amount = 777;
+    let res = master_account.call(
+        CONTRACT_ACC.to_string(),
+        "ft_transfer",
+        json!({
+            "receiver_id": CONTRACT_ACC,
+            "amount": transfer_amount,
+            "memo": "transfer memo"
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT);
+    assert_eq!(
+        balance,
+        DEPOSITED_AMOUNT - DEPOSITED_FEE - transfer_amount as u128
+    );
+
+    let balance = get_near_balance(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE + transfer_amount as u128);
+}
+
+#[test]
+fn test_ft_transfer_call() {
+    let (master_account, _contract) = init();
+    call_deposit_near(&master_account);
+
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT);
+    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
+
+    let balance = get_near_balance(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE);
+
+    let transfer_amount = 100;
+    let res = master_account.call(
+        CONTRACT_ACC.to_string(),
+        "ft_transfer_call",
+        json!({
+            "receiver_id": CONTRACT_ACC,
+            "amount": transfer_amount,
+            "memo": "transfer memo",
+            "msg": "some message"
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT);
+    assert_eq!(
+        balance,
+        DEPOSITED_AMOUNT - DEPOSITED_FEE - transfer_amount as u128
+    );
+
+    let balance = get_near_balance(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE + transfer_amount as u128);
+}

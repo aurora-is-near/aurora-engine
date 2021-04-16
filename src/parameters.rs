@@ -130,8 +130,8 @@ pub struct StorageBalance {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct ResolveTransferCallArgs {
     pub sender_id: AccountId,
-    pub receiver_id: AccountId,
     pub amount: Balance,
+    pub receiver_id: AccountId,
 }
 
 /// Finish deposit NEAR eth-connector call args
