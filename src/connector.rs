@@ -343,7 +343,6 @@ impl EthConnectorContract {
             ),
             "ERR_WRONG_EIP712_MSG"
         );
-        /*
         let res = WithdrawResult {
             recipient_id: args.eth_recipient,
             amount: args.amount.as_u128(),
@@ -355,7 +354,7 @@ impl EthConnectorContract {
         self.burn_eth(args.eth_recipient, args.amount.as_u128());
         // Save new contract data
         self.save_contract();
-        sdk::return_output(&res[..]);*/
+        sdk::return_output(&res[..]);
     }
 
     // Return total supply of NEAR + ETH
@@ -401,9 +400,13 @@ impl EthConnectorContract {
         let args = BalanceOfEthCallArgs::from(
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
         );
-        let balance = self.ft.internal_unwrap_balance_of_eth(args.address.clamp());
+        let balance = self.ft.internal_unwrap_balance_of_eth(args.address);
         #[cfg(feature = "log")]
-        sdk::log(format!("Balance of ETH [{}]: {}", args.account_id, balance));
+        sdk::log(format!(
+            "Balance of ETH [{}]: {}",
+            hex::encode(args.address),
+            balance
+        ));
         sdk::return_output(&balance.to_string().as_bytes());
     }
 
@@ -433,6 +436,7 @@ impl EthConnectorContract {
             prover::verify_transfer_eip712(
                 args.sender,
                 args.near_recipient.clone(),
+                self.contract.eth_custodian_address,
                 args.amount,
                 args.eip712_signature
             ),

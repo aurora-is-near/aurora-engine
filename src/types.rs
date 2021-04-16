@@ -219,10 +219,10 @@ impl From<json::JsonValue> for BalanceOfCallArgs {
 impl From<json::JsonValue> for BalanceOfEthCallArgs {
     fn from(v: json::JsonValue) -> Self {
         use crate::prover::validate_eth_address;
-        
+
         let address = v.string("address").expect(str_from_slice(FAILED_PARSE));
         Self {
-            address: validate_eth_address(address), 
+            address: validate_eth_address(address),
         }
     }
 }
