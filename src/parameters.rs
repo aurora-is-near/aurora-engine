@@ -144,6 +144,14 @@ pub struct FinishDepositCallArgs {
     pub proof: Proof,
 }
 
+/// Deposit ETH args
+#[cfg(feature = "contract")]
+#[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
+pub struct DepositEthCallArgs {
+    pub proof: Proof,
+    pub relayer_eth_account: EthAddress,
+}
+
 /// Finish deposit NEAR eth-connector call args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]

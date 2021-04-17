@@ -130,7 +130,9 @@ impl EthConnectorContract {
         #[cfg(feature = "log")]
         sdk::log("[Deposit ETH tokens]".into());
 
-        let proof: Proof = Proof::from(parse_json(&sdk::read_input()).unwrap());
+        let deposit_data: DepositEthCallArgs =
+            DepositEthCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+        let proof = deposit_data.proof;
         let event = EthDepositedEthEvent::from_log_entry_data(&proof.log_entry_data);
         #[cfg(feature = "log")]
         sdk::log(format!(
@@ -143,9 +145,10 @@ impl EthConnectorContract {
 
         #[cfg(feature = "log")]
         sdk::log(format!(
-            "Event's address {}, custodian address {}",
+            "Event's address {}, custodian address {}, relayer account: {}",
             hex::encode(&event.eth_custodian_address),
             hex::encode(&self.contract.eth_custodian_address),
+            hex::encode(&deposit_data.relayer_eth_account),
         ));
 
         assert_eq!(
@@ -171,7 +174,7 @@ impl EthConnectorContract {
             new_owner_id: event.recipient,
             amount: event.amount.as_u128(),
             fee: event.fee.as_u128(),
-            relayer_eth_account: event.recipient,
+            relayer_eth_account: deposit_data.relayer_eth_account,
             proof,
         }
         .try_to_vec()
@@ -234,6 +237,10 @@ impl EthConnectorContract {
         // Mint tokens to recipient minus fee
         self.mint_eth(data.new_owner_id, data.amount - data.fee);
         // Mint tokens fee to Relayer
+        sdk::log(format!(
+            "relayer_eth_account: {}",
+            hex::encode(data.relayer_eth_account)
+        ));
         self.mint_eth(data.relayer_eth_account, data.fee);
         // Save new contract data
         self.save_contract();

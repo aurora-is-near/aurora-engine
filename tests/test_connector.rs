@@ -1,4 +1,6 @@
-use near_sdk::borsh::BorshSerialize;
+use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
+use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::serde_json;
 use near_sdk::serde_json::json;
 use near_sdk::test_utils::accounts;
 use near_sdk_sim::{to_yocto, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
@@ -21,6 +23,25 @@ const DEPOSITED_EVM_FEE: u128 = 400;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Proof {
+    pub log_index: u64,
+    pub log_entry_data: Vec<u8>,
+    pub receipt_index: u64,
+    pub receipt_data: Vec<u8>,
+    pub header_data: Vec<u8>,
+    pub proof: Vec<Vec<u8>>,
+    pub skip_bridge_call: bool,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct DepositEthCallArgs {
+    pub proof: Proof,
+    pub relayer_eth_account: EthAddress,
 }
 
 fn init(custodian_address: &str) -> (UserAccount, UserAccount) {
@@ -82,16 +103,31 @@ fn call_deposit_near(master_account: &UserAccount) {
     res.assert_success();
 }
 
+#[allow(dead_code)]
+fn print_logs(logs: &Vec<String>) {
+    for l in logs {
+        println!("[log] {}", l);
+    }
+}
+
 fn call_deposit_eth(master_account: &UserAccount) {
+    let proof: Proof = serde_json::from_str(PROOF_DATA_ETH).unwrap();
+    let data = DepositEthCallArgs {
+        relayer_eth_account: validate_eth_address("09f7219e434EAA7021Ae5f9Ecd0CaBc2405447A3"),
+        proof,
+    }
+    .try_to_vec()
+    .unwrap();
     let res = master_account.call(
         CONTRACT_ACC.to_string(),
         "deposit_eth",
-        PROOF_DATA_ETH.to_string().as_bytes(),
+        &data[..],
         DEFAULT_GAS,
         0,
     );
     res.assert_success();
-    //println!("#1: {:#?}", res.logs());
+    //println!("{:#?}", res.promise_results());
+    //print_logs(res.logs());
 }
 
 fn get_near_balance(master_account: &UserAccount, acc: &str) -> u128 {
@@ -168,6 +204,7 @@ fn test_near_deposit_balance_total_supply() {
 fn test_deposit_eth_and_near() {
     let (master_account, _contract) = init(CUSTODIAN_ADDRESS);
     call_deposit_near(&master_account);
+    let (master_account, _contract) = init(EVM_CUSTODIAN_ADDRESS);
     call_deposit_eth(&master_account);
 }
 
@@ -176,14 +213,17 @@ fn test_eth_deposit_balance_total_supply() {
     let (master_account, _contract) = init(EVM_CUSTODIAN_ADDRESS);
     call_deposit_eth(&master_account);
 
-    let balance = get_eth_balance(
-        &master_account,
-        validate_eth_address("891b2749238b27ff58e951088e55b04de71dc374"),
-    );
+    let balance = get_eth_balance(&master_account, validate_eth_address(RECIPIENT_ETH_ADDRESS));
     assert_eq!(balance, DEPOSITED_EVM_AMOUNT - DEPOSITED_EVM_FEE);
 
     let balance = total_supply(&master_account);
-    assert_eq!(balance, DEPOSITED_AMOUNT);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+
+    let balance = total_supply_eth(&master_account);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+
+    let balance = total_supply_near(&master_account);
+    assert_eq!(balance, 0);
 }
 
 #[test]
@@ -216,9 +256,9 @@ fn test_withdraw_near() {
     assert_eq!(balance, DEPOSITED_FEE);
 
     let balance = total_supply(&master_account);
-    assert_eq!(balance, DEPOSITED_AMOUNT);
+    assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount as u128);
 }
-
+/*
 #[test]
 fn test_withdraw_eth() {
     let (master_account, _contract_account) = init(CUSTODIAN_ADDRESS);
@@ -227,8 +267,8 @@ fn test_withdraw_eth() {
             CONTRACT_ACC.to_string(),
             "withdraw_eth",
             json!({
-                "sender": "891B2749238B27fF58e951088e55b04de71Dc374", 
-                "eth_recipient": "891B2749238B27fF58e951088e55b04de71Dc374", 
+                "sender": "891B2749238B27fF58e951088e55b04de71Dc374",
+                "eth_recipient": "891B2749238B27fF58e951088e55b04de71Dc374",
                 "amount": "7654321",
                 "eip712_signature": "51ea7c8a54da3ffc1f6af82f9e535e156577583583d3e9de375139b41443ab5f4bddc25f69134a2d0fba2aa701da1532a94a013dd811d6c7edbbe94542a62ba41c"
             }).to_string().as_bytes(),
@@ -240,7 +280,7 @@ fn test_withdraw_eth() {
         println!("[log] {}", s);
     }
 }
-
+*/
 #[test]
 fn test_ft_transfer() {
     let (master_account, _contract) = init(CUSTODIAN_ADDRESS);
