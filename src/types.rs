@@ -210,7 +210,7 @@ pub fn str_from_slice(inp: &[u8]) -> &str {
 impl From<json::JsonValue> for BalanceOfCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            account_id: v.string("account_id").expect(str_from_slice(FAILED_PARSE)),
+            account_id: v.string("account_id").expect_utf8(FAILED_PARSE),
         }
     }
 }
@@ -220,7 +220,7 @@ impl From<json::JsonValue> for BalanceOfEthCallArgs {
     fn from(v: json::JsonValue) -> Self {
         use crate::prover::validate_eth_address;
 
-        let address = v.string("address").expect(str_from_slice(FAILED_PARSE));
+        let address = v.string("address").expect_utf8(FAILED_PARSE);
         Self {
             address: validate_eth_address(address),
         }
@@ -231,12 +231,8 @@ impl From<json::JsonValue> for BalanceOfEthCallArgs {
 impl From<json::JsonValue> for InitCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            eth_custodian_address: v
-                .string("eth_custodian_address")
-                .expect(str_from_slice(FAILED_PARSE)),
-            prover_account: v
-                .string("prover_account")
-                .expect(str_from_slice(FAILED_PARSE)),
+            eth_custodian_address: v.string("eth_custodian_address").expect_utf8(FAILED_PARSE),
+            prover_account: v.string("prover_account").expect_utf8(FAILED_PARSE),
         }
     }
 }
@@ -245,10 +241,8 @@ impl From<json::JsonValue> for InitCallArgs {
 impl From<json::JsonValue> for WithdrawCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            recipient_id: v
-                .string("recipient_id")
-                .expect(str_from_slice(FAILED_PARSE)),
-            amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
+            recipient_id: v.string("recipient_id").expect_utf8(FAILED_PARSE),
+            amount: v.u128("amount").expect_utf8(FAILED_PARSE),
         }
     }
 }
@@ -266,7 +260,7 @@ impl From<json::JsonValue> for StorageWithdrawCallArgs {
 impl From<json::JsonValue> for StorageBalanceOfCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            account_id: v.string("account_id").expect(str_from_slice(FAILED_PARSE)),
+            account_id: v.string("account_id").expect_utf8(FAILED_PARSE),
         }
     }
 }
@@ -285,10 +279,10 @@ impl From<json::JsonValue> for StorageDepositCallArgs {
 impl From<json::JsonValue> for TransferCallCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            receiver_id: v.string("receiver_id").expect(str_from_slice(FAILED_PARSE)),
-            amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
+            receiver_id: v.string("receiver_id").expect_utf8(FAILED_PARSE),
+            amount: v.u128("amount").expect_utf8(FAILED_PARSE),
             memo: v.string("memo").ok(),
-            msg: v.string("msg").expect(str_from_slice(FAILED_PARSE)),
+            msg: v.string("msg").expect_utf8(FAILED_PARSE),
         }
     }
 }
@@ -297,8 +291,8 @@ impl From<json::JsonValue> for TransferCallCallArgs {
 impl From<json::JsonValue> for TransferCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            receiver_id: v.string("receiver_id").expect(str_from_slice(FAILED_PARSE)),
-            amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
+            receiver_id: v.string("receiver_id").expect_utf8(FAILED_PARSE),
+            amount: v.u128("amount").expect_utf8(FAILED_PARSE),
             memo: v.string("memo").ok(),
         }
     }
@@ -309,10 +303,10 @@ impl From<json::JsonValue> for TransferEthCallArgs {
     fn from(v: json::JsonValue) -> Self {
         use crate::prover::validate_eth_address;
 
-        let address = v.string("address").expect(str_from_slice(FAILED_PARSE));
+        let address = v.string("address").expect_utf8(FAILED_PARSE);
         Self {
             address: validate_eth_address(address),
-            amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
+            amount: v.u128("amount").expect_utf8(FAILED_PARSE),
             memo: v.string("memo").ok(),
         }
     }
@@ -324,17 +318,15 @@ impl From<json::JsonValue> for TransferNearCallArgs {
         use crate::prover::validate_eth_address;
         use alloc::str::FromStr;
 
-        let sender = v.string("sender").expect(str_from_slice(FAILED_PARSE));
-        let amount = v.string("amount").expect(str_from_slice(FAILED_PARSE));
+        let sender = v.string("sender").expect_utf8(FAILED_PARSE);
+        let amount = v.string("amount").expect_utf8(FAILED_PARSE);
         let eip712_signature: Vec<u8> = v
             .array("eip712_signature", json::JsonValue::parse_u8)
-            .expect(str_from_slice(FAILED_PARSE));
+            .expect_utf8(FAILED_PARSE);
         Self {
             sender: validate_eth_address(sender),
-            near_recipient: v
-                .string("near_recipient")
-                .expect(str_from_slice(FAILED_PARSE)),
-            amount: U256::from_str(amount.as_str()).expect(str_from_slice(FAILED_PARSE)),
+            near_recipient: v.string("near_recipient").expect_utf8(FAILED_PARSE),
+            amount: U256::from_str(amount.as_str()).expect_utf8(FAILED_PARSE),
             eip712_signature,
         }
     }
@@ -345,22 +337,43 @@ impl From<json::JsonValue> for WithdrawEthCallArgs {
     fn from(v: json::JsonValue) -> Self {
         use crate::prover::validate_eth_address;
 
-        let sender = v.string("sender").expect(str_from_slice(FAILED_PARSE));
-        let eth_recipient = v
-            .string("eth_recipient")
-            .expect(str_from_slice(FAILED_PARSE));
-        let amount = v.string("amount").expect(str_from_slice(FAILED_PARSE));
+        let sender = v.string("sender").expect_utf8(FAILED_PARSE);
+        let eth_recipient = v.string("eth_recipient").expect_utf8(FAILED_PARSE);
+        let amount = v.string("amount").expect_utf8(FAILED_PARSE);
 
-        let eip712_signature: Vec<u8> = hex::decode(
-            v.string("eip712_signature")
-                .expect(str_from_slice(FAILED_PARSE)),
-        )
-        .expect("ETH_ADDRESS_FAILED");
+        let eip712_signature: Vec<u8> =
+            hex::decode(v.string("eip712_signature").expect_utf8(FAILED_PARSE))
+                .expect("ETH_ADDRESS_FAILED");
         Self {
             sender: validate_eth_address(sender),
             eth_recipient: validate_eth_address(eth_recipient),
-            amount: U256::from_str_radix(amount.as_str(), 10).expect(str_from_slice(FAILED_PARSE)),
+            amount: U256::from_str_radix(amount.as_str(), 10).expect_utf8(FAILED_PARSE),
             eip712_signature,
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+pub trait ExpectUtf8<T> {
+    fn expect_utf8(self, message: &[u8]) -> T;
+}
+
+#[cfg(feature = "contract")]
+impl<T> ExpectUtf8<T> for Option<T> {
+    fn expect_utf8(self, message: &[u8]) -> T {
+        match self {
+            Some(t) => t,
+            None => sdk::panic_utf8(message),
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
+    fn expect_utf8(self, message: &[u8]) -> T {
+        match self {
+            Ok(t) => t,
+            Err(_) => sdk::panic_utf8(message),
         }
     }
 }

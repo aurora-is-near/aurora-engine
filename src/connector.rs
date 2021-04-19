@@ -49,7 +49,7 @@ impl EthConnectorContract {
         #[cfg(feature = "log")]
         sdk::log("[init contract]".into());
         let args: InitCallArgs =
-            InitCallArgs::from(parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)));
+            InitCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let current_account_id = sdk::current_account_id();
         let owner_id = String::from_utf8(current_account_id).unwrap();
         let mut ft = FungibleToken::new();
@@ -313,9 +313,8 @@ impl EthConnectorContract {
     pub fn withdraw_near(&mut self) {
         #[cfg(feature = "log")]
         sdk::log("Start withdraw NEAR".into());
-        let args: WithdrawCallArgs = WithdrawCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: WithdrawCallArgs =
+            WithdrawCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let recipient_address = validate_eth_address(args.recipient_id);
         let res = WithdrawResult {
             recipient_id: recipient_address,
@@ -338,9 +337,8 @@ impl EthConnectorContract {
         #[cfg(feature = "log")]
         sdk::log("Start withdraw ETH".into());
 
-        let args: WithdrawEthCallArgs = WithdrawEthCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: WithdrawEthCallArgs =
+            WithdrawEthCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         assert!(
             prover::verify_withdraw_eip712(
                 args.sender,
@@ -391,9 +389,8 @@ impl EthConnectorContract {
 
     /// Return balance of NEAR
     pub fn ft_balance_of(&self) {
-        let args = BalanceOfCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args =
+            BalanceOfCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let balance = self.ft.ft_balance_of(&args.account_id);
         sdk::return_output(&balance.to_string().as_bytes());
         #[cfg(feature = "log")]
@@ -405,9 +402,8 @@ impl EthConnectorContract {
 
     /// Return balance of ETH
     pub fn ft_balance_of_eth(&self) {
-        let args = BalanceOfEthCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args =
+            BalanceOfEthCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let balance = self.ft.internal_unwrap_balance_of_eth(args.address);
         #[cfg(feature = "log")]
         sdk::log(format!(
@@ -420,9 +416,8 @@ impl EthConnectorContract {
 
     /// Transfer between NEAR accounts
     pub fn ft_transfer(&mut self) {
-        let args: TransferCallArgs = TransferCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: TransferCallArgs =
+            TransferCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
 
         self.ft
             .ft_transfer(&args.receiver_id, args.amount, &args.memo);
@@ -437,9 +432,8 @@ impl EthConnectorContract {
     /// Transfer tokens from ETH account to NEAR account
     pub fn transfer_near(&mut self) {
         use crate::prover;
-        let args: TransferNearCallArgs = TransferNearCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: TransferNearCallArgs =
+            TransferNearCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         assert!(
             prover::verify_transfer_eip712(
                 args.sender,
@@ -465,9 +459,8 @@ impl EthConnectorContract {
 
     /// Transfer tokens from NEAR account to ETH account
     pub fn transfer_eth(&mut self) {
-        let args: TransferEthCallArgs = TransferEthCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: TransferEthCallArgs =
+            TransferEthCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
 
         let predecessor_account_id = sdk::predecessor_account_id();
         let sender_id = str_from_slice(&predecessor_account_id);
@@ -502,9 +495,8 @@ impl EthConnectorContract {
     }
 
     pub fn ft_transfer_call(&mut self) {
-        let args: TransferCallCallArgs = TransferCallCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: TransferCallCallArgs =
+            TransferCallCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         #[cfg(feature = "log")]
         sdk::log(format!(
             "Transfer call to {} amount {}",
@@ -516,9 +508,8 @@ impl EthConnectorContract {
     }
 
     pub fn storage_deposit(&mut self) {
-        let args: StorageDepositCallArgs = StorageDepositCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: StorageDepositCallArgs =
+            StorageDepositCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let res = self
             .ft
             .storage_deposit(args.account_id.as_ref(), args.registration_only)
@@ -529,9 +520,8 @@ impl EthConnectorContract {
     }
 
     pub fn storage_withdraw(&mut self) {
-        let args: StorageWithdrawCallArgs = StorageWithdrawCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: StorageWithdrawCallArgs =
+            StorageWithdrawCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let res = self.ft.storage_withdraw(args.amount).try_to_vec().unwrap();
         self.save_contract();
         sdk::return_output(&res[..]);
@@ -539,7 +529,7 @@ impl EthConnectorContract {
 
     pub fn storage_balance_of(&self) {
         let args: StorageBalanceOfCallArgs = StorageBalanceOfCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
+            parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE),
         );
         let res = self
             .ft
