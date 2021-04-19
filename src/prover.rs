@@ -138,9 +138,7 @@ impl From<json::JsonValue> for Proof {
             })
             .expect_utf8(FAILED_PARSE);
 
-        let skip_bridge_call = v
-            .bool("skip_bridge_call")
-            .expect_utf8(FAILED_PARSE);
+        let skip_bridge_call = v.bool("skip_bridge_call").expect_utf8(FAILED_PARSE);
         Self {
             log_index,
             log_entry_data,

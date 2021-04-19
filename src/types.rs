@@ -231,12 +231,8 @@ impl From<json::JsonValue> for BalanceOfEthCallArgs {
 impl From<json::JsonValue> for InitCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            eth_custodian_address: v
-                .string("eth_custodian_address")
-                .expect_utf8(FAILED_PARSE),
-            prover_account: v
-                .string("prover_account")
-                .expect_utf8(FAILED_PARSE),
+            eth_custodian_address: v.string("eth_custodian_address").expect_utf8(FAILED_PARSE),
+            prover_account: v.string("prover_account").expect_utf8(FAILED_PARSE),
         }
     }
 }
@@ -245,9 +241,7 @@ impl From<json::JsonValue> for InitCallArgs {
 impl From<json::JsonValue> for WithdrawCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            recipient_id: v
-                .string("recipient_id")
-                .expect_utf8(FAILED_PARSE),
+            recipient_id: v.string("recipient_id").expect_utf8(FAILED_PARSE),
             amount: v.u128("amount").expect_utf8(FAILED_PARSE),
         }
     }
@@ -331,9 +325,7 @@ impl From<json::JsonValue> for TransferNearCallArgs {
             .expect_utf8(FAILED_PARSE);
         Self {
             sender: validate_eth_address(sender),
-            near_recipient: v
-                .string("near_recipient")
-                .expect_utf8(FAILED_PARSE),
+            near_recipient: v.string("near_recipient").expect_utf8(FAILED_PARSE),
             amount: U256::from_str(amount.as_str()).expect_utf8(FAILED_PARSE),
             eip712_signature,
         }
@@ -346,16 +338,12 @@ impl From<json::JsonValue> for WithdrawEthCallArgs {
         use crate::prover::validate_eth_address;
 
         let sender = v.string("sender").expect_utf8(FAILED_PARSE);
-        let eth_recipient = v
-            .string("eth_recipient")
-            .expect_utf8(FAILED_PARSE);
+        let eth_recipient = v.string("eth_recipient").expect_utf8(FAILED_PARSE);
         let amount = v.string("amount").expect_utf8(FAILED_PARSE);
 
-        let eip712_signature: Vec<u8> = hex::decode(
-            v.string("eip712_signature")
-                .expect_utf8(FAILED_PARSE),
-        )
-        .expect("ETH_ADDRESS_FAILED");
+        let eip712_signature: Vec<u8> =
+            hex::decode(v.string("eip712_signature").expect_utf8(FAILED_PARSE))
+                .expect("ETH_ADDRESS_FAILED");
         Self {
             sender: validate_eth_address(sender),
             eth_recipient: validate_eth_address(eth_recipient),
