@@ -4,7 +4,7 @@ use crate::engine::Engine;
 use crate::json::{self, FAILED_PARSE};
 use crate::log_entry::LogEntry;
 use crate::precompiles::ecrecover;
-use crate::types::{str_from_slice, AccountId, EthAddress};
+use crate::types::{AccountId, EthAddress, ExpectUtf8};
 use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::{Bytes, Event, EventParam, Hash, Log, ParamType, RawLog, Token};
@@ -120,27 +120,27 @@ impl EthEvent {
 
 impl From<json::JsonValue> for Proof {
     fn from(v: json::JsonValue) -> Self {
-        let log_index = v.u64("log_index").expect(str_from_slice(FAILED_PARSE));
+        let log_index = v.u64("log_index").expect_utf8(FAILED_PARSE);
         let log_entry_data: Vec<u8> = v
             .array("log_entry_data", json::JsonValue::parse_u8)
-            .expect(str_from_slice(FAILED_PARSE));
-        let receipt_index = v.u64("receipt_index").expect(str_from_slice(FAILED_PARSE));
+            .expect_utf8(FAILED_PARSE);
+        let receipt_index = v.u64("receipt_index").expect_utf8(FAILED_PARSE);
         let receipt_data: Vec<u8> = v
             .array("receipt_data", json::JsonValue::parse_u8)
-            .expect(str_from_slice(FAILED_PARSE));
+            .expect_utf8(FAILED_PARSE);
         let header_data: Vec<u8> = v
             .array("header_data", json::JsonValue::parse_u8)
-            .expect(str_from_slice(FAILED_PARSE));
+            .expect_utf8(FAILED_PARSE);
         let proof = v
             .array("proof", |v1| match v1 {
                 json::JsonValue::Array(arr) => arr.iter().map(json::JsonValue::parse_u8).collect(),
                 _ => sdk::panic_utf8(FAILED_PARSE),
             })
-            .expect(str_from_slice(FAILED_PARSE));
+            .expect_utf8(FAILED_PARSE);
 
         let skip_bridge_call = v
             .bool("skip_bridge_call")
-            .expect(str_from_slice(FAILED_PARSE));
+            .expect_utf8(FAILED_PARSE);
         Self {
             log_index,
             log_entry_data,
