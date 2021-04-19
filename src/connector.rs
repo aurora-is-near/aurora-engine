@@ -452,8 +452,7 @@ impl EthConnectorContract {
 
         let amoubt = args.amount.as_u128();
         self.ft.internal_withdraw_eth(args.sender, amoubt);
-        self.ft
-            .internal_deposit(&args.near_recipient, amoubt);
+        self.ft.internal_deposit(&args.near_recipient, amoubt);
         self.save_contract();
 
         #[cfg(feature = "log")]
@@ -488,11 +487,9 @@ impl EthConnectorContract {
         sdk::assert_private_call();
         let args: ResolveTransferCallArgs =
             ResolveTransferCallArgs::try_from_slice(&sdk::read_input()).unwrap();
-        let amount = self.ft.ft_resolve_transfer(
-            &args.sender_id,
-            &args.receiver_id,
-            args.amount,
-        );
+        let amount = self
+            .ft
+            .ft_resolve_transfer(&args.sender_id, &args.receiver_id, args.amount);
         // `ft_resolve_transfer` can changed `total_supply` so we should save contract
         self.save_contract();
         sdk::return_output(&amount.to_string().as_bytes());
@@ -513,12 +510,8 @@ impl EthConnectorContract {
             args.receiver_id, args.amount,
         ));
 
-        self.ft.ft_transfer_call(
-            &args.receiver_id,
-            args.amount,
-            &args.memo,
-            args.msg,
-        );
+        self.ft
+            .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
     }
 
     pub fn storage_deposit(&mut self) {

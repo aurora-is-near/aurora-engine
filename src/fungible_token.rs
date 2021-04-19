@@ -259,13 +259,12 @@ impl FungibleToken {
         };
 
         if unused_amount > 0 {
-            let receiver_balance =
-                if let Some(receiver_balance) = self.accounts_get(receiver_id) {
-                    u128::try_from_slice(&receiver_balance[..]).unwrap()
-                } else {
-                    self.accounts_insert(receiver_id, 0);
-                    0
-                };
+            let receiver_balance = if let Some(receiver_balance) = self.accounts_get(receiver_id) {
+                u128::try_from_slice(&receiver_balance[..]).unwrap()
+            } else {
+                self.accounts_insert(receiver_id, 0);
+                0
+            };
             if receiver_balance > 0 {
                 let refund_amount = if receiver_balance > unused_amount {
                     unused_amount
