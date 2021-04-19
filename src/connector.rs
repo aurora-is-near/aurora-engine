@@ -53,7 +53,7 @@ impl EthConnectorContract {
         let current_account_id = sdk::current_account_id();
         let owner_id = String::from_utf8(current_account_id).unwrap();
         let mut ft = FungibleToken::new();
-        ft.internal_register_account(owner_id);
+        ft.internal_register_account(&owner_id);
         let contract_data = EthConnector {
             prover_account: args.prover_account,
             eth_custodian_address: validate_eth_address(args.eth_custodian_address),
@@ -270,10 +270,10 @@ impl EthConnectorContract {
         #[cfg(feature = "log")]
         sdk::log(format!("Mint NEAR {} tokens for: {}", amount, owner_id));
 
-        if self.ft.accounts_get(owner_id.clone()).is_none() {
-            self.ft.accounts_insert(owner_id.clone(), 0);
+        if self.ft.accounts_get(&owner_id).is_none() {
+            self.ft.accounts_insert(&owner_id, 0);
         }
-        self.ft.internal_deposit(owner_id, amount);
+        self.ft.internal_deposit(&owner_id, amount);
         #[cfg(feature = "log")]
         sdk::log("Mint NEAR success".into());
     }
@@ -295,7 +295,7 @@ impl EthConnectorContract {
     fn burn_near(&mut self, owner_id: AccountId, amount: Balance) {
         #[cfg(feature = "log")]
         sdk::log(format!("Burn NEAR {} tokens for: {}", amount, owner_id));
-        self.ft.internal_withdraw(owner_id, amount);
+        self.ft.internal_withdraw(&owner_id, amount);
     }
 
     /// Burn ETH tokens
@@ -393,7 +393,7 @@ impl EthConnectorContract {
         let args = BalanceOfCallArgs::from(
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
         );
-        let balance = self.ft.ft_balance_of(args.account_id.clone());
+        let balance = self.ft.ft_balance_of(&args.account_id);
         sdk::return_output(&balance.to_string().as_bytes());
         #[cfg(feature = "log")]
         sdk::log(format!(
@@ -424,7 +424,7 @@ impl EthConnectorContract {
         );
 
         self.ft
-            .ft_transfer(args.receiver_id.clone(), args.amount, args.memo.clone());
+            .ft_transfer(&args.receiver_id, args.amount, &args.memo);
         self.save_contract();
         #[cfg(feature = "log")]
         sdk::log(format!(
@@ -452,8 +452,7 @@ impl EthConnectorContract {
 
         let amoubt = args.amount.as_u128();
         self.ft.internal_withdraw_eth(args.sender, amoubt);
-        self.ft
-            .internal_deposit(args.near_recipient.clone(), amoubt);
+        self.ft.internal_deposit(&args.near_recipient, amoubt);
         self.save_contract();
 
         #[cfg(feature = "log")]
@@ -469,7 +468,8 @@ impl EthConnectorContract {
             parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
         );
 
-        let sender_id = str_from_slice(&sdk::predecessor_account_id()).into();
+        let predecessor_account_id = sdk::predecessor_account_id();
+        let sender_id = str_from_slice(&predecessor_account_id);
         self.ft.internal_withdraw(sender_id, args.amount);
         self.ft.internal_deposit_eth(args.address, args.amount);
         self.save_contract();
@@ -487,11 +487,9 @@ impl EthConnectorContract {
         sdk::assert_private_call();
         let args: ResolveTransferCallArgs =
             ResolveTransferCallArgs::try_from_slice(&sdk::read_input()).unwrap();
-        let amount = self.ft.ft_resolve_transfer(
-            args.sender_id.clone(),
-            args.receiver_id.clone(),
-            args.amount,
-        );
+        let amount = self
+            .ft
+            .ft_resolve_transfer(&args.sender_id, &args.receiver_id, args.amount);
         // `ft_resolve_transfer` can changed `total_supply` so we should save contract
         self.save_contract();
         sdk::return_output(&amount.to_string().as_bytes());
@@ -512,12 +510,8 @@ impl EthConnectorContract {
             args.receiver_id, args.amount,
         ));
 
-        self.ft.ft_transfer_call(
-            args.receiver_id.clone(),
-            args.amount,
-            args.memo.clone(),
-            args.msg.clone(),
-        );
+        self.ft
+            .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
     }
 
     pub fn storage_deposit(&mut self) {
@@ -526,7 +520,7 @@ impl EthConnectorContract {
         );
         let res = self
             .ft
-            .storage_deposit(args.account_id, args.registration_only)
+            .storage_deposit(args.account_id.as_ref(), args.registration_only)
             .try_to_vec()
             .unwrap();
         self.save_contract();
@@ -548,7 +542,7 @@ impl EthConnectorContract {
         );
         let res = self
             .ft
-            .storage_balance_of(args.account_id)
+            .storage_balance_of(&args.account_id)
             .try_to_vec()
             .unwrap();
         sdk::return_output(&res[..]);

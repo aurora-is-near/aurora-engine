@@ -49,7 +49,7 @@ impl FungibleToken {
     }
 
     /// Balance of NEAR tokens
-    pub fn internal_unwrap_balance_of(&self, account_id: AccountId) -> Balance {
+    pub fn internal_unwrap_balance_of(&self, account_id: &str) -> Balance {
         match self.accounts_get(account_id) {
             Some(balance) => u128::try_from_slice(&balance[..]).unwrap(),
             None => sdk::panic_utf8(b"ERR_ACCOUNT_NOT_EXIST"),
@@ -62,8 +62,8 @@ impl FungibleToken {
     }
 
     /// Internal deposit NEAR (nETH) FT
-    pub fn internal_deposit(&mut self, account_id: AccountId, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of(account_id.clone());
+    pub fn internal_deposit(&mut self, account_id: &str, amount: Balance) {
+        let balance = self.internal_unwrap_balance_of(account_id);
         if let Some(new_balance) = balance.checked_add(amount) {
             self.accounts_insert(account_id, new_balance);
             self.total_supply_near = self
@@ -81,7 +81,7 @@ impl FungibleToken {
 
     /// Internal deposit ETH FT
     pub fn internal_deposit_eth(&mut self, address: EthAddress, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of_eth(address.clone());
+        let balance = self.internal_unwrap_balance_of_eth(address);
         if let Some(new_balance) = balance.checked_add(amount) {
             Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
             self.total_supply_eth = self
@@ -98,8 +98,8 @@ impl FungibleToken {
     }
 
     /// Withdraw NEAR tokens
-    pub fn internal_withdraw(&mut self, account_id: AccountId, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of(account_id.clone());
+    pub fn internal_withdraw(&mut self, account_id: &str, amount: Balance) {
+        let balance = self.internal_unwrap_balance_of(account_id);
         if let Some(new_balance) = balance.checked_sub(amount) {
             self.accounts_insert(account_id, new_balance);
             self.total_supply_near = self
@@ -117,7 +117,7 @@ impl FungibleToken {
 
     /// Withdraw ETH tokens
     pub fn internal_withdraw_eth(&mut self, address: EthAddress, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of_eth(address.clone());
+        let balance = self.internal_unwrap_balance_of_eth(address);
         if let Some(new_balance) = balance.checked_sub(amount) {
             Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
             self.total_supply_eth = self
@@ -139,15 +139,15 @@ impl FungibleToken {
         sender_id: &str,
         receiver_id: &str,
         amount: Balance,
-        #[allow(unused_variables)] memo: Option<String>,
+        #[allow(unused_variables)] memo: &Option<String>,
     ) {
         assert_ne!(
             sender_id, receiver_id,
             "Sender and receiver should be different"
         );
         assert!(amount > 0, "The amount should be a positive number");
-        self.internal_withdraw(sender_id.to_string(), amount);
-        self.internal_deposit(receiver_id.to_string(), amount);
+        self.internal_withdraw(sender_id, amount);
+        self.internal_deposit(receiver_id, amount);
         #[cfg(feature = "log")]
         sdk::log(format!(
             "Transfer {} from {} to {}",
@@ -159,15 +159,15 @@ impl FungibleToken {
         }
     }
 
-    pub fn internal_register_account(&mut self, account_id: AccountId) {
+    pub fn internal_register_account(&mut self, account_id: &str) {
         self.accounts_insert(account_id, 0)
     }
 
-    pub fn ft_transfer(&mut self, receiver_id: AccountId, amount: Balance, memo: Option<String>) {
+    pub fn ft_transfer(&mut self, receiver_id: &str, amount: Balance, memo: &Option<String>) {
         sdk::assert_one_yocto();
         let predecessor_account_id = sdk::predecessor_account_id();
-        let sender_id = alloc::str::from_utf8(&predecessor_account_id).unwrap();
-        self.internal_transfer(&sender_id, &receiver_id, amount, memo);
+        let sender_id = str_from_slice(&predecessor_account_id);
+        self.internal_transfer(sender_id, receiver_id, amount, memo);
     }
 
     pub fn ft_total_supply(&self) -> u128 {
@@ -182,7 +182,7 @@ impl FungibleToken {
         self.total_supply_eth
     }
 
-    pub fn ft_balance_of(&self, account_id: AccountId) -> u128 {
+    pub fn ft_balance_of(&self, account_id: &str) -> u128 {
         if let Some(data) = self.accounts_get(account_id) {
             u128::try_from_slice(&data[..]).unwrap()
         } else {
@@ -192,25 +192,25 @@ impl FungibleToken {
 
     pub fn ft_transfer_call(
         &mut self,
-        receiver_id: AccountId,
+        receiver_id: &str,
         amount: Balance,
-        memo: Option<String>,
+        memo: &Option<String>,
         msg: String,
     ) {
         sdk::assert_one_yocto();
         let predecessor_account_id = sdk::predecessor_account_id();
-        let sender_id = alloc::str::from_utf8(&predecessor_account_id).unwrap();
-        self.internal_transfer(&sender_id, &receiver_id, amount, memo);
+        let sender_id = str_from_slice(&predecessor_account_id);
+        self.internal_transfer(sender_id, receiver_id, amount, memo);
         let data1 = FtOnTransfer {
             amount,
             msg,
-            receiver_id: receiver_id.clone(),
+            receiver_id: receiver_id.to_string(),
         }
         .try_to_vec()
         .unwrap();
         let account_id = String::from_utf8(sdk::current_account_id()).unwrap();
         let data2 = FtResolveTransfer {
-            receiver_id: receiver_id.clone(),
+            receiver_id: receiver_id.to_string(),
             amount,
             current_account_id: account_id,
         }
@@ -237,8 +237,8 @@ impl FungibleToken {
 
     pub fn internal_ft_resolve_transfer(
         &mut self,
-        sender_id: AccountId,
-        receiver_id: AccountId,
+        sender_id: &str,
+        receiver_id: &str,
         amount: Balance,
     ) -> (u128, u128) {
         // Get the unused amount from the `ft_on_transfer` call result.
@@ -259,30 +259,29 @@ impl FungibleToken {
         };
 
         if unused_amount > 0 {
-            let receiver_balance =
-                if let Some(receiver_balance) = self.accounts_get(receiver_id.clone()) {
-                    u128::try_from_slice(&receiver_balance[..]).unwrap()
-                } else {
-                    self.accounts_insert(receiver_id.clone(), 0);
-                    0
-                };
+            let receiver_balance = if let Some(receiver_balance) = self.accounts_get(receiver_id) {
+                u128::try_from_slice(&receiver_balance[..]).unwrap()
+            } else {
+                self.accounts_insert(receiver_id, 0);
+                0
+            };
             if receiver_balance > 0 {
                 let refund_amount = if receiver_balance > unused_amount {
                     unused_amount
                 } else {
                     receiver_balance
                 };
-                self.accounts_insert(receiver_id.clone(), receiver_balance - refund_amount);
+                self.accounts_insert(receiver_id, receiver_balance - refund_amount);
                 #[cfg(feature = "log")]
                 sdk::log(format!(
                     "Decrease receiver {} balance to: {}",
-                    receiver_id.clone(),
+                    receiver_id,
                     receiver_balance - refund_amount
                 ));
 
-                return if let Some(sender_balance) = self.accounts_get(sender_id.clone()) {
+                return if let Some(sender_balance) = self.accounts_get(sender_id) {
                     let sender_balance = u128::try_from_slice(&sender_balance[..]).unwrap();
-                    self.accounts_insert(sender_id.clone(), sender_balance + refund_amount);
+                    self.accounts_insert(sender_id, sender_balance + refund_amount);
                     #[cfg(feature = "log")]
                     sdk::log(format!(
                         "Refund amount {} from {} to {}",
@@ -303,8 +302,8 @@ impl FungibleToken {
 
     pub fn ft_resolve_transfer(
         &mut self,
-        sender_id: AccountId,
-        receiver_id: AccountId,
+        sender_id: &str,
+        receiver_id: &str,
         amount: u128,
     ) -> u128 {
         self.internal_ft_resolve_transfer(sender_id, receiver_id, amount)
@@ -317,17 +316,17 @@ impl FungibleToken {
     ) -> Option<(AccountId, Balance)> {
         sdk::assert_one_yocto();
         let account_id_key = sdk::predecessor_account_id();
-        let account_id = String::from_utf8(account_id_key.clone()).unwrap();
+        let account_id = str_from_slice(&account_id_key);
         let force = force.unwrap_or(false);
-        if let Some(balance) = self.accounts_get(account_id.clone()) {
+        if let Some(balance) = self.accounts_get(account_id) {
             let balance = u128::try_from_slice(&balance[..]).unwrap();
             if balance == 0 || force {
-                self.accounts_remove(account_id.clone());
+                self.accounts_remove(account_id);
                 self.total_supply -= balance;
                 let amount = self.storage_balance_bounds().min + 1;
                 let promise0 = sdk::promise_batch_create(&account_id_key);
                 sdk::promise_batch_action_transfer(promise0, amount);
-                Some((account_id, balance))
+                Some((account_id.to_string(), balance))
             } else {
                 sdk::panic_utf8(b"ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE")
             }
@@ -347,7 +346,7 @@ impl FungibleToken {
         }
     }
 
-    pub fn internal_storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance> {
+    pub fn internal_storage_balance_of(&self, account_id: &str) -> Option<StorageBalance> {
         if self.accounts_contains_key(account_id) {
             Some(StorageBalance {
                 total: self.storage_balance_bounds().min,
@@ -358,7 +357,7 @@ impl FungibleToken {
         }
     }
 
-    pub fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance> {
+    pub fn storage_balance_of(&self, account_id: &str) -> Option<StorageBalance> {
         self.internal_storage_balance_of(account_id)
     }
 
@@ -366,13 +365,13 @@ impl FungibleToken {
     #[allow(unused_variables)]
     pub fn storage_deposit(
         &mut self,
-        account_id: Option<AccountId>,
+        account_id: Option<&AccountId>,
         registration_only: Option<bool>,
     ) -> StorageBalance {
         let amount: Balance = sdk::attached_deposit();
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-        let account_id = account_id.unwrap_or(predecessor_account_id);
-        if self.accounts_contains_key(account_id.clone()) {
+        let account_id = account_id.unwrap_or(&predecessor_account_id);
+        if self.accounts_contains_key(account_id) {
             #[cfg(feature = "log")]
             sdk::log("The account is already registered, refunding the deposit".into());
             if amount > 0 {
@@ -386,7 +385,7 @@ impl FungibleToken {
                 sdk::panic_utf8(b"ERR_ATTACHED_DEPOSIT_NOT_ENOUGH");
             }
 
-            self.internal_register_account(account_id.clone());
+            self.internal_register_account(account_id);
             let refund = amount - min_balance;
             if refund > 0 {
                 let promise0 = sdk::promise_batch_create(&sdk::predecessor_account_id());
@@ -402,7 +401,8 @@ impl FungibleToken {
 
     pub fn storage_withdraw(&mut self, amount: Option<u128>) -> StorageBalance {
         sdk::assert_one_yocto();
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let predecessor_account_id_bytes = sdk::predecessor_account_id();
+        let predecessor_account_id = str_from_slice(&predecessor_account_id_bytes);
         if let Some(storage_balance) = self.internal_storage_balance_of(predecessor_account_id) {
             match amount {
                 Some(amount) if amount > 0 => {
@@ -415,27 +415,27 @@ impl FungibleToken {
         }
     }
 
-    fn ft_key(&self, account_id: AccountId) -> Vec<u8> {
+    fn ft_key(&self, account_id: &str) -> Vec<u8> {
         [CONTRACT_FT_KEY, &account_id].join(".").as_bytes().to_vec()
     }
 
-    pub fn accounts_insert(&self, account_id: AccountId, amount: Balance) {
+    pub fn accounts_insert(&self, account_id: &str, amount: Balance) {
         sdk::save_contract(&self.ft_key(account_id), &amount)
     }
 
-    fn accounts_contains_key(&self, account_id: AccountId) -> bool {
+    fn accounts_contains_key(&self, account_id: &str) -> bool {
         sdk::storage_has_key(&self.ft_key(account_id))
     }
 
-    fn accounts_remove(&self, account_id: AccountId) {
+    fn accounts_remove(&self, account_id: &str) {
         sdk::remove_storage(&self.ft_key(account_id))
     }
 
-    pub fn accounts_get(&self, account_id: AccountId) -> Option<Vec<u8>> {
+    pub fn accounts_get(&self, account_id: &str) -> Option<Vec<u8>> {
         sdk::read_storage(&self.ft_key(account_id)[..])
     }
 
-    pub fn accounts_get_eth(&self, account_id: AccountId) -> Option<Vec<u8>> {
+    pub fn accounts_get_eth(&self, account_id: &str) -> Option<Vec<u8>> {
         // TODO: modify
         sdk::read_storage(&self.ft_key(account_id)[..])
     }
