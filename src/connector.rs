@@ -237,6 +237,7 @@ impl EthConnectorContract {
         // Mint tokens to recipient minus fee
         self.mint_eth(data.new_owner_id, data.amount - data.fee);
         // Mint tokens fee to Relayer
+        #[cfg(feature = "log")]
         sdk::log(format!(
             "relayer_eth_account: {}",
             hex::encode(data.relayer_eth_account)
