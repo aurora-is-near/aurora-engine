@@ -353,10 +353,12 @@ impl From<json::JsonValue> for WithdrawEthCallArgs {
     }
 }
 
+#[cfg(feature = "contract")]
 pub trait ExpectUtf8<T> {
     fn expect_utf8(self, message: &[u8]) -> T;
 }
 
+#[cfg(feature = "contract")]
 impl<T> ExpectUtf8<T> for Option<T> {
     fn expect_utf8(self, message: &[u8]) -> T {
         match self {
@@ -366,6 +368,7 @@ impl<T> ExpectUtf8<T> for Option<T> {
     }
 }
 
+#[cfg(feature = "contract")]
 impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
     fn expect_utf8(self, message: &[u8]) -> T {
         match self {
