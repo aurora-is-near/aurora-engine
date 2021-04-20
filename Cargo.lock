@@ -85,7 +85,7 @@ dependencies = [
 [[package]]
 name = "aurora-bn"
 version = "0.1.0"
-source = "git+https://github.com/aurora-is-near/aurora-bn.git#a3f5d27b4f248513009616c8a4cc63279676828d"
+source = "git+https://github.com/aurora-is-near/aurora-bn.git#c9e76ec5ae60f963e8882519fcf2502e394eaba8"
 dependencies = [
  "byteorder",
  "rand 0.8.3",
@@ -125,9 +125,9 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "backtrace"
-version = "0.3.56"
+version = "0.3.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d117600f438b1707d4e4ae15d3595657288f8235a0eb593e80ecc98ab34e1bc"
+checksum = "78ed203b9ba68b242c62b3fb7480f589dd49829be1edb3fe8fc8b4ffda2dcb8d"
 dependencies = [
  "addr2line",
  "cfg-if 1.0.0",
