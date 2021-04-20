@@ -1,7 +1,13 @@
 #[cfg(not(feature = "std"))]
 pub use alloc::{
-    borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, collections::BTreeMap as HashMap,
-    string::String, string::ToString, vec, vec::Vec,
+    borrow::ToOwned,
+    borrow::{Cow, Cow::*},
+    boxed::Box,
+    collections::BTreeMap as HashMap,
+    string::String,
+    string::ToString,
+    vec,
+    vec::Vec,
 };
 #[cfg(feature = "std")]
 pub use std::{

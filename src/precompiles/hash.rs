@@ -1,4 +1,4 @@
-use crate::prelude::{H256, H160};
+use crate::prelude::{H160, H256};
 
 /// See: https://ethereum.github.io/yellowpaper/paper.pdf
 /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions

@@ -1,6 +1,6 @@
+use crate::prelude::{Borrowed, H256};
 use ethabi::Address;
 use evm::ExitError;
-use crate::prelude::{Borrowed, H256};
 
 pub(crate) fn ecrecover_raw(input: &[u8]) -> Address {
     assert_eq!(input.len(), 128); // input is (hash, v, r, s), each typed as a uint256

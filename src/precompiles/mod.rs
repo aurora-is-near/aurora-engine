@@ -1,13 +1,13 @@
-mod hash;
-mod secp256k1;
-mod modexp;
 mod blake2;
 mod bn128;
+mod hash;
+mod modexp;
+mod secp256k1;
 
+pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::prelude::{Address, Vec, U256};
 use evm::{Context, ExitError, ExitSucceed};
 use num_bigint::BigUint;
-pub(crate) use crate::precompiles::secp256k1::ecrecover;
 
 type PrecompileResult = Result<(ExitSucceed, Vec<u8>, u64), ExitError>;
 

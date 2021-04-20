@@ -120,7 +120,7 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e\
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
         )
-            .unwrap();
+        .unwrap();
         let res = U256::from_big_endian(&modexp(&test_input1, None).unwrap());
         assert_eq!(res, U256::from(1));
 
@@ -131,7 +131,7 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e\
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
         )
-            .unwrap();
+        .unwrap();
         let res = U256::from_big_endian(&modexp(&test_input2, None).unwrap());
         assert_eq!(res, U256::from(0));
 
@@ -142,7 +142,7 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe\
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd",
         )
-            .unwrap();
+        .unwrap();
         assert!(modexp(&test_input3, None).is_err());
 
         let test_input4 = hex::decode(
@@ -154,7 +154,7 @@ mod tests {
             8000000000000000000000000000000000000000000000000000000000000000\
             07",
         )
-            .unwrap();
+        .unwrap();
         let expected = U256::from_big_endian(
             &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
                 .unwrap(),
@@ -170,7 +170,7 @@ mod tests {
             ffff\
             80",
         )
-            .unwrap();
+        .unwrap();
         let expected = U256::from_big_endian(
             &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
                 .unwrap(),
