@@ -27,7 +27,7 @@ mod sdk;
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::BorshDeserialize;
-    use evm::ExitReason;
+    use evm::{ExitError, ExitFatal, ExitReason};
 
     use crate::engine::{Engine, EngineState};
     #[cfg(feature = "evm_bully")]
@@ -318,8 +318,44 @@ mod contract {
         match status {
             ExitReason::Succeed(_) => sdk::return_output(result),
             ExitReason::Revert(_) => sdk::panic_hex(&result),
-            ExitReason::Error(_error) => sdk::panic_utf8(b"error"), // TODO
-            ExitReason::Fatal(_error) => sdk::panic_utf8(b"fatal error"), // TODO
+            ExitReason::Error(error) => sdk::panic_utf8(error.to_str().as_bytes()),
+            ExitReason::Fatal(error) => sdk::panic_utf8(error.to_str().as_bytes()),
+        }
+    }
+
+    trait ToStr {
+        fn to_str(self) -> &'static str;
+    }
+
+    impl ToStr for ExitError {
+        fn to_str(self) -> &'static str {
+            match self {
+                ExitError::StackUnderflow => "StackUnderflow",
+                ExitError::StackOverflow => "StackOverflow",
+                ExitError::InvalidJump => "InvalidJump",
+                ExitError::InvalidRange => "InvalidRange",
+                ExitError::DesignatedInvalid => "DesignatedInvalid",
+                ExitError::CallTooDeep => "CallTooDeep",
+                ExitError::CreateCollision => "CreateCollision",
+                ExitError::CreateContractLimit => "CreateContractLimit",
+                ExitError::OutOfOffset => "OutOfOffset",
+                ExitError::OutOfGas => "OutOfGas",
+                ExitError::OutOfFund => "OutOfFund",
+                ExitError::PCUnderflow => "PCUnderflow",
+                ExitError::CreateEmpty => "CreateEmpty",
+                ExitError::Other(_) => "Other",
+            }
+        }
+    }
+
+    impl ToStr for ExitFatal {
+        fn to_str(self) -> &'static str {
+            match self {
+                ExitFatal::NotSupported => "NotSupported",
+                ExitFatal::UnhandledInterrupt => "UnhandledInterrupt",
+                ExitFatal::CallErrorAsFatal(_) => "CallErrorAsFatal",
+                ExitFatal::Other(_) => "Other",
+            }
         }
     }
 }
