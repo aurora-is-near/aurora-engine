@@ -3,11 +3,11 @@ mod bn128;
 mod hash;
 mod modexp;
 mod secp256k1;
+mod util;
 
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
-use crate::prelude::{Address, Vec, U256};
+use crate::prelude::{Address, Vec};
 use evm::{Context, ExitError, ExitSucceed};
-use num_bigint::BigUint;
 
 type PrecompileResult = Result<(ExitSucceed, Vec<u8>, u64), ExitError>;
 
