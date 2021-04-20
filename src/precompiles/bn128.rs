@@ -2,27 +2,12 @@ use crate::prelude::*;
 use evm::ExitError;
 
 fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
-    use bn::{arith::U256, AffineG1, Fq, Group, G1};
+    use bn::{AffineG1, Fq, Group, G1};
 
-    let mut px_words = [0u64; 4];
-    for (mut x, value) in px_words.iter_mut().enumerate() {
-        let mut word: [u8; 8] = [0u8; 8];
-        x = x * 8 + pos;
-        word.copy_from_slice(&input[x..(x + 8)]);
-        *value = u64::from_be_bytes(word);
-    }
-    let px_u256 = U256(px_words);
-    let px = Fq::from_u256(px_u256).map_err(|_e| ExitError::Other(Borrowed("invalid X point")))?;
-
-    let mut py_words = [0u64; 4];
-    for (mut x, value) in py_words.iter_mut().enumerate() {
-        let mut word: [u8; 8] = [0u8; 8];
-        x = x * 8 + (pos + 32);
-        word.copy_from_slice(&input[x..(x + 8)]);
-        *value = u64::from_be_bytes(word);
-    }
-    let py_u256 = U256(py_words);
-    let py = Fq::from_u256(py_u256).map_err(|_e| ExitError::Other(Borrowed("invalid Y point")))?;
+    let px = Fq::from_slice(&input[pos..(pos + 32)])
+        .map_err(|_e| ExitError::Other(Borrowed("invalid `x` point")))?;
+    let py = Fq::from_slice(&input[(pos + 32)..(pos + 64)])
+        .map_err(|_e| ExitError::Other(Borrowed("invalid `y` point")))?;
 
     Ok(if px == Fq::zero() && py == bn::Fq::zero() {
         G1::zero()
@@ -31,20 +16,6 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
             .map_err(|_| ExitError::Other(Borrowed("invalid curve point")))?
             .into()
     })
-}
-
-fn read_fr(input: &[u8], pos: usize) -> Result<bn::Fr, ExitError> {
-    use bn::arith::U256;
-
-    let mut fr_words = [0u64; 4];
-    for (mut x, value) in fr_words.iter_mut().enumerate() {
-        let mut word: [u8; 8] = [0u8; 8];
-        x = x * 8 + pos;
-        word.copy_from_slice(&input[x..(x + 8)]);
-        *value = u64::from_be_bytes(word);
-    }
-
-    bn::Fr::from_u256(U256(fr_words)).map_err(|_e| ExitError::Other(Borrowed("invalid field element")))
 }
 
 /// See: https://eips.ethereum.org/EIPS/eip-196
@@ -92,7 +63,8 @@ pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> Result<Vec
     let input = super::util::pad_input(input, 128);
 
     let p = read_point(&input, 0)?;
-    let fr = read_fr(&input, 32)?;
+    let fr = bn::Fr::from_slice(&input[32..64])
+        .map_err(|_e| ExitError::Other(Borrowed("invalid field element")))?;
 
     let mut output = [0u8; 64];
     if let Some(sum) = AffineG1::from_jacobian(p * fr) {
@@ -108,8 +80,78 @@ pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> Result<Vec
 /// See: https://eips.ethereum.org/EIPS/eip-197
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
 #[allow(dead_code)]
-pub(crate) fn alt_bn128_pair(_input: Vec<u8>) -> U256 {
-    U256::zero() // TODO: implement alt_bn128_pairing
+pub(crate) fn alt_bn128_pair(input: &[u8], target_gas: Option<u64>) -> Result<Vec<u8>, ExitError> {
+    use bn::{arith::U256, AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
+
+    if let Some(target_gas) = target_gas {
+        let gas = input.len() as u64 / 192u64;
+        if gas > target_gas {
+            return Err(ExitError::OutOfGas);
+        }
+    }
+
+    if input.len() % 192 != 0 {
+        return Err(ExitError::Other(Borrowed(
+            "input length invalid, must be multiple of 192",
+        )));
+    }
+
+    let ret = if input.is_empty() {
+        U256::one()
+    } else {
+        let elements = input.len() / 192;
+        let mut vals = Vec::with_capacity(elements);
+
+        for idx in 0..elements {
+            let ax = Fq::from_slice(&input[(idx * 192)..(idx * 192 + 32)])
+                .map_err(|_e| ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate")))?;
+            let ay = Fq::from_slice(&input[(idx * 192 + 32)..(idx * 192 + 64)])
+                .map_err(|_e| ExitError::Other(Borrowed("invalid `a` argument, `y` coordinate")))?;
+            let bay = Fq::from_slice(&input[(idx * 192 + 64)..(idx * 192 + 96)])
+                .map_err(|_e| ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate")))?;
+            let bax = Fq::from_slice(&input[(idx * 192 + 96)..(idx * 192 + 128)])
+                .map_err(|_e| ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate")))?;
+            let bby = Fq::from_slice(&input[(idx * 192 + 128)..(idx * 192 + 160)])
+                .map_err(|_e| ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate")))?;
+            let bbx = Fq::from_slice(&input[(idx * 192 + 160)..(idx * 192 + 192)])
+                .map_err(|_e| ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate")))?;
+
+            let a = {
+                if ax.is_zero() && ay.is_zero() {
+                    G1::zero()
+                } else {
+                    G1::from(AffineG1::new(ax, ay).map_err(|_e| {
+                        ExitError::Other(Borrowed("invalid `a` argument, not on curve"))
+                    })?)
+                }
+            };
+            let b = {
+                let ba = Fq2::new(bax, bay);
+                let bb = Fq2::new(bbx, bby);
+
+                if ba.is_zero() && bb.is_zero() {
+                    G2::zero()
+                } else {
+                    G2::from(AffineG2::new(ba, bb).map_err(|_e| {
+                        ExitError::Other(Borrowed("invalid `b` argument, not on curve"))
+                    })?)
+                }
+            };
+            vals.push((a, b))
+        }
+
+        let mul = vals
+            .into_iter()
+            .fold(Gt::one(), |s, (a, b)| s * bn::pairing(a, b));
+
+        if mul == Gt::one() {
+            U256::one()
+        } else {
+            U256::zero()
+        }
+    };
+
+    Ok(ret.to_big_endian().to_vec())
 }
 
 #[cfg(test)]
@@ -120,7 +162,7 @@ mod tests {
     fn test_alt_bn128_add() {
         // zero sum test
         let input = hex::decode(
-        "\
+            "\
             0000000000000000000000000000000000000000000000000000000000000000\
             0000000000000000000000000000000000000000000000000000000000000000\
             0000000000000000000000000000000000000000000000000000000000000000\
@@ -130,8 +172,9 @@ mod tests {
         let expected = hex::decode(
             "\
             0000000000000000000000000000000000000000000000000000000000000000\
-            0000000000000000000000000000000000000000000000000000000000000000"
-            ).unwrap();
+            0000000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
 
         let res = alt_bn128_add(&input, None).unwrap();
         assert_eq!(res, expected);
@@ -139,10 +182,11 @@ mod tests {
         // no input test
         let input = [0u8; 0];
         let expected = hex::decode(
-        "\
+            "\
             0000000000000000000000000000000000000000000000000000000000000000\
-            0000000000000000000000000000000000000000000000000000000000000000"
-        ).unwrap();
+            0000000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
 
         let res = alt_bn128_add(&input, None).unwrap();
         assert_eq!(res, expected);
@@ -153,8 +197,9 @@ mod tests {
             1111111111111111111111111111111111111111111111111111111111111111\
             1111111111111111111111111111111111111111111111111111111111111111\
             1111111111111111111111111111111111111111111111111111111111111111\
-            1111111111111111111111111111111111111111111111111111111111111111"
-        ).unwrap();
+            1111111111111111111111111111111111111111111111111111111111111111",
+        )
+        .unwrap();
 
         let res = alt_bn128_add(&input, None);
         assert!(res.is_err());
@@ -164,16 +209,18 @@ mod tests {
     fn test_alt_bn128_mul() {
         // zero multiplication test
         let input = hex::decode(
-        "\
+            "\
             0000000000000000000000000000000000000000000000000000000000000000\
             0000000000000000000000000000000000000000000000000000000000000000\
-            0200000000000000000000000000000000000000000000000000000000000000"
-        ).unwrap();
+            0200000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
         let expected = hex::decode(
-        "\
+            "\
             0000000000000000000000000000000000000000000000000000000000000000\
-            0000000000000000000000000000000000000000000000000000000000000000"
-        ).unwrap();
+            0000000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
 
         let res = alt_bn128_mul(&input, None).unwrap();
         assert_eq!(res, expected);
@@ -183,8 +230,9 @@ mod tests {
         let expected = hex::decode(
             "\
             0000000000000000000000000000000000000000000000000000000000000000\
-            0000000000000000000000000000000000000000000000000000000000000000"
-        ).unwrap();
+            0000000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
 
         let res = alt_bn128_add(&input, None).unwrap();
         assert_eq!(res, expected);
@@ -194,10 +242,46 @@ mod tests {
             "\
             1111111111111111111111111111111111111111111111111111111111111111\
             1111111111111111111111111111111111111111111111111111111111111111\
-            0f00000000000000000000000000000000000000000000000000000000000000"
-        ).unwrap();
+            0f00000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
 
         let res = alt_bn128_mul(&input, None);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_alt_bn128_pair() {
+        // no input test
+        let input = [0u8; 0];
+        let expected = hex::decode(
+            "0000000000000000000000000000000000000000000000000000000000000001"
+        ).unwrap();
+
+        let res = alt_bn128_pair(&input, None).unwrap();
+        assert_eq!(res, expected);
+
+        // point not on curve fail
+        let input = hex::decode("\
+            1111111111111111111111111111111111111111111111111111111111111111\
+            1111111111111111111111111111111111111111111111111111111111111111\
+            1111111111111111111111111111111111111111111111111111111111111111\
+            1111111111111111111111111111111111111111111111111111111111111111\
+            1111111111111111111111111111111111111111111111111111111111111111\
+            1111111111111111111111111111111111111111111111111111111111111111"
+        ).unwrap();
+
+        let res = alt_bn128_pair(&input, None);
+        assert!(res.is_err());
+
+        // invalid input length
+        let input = hex::decode("\
+            1111111111111111111111111111111111111111111111111111111111111111\
+            1111111111111111111111111111111111111111111111111111111111111111\
+            111111111111111111111111111111\
+        ").unwrap();
+
+        let res = alt_bn128_pair(&input, None);
         assert!(res.is_err());
     }
 }
