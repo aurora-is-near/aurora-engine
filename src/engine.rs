@@ -204,7 +204,7 @@ impl Engine {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
-            executor.transact_create(origin, value, Vec::from(input), u64::max_value()),
+            executor.transact_create(origin, value, Vec::from(input), u64::MAX),
             address,
         );
         let (values, logs) = executor.into_state().deconstruct();
@@ -227,8 +227,7 @@ impl Engine {
         input: Vec<u8>,
     ) -> (ExitReason, Vec<u8>) {
         let mut executor = self.make_executor();
-        let (status, result) =
-            executor.transact_call(origin, contract, value, input, u64::max_value());
+        let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
         (status, result)
@@ -249,11 +248,11 @@ impl Engine {
         input: Vec<u8>,
     ) -> (ExitReason, Vec<u8>) {
         let mut executor = self.make_executor();
-        executor.transact_call(origin, contract, value, input, u64::max_value())
+        executor.transact_call(origin, contract, value, input, u64::MAX)
     }
 
     fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {
-        let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
+        let metadata = StackSubstateMetadata::new(u64::MAX, &CONFIG);
         let state = MemoryStackState::new(metadata, self);
         StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
     }
