@@ -9,8 +9,10 @@ use crate::prelude::{Address, U256};
 use crate::prover::validate_eth_address;
 #[cfg(feature = "log")]
 use alloc::format;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const CONTRACT_NAME_KEY: &str = "EthConnector";
@@ -32,6 +34,16 @@ pub struct EthConnector {
     pub eth_custodian_address: EthAddress,
 }
 
+/// Token message data
+#[derive(BorshSerialize, BorshDeserialize)]
+pub enum TokenMessageData {
+    Near(AccountId),
+    Eth {
+        contract: String,
+        address: EthAddress,
+    },
+}
+
 impl EthConnectorContract {
     pub fn new() -> Self {
         Self {
@@ -41,7 +53,6 @@ impl EthConnectorContract {
     }
 
     pub fn init_contract() {
-        //assert_eq!(sdk::current_account_id(), sdk::predecessor_account_id());
         assert!(
             !sdk::storage_has_key(CONTRACT_NAME_KEY.as_bytes()),
             "ERR_CONTRACT_INITIALIZED"
@@ -49,7 +60,7 @@ impl EthConnectorContract {
         #[cfg(feature = "log")]
         sdk::log("[init contract]".into());
         let args: InitCallArgs =
-            InitCallArgs::from(parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)));
+            InitCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let current_account_id = sdk::current_account_id();
         let owner_id = String::from_utf8(current_account_id).unwrap();
         let mut ft = FungibleToken::new();
@@ -65,37 +76,58 @@ impl EthConnectorContract {
         .save_contract();
     }
 
+    /// Parse event message data
+    fn parse_event_message(&self, message: &String) -> TokenMessageData {
+        let data: Vec<_> = message.split(":").collect();
+        assert!(data.len() < 3);
+        if data.len() == 1 {
+            TokenMessageData::Near(data[0].into())
+        } else {
+            TokenMessageData::Eth {
+                contract: data[0].into(),
+                address: validate_eth_address(data[1].into()),
+            }
+        }
+    }
+
     pub fn deposit(&self) {
         #[cfg(feature = "log")]
-        sdk::log("[Deposit ETH tokens]".into());
+        sdk::log("[Deposit tokens]".into());
 
-        let deposit_data: DepositEthCallArgs =
-            DepositEthCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+        let deposit_data: DepositCallArgs =
+            DepositCallArgs::try_from_slice(&sdk::read_input()[..]).expect("ERR_FAILED_PARSE");
         let proof = deposit_data.proof;
-        let event = EthDepositedEthEvent::from_log_entry_data(&proof.log_entry_data);
+        let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
         #[cfg(feature = "log")]
         sdk::log(format!(
-            "Deposit started: from {} ETH to {} NEAR with amount: {:?} and fee {:?}",
+            "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
             hex::encode(event.sender),
-            hex::encode(event.recipient),
+            event.recipient.clone(),
             event.amount.as_u128(),
             event.fee.as_u128()
         ));
 
         #[cfg(feature = "log")]
-        sdk::log(format!(
-            "Event's address {}, custodian address {}, relayer account: {}",
-            hex::encode(&event.eth_custodian_address),
-            hex::encode(&self.contract.eth_custodian_address),
-            hex::encode(&deposit_data.relayer_eth_account),
-        ));
+        if let Some(relayer_eth_account) = deposit_data.relayer_eth_account {
+            sdk::log(format!(
+                "Event's address {}, custodian address {}, relayer account: {}",
+                hex::encode(&event.eth_custodian_address),
+                hex::encode(&self.contract.eth_custodian_address),
+                hex::encode(&relayer_eth_account),
+            ));
+        } else {
+            sdk::log(format!(
+                "Event's address {}, custodian address {}",
+                hex::encode(&event.eth_custodian_address),
+                hex::encode(&self.contract.eth_custodian_address),
+            ));
+        }
 
         assert_eq!(
             event.eth_custodian_address, self.contract.eth_custodian_address,
             "ERR_WRONG_EVENT_ADDRESS",
         );
-        assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
-        let account_id = sdk::current_account_id();
+        assert!(event.amount < event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
         let proof_1 = proof.try_to_vec().unwrap();
         #[cfg(feature = "log")]
         sdk::log(format!(
@@ -109,24 +141,55 @@ impl EthConnectorContract {
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
-        let data = FinishDepositEthCallArgs {
-            new_owner_id: event.recipient,
-            amount: event.amount.as_u128(),
-            fee: event.fee.as_u128(),
-            relayer_eth_account: deposit_data.relayer_eth_account,
-            proof,
-        }
-        .try_to_vec()
-        .unwrap();
 
-        let promise1 = sdk::promise_then(
-            promise0,
-            &account_id,
-            b"finish_deposit_eth",
-            &data[..],
-            NO_DEPOSIT,
-            GAS_FOR_FINISH_DEPOSIT,
-        );
+        let promise1 = match self.parse_event_message(&event.recipient) {
+            TokenMessageData::Near(account_id) => {
+                let data = FinishDepositCallArgs {
+                    new_owner_id: account_id,
+                    amount: event.amount.as_u128(),
+                    fee: event.fee.as_u128(),
+                    proof,
+                }
+                .try_to_vec()
+                .unwrap();
+
+                sdk::promise_then(
+                    promise0,
+                    &sdk::current_account_id(),
+                    b"finish_deposit_near",
+                    &data[..],
+                    NO_DEPOSIT,
+                    GAS_FOR_FINISH_DEPOSIT,
+                )
+            }
+            TokenMessageData::Eth {
+                contract: _,
+                address,
+            } => {
+                let relayer_eth_account = deposit_data
+                    .relayer_eth_account
+                    .expect("ERR_RELAYER_NOT_SET");
+                let data = FinishDepositEthCallArgs {
+                    new_owner_id: address,
+                    amount: event.amount.as_u128(),
+                    fee: event.fee.as_u128(),
+                    relayer_eth_account,
+                    proof,
+                }
+                .try_to_vec()
+                .unwrap();
+
+                sdk::promise_then(
+                    promise0,
+                    &sdk::current_account_id(),
+                    b"finish_deposit_eth",
+                    &data[..],
+                    NO_DEPOSIT,
+                    GAS_FOR_FINISH_DEPOSIT,
+                )
+            }
+        };
+
         sdk::promise_return(promise1);
     }
 
@@ -252,9 +315,8 @@ impl EthConnectorContract {
     pub fn withdraw_near(&mut self) {
         #[cfg(feature = "log")]
         sdk::log("Start withdraw NEAR".into());
-        let args: WithdrawCallArgs = WithdrawCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: WithdrawCallArgs =
+            WithdrawCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let recipient_address = validate_eth_address(args.recipient_id);
         let res = WithdrawResult {
             recipient_id: recipient_address,
@@ -277,9 +339,8 @@ impl EthConnectorContract {
         #[cfg(feature = "log")]
         sdk::log("Start withdraw ETH".into());
 
-        let args: WithdrawEthCallArgs = WithdrawEthCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: WithdrawEthCallArgs =
+            WithdrawEthCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         assert!(
             prover::verify_withdraw_eip712(
                 args.sender,
@@ -330,9 +391,8 @@ impl EthConnectorContract {
 
     /// Return balance of NEAR
     pub fn ft_balance_of(&self) {
-        let args = BalanceOfCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args =
+            BalanceOfCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let balance = self.ft.ft_balance_of(&args.account_id);
         sdk::return_output(&balance.to_string().as_bytes());
         #[cfg(feature = "log")]
@@ -344,9 +404,8 @@ impl EthConnectorContract {
 
     /// Return balance of ETH
     pub fn ft_balance_of_eth(&self) {
-        let args = BalanceOfEthCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args =
+            BalanceOfEthCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let balance = self.ft.internal_unwrap_balance_of_eth(args.address);
         #[cfg(feature = "log")]
         sdk::log(format!(
@@ -359,9 +418,8 @@ impl EthConnectorContract {
 
     /// Transfer between NEAR accounts
     pub fn ft_transfer(&mut self) {
-        let args: TransferCallArgs = TransferCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: TransferCallArgs =
+            TransferCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
 
         self.ft
             .ft_transfer(&args.receiver_id, args.amount, &args.memo);
@@ -391,9 +449,8 @@ impl EthConnectorContract {
     }
 
     pub fn ft_transfer_call(&mut self) {
-        let args: TransferCallCallArgs = TransferCallCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: TransferCallCallArgs =
+            TransferCallCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         #[cfg(feature = "log")]
         sdk::log(format!(
             "Transfer call to {} amount {}",
@@ -405,9 +462,8 @@ impl EthConnectorContract {
     }
 
     pub fn storage_deposit(&mut self) {
-        let args: StorageDepositCallArgs = StorageDepositCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: StorageDepositCallArgs =
+            StorageDepositCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let res = self
             .ft
             .storage_deposit(args.account_id.as_ref(), args.registration_only)
@@ -418,9 +474,8 @@ impl EthConnectorContract {
     }
 
     pub fn storage_withdraw(&mut self) {
-        let args: StorageWithdrawCallArgs = StorageWithdrawCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
+        let args: StorageWithdrawCallArgs =
+            StorageWithdrawCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
         let res = self.ft.storage_withdraw(args.amount).try_to_vec().unwrap();
         self.save_contract();
         sdk::return_output(&res[..]);
@@ -428,7 +483,7 @@ impl EthConnectorContract {
 
     pub fn storage_balance_of(&self) {
         let args: StorageBalanceOfCallArgs = StorageBalanceOfCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
+            parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE),
         );
         let res = self
             .ft

@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm::{Config, CreateScheme, ExitFatal, ExitReason};
+use evm::{Config, CreateScheme, ExitError, ExitReason, ExitSucceed};
 
 use crate::connector::EthConnectorContract;
 use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
@@ -124,6 +124,20 @@ impl Engine {
             .unwrap_or_else(U256::zero)
     }
 
+    /// Increases the balance for a given address.
+    pub fn increase_balance(address: &Address, amount: &U256) {
+        let mut balance = Self::get_balance(address);
+        balance += *amount;
+        Self::set_balance(address, &balance);
+    }
+
+    /// Decreases the balance for a given address.
+    pub fn decrease_balance(address: &Address, amount: &U256) {
+        let mut balance = Self::get_balance(address);
+        balance -= *amount;
+        Self::set_balance(address, &balance);
+    }
+
     pub fn remove_storage(address: &Address, key: &H256) {
         sdk::remove_storage(&storage_to_key(address, key));
     }
@@ -165,8 +179,18 @@ impl Engine {
         }
     }
 
-    pub fn transfer(&mut self, _sender: Address, _receiver: Address, _value: U256) -> ExitReason {
-        ExitReason::Fatal(ExitFatal::NotSupported) // TODO: implement balance transfers
+    /// Transfers an amount from a given sender to a receiver, provided that
+    /// the have enough in their balance.
+    pub fn transfer(&mut self, sender: &Address, receiver: &Address, value: &U256) -> ExitReason {
+        let balance = Self::get_balance(sender);
+        if balance < *value {
+            return ExitReason::Error(ExitError::OutOfFund);
+        }
+
+        Self::increase_balance(receiver, value);
+        Self::decrease_balance(sender, value);
+
+        ExitReason::Succeed(ExitSucceed::Returned)
     }
 
     pub fn deploy_code_with_input(&mut self, input: &[u8]) -> (ExitReason, Address) {
@@ -184,7 +208,7 @@ impl Engine {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
-            executor.transact_create(origin, value, Vec::from(input), u64::max_value()),
+            executor.transact_create(origin, value, Vec::from(input), u64::MAX),
             address,
         );
         let (values, logs) = executor.into_state().deconstruct();
@@ -207,8 +231,7 @@ impl Engine {
         input: Vec<u8>,
     ) -> (ExitReason, Vec<u8>) {
         let mut executor = self.make_executor();
-        let (status, result) =
-            executor.transact_call(origin, contract, value, input, u64::max_value());
+        let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
         (status, result)
@@ -229,11 +252,11 @@ impl Engine {
         input: Vec<u8>,
     ) -> (ExitReason, Vec<u8>) {
         let mut executor = self.make_executor();
-        executor.transact_call(origin, contract, value, input, u64::max_value())
+        executor.transact_call(origin, contract, value, input, u64::MAX)
     }
 
     fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {
-        let metadata = StackSubstateMetadata::new(u64::max_value(), &CONFIG);
+        let metadata = StackSubstateMetadata::new(u64::MAX, &CONFIG);
         let state = MemoryStackState::new(metadata, self);
         StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
     }

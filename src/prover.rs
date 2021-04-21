@@ -1,13 +1,12 @@
 use super::prelude::*;
 use super::sdk;
 use crate::engine::Engine;
-use crate::json::{self, FAILED_PARSE};
 use crate::log_entry::LogEntry;
 use crate::precompiles::ecrecover;
-use crate::types::{str_from_slice, AccountId, EthAddress};
-use alloc::format;
+use crate::types::{AccountId, EthAddress};
+use alloc::{format, vec::Vec};
 use borsh::{BorshDeserialize, BorshSerialize};
-use ethabi::{Bytes, Event, EventParam, Hash, Log, ParamType, RawLog, Token};
+use ethabi::{Bytes, Event, EventParam, Hash, Log, RawLog, Token};
 
 /// Validate Etherium address from string and return EthAddress
 #[allow(dead_code)]
@@ -76,8 +75,7 @@ impl Proof {
     }
 }
 
-/// Parameters of Etherium event
-pub type EthEventParams = Vec<(String, ParamType, bool)>;
+pub type EventParams = Vec<EventParam>;
 
 /// Etherium event
 pub struct EthEvent {
@@ -88,17 +86,10 @@ pub struct EthEvent {
 #[allow(dead_code)]
 impl EthEvent {
     /// Get Etherium event from `log_entry_data`
-    pub fn fetch_log_entry_data(name: &str, params: EthEventParams, data: &[u8]) -> Self {
+    pub fn fetch_log_entry_data(name: &str, params: EventParams, data: &[u8]) -> Self {
         let event = Event {
             name: name.to_string(),
-            inputs: params
-                .into_iter()
-                .map(|(name, kind, indexed)| EventParam {
-                    name,
-                    kind,
-                    indexed,
-                })
-                .collect(),
+            inputs: params,
             anonymous: false,
         };
         let log_entry: LogEntry = rlp::decode(data).expect("IVALID_RLP");
@@ -114,41 +105,6 @@ impl EthEvent {
         Self {
             eth_custodian_address,
             log,
-        }
-    }
-}
-
-impl From<json::JsonValue> for Proof {
-    fn from(v: json::JsonValue) -> Self {
-        let log_index = v.u64("log_index").expect(str_from_slice(FAILED_PARSE));
-        let log_entry_data: Vec<u8> = v
-            .array("log_entry_data", json::JsonValue::parse_u8)
-            .expect(str_from_slice(FAILED_PARSE));
-        let receipt_index = v.u64("receipt_index").expect(str_from_slice(FAILED_PARSE));
-        let receipt_data: Vec<u8> = v
-            .array("receipt_data", json::JsonValue::parse_u8)
-            .expect(str_from_slice(FAILED_PARSE));
-        let header_data: Vec<u8> = v
-            .array("header_data", json::JsonValue::parse_u8)
-            .expect(str_from_slice(FAILED_PARSE));
-        let proof = v
-            .array("proof", |v1| match v1 {
-                json::JsonValue::Array(arr) => arr.iter().map(json::JsonValue::parse_u8).collect(),
-                _ => sdk::panic_utf8(FAILED_PARSE),
-            })
-            .expect(str_from_slice(FAILED_PARSE));
-
-        let skip_bridge_call = v
-            .bool("skip_bridge_call")
-            .expect(str_from_slice(FAILED_PARSE));
-        Self {
-            log_index,
-            log_entry_data,
-            receipt_index,
-            receipt_data,
-            header_data,
-            proof,
-            skip_bridge_call,
         }
     }
 }

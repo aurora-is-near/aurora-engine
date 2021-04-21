@@ -8,7 +8,7 @@ use crate::prelude::{String, Vec};
 #[cfg(feature = "contract")]
 use crate::prover::Proof;
 #[cfg(feature = "contract")]
-use crate::types::str_from_slice;
+use crate::types::ExpectUtf8;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 #[cfg(feature = "contract")]
 use crate::types::{Balance, EthAddress};
@@ -90,6 +90,16 @@ pub struct BeginBlockArgs {
     pub gaslimit: RawU256,
 }
 
+/// Eth-connector deposit arguments
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct DepositCallArgs {
+    /// Proof data
+    pub proof: Proof,
+    /// Optional relayer address
+    pub relayer_eth_account: Option<EthAddress>,
+}
+
 /// withdraw result for eth-connector
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize)]
@@ -167,9 +177,9 @@ pub struct FinishDepositEthCallArgs {
 impl From<json::JsonValue> for ResolveTransferCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            sender_id: v.string("sender_id").expect(str_from_slice(FAILED_PARSE)),
-            receiver_id: v.string("receiver_id").expect(str_from_slice(FAILED_PARSE)),
-            amount: v.u128("amount").expect(str_from_slice(FAILED_PARSE)),
+            sender_id: v.string("sender_id").expect_utf8(FAILED_PARSE),
+            receiver_id: v.string("receiver_id").expect_utf8(FAILED_PARSE),
+            amount: v.u128("amount").expect_utf8(FAILED_PARSE),
         }
     }
 }
