@@ -49,9 +49,18 @@ pub fn istanbul_precompiles(
             Ok(r) => Some(Ok((ExitSucceed::Returned, r, 0))),
             Err(e) => Some(Err(e)),
         },
-        6 => todo!(), // TODO: implement alt_bn128_add()
-        7 => todo!(), // TODO: implement alt_bn128_mul()
-        8 => todo!(), // TODO: implement alt_bn128_pair()
+        6 => match bn128::alt_bn128_add(input, target_gas) {
+            Ok(v) => Some(Ok((ExitSucceed::Returned, v, 0))),
+            Err(e) => Some(Err(e)),
+        },
+        7 => match bn128::alt_bn128_mul(input, target_gas) {
+            Ok(v) => Some(Ok((ExitSucceed::Returned, v, 0))),
+            Err(e) => Some(Err(e)),
+        },
+        8 => match bn128::alt_bn128_pair(input, target_gas) {
+            Ok(v) => Some(Ok((ExitSucceed::Returned, v, 0))),
+            Err(e) => Some(Err(e)),
+        },
         9 => Some(Ok((ExitSucceed::Returned, blake2::blake2f(input), 0))),
         // Not supported.
         _ => None,
