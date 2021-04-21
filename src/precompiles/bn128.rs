@@ -91,7 +91,7 @@ pub(crate) fn alt_bn128_pair(input: &[u8], target_gas: Option<u64>) -> Result<Ve
     use bn::{arith::U256, AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
 
     if let Some(target_gas) = target_gas {
-        let gas = input.len() as u64 / 192u64;
+        let gas = 80_000 * input.len() as u64 / 192u64 + 100_000;
         if gas > target_gas {
             return Err(ExitError::OutOfGas);
         }
