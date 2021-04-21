@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(core_intrinsics))]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![cfg_attr(feature = "log", feature(panic_info_message))]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -16,11 +17,19 @@ mod transaction;
 pub mod types;
 
 #[cfg(feature = "contract")]
+mod connector;
+#[cfg(feature = "contract")]
+mod deposit_event;
+#[cfg(feature = "contract")]
 mod engine;
+#[cfg(feature = "contract")]
+mod fungible_token;
 #[cfg(feature = "contract")]
 mod json;
 #[cfg(feature = "contract")]
 mod log_entry;
+#[cfg(feature = "contract")]
+mod prover;
 #[cfg(feature = "contract")]
 mod sdk;
 
@@ -29,6 +38,7 @@ mod contract {
     use borsh::BorshDeserialize;
     use evm::{ExitError, ExitFatal, ExitReason};
 
+    use crate::connector::EthConnectorContract;
     use crate::engine::{Engine, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -45,8 +55,24 @@ mod contract {
 
     #[cfg(target_arch = "wasm32")]
     #[panic_handler]
+    #[cfg_attr(not(feature = "log"), allow(unused_variables))]
     #[no_mangle]
-    pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
+    pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
+        #[cfg(feature = "log")]
+        {
+            use alloc::string::ToString;
+            if let Some(msg) = info.message() {
+                let msg = if let Some(log) = info.location() {
+                    [msg.to_string(), " [".into(), log.to_string(), "]".into()].join("")
+                } else {
+                    msg.to_string()
+                };
+                sdk::log(msg);
+            } else if let Some(log) = info.location() {
+                sdk::log(log.to_string());
+            }
+        }
+
         ::core::intrinsics::abort();
     }
 
@@ -298,6 +324,126 @@ mod contract {
         let input = sdk::read_input();
         let _args = BeginBlockArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
+    }
+
+    #[no_mangle]
+    pub extern "C" fn new_eth_connector() {
+        EthConnectorContract::init_contract()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn deposit_near() {
+        EthConnectorContract::new().deposit_near()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn withdraw_near() {
+        EthConnectorContract::new().withdraw_near()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn deposit_eth() {
+        EthConnectorContract::new().deposit_eth()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn withdraw_eth() {
+        EthConnectorContract::new().withdraw_eth()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn finish_deposit_near() {
+        EthConnectorContract::new().finish_deposit_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn finish_deposit_eth() {
+        EthConnectorContract::new().finish_deposit_eth();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_total_supply() {
+        EthConnectorContract::new().ft_total_supply();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_total_supply_near() {
+        EthConnectorContract::new().ft_total_supply_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_total_supply_eth() {
+        EthConnectorContract::new().ft_total_supply_eth();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_balance_of() {
+        EthConnectorContract::new().ft_balance_of();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_balance_of_eth() {
+        EthConnectorContract::new().ft_balance_of_eth();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_transfer() {
+        EthConnectorContract::new().ft_transfer();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn transfer_near() {
+        EthConnectorContract::new().transfer_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn transfer_eth() {
+        EthConnectorContract::new().transfer_eth();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_resolve_transfer() {
+        EthConnectorContract::new().ft_resolve_transfer();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_transfer_call() {
+        EthConnectorContract::new().ft_transfer_call();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_deposit() {
+        EthConnectorContract::new().storage_deposit()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_withdraw() {
+        EthConnectorContract::new().storage_withdraw()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_balance_of() {
+        EthConnectorContract::new().storage_balance_of()
+    }
+
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn verify_log_entry() {
+        use borsh::BorshSerialize;
+        #[cfg(feature = "log")]
+        sdk::log("Call from verify_log_entry".into());
+        let data = true.try_to_vec().unwrap();
+        sdk::return_output(&data[..]);
+    }
+
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn ft_on_transfer() {
+        use borsh::BorshSerialize;
+        #[cfg(feature = "log")]
+        sdk::log("Call ft_on_trasfer".into());
+        let data = 10u128.try_to_vec().unwrap();
+        sdk::return_output(&data[..]);
     }
 
     ///
