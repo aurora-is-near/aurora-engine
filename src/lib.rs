@@ -190,7 +190,7 @@ mod contract {
             let (status, result) = if data.is_empty() {
                 // Execute a balance transfer:
                 (
-                    Engine::transfer(&mut engine, sender, receiver, value),
+                    Engine::transfer(&mut engine, &sender, &receiver, &value),
                     vec![],
                 )
             } else {
