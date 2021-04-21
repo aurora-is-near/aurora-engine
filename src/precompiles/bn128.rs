@@ -6,13 +6,13 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
 
     let mut px_buf = [0u8; 32];
     px_buf.copy_from_slice(&input[pos..(pos + 32)]);
-    let px = Fq::interpret(&px_buf)
-        .map_err(|_e| ExitError::Other(Borrowed("invalid `x` point")))?;
+    let px =
+        Fq::interpret(&px_buf).map_err(|_e| ExitError::Other(Borrowed("invalid `x` point")))?;
 
     let mut py_buf = [0u8; 32];
     py_buf.copy_from_slice(&input[(pos + 32)..(pos + 64)]);
-    let py = Fq::interpret(&py_buf)
-        .map_err(|_e| ExitError::Other(Borrowed("invalid `y` point")))?;
+    let py =
+        Fq::interpret(&py_buf).map_err(|_e| ExitError::Other(Borrowed("invalid `y` point")))?;
 
     Ok(if px == Fq::zero() && py == bn::Fq::zero() {
         G1::zero()
@@ -69,14 +69,14 @@ pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> Result<Vec
 
     let p = read_point(&input, 0)?;
     let mut fr_buf = [0u8; 32];
-    fr_buf.copy_from_slice(&input[32..64]);
+    fr_buf.copy_from_slice(&input[64..96]);
     let fr = bn::Fr::interpret(&fr_buf)
         .map_err(|_e| ExitError::Other(Borrowed("invalid field element")))?;
 
     let mut output = [0u8; 64];
-    if let Some(sum) = AffineG1::from_jacobian(p * fr) {
-        let x = sum.x().into_u256().to_big_endian();
-        let y = sum.y().into_u256().to_big_endian();
+    if let Some(mul) = AffineG1::from_jacobian(p * fr) {
+        let x = mul.x().into_u256().to_big_endian();
+        let y = mul.y().into_u256().to_big_endian();
         output[0..32].copy_from_slice(&x);
         output[32..64].copy_from_slice(&y);
     }
@@ -240,6 +240,23 @@ mod tests {
 
     #[test]
     fn test_alt_bn128_mul() {
+        let input = hex::decode(
+            "\
+            2bd3e6d0f3b142924f5ca7b49ce5b9d54c4703d7ae5648e61d02268b1a0a9fb7\
+            21611ce0a6af85915e2f1d70300909ce2e49dfad4a4619c8390cae66cefdb204\
+            00000000000000000000000000000000000000000000000011138ce750fa15c2",
+        )
+        .unwrap();
+        let expected = hex::decode(
+            "\
+            070a8d6a982153cae4be29d434e8faef8a47b274a053f5a4ee2a6c9c13c31e5c\
+            031b8ce914eba3a9ffb989f9cdd5b0f01943074bf4f0f315690ec3cec6981afc",
+        )
+        .unwrap();
+
+        let res = alt_bn128_mul(&input, None).unwrap();
+        assert_eq!(res, expected);
+
         // zero multiplication test
         let input = hex::decode(
             "\
