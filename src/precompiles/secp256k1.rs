@@ -35,10 +35,10 @@ pub(crate) fn ecrecover_raw(input: &[u8], target_gas: Option<u64>) -> Precompile
             let mut output = [0u8; 32];
             output[12..32].copy_from_slice(a.as_bytes());
             output.to_vec()
-        },
+        }
         Err(_) => {
             vec![255u8; 32]
-        },
+        }
     };
 
     Ok((ExitSucceed::Returned, output.to_vec(), 0))
@@ -97,7 +97,9 @@ mod tests {
     #[test]
     fn test_ecrecover() {
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b650acf9d3f5f0a2c799776a1254355d5f4061762a237396a99a0e0e3fc2bcd6729514a0dacb2e623ac4abd157cb18163ff942280db4d5caad66ddf941ba12e03").unwrap();
-        let expected = hex::decode("000000000000000000000000c08b5542d177ac6686946920409741463a15dddb").unwrap();
+        let expected =
+            hex::decode("000000000000000000000000c08b5542d177ac6686946920409741463a15dddb")
+                .unwrap();
 
         let res = ecrecover_raw(&input, Some(3_000)).unwrap().1;
         assert_eq!(res, expected);
@@ -110,25 +112,33 @@ mod tests {
 
         // bad inputs
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001a650acf9d3f5f0a2c799776a1254355d5f4061762a237396a99a0e0e3fc2bcd6729514a0dacb2e623ac4abd157cb18163ff942280db4d5caad66ddf941ba12e03").unwrap();
-        let expected = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
+        let expected =
+            hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+                .unwrap();
 
         let res = ecrecover_raw(&input, Some(3_000)).unwrap().1;
         assert_eq!(res, expected);
 
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b000000000000000000000000000000000000000000000000000000000000001b0000000000000000000000000000000000000000000000000000000000000000").unwrap();
-        let expected = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
+        let expected =
+            hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+                .unwrap();
 
         let res = ecrecover_raw(&input, Some(3_000)).unwrap().1;
         assert_eq!(res, expected);
 
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001b").unwrap();
-        let expected = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
+        let expected =
+            hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+                .unwrap();
 
         let res = ecrecover_raw(&input, Some(3_000)).unwrap().1;
         assert_eq!(res, expected);
 
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000001b").unwrap();
-        let expected = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
+        let expected =
+            hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+                .unwrap();
 
         let res = ecrecover_raw(&input, Some(3_000)).unwrap().1;
         assert_eq!(res, expected);

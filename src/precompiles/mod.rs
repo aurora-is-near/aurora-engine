@@ -31,21 +31,10 @@ pub fn istanbul_precompiles(
 ) -> Option<PrecompileResult> {
     match address.to_low_u64_be() {
         1 => Some(secp256k1::ecrecover_raw(input, target_gas)),
-        2 => Some(Ok((
-            ExitSucceed::Returned,
-            hash::sha256(input).as_bytes().to_vec(),
-            0,
-        ))),
-        3 => Some(Ok((
-            ExitSucceed::Returned,
-            hash::ripemd160(input).as_bytes().to_vec(),
-            0,
-        ))),
+        2 => Some(hash::sha256(input, target_gas)),
+        3 => Some(hash::ripemd160(input, target_gas)),
         4 => Some(identity::identity(input, target_gas)),
-        5 => match modexp::modexp(input, target_gas) {
-            Ok(r) => Some(Ok((ExitSucceed::Returned, r, 0))),
-            Err(e) => Some(Err(e)),
-        },
+        5 => Some(modexp::modexp(input, target_gas)),
         6 => Some(bn128::alt_bn128_add(input, target_gas)),
         7 => Some(bn128::alt_bn128_mul(input, target_gas)),
         8 => Some(bn128::alt_bn128_pair(input, target_gas)),
