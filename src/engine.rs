@@ -3,6 +3,7 @@ use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::{Config, CreateScheme, ExitError, ExitReason, ExitSucceed};
 
+use crate::connector::EthConnectorContract;
 use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
 use crate::precompiles;
 use crate::prelude::{Address, Vec, H256, U256};
@@ -111,6 +112,9 @@ impl Engine {
     }
 
     pub fn remove_balance(address: &Address) {
+        let balance = Self::get_balance(address);
+        // Apply changes for eth-conenctor
+        EthConnectorContract::new().internal_remove_eth(address, &balance);
         sdk::remove_storage(&address_to_key(KeyPrefix::Balance, address))
     }
 
@@ -337,7 +341,10 @@ impl ApplyBackend for Engine {
                     reset_storage,
                 } => {
                     Engine::set_nonce(&address, &basic.nonce);
-                    Engine::set_balance(&address, &basic.balance);
+                    // TODO: should be aligned to eth-connector balance management logic
+                    //Engine::set_balance(&address, &basic.balance);
+                    // Apply changes for eth-conenctor
+                    EthConnectorContract::new().internal_deposit_eth(&address, &basic.balance);
                     if let Some(code) = code {
                         Engine::set_code(&address, &code)
                     }

@@ -1,6 +1,6 @@
 CARGO = cargo
 NEAR  = near
-FEATURES = contract
+FEATURES = contract,integration-test
 
 ifeq ($(evm-bully),yes)
   FEATURES := $(FEATURES),evm_bully
@@ -15,6 +15,7 @@ release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 
 target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
+	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm 
 
 debug: debug.wasm
 
