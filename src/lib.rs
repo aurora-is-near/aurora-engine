@@ -232,6 +232,16 @@ mod contract {
         process_exit_reason(status, &result);
     }
 
+    #[cfg(feature = "testnet")]
+    #[no_mangle]
+    pub extern "C" fn make_it_rain() {
+        let input = sdk::read_input();
+        let address = Address::from_slice(&input);
+        let mut engine = Engine::new(address);
+        let status = engine.credit(&address);
+        process_exit_reason(status, &[])
+    }
+
     ///
     /// NONMUTATIVE METHODS
     ///

@@ -60,5 +60,6 @@ near-crypto = "0.1.0"
 [features]
 default = ["sha2", "std"]
 std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "lunarity-lexer/std"]
+testnet = []
 contract = []
 evm_bully = []

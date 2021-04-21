@@ -121,17 +121,27 @@ impl Engine {
     }
 
     /// Increases the balance for a given address.
-    pub fn increase_balance(address: &Address, amount: &U256) {
-        let mut balance = Self::get_balance(address);
-        balance += *amount;
-        Self::set_balance(address, &balance);
+    #[cfg(feature = "testnet")]
+    fn increase_balance(address: &Address, amount: &U256) -> Result<(), ExitError> {
+        let balance = Self::get_balance(address);
+        let (new_balance, overflow) = balance.overflowing_add(*amount);
+        if overflow {
+            return Err(ExitError::StackOverflow);
+        }
+        Self::set_balance(address, &new_balance);
+        Ok(())
     }
 
     /// Decreases the balance for a given address.
-    pub fn decrease_balance(address: &Address, amount: &U256) {
-        let mut balance = Self::get_balance(address);
-        balance -= *amount;
-        Self::set_balance(address, &balance);
+    #[cfg(feature = "testnet")]
+    fn decrease_balance(address: &Address, amount: &U256) -> Result<(), ExitError> {
+        let balance = Self::get_balance(address);
+        let (new_balance, underflow) = balance.overflowing_sub(*amount);
+        if underflow {
+            return Err(ExitError::StackUnderflow);
+        }
+        Self::set_balance(address, &new_balance);
+        Ok(())
     }
 
     pub fn remove_storage(address: &Address, key: &H256) {
@@ -183,8 +193,12 @@ impl Engine {
             return ExitReason::Error(ExitError::OutOfFund);
         }
 
-        Self::increase_balance(receiver, value);
-        Self::decrease_balance(sender, value);
+        if let Err(e) = Self::increase_balance(receiver, value) {
+            return ExitReason::Error(e);
+        }
+        if let Err(e) = Self::decrease_balance(sender, value) {
+            return ExitReason::Error(e);
+        }
 
         ExitReason::Succeed(ExitSucceed::Returned)
     }
@@ -231,6 +245,15 @@ impl Engine {
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
         (status, result)
+    }
+
+    #[cfg(feature = "testnet")]
+    /// Credits the address with 10 coins from the faucet.
+    pub fn credit(&mut self, address: &Address) -> ExitReason {
+        if let Err(e) = Self::increase_balance(address, &U256::from(10)) {
+            return ExitReason::Error(e);
+        }
+        ExitReason::Succeed(ExitSucceed::Returned)
     }
 
     pub fn view_with_args(&self, args: ViewCallArgs) -> (ExitReason, Vec<u8>) {
