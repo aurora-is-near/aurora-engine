@@ -1,10 +1,12 @@
 use crate::precompiles::{util, PrecompileResult};
 use evm::ExitSucceed;
 
-/// Costs of
+/// Identity precompile costs.
 mod costs {
+    /// The base cost of the operation.
     pub(super) const IDENTITY_BASE: u64 = 15;
 
+    /// The cost per word.
     pub(super) const IDENTITY_PER_WORD: u64 = 3;
 }
 

@@ -5,7 +5,7 @@ use evm::{ExitError, ExitSucceed};
 /// Blake2 costs.
 mod costs {
     /// Cost per round of Blake2 F.
-    pub(super) const FROUND: u32 = 1;
+    pub(super) const F_ROUND_BASE: u32 = 1;
 }
 
 /// The compression function of the blake2 algorithm.
@@ -30,7 +30,7 @@ pub(crate) fn blake2f(input: &[u8], target_gas: Option<u64>) -> PrecompileResult
     let rounds = u32::from_be_bytes(rounds_bytes);
 
     if let Some(target_gas) = target_gas {
-        let gas = (rounds * costs::FROUND) as u64;
+        let gas = (rounds * costs::F_ROUND_BASE) as u64;
         if gas > target_gas {
             return Err(ExitError::OutOfGas);
         }

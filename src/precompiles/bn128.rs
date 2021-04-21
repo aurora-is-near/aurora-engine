@@ -6,16 +6,16 @@ use evm::{ExitError, ExitSucceed};
 /// bn128 costs.
 mod costs {
     /// Cost of the alt_bn128_add operation.
-    pub(super) const ADD: u64 = 500;
+    pub(super) const ADD_BASE: u64 = 500;
 
     /// Cost of the alt_bn128_mul operation.
-    pub(super) const MUL: u64 = 40_000;
+    pub(super) const MUL_BASE: u64 = 40_000;
 
     /// Cost of the alt_bn128_pair per point.
     pub(super) const PAIR_PER_POINT: u64 = 80_000;
 
     /// Cost of the alt_bn128_pair operation.
-    pub(super) const PAIR: u64 = 100_000;
+    pub(super) const PAIR_BASE: u64 = 100_000;
 }
 
 /// Reads the `x` and `y` points from an input at a given position.
@@ -50,7 +50,7 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
 pub(crate) fn alt_bn128_add(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     use bn::AffineG1;
 
-    check_gas(target_gas, costs::ADD)?;
+    check_gas(target_gas, costs::ADD_BASE)?;
 
     let input = super::util::pad_input(input, 128);
 
@@ -76,7 +76,7 @@ pub(crate) fn alt_bn128_add(input: &[u8], target_gas: Option<u64>) -> Precompile
 pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     use bn::AffineG1;
 
-    check_gas(target_gas, costs::MUL)?;
+    check_gas(target_gas, costs::MUL_BASE)?;
 
     let input = super::util::pad_input(input, 128);
 
@@ -107,7 +107,7 @@ pub(crate) fn alt_bn128_pair(input: &[u8], target_gas: Option<u64>) -> Precompil
 
     check_gas(
         target_gas,
-        costs::PAIR_PER_POINT * input.len() as u64 / 192u64 + costs::PAIR,
+        costs::PAIR_PER_POINT * input.len() as u64 / 192u64 + costs::PAIR_BASE,
     )?;
 
     if input.len() % 192 != 0 {
