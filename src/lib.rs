@@ -332,18 +332,13 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn deposit_near() {
-        EthConnectorContract::new().deposit_near()
-    }
-
-    #[no_mangle]
     pub extern "C" fn withdraw_near() {
         EthConnectorContract::new().withdraw_near()
     }
 
     #[no_mangle]
-    pub extern "C" fn deposit_eth() {
-        EthConnectorContract::new().deposit_eth()
+    pub extern "C" fn deposit() {
+        EthConnectorContract::new().deposit()
     }
 
     #[no_mangle]
@@ -389,16 +384,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_transfer() {
         EthConnectorContract::new().ft_transfer();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn transfer_near() {
-        EthConnectorContract::new().transfer_near();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn transfer_eth() {
-        EthConnectorContract::new().transfer_eth();
     }
 
     #[no_mangle]

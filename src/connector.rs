@@ -6,7 +6,7 @@ use crate::types::*;
 use crate::deposit_event::*;
 use crate::json::{parse_json, FAILED_PARSE};
 use crate::prelude::{Address, U256};
-use crate::prover::{validate_eth_address, Proof};
+use crate::prover::validate_eth_address;
 #[cfg(feature = "log")]
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -65,68 +65,7 @@ impl EthConnectorContract {
         .save_contract();
     }
 
-    pub fn deposit_near(&self) {
-        #[cfg(feature = "log")]
-        sdk::log("[Deposit NEAR tokens]".into());
-
-        let proof: Proof = Proof::from(parse_json(&sdk::read_input()).unwrap());
-        let event = EthDepositedNearEvent::from_log_entry_data(&proof.log_entry_data);
-        #[cfg(feature = "log")]
-        sdk::log(format!(
-            "Deposit started: from {} ETH to {} NEAR with amount: {:?} and fee {:?}",
-            event.sender,
-            event.recipient,
-            event.amount.as_u128(),
-            event.fee.as_u128()
-        ));
-
-        #[cfg(feature = "log")]
-        sdk::log(format!(
-            "Event's address {}, custodian address {}",
-            hex::encode(&event.eth_custodian_address),
-            hex::encode(&self.contract.eth_custodian_address),
-        ));
-
-        assert_eq!(
-            event.eth_custodian_address, self.contract.eth_custodian_address,
-            "ERR_WRONG_EVENT_ADDRESS",
-        );
-        assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
-        let account_id = sdk::current_account_id();
-        let proof_1 = proof.try_to_vec().unwrap();
-        #[cfg(feature = "log")]
-        sdk::log(format!(
-            "Deposit verify_log_entry for prover: {}",
-            self.contract.prover_account,
-        ));
-        let promise0 = sdk::promise_create(
-            self.contract.prover_account.as_bytes(),
-            b"verify_log_entry",
-            &proof_1[..],
-            NO_DEPOSIT,
-            GAS_FOR_VERIFY_LOG_ENTRY,
-        );
-        let data = FinishDepositCallArgs {
-            new_owner_id: event.recipient,
-            amount: event.amount.as_u128(),
-            fee: event.fee.as_u128(),
-            proof,
-        }
-        .try_to_vec()
-        .unwrap();
-
-        let promise1 = sdk::promise_then(
-            promise0,
-            &account_id,
-            b"finish_deposit_near",
-            &data[..],
-            NO_DEPOSIT,
-            GAS_FOR_FINISH_DEPOSIT,
-        );
-        sdk::promise_return(promise1);
-    }
-
-    pub fn deposit_eth(&self) {
+    pub fn deposit(&self) {
         #[cfg(feature = "log")]
         sdk::log("[Deposit ETH tokens]".into());
 
@@ -431,56 +370,6 @@ impl EthConnectorContract {
         sdk::log(format!(
             "Transfer amount {} to {} success with memo: {:?}",
             args.amount, args.receiver_id, args.memo
-        ));
-    }
-
-    /// Transfer tokens from ETH account to NEAR account
-    pub fn transfer_near(&mut self) {
-        use crate::prover;
-        let args: TransferNearCallArgs = TransferNearCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
-        assert!(
-            prover::verify_transfer_eip712(
-                args.sender,
-                args.near_recipient.clone(),
-                self.contract.eth_custodian_address,
-                args.amount,
-                args.eip712_signature
-            ),
-            "ERR_WRONG_EIP712_MSG"
-        );
-
-        let amoubt = args.amount.as_u128();
-        self.ft.internal_withdraw_eth(args.sender, amoubt);
-        self.ft.internal_deposit(&args.near_recipient, amoubt);
-        self.save_contract();
-
-        #[cfg(feature = "log")]
-        sdk::log(format!(
-            "Transfer ETH tokens {} amount to {} NEAR success",
-            args.amount, args.near_recipient,
-        ));
-    }
-
-    /// Transfer tokens from NEAR account to ETH account
-    pub fn transfer_eth(&mut self) {
-        let args: TransferEthCallArgs = TransferEthCallArgs::from(
-            parse_json(&sdk::read_input()).expect(str_from_slice(FAILED_PARSE)),
-        );
-
-        let predecessor_account_id = sdk::predecessor_account_id();
-        let sender_id = str_from_slice(&predecessor_account_id);
-        self.ft.internal_withdraw(sender_id, args.amount);
-        self.ft.internal_deposit_eth(args.address, args.amount);
-        self.save_contract();
-
-        #[cfg(feature = "log")]
-        sdk::log(format!(
-            "Transfer NEAR tokens {} amount to {} ETH success with memo: {:?}",
-            args.amount,
-            hex::encode(args.address),
-            args.memo
         ));
     }
 

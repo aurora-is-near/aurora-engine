@@ -259,6 +259,7 @@ fn encode_eip712(
     digest
 }
 
+#[allow(dead_code)]
 pub fn verify_withdraw_eip712(
     sender: EthAddress,
     eth_recipient: EthAddress,
@@ -283,6 +284,7 @@ pub fn verify_withdraw_eip712(
     H160::from(sender) == withdraw_msg_signer
 }
 
+#[allow(dead_code)]
 pub fn verify_transfer_eip712(
     sender: EthAddress,
     near_recipient: AccountId,
