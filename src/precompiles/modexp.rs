@@ -1,10 +1,11 @@
+use crate::precompiles::PrecompileResult;
 use crate::prelude::{Vec, U256};
-use evm::ExitError;
+use evm::{ExitError, ExitSucceed};
 use num_bigint::BigUint;
 
 /// See: https://eips.ethereum.org/EIPS/eip-198
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
-pub(crate) fn modexp(input: &[u8], target_gas: Option<u64>) -> Result<Vec<u8>, ExitError> {
+pub(crate) fn modexp(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     fn adj_exp_len(exp_len: U256, base_len: U256, bytes: &[u8]) -> U256 {
         let mut exp32_bytes = Vec::with_capacity(32);
         for i in 0..32 {
@@ -102,7 +103,11 @@ pub(crate) fn modexp(input: &[u8], target_gas: Option<u64>) -> Result<Vec<u8>, E
     let exponent = BigUint::from_bytes_be(&exp_bytes);
     let modulus = BigUint::from_bytes_be(&mod_bytes);
 
-    Ok(base.modpow(&exponent, &modulus).to_bytes_be())
+    Ok((
+        ExitSucceed::Returned,
+        base.modpow(&exponent, &modulus).to_bytes_be(),
+        0,
+    ))
 }
 
 #[cfg(test)]
@@ -121,7 +126,7 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
         )
         .unwrap();
-        let res = U256::from_big_endian(&modexp(&test_input1, None).unwrap());
+        let res = U256::from_big_endian(&modexp(&test_input1, None).unwrap().1);
         assert_eq!(res, U256::from(1));
 
         let test_input2 = hex::decode(
@@ -132,7 +137,7 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
         )
         .unwrap();
-        let res = U256::from_big_endian(&modexp(&test_input2, None).unwrap());
+        let res = U256::from_big_endian(&modexp(&test_input2, None).unwrap().1);
         assert_eq!(res, U256::from(0));
 
         let test_input3 = hex::decode(
@@ -159,7 +164,7 @@ mod tests {
             &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
                 .unwrap(),
         );
-        let res = U256::from_big_endian(&modexp(&test_input4, None).unwrap());
+        let res = U256::from_big_endian(&modexp(&test_input4, None).unwrap().1);
         assert_eq!(res, expected);
 
         let test_input5 = hex::decode(
@@ -175,7 +180,7 @@ mod tests {
             &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
                 .unwrap(),
         );
-        let res = U256::from_big_endian(&modexp(&test_input5, None).unwrap());
+        let res = U256::from_big_endian(&modexp(&test_input5, None).unwrap().1);
         assert_eq!(res, expected);
     }
 }
