@@ -1,19 +1,49 @@
-use crate::prelude::Vec;
+use crate::precompiles::PrecompileResult;
+use crate::prelude::Borrowed;
+use evm::{ExitError, ExitSucceed};
 
+/// Blake2 costs.
+mod costs {
+    /// Cost per round of Blake2 F.
+    pub(super) const FROUND: u32 = 1;
+}
+
+/// The compression function of the blake2 algorithm.
+///
+/// Takes as an argument the state vector "h", message block vector "m" (the last block is padded
+/// with zeros to full block size, if required), 2w-bit offset counter "t", and final block
+/// indicator flag "f". Local vector v[0..15] is used in processing. F returns a new state vector.
+/// The number of rounds, "r", is 12 for BLAKE2b and 10 for BLAKE2s. Rounds are numbered from 0 to
+/// r - 1.
+///
 /// See: https://eips.ethereum.org/EIPS/eip-152
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
-/// NOTE: Shouldn't there be gas checks here?
-pub(crate) fn blake2f(input: &[u8]) -> Vec<u8> {
+pub(crate) fn blake2f(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
+    if input.len() != 213 {
+        return Err(ExitError::Other(Borrowed(
+            "input length invalid, must be 213 bytes",
+        )));
+    }
+
     let mut rounds_bytes = [0u8; 4];
     rounds_bytes.copy_from_slice(&input[0..4]);
     let rounds = u32::from_be_bytes(rounds_bytes);
+
+    if let Some(target_gas) = target_gas {
+        let gas = (rounds * costs::FROUND) as u64;
+        if gas > target_gas {
+            return Err(ExitError::OutOfGas);
+        }
+    } else {
+        return Err(ExitError::OutOfGas);
+    }
 
     let mut h = [0u64; 8];
     for (mut x, value) in h.iter_mut().enumerate() {
         let mut word: [u8; 8] = [0u8; 8];
         x = x * 8 + 4;
         word.copy_from_slice(&input[x..(x + 8)]);
-        *value = u64::from_be_bytes(word);
+        *value = u64::from_le_bytes(word);
     }
 
     let mut m = [0u64; 16];
@@ -21,7 +51,7 @@ pub(crate) fn blake2f(input: &[u8]) -> Vec<u8> {
         let mut word: [u8; 8] = [0u8; 8];
         x = x * 8 + 68;
         word.copy_from_slice(&input[x..(x + 8)]);
-        *value = u64::from_be_bytes(word);
+        *value = u64::from_le_bytes(word);
     }
 
     let mut t: [u64; 2] = [0u64; 2];
@@ -29,9 +59,14 @@ pub(crate) fn blake2f(input: &[u8]) -> Vec<u8> {
         let mut word: [u8; 8] = [0u8; 8];
         x = x * 8 + 196;
         word.copy_from_slice(&input[x..(x + 8)]);
-        *value = u64::from_be_bytes(word);
+        *value = u64::from_le_bytes(word);
     }
 
+    if input[212] != 0 && input[212] != 1 {
+        return Err(ExitError::Other(Borrowed(
+            "incorrect final block indicator flag",
+        )));
+    }
     let finished = input[212] != 0;
 
     let res = &*blake2::blake2b_f(rounds, h, m, t, finished);
@@ -40,77 +75,191 @@ pub(crate) fn blake2f(input: &[u8]) -> Vec<u8> {
     l.copy_from_slice(&res[..32]);
     h.copy_from_slice(&res[32..64]);
 
-    let mut res = l.to_vec();
-    res.extend_from_slice(&h.to_vec());
-    res
+    let mut output = l.to_vec();
+    output.extend_from_slice(&h.to_vec());
+
+    Ok((ExitSucceed::Returned, output.to_vec(), 0))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::Vec;
+
+    // [4 bytes for rounds]
+    // [64 bytes for h]
+    // [128 bytes for m]
+    // [8 bytes for t_0]
+    // [8 bytes for t_1]
+    // [1 byte for f]
+    const INPUT: &str = "\
+            0000000c\
+            48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5\
+            d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b\
+            6162630000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0300000000000000\
+            0000000000000000\
+            01";
+
+    fn test_blake2f_out_of_gas() -> PrecompileResult {
+        let input = hex::decode(INPUT).unwrap();
+        blake2f(&input, Some(11))
+    }
+
+    fn test_blake2f_empty() -> PrecompileResult {
+        let input = [0u8; 0];
+        blake2f(&input, None)
+    }
+
+    fn test_blake2f_invalid_len_1() -> PrecompileResult {
+        let input = hex::decode(
+            "\
+            00000c\
+            48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5\
+            d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b\
+            6162630000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0300000000000000\
+            0000000000000000\
+            01",
+        )
+        .unwrap();
+        blake2f(&input, Some(12))
+    }
+
+    fn test_blake2f_invalid_len_2() -> PrecompileResult {
+        let input = hex::decode(
+            "\
+            000000000c\
+            48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5\
+            d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b\
+            6162630000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0300000000000000\
+            0000000000000000\
+            01",
+        )
+        .unwrap();
+        blake2f(&input, Some(12))
+    }
+
+    fn test_blake2f_invalid_flag() -> PrecompileResult {
+        let input = hex::decode(
+            "\
+            0000000c\
+            48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5\
+            d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b\
+            6162630000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0300000000000000\
+            0000000000000000\
+            02",
+        )
+        .unwrap();
+        blake2f(&input, Some(12))
+    }
+
+    fn test_blake2f_r_0() -> Vec<u8> {
+        let input = hex::decode(
+            "\
+            00000000\
+            48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5\
+            d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b\
+            6162630000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0300000000000000\
+            0000000000000000\
+            01",
+        )
+        .unwrap();
+        blake2f(&input, Some(12)).unwrap().1
+    }
+
+    fn test_blake2f_r_12() -> Vec<u8> {
+        let input = hex::decode(INPUT).unwrap();
+        blake2f(&input, Some(12)).unwrap().1
+    }
+
+    fn test_blake2f_final_block_false() -> Vec<u8> {
+        let input = hex::decode(
+            "\
+            0000000c\
+            48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5\
+            d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b\
+            6162630000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0300000000000000\
+            0000000000000000\
+            00",
+        ).unwrap();
+        blake2f(&input, Some(12)).unwrap().1
+    }
 
     #[test]
     fn test_blake2f() {
-        let mut v = [0u8; 213];
-        let rounds: [u8; 4] = 12u32.to_be_bytes();
-        v[..4].copy_from_slice(&rounds);
-        let h: [u64; 8] = [
-            0x6a09e667f2bdc948,
-            0xbb67ae8584caa73b,
-            0x3c6ef372fe94f82b,
-            0xa54ff53a5f1d36f1,
-            0x510e527fade682d1,
-            0x9b05688c2b3e6c1f,
-            0x1f83d9abfb41bd6b,
-            0x5be0cd19137e2179,
-        ];
-        for (mut x, value) in h.iter().enumerate() {
-            let value: [u8; 8] = value.to_be_bytes();
-            x = x * 8 + 4;
+        assert!(matches!(
+            test_blake2f_out_of_gas(),
+            Err(ExitError::OutOfGas)
+        ));
 
-            v[x..(x + 8)].copy_from_slice(&value);
-        }
+        assert!(matches!(
+            test_blake2f_empty(),
+            Err(ExitError::Other(Borrowed(
+                "input length invalid, must be 213 bytes"
+            )))
+        ));
 
-        let m: [u64; 16] = [
-            0x0000000000636261,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-            0x0000000000000000,
-        ];
-        for (mut x, value) in m.iter().enumerate() {
-            let value: [u8; 8] = value.to_be_bytes();
-            x = x * 8 + 68;
-            v[x..(x + 8)].copy_from_slice(&value);
-        }
+        assert!(matches!(
+            test_blake2f_invalid_len_1(),
+            Err(ExitError::Other(Borrowed(
+                "input length invalid, must be 213 bytes"
+            )))
+        ));
 
-        let t: [u64; 2] = [3, 0];
-        for (mut x, value) in t.iter().enumerate() {
-            let value: [u8; 8] = value.to_be_bytes();
-            x = x * 8 + 196;
-            v[x..(x + 8)].copy_from_slice(&value);
-        }
+        assert!(matches!(
+            test_blake2f_invalid_len_2(),
+            Err(ExitError::Other(Borrowed(
+                "input length invalid, must be 213 bytes"
+            )))
+        ));
 
-        let bool = 1;
-        v[212] = bool;
+        assert!(matches!(
+            test_blake2f_invalid_flag(),
+            Err(ExitError::Other(Borrowed(
+                "incorrect final block indicator flag",
+            )))
+        ));
 
-        let expected = &*hex::decode(
+        let expected = hex::decode(
+            "08c9bcf367e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d\
+            282e6ad7f520e511f6c3e2b8c68059b9442be0454267ce079217e1319cde05b",
+        )
+        .unwrap();
+        assert_eq!(test_blake2f_r_0(), expected);
+
+        let expected = hex::decode(
             "ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d1\
                 7d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923",
         )
         .unwrap();
-        let res = blake2f(&v);
-        assert_eq!(res, expected);
+        assert_eq!(test_blake2f_r_12(), expected);
+
+        let expected = hex::decode(
+            "75ab69d3190a562c51aef8d88f1c2775876944407270c42c9844252c26d28752\
+            98743e7f6d5ea2f2d3e8d226039cd31b4e426ac4f2d3d666a610c2116fde4735").unwrap();
+        assert_eq!(test_blake2f_final_block_false(), expected);
     }
 }
