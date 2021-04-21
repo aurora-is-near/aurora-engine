@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm::{Config, CreateScheme, ExitReason, ExitError, ExitSucceed};
+use evm::{Config, CreateScheme, ExitError, ExitReason, ExitSucceed};
 
 use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
 use crate::precompiles;
