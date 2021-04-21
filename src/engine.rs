@@ -121,7 +121,6 @@ impl Engine {
     }
 
     /// Increases the balance for a given address.
-    #[cfg(feature = "testnet")]
     fn increase_balance(address: &Address, amount: &U256) -> Result<(), ExitError> {
         let balance = Self::get_balance(address);
         let (new_balance, overflow) = balance.overflowing_add(*amount);
@@ -133,7 +132,6 @@ impl Engine {
     }
 
     /// Decreases the balance for a given address.
-    #[cfg(feature = "testnet")]
     fn decrease_balance(address: &Address, amount: &U256) -> Result<(), ExitError> {
         let balance = Self::get_balance(address);
         let (new_balance, underflow) = balance.overflowing_sub(*amount);
