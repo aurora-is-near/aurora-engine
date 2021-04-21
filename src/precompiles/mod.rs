@@ -1,6 +1,7 @@
 mod blake2;
 mod bn128;
 mod hash;
+mod identity;
 mod modexp;
 mod secp256k1;
 mod util;
@@ -44,7 +45,7 @@ pub fn istanbul_precompiles(
             hash::ripemd160(input).as_bytes().to_vec(),
             0,
         ))),
-        4 => Some(Ok((ExitSucceed::Returned, identity(input).to_vec(), 0))),
+        4 => Some(identity::identity(input, target_gas)),
         5 => match modexp::modexp(input, target_gas) {
             Ok(r) => Some(Ok((ExitSucceed::Returned, r, 0))),
             Err(e) => Some(Err(e)),
@@ -55,21 +56,5 @@ pub fn istanbul_precompiles(
         9 => Some(blake2::blake2f(input, target_gas)),
         // Not supported.
         _ => None,
-    }
-}
-
-/// See: https://ethereum.github.io/yellowpaper/paper.pdf
-/// See: https://etherscan.io/address/0000000000000000000000000000000000000004
-fn identity(input: &[u8]) -> &[u8] {
-    input
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_identity() {
-        assert_eq!(identity(b""), b"")
     }
 }

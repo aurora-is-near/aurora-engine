@@ -1,7 +1,7 @@
+use crate::precompiles::util::check_gas;
 use crate::precompiles::PrecompileResult;
 use crate::prelude::*;
 use evm::{ExitError, ExitSucceed};
-use crate::precompiles::util::check_gas;
 
 /// bn128 costs.
 mod costs {
@@ -105,7 +105,10 @@ pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> Precompile
 pub(crate) fn alt_bn128_pair(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     use bn::{arith::U256, AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
 
-    check_gas(target_gas, costs::PAIR_PER_POINT * input.len() as u64 / 192u64 + costs::PAIR)?;
+    check_gas(
+        target_gas,
+        costs::PAIR_PER_POINT * input.len() as u64 / 192u64 + costs::PAIR,
+    )?;
 
     if input.len() % 192 != 0 {
         return Err(ExitError::Other(Borrowed(

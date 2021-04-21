@@ -204,7 +204,8 @@ mod tests {
             0300000000000000\
             0000000000000000\
             00",
-        ).unwrap();
+        )
+        .unwrap();
         blake2f(&input, Some(12)).unwrap().1
     }
 
@@ -259,7 +260,9 @@ mod tests {
 
         let expected = hex::decode(
             "75ab69d3190a562c51aef8d88f1c2775876944407270c42c9844252c26d28752\
-            98743e7f6d5ea2f2d3e8d226039cd31b4e426ac4f2d3d666a610c2116fde4735").unwrap();
+            98743e7f6d5ea2f2d3e8d226039cd31b4e426ac4f2d3d666a610c2116fde4735",
+        )
+        .unwrap();
         assert_eq!(test_blake2f_final_block_false(), expected);
     }
 }
