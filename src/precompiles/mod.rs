@@ -49,19 +49,10 @@ pub fn istanbul_precompiles(
             Ok(r) => Some(Ok((ExitSucceed::Returned, r, 0))),
             Err(e) => Some(Err(e)),
         },
-        6 => match bn128::alt_bn128_add(input, target_gas) {
-            Ok(v) => Some(Ok((ExitSucceed::Returned, v, 0))),
-            Err(e) => Some(Err(e)),
-        },
-        7 => match bn128::alt_bn128_mul(input, target_gas) {
-            Ok(v) => Some(Ok((ExitSucceed::Returned, v, 0))),
-            Err(e) => Some(Err(e)),
-        },
-        8 => match bn128::alt_bn128_pair(input, target_gas) {
-            Ok(v) => Some(Ok((ExitSucceed::Returned, v, 0))),
-            Err(e) => Some(Err(e)),
-        },
-        9 => Some(Ok((ExitSucceed::Returned, blake2::blake2f(input), 0))),
+        6 => Some(bn128::alt_bn128_add(input, target_gas)),
+        7 => Some(bn128::alt_bn128_mul(input, target_gas)),
+        8 => Some(bn128::alt_bn128_pair(input, target_gas)),
+        9 => Some(blake2::blake2f(input, target_gas)),
         // Not supported.
         _ => None,
     }

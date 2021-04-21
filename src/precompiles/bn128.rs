@@ -1,6 +1,24 @@
+use crate::precompiles::PrecompileResult;
 use crate::prelude::*;
-use evm::ExitError;
+use evm::{ExitError, ExitSucceed};
+use crate::precompiles::util::check_gas;
 
+/// bn128 costs.
+mod costs {
+    /// Cost of the alt_bn128_add operation.
+    pub(super) const ADD: u64 = 500;
+
+    /// Cost of the alt_bn128_mul operation.
+    pub(super) const MUL: u64 = 40_000;
+
+    /// Cost of the alt_bn128_pair per point.
+    pub(super) const PAIR_PER_POINT: u64 = 80_000;
+
+    /// Cost of the alt_bn128_pair operation.
+    pub(super) const PAIR: u64 = 100_000;
+}
+
+/// Reads the `x` and `y` points from an input at a given position.
 fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
     use bn::{AffineG1, Fq, Group, G1};
 
@@ -23,18 +41,16 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
     })
 }
 
+/// Takes in two points on the elliptic curve alt_bn128 and calculates the sum
+/// of them.
+///
 /// See: https://eips.ethereum.org/EIPS/eip-196
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
 #[allow(dead_code)]
-pub(crate) fn alt_bn128_add(input: &[u8], target_gas: Option<u64>) -> Result<Vec<u8>, ExitError> {
+pub(crate) fn alt_bn128_add(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     use bn::AffineG1;
 
-    if let Some(target_gas) = target_gas {
-        let gas = 500u64;
-        if gas > target_gas {
-            return Err(ExitError::OutOfGas);
-        }
-    }
+    check_gas(target_gas, costs::ADD)?;
 
     let input = super::util::pad_input(input, 128);
 
@@ -49,21 +65,18 @@ pub(crate) fn alt_bn128_add(input: &[u8], target_gas: Option<u64>) -> Result<Vec
         output[32..64].copy_from_slice(&y);
     }
 
-    Ok(output.to_vec())
+    Ok((ExitSucceed::Returned, output.to_vec(), 0))
 }
 
+/// Takes in two points on the elliptic curve alt_bn128 and multiples them.
+///
 /// See: https://eips.ethereum.org/EIPS/eip-196
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
 #[allow(dead_code)]
-pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> Result<Vec<u8>, ExitError> {
+pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     use bn::AffineG1;
 
-    if let Some(target_gas) = target_gas {
-        let gas = 40_000u64;
-        if gas > target_gas {
-            return Err(ExitError::OutOfGas);
-        }
-    }
+    check_gas(target_gas, costs::MUL)?;
 
     let input = super::util::pad_input(input, 128);
 
@@ -81,21 +94,18 @@ pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> Result<Vec
         output[32..64].copy_from_slice(&y);
     }
 
-    Ok(output.to_vec())
+    Ok((ExitSucceed::Returned, output.to_vec(), 0))
 }
 
+/// Takes in elements and calculates the pair.
+///
 /// See: https://eips.ethereum.org/EIPS/eip-197
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
 #[allow(dead_code)]
-pub(crate) fn alt_bn128_pair(input: &[u8], target_gas: Option<u64>) -> Result<Vec<u8>, ExitError> {
+pub(crate) fn alt_bn128_pair(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     use bn::{arith::U256, AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
 
-    if let Some(target_gas) = target_gas {
-        let gas = 80_000 * input.len() as u64 / 192u64 + 100_000;
-        if gas > target_gas {
-            return Err(ExitError::OutOfGas);
-        }
-    }
+    check_gas(target_gas, costs::PAIR_PER_POINT * input.len() as u64 / 192u64 + costs::PAIR)?;
 
     if input.len() % 192 != 0 {
         return Err(ExitError::Other(Borrowed(
@@ -103,7 +113,7 @@ pub(crate) fn alt_bn128_pair(input: &[u8], target_gas: Option<u64>) -> Result<Ve
         )));
     }
 
-    let ret = if input.is_empty() {
+    let output = if input.is_empty() {
         U256::one()
     } else {
         let elements = input.len() / 192;
@@ -166,7 +176,7 @@ pub(crate) fn alt_bn128_pair(input: &[u8], target_gas: Option<u64>) -> Result<Ve
         }
     };
 
-    Ok(ret.to_big_endian().to_vec())
+    Ok((ExitSucceed::Returned, output.to_big_endian().to_vec(), 0))
 }
 
 #[cfg(test)]
@@ -190,7 +200,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_add(&input, Some(500)).unwrap();
+        let res = alt_bn128_add(&input, Some(500)).unwrap().1;
         assert_eq!(res, expected);
 
         // zero sum test
@@ -209,7 +219,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_add(&input, None).unwrap();
+        let res = alt_bn128_add(&input, Some(500)).unwrap().1;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -220,7 +230,7 @@ mod tests {
             0000000000000000000000000000000000000000000000000000000000000000\
             0000000000000000000000000000000000000000000000000000000000000000",
         )
-            .unwrap();
+        .unwrap();
         let res = alt_bn128_add(&input, Some(499));
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
@@ -233,7 +243,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_add(&input, None).unwrap();
+        let res = alt_bn128_add(&input, Some(500)).unwrap().1;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -246,7 +256,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_add(&input, None);
+        let res = alt_bn128_add(&input, Some(500));
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("invalid curve point")))
@@ -269,7 +279,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_mul(&input, Some(40_000)).unwrap();
+        let res = alt_bn128_mul(&input, Some(40_000)).unwrap().1;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -298,7 +308,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_mul(&input, None).unwrap();
+        let res = alt_bn128_mul(&input, Some(40_000)).unwrap().1;
         assert_eq!(res, expected);
 
         // no input test
@@ -310,7 +320,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_add(&input, None).unwrap();
+        let res = alt_bn128_add(&input, Some(40_000)).unwrap().1;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -322,7 +332,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_mul(&input, None);
+        let res = alt_bn128_mul(&input, Some(40_000));
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("invalid curve point")))
@@ -351,7 +361,7 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = alt_bn128_pair(&input, Some(300_000)).unwrap();
+        let res = alt_bn128_pair(&input, Some(300_000)).unwrap().1;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -369,7 +379,8 @@ mod tests {
             1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed\
             090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b\
             12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
-        ).unwrap();
+        )
+        .unwrap();
         let res = alt_bn128_pair(&input, Some(259_999));
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
@@ -379,7 +390,7 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = alt_bn128_pair(&input, None).unwrap();
+        let res = alt_bn128_pair(&input, Some(300_000)).unwrap().1;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -394,7 +405,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_pair(&input, None);
+        let res = alt_bn128_pair(&input, Some(300_000));
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed(
@@ -412,7 +423,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = alt_bn128_pair(&input, None);
+        let res = alt_bn128_pair(&input, Some(300_000));
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed(
