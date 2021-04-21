@@ -30,11 +30,7 @@ pub fn istanbul_precompiles(
     _context: &Context,
 ) -> Option<PrecompileResult> {
     match address.to_low_u64_be() {
-        1 => Some(Ok((
-            ExitSucceed::Returned,
-            secp256k1::ecrecover_raw(input).as_bytes().to_vec(),
-            0,
-        ))),
+        1 => Some(secp256k1::ecrecover_raw(input, target_gas)),
         2 => Some(Ok((
             ExitSucceed::Returned,
             hash::sha256(input).as_bytes().to_vec(),

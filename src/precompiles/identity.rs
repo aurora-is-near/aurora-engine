@@ -36,6 +36,7 @@ mod tests {
 
         let expected = input.to_vec();
         let res = identity(&input, Some(18)).unwrap().1;
+        assert_eq!(res, expected);
 
         // gas fail
         let res = identity(&input[0..2], Some(17));
