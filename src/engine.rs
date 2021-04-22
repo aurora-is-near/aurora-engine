@@ -5,7 +5,7 @@ use evm::{Config, CreateScheme, ExitError, ExitReason, ExitSucceed};
 
 use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
 use crate::precompiles;
-use crate::prelude::{Address, Vec, H256, U256, Borrowed};
+use crate::prelude::{Address, Borrowed, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
 use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
@@ -129,10 +129,12 @@ impl Engine {
     /// * If the balance is > `U256::MAX`
     fn check_increase_balance(address: &Address, amount: &U256) -> Result<U256, ExitError> {
         let balance = Self::get_balance(address);
-        if let Some (new_balance) = balance.checked_add(*amount) {
+        if let Some(new_balance) = balance.checked_add(*amount) {
             Ok(new_balance)
         } else {
-            Err(ExitError::Other(Borrowed("balance is too high, can not increase")))
+            Err(ExitError::Other(Borrowed(
+                "balance is too high, can not increase",
+            )))
         }
     }
 
@@ -148,7 +150,9 @@ impl Engine {
         if let Some(new_balance) = balance.checked_sub(*amount) {
             Ok(new_balance)
         } else {
-            Err(ExitError::Other(Borrowed("balance is too low, can not decrease")))
+            Err(ExitError::Other(Borrowed(
+                "balance is too low, can not decrease",
+            )))
         }
     }
 
