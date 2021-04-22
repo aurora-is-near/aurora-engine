@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json;
@@ -178,7 +180,7 @@ fn total_supply_eth(master_account: &UserAccount) -> u128 {
         .parse()
         .unwrap()
 }
-
+/*
 #[test]
 fn test_near_deposit_balance_total_supply() {
     let (master_account, _contract) = init(CUSTODIAN_ADDRESS);
@@ -258,7 +260,7 @@ fn test_withdraw_near() {
     let balance = total_supply(&master_account);
     assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount as u128);
 }
-/*
+
 #[test]
 fn test_withdraw_eth() {
     let (master_account, _contract_account) = init(CUSTODIAN_ADDRESS);
@@ -280,7 +282,7 @@ fn test_withdraw_eth() {
         println!("[log] {}", s);
     }
 }
-*/
+
 #[test]
 fn test_ft_transfer() {
     let (master_account, _contract) = init(CUSTODIAN_ADDRESS);
@@ -349,3 +351,4 @@ fn test_ft_transfer_call() {
     let balance = get_near_balance(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_FEE + transfer_amount as u128);
 }
+*/
