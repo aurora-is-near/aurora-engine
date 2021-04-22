@@ -85,7 +85,7 @@ dependencies = [
 [[package]]
 name = "aurora-bn"
 version = "0.1.0"
-source = "git+https://github.com/aurora-is-near/aurora-bn.git#674091569d77f9ce2fb1f692fbd552b7f4da669c"
+source = "git+https://github.com/aurora-is-near/aurora-bn.git#8f1743884061981cac84388862e2763b2aa09307"
 dependencies = [
  "byteorder",
  "getrandom 0.2.2",
