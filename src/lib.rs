@@ -324,11 +324,11 @@ mod contract {
     }
 
     trait ToStr {
-        fn to_str(&self) -> &'static str;
+        fn to_str(&self) -> &str;
     }
 
     impl ToStr for ExitError {
-        fn to_str(&self) -> &'static str {
+        fn to_str(&self) -> &str {
             match self {
                 ExitError::StackUnderflow => "StackUnderflow",
                 ExitError::StackOverflow => "StackOverflow",
@@ -343,18 +343,18 @@ mod contract {
                 ExitError::OutOfFund => "OutOfFund",
                 ExitError::PCUnderflow => "PCUnderflow",
                 ExitError::CreateEmpty => "CreateEmpty",
-                ExitError::Other(m) => format!("Other: {}", m),
+                ExitError::Other(m) => m,
             }
         }
     }
 
     impl ToStr for ExitFatal {
-        fn to_str(&self) -> &'static str {
+        fn to_str(&self) -> &str {
             match self {
                 ExitFatal::NotSupported => "NotSupported",
                 ExitFatal::UnhandledInterrupt => "UnhandledInterrupt",
                 ExitFatal::CallErrorAsFatal(_) => "CallErrorAsFatal",
-                ExitFatal::Other(m) => format!("Other: {}", m),
+                ExitFatal::Other(m) => m,
             }
         }
     }
