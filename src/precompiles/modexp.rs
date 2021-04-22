@@ -1,7 +1,7 @@
 use crate::precompiles::PrecompileResult;
 use crate::prelude::{Vec, U256};
 use evm::{ExitError, ExitSucceed};
-use num_bigint::BigUint;
+use num::BigUint;
 
 /// See: https://eips.ethereum.org/EIPS/eip-198
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
