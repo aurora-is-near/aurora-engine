@@ -52,8 +52,8 @@ impl DepositedEvent {
         let sender = event.log.params[0].value.clone().into_address().unwrap().0;
 
         let recipient = event.log.params[1].value.clone().to_string();
-        let amount = U256::from(event.log.params[2].value.clone().into_uint().unwrap());
-        let fee = U256::from(event.log.params[3].value.clone().into_uint().unwrap());
+        let amount = event.log.params[2].value.clone().into_uint().unwrap();
+        let fee = event.log.params[3].value.clone().into_uint().unwrap();
         Self {
             eth_custodian_address: event.eth_custodian_address,
             sender,

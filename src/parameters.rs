@@ -184,6 +184,24 @@ impl From<json::JsonValue> for ResolveTransferCallArgs {
     }
 }
 
+/// eth-connector initial args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct InitCallArgs {
+    pub prover_account: AccountId,
+    pub eth_custodian_address: AccountId,
+}
+
+/// transfer eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct TransferCallCallArgs {
+    pub receiver_id: AccountId,
+    pub amount: Balance,
+    pub memo: Option<String>,
+    pub msg: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

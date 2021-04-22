@@ -22,6 +22,7 @@ pub type Gas = u64;
 pub type StorageUsage = u64;
 
 pub const STORAGE_PRICE_PER_BYTE: u128 = 100_000_000_000_000_000_000; // 1e20yN, 0.0001N
+pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
 
 /// Internal args format for meta call.
 #[derive(Debug)]
@@ -33,13 +34,6 @@ pub struct InternalMetaCallArgs {
     pub contract_address: Address,
     pub value: U256,
     pub input: Vec<u8>,
-}
-
-/// eth-connector initial args
-#[cfg(feature = "contract")]
-pub struct InitCallArgs {
-    pub prover_account: AccountId,
-    pub eth_custodian_address: AccountId,
 }
 
 /// balance_of args for json invocation
@@ -92,15 +86,6 @@ pub struct TransferNearCallArgs {
     pub near_recipient: AccountId,
     pub amount: U256,
     pub eip712_signature: Vec<u8>,
-}
-
-/// transfer eth-connector call args
-#[cfg(feature = "contract")]
-pub struct TransferCallCallArgs {
-    pub receiver_id: AccountId,
-    pub amount: Balance,
-    pub memo: Option<String>,
-    pub msg: String,
 }
 
 /// storage_balance_of eth-connector call args
@@ -228,16 +213,6 @@ impl From<json::JsonValue> for BalanceOfEthCallArgs {
 }
 
 #[cfg(feature = "contract")]
-impl From<json::JsonValue> for InitCallArgs {
-    fn from(v: json::JsonValue) -> Self {
-        Self {
-            eth_custodian_address: v.string("eth_custodian_address").expect_utf8(FAILED_PARSE),
-            prover_account: v.string("prover_account").expect_utf8(FAILED_PARSE),
-        }
-    }
-}
-
-#[cfg(feature = "contract")]
 impl From<json::JsonValue> for WithdrawCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
@@ -271,18 +246,6 @@ impl From<json::JsonValue> for StorageDepositCallArgs {
         Self {
             account_id: v.string("account_id").ok(),
             registration_only: v.bool("registration_only").ok(),
-        }
-    }
-}
-
-#[cfg(feature = "contract")]
-impl From<json::JsonValue> for TransferCallCallArgs {
-    fn from(v: json::JsonValue) -> Self {
-        Self {
-            receiver_id: v.string("receiver_id").expect_utf8(FAILED_PARSE),
-            amount: v.u128("amount").expect_utf8(FAILED_PARSE),
-            memo: v.string("memo").ok(),
-            msg: v.string("msg").expect_utf8(FAILED_PARSE),
         }
     }
 }

@@ -52,18 +52,21 @@ impl EthConnectorContract {
         }
     }
 
+    /// Init eth-connector contract specific data
     pub fn init_contract() {
+        // Check is it already initialized
         assert!(
             !sdk::storage_has_key(CONTRACT_NAME_KEY.as_bytes()),
             "ERR_CONTRACT_INITIALIZED"
         );
         #[cfg(feature = "log")]
         sdk::log("[init contract]".into());
-        let args: InitCallArgs =
-            InitCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
+        // Get initial contract arguments
+        let args = InitCallArgs::try_from_slice(&sdk::read_input()[..]).expect(ERR_FAILED_PARSE);
         let current_account_id = sdk::current_account_id();
         let owner_id = String::from_utf8(current_account_id).unwrap();
         let mut ft = FungibleToken::new();
+        // Register FT account for current contract
         ft.internal_register_account(&owner_id);
         let contract_data = EthConnector {
             prover_account: args.prover_account,
@@ -76,9 +79,9 @@ impl EthConnectorContract {
         .save_contract();
     }
 
-    /// Parse event message data
-    fn parse_event_message(&self, message: &String) -> TokenMessageData {
-        let data: Vec<_> = message.split(":").collect();
+    /// Parse event message data for tokens
+    fn parse_event_message(&self, message: &str) -> TokenMessageData {
+        let data: Vec<_> = message.split(':').collect();
         assert!(data.len() < 3);
         if data.len() == 1 {
             TokenMessageData::Near(data[0].into())
@@ -90,14 +93,18 @@ impl EthConnectorContract {
         }
     }
 
+    /// Deposit all types of tokens
     pub fn deposit(&self) {
         #[cfg(feature = "log")]
         sdk::log("[Deposit tokens]".into());
 
+        // Get incoming deposit arguments
         let deposit_data: DepositCallArgs =
             DepositCallArgs::try_from_slice(&sdk::read_input()[..]).expect("ERR_FAILED_PARSE");
         let proof = deposit_data.proof;
+        // Fetch event data from Proof
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
+
         #[cfg(feature = "log")]
         sdk::log(format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
@@ -128,6 +135,8 @@ impl EthConnectorContract {
             "ERR_WRONG_EVENT_ADDRESS",
         );
         assert!(event.amount < event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
+
+        // Verify proof data with cross-cotract call at prover account
         let proof_1 = proof.try_to_vec().unwrap();
         #[cfg(feature = "log")]
         sdk::log(format!(
@@ -142,6 +151,7 @@ impl EthConnectorContract {
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
 
+        // Finilize deposit
         let promise1 = match self.parse_event_message(&event.recipient) {
             TokenMessageData::Near(account_id) => {
                 let data = FinishDepositCallArgs {
@@ -193,13 +203,15 @@ impl EthConnectorContract {
         sdk::promise_return(promise1);
     }
 
+    /// Finish deposit for NEAR accounts
     pub fn finish_deposit_near(&mut self) {
         sdk::assert_private_call();
-        let data: FinishDepositCallArgs =
-            FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+        let data = FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
         #[cfg(feature = "log")]
         sdk::log(format!("Finish deposit NEAR amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
+
+        // Check promise results
         let data0: Vec<u8> = match sdk::promise_result(0) {
             PromiseResult::Successful(x) => x,
             _ => sdk::panic_utf8(b"ERR_PROMISE_INDEX"),
@@ -219,13 +231,15 @@ impl EthConnectorContract {
         self.save_contract();
     }
 
+    /// Finish deposit for ETH accounts
     pub fn finish_deposit_eth(&mut self) {
         sdk::assert_private_call();
-        let data: FinishDepositEthCallArgs =
-            FinishDepositEthCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+        let data = FinishDepositEthCallArgs::try_from_slice(&sdk::read_input()).unwrap();
         #[cfg(feature = "log")]
         sdk::log(format!("Finish deposit ETH amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
+
+        // Check promise results
         let data0: Vec<u8> = match sdk::promise_result(0) {
             PromiseResult::Successful(x) => x,
             _ => sdk::panic_utf8(b"ERR_PROMISE_INDEX"),
@@ -249,16 +263,19 @@ impl EthConnectorContract {
         self.save_contract();
     }
 
+    /// Internal ETH deposit logic
     pub(crate) fn internal_deposit_eth(&mut self, address: &Address, amount: &U256) {
         self.ft.internal_deposit_eth(address.0, amount.as_u128());
         self.save_contract();
     }
 
+    /// Internal ETH withdraw ETH logic
     pub(crate) fn internal_remove_eth(&mut self, address: &Address, amount: &U256) {
         self.ft.internal_withdraw_eth(address.0, amount.as_u128());
         self.save_contract();
     }
 
+    /// Record used proof as hash key
     fn record_proof(&mut self, key: String) {
         #[cfg(feature = "log")]
         sdk::log("Record proof".into());
@@ -365,7 +382,7 @@ impl EthConnectorContract {
         sdk::return_output(&res[..]);
     }
 
-    // Return total supply of NEAR + ETH
+    /// Return total supply of NEAR + ETH
     pub fn ft_total_supply(&self) {
         let total_supply = self.ft.ft_total_supply();
         sdk::return_output(&total_supply.to_string().as_bytes());
@@ -373,7 +390,7 @@ impl EthConnectorContract {
         sdk::log(format!("Total supply: {}", total_supply));
     }
 
-    // Return total supply of NEAR
+    /// Return total supply of NEAR
     pub fn ft_total_supply_near(&self) {
         let total_supply = self.ft.ft_total_supply_near();
         sdk::return_output(&total_supply.to_string().as_bytes());
@@ -381,7 +398,7 @@ impl EthConnectorContract {
         sdk::log(format!("Total supply NEAR: {}", total_supply));
     }
 
-    // Return total supply of ETH
+    /// Return total supply of ETH
     pub fn ft_total_supply_eth(&self) {
         let total_supply = self.ft.ft_total_supply_eth();
         sdk::return_output(&total_supply.to_string().as_bytes());
@@ -431,6 +448,7 @@ impl EthConnectorContract {
         ));
     }
 
+    /// FT resolve transfer logic
     pub fn ft_resolve_transfer(&mut self) {
         sdk::assert_private_call();
         let args: ResolveTransferCallArgs =
@@ -448,9 +466,10 @@ impl EthConnectorContract {
         ));
     }
 
+    /// FT transfer call from sender account (invoker account) to receiver
     pub fn ft_transfer_call(&mut self) {
-        let args: TransferCallCallArgs =
-            TransferCallCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
+        let args =
+            TransferCallCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         #[cfg(feature = "log")]
         sdk::log(format!(
             "Transfer call to {} amount {}",
@@ -461,6 +480,7 @@ impl EthConnectorContract {
             .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
     }
 
+    /// FT storage deposit logic
     pub fn storage_deposit(&mut self) {
         let args: StorageDepositCallArgs =
             StorageDepositCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
@@ -473,6 +493,7 @@ impl EthConnectorContract {
         sdk::return_output(&res[..]);
     }
 
+    /// FT storage withdraw
     pub fn storage_withdraw(&mut self) {
         let args: StorageWithdrawCallArgs =
             StorageWithdrawCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
@@ -481,6 +502,7 @@ impl EthConnectorContract {
         sdk::return_output(&res[..]);
     }
 
+    /// Get balance of storage
     pub fn storage_balance_of(&self) {
         let args: StorageBalanceOfCallArgs = StorageBalanceOfCallArgs::from(
             parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE),
@@ -493,19 +515,23 @@ impl EthConnectorContract {
         sdk::return_output(&res[..]);
     }
 
+    /// Save eth-connecor contract data
     fn save_contract(&mut self) {
         sdk::save_contract(CONTRACT_NAME_KEY.as_bytes(), &self.contract);
         sdk::save_contract(CONTRACT_FT_KEY.as_bytes(), &self.ft);
     }
 
+    /// Generate key for used events from Prood
     fn used_event_key(&self, key: &str) -> String {
         [CONTRACT_NAME_KEY, "used-event", key].join(".")
     }
 
+    /// Save already used event proof as hash key
     fn save_used_event(&self, key: &str) {
         sdk::save_contract(&self.used_event_key(key).as_bytes(), &0u8);
     }
 
+    /// Check is event of proof already used
     fn check_used_event(&self, key: &str) -> bool {
         sdk::storage_has_key(&self.used_event_key(key).as_bytes())
     }
