@@ -343,7 +343,7 @@ mod contract {
                 ExitError::OutOfFund => "OutOfFund",
                 ExitError::PCUnderflow => "PCUnderflow",
                 ExitError::CreateEmpty => "CreateEmpty",
-                ExitError::Other(_) => "Other",
+                ExitError::Other(m) => format!("Other: {}", m),
             }
         }
     }
@@ -354,7 +354,7 @@ mod contract {
                 ExitFatal::NotSupported => "NotSupported",
                 ExitFatal::UnhandledInterrupt => "UnhandledInterrupt",
                 ExitFatal::CallErrorAsFatal(_) => "CallErrorAsFatal",
-                ExitFatal::Other(_) => "Other",
+                ExitFatal::Other(m) => format!("Other: {}", m),
             }
         }
     }
