@@ -5,7 +5,7 @@ use evm::{Config, CreateScheme, ExitError, ExitReason, ExitSucceed};
 
 use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
 use crate::precompiles;
-use crate::prelude::{Address, Vec, H256, U256};
+use crate::prelude::{Address, Vec, H256, U256, Borrowed};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
 use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
@@ -120,26 +120,36 @@ impl Engine {
             .unwrap_or_else(U256::zero)
     }
 
-    /// Increases the balance for a given address.
-    fn increase_balance(address: &Address, amount: &U256) -> Result<(), ExitError> {
+    /// Checks if the balance can be increased by an amount for a given address.
+    ///
+    /// Returns the new balance on success.
+    ///
+    /// # Errors
+    ///
+    /// * If the balance is > `U256::MAX`
+    fn check_increase_balance(address: &Address, amount: &U256) -> Result<U256, ExitError> {
         let balance = Self::get_balance(address);
-        let (new_balance, overflow) = balance.overflowing_add(*amount);
-        if overflow {
-            return Err(ExitError::StackOverflow);
+        if let Some (new_balance) = balance.checked_add(*amount) {
+            Ok(new_balance)
+        } else {
+            Err(ExitError::Other(Borrowed("balance is too high, can not increase")))
         }
-        Self::set_balance(address, &new_balance);
-        Ok(())
     }
 
-    /// Decreases the balance for a given address.
-    fn decrease_balance(address: &Address, amount: &U256) -> Result<(), ExitError> {
+    /// Checks if the balance can be decreased by an amount for a given address.
+    ///
+    /// Returns the new balance on success.
+    ///
+    /// # Errors
+    ///
+    /// * If the balance is < `U256::zero()`
+    fn check_decrease_balance(address: &Address, amount: &U256) -> Result<U256, ExitError> {
         let balance = Self::get_balance(address);
-        let (new_balance, underflow) = balance.overflowing_sub(*amount);
-        if underflow {
-            return Err(ExitError::StackUnderflow);
+        if let Some(new_balance) = balance.checked_sub(*amount) {
+            Ok(new_balance)
+        } else {
+            Err(ExitError::Other(Borrowed("balance is too low, can not decrease")))
         }
-        Self::set_balance(address, &new_balance);
-        Ok(())
     }
 
     pub fn remove_storage(address: &Address, key: &H256) {
@@ -185,18 +195,26 @@ impl Engine {
 
     /// Transfers an amount from a given sender to a receiver, provided that
     /// the have enough in their balance.
+    ///
+    /// If the sender can send, and the receiver can receive, then the transfer
+    /// will execute successfully.
     pub fn transfer(&mut self, sender: &Address, receiver: &Address, value: &U256) -> ExitReason {
         let balance = Self::get_balance(sender);
         if balance < *value {
             return ExitReason::Error(ExitError::OutOfFund);
         }
 
-        if let Err(e) = Self::increase_balance(receiver, value) {
-            return ExitReason::Error(e);
-        }
-        if let Err(e) = Self::decrease_balance(sender, value) {
-            return ExitReason::Error(e);
-        }
+        let new_receiver_balance = match Self::check_increase_balance(receiver, value) {
+            Ok(b) => b,
+            Err(e) => return ExitReason::Error(e),
+        };
+        let new_sender_balance = match Self::check_decrease_balance(sender, value) {
+            Ok(b) => b,
+            Err(e) => return ExitReason::Error(e),
+        };
+
+        Self::set_balance(sender, &new_sender_balance);
+        Self::set_balance(receiver, &new_receiver_balance);
 
         ExitReason::Succeed(ExitSucceed::Returned)
     }
