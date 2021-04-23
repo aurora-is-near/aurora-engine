@@ -67,7 +67,7 @@ mod contract {
     pub extern "C" fn new() {
         let state = Engine::get_state();
         if !state.owner_id.is_empty() {
-            require_owner_only(state);
+            require_owner_only(&state);
         }
         let args = NewCallArgs::try_from_slice(&sdk::read_input()).expect("ERR_ARG_PARSE");
         Engine::set_state(args.into());
@@ -114,7 +114,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
         let state = Engine::get_state();
-        require_owner_only(state);
+        require_owner_only(&state);
         sdk::read_input_and_store(CODE_KEY);
         sdk::write_storage(CODE_STAGE_KEY, &sdk::block_index().to_le_bytes());
     }
@@ -282,19 +282,27 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn begin_chain() {
         let mut state = Engine::get_state();
-        require_owner_only(state);
+        require_owner_only(&state);
         let input = sdk::read_input();
         let args = BeginChainArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         state.chain_id = args.chain_id;
         Engine::set_state(state);
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
+        // set genesis block balances
+        for account_balance in args.genesis_alloc {
+            Engine::set_balance(
+                &Address(account_balance.address),
+                &U256::from(account_balance.balance),
+            )
+        }
+        // return new chain ID
+        sdk::return_output(&Engine::get_state().chain_id)
     }
 
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_block() {
         let state = Engine::get_state();
-        require_owner_only(state);
+        require_owner_only(&state);
         let input = sdk::read_input();
         let _args = BeginBlockArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
@@ -304,7 +312,7 @@ mod contract {
     /// Utility methods.
     ///
 
-    fn require_owner_only(state: EngineState) {
+    fn require_owner_only(state: &EngineState) {
         if state.owner_id.as_bytes() != sdk::predecessor_account_id() {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED");
         }
