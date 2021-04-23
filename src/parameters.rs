@@ -69,7 +69,7 @@ pub struct BeginBlockArgs {
     /// The current block's hash (for replayer use).
     pub hash: RawU256,
     /// The current block's beneficiary address.
-    pub coinbase: RawU256,
+    pub coinbase: RawAddress,
     /// The current block's timestamp (in seconds since the Unix epoch).
     pub timestamp: RawU256,
     /// The current block's number (the genesis block is number zero).
