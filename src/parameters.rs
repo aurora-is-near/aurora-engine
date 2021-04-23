@@ -55,11 +55,20 @@ pub struct GetStorageAtArgs {
     pub key: RawH256,
 }
 
+/// Borsh-encoded (genesis) account balance used by the `begin_chain` function.
+#[cfg(feature = "evm_bully")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct AccountBalance {
+    pub address: RawAddress,
+    pub balance: RawU256,
+}
+
 /// Borsh-encoded parameters for the `begin_chain` function.
 #[cfg(feature = "evm_bully")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct BeginChainArgs {
     pub chain_id: RawU256,
+    pub genesis_alloc: Vec<AccountBalance>,
 }
 
 /// Borsh-encoded parameters for the `begin_block` function.
