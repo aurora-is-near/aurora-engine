@@ -287,10 +287,13 @@ mod contract {
         let args = BeginChainArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         state.chain_id = args.chain_id;
         Engine::set_state(state);
-
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
-        // genesis block balances
-
+        // set genesis block balances
+        for account_balance in args.genesis_alloc {
+            Engine::set_balance(
+                &Address(account_balance.address),
+                &U256::from(account_balance.balance),
+            )
+        }
         // return new chain ID
         sdk::return_output(&Engine::get_state().chain_id)
     }
