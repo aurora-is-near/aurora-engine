@@ -16,6 +16,7 @@ use alloc::{
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const CONTRACT_NAME_KEY: &str = "EthConnector";
+pub const EVM_TOKEN_NAME_KEY: &str = "evt";
 pub const CONTRACT_FT_KEY: &str = "EthConnector.ft";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 10_000_000_000_000;
@@ -517,7 +518,14 @@ impl EthConnectorContract {
 
     pub fn register_relayer(&self) {}
 
-    pub fn deploy_evm_token(&self) {}
+    /// Save to storage erc20 addrass as NEAR account alias
+    pub fn save_evm_token_address(&self, account_id: &str, address: EthAddress) {
+        sdk::write_storage(self.evm_token_key(account_id).as_bytes(), &address)
+    }
+
+    fn evm_token_key(&self, account_id: &str) -> String {
+        [EVM_TOKEN_NAME_KEY, account_id].join(":")
+    }
 
     pub fn ft_on_transfer(&self) {
         #[cfg(feature = "log")]

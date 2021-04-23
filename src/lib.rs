@@ -42,7 +42,9 @@ mod contract {
     use crate::engine::{Engine, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
+    use crate::parameters::{
+        DeployEvmTokenCallArgs, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs,
+    };
     use crate::prelude::{vec, Address, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
@@ -416,9 +418,17 @@ mod contract {
         EthConnectorContract::new().register_relayer()
     }
 
+    /// Deploy ERC20 contract and save to storage ERC20 account to NEAR account alias
     #[no_mangle]
     pub extern "C" fn deploy_evm_token() {
-        EthConnectorContract::new().deploy_evm_token()
+        let args =
+            DeployEvmTokenCallArgs::try_from_slice(&sdk::read_input()).expect("ERR_ARG_PARSE");
+        let mut engine = Engine::new(predecessor_address());
+        let (status, address) = Engine::deploy_code_with_input(&mut engine, &args.erc20_contract);
+        if let ExitReason::Succeed(_) = status {
+            EthConnectorContract::new().save_evm_token_address(&args.near_account_id, address.0);
+        }
+        process_exit_reason(status, &address.0)
     }
 
     #[no_mangle]

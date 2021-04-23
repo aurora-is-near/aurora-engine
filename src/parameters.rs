@@ -202,6 +202,13 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct DeployEvmTokenCallArgs {
+    pub near_account_id: AccountId,
+    pub erc20_contract: Vec<u8>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
