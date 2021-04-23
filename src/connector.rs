@@ -109,7 +109,7 @@ impl EthConnectorContract {
         sdk::log(format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
             hex::encode(event.sender),
-            event.recipient.clone(),
+            event.recipient,
             event.amount.as_u128(),
             event.fee.as_u128()
         ));
@@ -513,6 +513,17 @@ impl EthConnectorContract {
             .try_to_vec()
             .unwrap();
         sdk::return_output(&res[..]);
+    }
+
+    pub fn register_relayer(&self) {}
+
+    pub fn deploy_evm_token(&self) {}
+
+    pub fn ft_on_transfer(&self) {
+        #[cfg(feature = "log")]
+        sdk::log("Call ft_on_trasfer".into());
+        let data = 0u128.try_to_vec().unwrap();
+        sdk::return_output(&data[..]);
     }
 
     /// Save eth-connecor contract data

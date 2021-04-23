@@ -411,6 +411,21 @@ mod contract {
         EthConnectorContract::new().storage_balance_of()
     }
 
+    #[no_mangle]
+    pub extern "C" fn register_relayer() {
+        EthConnectorContract::new().register_relayer()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn deploy_evm_token() {
+        EthConnectorContract::new().deploy_evm_token()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_on_transfer() {
+        EthConnectorContract::new().ft_on_transfer()
+    }
+
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
@@ -418,16 +433,6 @@ mod contract {
         #[cfg(feature = "log")]
         sdk::log("Call from verify_log_entry".into());
         let data = true.try_to_vec().unwrap();
-        sdk::return_output(&data[..]);
-    }
-
-    #[cfg(feature = "integration-test")]
-    #[no_mangle]
-    pub extern "C" fn ft_on_transfer() {
-        use borsh::BorshSerialize;
-        #[cfg(feature = "log")]
-        sdk::log("Call ft_on_trasfer".into());
-        let data = 10u128.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
     }
 
