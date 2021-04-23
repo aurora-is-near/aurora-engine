@@ -45,6 +45,13 @@ pub enum TokenMessageData {
     },
 }
 
+/// On-transfer message
+pub struct OnTrasnferMessageData {
+    pub receipient: EthAddress,
+    pub fee: U256,
+    pub ralayer: EthAddress,
+}
+
 impl EthConnectorContract {
     pub fn new() -> Self {
         Self {
@@ -91,6 +98,23 @@ impl EthConnectorContract {
                 contract: data[0].into(),
                 address: validate_eth_address(data[1].into()),
             }
+        }
+    }
+
+    // Get on-transfer data from message
+    fn parse_on_transfer_message(&self, message: &[u8]) -> OnTrasnferMessageData {
+        assert_eq!(message.len(), 72);
+        let mut receipient: EthAddress = Default::default();
+        receipient.copy_from_slice(&message[0..20]);
+        let mut fee: [u8; 32] = Default::default();
+        fee.copy_from_slice(&message[21..52]);
+        let mut ralayer: EthAddress = Default::default();
+        ralayer.copy_from_slice(&message[52..72]);
+
+        OnTrasnferMessageData {
+            receipient,
+            fee: U256::from(fee),
+            ralayer,
         }
     }
 
@@ -320,6 +344,7 @@ impl EthConnectorContract {
     }
 
     /// Burn ETH tokens
+    #[allow(dead_code)]
     fn burn_eth(&mut self, address: EthAddress, amount: Balance) {
         #[cfg(feature = "log")]
         sdk::log(format!(
@@ -346,38 +371,6 @@ impl EthConnectorContract {
         // Burn tokens to recipient
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         self.burn_near(predecessor_account_id, args.amount);
-        // Save new contract data
-        self.save_contract();
-        sdk::return_output(&res[..]);
-    }
-
-    /// Withdraw ETH tokens
-    pub fn withdraw_eth(&mut self) {
-        use crate::prover;
-        #[cfg(feature = "log")]
-        sdk::log("Start withdraw ETH".into());
-
-        let args: WithdrawEthCallArgs =
-            WithdrawEthCallArgs::from(parse_json(&sdk::read_input()).expect_utf8(FAILED_PARSE));
-        assert!(
-            prover::verify_withdraw_eip712(
-                args.sender,
-                args.eth_recipient,
-                self.contract.eth_custodian_address,
-                args.amount,
-                args.eip712_signature
-            ),
-            "ERR_WRONG_EIP712_MSG"
-        );
-        let res = WithdrawResult {
-            recipient_id: args.eth_recipient,
-            amount: args.amount.as_u128(),
-            eth_custodian_address: self.contract.eth_custodian_address,
-        }
-        .try_to_vec()
-        .unwrap();
-        // Burn tokens to recipient
-        self.burn_eth(args.eth_recipient, args.amount.as_u128());
         // Save new contract data
         self.save_contract();
         sdk::return_output(&res[..]);
@@ -523,15 +516,52 @@ impl EthConnectorContract {
         sdk::write_storage(self.evm_token_key(account_id).as_bytes(), &address)
     }
 
-    fn evm_token_key(&self, account_id: &str) -> String {
-        [EVM_TOKEN_NAME_KEY, account_id].join(":")
+    /// Get EVM ERC20 token address
+    pub fn get_evm_token_address(&self, account_id: &str) -> EthAddress {
+        let acc = sdk::read_storage(self.evm_token_key(account_id).as_bytes())
+            .expect("ERR_WRONG_EVM_TOKEN_KEY");
+        let mut addr: EthAddress = Default::default();
+        addr.copy_from_slice(&acc[0..19]);
+        addr
     }
 
-    pub fn ft_on_transfer(&self) {
+    /// ft_on_transfer call back function
+    pub fn ft_on_transfer(&mut self) {
         #[cfg(feature = "log")]
         sdk::log("Call ft_on_trasfer".into());
+        let args = FtOnTransfer::try_from_slice(&sdk::read_input()[..]).expect(ERR_FAILED_PARSE);
+        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
+        let message = hex::decode(args.msg).expect(ERR_FAILED_PARSE);
+        let message_data = self.parse_on_transfer_message(&message[..]);
+
+        // Special case when current_account_id is predecessor
+        if current_account_id == predecessor_account_id {
+            self.ft.internal_withdraw(&current_account_id, args.amount);
+            self.ft
+                .internal_deposit_eth(message_data.receipient, args.amount);
+            self.save_contract();
+
+            #[cfg(feature = "log")]
+            sdk::log(format!(
+                "Transfer NEAR tokens {} amount to {} ETH success",
+                args.amount,
+                hex::encode(message_data.receipient),
+            ));
+        } else {
+            let _evm_token_addres = self.get_evm_token_address(&predecessor_account_id);
+            // mint to Receipient tokens
+            // Transfer fee to Relayer
+        }
+
+        // Return unused tokens
         let data = 0u128.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
+    }
+
+    /// EVM ERC20 token key
+    fn evm_token_key(&self, account_id: &str) -> String {
+        [EVM_TOKEN_NAME_KEY, account_id].join(":")
     }
 
     /// Save eth-connecor contract data

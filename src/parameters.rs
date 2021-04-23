@@ -111,7 +111,7 @@ pub struct WithdrawResult {
 
 /// ft_on_transfer eth-connector call args
 #[cfg(feature = "contract")]
-#[derive(BorshSerialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct FtOnTransfer {
     pub amount: Balance,
     pub msg: String,

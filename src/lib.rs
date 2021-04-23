@@ -334,18 +334,13 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn withdraw_near() {
+    pub extern "C" fn withdraw() {
         EthConnectorContract::new().withdraw_near()
     }
 
     #[no_mangle]
     pub extern "C" fn deposit() {
         EthConnectorContract::new().deposit()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn withdraw_eth() {
-        EthConnectorContract::new().withdraw_eth()
     }
 
     #[no_mangle]
