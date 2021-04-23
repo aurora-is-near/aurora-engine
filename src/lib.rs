@@ -138,7 +138,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
-        let mut engine = Engine::new(predecessor_address());
+        let origin = predecessor_address();
+        Engine::increment_nonce(&origin).unwrap_or_sdk_panic();
+        let mut engine = Engine::new(origin);
         let (status, address) = Engine::deploy_code_with_input(&mut engine, &input);
         // TODO: charge for storage
         process_exit_reason(status, &address.0)
@@ -149,7 +151,9 @@ mod contract {
     pub extern "C" fn call() {
         let input = sdk::read_input();
         let args = FunctionCallArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
-        let mut engine = Engine::new(predecessor_address());
+        let origin = predecessor_address();
+        Engine::increment_nonce(&origin).unwrap_or_sdk_panic();
+        let mut engine = Engine::new(origin);
         let (status, result) = Engine::call_with_args(&mut engine, args);
         // TODO: charge for storage
         process_exit_reason(status, &result)
@@ -181,6 +185,8 @@ mod contract {
             Some(sender) => sender,
             None => sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
         };
+
+        Engine::check_nonce(&sender, signed_transaction.transaction.nonce).unwrap_or_sdk_panic();
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
@@ -222,6 +228,9 @@ mod contract {
                 sdk::panic_utf8(b"ERR_META_TX_PARSE");
             }
         };
+
+        Engine::check_nonce(&meta_call_args.sender, meta_call_args.nonce).unwrap_or_sdk_panic();
+
         let mut engine = Engine::new_with_state(state, meta_call_args.sender);
         let (status, result) = engine.call(
             meta_call_args.sender,
@@ -363,6 +372,28 @@ mod contract {
                 ExitFatal::UnhandledInterrupt => "UnhandledInterrupt",
                 ExitFatal::CallErrorAsFatal(_) => "CallErrorAsFatal",
                 ExitFatal::Other(m) => m,
+            }
+        }
+    }
+
+    impl ToStr for crate::types::NonceError {
+        fn to_str(&self) -> &str {
+            match self {
+                Self::NonceOverflow => "ERR_NONCE_OVERFLOW",
+                Self::IncorrectNonce => "ERR_INCORRECT_NONCE",
+            }
+        }
+    }
+
+    trait OrSdkPanic<T, E> {
+        fn unwrap_or_sdk_panic(self) -> T;
+    }
+
+    impl<T, E: ToStr> OrSdkPanic<T, E> for Result<T, E> {
+        fn unwrap_or_sdk_panic(self) -> T {
+            match self {
+                Ok(t) => t,
+                Err(e) => sdk::panic_utf8(e.to_str().as_bytes()),
             }
         }
     }

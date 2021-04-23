@@ -8,7 +8,7 @@ use crate::precompiles;
 use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
-use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
+use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId, NonceError};
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
@@ -95,6 +95,37 @@ impl Engine {
 
     pub fn remove_nonce(address: &Address) {
         sdk::remove_storage(&address_to_key(KeyPrefix::Nonce, address))
+    }
+
+    /// Checks the nonce for the address matches the transaction nonce, and if so
+    /// increments the account nonce
+    #[inline]
+    pub fn check_nonce(address: &Address, transaction_nonce: U256) -> Result<(), NonceError> {
+        Self::check_and_increment_nonce(address, Some(transaction_nonce))
+    }
+
+    /// Increment the account nonce (without any check it matches a certain value)
+    #[inline]
+    pub fn increment_nonce(address: &Address) -> Result<(), NonceError> {
+        Self::check_and_increment_nonce(address, None)
+    }
+
+    fn check_and_increment_nonce(
+        address: &Address,
+        transaction_nonce: Option<U256>,
+    ) -> Result<(), NonceError> {
+        let account_nonce = Self::get_nonce(address);
+
+        if let Some(nonce) = transaction_nonce {
+            if nonce != account_nonce {
+                return Err(NonceError::IncorrectNonce);
+            }
+        }
+
+        account_nonce
+            .checked_add(U256::one())
+            .map(|new_nonce| Self::set_nonce(address, &new_nonce))
+            .ok_or(NonceError::NonceOverflow)
     }
 
     pub fn get_nonce(address: &Address) -> U256 {

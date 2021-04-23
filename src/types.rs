@@ -35,6 +35,14 @@ pub enum ErrorKind {
     InvalidEcRecoverSignature,
 }
 
+/// Errors involving the nonce
+pub enum NonceError {
+    /// Attempted to increment the nonce, but overflow occurred
+    NonceOverflow,
+    /// Account nonce did not match the transaction nonce
+    IncorrectNonce,
+}
+
 pub type Result<T> = core::result::Result<T, ErrorKind>;
 
 #[allow(dead_code)]
