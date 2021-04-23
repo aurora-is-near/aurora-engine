@@ -25,8 +25,6 @@ mod engine;
 #[cfg(feature = "contract")]
 mod fungible_token;
 #[cfg(feature = "contract")]
-mod json;
-#[cfg(feature = "contract")]
 mod log_entry;
 #[cfg(feature = "contract")]
 mod prover;

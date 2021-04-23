@@ -1,14 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-#[cfg(feature = "contract")]
-use crate::json;
-#[cfg(feature = "contract")]
-use crate::json::FAILED_PARSE;
 use crate::prelude::{String, Vec};
 #[cfg(feature = "contract")]
 use crate::prover::Proof;
-#[cfg(feature = "contract")]
-use crate::types::ExpectUtf8;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 #[cfg(feature = "contract")]
 use crate::types::{Balance, EthAddress};
@@ -173,17 +167,6 @@ pub struct FinishDepositEthCallArgs {
     pub proof: Proof,
 }
 
-#[cfg(feature = "contract")]
-impl From<json::JsonValue> for ResolveTransferCallArgs {
-    fn from(v: json::JsonValue) -> Self {
-        Self {
-            sender_id: v.string("sender_id").expect_utf8(FAILED_PARSE),
-            receiver_id: v.string("receiver_id").expect_utf8(FAILED_PARSE),
-            amount: v.u128("amount").expect_utf8(FAILED_PARSE),
-        }
-    }
-}
-
 /// eth-connector initial args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -202,11 +185,64 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
+/// Deploy EVM token args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct DeployEvmTokenCallArgs {
     pub near_account_id: AccountId,
     pub erc20_contract: Vec<u8>,
+}
+
+/// storage_balance_of eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct StorageBalanceOfCallArgs {
+    pub account_id: AccountId,
+}
+
+/// storage_deposit eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct StorageDepositCallArgs {
+    pub account_id: Option<AccountId>,
+    pub registration_only: Option<bool>,
+}
+
+/// storage_withdraw eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct StorageWithdrawCallArgs {
+    pub amount: Option<u128>,
+}
+
+/// transfer args for json invocation
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct TransferCallArgs {
+    pub receiver_id: AccountId,
+    pub amount: Balance,
+    pub memo: Option<String>,
+}
+
+/// withdraw NEAR eth-connector call args
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct WithdrawCallArgs {
+    pub recipient_id: AccountId,
+    pub amount: Balance,
+}
+
+/// balance_of args for json invocation
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct BalanceOfCallArgs {
+    pub account_id: AccountId,
+}
+
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct BalanceOfEthCallArgs {
+    pub address: EthAddress,
 }
 
 #[cfg(test)]
