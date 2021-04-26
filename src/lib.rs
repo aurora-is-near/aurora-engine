@@ -138,9 +138,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
-        let origin = predecessor_address();
-        Engine::increment_nonce(&origin).sdk_unwrap();
-        let mut engine = Engine::new(origin);
+        let mut engine = Engine::new(predecessor_address());
         let (status, address) = Engine::deploy_code_with_input(&mut engine, &input);
         // TODO: charge for storage
         process_exit_reason(status, &address.0)
@@ -151,9 +149,7 @@ mod contract {
     pub extern "C" fn call() {
         let input = sdk::read_input();
         let args = FunctionCallArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
-        let origin = predecessor_address();
-        Engine::increment_nonce(&origin).sdk_unwrap();
-        let mut engine = Engine::new(origin);
+        let mut engine = Engine::new(predecessor_address());
         let (status, result) = Engine::call_with_args(&mut engine, args);
         // TODO: charge for storage
         process_exit_reason(status, &result)
@@ -186,7 +182,8 @@ mod contract {
             None => sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
         };
 
-        Engine::check_nonce(&sender, signed_transaction.transaction.nonce).sdk_unwrap();
+        let next_nonce =
+            Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
@@ -194,7 +191,10 @@ mod contract {
         let data = signed_transaction.transaction.data;
         if let Some(receiver) = signed_transaction.transaction.to {
             let (status, result) = if data.is_empty() {
-                // Execute a balance transfer:
+                // Execute a balance transfer. We need to save the incremented nonce in this case
+                // because it is not handled internally by the SputnikVM like it is in the case of
+                // `call` and `deploy_code`.
+                Engine::set_nonce(&sender, &next_nonce);
                 (
                     Engine::transfer(&mut engine, &sender, &receiver, &value),
                     vec![],
@@ -229,7 +229,7 @@ mod contract {
             }
         };
 
-        Engine::check_nonce(&meta_call_args.sender, meta_call_args.nonce).sdk_unwrap();
+        Engine::check_nonce(&meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
 
         let mut engine = Engine::new_with_state(state, meta_call_args.sender);
         let (status, result) = engine.call(

@@ -98,33 +98,19 @@ impl Engine {
     }
 
     /// Checks the nonce for the address matches the transaction nonce, and if so
-    /// increments the account nonce
+    /// returns the next nonce (if it exists). Note: this does not modify the actual
+    /// nonce of the account in storage. The nonce still needs to be set to the new value
+    /// if this is required.
     #[inline]
-    pub fn check_nonce(address: &Address, transaction_nonce: U256) -> Result<(), NonceError> {
-        Self::check_and_increment_nonce(address, Some(transaction_nonce))
-    }
-
-    /// Increment the account nonce (without any check it matches a certain value)
-    #[inline]
-    pub fn increment_nonce(address: &Address) -> Result<(), NonceError> {
-        Self::check_and_increment_nonce(address, None)
-    }
-
-    fn check_and_increment_nonce(
-        address: &Address,
-        transaction_nonce: Option<U256>,
-    ) -> Result<(), NonceError> {
+    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> Result<U256, NonceError> {
         let account_nonce = Self::get_nonce(address);
 
-        if let Some(nonce) = transaction_nonce {
-            if nonce != account_nonce {
-                return Err(NonceError::IncorrectNonce);
-            }
+        if transaction_nonce != &account_nonce {
+            return Err(NonceError::IncorrectNonce);
         }
 
         account_nonce
             .checked_add(U256::one())
-            .map(|new_nonce| Self::set_nonce(address, &new_nonce))
             .ok_or(NonceError::NonceOverflow)
     }
 
