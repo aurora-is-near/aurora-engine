@@ -30,7 +30,7 @@ impl DepositedEvent {
             },
             EventParam {
                 name: "recipient".to_string(),
-                kind: ParamType::Bytes,
+                kind: ParamType::String,
                 indexed: false,
             },
             EventParam {

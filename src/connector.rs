@@ -21,7 +21,6 @@ pub const CONTRACT_FT_KEY: &str = "EthConnector.ft";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 10_000_000_000_000;
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
-const AURORA_SELF_ACCOUNT_ID: &str = "aurora";
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnectorContract {
@@ -40,10 +39,7 @@ pub struct EthConnector {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub enum TokenMessageData {
     Near(AccountId),
-    Eth {
-        address: EthAddress,
-        message: String,
-    },
+    Eth { address: AccountId, message: String },
 }
 
 /// On-transfer message
@@ -96,20 +92,20 @@ impl EthConnectorContract {
             TokenMessageData::Near(data[0].into())
         } else {
             TokenMessageData::Eth {
-                address: validate_eth_address(data[0].into()),
+                address: data[0].into(),
                 message: data[1].into(),
             }
         }
     }
 
-    // Get on-transfer data from message
+    /// Get on-transfer data from message
     fn parse_on_transfer_message(&self, message: &str) -> OnTrasnferMessageData {
         let data: Vec<_> = message.split(':').collect();
         assert_eq!(data.len(), 2);
 
         let msg = hex::decode(data[1]).expect(ERR_FAILED_PARSE);
         let mut fee: [u8; 32] = Default::default();
-        fee.copy_from_slice(&msg[0..31]);
+        fee.copy_from_slice(&msg[..31]);
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..51]);
 
@@ -120,6 +116,18 @@ impl EthConnectorContract {
         }
     }
 
+    /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
+    fn set_message_for_on_transfer(&self, fee: U256, message: String) -> String {
+        use byte_slice_cast::AsByteSlice;
+
+        // Relayer == predecessor
+        let relayer_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let mut data = fee.as_byte_slice().to_vec();
+        let message = hex::decode(message).expect(ERR_FAILED_PARSE);
+        data.append(&mut message.to_vec());
+        [relayer_account_id, hex::encode(data)].join(":")
+    }
+
     /// Deposit all types of tokens
     pub fn deposit(&self) {
         use crate::prover::Proof;
@@ -127,7 +135,7 @@ impl EthConnectorContract {
         sdk::log("[Deposit tokens]".into());
 
         // Get incoming deposit arguments
-        let raw_proof = &casdk::read_input()[..];
+        let raw_proof = &sdk::read_input()[..];
         let proof: Proof = Proof::try_from_slice(&raw_proof).expect("ERR_FAILED_PARSE");
         // Fetch event data from Proof
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
@@ -192,11 +200,10 @@ impl EthConnectorContract {
             }
             // Deposit to Eth/ERC20 accounts
             TokenMessageData::Eth { address, message } => {
-                // Relayer == predecessor
-                let relayer_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-                // Send to self
+                let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
+                // Send to self - current account id
                 let data = FinishDepositCallArgs {
-                    new_owner_id: AURORA_SELF_ACCOUNT_ID.into(),
+                    new_owner_id: current_account_id,
                     amount: event.amount.as_u128(),
                     fee: event.fee.as_u128(),
                     proof,
@@ -204,11 +211,29 @@ impl EthConnectorContract {
                 .try_to_vec()
                 .unwrap();
 
-                sdk::promise_then(
+                let internal_promise = sdk::promise_then(
                     promise0,
                     &sdk::current_account_id(),
                     b"finish_deposit_near",
                     &data[..],
+                    NO_DEPOSIT,
+                    GAS_FOR_FINISH_DEPOSIT,
+                );
+                // Transfer to self and then transfer ETH in `ft_on_transfer`
+                // address - is NEAR account
+                let transfer_data = TransferCallCallArgs {
+                    receiver_id: address,
+                    amount: event.amount.as_u128(),
+                    memo: None,
+                    msg: self.set_message_for_on_transfer(event.fee, message),
+                }
+                .try_to_vec()
+                .unwrap();
+                sdk::promise_then(
+                    internal_promise,
+                    &sdk::current_account_id(),
+                    b"ft_transfer_call",
+                    &transfer_data[..],
                     NO_DEPOSIT,
                     GAS_FOR_FINISH_DEPOSIT,
                 )
@@ -247,6 +272,7 @@ impl EthConnectorContract {
     }
 
     /// Finish deposit for ETH accounts
+    /// TODO: remove, it's not used
     pub fn finish_deposit_eth(&mut self) {
         sdk::assert_private_call();
         let data = FinishDepositEthCallArgs::try_from_slice(&sdk::read_input()).unwrap();
