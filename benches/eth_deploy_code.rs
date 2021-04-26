@@ -18,7 +18,7 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
         INITIAL_BALANCE.into(),
         INITIAL_NONCE.into(),
     );
-    let inputs: Vec<_> = [1, 5, 10, 15, 20]
+    let inputs: Vec<_> = [1, 4, 8, 12, 16]
         .iter()
         .copied()
         .map(|n| {
@@ -39,10 +39,11 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
     // measure gas usage
     for input in inputs.iter() {
         let input_size = input.len();
-        let (output, _) =
+        let (output, maybe_err) =
             runner
                 .one_shot()
                 .call(RAW_CALL, calling_account_id.clone(), input.clone());
+        assert!(maybe_err.is_none());
         let gas = output.unwrap().burnt_gas;
         // TODO: capture this in a file
         println!("ETH_DEPLOY_CODE_{:?} GAS: {:?}", input_size, gas);

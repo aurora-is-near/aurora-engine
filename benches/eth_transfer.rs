@@ -30,9 +30,10 @@ fn eth_transfer_benchmark(c: &mut Criterion) {
     let calling_account_id = "some-account.near".to_string();
 
     // measure gas usage
-    let (output, _) = runner
+    let (output, maybe_err) = runner
         .one_shot()
         .call(RAW_CALL, calling_account_id.clone(), input.clone());
+    assert!(maybe_err.is_none());
     let gas = output.unwrap().burnt_gas;
     println!("ETH_TRANSFER GAS: {:?}", gas); // TODO: capture this in a file
 
