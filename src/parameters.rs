@@ -245,6 +245,12 @@ pub struct BalanceOfEthCallArgs {
     pub address: EthAddress,
 }
 
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct RegisterRelayerCallArgs {
+    pub address: EthAddress,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

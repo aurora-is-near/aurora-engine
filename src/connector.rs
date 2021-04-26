@@ -127,9 +127,8 @@ impl EthConnectorContract {
         sdk::log("[Deposit tokens]".into());
 
         // Get incoming deposit arguments
-        let raw_proof = sdk::read_input()[..];
-        let proof: Proof =
-            Proof::try_from_slice(&raw_proof).expect("ERR_FAILED_PARSE");
+        let raw_proof = &casdk::read_input()[..];
+        let proof: Proof = Proof::try_from_slice(&raw_proof).expect("ERR_FAILED_PARSE");
         // Fetch event data from Proof
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
 
@@ -143,12 +142,12 @@ impl EthConnectorContract {
         ));
 
         #[cfg(feature = "log")]
-            sdk::log(format!(
-                "Event's address {}, custodian address {}",
-                hex::encode(&event.eth_custodian_address),
-                hex::encode(&self.contract.eth_custodian_address),
-            ));
-    
+        sdk::log(format!(
+            "Event's address {}, custodian address {}",
+            hex::encode(&event.eth_custodian_address),
+            hex::encode(&self.contract.eth_custodian_address),
+        ));
+
         assert_eq!(
             event.eth_custodian_address, self.contract.eth_custodian_address,
             "ERR_WRONG_EVENT_ADDRESS",
@@ -192,10 +191,7 @@ impl EthConnectorContract {
                 )
             }
             // Deposit to Eth/ERC20 accounts
-            TokenMessageData::Eth {
-                address,
-                message,
-            } => {
+            TokenMessageData::Eth { address, message } => {
                 // Relayer == predecessor
                 let relayer_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
                 // Send to self
@@ -495,7 +491,11 @@ impl EthConnectorContract {
 
     /// Save to storage Relayed address as NEAR account alias
     pub fn register_relayer(&self) {
-        sdk::write_storage(self.evm_relayer_key(account_id).as_bytes(), &address)
+        let args: RegisterRelayerCallArgs =
+            RegisterRelayerCallArgs::try_from_slice(&sdk::read_input()[..])
+                .expect(ERR_FAILED_PARSE);
+        let account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        sdk::write_storage(self.evm_relayer_key(&account_id).as_bytes(), &args.address)
     }
 
     /// Save to storage erc20 address as NEAR account alias
