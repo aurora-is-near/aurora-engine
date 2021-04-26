@@ -1,4 +1,3 @@
-use crate::precompiles::util::check_gas;
 use crate::precompiles::PrecompileResult;
 use crate::prelude::*;
 use evm::{ExitError, ExitSucceed};
@@ -50,9 +49,10 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
 pub(crate) fn alt_bn128_add(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     use bn::AffineG1;
 
-    check_gas(target_gas, costs::ADD_BASE)?;
+    super::check_gas(target_gas, costs::ADD_BASE)?;
 
-    let input = super::util::pad_input(input, 128);
+    let mut input = input.to_vec();
+    input.resize(128, 0);
 
     let p1 = read_point(&input, 0)?;
     let p2 = read_point(&input, 64)?;
@@ -76,9 +76,10 @@ pub(crate) fn alt_bn128_add(input: &[u8], target_gas: Option<u64>) -> Precompile
 pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     use bn::AffineG1;
 
-    check_gas(target_gas, costs::MUL_BASE)?;
+    super::check_gas(target_gas, costs::MUL_BASE)?;
 
-    let input = super::util::pad_input(input, 128);
+    let mut input = input.to_vec();
+    input.resize(128, 0);
 
     let p = read_point(&input, 0)?;
     let mut fr_buf = [0u8; 32];
@@ -105,7 +106,7 @@ pub(crate) fn alt_bn128_mul(input: &[u8], target_gas: Option<u64>) -> Precompile
 pub(crate) fn alt_bn128_pair(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     use bn::{arith::U256, AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
 
-    check_gas(
+    super::check_gas(
         target_gas,
         costs::PAIR_PER_POINT * input.len() as u64 / 192u64 + costs::PAIR_BASE,
     )?;

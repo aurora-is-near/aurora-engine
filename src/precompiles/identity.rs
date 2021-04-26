@@ -1,4 +1,4 @@
-use crate::precompiles::{util, PrecompileResult};
+use crate::precompiles::PrecompileResult;
 use evm::ExitSucceed;
 
 /// Identity precompile costs.
@@ -16,7 +16,7 @@ mod costs {
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000004
 pub(super) fn identity(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
     let cost = (input.len() + 31) as u64 / 32 * costs::IDENTITY_PER_WORD + costs::IDENTITY_BASE;
-    util::check_gas(target_gas, cost)?;
+    super::check_gas(target_gas, cost)?;
 
     Ok((ExitSucceed::Returned, input.to_vec(), 0))
 }

@@ -4,7 +4,6 @@ mod hash;
 mod identity;
 mod modexp;
 mod secp256k1;
-mod util;
 
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::prelude::{Address, Vec};
@@ -42,4 +41,17 @@ pub fn istanbul_precompiles(
         // Not supported.
         _ => None,
     }
+}
+
+/// Checks the target gas with the cost of the operation.
+pub(super) fn check_gas(target_gas: Option<u64>, cost: u64) -> Result<(), ExitError> {
+    if let Some(target_gas) = target_gas {
+        if cost > target_gas {
+            return Err(ExitError::OutOfGas);
+        }
+    } else {
+        return Err(ExitError::OutOfGas);
+    }
+
+    Ok(())
 }

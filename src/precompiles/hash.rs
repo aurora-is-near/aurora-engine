@@ -30,7 +30,7 @@ pub(crate) fn sha256(input: &[u8], target_gas: Option<u64>) -> PrecompileResult 
     use crate::sdk;
 
     let cost = (input.len() + 31) as u64 / 32 * costs::SHA256_PER_WORD + costs::SHA256_BASE;
-    super::util::check_gas(target_gas, cost)?;
+    super::check_gas(target_gas, cost)?;
 
     Ok((
         ExitSucceed::Returned,
@@ -46,7 +46,7 @@ pub(crate) fn ripemd160(input: &[u8], target_gas: Option<u64>) -> PrecompileResu
     use ripemd160::Digest;
 
     let cost = (input.len() + 31) as u64 / 32 * costs::RIPEMD160_PER_WORD + costs::RIPEMD160_BASE;
-    super::util::check_gas(target_gas, cost)?;
+    super::check_gas(target_gas, cost)?;
 
     let hash = ripemd160::Ripemd160::digest(input);
     Ok((ExitSucceed::Returned, hash.to_vec(), 0))

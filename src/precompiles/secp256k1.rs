@@ -8,8 +8,10 @@ mod costs {
 }
 
 pub(crate) fn ecrecover_raw(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
-    super::util::pad_input(input, 128);
-    super::util::check_gas(target_gas, costs::ECRECOVER_BASE)?;
+    let mut input = input.to_vec();
+    input.resize(128, 0);
+
+    super::check_gas(target_gas, costs::ECRECOVER_BASE)?;
 
     let mut hash = [0; 32];
     hash.copy_from_slice(&input[0..32]);
