@@ -5,7 +5,7 @@ use evm::{Config, CreateScheme, ExitError, ExitReason, ExitSucceed};
 
 use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
 use crate::precompiles;
-use crate::prelude::{Address, Vec, H256, U256};
+use crate::prelude::{Address, Borrowed, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
 use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
@@ -120,18 +120,40 @@ impl Engine {
             .unwrap_or_else(U256::zero)
     }
 
-    /// Increases the balance for a given address.
-    pub fn increase_balance(address: &Address, amount: &U256) {
-        let mut balance = Self::get_balance(address);
-        balance += *amount;
-        Self::set_balance(address, &balance);
+    /// Checks if the balance can be increased by an amount for a given address.
+    ///
+    /// Returns the new balance on success.
+    ///
+    /// # Errors
+    ///
+    /// * If the balance is > `U256::MAX`
+    fn check_increase_balance(address: &Address, amount: &U256) -> Result<U256, ExitError> {
+        let balance = Self::get_balance(address);
+        if let Some(new_balance) = balance.checked_add(*amount) {
+            Ok(new_balance)
+        } else {
+            Err(ExitError::Other(Borrowed(
+                "balance is too high, can not increase",
+            )))
+        }
     }
 
-    /// Decreases the balance for a given address.
-    pub fn decrease_balance(address: &Address, amount: &U256) {
-        let mut balance = Self::get_balance(address);
-        balance -= *amount;
-        Self::set_balance(address, &balance);
+    /// Checks if the balance can be decreased by an amount for a given address.
+    ///
+    /// Returns the new balance on success.
+    ///
+    /// # Errors
+    ///
+    /// * If the balance is < `U256::zero()`
+    fn check_decrease_balance(address: &Address, amount: &U256) -> Result<U256, ExitError> {
+        let balance = Self::get_balance(address);
+        if let Some(new_balance) = balance.checked_sub(*amount) {
+            Ok(new_balance)
+        } else {
+            Err(ExitError::Other(Borrowed(
+                "balance is too low, can not decrease",
+            )))
+        }
     }
 
     pub fn remove_storage(address: &Address, key: &H256) {
@@ -177,14 +199,26 @@ impl Engine {
 
     /// Transfers an amount from a given sender to a receiver, provided that
     /// the have enough in their balance.
+    ///
+    /// If the sender can send, and the receiver can receive, then the transfer
+    /// will execute successfully.
     pub fn transfer(&mut self, sender: &Address, receiver: &Address, value: &U256) -> ExitReason {
         let balance = Self::get_balance(sender);
         if balance < *value {
             return ExitReason::Error(ExitError::OutOfFund);
         }
 
-        Self::increase_balance(receiver, value);
-        Self::decrease_balance(sender, value);
+        let new_receiver_balance = match Self::check_increase_balance(receiver, value) {
+            Ok(b) => b,
+            Err(e) => return ExitReason::Error(e),
+        };
+        let new_sender_balance = match Self::check_decrease_balance(sender, value) {
+            Ok(b) => b,
+            Err(e) => return ExitReason::Error(e),
+        };
+
+        Self::set_balance(sender, &new_sender_balance);
+        Self::set_balance(receiver, &new_receiver_balance);
 
         ExitReason::Succeed(ExitSucceed::Returned)
     }
@@ -231,6 +265,15 @@ impl Engine {
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
         (status, result)
+    }
+
+    #[cfg(feature = "testnet")]
+    /// Credits the address with 10 coins from the faucet.
+    pub fn credit(&mut self, address: &Address) -> ExitReason {
+        if let Err(e) = Self::increase_balance(address, &U256::from(10)) {
+            return ExitReason::Error(e);
+        }
+        ExitReason::Succeed(ExitSucceed::Returned)
     }
 
     pub fn view_with_args(&self, args: ViewCallArgs) -> (ExitReason, Vec<u8>) {
