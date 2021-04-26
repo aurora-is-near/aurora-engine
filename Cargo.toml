@@ -71,6 +71,10 @@ harness = false
 name = "eth_deploy_code"
 harness = false
 
+[[bench]]
+name = "eth_erc20"
+harness = false
+
 [features]
 default = ["sha2", "std"]
 std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "lunarity-lexer/std"]
