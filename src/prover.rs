@@ -77,7 +77,7 @@ impl Proof {
 
 pub type EventParams = Vec<EventParam>;
 
-/// Etherium event
+/// Ethereum event
 pub struct EthEvent {
     pub eth_custodian_address: EthAddress,
     pub log: Log,
@@ -85,14 +85,14 @@ pub struct EthEvent {
 
 #[allow(dead_code)]
 impl EthEvent {
-    /// Get Etherium event from `log_entry_data`
+    /// Get Ethereum event from `log_entry_data`
     pub fn fetch_log_entry_data(name: &str, params: EventParams, data: &[u8]) -> Self {
         let event = Event {
             name: name.to_string(),
             inputs: params,
             anonymous: false,
         };
-        let log_entry: LogEntry = rlp::decode(data).expect("IVALID_RLP");
+        let log_entry: LogEntry = rlp::decode(data).expect("INVALID_RLP");
         let eth_custodian_address = log_entry.address.0;
         let topics = log_entry.topics.iter().map(|h| Hash::from(h.0)).collect();
 

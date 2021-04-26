@@ -16,10 +16,12 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const CONTRACT_NAME_KEY: &str = "EthConnector";
 pub const EVM_TOKEN_NAME_KEY: &str = "evt";
+pub const EVM_RELAYER_NAME_KEY: &str = "rel";
 pub const CONTRACT_FT_KEY: &str = "EthConnector.ft";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 10_000_000_000_000;
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
+const AURORA_SELF_ACCOUNT_ID: &str = "aurora";
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnectorContract {
@@ -39,8 +41,8 @@ pub struct EthConnector {
 pub enum TokenMessageData {
     Near(AccountId),
     Eth {
-        contract: String,
         address: EthAddress,
+        message: String,
     },
 }
 
@@ -94,8 +96,8 @@ impl EthConnectorContract {
             TokenMessageData::Near(data[0].into())
         } else {
             TokenMessageData::Eth {
-                contract: data[0].into(),
-                address: validate_eth_address(data[1].into()),
+                address: validate_eth_address(data[0].into()),
+                message: data[1].into(),
             }
         }
     }
@@ -120,13 +122,14 @@ impl EthConnectorContract {
 
     /// Deposit all types of tokens
     pub fn deposit(&self) {
+        use crate::prover::Proof;
         #[cfg(feature = "log")]
         sdk::log("[Deposit tokens]".into());
 
         // Get incoming deposit arguments
-        let deposit_data: DepositCallArgs =
-            DepositCallArgs::try_from_slice(&sdk::read_input()[..]).expect("ERR_FAILED_PARSE");
-        let proof = deposit_data.proof;
+        let raw_proof = sdk::read_input()[..];
+        let proof: Proof =
+            Proof::try_from_slice(&raw_proof).expect("ERR_FAILED_PARSE");
         // Fetch event data from Proof
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
 
@@ -140,21 +143,12 @@ impl EthConnectorContract {
         ));
 
         #[cfg(feature = "log")]
-        if let Some(relayer_eth_account) = deposit_data.relayer_eth_account {
-            sdk::log(format!(
-                "Event's address {}, custodian address {}, relayer account: {}",
-                hex::encode(&event.eth_custodian_address),
-                hex::encode(&self.contract.eth_custodian_address),
-                hex::encode(&relayer_eth_account),
-            ));
-        } else {
             sdk::log(format!(
                 "Event's address {}, custodian address {}",
                 hex::encode(&event.eth_custodian_address),
                 hex::encode(&self.contract.eth_custodian_address),
             ));
-        }
-
+    
         assert_eq!(
             event.eth_custodian_address, self.contract.eth_custodian_address,
             "ERR_WRONG_EVENT_ADDRESS",
@@ -162,7 +156,6 @@ impl EthConnectorContract {
         assert!(event.amount < event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
 
         // Verify proof data with cross-cotract call at prover account
-        let proof_1 = proof.try_to_vec().unwrap();
         #[cfg(feature = "log")]
         sdk::log(format!(
             "Deposit verify_log_entry for prover: {}",
@@ -171,13 +164,14 @@ impl EthConnectorContract {
         let promise0 = sdk::promise_create(
             self.contract.prover_account.as_bytes(),
             b"verify_log_entry",
-            &proof_1[..],
+            &raw_proof,
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
 
         // Finilize deposit
         let promise1 = match self.parse_event_message(&event.recipient) {
+            // Deposit to NEAR accounts
             TokenMessageData::Near(account_id) => {
                 let data = FinishDepositCallArgs {
                     new_owner_id: account_id,
@@ -197,18 +191,18 @@ impl EthConnectorContract {
                     GAS_FOR_FINISH_DEPOSIT,
                 )
             }
+            // Deposit to Eth/ERC20 accounts
             TokenMessageData::Eth {
-                contract: _,
                 address,
+                message,
             } => {
-                let relayer_eth_account = deposit_data
-                    .relayer_eth_account
-                    .expect("ERR_RELAYER_NOT_SET");
-                let data = FinishDepositEthCallArgs {
-                    new_owner_id: address,
+                // Relayer == predecessor
+                let relayer_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+                // Send to self
+                let data = FinishDepositCallArgs {
+                    new_owner_id: AURORA_SELF_ACCOUNT_ID.into(),
                     amount: event.amount.as_u128(),
                     fee: event.fee.as_u128(),
-                    relayer_eth_account,
                     proof,
                 }
                 .try_to_vec()
@@ -217,7 +211,7 @@ impl EthConnectorContract {
                 sdk::promise_then(
                     promise0,
                     &sdk::current_account_id(),
-                    b"finish_deposit_eth",
+                    b"finish_deposit_near",
                     &data[..],
                     NO_DEPOSIT,
                     GAS_FOR_FINISH_DEPOSIT,
@@ -276,14 +270,7 @@ impl EthConnectorContract {
         self.record_proof(data.proof.get_key());
 
         // Mint tokens to recipient minus fee
-        self.mint_eth(data.new_owner_id, data.amount - data.fee);
-        // Mint tokens fee to Relayer
-        #[cfg(feature = "log")]
-        sdk::log(format!(
-            "relayer_eth_account: {}",
-            hex::encode(data.relayer_eth_account)
-        ));
-        self.mint_eth(data.relayer_eth_account, data.fee);
+        self.mint_eth(data.new_owner_id, data.amount);
         // Save new contract data
         self.save_contract();
     }
@@ -506,9 +493,12 @@ impl EthConnectorContract {
         sdk::return_output(&res[..]);
     }
 
-    pub fn register_relayer(&self) {}
+    /// Save to storage Relayed address as NEAR account alias
+    pub fn register_relayer(&self) {
+        sdk::write_storage(self.evm_relayer_key(account_id).as_bytes(), &address)
+    }
 
-    /// Save to storage erc20 addrass as NEAR account alias
+    /// Save to storage erc20 address as NEAR account alias
     pub fn save_evm_token_address(&self, account_id: &str, address: EthAddress) {
         sdk::write_storage(self.evm_token_key(account_id).as_bytes(), &address)
     }
@@ -518,7 +508,16 @@ impl EthConnectorContract {
         let acc = sdk::read_storage(self.evm_token_key(account_id).as_bytes())
             .expect("ERR_WRONG_EVM_TOKEN_KEY");
         let mut addr: EthAddress = Default::default();
-        addr.copy_from_slice(&acc[0..19]);
+        addr.copy_from_slice(&acc);
+        addr
+    }
+
+    /// Get EVM Relayer address
+    pub fn get_evm_relayer_address(&self, account_id: &str) -> EthAddress {
+        let acc = sdk::read_storage(self.evm_relayer_key(account_id).as_bytes())
+            .expect("ERR_WRONG_EVM_TOKEN_KEY");
+        let mut addr: EthAddress = Default::default();
+        addr.copy_from_slice(&acc);
         addr
     }
 
@@ -562,6 +561,11 @@ impl EthConnectorContract {
     /// EVM ERC20 token key
     fn evm_token_key(&self, account_id: &str) -> String {
         [EVM_TOKEN_NAME_KEY, account_id].join(":")
+    }
+
+    /// EVM relayer address key
+    fn evm_relayer_key(&self, account_id: &str) -> String {
+        [EVM_RELAYER_NAME_KEY, account_id].join(":")
     }
 
     /// Save eth-connecor contract data
