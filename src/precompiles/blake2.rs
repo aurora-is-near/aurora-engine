@@ -1,90 +1,101 @@
-use crate::precompiles::PrecompileResult;
-use crate::prelude::Borrowed;
-use evm::{ExitError, ExitSucceed};
+use crate::precompiles::{Precompile, PrecompileResult};
+use crate::prelude::{Borrowed, mem, TryInto};
+use evm::{Context, ExitError, ExitSucceed};
 
 /// Blake2 costs.
 mod costs {
     /// Cost per round of Blake2 F.
-    pub(super) const F_ROUND_BASE: u32 = 1;
+    pub(super) const F_ROUND: u64 = 1;
 }
 
-/// The compression function of the blake2 algorithm.
-///
-/// Takes as an argument the state vector "h", message block vector "m" (the last block is padded
-/// with zeros to full block size, if required), 2w-bit offset counter "t", and final block
-/// indicator flag "f". Local vector v[0..15] is used in processing. F returns a new state vector.
-/// The number of rounds, "r", is 12 for BLAKE2b and 10 for BLAKE2s. Rounds are numbered from 0 to
-/// r - 1.
-///
-/// See: https://eips.ethereum.org/EIPS/eip-152
-/// See: https://etherscan.io/address/0000000000000000000000000000000000000009
-pub(crate) fn blake2f(input: &[u8], target_gas: Option<u64>) -> PrecompileResult {
-    if input.len() != 213 {
-        return Err(ExitError::Other(Borrowed(
-            "input length invalid, must be 213 bytes",
-        )));
+/// Blake2 constants.
+mod consts {
+    pub(super) const INPUT_LENGTH: usize = 213;
+}
+
+pub(super) struct Blake2F;
+
+impl Precompile for Blake2F {
+    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+        let (int_bytes, _) = input.split_at(mem::size_of::<u32>());
+        Ok(u64::from(u32::from_be_bytes(
+            int_bytes.try_into().expect("cannot fail"),
+        )) * costs::F_ROUND)
     }
 
-    let mut rounds_bytes = [0u8; 4];
-    rounds_bytes.copy_from_slice(&input[0..4]);
-    let rounds = u32::from_be_bytes(rounds_bytes);
+    /// The compression function of the blake2 algorithm.
+    ///
+    /// Takes as an argument the state vector `h`, message block vector `m` (the last block is padded
+    /// with zeros to full block size, if required), 2w-bit offset counter `t`, and final block
+    /// indicator flag `f`. Local vector v[0..15] is used in processing. F returns a new state vector.
+    /// The number of rounds, `r`, is 12 for BLAKE2b and 10 for BLAKE2s. Rounds are numbered from 0 to
+    /// r - 1.
+    ///
+    /// See: https://eips.ethereum.org/EIPS/eip-152
+    /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
+    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+        if input.len() != consts::INPUT_LENGTH {
+            return Err(ExitError::Other(Borrowed(
+                "input length invalid, must be 213 bytes",
+            )));
+        }
 
-    if let Some(target_gas) = target_gas {
-        let gas = (rounds * costs::F_ROUND_BASE) as u64;
-        if gas > target_gas {
+        let mut rounds_bytes = [0u8; 4];
+        rounds_bytes.copy_from_slice(&input[0..4]);
+        let rounds = u32::from_be_bytes(rounds_bytes);
+
+        if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
-    } else {
-        return Err(ExitError::OutOfGas);
+
+        let mut h = [0u64; 8];
+        for (mut x, value) in h.iter_mut().enumerate() {
+            let mut word: [u8; 8] = [0u8; 8];
+            x = x * 8 + 4;
+            word.copy_from_slice(&input[x..(x + 8)]);
+            *value = u64::from_le_bytes(word);
+        }
+
+        let mut m = [0u64; 16];
+        for (mut x, value) in m.iter_mut().enumerate() {
+            let mut word: [u8; 8] = [0u8; 8];
+            x = x * 8 + 68;
+            word.copy_from_slice(&input[x..(x + 8)]);
+            *value = u64::from_le_bytes(word);
+        }
+
+        let mut t: [u64; 2] = [0u64; 2];
+        for (mut x, value) in t.iter_mut().enumerate() {
+            let mut word: [u8; 8] = [0u8; 8];
+            x = x * 8 + 196;
+            word.copy_from_slice(&input[x..(x + 8)]);
+            *value = u64::from_le_bytes(word);
+        }
+
+        if input[212] != 0 && input[212] != 1 {
+            return Err(ExitError::Other(Borrowed(
+                "incorrect final block indicator flag",
+            )));
+        }
+        let finished = input[212] != 0;
+
+        let res = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
+        Ok((ExitSucceed::Returned, res, 0))
     }
-
-    let mut h = [0u64; 8];
-    for (mut x, value) in h.iter_mut().enumerate() {
-        let mut word: [u8; 8] = [0u8; 8];
-        x = x * 8 + 4;
-        word.copy_from_slice(&input[x..(x + 8)]);
-        *value = u64::from_le_bytes(word);
-    }
-
-    let mut m = [0u64; 16];
-    for (mut x, value) in m.iter_mut().enumerate() {
-        let mut word: [u8; 8] = [0u8; 8];
-        x = x * 8 + 68;
-        word.copy_from_slice(&input[x..(x + 8)]);
-        *value = u64::from_le_bytes(word);
-    }
-
-    let mut t: [u64; 2] = [0u64; 2];
-    for (mut x, value) in t.iter_mut().enumerate() {
-        let mut word: [u8; 8] = [0u8; 8];
-        x = x * 8 + 196;
-        word.copy_from_slice(&input[x..(x + 8)]);
-        *value = u64::from_le_bytes(word);
-    }
-
-    if input[212] != 0 && input[212] != 1 {
-        return Err(ExitError::Other(Borrowed(
-            "incorrect final block indicator flag",
-        )));
-    }
-    let finished = input[212] != 0;
-
-    let res = &*blake2::blake2b_f(rounds, h, m, t, finished);
-    let mut l = [0u8; 32];
-    let mut h = [0u8; 32];
-    l.copy_from_slice(&res[..32]);
-    h.copy_from_slice(&res[32..64]);
-
-    let mut output = l.to_vec();
-    output.extend_from_slice(&h.to_vec());
-
-    Ok((ExitSucceed::Returned, output.to_vec(), 0))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::prelude::Vec;
+
+    fn new_context() -> Context {
+        Context {
+            address: Default::default(),
+            caller: Default::default(),
+            apparent_value: Default::default(),
+        }
+    }
 
     // [4 bytes for rounds]
     // [64 bytes for h]
@@ -106,12 +117,12 @@ mod tests {
 
     fn test_blake2f_out_of_gas() -> PrecompileResult {
         let input = hex::decode(INPUT).unwrap();
-        blake2f(&input, Some(11))
+        Blake2F::run(&input, 11, &new_context())
     }
 
     fn test_blake2f_empty() -> PrecompileResult {
         let input = [0u8; 0];
-        blake2f(&input, None)
+        Blake2F::run(&input, 0, &new_context())
     }
 
     fn test_blake2f_invalid_len_1() -> PrecompileResult {
@@ -129,7 +140,7 @@ mod tests {
             01",
         )
         .unwrap();
-        blake2f(&input, Some(12))
+        Blake2F::run(&input, 12, &new_context())
     }
 
     fn test_blake2f_invalid_len_2() -> PrecompileResult {
@@ -147,7 +158,7 @@ mod tests {
             01",
         )
         .unwrap();
-        blake2f(&input, Some(12))
+        Blake2F::run(&input, 12, &new_context())
     }
 
     fn test_blake2f_invalid_flag() -> PrecompileResult {
@@ -165,7 +176,7 @@ mod tests {
             02",
         )
         .unwrap();
-        blake2f(&input, Some(12))
+        Blake2F::run(&input, 12, &new_context())
     }
 
     fn test_blake2f_r_0() -> Vec<u8> {
@@ -183,12 +194,12 @@ mod tests {
             01",
         )
         .unwrap();
-        blake2f(&input, Some(12)).unwrap().1
+        Blake2F::run(&input, 12, &new_context()).unwrap().1
     }
 
     fn test_blake2f_r_12() -> Vec<u8> {
         let input = hex::decode(INPUT).unwrap();
-        blake2f(&input, Some(12)).unwrap().1
+        Blake2F::run(&input, 12, &new_context()).unwrap().1
     }
 
     fn test_blake2f_final_block_false() -> Vec<u8> {
@@ -206,7 +217,7 @@ mod tests {
             00",
         )
         .unwrap();
-        blake2f(&input, Some(12)).unwrap().1
+        Blake2F::run(&input, 12, &new_context()).unwrap().1
     }
 
     #[test]
