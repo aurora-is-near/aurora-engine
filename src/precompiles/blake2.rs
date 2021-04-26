@@ -1,5 +1,5 @@
 use crate::precompiles::{Precompile, PrecompileResult};
-use crate::prelude::{Borrowed, mem, TryInto};
+use crate::prelude::{mem, Borrowed, TryInto};
 use evm::{Context, ExitError, ExitSucceed};
 
 /// Blake2 costs.

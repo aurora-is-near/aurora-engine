@@ -6,14 +6,14 @@ mod modexp;
 mod secp256k1;
 
 use crate::precompiles::blake2::Blake2F;
-pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::precompiles::bn128::{BN128Add, BN128Mul, BN128Pair};
-use crate::prelude::{Address, Vec};
-use evm::{Context, ExitError, ExitSucceed};
-use crate::precompiles::secp256k1::ECRecover;
-use crate::precompiles::hash::{SHA256, RIPEMD160};
+use crate::precompiles::hash::{RIPEMD160, SHA256};
 use crate::precompiles::identity::Identity;
 use crate::precompiles::modexp::ModExp;
+pub(crate) use crate::precompiles::secp256k1::ecrecover;
+use crate::precompiles::secp256k1::ECRecover;
+use crate::prelude::{Address, Vec};
+use evm::{Context, ExitError, ExitSucceed};
 
 /// A precompile operation result.
 type PrecompileResult = Result<(ExitSucceed, Vec<u8>, u64), ExitError>;

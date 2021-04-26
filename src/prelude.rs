@@ -10,7 +10,7 @@ pub use alloc::{
     vec::Vec,
 };
 #[cfg(not(feature = "std"))]
-pub use core::{marker::PhantomData, convert::TryInto, mem};
+pub use core::{convert::TryInto, marker::PhantomData, mem};
 #[cfg(feature = "std")]
 pub use std::{
     borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, collections::HashMap, convert::TryInto,

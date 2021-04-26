@@ -1,4 +1,4 @@
-use crate::precompiles::{HardFork, Precompile, PrecompileResult, Berlin, Byzantium};
+use crate::precompiles::{Berlin, Byzantium, HardFork, Precompile, PrecompileResult};
 use crate::prelude::{PhantomData, Vec, U256};
 use evm::{Context, ExitError, ExitSucceed};
 use num::BigUint;
