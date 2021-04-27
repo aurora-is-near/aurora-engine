@@ -67,7 +67,7 @@ mod contract {
     pub extern "C" fn new() {
         let state = Engine::get_state();
         if !state.owner_id.is_empty() {
-            require_owner_only(state);
+            require_owner_only(&state);
         }
         let args = NewCallArgs::try_from_slice(&sdk::read_input()).expect("ERR_ARG_PARSE");
         Engine::set_state(args.into());
@@ -114,7 +114,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
         let state = Engine::get_state();
-        require_owner_only(state);
+        require_owner_only(&state);
         sdk::read_input_and_store(CODE_KEY);
         sdk::write_storage(CODE_STAGE_KEY, &sdk::block_index().to_le_bytes());
     }
@@ -182,13 +182,19 @@ mod contract {
             None => sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
         };
 
+        let next_nonce =
+            Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
+
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
         if let Some(receiver) = signed_transaction.transaction.to {
             let (status, result) = if data.is_empty() {
-                // Execute a balance transfer:
+                // Execute a balance transfer. We need to save the incremented nonce in this case
+                // because it is not handled internally by the SputnikVM like it is in the case of
+                // `call` and `deploy_code`.
+                Engine::set_nonce(&sender, &next_nonce);
                 (
                     Engine::transfer(&mut engine, &sender, &receiver, &value),
                     vec![],
@@ -222,6 +228,9 @@ mod contract {
                 sdk::panic_utf8(b"ERR_META_TX_PARSE");
             }
         };
+
+        Engine::check_nonce(&meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
+
         let mut engine = Engine::new_with_state(state, meta_call_args.sender);
         let (status, result) = engine.call(
             meta_call_args.sender,
@@ -230,6 +239,16 @@ mod contract {
             meta_call_args.input,
         );
         process_exit_reason(status, &result);
+    }
+
+    #[cfg(feature = "testnet")]
+    #[no_mangle]
+    pub extern "C" fn make_it_rain() {
+        let input = sdk::read_input();
+        let address = Address::from_slice(&input);
+        let mut engine = Engine::new(address);
+        let status = engine.credit(&address);
+        process_exit_reason(status, &[])
     }
 
     ///
@@ -282,19 +301,27 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn begin_chain() {
         let mut state = Engine::get_state();
-        require_owner_only(state);
+        require_owner_only(&state);
         let input = sdk::read_input();
         let args = BeginChainArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         state.chain_id = args.chain_id;
         Engine::set_state(state);
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/1
+        // set genesis block balances
+        for account_balance in args.genesis_alloc {
+            Engine::set_balance(
+                &Address(account_balance.address),
+                &U256::from(account_balance.balance),
+            )
+        }
+        // return new chain ID
+        sdk::return_output(&Engine::get_state().chain_id)
     }
 
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_block() {
         let state = Engine::get_state();
-        require_owner_only(state);
+        require_owner_only(&state);
         let input = sdk::read_input();
         let _args = BeginBlockArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
@@ -304,7 +331,7 @@ mod contract {
     /// Utility methods.
     ///
 
-    fn require_owner_only(state: EngineState) {
+    fn require_owner_only(state: &EngineState) {
         if state.owner_id.as_bytes() != sdk::predecessor_account_id() {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED");
         }
@@ -355,6 +382,28 @@ mod contract {
                 ExitFatal::UnhandledInterrupt => "UnhandledInterrupt",
                 ExitFatal::CallErrorAsFatal(_) => "CallErrorAsFatal",
                 ExitFatal::Other(m) => m,
+            }
+        }
+    }
+
+    impl ToStr for crate::types::NonceError {
+        fn to_str(&self) -> &str {
+            match self {
+                Self::NonceOverflow => "ERR_NONCE_OVERFLOW",
+                Self::IncorrectNonce => "ERR_INCORRECT_NONCE",
+            }
+        }
+    }
+
+    trait SdkUnwrap<T, E> {
+        fn sdk_unwrap(self) -> T;
+    }
+
+    impl<T, E: ToStr> SdkUnwrap<T, E> for Result<T, E> {
+        fn sdk_unwrap(self) -> T {
+            match self {
+                Ok(t) => t,
+                Err(e) => sdk::panic_utf8(e.to_str().as_bytes()),
             }
         }
     }
