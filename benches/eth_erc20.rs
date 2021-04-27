@@ -31,7 +31,7 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
     let constructor = ERC20Constructor::load();
     let output = exec_transaction(
         &mut runner,
-        constructor.deploy("Benchmarker", "BENCH", U256::zero()),
+        constructor.deploy("Benchmarker", "BENCH", INITIAL_NONCE.into()),
         &source_account,
     );
     let erc20_address = output.return_data.as_value().unwrap();
