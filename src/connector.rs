@@ -559,12 +559,8 @@ impl EthConnectorContract {
         // Special case when current_account_id is predecessor
         if current_account_id == predecessor_account_id {
             self.ft.internal_withdraw(&current_account_id, args.amount);
-            self.ft.internal_deposit_eth(
-                message_data.recipient,
-                args.amount - message_data.fee.as_u128(),
-            );
             self.ft
-                .internal_deposit_eth(message_data.recipient, message_data.fee.as_u128());
+                .internal_deposit_eth(message_data.recipient, args.amount);
             self.save_contract();
 
             #[cfg(feature = "log")]
@@ -574,20 +570,17 @@ impl EthConnectorContract {
                 hex::encode(message_data.recipient),
             ));
         } else {
+            // ERC20 address
             let _evm_token_addres = self.get_evm_token_address(&predecessor_account_id);
-            let _evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
-            let _fee = message_data.fee;
-            let _recipient_address = message_data.recipient;
-            let _amount = args.amount;
+            let evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
+            let recipient_address = message_data.recipient;
 
-            self.ft.internal_withdraw(&predecessor_account_id, args.amount);
-            self.ft.internal_deposit_eth(
-                message_data.recipient,
-                args.amount - message_data.fee.as_u128(),
-            );
-            self.ft
-                .internal_deposit_eth(message_data.recipient, message_data.fee.as_u128());
-            // TODO: Mint ERC20
+            // Transfer fee to Relayer
+            let fee = message_data.fee.as_u128();
+            if fee > 0 {
+                self.ft.internal_withdraw_eth(recipient_address, fee);
+                self.ft.internal_deposit_eth(evm_relayer_addres, fee);
+            }
             self.save_contract();
         }
 
