@@ -561,7 +561,6 @@ impl EthConnectorContract {
             self.ft.internal_withdraw(&current_account_id, args.amount);
             self.ft
                 .internal_deposit_eth(message_data.recipient, args.amount);
-            self.save_contract();
 
             #[cfg(feature = "log")]
             sdk::log(format!(
@@ -570,19 +569,46 @@ impl EthConnectorContract {
                 hex::encode(message_data.recipient),
             ));
         } else {
+            use crate::engine::Engine;
+            use alloc::vec;
+
             // ERC20 address
-            let _evm_token_addres = self.get_evm_token_address(&predecessor_account_id);
+            let evm_token_addres = self.get_evm_token_address(&predecessor_account_id);
             let evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
             let recipient_address = message_data.recipient;
+
+            #[cfg(feature = "log")]
+            sdk::log(format!(
+                "Call ERC20 contract: {}",
+                hex::encode(evm_token_addres),
+            ));
+
+            // Call Eth ERC20 contract to mint ERC20 EVM tokens
+            // TODO: modify inputs related to Eth contract
+            let args = FunctionCallArgs {
+                contract: evm_token_addres,
+                input: vec![],
+            };
+            let mut engine =
+                Engine::new(near_account_to_evm_address(&sdk::predecessor_account_id()));
+            // TODO: handle results
+            let (_status, _result) = Engine::call_with_args(&mut engine, args);
 
             // Transfer fee to Relayer
             let fee = message_data.fee.as_u128();
             if fee > 0 {
                 self.ft.internal_withdraw_eth(recipient_address, fee);
                 self.ft.internal_deposit_eth(evm_relayer_addres, fee);
+
+                #[cfg(feature = "log")]
+                sdk::log(format!(
+                    "Send fee {:?} to Relayer: {}",
+                    fee,
+                    hex::encode(evm_relayer_addres),
+                ));
             }
-            self.save_contract();
         }
+        self.save_contract();
 
         // Return unused tokens
         let data = 0u128.try_to_vec().unwrap();
