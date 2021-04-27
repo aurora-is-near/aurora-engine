@@ -85,7 +85,11 @@ impl Precompile for RIPEMD160 {
             Err(ExitError::OutOfGas)
         } else {
             let hash = ripemd160::Ripemd160::digest(input);
-            Ok((ExitSucceed::Returned, hash.to_vec(), 0))
+            // The result needs to be padded with leading zeros because it is only 20 bytes, but
+            // the evm works with 32-byte words.
+            let mut result = [0u8; 32];
+            result[12..].copy_from_slice(&hash);
+            Ok((ExitSucceed::Returned, result.to_vec(), 0))
         }
     }
 }
