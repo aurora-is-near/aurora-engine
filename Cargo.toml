@@ -62,6 +62,7 @@ near-vm-logic = { git = "https://github.com/near/nearcore", rev = "3744f07e13bf4
 libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
+git2 = "0.13"
 
 [[bench]]
 name = "eth_transfer"

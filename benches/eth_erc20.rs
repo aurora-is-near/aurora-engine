@@ -3,14 +3,14 @@ use aurora_engine::transaction::EthTransaction;
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use near_vm_logic::VMOutcome;
 use secp256k1::SecretKey;
+use std::path::{Path, PathBuf};
 
 // We don't use everything in `common`, but that's ok, other benchmarks do
 #[allow(dead_code)]
 mod common;
+mod solidity;
 
-use common::{
-    address_from_secret_key, deploy_evm, sign_transaction, AuroraRunner, RAW_CALL,
-};
+use common::{address_from_secret_key, deploy_evm, sign_transaction, AuroraRunner, RAW_CALL};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -126,9 +126,25 @@ struct ERC20 {
 
 impl ERC20Constructor {
     fn load() -> Self {
-        let hex_rep = std::fs::read_to_string("benches/res/ERC20PresetMinterPauser.bin").unwrap();
+        let artifacts_base_path = Self::solidity_artifacts_path();
+        let hex_path = artifacts_base_path.join("ERC20PresetMinterPauser.bin");
+        let hex_rep = match std::fs::read_to_string(&hex_path) {
+            Ok(hex) => hex,
+            Err(_) => {
+                // An error occurred opening the file, maybe the contract hasn't been compiled?
+                let sources_root = Self::download_solidity_sources();
+                solidity::compile(
+                    sources_root,
+                    "token/ERC20/presets/ERC20PresetMinterPauser.sol",
+                    &artifacts_base_path,
+                );
+                // If another error occurs, then we can't handle it so we just unwrap.
+                std::fs::read_to_string(hex_path).unwrap()
+            }
+        };
         let code = hex::decode(&hex_rep).unwrap();
-        let reader = std::fs::File::open("benches/res/ERC20PresetMinterPauser.abi").unwrap();
+        let abi_path = artifacts_base_path.join("ERC20PresetMinterPauser.abi");
+        let reader = std::fs::File::open(abi_path).unwrap();
         let abi = ethabi::Contract::load(reader).unwrap();
 
         Self { abi, code }
@@ -155,6 +171,23 @@ impl ERC20Constructor {
             value: Default::default(),
             data,
         }
+    }
+
+    fn download_solidity_sources() -> PathBuf {
+        let sources_dir = Path::new("target").join("openzeppelin-contracts");
+        let contracts_dir = sources_dir.join("contracts");
+        if contracts_dir.exists() {
+            contracts_dir
+        } else {
+            let url = "https://github.com/OpenZeppelin/openzeppelin-contracts";
+            let repo = git2::Repository::clone(url, sources_dir).unwrap();
+            // repo.path() gives the path of the .git directory, so we need to use the parent
+            repo.path().parent().unwrap().join("contracts")
+        }
+    }
+
+    fn solidity_artifacts_path() -> PathBuf {
+        Path::new("target").join("solidity_build")
     }
 }
 
