@@ -575,8 +575,20 @@ impl EthConnectorContract {
             ));
         } else {
             let _evm_token_addres = self.get_evm_token_address(&predecessor_account_id);
-            // mint to Receipient tokens
-            // Transfer fee to Relayer
+            let _evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
+            let _fee = message_data.fee;
+            let _recipient_address = message_data.recipient;
+            let _amount = args.amount;
+
+            self.ft.internal_withdraw(&predecessor_account_id, args.amount);
+            self.ft.internal_deposit_eth(
+                message_data.recipient,
+                args.amount - message_data.fee.as_u128(),
+            );
+            self.ft
+                .internal_deposit_eth(message_data.recipient, message_data.fee.as_u128());
+            // TODO: Mint ERC20
+            self.save_contract();
         }
 
         // Return unused tokens
