@@ -8,7 +8,7 @@ use crate::precompiles;
 use crate::prelude::{Address, Borrowed, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
-use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
+use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId, NonceError};
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
@@ -95,6 +95,23 @@ impl Engine {
 
     pub fn remove_nonce(address: &Address) {
         sdk::remove_storage(&address_to_key(KeyPrefix::Nonce, address))
+    }
+
+    /// Checks the nonce for the address matches the transaction nonce, and if so
+    /// returns the next nonce (if it exists). Note: this does not modify the actual
+    /// nonce of the account in storage. The nonce still needs to be set to the new value
+    /// if this is required.
+    #[inline]
+    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> Result<U256, NonceError> {
+        let account_nonce = Self::get_nonce(address);
+
+        if transaction_nonce != &account_nonce {
+            return Err(NonceError::IncorrectNonce);
+        }
+
+        account_nonce
+            .checked_add(U256::one())
+            .ok_or(NonceError::NonceOverflow)
     }
 
     pub fn get_nonce(address: &Address) -> U256 {

@@ -182,13 +182,19 @@ mod contract {
             None => sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
         };
 
+        let next_nonce =
+            Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
+
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
         if let Some(receiver) = signed_transaction.transaction.to {
             let (status, result) = if data.is_empty() {
-                // Execute a balance transfer:
+                // Execute a balance transfer. We need to save the incremented nonce in this case
+                // because it is not handled internally by the SputnikVM like it is in the case of
+                // `call` and `deploy_code`.
+                Engine::set_nonce(&sender, &next_nonce);
                 (
                     Engine::transfer(&mut engine, &sender, &receiver, &value),
                     vec![],
@@ -222,6 +228,9 @@ mod contract {
                 sdk::panic_utf8(b"ERR_META_TX_PARSE");
             }
         };
+
+        Engine::check_nonce(&meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
+
         let mut engine = Engine::new_with_state(state, meta_call_args.sender);
         let (status, result) = engine.call(
             meta_call_args.sender,
@@ -373,6 +382,28 @@ mod contract {
                 ExitFatal::UnhandledInterrupt => "UnhandledInterrupt",
                 ExitFatal::CallErrorAsFatal(_) => "CallErrorAsFatal",
                 ExitFatal::Other(m) => m,
+            }
+        }
+    }
+
+    impl ToStr for crate::types::NonceError {
+        fn to_str(&self) -> &str {
+            match self {
+                Self::NonceOverflow => "ERR_NONCE_OVERFLOW",
+                Self::IncorrectNonce => "ERR_INCORRECT_NONCE",
+            }
+        }
+    }
+
+    trait SdkUnwrap<T, E> {
+        fn sdk_unwrap(self) -> T;
+    }
+
+    impl<T, E: ToStr> SdkUnwrap<T, E> for Result<T, E> {
+        fn sdk_unwrap(self) -> T {
+            match self {
+                Ok(t) => t,
+                Err(e) => sdk::panic_utf8(e.to_str().as_bytes()),
             }
         }
     }
