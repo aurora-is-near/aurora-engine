@@ -120,7 +120,9 @@ mod tests {
     #[test]
     fn test_ripemd160() {
         let input = b"";
-        let expected = hex::decode("9c1185a5c5e9fc54612808977ee8f548b2258d31").unwrap();
+        let expected =
+            hex::decode("0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31")
+                .unwrap();
 
         let res = RIPEMD160::run(input, 600, &new_context()).unwrap().1;
         assert_eq!(res, expected);
