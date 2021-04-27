@@ -4,7 +4,6 @@ use lunarity_lexer::{Lexer, Token};
 use rlp::{Decodable, DecoderError, Rlp};
 
 use crate::parameters::MetaCallArgs;
-use crate::precompiles::ecrecover;
 use crate::prelude::{vec, Address, Box, HashMap, String, ToOwned, ToString, Vec, H256, U256};
 use crate::types::{keccak, u256_to_arr, ErrorKind, InternalMetaCallArgs, RawU256, Result};
 
@@ -545,7 +544,7 @@ pub fn parse_meta_call(
     let mut signature: [u8; 65] = [0; 65];
     signature[64] = meta_tx.v;
     signature[..64].copy_from_slice(&meta_tx.signature);
-    match ecrecover(H256::from_slice(&msg), &signature) {
+    match crate::precompiles::ecrecover(H256::from_slice(&msg), &signature) {
         Ok(sender) => {
             result.sender = sender;
             result.input = input;

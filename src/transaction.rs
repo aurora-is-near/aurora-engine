@@ -1,6 +1,4 @@
-use crate::precompiles::ecrecover;
 use crate::prelude::{Address, Vec, U256};
-use crate::types::keccak;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 #[derive(Debug, Eq, PartialEq)]
@@ -65,8 +63,8 @@ impl EthSignedTransaction {
         };
         self.transaction
             .rlp_append_unsigned(&mut rlp_stream, chain_id);
-        let message_hash = keccak(rlp_stream.as_raw());
-        ecrecover(message_hash, &vrs_to_arr(rec_id, self.r, self.s)).ok()
+        let message_hash = crate::types::keccak(rlp_stream.as_raw());
+        crate::precompiles::ecrecover(message_hash, &vrs_to_arr(rec_id, self.r, self.s)).ok()
     }
 
     /// Returns chain id encoded in `v` parameter of the signature if that was done, otherwise None.
@@ -149,6 +147,7 @@ fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::*;
 
     #[test]
     fn test_eth_signed_no_chain_sender() {
