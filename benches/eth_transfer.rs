@@ -36,7 +36,8 @@ fn eth_transfer_benchmark(c: &mut Criterion) {
             .call(RAW_CALL, calling_account_id.clone(), input.clone());
     assert!(maybe_err.is_none());
     let gas = output.unwrap().burnt_gas;
-    println!("ETH_TRANSFER GAS: {:?}", gas); // TODO: capture this in a file
+    // TODO(#45): capture this in a file
+    println!("ETH_TRANSFER GAS: {:?}", gas);
 
     // measure wall-clock time
     c.bench_function("eth_transfer", |b| {

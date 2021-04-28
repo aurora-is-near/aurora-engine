@@ -84,7 +84,8 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
         runner.call(RAW_CALL, calling_account_id.clone(), mint_tx_bytes.clone());
     assert!(maybe_error.is_none());
     let gas = output.unwrap().burnt_gas;
-    println!("ETH_ERC20_MINT GAS: {:?}", gas); // TODO: capture this in a file
+    // TODO(#45): capture this in a file
+    println!("ETH_ERC20_MINT GAS: {:?}", gas);
 
     // Measure transfer gas usage
     let (output, maybe_err) = runner.one_shot().call(
@@ -94,7 +95,8 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
     );
     assert!(maybe_err.is_none());
     let gas = output.unwrap().burnt_gas;
-    println!("ETH_ERC20_TRANSFER GAS: {:?}", gas); // TODO: capture this in a file
+    // TODO(#45): capture this in a file
+    println!("ETH_ERC20_TRANSFER GAS: {:?}", gas);
 
     // measure transfer wall-clock time
     group.bench_function(transfer_id, |b| {

@@ -45,7 +45,7 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
                 .call(RAW_CALL, calling_account_id.clone(), input.clone());
         assert!(maybe_err.is_none());
         let gas = output.unwrap().burnt_gas;
-        // TODO: capture this in a file
+        // TODO(#45): capture this in a file
         println!("ETH_DEPLOY_CODE_{:?} GAS: {:?}", input_size, gas);
     }
 

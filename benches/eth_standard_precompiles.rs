@@ -62,7 +62,8 @@ fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
                 .call(RAW_CALL, calling_account_id.clone(), tx_bytes.clone());
         assert!(maybe_err.is_none());
         let gas = output.unwrap().burnt_gas;
-        println!("ETH_STANDARD_PRECOMPILES_{} GAS: {:?}", name, gas); // TODO: capture this in a file
+        // TODO(#45): capture this in a file
+        println!("ETH_STANDARD_PRECOMPILES_{} GAS: {:?}", name, gas);
     }
 
     let mut group = c.benchmark_group("standard_precompiles");
@@ -172,7 +173,7 @@ impl Contract {
             "test_modexp",
             "test_ecadd",
             "test_ecmul",
-            // TODO: ecpair uses up all the gas (by itself) for some reason, need to look into this.
+            // TODO(#46): ecpair uses up all the gas (by itself) for some reason, need to look into this.
             // "test_ecpair",
             "test_blake2f",
             "test_all",
