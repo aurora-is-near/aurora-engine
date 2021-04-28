@@ -112,11 +112,22 @@ impl Precompile for ModExp<Byzantium> {
         let exponent = BigUint::from_bytes_be(&exp_bytes);
         let modulus = BigUint::from_bytes_be(&mod_bytes);
 
-        Ok((
-            ExitSucceed::Returned,
-            base.modpow(&exponent, &modulus).to_bytes_be(),
-            0,
-        ))
+        let result = {
+            let computed_result = base.modpow(&exponent, &modulus).to_bytes_be();
+            // The result must be the same length as the input modulus.
+            // To ensure this we pad on the left with zeros.
+            if mod_len > computed_result.len() {
+                let diff = mod_len - computed_result.len();
+                let mut padded_result = Vec::with_capacity(mod_len);
+                padded_result.extend(core::iter::repeat(0).take(diff));
+                padded_result.extend_from_slice(&computed_result);
+                padded_result
+            } else {
+                computed_result
+            }
+        };
+
+        Ok((ExitSucceed::Returned, result, 0))
     }
 }
 
