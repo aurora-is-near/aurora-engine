@@ -344,15 +344,12 @@ impl evm::backend::Backend for Engine {
         U256::from(sdk::block_index())
     }
 
-    /// Returns a mocked coinbase which is the first 160 bits of
-    /// `keccak256(b"aurora")`.
-    ///
-    /// It is not possible to return the address of the current block's miner in
-    /// NEAR as it isn't relevant.
+    /// Returns a mocked coinbase which is the EVM address for the Aurora
+    /// account.
     fn block_coinbase(&self) -> Address {
         Address([
-            0x2b, 0x0b, 0xf3, 0xb8, 0xff, 0xaa, 0x4f, 0x3d, 0x1f, 0x97, 0x76, 0x0d, 0x44, 0x44,
-            0x58, 0x84, 0x43, 0xc3, 0xa9, 0x12,
+            0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
+            0x9A, 0xba, 0x10, 0x54, 0x19, 0x2b,
         ])
     }
 
