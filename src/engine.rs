@@ -357,7 +357,7 @@ impl evm::backend::Backend for Engine {
     }
 
     fn block_gas_limit(&self) -> U256 {
-        U256::zero() // TODO
+        U256::max_value()
     }
 
     fn chain_id(&self) -> U256 {
