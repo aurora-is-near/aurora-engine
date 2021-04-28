@@ -319,46 +319,78 @@ impl Engine {
 }
 
 impl evm::backend::Backend for Engine {
+    /// Returns the gas price.
+    ///
+    /// This is currently zero, but may be changed in the future. This is mainly
+    /// because there already is another cost for transactions.
     fn gas_price(&self) -> U256 {
         U256::zero()
     }
 
+    /// Returns the origin address that created the contract.
     fn origin(&self) -> Address {
         self.origin
     }
 
+    /// Returns a block hash from a given index.
+    ///
+    /// Currently this returns zero, but may be changed in the future.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#blockhash
     fn block_hash(&self, _number: U256) -> H256 {
         H256::zero() // TODO: https://github.com/near/nearcore/issues/3456
     }
 
+    /// Returns the current block index number.
     fn block_number(&self) -> U256 {
         U256::from(sdk::block_index())
     }
 
+    /// Returns a mocked coinbase which is the EVM address for the Aurora
+    /// account, being 0x4444588443C3a91288c5002483449Aba1054192b.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#coinbase
     fn block_coinbase(&self) -> Address {
-        Address::zero()
+        Address([
+            0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
+            0x9A, 0xba, 0x10, 0x54, 0x19, 0x2b,
+        ])
     }
 
+    /// Returns the current block timestamp.
     fn block_timestamp(&self) -> U256 {
         U256::from(sdk::block_timestamp())
     }
 
+    /// Returns the current block difficulty.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#difficulty
     fn block_difficulty(&self) -> U256 {
         U256::zero()
     }
 
+    /// Returns the current block gas limit.
+    ///
+    /// Currently, this returns 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    /// as there isn't a gas limit alternative right now but this may change in
+    /// the future.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#gaslimit
     fn block_gas_limit(&self) -> U256 {
-        U256::zero() // TODO
+        U256::max_value()
     }
 
+    /// Returns the states chain ID.
     fn chain_id(&self) -> U256 {
         U256::from(self.state.chain_id)
     }
 
+    /// Checks if an address exists.
     fn exists(&self, address: Address) -> bool {
         !Engine::is_account_empty(&address)
     }
 
+    /// Returns basic account information.
     fn basic(&self, address: Address) -> Basic {
         Basic {
             nonce: Engine::get_nonce(&address),
@@ -366,14 +398,19 @@ impl evm::backend::Backend for Engine {
         }
     }
 
+    /// Returns the code of the contract from an address.
     fn code(&self, address: Address) -> Vec<u8> {
         Engine::get_code(&address)
     }
 
+    /// Get storage value of address at index.
     fn storage(&self, address: Address, index: H256) -> H256 {
         Engine::get_storage(&address, &index)
     }
 
+    /// Get original storage value of address at index, if available.
+    ///
+    /// Currently, this returns `None` for now.
     fn original_storage(&self, _address: Address, _index: H256) -> Option<H256> {
         None
     }
