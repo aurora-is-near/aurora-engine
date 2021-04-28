@@ -335,6 +335,8 @@ impl evm::backend::Backend for Engine {
     /// Returns a block hash from a given index.
     ///
     /// Currently this returns zero, but may be changed in the future.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#blockhash
     fn block_hash(&self, _number: U256) -> H256 {
         H256::zero() // TODO: https://github.com/near/nearcore/issues/3456
     }
@@ -346,6 +348,8 @@ impl evm::backend::Backend for Engine {
 
     /// Returns a mocked coinbase which is the EVM address for the Aurora
     /// account, being 0x4444588443C3a91288c5002483449Aba1054192b.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#coinbase
     fn block_coinbase(&self) -> Address {
         Address([
             0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
@@ -359,6 +363,8 @@ impl evm::backend::Backend for Engine {
     }
 
     /// Returns the current block difficulty.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#difficulty
     fn block_difficulty(&self) -> U256 {
         U256::zero()
     }
@@ -368,6 +374,8 @@ impl evm::backend::Backend for Engine {
     /// Currently, this returns 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
     /// as there isn't a gas limit alternative right now but this may change in
     /// the future.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#gaslimit
     fn block_gas_limit(&self) -> U256 {
         U256::max_value()
     }
