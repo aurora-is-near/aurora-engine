@@ -267,7 +267,7 @@ impl Engine {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = U256::zero();
-        self.call(origin, contract, value, args.input, u64::MAX)
+        self.call(origin, contract, value, args.input)
     }
 
     pub fn call(
@@ -276,10 +276,9 @@ impl Engine {
         contract: Address,
         value: U256,
         input: Vec<u8>,
-        gas_limit: u64,
     ) -> (ExitReason, Vec<u8>) {
         let mut executor = self.make_executor();
-        let (status, result) = executor.transact_call(origin, contract, value, input, gas_limit);
+        let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
         (status, result)
