@@ -36,7 +36,6 @@ pub struct MetaCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FunctionCallArgs {
     pub contract: RawAddress,
-    pub gas_limit: u64,
     pub input: Vec<u8>,
 }
 

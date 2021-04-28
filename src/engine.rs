@@ -267,7 +267,7 @@ impl Engine {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = U256::zero();
-        self.call(origin, contract, value, args.input, args.gas_limit)
+        self.call(origin, contract, value, args.input, u64::MAX)
     }
 
     pub fn call(
