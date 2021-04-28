@@ -36,7 +36,7 @@ pub struct EthConnector {
 }
 
 /// Token message data
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub enum TokenMessageData {
     Near(AccountId),
     Eth { address: AccountId, message: String },
@@ -99,7 +99,7 @@ impl EthConnectorContract {
     }
 
     /// Get on-transfer data from message
-    fn parse_on_transfer_message(&self, message: &str) -> OnTrasnferMessageData {
+    fn parse_on_transfer_message(&self, message: &str) -> OnTransferMessageData {
         let data: Vec<_> = message.split(':').collect();
         assert_eq!(data.len(), 2);
 
@@ -109,7 +109,7 @@ impl EthConnectorContract {
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..51]);
 
-        OnTrasnferMessageData {
+        OnTransferMessageData {
             relayer: data[0].into(),
             recipient,
             fee: U256::from(fee),
@@ -160,7 +160,7 @@ impl EthConnectorContract {
             event.eth_custodian_address, self.contract.eth_custodian_address,
             "ERR_WRONG_EVENT_ADDRESS",
         );
-        assert!(event.amount < event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
+        assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
 
         // Verify proof data with cross-cotract call at prover account
         #[cfg(feature = "log")]
@@ -175,6 +175,11 @@ impl EthConnectorContract {
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
+
+        sdk::log(format!(
+            "MSG: {:?}",
+            self.parse_event_message(&event.recipient)
+        ));
 
         // Finalize deposit
         let promise1 = match self.parse_event_message(&event.recipient) {
@@ -234,7 +239,7 @@ impl EthConnectorContract {
                     &sdk::current_account_id(),
                     b"ft_transfer_call",
                     &transfer_data[..],
-                    NO_DEPOSIT,
+                    1,
                     GAS_FOR_FINISH_DEPOSIT,
                 )
             }
@@ -278,7 +283,7 @@ impl EthConnectorContract {
 
     /// Internal ETH withdraw ETH logic
     pub(crate) fn internal_remove_eth(&mut self, address: &Address, amount: &U256) {
-        self.ft.internal_withdraw_eth(address.0, amount.as_u128());
+        self.burn_eth(address.0, amount.as_u128());
         self.save_contract();
     }
 
@@ -322,7 +327,6 @@ impl EthConnectorContract {
     }
 
     /// Burn ETH tokens
-    #[allow(dead_code)]
     fn burn_eth(&mut self, address: EthAddress, amount: Balance) {
         #[cfg(feature = "log")]
         sdk::log(format!(
@@ -525,13 +529,13 @@ impl EthConnectorContract {
         let args = FtOnTransfer::try_from_slice(&sdk::read_input()[..]).expect(ERR_FAILED_PARSE);
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
+        // Parse message with specific rules
         let message_data = self.parse_on_transfer_message(&args.msg);
 
         // Special case when current_account_id is predecessor
         if current_account_id == predecessor_account_id {
-            self.ft.internal_withdraw(&current_account_id, args.amount);
-            self.ft
-                .internal_deposit_eth(message_data.recipient, args.amount);
+            self.burn_near(current_account_id, args.amount);
+            self.mint_eth(message_data.recipient, args.amount);
 
             #[cfg(feature = "log")]
             sdk::log(format!(
