@@ -1,6 +1,6 @@
 use aurora_engine::prelude::{Address, U256};
 use aurora_engine::transaction::EthTransaction;
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
@@ -41,35 +41,50 @@ fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
         address: Address::from_slice(&contract_address),
     };
 
-    // create testing transaction
-    let tx = contract.test_all(U256::from(INITIAL_NONCE + 1));
-    let signed_tx = sign_transaction(tx, Some(runner.chain_id), &source_account);
-    let tx_bytes = rlp::encode(&signed_tx).to_vec();
+    let test_names = Contract::all_method_names();
+    let bench_ids: Vec<_> = test_names.iter().map(BenchmarkId::from_parameter).collect();
+
+    // create testing transactions
+    let transactions: Vec<_> = test_names
+        .iter()
+        .map(|method_name| {
+            let tx = contract.call_method(method_name, U256::from(INITIAL_NONCE + 1));
+            let signed_tx = sign_transaction(tx, Some(runner.chain_id), &source_account);
+            rlp::encode(&signed_tx).to_vec()
+        })
+        .collect();
 
     // measure gas usage
-    let (output, maybe_err) =
-        runner
-            .one_shot()
-            .call(RAW_CALL, calling_account_id.clone(), tx_bytes.clone());
-    println!("{:?}", maybe_err);
-    assert!(maybe_err.is_none());
-    let gas = output.unwrap().burnt_gas;
-    println!("ETH_STANDARD_PRECOMPILES GAS: {:?}", gas); // TODO: capture this in a file
+    for (tx_bytes, name) in transactions.iter().zip(test_names.iter()) {
+        let (output, maybe_err) =
+            runner
+                .one_shot()
+                .call(RAW_CALL, calling_account_id.clone(), tx_bytes.clone());
+        assert!(maybe_err.is_none());
+        let gas = output.unwrap().burnt_gas;
+        println!("ETH_STANDARD_PRECOMPILES_{} GAS: {:?}", name, gas); // TODO: capture this in a file
+    }
+
+    let mut group = c.benchmark_group("standard_precompiles");
 
     // measure wall-clock time
-    c.bench_function("eth_standard_precompiles", |b| {
-        b.iter_batched(
-            || {
-                (
-                    runner.one_shot(),
-                    calling_account_id.clone(),
-                    tx_bytes.clone(),
-                )
-            },
-            |(r, c, i)| r.call(RAW_CALL, c, i),
-            BatchSize::SmallInput,
-        )
-    });
+    for (tx_bytes, id) in transactions.iter().zip(bench_ids.into_iter()) {
+        group.bench_function(id, |b| {
+            b.iter_batched(
+                || {
+                    (
+                        runner.one_shot(),
+                        calling_account_id.clone(),
+                        tx_bytes.clone(),
+                    )
+                },
+                |(r, c, i)| r.call(RAW_CALL, c, i),
+                BatchSize::SmallInput,
+            )
+        });
+    }
+
+    group.finish();
 }
 
 struct ContractConstructor {
@@ -131,10 +146,10 @@ impl ContractConstructor {
 }
 
 impl Contract {
-    fn test_all(&self, nonce: U256) -> EthTransaction {
+    fn call_method(&self, method_name: &str, nonce: U256) -> EthTransaction {
         let data = self
             .abi
-            .function("test_all")
+            .function(method_name)
             .unwrap()
             .encode_input(&[])
             .unwrap();
@@ -146,6 +161,22 @@ impl Contract {
             value: Default::default(),
             data,
         }
+    }
+
+    fn all_method_names() -> &'static [&'static str] {
+        &[
+            "test_ecrecover",
+            "test_sha256",
+            "test_ripemd160",
+            "test_identity",
+            "test_modexp",
+            "test_ecadd",
+            "test_ecmul",
+            // TODO: ecpair uses up all the gas (by itself) for some reason, need to look into this.
+            // "test_ecpair",
+            "test_blake2f",
+            "test_all",
+        ]
     }
 }
 
