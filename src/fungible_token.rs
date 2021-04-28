@@ -61,7 +61,7 @@ impl FungibleToken {
         Engine::get_balance(&prelude::Address(address)).as_u128()
     }
 
-    /// Internal deposit NEAR (nETH) FT
+    /// Internal deposit NEAR - NEP-141
     pub fn internal_deposit(&mut self, account_id: &str, amount: Balance) {
         let balance = self.internal_unwrap_balance_of(account_id);
         if let Some(new_balance) = balance.checked_add(amount) {
@@ -79,7 +79,7 @@ impl FungibleToken {
         }
     }
 
-    /// Internal deposit ETH FT
+    /// Internal deposit ETH (nETH)
     pub fn internal_deposit_eth(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth(address);
         if let Some(new_balance) = balance.checked_add(amount) {

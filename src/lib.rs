@@ -347,11 +347,6 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn finish_deposit_eth() {
-        EthConnectorContract::new().finish_deposit_eth();
-    }
-
-    #[no_mangle]
     pub extern "C" fn ft_total_supply() {
         EthConnectorContract::new().ft_total_supply();
     }

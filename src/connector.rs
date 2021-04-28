@@ -43,7 +43,7 @@ pub enum TokenMessageData {
 }
 
 /// On-transfer message
-pub struct OnTrasnferMessageData {
+pub struct OnTransferMessageData {
     pub relayer: AccountId,
     pub recipient: EthAddress,
     pub fee: U256,
@@ -176,7 +176,7 @@ impl EthConnectorContract {
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
 
-        // Finilize deposit
+        // Finalize deposit
         let promise1 = match self.parse_event_message(&event.recipient) {
             // Deposit to NEAR accounts
             TokenMessageData::Near(account_id) => {
@@ -264,35 +264,8 @@ impl EthConnectorContract {
 
         // Mint tokens to recipient minus fee
         self.mint_near(data.new_owner_id, data.amount - data.fee);
-        // Mint fee for Predecessor
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-        self.mint_near(predecessor_account_id, data.fee);
-        // Save new contract data
-        self.save_contract();
-    }
-
-    /// Finish deposit for ETH accounts
-    /// TODO: remove, it's not used
-    pub fn finish_deposit_eth(&mut self) {
-        sdk::assert_private_call();
-        let data = FinishDepositEthCallArgs::try_from_slice(&sdk::read_input()).unwrap();
-        #[cfg(feature = "log")]
-        sdk::log(format!("Finish deposit ETH amount: {}", data.amount));
-        assert_eq!(sdk::promise_results_count(), 1);
-
-        // Check promise results
-        let data0: Vec<u8> = match sdk::promise_result(0) {
-            PromiseResult::Successful(x) => x,
-            _ => sdk::panic_utf8(b"ERR_PROMISE_INDEX"),
-        };
-        #[cfg(feature = "log")]
-        sdk::log("Check verification_success".into());
-        let verification_success: bool = bool::try_from_slice(&data0).unwrap();
-        assert!(verification_success, "ERR_VERIFY_PROOF");
-        self.record_proof(data.proof.get_key());
-
-        // Mint tokens to recipient minus fee
-        self.mint_eth(data.new_owner_id, data.amount);
+        // TODO: For near - set relayer = some predecessor_id, some fee
+        // TODO:  for eth - relayer without save fee
         // Save new contract data
         self.save_contract();
     }
@@ -328,8 +301,6 @@ impl EthConnectorContract {
             self.ft.accounts_insert(&owner_id, 0);
         }
         self.ft.internal_deposit(&owner_id, amount);
-        #[cfg(feature = "log")]
-        sdk::log("Mint NEAR success".into());
     }
 
     ///  Mint ETH tokens
@@ -341,8 +312,6 @@ impl EthConnectorContract {
             hex::encode(owner_id)
         ));
         self.ft.internal_deposit_eth(owner_id, amount);
-        #[cfg(feature = "log")]
-        sdk::log("Mint ETH success".into());
     }
 
     /// Burn NEAR tokens
@@ -364,7 +333,9 @@ impl EthConnectorContract {
         self.ft.internal_withdraw_eth(address, amount);
     }
 
+    /// Withdraw from NEAR accounts
     pub fn withdraw_near(&mut self) {
+        sdk::assert_one_yocto();
         #[cfg(feature = "log")]
         sdk::log("Start withdraw NEAR".into());
         let args =
