@@ -345,7 +345,7 @@ impl evm::backend::Backend for Engine {
     }
 
     /// Returns a mocked coinbase which is the EVM address for the Aurora
-    /// account.
+    /// account, being 0x4444588443C3a91288c5002483449Aba1054192b.
     fn block_coinbase(&self) -> Address {
         Address([
             0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
@@ -363,9 +363,11 @@ impl evm::backend::Backend for Engine {
         U256::zero()
     }
 
-    /// Returns the current block's gas limit.
+    /// Returns the current block gas limit.
     ///
-    /// Currently, this returns 0 as there is no concept of a gas limit.
+    /// Currently, this returns 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    /// as there isn't a gas limit alternative right now but this may change in
+    /// the future.
     fn block_gas_limit(&self) -> U256 {
         U256::max_value()
     }
