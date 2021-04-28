@@ -335,8 +335,16 @@ impl evm::backend::Backend for Engine {
         U256::from(sdk::block_index())
     }
 
+    /// Returns a mocked coinbase which is the first 160 bits of
+    /// `keccak256(b"aurora")`.
+    ///
+    /// It is not possible to return the address of the current block's miner in
+    /// NEAR as it isn't relevant.
     fn block_coinbase(&self) -> Address {
-        Address::zero()
+        Address([
+            0x2b, 0x0b, 0xf3, 0xb8, 0xff, 0xaa, 0x4f, 0x3d, 0x1f, 0x97, 0x76, 0x0d, 0x44, 0x44,
+            0x58, 0x84, 0x43, 0xc3, 0xa9, 0x12,
+        ])
     }
 
     fn block_timestamp(&self) -> U256 {
