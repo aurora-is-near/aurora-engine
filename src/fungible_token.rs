@@ -204,6 +204,7 @@ impl FungibleToken {
         if sender_id != receiver_id {
             self.internal_transfer(sender_id, receiver_id, amount, memo);
         }
+
         let data1 = FtOnTransfer {
             amount,
             msg,

@@ -450,8 +450,8 @@ impl EthConnectorContract {
             .ft_resolve_transfer(&args.sender_id, &args.receiver_id, args.amount);
         #[cfg(feature = "log")]
         sdk::log(format!(
-            "Resolve transfer of {} from {} to {} success",
-            args.amount, args.sender_id, args.receiver_id
+            "Resolve transfer from {} to {} success",
+            args.sender_id, args.receiver_id
         ));
         // `ft_resolve_transfer` can changed `total_supply` so we should save contract
         self.save_contract();
