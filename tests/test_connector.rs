@@ -3,7 +3,6 @@
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json;
-use near_sdk::serde_json::json;
 use near_sdk::test_utils::accounts;
 use near_sdk_sim::{to_yocto, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
 
@@ -122,9 +121,8 @@ fn call_deposit_eth(master_account: &UserAccount) {
         DEFAULT_GAS,
         10,
     );
-    //res.assert_success();
-    println!("{:#?}", res.promise_results());
-    //print_logs(res.logs());
+    res.assert_success();
+    //println!("{:#?}", res.promise_results());
 }
 
 fn get_near_balance(master_account: &UserAccount, acc: &str) -> u128 {
@@ -149,11 +147,15 @@ fn get_near_balance(master_account: &UserAccount, acc: &str) -> u128 {
 }
 
 fn get_eth_balance(master_account: &UserAccount, address: EthAddress) -> u128 {
-    let address = hex::encode(address);
+    #[derive(BorshSerialize, BorshDeserialize)]
+    pub struct BalanceOfEthCallArgs {
+        pub address: EthAddress,
+    }
+
     let balance = master_account.view(
         CONTRACT_ACC.to_string(),
         "ft_balance_of_eth",
-        json!({ "address": address }).to_string().as_bytes(),
+        &BalanceOfEthCallArgs { address }.try_to_vec().unwrap(),
     );
     String::from_utf8(balance.unwrap())
         .unwrap()
@@ -211,17 +213,17 @@ fn test_eth_deposit_balance_total_supply() {
     let (master_account, contract) = init(EVM_CUSTODIAN_ADDRESS);
     call_deposit_eth(&contract);
 
-    // let balance = get_eth_balance(&master_account, validate_eth_address(RECIPIENT_ETH_ADDRESS));
-    // assert_eq!(balance, DEPOSITED_EVM_AMOUNT - DEPOSITED_EVM_FEE);
+    let balance = get_eth_balance(&master_account, validate_eth_address(RECIPIENT_ETH_ADDRESS));
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
 
-    // let balance = total_supply(&master_account);
-    // assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+    let balance = total_supply(&master_account);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
 
-    // let balance = total_supply_eth(&master_account);
-    // assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+    let balance = total_supply_eth(&master_account);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
 
-    // let balance = total_supply_near(&master_account);
-    // assert_eq!(balance, 0);
+    let balance = total_supply_near(&master_account);
+    assert_eq!(balance, 0);
 }
 
 #[test]
@@ -259,45 +261,30 @@ fn test_withdraw_near() {
     let balance = total_supply(&master_account);
     assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount as u128);
 }
-/*
-#[test]
-fn test_withdraw_eth() {
-    let (master_account, _contract_account) = init(CUSTODIAN_ADDRESS);
-    let res = master_account
-        .call(
-            CONTRACT_ACC.to_string(),
-            "withdraw_eth",
-            json!({
-                "sender": "891B2749238B27fF58e951088e55b04de71Dc374",
-                "eth_recipient": "891B2749238B27fF58e951088e55b04de71Dc374",
-                "amount": "7654321",
-                "eip712_signature": "51ea7c8a54da3ffc1f6af82f9e535e156577583583d3e9de375139b41443ab5f4bddc25f69134a2d0fba2aa701da1532a94a013dd811d6c7edbbe94542a62ba41c"
-            }).to_string().as_bytes(),
-            DEFAULT_GAS,
-            0,
-        );
-    res.assert_success();
-    for s in res.logs().iter() {
-        println!("[log] {}", s);
-    }
-}
 
 #[test]
 fn test_ft_transfer() {
-    let (master_account, _contract) = init(CUSTODIAN_ADDRESS);
-    call_deposit_near(&master_account);
+    #[derive(BorshSerialize, BorshDeserialize)]
+    pub struct TransferCallArgs {
+        pub receiver_id: String,
+        pub amount: Balance,
+        pub memo: Option<String>,
+    }
 
-    let transfer_amount = 777;
-    let res = master_account.call(
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_near(&contract);
+
+    let transfer_amount = 70;
+    let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer",
-        json!({
-            "receiver_id": CONTRACT_ACC,
-            "amount": transfer_amount,
-            "memo": "transfer memo"
-        })
-        .to_string()
-        .as_bytes(),
+        &TransferCallArgs {
+            receiver_id: DEPOSITED_RECIPIENT.into(),
+            amount: transfer_amount,
+            memo: None,
+        }
+        .try_to_vec()
+        .unwrap(),
         DEFAULT_GAS,
         1,
     );
@@ -306,13 +293,23 @@ fn test_ft_transfer() {
     let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT);
     assert_eq!(
         balance,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE - transfer_amount as u128
+        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
     );
 
     let balance = get_near_balance(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE + transfer_amount as u128);
+    assert_eq!(balance, DEPOSITED_FEE - transfer_amount as u128);
+
+    let balance = total_supply(&master_account);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+
+    let balance = total_supply_eth(&master_account);
+    assert_eq!(balance, 0);
+
+    let balance = total_supply_near(&master_account);
+    assert_eq!(balance, DEPOSITED_AMOUNT);
 }
 
+/*
 #[test]
 fn test_ft_transfer_call() {
     let (master_account, _contract) = init(CUSTODIAN_ADDRESS);
