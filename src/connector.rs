@@ -135,7 +135,7 @@ impl EthConnectorContract {
         sdk::log("[Deposit tokens]".into());
 
         // Get incoming deposit arguments
-        let raw_proof = &sdk::read_input()[..];
+        let raw_proof = sdk::read_input();
         let proof: Proof = Proof::try_from_slice(&raw_proof).expect("ERR_FAILED_PARSE");
         // Fetch event data from Proof
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
@@ -168,10 +168,15 @@ impl EthConnectorContract {
             "Deposit verify_log_entry for prover: {}",
             self.contract.prover_account,
         ));
+
+        // Do not skip bridge call. This is only used for development and diagnostics.
+        let skip_bridge_call = false.try_to_vec().unwrap();
+        let mut proof_to_verify = raw_proof;
+        proof_to_verify.extend(skip_bridge_call);
         let promise0 = sdk::promise_create(
             self.contract.prover_account.as_bytes(),
             b"verify_log_entry",
-            &raw_proof,
+            &proof_to_verify,
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
@@ -610,7 +615,7 @@ impl EthConnectorContract {
         [EVM_RELAYER_NAME_KEY, account_id].join(":")
     }
 
-    /// Save eth-connecor contract data
+    /// Save eth-connector contract data
     fn save_contract(&mut self) {
         sdk::save_contract(CONTRACT_NAME_KEY.as_bytes(), &self.contract);
         sdk::save_contract(CONTRACT_FT_KEY.as_bytes(), &self.ft);
