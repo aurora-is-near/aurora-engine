@@ -182,11 +182,6 @@ impl EthConnectorContract {
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
 
-        sdk::log(format!(
-            "MSG: {:?}",
-            self.parse_event_message(&event.recipient)
-        ));
-
         // Finalize deposit
         let promise1 = match self.parse_event_message(&event.recipient) {
             // Deposit to NEAR accounts
