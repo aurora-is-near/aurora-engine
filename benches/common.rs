@@ -17,6 +17,9 @@ use aurora_engine::storage;
 use aurora_engine::transaction::{EthSignedTransaction, EthTransaction};
 use aurora_engine::types;
 
+#[cfg(feature = "profile_eth_gas")]
+use aurora_engine::prelude::ETH_GAS_USED;
+
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
 }
@@ -225,4 +228,18 @@ pub fn address_from_secret_key(sk: &SecretKey) -> Address {
     let pk = PublicKey::from_secret_key(sk);
     let hash = types::keccak(&pk.serialize()[1..]);
     Address::from_slice(&hash[12..])
+}
+
+#[cfg(feature = "profile_eth_gas")]
+pub fn parse_eth_gas(output: &VMOutcome) -> u64 {
+    for log in output.logs.iter() {
+        if log.starts_with(ETH_GAS_USED) {
+            let eth_gas: Option<u64> = log
+                .split_ascii_whitespace()
+                .last()
+                .and_then(|x| x.parse().ok());
+            return eth_gas.unwrap();
+        }
+    }
+    panic!("Failed to parse Eth gas from the output logs. Was the EVM contract compiled with `--features profile_eth_gas`?");
 }

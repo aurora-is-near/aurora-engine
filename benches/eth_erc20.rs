@@ -83,9 +83,16 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
     let (output, maybe_error) =
         runner.call(RAW_CALL, calling_account_id.clone(), mint_tx_bytes.clone());
     assert!(maybe_error.is_none());
-    let gas = output.unwrap().burnt_gas;
+    let output = output.unwrap();
+    let gas = output.burnt_gas;
     // TODO(#45): capture this in a file
-    println!("ETH_ERC20_MINT GAS: {:?}", gas);
+    println!("ETH_ERC20_MINT NEAR GAS: {:?}", gas);
+    #[cfg(feature = "profile_eth_gas")]
+    {
+        let eth_gas = common::parse_eth_gas(&output);
+        // TODO(#45): capture this in a file
+        println!("ETH_ERC20_MINT ETH GAS: {:?}", eth_gas);
+    }
 
     // Measure transfer gas usage
     let (output, maybe_err) = runner.one_shot().call(
@@ -94,9 +101,16 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
         transfer_tx_bytes.clone(),
     );
     assert!(maybe_err.is_none());
-    let gas = output.unwrap().burnt_gas;
+    let output = output.unwrap();
+    let gas = output.burnt_gas;
     // TODO(#45): capture this in a file
-    println!("ETH_ERC20_TRANSFER GAS: {:?}", gas);
+    println!("ETH_ERC20_TRANSFER NEAR GAS: {:?}", gas);
+    #[cfg(feature = "profile_eth_gas")]
+    {
+        let eth_gas = common::parse_eth_gas(&output);
+        // TODO(#45): capture this in a file
+        println!("ETH_ERC20_TRANSFER ETH GAS: {:?}", eth_gas);
+    }
 
     // measure transfer wall-clock time
     group.bench_function(transfer_id, |b| {

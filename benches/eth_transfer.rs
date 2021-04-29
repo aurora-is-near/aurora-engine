@@ -1,6 +1,7 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use secp256k1::SecretKey;
 
+#[allow(dead_code)]
 mod common;
 
 use common::{address_from_secret_key, create_eth_transaction, deploy_evm, RAW_CALL};
@@ -37,7 +38,9 @@ fn eth_transfer_benchmark(c: &mut Criterion) {
     assert!(maybe_err.is_none());
     let gas = output.unwrap().burnt_gas;
     // TODO(#45): capture this in a file
-    println!("ETH_TRANSFER GAS: {:?}", gas);
+    println!("ETH_TRANSFER NEAR GAS: {:?}", gas);
+    #[cfg(feature = "profile_eth_gas")]
+    println!("ETH_TRANSFER ETH GAS: {:?}", 21_000);
 
     // measure wall-clock time
     c.bench_function("eth_transfer", |b| {

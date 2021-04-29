@@ -44,9 +44,17 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
                 .one_shot()
                 .call(RAW_CALL, calling_account_id.clone(), input.clone());
         assert!(maybe_err.is_none());
-        let gas = output.unwrap().burnt_gas;
+        let output = output.unwrap();
+        let gas = output.burnt_gas;
         // TODO(#45): capture this in a file
-        println!("ETH_DEPLOY_CODE_{:?} GAS: {:?}", input_size, gas);
+        println!("ETH_DEPLOY_CODE_{:?} NEAR GAS: {:?}", input_size, gas);
+
+        #[cfg(feature = "profile_eth_gas")]
+        {
+            let eth_gas = common::parse_eth_gas(&output);
+            // TODO(#45): capture this in a file
+            println!("ETH_DEPLOY_CODE_{:?} ETH GAS: {:?}", input_size, eth_gas);
+        }
     }
 
     // measure wall-clock time

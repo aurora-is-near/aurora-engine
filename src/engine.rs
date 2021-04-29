@@ -258,6 +258,10 @@ impl Engine {
             executor.transact_create(origin, value, Vec::from(input), u64::MAX),
             address,
         );
+
+        #[cfg(feature = "profile_eth_gas")]
+        log_eth_gas_used(&executor);
+
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
         (status, result)
@@ -279,6 +283,10 @@ impl Engine {
     ) -> (ExitReason, Vec<u8>) {
         let mut executor = self.make_executor();
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+
+        #[cfg(feature = "profile_eth_gas")]
+        log_eth_gas_used(&executor);
+
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
         (status, result)
@@ -316,6 +324,16 @@ impl Engine {
         let state = MemoryStackState::new(metadata, self);
         StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
     }
+}
+
+#[cfg(feature = "profile_eth_gas")]
+fn log_eth_gas_used(executor: &StackExecutor<MemoryStackState<Engine>>) {
+    use alloc::format;
+    sdk::log(format!(
+        "{}: {}",
+        crate::prelude::ETH_GAS_USED,
+        executor.used_gas()
+    ));
 }
 
 impl evm::backend::Backend for Engine {

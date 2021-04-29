@@ -61,9 +61,16 @@ fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
                 .one_shot()
                 .call(RAW_CALL, calling_account_id.clone(), tx_bytes.clone());
         assert!(maybe_err.is_none());
-        let gas = output.unwrap().burnt_gas;
+        let output = output.unwrap();
+        let gas = output.burnt_gas;
         // TODO(#45): capture this in a file
-        println!("ETH_STANDARD_PRECOMPILES_{} GAS: {:?}", name, gas);
+        println!("ETH_STANDARD_PRECOMPILES_{} NEAR GAS: {:?}", name, gas);
+        #[cfg(feature = "profile_eth_gas")]
+        {
+            let eth_gas = common::parse_eth_gas(&output);
+            // TODO(#45): capture this in a file
+            println!("ETH_STANDARD_PRECOMPILES_{} ETH GAS: {:?}", name, eth_gas);
+        }
     }
 
     let mut group = c.benchmark_group("standard_precompiles");
