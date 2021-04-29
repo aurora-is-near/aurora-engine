@@ -118,8 +118,7 @@ fn call_deposit_eth(master_account: &UserAccount) {
     let res = master_account.call(
         CONTRACT_ACC.to_string(),
         "deposit",
-        &proof.try_to_vec()
-            .unwrap(),
+        &proof.try_to_vec().unwrap(),
         DEFAULT_GAS,
         10,
     );
@@ -217,10 +216,10 @@ fn test_eth_deposit_balance_total_supply() {
 
     // let balance = total_supply(&master_account);
     // assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
-    
+
     // let balance = total_supply_eth(&master_account);
     // assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
-    
+
     // let balance = total_supply_near(&master_account);
     // assert_eq!(balance, 0);
 }

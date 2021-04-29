@@ -15,8 +15,7 @@ use alloc::{
 use borsh::{BorshDeserialize, BorshSerialize};
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
-const GAS_FOR_FT_ON_TRANSFER: Gas = 24_000_000_000_000;
-const GAS_FOR_FT_TRANSFER_CALL: Gas = 50_000_000_000_000 + GAS_FOR_FT_ON_TRANSFER + GAS_FOR_RESOLVE_TRANSFER;
+const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
@@ -220,7 +219,6 @@ impl FungibleToken {
         }
         .try_to_vec()
         .unwrap();
-        sdk::log("ft_on_transfer".into());
         // Initiating receiver's call and the callback
         let promise0 = sdk::promise_create(
             receiver_id.as_bytes(),
@@ -228,7 +226,7 @@ impl FungibleToken {
             &data1[..],
             NO_DEPOSIT,
             GAS_FOR_FT_ON_TRANSFER,
-        );/*
+        );
         let promise1 = sdk::promise_then(
             promise0,
             &sdk::current_account_id(),
@@ -236,8 +234,8 @@ impl FungibleToken {
             &data2[..],
             NO_DEPOSIT,
             GAS_FOR_RESOLVE_TRANSFER,
-        );*/
-        sdk::promise_return(promise0);
+        );
+        sdk::promise_return(promise1);
     }
 
     pub fn internal_ft_resolve_transfer(

@@ -332,6 +332,7 @@ pub fn log(data: String) {
     log_utf8(data.as_bytes())
 }
 
+#[allow(unused)]
 pub fn prepaid_gas() -> u64 {
     unsafe { exports::prepaid_gas() }
 }

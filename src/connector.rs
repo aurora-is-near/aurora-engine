@@ -106,9 +106,9 @@ impl EthConnectorContract {
 
         let msg = hex::decode(data[1]).expect(ERR_FAILED_PARSE);
         let mut fee: [u8; 32] = Default::default();
-        fee.copy_from_slice(&msg[..31]);
+        fee.copy_from_slice(&msg[..32]);
         let mut recipient: EthAddress = Default::default();
-        recipient.copy_from_slice(&msg[32..51]);
+        recipient.copy_from_slice(&msg[32..52]);
 
         OnTransferMessageData {
             relayer: data[0].into(),
@@ -444,7 +444,7 @@ impl EthConnectorContract {
             .ft
             .ft_resolve_transfer(&args.sender_id, &args.receiver_id, args.amount);
         #[cfg(feature = "log")]
-            sdk::log(format!(
+        sdk::log(format!(
             "Resolve transfer of {} from {} to {} success",
             args.amount, args.sender_id, args.receiver_id
         ));
@@ -547,13 +547,6 @@ impl EthConnectorContract {
         if current_account_id == predecessor_account_id {
             self.burn_near(current_account_id, args.amount);
             self.mint_eth(message_data.recipient, args.amount);
-
-            #[cfg(feature = "log")]
-            sdk::log(format!(
-                "Transfer NEAR tokens {} amount to {} ETH success",
-                args.amount,
-                hex::encode(message_data.recipient),
-            ));
         } else {
             use crate::engine::Engine;
             use alloc::vec;
