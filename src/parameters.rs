@@ -144,8 +144,9 @@ pub struct ResolveTransferCallArgs {
 pub struct FinishDepositCallArgs {
     pub new_owner_id: AccountId,
     pub amount: Balance,
-    pub fee: Balance,
     pub proof: Proof,
+    pub relayer_id: Option<AccountId>,
+    pub fee: Option<Balance>,
 }
 
 /// Deposit ETH args

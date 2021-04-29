@@ -185,11 +185,14 @@ impl EthConnectorContract {
         let promise1 = match self.parse_event_message(&event.recipient) {
             // Deposit to NEAR accounts
             TokenMessageData::Near(account_id) => {
+                let predecessor_account_id =
+                    String::from_utf8(sdk::predecessor_account_id()).unwrap();
                 let data = FinishDepositCallArgs {
                     new_owner_id: account_id,
                     amount: event.amount.as_u128(),
-                    fee: event.fee.as_u128(),
                     proof,
+                    relayer_id: Some(predecessor_account_id),
+                    fee: Some(event.fee.as_u128()),
                 }
                 .try_to_vec()
                 .unwrap();
@@ -204,14 +207,16 @@ impl EthConnectorContract {
                 )
             }
             // Deposit to Eth/ERC20 accounts
+            // fee mint in the `ft_on_transfer` callback method
             TokenMessageData::Eth { address, message } => {
                 let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
                 // Send to self - current account id
                 let data = FinishDepositCallArgs {
                     new_owner_id: current_account_id,
                     amount: event.amount.as_u128(),
-                    fee: event.fee.as_u128(),
                     proof,
+                    relayer_id: None,
+                    fee: None,
                 }
                 .try_to_vec()
                 .unwrap();
@@ -268,9 +273,14 @@ impl EthConnectorContract {
         self.record_proof(data.proof.get_key());
 
         // Mint tokens to recipient minus fee
-        self.mint_near(data.new_owner_id, data.amount - data.fee);
-        // TODO: For near - set relayer = some predecessor_id, some fee
-        // TODO:  for eth - relayer without save fee
+        if data.relayer_id.is_some() && data.fee.is_some() {
+            let fee = data.fee.unwrap();
+            let relayer_id = data.relayer_id.unwrap();
+            self.mint_near(data.new_owner_id.clone(), data.amount - fee);
+            self.mint_near(relayer_id, fee);
+        } else {
+            self.mint_near(data.new_owner_id, data.amount);
+        }
         // Save new contract data
         self.save_contract();
     }
