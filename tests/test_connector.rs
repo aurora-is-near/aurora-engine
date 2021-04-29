@@ -19,7 +19,7 @@ const CUSTODIAN_ADDRESS: &'static str = "d045f7e19B2488924B97F9c145b5E51D0D895A6
 const DEPOSITED_AMOUNT: u128 = 800400;
 const DEPOSITED_FEE: u128 = 400;
 const RECIPIENT_ETH_ADDRESS: &'static str = "891b2749238b27ff58e951088e55b04de71dc374";
-const EVM_CUSTODIAN_ADDRESS: &'static str = "6597dfc423a174b76c9cfeed91072e38825f2ae8";
+const EVM_CUSTODIAN_ADDRESS: &'static str = "d045f7e19b2488924b97f9c145b5e51d0d895a65";
 const DEPOSITED_EVM_AMOUNT: u128 = 800400;
 const DEPOSITED_EVM_FEE: u128 = 400;
 
@@ -43,13 +43,6 @@ pub struct Proof {
 pub struct InitCallArgs {
     pub prover_account: String,
     pub eth_custodian_address: String,
-}
-
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
-#[serde(crate = "near_sdk::serde")]
-pub struct DepositEthCallArgs {
-    pub proof: Proof,
-    pub relayer_eth_account: EthAddress,
 }
 
 fn init(custodian_address: &str) -> (UserAccount, UserAccount) {
@@ -122,21 +115,16 @@ fn print_logs(logs: &Vec<String>) {
 
 fn call_deposit_eth(master_account: &UserAccount) {
     let proof: Proof = serde_json::from_str(PROOF_DATA_ETH).unwrap();
-    let data = DepositEthCallArgs {
-        relayer_eth_account: validate_eth_address("09f7219e434EAA7021Ae5f9Ecd0CaBc2405447A3"),
-        proof,
-    }
-    .try_to_vec()
-    .unwrap();
     let res = master_account.call(
         CONTRACT_ACC.to_string(),
-        "deposit_eth",
-        &data[..],
+        "deposit",
+        &proof.try_to_vec()
+            .unwrap(),
         DEFAULT_GAS,
         10,
     );
-    res.assert_success();
-    //println!("{:#?}", res.promise_results());
+    //res.assert_success();
+    println!("{:#?}", res.promise_results());
     //print_logs(res.logs());
 }
 
@@ -218,25 +206,25 @@ fn test_near_deposit_balance_total_supply() {
     let balance = total_supply_eth(&master_account);
     assert_eq!(balance, 0);
 }
-/*
+
 #[test]
 fn test_eth_deposit_balance_total_supply() {
-    let (master_account, _contract) = init(EVM_CUSTODIAN_ADDRESS);
-    call_deposit_eth(&master_account);
+    let (master_account, contract) = init(EVM_CUSTODIAN_ADDRESS);
+    call_deposit_eth(&contract);
 
-    let balance = get_eth_balance(&master_account, validate_eth_address(RECIPIENT_ETH_ADDRESS));
-    assert_eq!(balance, DEPOSITED_EVM_AMOUNT - DEPOSITED_EVM_FEE);
+    // let balance = get_eth_balance(&master_account, validate_eth_address(RECIPIENT_ETH_ADDRESS));
+    // assert_eq!(balance, DEPOSITED_EVM_AMOUNT - DEPOSITED_EVM_FEE);
 
-    let balance = total_supply(&master_account);
-    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
-
-    let balance = total_supply_eth(&master_account);
-    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
-
-    let balance = total_supply_near(&master_account);
-    assert_eq!(balance, 0);
+    // let balance = total_supply(&master_account);
+    // assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+    
+    // let balance = total_supply_eth(&master_account);
+    // assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+    
+    // let balance = total_supply_near(&master_account);
+    // assert_eq!(balance, 0);
 }
-*/
+
 #[test]
 fn test_withdraw_near() {
     #[derive(BorshSerialize, BorshDeserialize)]

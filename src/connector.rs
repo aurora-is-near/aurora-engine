@@ -21,6 +21,7 @@ pub const CONTRACT_FT_KEY: &str = "EthConnector.ft";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 10_000_000_000_000;
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
+const GAS_FOR_TRANSFER_CALL: Gas = 40_000_000_000_000;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnectorContract {
@@ -245,7 +246,7 @@ impl EthConnectorContract {
                     b"ft_transfer_call",
                     &transfer_data[..],
                     1,
-                    GAS_FOR_FINISH_DEPOSIT,
+                    GAS_FOR_TRANSFER_CALL,
                 )
             }
         };
@@ -442,14 +443,14 @@ impl EthConnectorContract {
         let amount = self
             .ft
             .ft_resolve_transfer(&args.sender_id, &args.receiver_id, args.amount);
-        // `ft_resolve_transfer` can changed `total_supply` so we should save contract
-        self.save_contract();
-        sdk::return_output(&amount.to_string().as_bytes());
         #[cfg(feature = "log")]
-        sdk::log(format!(
+            sdk::log(format!(
             "Resolve transfer of {} from {} to {} success",
             args.amount, args.sender_id, args.receiver_id
         ));
+        // `ft_resolve_transfer` can changed `total_supply` so we should save contract
+        self.save_contract();
+        sdk::return_output(&amount.to_string().as_bytes());
     }
 
     /// FT transfer call from sender account (invoker account) to receiver

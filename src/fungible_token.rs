@@ -15,7 +15,8 @@ use alloc::{
 use borsh::{BorshDeserialize, BorshSerialize};
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
-const GAS_FOR_FT_TRANSFER_CALL: Gas = 25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER;
+const GAS_FOR_FT_ON_TRANSFER: Gas = 24_000_000_000_000;
+const GAS_FOR_FT_TRANSFER_CALL: Gas = 50_000_000_000_000 + GAS_FOR_FT_ON_TRANSFER + GAS_FOR_RESOLVE_TRANSFER;
 
 #[derive(Debug, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
@@ -200,7 +201,10 @@ impl FungibleToken {
         sdk::assert_one_yocto();
         let predecessor_account_id = sdk::predecessor_account_id();
         let sender_id = str_from_slice(&predecessor_account_id);
-        self.internal_transfer(sender_id, receiver_id, amount, memo);
+        // Special case for Aurora transfer itself - we shouldn't transfer
+        if sender_id != receiver_id {
+            self.internal_transfer(sender_id, receiver_id, amount, memo);
+        }
         let data1 = FtOnTransfer {
             amount,
             msg,
@@ -216,14 +220,15 @@ impl FungibleToken {
         }
         .try_to_vec()
         .unwrap();
+        sdk::log("ft_on_transfer".into());
         // Initiating receiver's call and the callback
         let promise0 = sdk::promise_create(
             receiver_id.as_bytes(),
             b"ft_on_transfer",
             &data1[..],
             NO_DEPOSIT,
-            sdk::prepaid_gas() - GAS_FOR_FT_TRANSFER_CALL,
-        );
+            GAS_FOR_FT_ON_TRANSFER,
+        );/*
         let promise1 = sdk::promise_then(
             promise0,
             &sdk::current_account_id(),
@@ -231,8 +236,8 @@ impl FungibleToken {
             &data2[..],
             NO_DEPOSIT,
             GAS_FOR_RESOLVE_TRANSFER,
-        );
-        sdk::promise_return(promise1);
+        );*/
+        sdk::promise_return(promise0);
     }
 
     pub fn internal_ft_resolve_transfer(
