@@ -4,12 +4,12 @@ use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
-use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
+use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs, RawCallResult, ResultLog};
 use crate::precompiles;
 use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
-use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
+use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId, NonceError};
 
 macro_rules! as_ref_err_impl {
     ($err: ty) => {
@@ -388,8 +388,22 @@ impl Engine {
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
         maybe_error(status, &result)?;
         let (values, logs) = executor.into_state().deconstruct();
-        self.apply(values, logs, true);
-        Ok(result)
+        // There is no way to return the logs to the NEAR log method as it only
+        // allows a return of UTF-8 strings.
+        self.apply(values, Vec::<Log>::new(), true);
+
+        let mut res_logs = Vec::new();
+        for log in logs {
+            res_logs.push(log.into());
+        }
+
+        let res = RawCallResult {
+            status: false,
+            gas_used: executor.used_gas(),
+            logs: res_logs,
+            result,
+        };
+        (status, res)
     }
 
     #[cfg(feature = "testnet")]
@@ -526,7 +540,7 @@ impl evm::backend::Backend for Engine {
 }
 
 impl ApplyBackend for Engine {
-    fn apply<A, I, L>(&mut self, values: A, logs: L, delete_empty: bool)
+    fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,
         I: IntoIterator<Item = (H256, H256)>,
@@ -565,10 +579,6 @@ impl ApplyBackend for Engine {
                 }
                 Apply::Delete { address } => Engine::remove_account(&address),
             }
-        }
-
-        for log in logs {
-            sdk::log_utf8(&bytes_to_hex(&log_to_bytes(log)).into_bytes())
         }
     }
 }

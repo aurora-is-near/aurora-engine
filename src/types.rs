@@ -34,19 +34,6 @@ pub fn u256_to_arr(value: &U256) -> [u8; 32] {
     result
 }
 
-#[allow(dead_code)]
-pub fn log_to_bytes(log: Log) -> Vec<u8> {
-    let mut result = vec![0u8; 1 + log.topics.len() * 32 + log.data.len()];
-    result[0] = log.topics.len() as u8;
-    let mut index = 1;
-    for topic in log.topics.iter() {
-        result[index..index + 32].copy_from_slice(&topic.0);
-        index += 32;
-    }
-    result[index..].copy_from_slice(&log.data);
-    result
-}
-
 const HEX_ALPHABET: &[u8; 16] = b"0123456789abcdef";
 
 #[allow(dead_code)]

@@ -26,7 +26,8 @@ mod sdk;
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::BorshDeserialize;
+    use borsh::{BorshDeserialize, BorshSerialize};
+    use evm::{ExitError, ExitFatal, ExitReason};
 
     use crate::engine::{Engine, EngineError, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
@@ -155,7 +156,7 @@ mod contract {
     /// Process signed Ethereum transaction.
     /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
-    pub extern "C" fn raw_call() {
+    pub extern "C" fn submit() {
         use crate::transaction::EthSignedTransaction;
         use rlp::{Decodable, Rlp};
 
