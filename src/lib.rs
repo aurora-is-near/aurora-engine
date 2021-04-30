@@ -196,7 +196,7 @@ mod contract {
                 Engine::transfer(&mut engine, &sender, &receiver, &value).map(|_f| Vec::new())
             } else {
                 // Execute a contract call:
-                Engine::call(&mut engine, sender, receiver, value, data)
+                Engine::submit(&mut engine, sender, receiver, value, data)
                 // TODO: charge for storage
             };
             result.sdk_process();

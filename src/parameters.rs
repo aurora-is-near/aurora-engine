@@ -57,7 +57,7 @@ impl From<Log> for ResultLog {
 
 /// Borsch-encoded parameters for the `raw_call` function.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
-pub struct RawCallResult {
+pub struct SubmitResult {
     pub status: bool,
     pub gas_used: u64,
     pub logs: Vec<ResultLog>,

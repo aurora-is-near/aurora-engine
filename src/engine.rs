@@ -4,7 +4,7 @@ use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
-use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs, RawCallResult, ResultLog};
+use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs, SubmitResult};
 use crate::precompiles;
 use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
@@ -366,18 +366,36 @@ impl Engine {
         );
         maybe_error(status, &result.0)?;
         let (values, logs) = executor.into_state().deconstruct();
-        self.apply(values, logs, true);
-        Ok(result)
+        self.apply(values, Vec::<Log>::new(), true);
+
+        let mut res_logs = Vec::new();
+        for log in logs {
+            res_logs.push(log.into());
+        }
+
+        let (res_status, used_gas) = match status {
+            ExitReason::Succeed(_) => (true, used_gas),
+            ExitReason::Revert(_) => (false, used_gas),
+            ExitReason::Error(_) | ExitReason::Fatal(_) => (false, 0),
+        };
+
+        let res = SubmitResult {
+            status: res_status,
+            gas_used: used_gas,
+            logs: res_logs,
+            result: result.0.to_vec(),
+        };
+        (status, res)
     }
 
     pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<Vec<u8>> {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = U256::zero();
-        self.call(origin, contract, value, args.input)
+        self.submit(origin, contract, value, args.input)
     }
 
-    pub fn call(
+    pub fn submit(
         &mut self,
         origin: Address,
         contract: Address,
@@ -386,7 +404,7 @@ impl Engine {
     ) -> EngineResult<Vec<u8>> {
         let mut executor = self.make_executor();
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
-        maybe_error(status, &result)?;
+        let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
@@ -397,9 +415,15 @@ impl Engine {
             res_logs.push(log.into());
         }
 
-        let res = RawCallResult {
-            status: false,
-            gas_used: executor.used_gas(),
+        let (res_status, used_gas) = match status {
+            ExitReason::Succeed(_) => (true, used_gas),
+            ExitReason::Revert(_) => (false, used_gas),
+            ExitReason::Error(_) | ExitReason::Fatal(_) => (false, 0),
+        };
+
+        let res = SubmitResult {
+            status: res_status,
+            gas_used: used_gas,
             logs: res_logs,
             result,
         };
