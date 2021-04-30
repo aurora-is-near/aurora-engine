@@ -1,4 +1,5 @@
 use borsh::BorshSerialize;
+use criterion::criterion_main;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
@@ -20,11 +21,24 @@ use aurora_engine::types;
 #[cfg(feature = "profile_eth_gas")]
 use aurora_engine::prelude::ETH_GAS_USED;
 
+mod eth_deploy_code;
+mod eth_erc20;
+mod eth_standard_precompiles;
+mod eth_transfer;
+mod solidity;
+
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
 }
 
 pub const RAW_CALL: &str = "raw_call";
+
+criterion_main!(
+    eth_deploy_code::benches,
+    eth_erc20::benches,
+    eth_standard_precompiles::benches,
+    eth_transfer::benches
+);
 
 pub struct AuroraRunner {
     pub aurora_account_id: String,

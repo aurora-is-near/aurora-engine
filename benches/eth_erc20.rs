@@ -1,16 +1,12 @@
 use aurora_engine::prelude::{Address, U256};
 use aurora_engine::transaction::EthTransaction;
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
+use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
 use near_vm_logic::VMOutcome;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
-// We don't use everything in `common`, but that's ok, other benchmarks do
-#[allow(dead_code)]
-mod common;
-mod solidity;
-
-use common::{address_from_secret_key, deploy_evm, sign_transaction, AuroraRunner, RAW_CALL};
+use super::{address_from_secret_key, deploy_evm, sign_transaction, AuroraRunner, RAW_CALL};
+use crate::solidity;
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -89,7 +85,7 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
     println!("ETH_ERC20_MINT NEAR GAS: {:?}", gas);
     #[cfg(feature = "profile_eth_gas")]
     {
-        let eth_gas = common::parse_eth_gas(&output);
+        let eth_gas = super::parse_eth_gas(&output);
         // TODO(#45): capture this in a file
         println!("ETH_ERC20_MINT ETH GAS: {:?}", eth_gas);
     }
@@ -107,7 +103,7 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
     println!("ETH_ERC20_TRANSFER NEAR GAS: {:?}", gas);
     #[cfg(feature = "profile_eth_gas")]
     {
-        let eth_gas = common::parse_eth_gas(&output);
+        let eth_gas = super::parse_eth_gas(&output);
         // TODO(#45): capture this in a file
         println!("ETH_ERC20_TRANSFER ETH GAS: {:?}", eth_gas);
     }
@@ -266,4 +262,3 @@ fn exec_transaction(
 }
 
 criterion_group!(benches, eth_erc20_benchmark);
-criterion_main!(benches);

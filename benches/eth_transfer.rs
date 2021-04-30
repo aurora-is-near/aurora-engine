@@ -1,10 +1,7 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, BatchSize, Criterion};
 use secp256k1::SecretKey;
 
-#[allow(dead_code)]
-mod common;
-
-use common::{address_from_secret_key, create_eth_transaction, deploy_evm, RAW_CALL};
+use super::{address_from_secret_key, create_eth_transaction, deploy_evm, RAW_CALL};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -53,4 +50,3 @@ fn eth_transfer_benchmark(c: &mut Criterion) {
 }
 
 criterion_group!(benches, eth_transfer_benchmark);
-criterion_main!(benches);

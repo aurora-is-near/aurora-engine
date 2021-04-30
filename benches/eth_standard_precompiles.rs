@@ -1,15 +1,11 @@
 use aurora_engine::prelude::{Address, U256};
 use aurora_engine::transaction::EthTransaction;
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
+use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
-// We don't use everything in `common`, but that's ok, other benchmarks do
-#[allow(dead_code)]
-mod common;
-mod solidity;
-
-use common::{address_from_secret_key, deploy_evm, sign_transaction, RAW_CALL};
+use super::{address_from_secret_key, deploy_evm, sign_transaction, RAW_CALL};
+use crate::solidity;
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -67,7 +63,7 @@ fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
         println!("ETH_STANDARD_PRECOMPILES_{} NEAR GAS: {:?}", name, gas);
         #[cfg(feature = "profile_eth_gas")]
         {
-            let eth_gas = common::parse_eth_gas(&output);
+            let eth_gas = super::parse_eth_gas(&output);
             // TODO(#45): capture this in a file
             println!("ETH_STANDARD_PRECOMPILES_{} ETH GAS: {:?}", name, eth_gas);
         }
@@ -189,4 +185,3 @@ impl Contract {
 }
 
 criterion_group!(benches, eth_standard_precompiles_benchmark);
-criterion_main!(benches);

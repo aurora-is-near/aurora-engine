@@ -1,9 +1,7 @@
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, Throughput};
 use secp256k1::SecretKey;
 
-mod common;
-
-use common::{address_from_secret_key, create_eth_transaction, deploy_evm, RAW_CALL};
+use super::{address_from_secret_key, create_eth_transaction, deploy_evm, RAW_CALL};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -51,7 +49,7 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
 
         #[cfg(feature = "profile_eth_gas")]
         {
-            let eth_gas = common::parse_eth_gas(&output);
+            let eth_gas = super::parse_eth_gas(&output);
             // TODO(#45): capture this in a file
             println!("ETH_DEPLOY_CODE_{:?} ETH GAS: {:?}", input_size, eth_gas);
         }
@@ -75,4 +73,3 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
 }
 
 criterion_group!(benches, eth_deploy_code_benchmark);
-criterion_main!(benches);

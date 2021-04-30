@@ -10,6 +10,7 @@ homepage = "https://github.com/aurora-is-near/aurora-engine"
 repository = "https://github.com/aurora-is-near/aurora-engine"
 license = "CC0-1.0"
 publish = false
+autobenches = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -68,19 +69,8 @@ criterion = "0.3.4"
 git2 = "0.13"
 
 [[bench]]
-name = "eth_transfer"
-harness = false
-
-[[bench]]
-name = "eth_deploy_code"
-harness = false
-
-[[bench]]
-name = "eth_erc20"
-harness = false
-
-[[bench]]
-name = "eth_standard_precompiles"
+name = "benches"
+path = "benches/main.rs"
 harness = false
 
 [features]
