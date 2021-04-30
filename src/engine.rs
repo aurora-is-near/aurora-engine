@@ -4,7 +4,7 @@ use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
-use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs, SubmitResult};
+use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
 use crate::precompiles;
 use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
