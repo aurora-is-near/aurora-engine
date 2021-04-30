@@ -343,7 +343,7 @@ pub fn get_contract_data<T: BorshDeserialize>(key: &str) -> T {
 }
 
 #[allow(dead_code)]
-pub fn log(data: String) {
+pub fn log(data: &str) {
     log_utf8(data.as_bytes())
 }
 

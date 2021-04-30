@@ -329,7 +329,7 @@ impl Engine {
 #[cfg(feature = "profile_eth_gas")]
 fn log_eth_gas_used(executor: &StackExecutor<MemoryStackState<Engine>>) {
     use alloc::format;
-    sdk::log(format!(
+    sdk::log(&format!(
         "{}: {}",
         crate::prelude::ETH_GAS_USED,
         executor.used_gas()
