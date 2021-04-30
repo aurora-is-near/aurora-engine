@@ -21,7 +21,7 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
         .copied()
         .map(|n| {
             let code_size = 2usize.pow(n);
-            let code: Vec<u8> = std::iter::repeat(0).take(code_size).collect();
+            let code: Vec<u8> = vec![0; code_size];
             let transaction = create_eth_transaction(
                 None,
                 TRANSFER_AMOUNT.into(),
