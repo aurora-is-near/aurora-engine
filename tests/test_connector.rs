@@ -217,22 +217,26 @@ fn test_near_deposit_balance_total_supply() {
     let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, 0);
 }
-/*
+
 #[test]
 fn test_eth_deposit_balance_total_supply() {
     let (master_account, contract) = init(EVM_CUSTODIAN_ADDRESS);
-    call_deposit_eth(&contract);
+    call_deposit_eth(&contract, CONTRACT_ACC);
 
-    let balance = get_eth_balance(&master_account, validate_eth_address(RECIPIENT_ETH_ADDRESS));
+    let balance = get_eth_balance(
+        &master_account,
+        validate_eth_address(RECIPIENT_ETH_ADDRESS),
+        CONTRACT_ACC,
+    );
     assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
 
-    let balance = total_supply(&master_account);
+    let balance = total_supply(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
 
-    let balance = total_supply_eth(&master_account);
+    let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
 
-    let balance = total_supply_near(&master_account);
+    let balance = total_supply_near(&master_account, CONTRACT_ACC);
     assert_eq!(balance, 0);
 }
 
@@ -245,7 +249,7 @@ fn test_withdraw_near() {
     }
 
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
-    call_deposit_near(&contract);
+    call_deposit_near(&contract, CONTRACT_ACC);
 
     let withdraw_amount = 100;
     let res = contract.call(
@@ -262,13 +266,13 @@ fn test_withdraw_near() {
     );
     res.assert_success();
 
-    let balance = get_near_balance(&master_account, CONTRACT_ACC);
+    let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_FEE - withdraw_amount as u128);
 
-    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT);
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
 
-    let balance = total_supply(&master_account);
+    let balance = total_supply(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount as u128);
 }
 
@@ -282,7 +286,7 @@ fn test_ft_transfer() {
     }
 
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
-    call_deposit_near(&contract);
+    call_deposit_near(&contract, CONTRACT_ACC);
 
     let transfer_amount = 70;
     let res = contract.call(
@@ -300,22 +304,22 @@ fn test_ft_transfer() {
     );
     res.assert_success();
 
-    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT);
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
     assert_eq!(
         balance,
         DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
     );
 
-    let balance = get_near_balance(&master_account, CONTRACT_ACC);
+    let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_FEE - transfer_amount as u128);
 
-    let balance = total_supply(&master_account);
+    let balance = total_supply(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
 
     let balance = total_supply_eth(&master_account);
     assert_eq!(balance, 0);
 
-    let balance = total_supply_near(&master_account);
+    let balance = total_supply_near(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT);
 }
 
@@ -330,12 +334,12 @@ fn test_ft_transfer_call_near_eth() {
     }
 
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
-    call_deposit_near(&contract);
+    call_deposit_near(&contract, CONTRACT_ACC);
 
-    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT);
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
 
-    let balance = get_near_balance(&master_account, CONTRACT_ACC);
+    let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_FEE);
 
     let transfer_amount = 100;
@@ -359,25 +363,29 @@ fn test_ft_transfer_call_near_eth() {
     res.assert_success();
     //println!("{:#?}", res.promise_results());
 
-    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT);
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
 
-    let balance = get_near_balance(&master_account, CONTRACT_ACC);
+    let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_FEE - transfer_amount);
 
-    let balance = get_eth_balance(&master_account, validate_eth_address(RECIPIENT_ETH_ADDRESS));
+    let balance = get_eth_balance(
+        &master_account,
+        validate_eth_address(RECIPIENT_ETH_ADDRESS),
+        CONTRACT_ACC,
+    );
     assert_eq!(balance, transfer_amount);
 
-    let balance = total_supply(&master_account);
+    let balance = total_supply(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT);
 
-    let balance = total_supply_near(&master_account);
+    let balance = total_supply_near(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - transfer_amount);
 
-    let balance = total_supply_eth(&master_account);
+    let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, transfer_amount);
 }
-*/
+
 #[test]
 fn test_ft_transfer_call_erc20() {
     #[derive(BorshSerialize)]
