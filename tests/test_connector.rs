@@ -417,7 +417,7 @@ fn test_ft_transfer_call_erc20() {
     assert_eq!(balance, DEPOSITED_AMOUNT);
 
     /*
-    TODO: for testing should be completed Deploy ERC20 contract
+    TODO: for testing should be completed Deploy ER C20 contract
         let transfer_amount = 100;
         let mut msg = U256::from(30).as_byte_slice().to_vec();
         msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());

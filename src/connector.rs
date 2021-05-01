@@ -19,7 +19,7 @@ pub const EVM_TOKEN_NAME_KEY: &str = "evt";
 pub const EVM_RELAYER_NAME_KEY: &str = "rel";
 pub const CONTRACT_FT_KEY: &str = "EthConnector.ft";
 pub const NO_DEPOSIT: Balance = 0;
-const GAS_FOR_FINISH_DEPOSIT: Gas = 10_000_000_000_000;
+const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
 const GAS_FOR_TRANSFER_CALL: Gas = 40_000_000_000_000;
 
@@ -181,19 +181,19 @@ impl EthConnectorContract {
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
+        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
 
         // Finalize deposit
         let promise1 = match self.parse_event_message(&event.recipient) {
             // Deposit to NEAR accounts
             TokenMessageData::Near(account_id) => {
-                let predecessor_account_id =
-                    String::from_utf8(sdk::predecessor_account_id()).unwrap();
                 let data = FinishDepositCallArgs {
                     new_owner_id: account_id,
                     amount: event.amount.as_u128(),
-                    proof,
-                    relayer_id: Some(predecessor_account_id),
-                    fee: Some(event.fee.as_u128()),
+                    proof_key: proof.get_key(),
+                    relayer_id: predecessor_account_id,
+                    fee: event.fee.as_u128(),
+                    msg: None,
                 }
                 .try_to_vec()
                 .unwrap();
@@ -210,26 +210,6 @@ impl EthConnectorContract {
             // Deposit to Eth/ERC20 accounts
             // fee mint in the `ft_on_transfer` callback method
             TokenMessageData::Eth { address, message } => {
-                let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
-                // Send to self - current account id
-                let data = FinishDepositCallArgs {
-                    new_owner_id: current_account_id,
-                    amount: event.amount.as_u128(),
-                    proof,
-                    relayer_id: None,
-                    fee: None,
-                }
-                .try_to_vec()
-                .unwrap();
-
-                let internal_promise = sdk::promise_then(
-                    promise0,
-                    &sdk::current_account_id(),
-                    b"finish_deposit_near",
-                    &data[..],
-                    NO_DEPOSIT,
-                    GAS_FOR_FINISH_DEPOSIT,
-                );
                 // Transfer to self and then transfer ETH in `ft_on_transfer`
                 // address - is NEAR account
                 let transfer_data = TransferCallCallArgs {
@@ -240,13 +220,26 @@ impl EthConnectorContract {
                 }
                 .try_to_vec()
                 .unwrap();
+                let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
+                // Send to self - current account id
+                let data = FinishDepositCallArgs {
+                    new_owner_id: current_account_id,
+                    amount: event.amount.as_u128(),
+                    proof_key: proof.get_key(),
+                    relayer_id: predecessor_account_id,
+                    fee: event.fee.as_u128(),
+                    msg: Some(transfer_data),
+                }
+                .try_to_vec()
+                .unwrap();
+
                 sdk::promise_then(
-                    internal_promise,
+                    promise0,
                     &sdk::current_account_id(),
-                    b"ft_transfer_call",
-                    &transfer_data[..],
-                    1,
-                    GAS_FOR_TRANSFER_CALL,
+                    b"finish_deposit_near",
+                    &data[..],
+                    NO_DEPOSIT,
+                    GAS_FOR_FINISH_DEPOSIT,
                 )
             }
         };
@@ -257,7 +250,8 @@ impl EthConnectorContract {
     /// Finish deposit for NEAR accounts
     pub fn finish_deposit_near(&mut self) {
         sdk::assert_private_call();
-        let data = FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+        let data: FinishDepositCallArgs =
+            FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
         #[cfg(feature = "log")]
         sdk::log(format!("Finish deposit NEAR amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
@@ -271,19 +265,28 @@ impl EthConnectorContract {
         sdk::log("Check verification_success".into());
         let verification_success: bool = bool::try_from_slice(&data0).unwrap();
         assert!(verification_success, "ERR_VERIFY_PROOF");
-        self.record_proof(data.proof.get_key());
+        self.record_proof(data.proof_key);
 
         // Mint tokens to recipient minus fee
-        if data.relayer_id.is_some() && data.fee.is_some() {
-            let fee = data.fee.unwrap();
-            let relayer_id = data.relayer_id.unwrap();
-            self.mint_near(data.new_owner_id.clone(), data.amount - fee);
-            self.mint_near(relayer_id, fee);
-        } else {
+        if let Some(msg) = data.msg {
             self.mint_near(data.new_owner_id, data.amount);
+            // Save new contract data
+            self.save_contract();
+
+            let prommise0 = sdk::promise_create(
+                &sdk::current_account_id(),
+                b"ft_transfer_call",
+                &msg[..],
+                1,
+                GAS_FOR_TRANSFER_CALL,
+            );
+            sdk::promise_return(prommise0);
+        } else {
+            self.mint_near(data.new_owner_id.clone(), data.amount - data.fee);
+            self.mint_near(data.relayer_id, data.fee);
+            // Save new contract data
+            self.save_contract();
         }
-        // Save new contract data
-        self.save_contract();
     }
 
     /// Internal ETH deposit logic
