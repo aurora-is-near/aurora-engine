@@ -368,10 +368,7 @@ impl Engine {
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
 
-        let mut res_logs = Vec::new();
-        for log in logs {
-            res_logs.push(log.into());
-        }
+        let res_logs = logs.into_iter().map(Into::into).collect();
 
         let (res_status, used_gas) = match status {
             ExitReason::Succeed(_) => (true, used_gas),
