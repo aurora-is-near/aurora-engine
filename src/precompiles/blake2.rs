@@ -225,30 +225,22 @@ mod tests {
 
         assert!(matches!(
             test_blake2f_empty(),
-            Err(ExitError::Other(Borrowed(
-                "input length invalid, must be 213 bytes"
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")))
         ));
 
         assert!(matches!(
             test_blake2f_invalid_len_1(),
-            Err(ExitError::Other(Borrowed(
-                "input length invalid, must be 213 bytes"
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")))
         ));
 
         assert!(matches!(
             test_blake2f_invalid_len_2(),
-            Err(ExitError::Other(Borrowed(
-                "input length invalid, must be 213 bytes"
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")))
         ));
 
         assert!(matches!(
             test_blake2f_invalid_flag(),
-            Err(ExitError::Other(Borrowed(
-                "incorrect final block indicator flag",
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BLAKE2F_FINAL_FLAG",)))
         ));
 
         let expected = hex::decode(

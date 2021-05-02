@@ -421,7 +421,7 @@ mod tests {
         let res = BN128Add::<Byzantium>::run(&input, 500, &new_context());
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed("invalid curve point")))
+            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
         ));
     }
 
@@ -503,7 +503,7 @@ mod tests {
         let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context());
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed("invalid curve point")))
+            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
         ));
     }
 
@@ -580,9 +580,7 @@ mod tests {
         let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context());
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed(
-                "invalid `a` argument, not on curve"
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
         ));
 
         // invalid input length
@@ -598,9 +596,7 @@ mod tests {
         let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context());
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed(
-                "input length invalid, must be multiple of 192",
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN",)))
         ));
     }
 }
