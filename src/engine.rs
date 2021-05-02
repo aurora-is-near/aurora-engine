@@ -6,9 +6,6 @@ use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
 use crate::precompiles;
-use crate::prelude::fmt;
-#[cfg(feature = "std")]
-use crate::prelude::Error;
 use crate::prelude::{Address, Borrowed, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
@@ -23,12 +20,12 @@ pub enum NonceError {
     IncorrectNonce,
 }
 
-impl fmt::Display for NonceError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl NonceError {
+    pub fn to_str(&self) -> &str {
         use NonceError::*;
         match self {
-            NonceOverflow => write!(f, "ERR_NONCE_OVERFLOW"),
-            IncorrectNonce => write!(f, "ERR_INCORRECT_NONCE"),
+            NonceOverflow => "ERR_NONCE_OVERFLOW",
+            IncorrectNonce => "ERR_INCORRECT_NONCE",
         }
     }
 }
@@ -47,28 +44,28 @@ pub enum EngineError {
     EvmRevert(Vec<u8>),
 }
 
-impl fmt::Display for EngineError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl EngineError {
+    pub fn to_str(&self) -> &str {
         use EngineError::*;
         match self {
-            EvmError(ExitError::StackUnderflow) => write!(f, "ERR_STACK_UNDERFLOW"),
-            EvmError(ExitError::StackOverflow) => write!(f, "ERR_STACK_OVERFLOW"),
-            EvmError(ExitError::InvalidJump) => write!(f, "ERR_INVALID_JUMP"),
-            EvmError(ExitError::InvalidRange) => write!(f, "ERR_INVALID_RANGE"),
-            EvmError(ExitError::DesignatedInvalid) => write!(f, "ERR_DESIGNATED_INVALID"),
-            EvmError(ExitError::CallTooDeep) => write!(f, "ERR_CALL_TOO_DEEP"),
-            EvmError(ExitError::CreateCollision) => write!(f, "ERR_CREATE_COLLISION"),
-            EvmError(ExitError::CreateContractLimit) => write!(f, "ERR_CREATE_CONTRACT_LIMIT"),
-            EvmError(ExitError::OutOfOffset) => write!(f, "ERR_OUT_OF_OFFSET"),
-            EvmError(ExitError::OutOfGas) => write!(f, "ERR_OUT_OF_GAS"),
-            EvmError(ExitError::OutOfFund) => write!(f, "ERR_OUT_OF_FUND"),
-            EvmError(ExitError::Other(m)) => write!(f, "{}", m),
-            EvmError(_) => write!(f, ""), // unused misc
-            EvmFatal(ExitFatal::NotSupported) => write!(f, "ERR_NOT_SUPPORTED"),
-            EvmFatal(ExitFatal::UnhandledInterrupt) => write!(f, "ERR_UNHANDLED_INTERRUPT"),
-            EvmFatal(ExitFatal::Other(m)) => write!(f, "{}", m),
-            EvmFatal(_) => write!(f, ""), // unused misc
-            EvmRevert(_) => write!(f, "ERR_REVERT"),
+            EvmError(ExitError::StackUnderflow) => "ERR_STACK_UNDERFLOW",
+            EvmError(ExitError::StackOverflow) => "ERR_STACK_OVERFLOW",
+            EvmError(ExitError::InvalidJump) => "ERR_INVALID_JUMP",
+            EvmError(ExitError::InvalidRange) => "ERR_INVALID_RANGE",
+            EvmError(ExitError::DesignatedInvalid) => "ERR_DESIGNATED_INVALID",
+            EvmError(ExitError::CallTooDeep) => "ERR_CALL_TOO_DEEP",
+            EvmError(ExitError::CreateCollision) => "ERR_CREATE_COLLISION",
+            EvmError(ExitError::CreateContractLimit) => "ERR_CREATE_CONTRACT_LIMIT",
+            EvmError(ExitError::OutOfOffset) => "ERR_OUT_OF_OFFSET",
+            EvmError(ExitError::OutOfGas) => "ERR_OUT_OF_GAS",
+            EvmError(ExitError::OutOfFund) => "ERR_OUT_OF_FUND",
+            EvmError(ExitError::Other(m)) => m,
+            EvmError(_) => "", // unused misc
+            EvmFatal(ExitFatal::NotSupported) => "ERR_NOT_SUPPORTED",
+            EvmFatal(ExitFatal::UnhandledInterrupt) => "ERR_UNHANDLED_INTERRUPT",
+            EvmFatal(ExitFatal::Other(m)) => m,
+            EvmFatal(_) => "", // unused misc
+            EvmRevert(_) => "ERR_REVERT",
         }
     }
 }
@@ -84,9 +81,6 @@ impl From<ExitFatal> for EngineError {
         EngineError::EvmFatal(e)
     }
 }
-
-#[cfg(feature = "std")]
-impl Error for EngineError {}
 
 /// An engine result.
 pub type EngineResult<T> = Result<T, EngineError>;

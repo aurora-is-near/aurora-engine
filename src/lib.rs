@@ -32,7 +32,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{format, Address, Vec, H256, U256};
+    use crate::prelude::{Address, Vec, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
@@ -341,7 +341,7 @@ mod contract {
         match result {
             Ok(r) => sdk::return_output(r.as_ref()),
             Err(EngineError::EvmRevert(r)) => sdk::panic_hex(r.as_ref()),
-            Err(e) => sdk::panic_utf8(format!("{}", e).as_bytes()),
+            Err(e) => sdk::panic_utf8(e.to_str().as_bytes()),
         }
     }
 
@@ -353,7 +353,7 @@ mod contract {
         fn sdk_unwrap(self) -> T {
             match self {
                 Ok(t) => t,
-                Err(e) => sdk::panic_utf8(format!("{}", e).as_ref()),
+                Err(e) => sdk::panic_utf8(e.to_str().as_ref()),
             }
         }
     }
@@ -362,7 +362,7 @@ mod contract {
         fn sdk_unwrap(self) -> T {
             match self {
                 Ok(t) => t,
-                Err(e) => sdk::panic_utf8(format!("{}", e).as_ref()),
+                Err(e) => sdk::panic_utf8(e.to_str().as_ref()),
             }
         }
     }
