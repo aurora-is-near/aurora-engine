@@ -371,7 +371,7 @@ impl Engine {
         let res_logs = logs.into_iter().map(Into::into).collect();
 
         let res = match status {
-            ExitReason::Succeed(_) | ExitReason::Revert(_) => Some( SubmitResult {
+            ExitReason::Succeed(_) | ExitReason::Revert(_) => Some(SubmitResult {
                 gas_used: used_gas,
                 logs: res_logs,
                 result: result.0.to_vec(),
@@ -407,10 +407,10 @@ impl Engine {
         let res_logs = logs.into_iter().map(Into::into).collect();
 
         let res = match status {
-            ExitReason::Succeed(_) | ExitReason::Revert(_) => Some( SubmitResult {
+            ExitReason::Succeed(_) | ExitReason::Revert(_) => Some(SubmitResult {
                 gas_used: used_gas,
                 logs: res_logs,
-                result
+                result,
             }),
             ExitReason::Error(_) | ExitReason::Fatal(_) => None,
         };
