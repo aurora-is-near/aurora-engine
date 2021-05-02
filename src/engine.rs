@@ -370,18 +370,15 @@ impl Engine {
 
         let res_logs = logs.into_iter().map(Into::into).collect();
 
-        let (res_status, used_gas) = match status {
-            ExitReason::Succeed(_) => (true, used_gas),
-            ExitReason::Revert(_) => (false, used_gas),
-            ExitReason::Error(_) | ExitReason::Fatal(_) => (false, 0),
+        let res = match status {
+            ExitReason::Succeed(_) | ExitReason::Revert(_) => Some( SubmitResult {
+                gas_used: used_gas,
+                logs: res_logs,
+                result: result.0.to_vec(),
+            }),
+            ExitReason::Error(_) | ExitReason::Fatal(_) => None,
         };
 
-        let res = SubmitResult {
-            status: res_status,
-            gas_used: used_gas,
-            logs: res_logs,
-            result: result.0.to_vec(),
-        };
         (status, res)
     }
 
@@ -412,18 +409,15 @@ impl Engine {
             res_logs.push(log.into());
         }
 
-        let (res_status, used_gas) = match status {
-            ExitReason::Succeed(_) => (true, used_gas),
-            ExitReason::Revert(_) => (false, used_gas),
-            ExitReason::Error(_) | ExitReason::Fatal(_) => (false, 0),
+        let res = match status {
+            ExitReason::Succeed(_) | ExitReason::Revert(_) => Some( SubmitResult {
+                gas_used: used_gas,
+                logs: res_logs,
+                result
+            }),
+            ExitReason::Error(_) | ExitReason::Fatal(_) => None,
         };
 
-        let res = SubmitResult {
-            status: res_status,
-            gas_used: used_gas,
-            logs: res_logs,
-            result,
-        };
         (status, res)
     }
 
