@@ -42,14 +42,13 @@ pub struct ResultLog {
 
 impl From<Log> for ResultLog {
     fn from(log: Log) -> Self {
-        let mut res_topics = Vec::with_capacity(log.topics.len());
-        for topic in log.topics.into_iter() {
-            let res_topic = topic.0;
-            res_topics.push(res_topic);
-        }
-
+        let topics = log
+            .topics
+            .into_iter()
+            .map(|topic| topic.0)
+            .collect::<Vec<_>>();
         ResultLog {
-            topics: res_topics,
+            topics,
             data: log.data,
         }
     }
