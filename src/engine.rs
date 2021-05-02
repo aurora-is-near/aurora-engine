@@ -404,10 +404,7 @@ impl Engine {
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
 
-        let mut res_logs = Vec::new();
-        for log in logs {
-            res_logs.push(log.into());
-        }
+        let res_logs = logs.into_iter().map(Into::into).collect();
 
         let res = match status {
             ExitReason::Succeed(_) | ExitReason::Revert(_) => Some( SubmitResult {
