@@ -48,18 +48,18 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
     let mut px_buf = [0u8; 32];
     px_buf.copy_from_slice(&input[pos..(pos + 32)]);
     let px =
-        Fq::interpret(&px_buf).map_err(|_e| ExitError::Other(Borrowed("invalid `x` point")))?;
+        Fq::interpret(&px_buf).map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_X")))?;
 
     let mut py_buf = [0u8; 32];
     py_buf.copy_from_slice(&input[(pos + 32)..(pos + 64)]);
     let py =
-        Fq::interpret(&py_buf).map_err(|_e| ExitError::Other(Borrowed("invalid `y` point")))?;
+        Fq::interpret(&py_buf).map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_Y")))?;
 
     Ok(if px == Fq::zero() && py == bn::Fq::zero() {
         G1::zero()
     } else {
         AffineG1::new(px, py)
-            .map_err(|_| ExitError::Other(Borrowed("invalid curve point")))?
+            .map_err(|_| ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))?
             .into()
     })
 }
@@ -139,7 +139,7 @@ impl<HF: HardFork> BN128Mul<HF> {
         let mut fr_buf = [0u8; 32];
         fr_buf.copy_from_slice(&input[64..96]);
         let fr = bn::Fr::interpret(&fr_buf)
-            .map_err(|_e| ExitError::Other(Borrowed("invalid field element")))?;
+            .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_FE")))?;
 
         let mut output = [0u8; 64];
         if let Some(mul) = AffineG1::from_jacobian(p * fr) {
@@ -196,9 +196,7 @@ impl<HF: HardFork> BN128Pair<HF> {
         use bn::{arith::U256, AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
 
         if input.len() % consts::PAIR_ELEMENT_LEN != 0 {
-            return Err(ExitError::Other(Borrowed(
-                "input length invalid, must be multiple of 192",
-            )));
+            return Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN")));
         }
 
         let output = if input.is_empty() {
@@ -213,52 +211,47 @@ impl<HF: HardFork> BN128Pair<HF> {
                 buf.copy_from_slice(
                     &input[(idx * consts::PAIR_ELEMENT_LEN)..(idx * consts::PAIR_ELEMENT_LEN + 32)],
                 );
-                let ax = Fq::interpret(&buf).map_err(|_e| {
-                    ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate"))
-                })?;
+                let ax = Fq::interpret(&buf)
+                    .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_AX")))?;
                 buf.copy_from_slice(
                     &input[(idx * consts::PAIR_ELEMENT_LEN + 32)
                         ..(idx * consts::PAIR_ELEMENT_LEN + 64)],
                 );
-                let ay = Fq::interpret(&buf).map_err(|_e| {
-                    ExitError::Other(Borrowed("invalid `a` argument, `y` coordinate"))
-                })?;
+                let ay = Fq::interpret(&buf)
+                    .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_AY")))?;
                 buf.copy_from_slice(
                     &input[(idx * consts::PAIR_ELEMENT_LEN + 64)
                         ..(idx * consts::PAIR_ELEMENT_LEN + 96)],
                 );
-                let bay = Fq::interpret(&buf).map_err(|_e| {
-                    ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate"))
-                })?;
+                let bay = Fq::interpret(&buf)
+                    .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_B_AY")))?;
                 buf.copy_from_slice(
                     &input[(idx * consts::PAIR_ELEMENT_LEN + 96)
                         ..(idx * consts::PAIR_ELEMENT_LEN + 128)],
                 );
-                let bax = Fq::interpret(&buf).map_err(|_e| {
-                    ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate"))
-                })?;
+                let bax = Fq::interpret(&buf)
+                    .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_B_AX")))?;
                 buf.copy_from_slice(
                     &input[(idx * consts::PAIR_ELEMENT_LEN + 128)
                         ..(idx * consts::PAIR_ELEMENT_LEN + 160)],
                 );
-                let bby = Fq::interpret(&buf).map_err(|_e| {
-                    ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate"))
-                })?;
+                let bby = Fq::interpret(&buf)
+                    .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_B_BY")))?;
                 buf.copy_from_slice(
                     &input[(idx * consts::PAIR_ELEMENT_LEN + 160)
                         ..(idx * consts::PAIR_ELEMENT_LEN + 192)],
                 );
-                let bbx = Fq::interpret(&buf).map_err(|_e| {
-                    ExitError::Other(Borrowed("invalid `a` argument, `x` coordinate"))
-                })?;
+                let bbx = Fq::interpret(&buf)
+                    .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_B_BX")))?;
 
                 let a = {
                     if ax.is_zero() && ay.is_zero() {
                         G1::zero()
                     } else {
-                        G1::from(AffineG1::new(ax, ay).map_err(|_e| {
-                            ExitError::Other(Borrowed("invalid `a` argument, not on curve"))
-                        })?)
+                        G1::from(
+                            AffineG1::new(ax, ay)
+                                .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))?,
+                        )
                     }
                 };
                 let b = {
@@ -268,9 +261,10 @@ impl<HF: HardFork> BN128Pair<HF> {
                     if ba.is_zero() && bb.is_zero() {
                         G2::zero()
                     } else {
-                        G2::from(AffineG2::new(ba, bb).map_err(|_e| {
-                            ExitError::Other(Borrowed("invalid `b` argument, not on curve"))
-                        })?)
+                        G2::from(
+                            AffineG2::new(ba, bb)
+                                .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_B")))?,
+                        )
                     }
                 };
                 vals.push((a, b))

@@ -27,24 +27,6 @@ pub struct InternalMetaCallArgs {
     pub input: Vec<u8>,
 }
 
-/// Internal errors to propagate up and format in the single place.
-pub enum ErrorKind {
-    ArgumentParseError,
-    InvalidMetaTransactionMethodName,
-    InvalidMetaTransactionFunctionArg,
-    InvalidEcRecoverSignature,
-}
-
-/// Errors involving the nonce
-pub enum NonceError {
-    /// Attempted to increment the nonce, but overflow occurred
-    NonceOverflow,
-    /// Account nonce did not match the transaction nonce
-    IncorrectNonce,
-}
-
-pub type Result<T> = core::result::Result<T, ErrorKind>;
-
 #[allow(dead_code)]
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {
     let mut result = [0u8; 32];

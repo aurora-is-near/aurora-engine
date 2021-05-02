@@ -27,13 +27,12 @@ mod sdk;
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::BorshDeserialize;
-    use evm::{ExitError, ExitFatal, ExitReason};
 
-    use crate::engine::{Engine, EngineState};
+    use crate::engine::{Engine, EngineError, EngineResult, EngineState, NonceResult};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{vec, Address, H256, U256};
+    use crate::prelude::{format, Address, Vec, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
@@ -139,9 +138,9 @@ mod contract {
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
         let mut engine = Engine::new(predecessor_address());
-        let (status, address) = Engine::deploy_code_with_input(&mut engine, &input);
+        let res = Engine::deploy_code_with_input(&mut engine, &input);
         // TODO: charge for storage
-        process_exit_reason(status, &address.0)
+        process_engine_result(res)
     }
 
     /// Call method on the EVM contract.
@@ -150,9 +149,9 @@ mod contract {
         let input = sdk::read_input();
         let args = FunctionCallArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         let mut engine = Engine::new(predecessor_address());
-        let (status, result) = Engine::call_with_args(&mut engine, args);
+        let res = Engine::call_with_args(&mut engine, args);
         // TODO: charge for storage
-        process_exit_reason(status, &result)
+        process_engine_result(res)
     }
 
     /// Process signed Ethereum transaction.
@@ -190,26 +189,23 @@ mod contract {
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
         if let Some(receiver) = signed_transaction.transaction.to {
-            let (status, result) = if data.is_empty() {
+            let result = if data.is_empty() {
                 // Execute a balance transfer. We need to save the incremented nonce in this case
                 // because it is not handled internally by the SputnikVM like it is in the case of
                 // `call` and `deploy_code`.
                 Engine::set_nonce(&sender, &next_nonce);
-                (
-                    Engine::transfer(&mut engine, &sender, &receiver, &value),
-                    vec![],
-                )
+                Engine::transfer(&mut engine, &sender, &receiver, &value).map(|_f| Vec::new())
             } else {
                 // Execute a contract call:
                 Engine::call(&mut engine, sender, receiver, value, data)
                 // TODO: charge for storage
             };
-            process_exit_reason(status, &result)
+            process_engine_result(result)
         } else {
             // Execute a contract deployment:
-            let (status, result) = Engine::deploy_code(&mut engine, sender, value, &data);
+            let result = Engine::deploy_code(&mut engine, sender, value, &data);
             // TODO: charge for storage
-            process_exit_reason(status, &result.0)
+            process_engine_result(result)
         }
     }
 
@@ -232,13 +228,13 @@ mod contract {
         Engine::check_nonce(&meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
 
         let mut engine = Engine::new_with_state(state, meta_call_args.sender);
-        let (status, result) = engine.call(
+        let result = engine.call(
             meta_call_args.sender,
             meta_call_args.contract_address,
             meta_call_args.value,
             meta_call_args.input,
         );
-        process_exit_reason(status, &result);
+        process_engine_result(result);
     }
 
     #[cfg(feature = "testnet")]
@@ -248,7 +244,7 @@ mod contract {
         let address = Address::from_slice(&input);
         let mut engine = Engine::new(address);
         let status = engine.credit(&address);
-        process_exit_reason(status, &[])
+        process_engine_result(status, &[])
     }
 
     ///
@@ -260,8 +256,8 @@ mod contract {
         let input = sdk::read_input();
         let args = ViewCallArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
         let engine = Engine::new(Address::from_slice(&args.sender));
-        let (status, result) = Engine::view_with_args(&engine, args);
-        process_exit_reason(status, &result)
+        let result = Engine::view_with_args(&engine, args);
+        process_engine_result(result)
     }
 
     #[no_mangle]
@@ -341,69 +337,32 @@ mod contract {
         near_account_to_evm_address(&sdk::predecessor_account_id())
     }
 
-    fn process_exit_reason(status: ExitReason, result: &[u8]) {
-        match status {
-            ExitReason::Succeed(_) => sdk::return_output(result),
-            ExitReason::Revert(_) => sdk::panic_hex(&result),
-            ExitReason::Error(error) => sdk::panic_utf8(error.to_str().as_bytes()),
-            ExitReason::Fatal(error) => sdk::panic_utf8(error.to_str().as_bytes()),
+    fn process_engine_result<T: AsRef<[u8]>>(result: EngineResult<T>) {
+        match result {
+            Ok(r) => sdk::return_output(r.as_ref()),
+            Err(EngineError::EvmRevert(r)) => sdk::panic_hex(r.as_ref()),
+            Err(e) => sdk::panic_utf8(format!("{}", e).as_bytes()),
         }
     }
 
-    trait ToStr {
-        fn to_str(&self) -> &str;
-    }
-
-    impl ToStr for ExitError {
-        fn to_str(&self) -> &str {
-            match self {
-                ExitError::StackUnderflow => "StackUnderflow",
-                ExitError::StackOverflow => "StackOverflow",
-                ExitError::InvalidJump => "InvalidJump",
-                ExitError::InvalidRange => "InvalidRange",
-                ExitError::DesignatedInvalid => "DesignatedInvalid",
-                ExitError::CallTooDeep => "CallTooDeep",
-                ExitError::CreateCollision => "CreateCollision",
-                ExitError::CreateContractLimit => "CreateContractLimit",
-                ExitError::OutOfOffset => "OutOfOffset",
-                ExitError::OutOfGas => "OutOfGas",
-                ExitError::OutOfFund => "OutOfFund",
-                ExitError::PCUnderflow => "PCUnderflow",
-                ExitError::CreateEmpty => "CreateEmpty",
-                ExitError::Other(m) => m,
-            }
-        }
-    }
-
-    impl ToStr for ExitFatal {
-        fn to_str(&self) -> &str {
-            match self {
-                ExitFatal::NotSupported => "NotSupported",
-                ExitFatal::UnhandledInterrupt => "UnhandledInterrupt",
-                ExitFatal::CallErrorAsFatal(_) => "CallErrorAsFatal",
-                ExitFatal::Other(m) => m,
-            }
-        }
-    }
-
-    impl ToStr for crate::types::NonceError {
-        fn to_str(&self) -> &str {
-            match self {
-                Self::NonceOverflow => "ERR_NONCE_OVERFLOW",
-                Self::IncorrectNonce => "ERR_INCORRECT_NONCE",
-            }
-        }
-    }
-
-    trait SdkUnwrap<T, E> {
+    trait SdkUnwrap<T> {
         fn sdk_unwrap(self) -> T;
     }
 
-    impl<T, E: ToStr> SdkUnwrap<T, E> for Result<T, E> {
+    impl<T> SdkUnwrap<T> for EngineResult<T> {
         fn sdk_unwrap(self) -> T {
             match self {
                 Ok(t) => t,
-                Err(e) => sdk::panic_utf8(e.to_str().as_bytes()),
+                Err(e) => sdk::panic_utf8(format!("{}", e).as_ref()),
+            }
+        }
+    }
+
+    impl<T> SdkUnwrap<T> for NonceResult<T> {
+        fn sdk_unwrap(self) -> T {
+            match self {
+                Ok(t) => t,
+                Err(e) => sdk::panic_utf8(format!("{}", e).as_ref()),
             }
         }
     }
