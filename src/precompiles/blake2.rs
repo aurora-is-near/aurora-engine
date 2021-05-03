@@ -35,9 +35,7 @@ impl Precompile for Blake2F {
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
     fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
         if input.len() != consts::INPUT_LENGTH {
-            return Err(ExitError::Other(Borrowed(
-                "input length invalid, must be 213 bytes",
-            )));
+            return Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")));
         }
 
         let mut rounds_bytes = [0u8; 4];
@@ -73,9 +71,7 @@ impl Precompile for Blake2F {
         }
 
         if input[212] != 0 && input[212] != 1 {
-            return Err(ExitError::Other(Borrowed(
-                "incorrect final block indicator flag",
-            )));
+            return Err(ExitError::Other(Borrowed("ERR_BLAKE2F_FINAL_FLAG")));
         }
         let finished = input[212] != 0;
 
@@ -229,30 +225,22 @@ mod tests {
 
         assert!(matches!(
             test_blake2f_empty(),
-            Err(ExitError::Other(Borrowed(
-                "input length invalid, must be 213 bytes"
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")))
         ));
 
         assert!(matches!(
             test_blake2f_invalid_len_1(),
-            Err(ExitError::Other(Borrowed(
-                "input length invalid, must be 213 bytes"
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")))
         ));
 
         assert!(matches!(
             test_blake2f_invalid_len_2(),
-            Err(ExitError::Other(Borrowed(
-                "input length invalid, must be 213 bytes"
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")))
         ));
 
         assert!(matches!(
             test_blake2f_invalid_flag(),
-            Err(ExitError::Other(Borrowed(
-                "incorrect final block indicator flag",
-            )))
+            Err(ExitError::Other(Borrowed("ERR_BLAKE2F_FINAL_FLAG",)))
         ));
 
         let expected = hex::decode(

@@ -2,6 +2,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::prelude::{String, Vec};
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
+use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -30,6 +31,37 @@ pub struct MetaCallArgs {
     pub value: RawU256,
     pub method_def: String,
     pub args: Vec<u8>,
+}
+
+/// Borsh-encoded log for use in a `SubmitResult`.
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct ResultLog {
+    pub topics: Vec<RawU256>,
+    pub data: Vec<u8>,
+}
+
+impl From<Log> for ResultLog {
+    fn from(log: Log) -> Self {
+        let topics = log
+            .topics
+            .into_iter()
+            .map(|topic| topic.0)
+            .collect::<Vec<_>>();
+        ResultLog {
+            topics,
+            data: log.data,
+        }
+    }
+}
+
+/// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
+/// and `deploy_with_input` methods.
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct SubmitResult {
+    pub status: bool,
+    pub gas_used: u64,
+    pub result: Vec<u8>,
+    pub logs: Vec<ResultLog>,
 }
 
 /// Borsh-encoded parameters for the `call` function.

@@ -4,6 +4,7 @@ pub use alloc::{
     borrow::{Cow, Cow::*},
     boxed::Box,
     collections::BTreeMap as HashMap,
+    fmt,
     string::String,
     string::ToString,
     vec,
@@ -14,7 +15,7 @@ pub use core::{convert::TryInto, marker::PhantomData, mem};
 #[cfg(feature = "std")]
 pub use std::{
     borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, collections::HashMap, convert::TryInto,
-    marker::PhantomData, mem, string::String, string::ToString, vec, vec::Vec,
+    error::Error, fmt, marker::PhantomData, mem, string::String, string::ToString, vec, vec::Vec,
 };
 
 pub use primitive_types::{H160, H256, U256};
