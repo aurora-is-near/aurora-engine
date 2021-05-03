@@ -1,11 +1,13 @@
+use aurora_engine::parameters::SubmitResult;
 use aurora_engine::prelude::{Address, U256};
 use aurora_engine::transaction::EthTransaction;
+use borsh::BorshDeserialize;
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
 use near_vm_logic::VMOutcome;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
-use super::{address_from_secret_key, deploy_evm, sign_transaction, AuroraRunner, RAW_CALL};
+use super::{address_from_secret_key, deploy_evm, sign_transaction, AuroraRunner, SUBMIT};
 use crate::solidity;
 
 const INITIAL_BALANCE: u64 = 1000;
@@ -30,10 +32,12 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
         constructor.deploy("Benchmarker", "BENCH", INITIAL_NONCE.into()),
         &source_account,
     );
-    let erc20_address = output.return_data.as_value().unwrap();
+    let submit_result =
+        SubmitResult::try_from_slice(&output.return_data.as_value().unwrap()).unwrap();
+    let erc20_address = Address::from_slice(&submit_result.result);
     let contract = ERC20 {
         abi: constructor.abi,
-        address: Address::from_slice(&erc20_address),
+        address: erc20_address,
     };
 
     // create the transaction for minting
@@ -69,7 +73,7 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
                     mint_tx_bytes.clone(),
                 )
             },
-            |(r, c, i)| r.call(RAW_CALL, c, i),
+            |(r, c, i)| r.call(SUBMIT, c, i),
             BatchSize::SmallInput,
         )
     });
@@ -77,36 +81,28 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
     // Measure mint gas usage; don't use `one_shot` because we want to keep this state change for
     // the next benchmark where we transfer some of the minted tokens.
     let (output, maybe_error) =
-        runner.call(RAW_CALL, calling_account_id.clone(), mint_tx_bytes.clone());
+        runner.call(SUBMIT, calling_account_id.clone(), mint_tx_bytes.clone());
     assert!(maybe_error.is_none());
     let output = output.unwrap();
     let gas = output.burnt_gas;
+    let eth_gas = super::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("ETH_ERC20_MINT NEAR GAS: {:?}", gas);
-    #[cfg(feature = "profile_eth_gas")]
-    {
-        let eth_gas = super::parse_eth_gas(&output);
-        // TODO(#45): capture this in a file
-        println!("ETH_ERC20_MINT ETH GAS: {:?}", eth_gas);
-    }
+    println!("ETH_ERC20_MINT ETH GAS: {:?}", eth_gas);
 
     // Measure transfer gas usage
     let (output, maybe_err) = runner.one_shot().call(
-        RAW_CALL,
+        SUBMIT,
         calling_account_id.clone(),
         transfer_tx_bytes.clone(),
     );
     assert!(maybe_err.is_none());
     let output = output.unwrap();
     let gas = output.burnt_gas;
+    let eth_gas = super::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("ETH_ERC20_TRANSFER NEAR GAS: {:?}", gas);
-    #[cfg(feature = "profile_eth_gas")]
-    {
-        let eth_gas = super::parse_eth_gas(&output);
-        // TODO(#45): capture this in a file
-        println!("ETH_ERC20_TRANSFER ETH GAS: {:?}", eth_gas);
-    }
+    println!("ETH_ERC20_TRANSFER ETH GAS: {:?}", eth_gas);
 
     // measure transfer wall-clock time
     group.bench_function(transfer_id, |b| {
@@ -118,7 +114,7 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
                     transfer_tx_bytes.clone(),
                 )
             },
-            |(r, c, i)| r.call(RAW_CALL, c, i),
+            |(r, c, i)| r.call(SUBMIT, c, i),
             BatchSize::SmallInput,
         )
     });
@@ -252,11 +248,8 @@ fn exec_transaction(
 ) -> VMOutcome {
     let calling_account_id = "some-account.near".to_string();
     let signed_tx = sign_transaction(tx, Some(runner.chain_id), &account);
-    let (output, maybe_err) = runner.call(
-        RAW_CALL,
-        calling_account_id,
-        rlp::encode(&signed_tx).to_vec(),
-    );
+    let (output, maybe_err) =
+        runner.call(SUBMIT, calling_account_id, rlp::encode(&signed_tx).to_vec());
     assert!(maybe_err.is_none());
     output.unwrap()
 }

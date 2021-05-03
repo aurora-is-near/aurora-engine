@@ -1,10 +1,12 @@
+use aurora_engine::parameters::SubmitResult;
 use aurora_engine::prelude::{Address, U256};
 use aurora_engine::transaction::EthTransaction;
+use borsh::BorshDeserialize;
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
-use super::{address_from_secret_key, deploy_evm, sign_transaction, RAW_CALL};
+use super::{address_from_secret_key, deploy_evm, sign_transaction, SUBMIT};
 use crate::solidity;
 
 const INITIAL_BALANCE: u64 = 1000;
@@ -26,15 +28,17 @@ fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
     let tx = constructor.deploy(INITIAL_NONCE.into());
     let signed_tx = sign_transaction(tx, Some(runner.chain_id), &source_account);
     let (output, maybe_err) = runner.call(
-        RAW_CALL,
+        SUBMIT,
         calling_account_id.clone(),
         rlp::encode(&signed_tx).to_vec(),
     );
     assert!(maybe_err.is_none());
-    let contract_address = output.unwrap().return_data.as_value().unwrap();
+    let submit_result =
+        SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();
+    let contract_address = Address::from_slice(&submit_result.result);
     let contract = Contract {
         abi: constructor.abi,
-        address: Address::from_slice(&contract_address),
+        address: contract_address,
     };
 
     let test_names = Contract::all_method_names();
@@ -55,18 +59,14 @@ fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
         let (output, maybe_err) =
             runner
                 .one_shot()
-                .call(RAW_CALL, calling_account_id.clone(), tx_bytes.clone());
+                .call(SUBMIT, calling_account_id.clone(), tx_bytes.clone());
         assert!(maybe_err.is_none());
         let output = output.unwrap();
         let gas = output.burnt_gas;
+        let eth_gas = super::parse_eth_gas(&output);
         // TODO(#45): capture this in a file
         println!("ETH_STANDARD_PRECOMPILES_{} NEAR GAS: {:?}", name, gas);
-        #[cfg(feature = "profile_eth_gas")]
-        {
-            let eth_gas = super::parse_eth_gas(&output);
-            // TODO(#45): capture this in a file
-            println!("ETH_STANDARD_PRECOMPILES_{} ETH GAS: {:?}", name, eth_gas);
-        }
+        println!("ETH_STANDARD_PRECOMPILES_{} ETH GAS: {:?}", name, eth_gas);
     }
 
     let mut group = c.benchmark_group("standard_precompiles");
@@ -82,7 +82,7 @@ fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
                         tx_bytes.clone(),
                     )
                 },
-                |(r, c, i)| r.call(RAW_CALL, c, i),
+                |(r, c, i)| r.call(SUBMIT, c, i),
                 BatchSize::SmallInput,
             )
         });

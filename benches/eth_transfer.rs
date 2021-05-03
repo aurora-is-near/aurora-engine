@@ -1,7 +1,7 @@
 use criterion::{criterion_group, BatchSize, Criterion};
 use secp256k1::SecretKey;
 
-use super::{address_from_secret_key, create_eth_transaction, deploy_evm, RAW_CALL};
+use super::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -31,19 +31,18 @@ fn eth_transfer_benchmark(c: &mut Criterion) {
     let (output, maybe_err) =
         runner
             .one_shot()
-            .call(RAW_CALL, calling_account_id.clone(), input.clone());
+            .call(SUBMIT, calling_account_id.clone(), input.clone());
     assert!(maybe_err.is_none());
     let gas = output.unwrap().burnt_gas;
     // TODO(#45): capture this in a file
     println!("ETH_TRANSFER NEAR GAS: {:?}", gas);
-    #[cfg(feature = "profile_eth_gas")]
     println!("ETH_TRANSFER ETH GAS: {:?}", 21_000);
 
     // measure wall-clock time
     c.bench_function("eth_transfer", |b| {
         b.iter_batched(
             || (runner.one_shot(), calling_account_id.clone(), input.clone()),
-            |(r, c, i)| r.call(RAW_CALL, c, i),
+            |(r, c, i)| r.call(SUBMIT, c, i),
             BatchSize::SmallInput,
         )
     });

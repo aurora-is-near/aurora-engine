@@ -1,10 +1,11 @@
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 use criterion::criterion_main;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
 use near_primitives_core::runtime::fees::RuntimeFeesConfig;
 use near_vm_logic::mocks::mock_external::MockedExternal;
+use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome};
 use near_vm_runner::{MockCompiledContractCache, VMError};
 
@@ -12,7 +13,7 @@ use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
-use aurora_engine::parameters::NewCallArgs;
+use aurora_engine::parameters::{NewCallArgs, SubmitResult};
 use aurora_engine::prelude::Address;
 use aurora_engine::storage;
 use aurora_engine::transaction::{EthSignedTransaction, EthTransaction};
@@ -31,7 +32,7 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
 }
 
-pub const RAW_CALL: &str = "raw_call";
+pub const SUBMIT: &str = "submit";
 
 criterion_main!(
     eth_deploy_code::benches,
@@ -244,16 +245,11 @@ pub fn address_from_secret_key(sk: &SecretKey) -> Address {
     Address::from_slice(&hash[12..])
 }
 
-#[cfg(feature = "profile_eth_gas")]
 pub fn parse_eth_gas(output: &VMOutcome) -> u64 {
-    for log in output.logs.iter() {
-        if log.starts_with(ETH_GAS_USED) {
-            let eth_gas: Option<u64> = log
-                .split_ascii_whitespace()
-                .last()
-                .and_then(|x| x.parse().ok());
-            return eth_gas.unwrap();
-        }
-    }
-    panic!("Failed to parse Eth gas from the output logs. Was the EVM contract compiled with `--features profile_eth_gas`?");
+    let submit_result_bytes = match &output.return_data {
+        ReturnData::Value(bytes) => bytes.as_slice(),
+        ReturnData::None | ReturnData::ReceiptIndex(_) => panic!("Unexpected ReturnData"),
+    };
+    let submit_result = SubmitResult::try_from_slice(submit_result_bytes).unwrap();
+    submit_result.gas_used
 }

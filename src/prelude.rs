@@ -27,6 +27,3 @@ pub type Address = H160;
 pub fn Address(input: [u8; 20]) -> Address {
     H160(input)
 }
-
-#[cfg(feature = "profile_eth_gas")]
-pub const ETH_GAS_USED: &str = "ETH_GAS_USED";

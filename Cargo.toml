@@ -79,4 +79,3 @@ std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "et
 testnet = []
 contract = []
 evm_bully = []
-profile_eth_gas = []

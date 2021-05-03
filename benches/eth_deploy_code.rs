@@ -1,7 +1,7 @@
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, Throughput};
 use secp256k1::SecretKey;
 
-use super::{address_from_secret_key, create_eth_transaction, deploy_evm, RAW_CALL};
+use super::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -40,19 +40,14 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
         let (output, maybe_err) =
             runner
                 .one_shot()
-                .call(RAW_CALL, calling_account_id.clone(), input.clone());
+                .call(SUBMIT, calling_account_id.clone(), input.clone());
         assert!(maybe_err.is_none());
         let output = output.unwrap();
         let gas = output.burnt_gas;
+        let eth_gas = super::parse_eth_gas(&output);
         // TODO(#45): capture this in a file
         println!("ETH_DEPLOY_CODE_{:?} NEAR GAS: {:?}", input_size, gas);
-
-        #[cfg(feature = "profile_eth_gas")]
-        {
-            let eth_gas = super::parse_eth_gas(&output);
-            // TODO(#45): capture this in a file
-            println!("ETH_DEPLOY_CODE_{:?} ETH GAS: {:?}", input_size, eth_gas);
-        }
+        println!("ETH_DEPLOY_CODE_{:?} ETH GAS: {:?}", input_size, eth_gas);
     }
 
     // measure wall-clock time
@@ -64,7 +59,7 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
         group.bench_function(id, |b| {
             b.iter_batched(
                 || (runner.one_shot(), calling_account_id.clone(), input.clone()),
-                |(r, c, i)| r.call(RAW_CALL, c, i),
+                |(r, c, i)| r.call(SUBMIT, c, i),
                 BatchSize::SmallInput,
             )
         });
