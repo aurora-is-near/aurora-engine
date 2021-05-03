@@ -26,9 +26,9 @@ mod sdk;
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::BorshDeserialize;
+    use borsh::{BorshDeserialize, BorshSerialize};
 
-    use crate::engine::{Engine, EngineError, EngineResult, EngineState};
+    use crate::engine::{Engine, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
@@ -138,7 +138,9 @@ mod contract {
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
         let mut engine = Engine::new(predecessor_address());
-        Engine::deploy_code_with_input(&mut engine, &input).sdk_process();
+        Engine::deploy_code_with_input(&mut engine, &input)
+            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .sdk_process();
         // TODO: charge for storage
     }
 
@@ -148,14 +150,16 @@ mod contract {
         let input = sdk::read_input();
         let args = FunctionCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
         let mut engine = Engine::new(predecessor_address());
-        Engine::call_with_args(&mut engine, args).sdk_process();
+        Engine::call_with_args(&mut engine, args)
+            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .sdk_process();
         // TODO: charge for storage
     }
 
     /// Process signed Ethereum transaction.
     /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
-    pub extern "C" fn raw_call() {
+    pub extern "C" fn submit() {
         use crate::transaction::EthSignedTransaction;
         use rlp::{Decodable, Rlp};
 
@@ -196,12 +200,15 @@ mod contract {
             } else {
                 // Execute a contract call:
                 Engine::call(&mut engine, sender, receiver, value, data)
+                    .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
                 // TODO: charge for storage
             };
             result.sdk_process();
         } else {
             // Execute a contract deployment:
-            Engine::deploy_code(&mut engine, sender, value, &data).sdk_process();
+            Engine::deploy_code(&mut engine, sender, value, &data)
+                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+                .sdk_process();
             // TODO: charge for storage
         }
     }
@@ -231,7 +238,9 @@ mod contract {
             meta_call_args.value,
             meta_call_args.input,
         );
-        result.sdk_process();
+        result
+            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .sdk_process();
     }
 
     #[cfg(feature = "testnet")]
@@ -386,7 +395,6 @@ mod contract {
         fn sdk_process(self) {
             match self {
                 Ok(r) => sdk::return_output(r.as_ref()),
-                Err(EngineError::EvmRevert(r)) => sdk::panic_hex(r.as_ref()),
                 Err(e) => sdk::panic_utf8(e.as_ref()),
             }
         }
