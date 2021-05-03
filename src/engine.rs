@@ -366,17 +366,17 @@ impl Engine {
             executor.transact_create(origin, value, Vec::from(input), u64::MAX),
             address,
         );
-        let is_revert = status.is_revert();
+        let is_succeed = status.is_succeed();
         status.into_result()?;
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult {
-            reverted: is_revert,
+            status: is_succeed,
             gas_used: used_gas,
-            logs: logs.into_iter().map(Into::into).collect(),
             result: result.0.to_vec(),
+            logs: logs.into_iter().map(Into::into).collect(),
         })
     }
 
@@ -398,17 +398,17 @@ impl Engine {
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
-        let is_revert = status.is_revert();
+        let is_succeed = status.is_succeed();
         status.into_result()?;
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult {
-            reverted: is_revert,
+            status: is_succeed,
             gas_used: used_gas,
-            logs: logs.into_iter().map(Into::into).collect(),
             result,
+            logs: logs.into_iter().map(Into::into).collect(),
         })
     }
 

@@ -33,7 +33,7 @@ pub struct MetaCallArgs {
     pub args: Vec<u8>,
 }
 
-/// Borsch-encoded log for use in a `RawCallResult`.
+/// Borsch-encoded log for use in a `SubmitResult`.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct ResultLog {
     pub topics: Vec<RawU256>,
@@ -54,13 +54,14 @@ impl From<Log> for ResultLog {
     }
 }
 
-/// Borsch-encoded parameters for the `raw_call` function.
+/// Borsch-encoded parameters for the `submit`, `call_with_args`, `deploy_code`,
+/// `deploy_with_input` methods.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct SubmitResult {
-    pub reverted: bool,
+    pub status: bool,
     pub gas_used: u64,
-    pub logs: Vec<ResultLog>,
     pub result: Vec<u8>,
+    pub logs: Vec<ResultLog>,
 }
 
 /// Borsh-encoded parameters for the `call` function.
