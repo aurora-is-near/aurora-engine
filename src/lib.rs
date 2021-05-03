@@ -28,7 +28,7 @@ mod sdk;
 mod contract {
     use borsh::BorshDeserialize;
 
-    use crate::engine::{Engine, EngineError, EngineResult, EngineState, NonceResult};
+    use crate::engine::{Engine, EngineError, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
@@ -68,7 +68,7 @@ mod contract {
         if !state.owner_id.is_empty() {
             require_owner_only(&state);
         }
-        let args = NewCallArgs::try_from_slice(&sdk::read_input()).expect("ERR_ARG_PARSE");
+        let args = NewCallArgs::try_from_slice(&sdk::read_input()).sdk_expect("ERR_ARG_PARSE");
         Engine::set_state(args.into());
     }
 
@@ -105,7 +105,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let state = Engine::get_state();
-        let index = sdk::read_u64(CODE_STAGE_KEY).expect("ERR_NO_UPGRADE");
+        let index = sdk::read_u64(CODE_STAGE_KEY).sdk_expect("ERR_NO_UPGRADE");
         sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
 
@@ -122,7 +122,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
         let state = Engine::get_state();
-        let index = sdk::read_u64(CODE_STAGE_KEY).unwrap();
+        let index = sdk::read_u64(CODE_STAGE_KEY).sdk_unwrap();
         if sdk::block_index() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }
@@ -138,20 +138,18 @@ mod contract {
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
         let mut engine = Engine::new(predecessor_address());
-        let res = Engine::deploy_code_with_input(&mut engine, &input);
+        Engine::deploy_code_with_input(&mut engine, &input).sdk_process();
         // TODO: charge for storage
-        process_engine_result(res)
     }
 
     /// Call method on the EVM contract.
     #[no_mangle]
     pub extern "C" fn call() {
         let input = sdk::read_input();
-        let args = FunctionCallArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
+        let args = FunctionCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
         let mut engine = Engine::new(predecessor_address());
-        let res = Engine::call_with_args(&mut engine, args);
+        Engine::call_with_args(&mut engine, args).sdk_process();
         // TODO: charge for storage
-        process_engine_result(res)
     }
 
     /// Process signed Ethereum transaction.
@@ -164,7 +162,7 @@ mod contract {
         let input = sdk::read_input();
         let signed_transaction = EthSignedTransaction::decode(&Rlp::new(&input))
             .map_err(|_| ())
-            .expect("ERR_INVALID_TX");
+            .sdk_expect("ERR_INVALID_TX");
 
         let state = Engine::get_state();
 
@@ -200,12 +198,11 @@ mod contract {
                 Engine::call(&mut engine, sender, receiver, value, data)
                 // TODO: charge for storage
             };
-            process_engine_result(result)
+            result.sdk_process();
         } else {
             // Execute a contract deployment:
-            let result = Engine::deploy_code(&mut engine, sender, value, &data);
+            Engine::deploy_code(&mut engine, sender, value, &data).sdk_process();
             // TODO: charge for storage
-            process_engine_result(result)
         }
     }
 
@@ -234,7 +231,7 @@ mod contract {
             meta_call_args.value,
             meta_call_args.input,
         );
-        process_engine_result(result);
+        result.sdk_process();
     }
 
     #[cfg(feature = "testnet")]
@@ -243,8 +240,8 @@ mod contract {
         let input = sdk::read_input();
         let address = Address::from_slice(&input);
         let mut engine = Engine::new(address);
-        let status = engine.credit(&address);
-        process_engine_result(status, &[])
+        let result = engine.credit(&address);
+        result.map(|_f| Vec::new()).sdk_process();
     }
 
     ///
@@ -254,10 +251,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn view() {
         let input = sdk::read_input();
-        let args = ViewCallArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
+        let args = ViewCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
         let engine = Engine::new(Address::from_slice(&args.sender));
         let result = Engine::view_with_args(&engine, args);
-        process_engine_result(result)
+        result.sdk_process()
     }
 
     #[no_mangle]
@@ -284,7 +281,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
         let input = sdk::read_input();
-        let args = GetStorageAtArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
+        let args = GetStorageAtArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
         let value = Engine::get_storage(&Address(args.address), &H256(args.key));
         sdk::return_output(&value.0)
     }
@@ -299,7 +296,7 @@ mod contract {
         let mut state = Engine::get_state();
         require_owner_only(&state);
         let input = sdk::read_input();
-        let args = BeginChainArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
+        let args = BeginChainArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
         state.chain_id = args.chain_id;
         Engine::set_state(state);
         // set genesis block balances
@@ -319,7 +316,7 @@ mod contract {
         let state = Engine::get_state();
         require_owner_only(&state);
         let input = sdk::read_input();
-        let _args = BeginBlockArgs::try_from_slice(&input).expect("ERR_ARG_PARSE");
+        let _args = BeginBlockArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 
@@ -337,11 +334,25 @@ mod contract {
         near_account_to_evm_address(&sdk::predecessor_account_id())
     }
 
-    fn process_engine_result<T: AsRef<[u8]>>(result: EngineResult<T>) {
-        match result {
-            Ok(r) => sdk::return_output(r.as_ref()),
-            Err(EngineError::EvmRevert(r)) => sdk::panic_hex(r.as_ref()),
-            Err(e) => sdk::panic_utf8(e.to_str().as_bytes()),
+    trait SdkExpect<T> {
+        fn sdk_expect(self, msg: &str) -> T;
+    }
+
+    impl<T> SdkExpect<T> for Option<T> {
+        fn sdk_expect(self, msg: &str) -> T {
+            match self {
+                Some(t) => t,
+                None => sdk::panic_utf8(msg.as_ref()),
+            }
+        }
+    }
+
+    impl<T, E> SdkExpect<T> for Result<T, E> {
+        fn sdk_expect(self, msg: &str) -> T {
+            match self {
+                Ok(t) => t,
+                Err(_) => sdk::panic_utf8(msg.as_ref()),
+            }
         }
     }
 
@@ -349,20 +360,34 @@ mod contract {
         fn sdk_unwrap(self) -> T;
     }
 
-    impl<T> SdkUnwrap<T> for EngineResult<T> {
+    impl<T> SdkUnwrap<T> for Option<T> {
         fn sdk_unwrap(self) -> T {
             match self {
-                Ok(t) => t,
-                Err(e) => sdk::panic_utf8(e.to_str().as_ref()),
+                Some(t) => t,
+                None => sdk::panic_utf8("ERR_UNWRAP".as_bytes()),
             }
         }
     }
 
-    impl<T> SdkUnwrap<T> for NonceResult<T> {
+    impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for Result<T, E> {
         fn sdk_unwrap(self) -> T {
             match self {
                 Ok(t) => t,
-                Err(e) => sdk::panic_utf8(e.to_str().as_ref()),
+                Err(e) => sdk::panic_utf8(e.as_ref()),
+            }
+        }
+    }
+
+    trait SdkProcess<T> {
+        fn sdk_process(self);
+    }
+
+    impl<T: AsRef<[u8]>> SdkProcess<T> for EngineResult<T> {
+        fn sdk_process(self) {
+            match self {
+                Ok(r) => sdk::return_output(r.as_ref()),
+                Err(EngineError::EvmRevert(r)) => sdk::panic_hex(r.as_ref()),
+                Err(e) => sdk::panic_utf8(e.as_ref()),
             }
         }
     }
