@@ -9,7 +9,7 @@ use crate::precompiles;
 use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
-use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId, NonceError};
+use crate::types::{u256_to_arr, AccountId};
 
 macro_rules! as_ref_err_impl {
     ($err: ty) => {
@@ -58,8 +58,6 @@ pub enum EngineError {
     EvmError(ExitError),
     /// Fatal EVM errors.
     EvmFatal(ExitFatal),
-    /// Revert of the transaction.
-    EvmRevert(Vec<u8>),
     /// Balance is too high, over max value.
     BalanceTooHigh,
     /// Balance is too low, cannot cover costs.
@@ -87,7 +85,6 @@ impl EngineError {
             EvmFatal(ExitFatal::UnhandledInterrupt) => "ERR_UNHANDLED_INTERRUPT",
             EvmFatal(ExitFatal::Other(m)) => m,
             EvmFatal(_) => unreachable!(), // unused misc
-            EvmRevert(_) => "ERR_REVERT",
             BalanceTooHigh => "ERR_BALANCE_HIGH",
             BalanceTooLow => "ERR_BALANCE_LOW",
         }
@@ -111,14 +108,19 @@ impl From<ExitFatal> for EngineError {
 /// An engine result.
 pub type EngineResult<T> = Result<T, EngineError>;
 
-// Only want result cloned if its a revert.
-fn maybe_error(reason: ExitReason, result: &[u8]) -> EngineResult<()> {
-    use ExitReason::*;
-    match reason {
-        Succeed(_) => Ok(()),
-        Error(e) => Err(e.into()),
-        Revert(_) => Err(EngineError::EvmRevert(result.to_vec())),
-        Fatal(e) => Err(e.into()),
+trait ExitIntoResult {
+    /// Checks if the EVM exit is ok or an error.
+    fn into_result(self) -> EngineResult<()>;
+}
+
+impl ExitIntoResult for ExitReason {
+    fn into_result(self) -> EngineResult<()> {
+        use ExitReason::*;
+        match self {
+            Succeed(_) | Revert(_) => Ok(()),
+            Error(e) => Err(e.into()),
+            Fatal(e) => Err(e.into()),
+        }
     }
 }
 
@@ -346,7 +348,7 @@ impl Engine {
         Ok(())
     }
 
-    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<Address> {
+    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let value = U256::zero();
         self.deploy_code(origin, value, input)
@@ -357,32 +359,28 @@ impl Engine {
         origin: Address,
         value: U256,
         input: &[u8],
-    ) -> EngineResult<Address> {
+    ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
             executor.transact_create(origin, value, Vec::from(input), u64::MAX),
             address,
         );
-        maybe_error(status, &result.0)?;
+        let is_revert = status.is_revert();
+        status.into_result()?;
+        let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
 
-        let res_logs = logs.into_iter().map(Into::into).collect();
-
-        let res = match status {
-            ExitReason::Succeed(_) | ExitReason::Revert(_) => Some(SubmitResult {
-                gas_used: used_gas,
-                logs: res_logs,
-                result: result.0.to_vec(),
-            }),
-            ExitReason::Error(_) | ExitReason::Fatal(_) => None,
-        };
-
-        (status, res)
+        Ok(SubmitResult {
+            reverted: is_revert,
+            gas_used: used_gas,
+            logs: logs.into_iter().map(Into::into).collect(),
+            result: result.0.to_vec(),
+        })
     }
 
-    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<Vec<u8>> {
+    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = U256::zero();
@@ -395,27 +393,23 @@ impl Engine {
         contract: Address,
         value: U256,
         input: Vec<u8>,
-    ) -> EngineResult<Vec<u8>> {
+    ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor();
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
+        let is_revert = status.is_revert();
+        status.into_result()?;
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
 
-        let res_logs = logs.into_iter().map(Into::into).collect();
-
-        let res = match status {
-            ExitReason::Succeed(_) | ExitReason::Revert(_) => Some(SubmitResult {
-                gas_used: used_gas,
-                logs: res_logs,
-                result,
-            }),
-            ExitReason::Error(_) | ExitReason::Fatal(_) => None,
-        };
-
-        (status, res)
+        Ok(SubmitResult {
+            reverted: is_revert,
+            gas_used: used_gas,
+            logs: logs.into_iter().map(Into::into).collect(),
+            result,
+        })
     }
 
     #[cfg(feature = "testnet")]
@@ -442,7 +436,7 @@ impl Engine {
     ) -> EngineResult<Vec<u8>> {
         let mut executor = self.make_executor();
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
-        maybe_error(status, &result)?;
+        status.into_result()?;
         Ok(result)
     }
 
