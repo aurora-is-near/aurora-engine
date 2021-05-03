@@ -384,10 +384,10 @@ impl Engine {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = U256::zero();
-        self.submit(origin, contract, value, args.input)
+        self.call(origin, contract, value, args.input)
     }
 
-    pub fn submit(
+    pub fn call(
         &mut self,
         origin: Address,
         contract: Address,
