@@ -5,7 +5,17 @@ use rlp::{Decodable, DecoderError, Rlp};
 
 use crate::parameters::MetaCallArgs;
 use crate::prelude::{vec, Address, Box, HashMap, String, ToOwned, ToString, Vec, H256, U256};
-use crate::types::{keccak, u256_to_arr, ErrorKind, InternalMetaCallArgs, RawU256, Result};
+use crate::types::{keccak, u256_to_arr, InternalMetaCallArgs, RawU256};
+
+/// Internal errors to propagate up and format in the single place.
+pub enum ParsingError {
+    ArgumentParseError,
+    InvalidMetaTransactionMethodName,
+    InvalidMetaTransactionFunctionArg,
+    InvalidEcRecoverSignature,
+}
+
+pub type ParsingResult<T> = core::result::Result<T, ParsingError>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgType {
@@ -26,7 +36,7 @@ pub enum ArgType {
 /// the type string is being validated before it's parsed.
 /// field_type: A single evm function arg type in string, without the argument name
 /// e.g. "bytes" "uint256[][3]" "CustomStructName"
-pub fn parse_type(field_type: &str) -> Result<ArgType> {
+pub fn parse_type(field_type: &str) -> ParsingResult<ArgType> {
     #[derive(PartialEq)]
     enum State {
         Open,
@@ -54,7 +64,7 @@ pub fn parse_type(field_type: &str) -> Result<ArgType> {
                 current_array_length = Some(
                     length
                         .parse()
-                        .map_err(|_| ErrorKind::InvalidMetaTransactionMethodName)?,
+                        .map_err(|_| ParsingError::InvalidMetaTransactionMethodName)?,
                 );
                 lexer.advance();
                 continue;
@@ -76,14 +86,14 @@ pub fn parse_type(field_type: &str) -> Result<ArgType> {
                     array_depth += 1;
                     continue;
                 } else {
-                    return Err(ErrorKind::InvalidMetaTransactionMethodName);
+                    return Err(ParsingError::InvalidMetaTransactionMethodName);
                 }
             }
             Token::BracketClose if array_depth == 10 => {
-                return Err(ErrorKind::InvalidMetaTransactionMethodName);
+                return Err(ParsingError::InvalidMetaTransactionMethodName);
             }
             _ => {
-                return Err(ErrorKind::InvalidMetaTransactionMethodName);
+                return Err(ParsingError::InvalidMetaTransactionMethodName);
             }
         };
 
@@ -91,7 +101,7 @@ pub fn parse_type(field_type: &str) -> Result<ArgType> {
         lexer.advance();
     }
 
-    token.ok_or(ErrorKind::InvalidMetaTransactionMethodName)
+    token.ok_or(ParsingError::InvalidMetaTransactionMethodName)
 }
 
 /// NEAR's domainSeparator
@@ -173,7 +183,7 @@ pub struct MethodAndTypes {
 }
 
 impl Arg {
-    fn parse(text: &str) -> Result<(Arg, &str)> {
+    fn parse(text: &str) -> ParsingResult<(Arg, &str)> {
         let (type_raw, remains) = parse_type_raw(text)?;
         let t = parse_type(&type_raw)?;
         let remains = consume(remains, ' ')?;
@@ -181,10 +191,10 @@ impl Arg {
         Ok((Arg { name, type_raw, t }, remains))
     }
 
-    fn parse_args(text: &str) -> Result<(Vec<Arg>, &str)> {
+    fn parse_args(text: &str) -> ParsingResult<(Vec<Arg>, &str)> {
         let mut remains = consume(text, '(')?;
         if remains.is_empty() {
-            return Err(ErrorKind::InvalidMetaTransactionMethodName);
+            return Err(ParsingError::InvalidMetaTransactionMethodName);
         }
         let mut args = vec![];
         let first = remains.chars().next().unwrap();
@@ -207,7 +217,7 @@ impl Arg {
 }
 
 impl Method {
-    fn parse(method_def: &str) -> Result<(Method, &str)> {
+    fn parse(method_def: &str) -> ParsingResult<(Method, &str)> {
         let (name, remains) = parse_ident(method_def)?;
         let (args, remains) = Arg::parse_args(remains)?;
         Ok((
@@ -222,7 +232,7 @@ impl Method {
 }
 
 impl MethodAndTypes {
-    pub fn parse(method_def: &str) -> Result<Self> {
+    pub fn parse(method_def: &str) -> ParsingResult<Self> {
         let method_def = method_def;
         let mut parsed_types = HashMap::new();
         let mut type_sequences = vec![];
@@ -241,10 +251,10 @@ impl MethodAndTypes {
     }
 }
 
-fn parse_ident(text: &str) -> Result<(String, &str)> {
+fn parse_ident(text: &str) -> ParsingResult<(String, &str)> {
     let mut chars = text.chars();
     if text.is_empty() || !is_arg_start(chars.next().unwrap()) {
-        return Err(ErrorKind::InvalidMetaTransactionMethodName);
+        return Err(ParsingError::InvalidMetaTransactionMethodName);
     }
 
     let mut i = 1;
@@ -261,19 +271,19 @@ fn parse_ident(text: &str) -> Result<(String, &str)> {
 /// E.g. text: "uint256[] petIds,..."
 /// returns: "uint256[]", " petIds,..."
 /// "uint256[]" is not parsed further to "an array of uint256" in this fn
-fn parse_type_raw(text: &str) -> Result<(String, &str)> {
+fn parse_type_raw(text: &str) -> ParsingResult<(String, &str)> {
     let i = text
         .find(' ')
-        .ok_or(ErrorKind::InvalidMetaTransactionMethodName)?;
+        .ok_or(ParsingError::InvalidMetaTransactionMethodName)?;
     Ok((text[..i].to_string(), &text[i..]))
 }
 
 /// Consume next char in text, it must be c or return parse error
 /// return text without the first char
-fn consume(text: &str, c: char) -> Result<&str> {
+fn consume(text: &str, c: char) -> ParsingResult<&str> {
     let first = text.chars().next();
     if first.is_none() || first.unwrap() != c {
-        return Err(ErrorKind::InvalidMetaTransactionMethodName);
+        return Err(ParsingError::InvalidMetaTransactionMethodName);
     }
 
     Ok(&text[1..])
@@ -306,10 +316,10 @@ fn method_signature(method_and_type: &MethodAndTypes) -> String {
 }
 
 /// Decode rlp-encoded args into vector of Values
-fn rlp_decode(args: &[u8]) -> Result<Vec<RlpValue>> {
+fn rlp_decode(args: &[u8]) -> ParsingResult<Vec<RlpValue>> {
     let rlp = Rlp::new(args);
     let res: core::result::Result<Vec<RlpValue>, DecoderError> = rlp.as_list();
-    res.map_err(|_| ErrorKind::InvalidMetaTransactionFunctionArg)
+    res.map_err(|_| ParsingError::InvalidMetaTransactionFunctionArg)
 }
 
 /// eip-712 hash a single argument, whose type is ty, and value is value.
@@ -318,7 +328,7 @@ fn eip_712_hash_argument(
     ty: &ArgType,
     value: &RlpValue,
     types: &HashMap<String, Method>,
-) -> Result<Vec<u8>> {
+) -> ParsingResult<Vec<u8>> {
     match ty {
         ArgType::String | ArgType::Bytes => {
             eip_712_rlp_value(value, |b| Ok(keccak(&b).as_bytes().to_vec()))
@@ -341,7 +351,7 @@ fn eip_712_hash_argument(
         ArgType::Custom(type_name) => eip_712_rlp_list(value, |l| {
             let struct_type = types
                 .get(type_name)
-                .ok_or(ErrorKind::InvalidMetaTransactionFunctionArg)?;
+                .ok_or(ParsingError::InvalidMetaTransactionFunctionArg)?;
             // struct_type.raw is with struct type with argument names (a "method_def"), so it follows
             // EIP-712 typeHash.
             let mut r = keccak(struct_type.raw.as_bytes()).as_bytes().to_vec();
@@ -359,29 +369,32 @@ fn eip_712_hash_argument(
 
 /// EIP-712 hash a RLP list. f must contain actual logic of EIP-712 encoding
 /// This function serves as a guard to assert value is a List instead of Value
-fn eip_712_rlp_list<F>(value: &RlpValue, f: F) -> Result<Vec<u8>>
+fn eip_712_rlp_list<F>(value: &RlpValue, f: F) -> ParsingResult<Vec<u8>>
 where
-    F: Fn(&Vec<RlpValue>) -> Result<Vec<u8>>,
+    F: Fn(&Vec<RlpValue>) -> ParsingResult<Vec<u8>>,
 {
     match value {
-        RlpValue::Bytes(_) => Err(ErrorKind::InvalidMetaTransactionFunctionArg),
+        RlpValue::Bytes(_) => Err(ParsingError::InvalidMetaTransactionFunctionArg),
         RlpValue::List(l) => f(l),
     }
 }
 
 /// EIP-712 hash a RLP value. f must contain actual logic of EIP-712 encoding
 /// This function serves as a guard to assert value is a Value instead of List
-fn eip_712_rlp_value<F>(value: &RlpValue, f: F) -> Result<Vec<u8>>
+fn eip_712_rlp_value<F>(value: &RlpValue, f: F) -> ParsingResult<Vec<u8>>
 where
-    F: Fn(&Vec<u8>) -> Result<Vec<u8>>,
+    F: Fn(&Vec<u8>) -> ParsingResult<Vec<u8>>,
 {
     match value {
-        RlpValue::List(_) => Err(ErrorKind::InvalidMetaTransactionFunctionArg),
+        RlpValue::List(_) => Err(ParsingError::InvalidMetaTransactionFunctionArg),
         RlpValue::Bytes(b) => f(b),
     }
 }
 
-fn eth_abi_encode_args(args_decoded: &[RlpValue], methods: &MethodAndTypes) -> Result<Vec<u8>> {
+fn eth_abi_encode_args(
+    args_decoded: &[RlpValue],
+    methods: &MethodAndTypes,
+) -> ParsingResult<Vec<u8>> {
     let mut tokens = vec![];
     for (i, arg) in args_decoded.iter().enumerate() {
         tokens.push(arg_to_abi_token(&methods.method.args[i].t, arg, methods)?);
@@ -389,7 +402,11 @@ fn eth_abi_encode_args(args_decoded: &[RlpValue], methods: &MethodAndTypes) -> R
     Ok(encode(&tokens))
 }
 
-fn arg_to_abi_token(ty: &ArgType, arg: &RlpValue, methods: &MethodAndTypes) -> Result<ABIToken> {
+fn arg_to_abi_token(
+    ty: &ArgType,
+    arg: &RlpValue,
+    methods: &MethodAndTypes,
+) -> ParsingResult<ABIToken> {
     match ty {
         ArgType::String | ArgType::Bytes => {
             value_to_abi_token(arg, |b| Ok(ABIToken::Bytes(b.clone())))
@@ -425,7 +442,7 @@ fn arg_to_abi_token(ty: &ArgType, arg: &RlpValue, methods: &MethodAndTypes) -> R
             let struct_type = methods
                 .types
                 .get(type_name)
-                .ok_or(ErrorKind::InvalidMetaTransactionFunctionArg)?;
+                .ok_or(ParsingError::InvalidMetaTransactionFunctionArg)?;
             let mut tokens = vec![];
             for (i, element) in l.iter().enumerate() {
                 tokens.push(arg_to_abi_token(&struct_type.args[i].t, element, methods)?);
@@ -435,22 +452,22 @@ fn arg_to_abi_token(ty: &ArgType, arg: &RlpValue, methods: &MethodAndTypes) -> R
     }
 }
 
-fn value_to_abi_token<F>(value: &RlpValue, f: F) -> Result<ABIToken>
+fn value_to_abi_token<F>(value: &RlpValue, f: F) -> ParsingResult<ABIToken>
 where
-    F: Fn(&Vec<u8>) -> Result<ABIToken>,
+    F: Fn(&Vec<u8>) -> ParsingResult<ABIToken>,
 {
     match value {
-        RlpValue::List(_) => Err(ErrorKind::InvalidMetaTransactionFunctionArg),
+        RlpValue::List(_) => Err(ParsingError::InvalidMetaTransactionFunctionArg),
         RlpValue::Bytes(b) => f(b),
     }
 }
 
-fn list_to_abi_token<F>(value: &RlpValue, f: F) -> Result<ABIToken>
+fn list_to_abi_token<F>(value: &RlpValue, f: F) -> ParsingResult<ABIToken>
 where
-    F: Fn(&Vec<RlpValue>) -> Result<ABIToken>,
+    F: Fn(&Vec<RlpValue>) -> ParsingResult<ABIToken>,
 {
     match value {
-        RlpValue::Bytes(_) => Err(ErrorKind::InvalidMetaTransactionFunctionArg),
+        RlpValue::Bytes(_) => Err(ParsingError::InvalidMetaTransactionFunctionArg),
         RlpValue::List(l) => f(l),
     }
 }
@@ -461,11 +478,11 @@ pub fn prepare_meta_call_args(
     account_id: &[u8],
     method_def: String,
     input: &InternalMetaCallArgs,
-) -> Result<(RawU256, Vec<u8>)> {
+) -> ParsingResult<(RawU256, Vec<u8>)> {
     let mut bytes = Vec::new();
     let method_arg_start = match method_def.find('(') {
         Some(index) => index,
-        None => return Err(ErrorKind::InvalidMetaTransactionMethodName),
+        None => return Err(ParsingError::InvalidMetaTransactionMethodName),
     };
     let arguments = "Arguments".to_string() + &method_def[method_arg_start..];
     // Note: method_def is like "adopt(uint256 petId,PetObj petObj)PetObj(string name,address owner)",
@@ -522,8 +539,9 @@ pub fn parse_meta_call(
     domain_separator: &RawU256,
     account_id: &[u8],
     args: Vec<u8>,
-) -> Result<InternalMetaCallArgs> {
-    let meta_tx = MetaCallArgs::try_from_slice(&args).map_err(|_| ErrorKind::ArgumentParseError)?;
+) -> ParsingResult<InternalMetaCallArgs> {
+    let meta_tx =
+        MetaCallArgs::try_from_slice(&args).map_err(|_| ParsingError::ArgumentParseError)?;
     let nonce = U256::from(meta_tx.nonce);
     let fee_amount = U256::from(meta_tx.fee_amount);
     let fee_address = Address::from(meta_tx.fee_address);
@@ -550,6 +568,6 @@ pub fn parse_meta_call(
             result.input = input;
             Ok(result)
         }
-        Err(_) => Err(ErrorKind::InvalidEcRecoverSignature),
+        Err(_) => Err(ParsingError::InvalidEcRecoverSignature),
     }
 }

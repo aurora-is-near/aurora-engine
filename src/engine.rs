@@ -1,14 +1,126 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm::{Config, CreateScheme, ExitError, ExitReason, ExitSucceed};
+use evm::ExitFatal;
+use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
 use crate::precompiles;
-use crate::prelude::{Address, Borrowed, Vec, H256, U256};
+use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
-use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId, NonceError};
+use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
+
+macro_rules! as_ref_err_impl {
+    ($err: ty) => {
+        impl AsRef<str> for $err {
+            fn as_ref(&self) -> &str {
+                self.to_str()
+            }
+        }
+
+        impl AsRef<[u8]> for $err {
+            fn as_ref(&self) -> &[u8] {
+                self.to_str().as_bytes()
+            }
+        }
+    };
+}
+
+/// Errors involving the nonce
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum NonceError {
+    /// Attempted to increment the nonce, but overflow occurred
+    NonceOverflow,
+    /// Account nonce did not match the transaction nonce
+    IncorrectNonce,
+}
+
+impl NonceError {
+    pub fn to_str(&self) -> &str {
+        use NonceError::*;
+        match self {
+            NonceOverflow => "ERR_NONCE_OVERFLOW",
+            IncorrectNonce => "ERR_INCORRECT_NONCE",
+        }
+    }
+}
+
+as_ref_err_impl!(NonceError);
+
+/// A result for nonces.
+pub type NonceResult<T> = Result<T, NonceError>;
+
+/// Errors with the EVM engine.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum EngineError {
+    /// Normal EVM errors.
+    EvmError(ExitError),
+    /// Fatal EVM errors.
+    EvmFatal(ExitFatal),
+    /// Revert of the transaction.
+    EvmRevert(Vec<u8>),
+    /// Balance is too high, over max value.
+    BalanceTooHigh,
+    /// Balance is too low, cannot cover costs.
+    BalanceTooLow,
+}
+
+impl EngineError {
+    pub fn to_str(&self) -> &str {
+        use EngineError::*;
+        match self {
+            EvmError(ExitError::StackUnderflow) => "ERR_STACK_UNDERFLOW",
+            EvmError(ExitError::StackOverflow) => "ERR_STACK_OVERFLOW",
+            EvmError(ExitError::InvalidJump) => "ERR_INVALID_JUMP",
+            EvmError(ExitError::InvalidRange) => "ERR_INVALID_RANGE",
+            EvmError(ExitError::DesignatedInvalid) => "ERR_DESIGNATED_INVALID",
+            EvmError(ExitError::CallTooDeep) => "ERR_CALL_TOO_DEEP",
+            EvmError(ExitError::CreateCollision) => "ERR_CREATE_COLLISION",
+            EvmError(ExitError::CreateContractLimit) => "ERR_CREATE_CONTRACT_LIMIT",
+            EvmError(ExitError::OutOfOffset) => "ERR_OUT_OF_OFFSET",
+            EvmError(ExitError::OutOfGas) => "ERR_OUT_OF_GAS",
+            EvmError(ExitError::OutOfFund) => "ERR_OUT_OF_FUND",
+            EvmError(ExitError::Other(m)) => m,
+            EvmError(_) => unreachable!(), // unused misc
+            EvmFatal(ExitFatal::NotSupported) => "ERR_NOT_SUPPORTED",
+            EvmFatal(ExitFatal::UnhandledInterrupt) => "ERR_UNHANDLED_INTERRUPT",
+            EvmFatal(ExitFatal::Other(m)) => m,
+            EvmFatal(_) => unreachable!(), // unused misc
+            EvmRevert(_) => "ERR_REVERT",
+            BalanceTooHigh => "ERR_BALANCE_HIGH",
+            BalanceTooLow => "ERR_BALANCE_LOW",
+        }
+    }
+}
+
+as_ref_err_impl!(EngineError);
+
+impl From<ExitError> for EngineError {
+    fn from(e: ExitError) -> Self {
+        EngineError::EvmError(e)
+    }
+}
+
+impl From<ExitFatal> for EngineError {
+    fn from(e: ExitFatal) -> Self {
+        EngineError::EvmFatal(e)
+    }
+}
+
+/// An engine result.
+pub type EngineResult<T> = Result<T, EngineError>;
+
+// Only want result cloned if its a revert.
+fn maybe_error(reason: ExitReason, result: &[u8]) -> EngineResult<()> {
+    use ExitReason::*;
+    match reason {
+        Succeed(_) => Ok(()),
+        Error(e) => Err(e.into()),
+        Revert(_) => Err(EngineError::EvmRevert(result.to_vec())),
+        Fatal(e) => Err(e.into()),
+    }
+}
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
@@ -102,7 +214,7 @@ impl Engine {
     /// nonce of the account in storage. The nonce still needs to be set to the new value
     /// if this is required.
     #[inline]
-    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> Result<U256, NonceError> {
+    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> NonceResult<U256> {
         let account_nonce = Self::get_nonce(address);
 
         if transaction_nonce != &account_nonce {
@@ -144,14 +256,12 @@ impl Engine {
     /// # Errors
     ///
     /// * If the balance is > `U256::MAX`
-    fn check_increase_balance(address: &Address, amount: &U256) -> Result<U256, ExitError> {
+    fn check_increase_balance(address: &Address, amount: &U256) -> EngineResult<U256> {
         let balance = Self::get_balance(address);
         if let Some(new_balance) = balance.checked_add(*amount) {
             Ok(new_balance)
         } else {
-            Err(ExitError::Other(Borrowed(
-                "balance is too high, can not increase",
-            )))
+            Err(EngineError::BalanceTooHigh)
         }
     }
 
@@ -162,14 +272,12 @@ impl Engine {
     /// # Errors
     ///
     /// * If the balance is < `U256::zero()`
-    fn check_decrease_balance(address: &Address, amount: &U256) -> Result<U256, ExitError> {
+    fn check_decrease_balance(address: &Address, amount: &U256) -> EngineResult<U256> {
         let balance = Self::get_balance(address);
         if let Some(new_balance) = balance.checked_sub(*amount) {
             Ok(new_balance)
         } else {
-            Err(ExitError::Other(Borrowed(
-                "balance is too low, can not decrease",
-            )))
+            Err(EngineError::BalanceTooLow)
         }
     }
 
@@ -219,28 +327,26 @@ impl Engine {
     ///
     /// If the sender can send, and the receiver can receive, then the transfer
     /// will execute successfully.
-    pub fn transfer(&mut self, sender: &Address, receiver: &Address, value: &U256) -> ExitReason {
+    pub fn transfer(
+        &mut self,
+        sender: &Address,
+        receiver: &Address,
+        value: &U256,
+    ) -> EngineResult<()> {
         let balance = Self::get_balance(sender);
         if balance < *value {
-            return ExitReason::Error(ExitError::OutOfFund);
+            return Err(ExitError::OutOfFund.into());
         }
 
-        let new_receiver_balance = match Self::check_increase_balance(receiver, value) {
-            Ok(b) => b,
-            Err(e) => return ExitReason::Error(e),
-        };
-        let new_sender_balance = match Self::check_decrease_balance(sender, value) {
-            Ok(b) => b,
-            Err(e) => return ExitReason::Error(e),
-        };
-
+        let new_receiver_balance = Self::check_increase_balance(receiver, value)?;
+        let new_sender_balance = Self::check_decrease_balance(sender, value)?;
         Self::set_balance(sender, &new_sender_balance);
         Self::set_balance(receiver, &new_receiver_balance);
 
-        ExitReason::Succeed(ExitSucceed::Returned)
+        Ok(())
     }
 
-    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> (ExitReason, Address) {
+    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<Address> {
         let origin = self.origin();
         let value = U256::zero();
         self.deploy_code(origin, value, input)
@@ -251,19 +357,20 @@ impl Engine {
         origin: Address,
         value: U256,
         input: &[u8],
-    ) -> (ExitReason, Address) {
+    ) -> EngineResult<Address> {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
             executor.transact_create(origin, value, Vec::from(input), u64::MAX),
             address,
         );
+        maybe_error(status, &result.0)?;
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
-        (status, result)
+        Ok(result)
     }
 
-    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> (ExitReason, Vec<u8>) {
+    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<Vec<u8>> {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = U256::zero();
@@ -276,24 +383,24 @@ impl Engine {
         contract: Address,
         value: U256,
         input: Vec<u8>,
-    ) -> (ExitReason, Vec<u8>) {
+    ) -> EngineResult<Vec<u8>> {
         let mut executor = self.make_executor();
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+        maybe_error(status, &result)?;
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, logs, true);
-        (status, result)
+        Ok(result)
     }
 
     #[cfg(feature = "testnet")]
     /// Credits the address with 10 coins from the faucet.
-    pub fn credit(&mut self, address: &Address) -> ExitReason {
-        if let Err(e) = Self::increase_balance(address, &U256::from(10)) {
-            return ExitReason::Error(e);
-        }
-        ExitReason::Succeed(ExitSucceed::Returned)
+    pub fn credit(&mut self, address: &Address) -> EngineResult<()> {
+        let new_bal = Self::check_increase_balance(address, &U256::from(10))?;
+        Self::set_balance(address, &new_bal);
+        Ok(())
     }
 
-    pub fn view_with_args(&self, args: ViewCallArgs) -> (ExitReason, Vec<u8>) {
+    pub fn view_with_args(&self, args: ViewCallArgs) -> EngineResult<Vec<u8>> {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
@@ -306,9 +413,11 @@ impl Engine {
         contract: Address,
         value: U256,
         input: Vec<u8>,
-    ) -> (ExitReason, Vec<u8>) {
+    ) -> EngineResult<Vec<u8>> {
         let mut executor = self.make_executor();
-        executor.transact_call(origin, contract, value, input, u64::MAX)
+        let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+        maybe_error(status, &result)?;
+        Ok(result)
     }
 
     fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {
