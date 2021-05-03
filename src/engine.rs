@@ -82,11 +82,11 @@ impl EngineError {
             EvmError(ExitError::OutOfGas) => "ERR_OUT_OF_GAS",
             EvmError(ExitError::OutOfFund) => "ERR_OUT_OF_FUND",
             EvmError(ExitError::Other(m)) => m,
-            EvmError(_) => "", // unused misc
+            EvmError(_) => unreachable!(), // unused misc
             EvmFatal(ExitFatal::NotSupported) => "ERR_NOT_SUPPORTED",
             EvmFatal(ExitFatal::UnhandledInterrupt) => "ERR_UNHANDLED_INTERRUPT",
             EvmFatal(ExitFatal::Other(m)) => m,
-            EvmFatal(_) => "", // unused misc
+            EvmFatal(_) => unreachable!(), // unused misc
             EvmRevert(_) => "ERR_REVERT",
             BalanceTooHigh => "ERR_BALANCE_HIGH",
             BalanceTooLow => "ERR_BALANCE_LOW",
