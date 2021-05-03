@@ -4,11 +4,12 @@ use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json;
 use near_sdk::test_utils::accounts;
-use near_sdk_sim::{to_yocto, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
+use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
 
 use aurora_engine::parameters::NewCallArgs;
 use aurora_engine::types::{Balance, EthAddress};
 use byte_slice_cast::AsByteSlice;
+use near_sdk_sim::transaction::ExecutionStatus;
 use primitive_types::U256;
 
 const CONTRACT_ACC: &'static str = "eth_connector.root";
@@ -103,7 +104,7 @@ fn validate_eth_address(address: &str) -> EthAddress {
     result
 }
 
-fn call_deposit_near(master_account: &UserAccount, contract: &str) {
+fn call_deposit_near(master_account: &UserAccount, contract: &str) -> Vec<Option<ExecutionResult>> {
     let proof: Proof = serde_json::from_str(PROOF_DATA_NEAR).unwrap();
     let res = master_account.call(
         contract.to_string(),
@@ -113,7 +114,8 @@ fn call_deposit_near(master_account: &UserAccount, contract: &str) {
         0,
     );
     //res.assert_success();
-    println!("{:#?}", res.promise_results());
+    //println!("{:#?}", res.promise_results());
+    res.promise_results()
 }
 
 #[allow(dead_code)]
@@ -417,7 +419,7 @@ fn test_ft_transfer_call_erc20() {
     assert_eq!(balance, DEPOSITED_AMOUNT);
 
     /*
-    TODO: for testing should be completed Deploy ER C20 contract
+    TODO: for testing should be completed Deploy ERC20 contract
         let transfer_amount = 100;
         let mut msg = U256::from(30).as_byte_slice().to_vec();
         msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
@@ -456,4 +458,22 @@ fn test_ft_transfer_call_erc20() {
 
         let balance = total_supply_eth(&master_account);
         assert_eq!(balance, transfer_amount);*/
+}
+
+#[test]
+fn test_deposit_with_same_proof() {
+    let (_master_account, contract) = init(CUSTODIAN_ADDRESS);
+    let promises = call_deposit_near(&contract, CONTRACT_ACC);
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
+    let promises = call_deposit_near(&contract, CONTRACT_ACC);
+    let l = promises.len();
+    let p = promises[l - 2].clone();
+    match p.unwrap().status() {
+        ExecutionStatus::Failure(_) => {}
+        _ => panic!(),
+    }
 }
