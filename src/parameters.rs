@@ -5,7 +5,8 @@ use crate::prelude::{String, Vec};
 use crate::prover::Proof;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 #[cfg(feature = "contract")]
-use crate::types::{Balance, EthAddress};
+use crate::types::Balance;
+use crate::types::EthAddress;
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
