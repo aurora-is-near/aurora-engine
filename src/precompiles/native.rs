@@ -61,16 +61,16 @@ impl Precompile for TransferEthToNear {
             //TODO: add method in Aurora connector and call promise `get_near_account_for_evm_token(context.caller)`
             let nep141address = context.caller.to_string();
 
-            let mut input = input;
+            let mut input_mut = input;
 
             let mut sender = [0u8; 20];
-            sender.copy_from_slice(&input[..20]);
-            input = &input[20..];
+            sender.copy_from_slice(&input_mut[..20]);
+            input_mut = &input_mut[20..];
 
-            let amount = U256::from_little_endian(&input[..32]).as_u128();
-            input = &input[32..];
+            let amount = U256::from_little_endian(&input_mut[..32]).as_u128();
+            input_mut = &input_mut[32..];
 
-            let receiver_account_id: AccountId = String::from_utf8(input.to_vec()).unwrap();
+            let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
 
             (
                 nep141address,
@@ -140,16 +140,16 @@ impl Precompile for TransferNearToEth {
             //TODO: add method in Aurora connector and call promise `get_near_account_for_evm_token(context.caller)`
             let nep141address = context.caller.to_string();
 
-            let mut input = input;
+            let mut input_mut = input;
 
             let mut sender = [0u8; 20];
-            sender.copy_from_slice(&input[..20]);
-            input = &input[20..];
+            sender.copy_from_slice(&input_mut[..20]);
+            input_mut = &input_mut[20..];
 
-            let amount = U256::from_little_endian(&input[..32]).as_u128();
-            input = &input[32..];
+            let amount = U256::from_little_endian(&input_mut[..32]).as_u128();
+            input_mut = &input_mut[32..];
 
-            let eth_recipient: AccountId = String::from_utf8(input.to_vec()).unwrap();
+            let eth_recipient: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
             let args = BridgedTokenWithdrawArgs {
                 recipient: eth_recipient,
                 amount,
