@@ -1,15 +1,129 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm::{Config, CreateScheme, ExitError, ExitReason, ExitSucceed};
+use evm::ExitFatal;
+use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::connector::EthConnectorContract;
-use crate::parameters::{FunctionCallArgs, NewCallArgs, ViewCallArgs};
+use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
 use crate::precompiles;
 use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
-use crate::types::{bytes_to_hex, log_to_bytes, u256_to_arr, AccountId};
+use crate::types::{u256_to_arr, AccountId};
+
+macro_rules! as_ref_err_impl {
+    ($err: ty) => {
+        impl AsRef<str> for $err {
+            fn as_ref(&self) -> &str {
+                self.to_str()
+            }
+        }
+
+        impl AsRef<[u8]> for $err {
+            fn as_ref(&self) -> &[u8] {
+                self.to_str().as_bytes()
+            }
+        }
+    };
+}
+
+/// Errors involving the nonce
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum NonceError {
+    /// Attempted to increment the nonce, but overflow occurred
+    NonceOverflow,
+    /// Account nonce did not match the transaction nonce
+    IncorrectNonce,
+}
+
+impl NonceError {
+    pub fn to_str(&self) -> &str {
+        use NonceError::*;
+        match self {
+            NonceOverflow => "ERR_NONCE_OVERFLOW",
+            IncorrectNonce => "ERR_INCORRECT_NONCE",
+        }
+    }
+}
+
+as_ref_err_impl!(NonceError);
+
+/// A result for nonces.
+pub type NonceResult<T> = Result<T, NonceError>;
+
+/// Errors with the EVM engine.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum EngineError {
+    /// Normal EVM errors.
+    EvmError(ExitError),
+    /// Fatal EVM errors.
+    EvmFatal(ExitFatal),
+    /// Balance is too high, over max value.
+    BalanceTooHigh,
+    /// Balance is too low, cannot cover costs.
+    BalanceTooLow,
+}
+
+impl EngineError {
+    pub fn to_str(&self) -> &str {
+        use EngineError::*;
+        match self {
+            EvmError(ExitError::StackUnderflow) => "ERR_STACK_UNDERFLOW",
+            EvmError(ExitError::StackOverflow) => "ERR_STACK_OVERFLOW",
+            EvmError(ExitError::InvalidJump) => "ERR_INVALID_JUMP",
+            EvmError(ExitError::InvalidRange) => "ERR_INVALID_RANGE",
+            EvmError(ExitError::DesignatedInvalid) => "ERR_DESIGNATED_INVALID",
+            EvmError(ExitError::CallTooDeep) => "ERR_CALL_TOO_DEEP",
+            EvmError(ExitError::CreateCollision) => "ERR_CREATE_COLLISION",
+            EvmError(ExitError::CreateContractLimit) => "ERR_CREATE_CONTRACT_LIMIT",
+            EvmError(ExitError::OutOfOffset) => "ERR_OUT_OF_OFFSET",
+            EvmError(ExitError::OutOfGas) => "ERR_OUT_OF_GAS",
+            EvmError(ExitError::OutOfFund) => "ERR_OUT_OF_FUND",
+            EvmError(ExitError::Other(m)) => m,
+            EvmError(_) => unreachable!(), // unused misc
+            EvmFatal(ExitFatal::NotSupported) => "ERR_NOT_SUPPORTED",
+            EvmFatal(ExitFatal::UnhandledInterrupt) => "ERR_UNHANDLED_INTERRUPT",
+            EvmFatal(ExitFatal::Other(m)) => m,
+            EvmFatal(_) => unreachable!(), // unused misc
+            BalanceTooHigh => "ERR_BALANCE_HIGH",
+            BalanceTooLow => "ERR_BALANCE_LOW",
+        }
+    }
+}
+
+as_ref_err_impl!(EngineError);
+
+impl From<ExitError> for EngineError {
+    fn from(e: ExitError) -> Self {
+        EngineError::EvmError(e)
+    }
+}
+
+impl From<ExitFatal> for EngineError {
+    fn from(e: ExitFatal) -> Self {
+        EngineError::EvmFatal(e)
+    }
+}
+
+/// An engine result.
+pub type EngineResult<T> = Result<T, EngineError>;
+
+trait ExitIntoResult {
+    /// Checks if the EVM exit is ok or an error.
+    fn into_result(self) -> EngineResult<()>;
+}
+
+impl ExitIntoResult for ExitReason {
+    fn into_result(self) -> EngineResult<()> {
+        use ExitReason::*;
+        match self {
+            Succeed(_) | Revert(_) => Ok(()),
+            Error(e) => Err(e.into()),
+            Fatal(e) => Err(e.into()),
+        }
+    }
+}
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
@@ -98,6 +212,23 @@ impl Engine {
         sdk::remove_storage(&address_to_key(KeyPrefix::Nonce, address))
     }
 
+    /// Checks the nonce for the address matches the transaction nonce, and if so
+    /// returns the next nonce (if it exists). Note: this does not modify the actual
+    /// nonce of the account in storage. The nonce still needs to be set to the new value
+    /// if this is required.
+    #[inline]
+    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> NonceResult<U256> {
+        let account_nonce = Self::get_nonce(address);
+
+        if transaction_nonce != &account_nonce {
+            return Err(NonceError::IncorrectNonce);
+        }
+
+        account_nonce
+            .checked_add(U256::one())
+            .ok_or(NonceError::NonceOverflow)
+    }
+
     pub fn get_nonce(address: &Address) -> U256 {
         sdk::read_storage(&address_to_key(KeyPrefix::Nonce, address))
             .map(|value| U256::from_big_endian(&value))
@@ -124,18 +255,36 @@ impl Engine {
             .unwrap_or_else(U256::zero)
     }
 
-    /// Increases the balance for a given address.
-    pub fn increase_balance(address: &Address, amount: &U256) {
-        let mut balance = Self::get_balance(address);
-        balance += *amount;
-        Self::set_balance(address, &balance);
+    /// Checks if the balance can be increased by an amount for a given address.
+    ///
+    /// Returns the new balance on success.
+    ///
+    /// # Errors
+    ///
+    /// * If the balance is > `U256::MAX`
+    fn check_increase_balance(address: &Address, amount: &U256) -> EngineResult<U256> {
+        let balance = Self::get_balance(address);
+        if let Some(new_balance) = balance.checked_add(*amount) {
+            Ok(new_balance)
+        } else {
+            Err(EngineError::BalanceTooHigh)
+        }
     }
 
-    /// Decreases the balance for a given address.
-    pub fn decrease_balance(address: &Address, amount: &U256) {
-        let mut balance = Self::get_balance(address);
-        balance -= *amount;
-        Self::set_balance(address, &balance);
+    /// Checks if the balance can be decreased by an amount for a given address.
+    ///
+    /// Returns the new balance on success.
+    ///
+    /// # Errors
+    ///
+    /// * If the balance is < `U256::zero()`
+    fn check_decrease_balance(address: &Address, amount: &U256) -> EngineResult<U256> {
+        let balance = Self::get_balance(address);
+        if let Some(new_balance) = balance.checked_sub(*amount) {
+            Ok(new_balance)
+        } else {
+            Err(EngineError::BalanceTooLow)
+        }
     }
 
     pub fn remove_storage(address: &Address, key: &H256) {
@@ -181,19 +330,29 @@ impl Engine {
 
     /// Transfers an amount from a given sender to a receiver, provided that
     /// the have enough in their balance.
-    pub fn transfer(&mut self, sender: &Address, receiver: &Address, value: &U256) -> ExitReason {
+    ///
+    /// If the sender can send, and the receiver can receive, then the transfer
+    /// will execute successfully.
+    pub fn transfer(
+        &mut self,
+        sender: &Address,
+        receiver: &Address,
+        value: &U256,
+    ) -> EngineResult<()> {
         let balance = Self::get_balance(sender);
         if balance < *value {
-            return ExitReason::Error(ExitError::OutOfFund);
+            return Err(ExitError::OutOfFund.into());
         }
 
-        Self::increase_balance(receiver, value);
-        Self::decrease_balance(sender, value);
+        let new_receiver_balance = Self::check_increase_balance(receiver, value)?;
+        let new_sender_balance = Self::check_decrease_balance(sender, value)?;
+        Self::set_balance(sender, &new_sender_balance);
+        Self::set_balance(receiver, &new_receiver_balance);
 
-        ExitReason::Succeed(ExitSucceed::Returned)
+        Ok(())
     }
 
-    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> (ExitReason, Address) {
+    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let value = U256::zero();
         self.deploy_code(origin, value, input)
@@ -204,19 +363,28 @@ impl Engine {
         origin: Address,
         value: U256,
         input: &[u8],
-    ) -> (ExitReason, Address) {
+    ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
             executor.transact_create(origin, value, Vec::from(input), u64::MAX),
             address,
         );
+        let is_succeed = status.is_succeed();
+        status.into_result()?;
+        let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
-        self.apply(values, logs, true);
-        (status, result)
+        self.apply(values, Vec::<Log>::new(), true);
+
+        Ok(SubmitResult {
+            status: is_succeed,
+            gas_used: used_gas,
+            result: result.0.to_vec(),
+            logs: logs.into_iter().map(Into::into).collect(),
+        })
     }
 
-    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> (ExitReason, Vec<u8>) {
+    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = U256::zero();
@@ -229,15 +397,34 @@ impl Engine {
         contract: Address,
         value: U256,
         input: Vec<u8>,
-    ) -> (ExitReason, Vec<u8>) {
+    ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor();
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+        let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
-        self.apply(values, logs, true);
-        (status, result)
+        let is_succeed = status.is_succeed();
+        status.into_result()?;
+        // There is no way to return the logs to the NEAR log method as it only
+        // allows a return of UTF-8 strings.
+        self.apply(values, Vec::<Log>::new(), true);
+
+        Ok(SubmitResult {
+            status: is_succeed,
+            gas_used: used_gas,
+            result,
+            logs: logs.into_iter().map(Into::into).collect(),
+        })
     }
 
-    pub fn view_with_args(&self, args: ViewCallArgs) -> (ExitReason, Vec<u8>) {
+    #[cfg(feature = "testnet")]
+    /// Credits the address with 10 coins from the faucet.
+    pub fn credit(&mut self, address: &Address) -> EngineResult<()> {
+        let new_bal = Self::check_increase_balance(address, &U256::from(10))?;
+        Self::set_balance(address, &new_bal);
+        Ok(())
+    }
+
+    pub fn view_with_args(&self, args: ViewCallArgs) -> EngineResult<Vec<u8>> {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
@@ -250,9 +437,11 @@ impl Engine {
         contract: Address,
         value: U256,
         input: Vec<u8>,
-    ) -> (ExitReason, Vec<u8>) {
+    ) -> EngineResult<Vec<u8>> {
         let mut executor = self.make_executor();
-        executor.transact_call(origin, contract, value, input, u64::MAX)
+        let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+        status.into_result()?;
+        Ok(result)
     }
 
     fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {
@@ -263,46 +452,78 @@ impl Engine {
 }
 
 impl evm::backend::Backend for Engine {
+    /// Returns the gas price.
+    ///
+    /// This is currently zero, but may be changed in the future. This is mainly
+    /// because there already is another cost for transactions.
     fn gas_price(&self) -> U256 {
         U256::zero()
     }
 
+    /// Returns the origin address that created the contract.
     fn origin(&self) -> Address {
         self.origin
     }
 
+    /// Returns a block hash from a given index.
+    ///
+    /// Currently this returns zero, but may be changed in the future.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#blockhash
     fn block_hash(&self, _number: U256) -> H256 {
         H256::zero() // TODO: https://github.com/near/nearcore/issues/3456
     }
 
+    /// Returns the current block index number.
     fn block_number(&self) -> U256 {
         U256::from(sdk::block_index())
     }
 
+    /// Returns a mocked coinbase which is the EVM address for the Aurora
+    /// account, being 0x4444588443C3a91288c5002483449Aba1054192b.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#coinbase
     fn block_coinbase(&self) -> Address {
-        Address::zero()
+        Address([
+            0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
+            0x9A, 0xba, 0x10, 0x54, 0x19, 0x2b,
+        ])
     }
 
+    /// Returns the current block timestamp.
     fn block_timestamp(&self) -> U256 {
         U256::from(sdk::block_timestamp())
     }
 
+    /// Returns the current block difficulty.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#difficulty
     fn block_difficulty(&self) -> U256 {
         U256::zero()
     }
 
+    /// Returns the current block gas limit.
+    ///
+    /// Currently, this returns 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    /// as there isn't a gas limit alternative right now but this may change in
+    /// the future.
+    ///
+    /// See: https://doc.aurora.dev/develop/compat/evm#gaslimit
     fn block_gas_limit(&self) -> U256 {
-        U256::zero() // TODO
+        U256::max_value()
     }
 
+    /// Returns the states chain ID.
     fn chain_id(&self) -> U256 {
         U256::from(self.state.chain_id)
     }
 
+    /// Checks if an address exists.
     fn exists(&self, address: Address) -> bool {
         !Engine::is_account_empty(&address)
     }
 
+    /// Returns basic account information.
     fn basic(&self, address: Address) -> Basic {
         Basic {
             nonce: Engine::get_nonce(&address),
@@ -310,21 +531,26 @@ impl evm::backend::Backend for Engine {
         }
     }
 
+    /// Returns the code of the contract from an address.
     fn code(&self, address: Address) -> Vec<u8> {
         Engine::get_code(&address)
     }
 
+    /// Get storage value of address at index.
     fn storage(&self, address: Address, index: H256) -> H256 {
         Engine::get_storage(&address, &index)
     }
 
+    /// Get original storage value of address at index, if available.
+    ///
+    /// Currently, this returns `None` for now.
     fn original_storage(&self, _address: Address, _index: H256) -> Option<H256> {
         None
     }
 }
 
 impl ApplyBackend for Engine {
-    fn apply<A, I, L>(&mut self, values: A, logs: L, delete_empty: bool)
+    fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,
         I: IntoIterator<Item = (H256, H256)>,
@@ -366,10 +592,6 @@ impl ApplyBackend for Engine {
                 }
                 Apply::Delete { address } => Engine::remove_account(&address),
             }
-        }
-
-        for log in logs {
-            sdk::log_utf8(&bytes_to_hex(&log_to_bytes(log)).into_bytes())
         }
     }
 }

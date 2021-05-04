@@ -37,9 +37,12 @@ codegen-units = 1
 rpath = false
 
 [dependencies]
+blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
+bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm", rev = "2a8a3e9", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
+num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }
 ripemd160 = { version = "0.9.1", default-features = false }
 rlp = { version = "0.5.0", default-features = false }
@@ -59,7 +62,8 @@ near-crypto = "0.1.0"
 
 [features]
 default = ["sha2", "std"]
-std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "lunarity-lexer/std"]
+std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "lunarity-lexer/std", "bn/std"]
+testnet = []
 contract = []
 evm_bully = []
 log = []
