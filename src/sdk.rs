@@ -477,6 +477,6 @@ pub fn promise_batch_create(account_id: String) -> u64 {
 }
 
 #[allow(dead_code)]
-pub fn storage_has_key(key: &str) -> bool {
+pub fn storage_has_key(key: &[u8]) -> bool {
     unsafe { exports::storage_has_key(key.len() as u64, key.as_ptr() as u64) == 1 }
 }

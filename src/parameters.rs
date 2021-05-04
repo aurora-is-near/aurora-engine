@@ -128,7 +128,7 @@ type StringU128 = u128;
 /// for regular NEP-141 tokens.
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct NEP41TransferCallArgs {
+pub struct NEP141TransferCallArgs {
     pub receiver_id: AccountId,
     pub amount: StringU128,
     pub memo: Option<String>,
