@@ -91,7 +91,7 @@ mod contract {
 
     /// Get bridge prover id for this contract.
     #[no_mangle]
-    pub extern "C" fn get_bridge_provider() {
+    pub extern "C" fn get_bridge_prover() {
         let state = Engine::get_state();
         sdk::return_output(state.bridge_prover_id.as_bytes());
     }

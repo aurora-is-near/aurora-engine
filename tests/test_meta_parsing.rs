@@ -115,5 +115,6 @@ fn test_meta_parsing() {
     assert_eq!(hex::encode(&meta_tx3[0..65]), "d5fc0804e27c7ee36178b5ce1f0ef97e9f9317855743f16a38cc2ec81eb852dc58f76aaebb8f0264eeb6a61ba5d094a546fa95efcded4d507708c1d96a3c06561b");
     let result = parse_meta_call(&domain_separator, "evm".as_bytes(), meta_tx3)
         .unwrap_or_else(|_| panic!("Fail meta_tx3"));
-    assert_eq!(result.sender, signer_addr);
+
+        assert_eq!(result.sender, signer_addr);
 }
