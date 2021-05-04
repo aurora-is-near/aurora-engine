@@ -288,13 +288,6 @@ pub fn keccak(input: &[u8]) -> H256 {
     }
 }
 
-/// Calls environment panic with data encoded in hex as panic message.
-pub fn panic_hex(data: &[u8]) -> ! {
-    let message = crate::types::bytes_to_hex(data).into_bytes();
-    unsafe { exports::panic_utf8(message.len() as _, message.as_ptr() as _) }
-    unreachable!()
-}
-
 /// Returns account id of the current account.
 pub fn current_account_id() -> Vec<u8> {
     unsafe {

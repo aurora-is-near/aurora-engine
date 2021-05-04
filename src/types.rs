@@ -1,4 +1,4 @@
-use crate::prelude::{vec, Address, String, Vec, H256, U256};
+use crate::prelude::{Address, String, Vec, H256, U256};
 #[cfg(feature = "contract")]
 use alloc::str;
 

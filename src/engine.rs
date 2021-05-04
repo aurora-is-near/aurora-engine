@@ -5,7 +5,7 @@ use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::connector::EthConnectorContract;
-use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
+use crate::parameters::{DeployResult, FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
 use crate::precompiles;
 use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
@@ -352,7 +352,7 @@ impl Engine {
         Ok(())
     }
 
-    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<SubmitResult> {
+    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<DeployResult> {
         let origin = self.origin();
         let value = U256::zero();
         self.deploy_code(origin, value, input)
@@ -363,7 +363,7 @@ impl Engine {
         origin: Address,
         value: U256,
         input: &[u8],
-    ) -> EngineResult<SubmitResult> {
+    ) -> EngineResult<DeployResult> {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
@@ -376,10 +376,10 @@ impl Engine {
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
 
-        Ok(SubmitResult {
+        Ok(DeployResult {
             status: is_succeed,
             gas_used: used_gas,
-            result: result.0.to_vec(),
+            result: result.0,
             logs: logs.into_iter().map(Into::into).collect(),
         })
     }

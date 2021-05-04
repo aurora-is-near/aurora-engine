@@ -4,9 +4,9 @@ use crate::prelude::{String, Vec};
 #[cfg(feature = "contract")]
 use crate::prover::Proof;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
-use evm::backend::Log;
 #[cfg(feature = "contract")]
 use crate::types::{Balance, EthAddress};
+use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -58,8 +58,16 @@ impl From<Log> for ResultLog {
     }
 }
 
-/// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
-/// and `deploy_with_input` methods.
+/// Borsh-encoded result for the `deploy` and `deploy_with_input` methods.
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct DeployResult {
+    pub status: bool,
+    pub gas_used: u64,
+    pub result: EthAddress,
+    pub logs: Vec<ResultLog>,
+}
+
+/// Borsh-encoded result for the `call` and `call_with_args` methods.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct SubmitResult {
     pub status: bool,

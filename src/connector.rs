@@ -574,7 +574,7 @@ impl EthConnectorContract {
             let mut engine =
                 Engine::new(near_account_to_evm_address(&sdk::predecessor_account_id()));
             // TODO: handle results
-            let (_status, _result) = Engine::call_with_args(&mut engine, args);
+            let _result = Engine::call_with_args(&mut engine, args);
 
             // Transfer fee to Relayer
             let fee = message_data.fee.as_u128();

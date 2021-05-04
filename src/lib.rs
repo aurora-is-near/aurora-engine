@@ -42,7 +42,7 @@ mod contract {
     use crate::parameters::{
         DeployEvmTokenCallArgs, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs,
     };
-    use crate::prelude::{vec, Address, H256, U256};
+    use crate::prelude::{Address, Vec, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
@@ -441,11 +441,13 @@ mod contract {
         let args =
             DeployEvmTokenCallArgs::try_from_slice(&sdk::read_input()).expect("ERR_ARG_PARSE");
         let mut engine = Engine::new(predecessor_address());
-        let (status, address) = Engine::deploy_code_with_input(&mut engine, &args.erc20_contract);
-        if let ExitReason::Succeed(_) = status {
-            EthConnectorContract::new().save_evm_token_address(&args.near_account_id, address.0);
+        let result = Engine::deploy_code_with_input(&mut engine, &args.erc20_contract);
+        if let Ok(dr) = &result {
+            EthConnectorContract::new().save_evm_token_address(&args.near_account_id, dr.result);
         }
-        process_exit_reason(status, &address.0)
+        result
+            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .sdk_process();
     }
 
     #[no_mangle]
