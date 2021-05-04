@@ -2,12 +2,16 @@ use borsh::BorshSerialize;
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
+use crate::engine::TOKEN_MAP_PREFIX;
+use crate::map::append_slice;
 use crate::parameters::{
-    BridgedTokenWithdrawArgs, BridgedTokenWithdrawEthConnectorArgs, NEP41TransferCallArgs,
+    BridgedTokenWithdrawArgs, BridgedTokenWithdrawEthConnectorArgs, NEP141TransferCallArgs,
 };
-use crate::prelude::{String, ToString, Vec, U256};
+use crate::prelude::{String, Vec, U256};
 use crate::sdk;
 use crate::types::{AccountId, Gas};
+
+const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 mod costs {
     use crate::types::Gas;
@@ -21,9 +25,19 @@ mod costs {
     pub(super) const GAS_FOR_FT_TRANSFER: Gas = 50_000;
 }
 
-pub struct TransferEthToNear;
+/// Get the current nep141 token associated with the current erc20 token.
+/// This will fail is none is associated.
+fn get_nep141_from_erc20(erc20_token: &[u8]) -> String {
+    String::from_utf8(
+        sdk::read_storage(append_slice(TOKEN_MAP_PREFIX, erc20_token).as_slice())
+            .expect(ERR_TARGET_TOKEN_NOT_FOUND),
+    )
+    .unwrap()
+}
 
-impl Precompile for TransferEthToNear {
+pub struct ExitToNear; //TransferEthToNear
+
+impl Precompile for ExitToNear {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         //TODO
         Ok(costs::TRANSFER_ETH_TO_NEAR)
@@ -34,7 +48,7 @@ impl Precompile for TransferEthToNear {
             return Err(ExitError::OutOfGas);
         }
 
-        let (nep141account, args) = if context.apparent_value != U256::from(0) {
+        let (nep141_account, args) = if context.apparent_value != U256::from(0) {
             // ETH transfer
             //
             // Input slice format:
@@ -42,7 +56,7 @@ impl Precompile for TransferEthToNear {
 
             (
                 String::from_utf8(sdk::current_account_id()).unwrap(),
-                NEP41TransferCallArgs {
+                NEP141TransferCallArgs {
                     receiver_id: String::from_utf8(input.to_vec()).unwrap(),
                     amount: context.apparent_value.as_u128(),
                     memo: None,
@@ -58,8 +72,7 @@ impl Precompile for TransferEthToNear {
             //      amount (U256 le bytes) - the amount that was burned
             //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
 
-            //TODO: add method in Aurora connector and call promise `get_near_account_for_evm_token(context.caller)`
-            let nep141address = context.caller.to_string();
+            let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
             let mut input_mut = input;
 
@@ -73,8 +86,8 @@ impl Precompile for TransferEthToNear {
             let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
 
             (
-                nep141address,
-                NEP41TransferCallArgs {
+                nep141_address,
+                NEP141TransferCallArgs {
                     receiver_id: receiver_account_id,
                     amount,
                     memo: None,
@@ -83,7 +96,7 @@ impl Precompile for TransferEthToNear {
         };
 
         let promise0 = sdk::promise_create(
-            nep141account,
+            nep141_account,
             b"ft_transfer",
             BorshSerialize::try_to_vec(&args).ok().unwrap().as_slice(),
             0,
@@ -96,9 +109,9 @@ impl Precompile for TransferEthToNear {
     }
 }
 
-pub struct TransferNearToEth;
+pub struct ExitToEthereum;
 
-impl Precompile for TransferNearToEth {
+impl Precompile for ExitToEthereum {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::TRANSFER_NEAR_TO_ETH)
     }
@@ -110,7 +123,7 @@ impl Precompile for TransferNearToEth {
             return Err(ExitError::OutOfGas);
         }
 
-        let (nep141account, serialized_args) = if context.apparent_value != U256::from(0) {
+        let (nep141_account, serialized_args) = if context.apparent_value != U256::from(0) {
             // ETH transfer
             //
             // Input slice format:
@@ -137,8 +150,7 @@ impl Precompile for TransferNearToEth {
             //      amount (U256 le bytes) - the amount that was burned
             //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
 
-            //TODO: add method in Aurora connector and call promise `get_near_account_for_evm_token(context.caller)`
-            let nep141address = context.caller.to_string();
+            let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
             let mut input_mut = input;
 
@@ -156,13 +168,13 @@ impl Precompile for TransferNearToEth {
             };
 
             (
-                nep141address,
+                nep141_address,
                 BorshSerialize::try_to_vec(&args).ok().unwrap(),
             )
         };
 
         let promise0 = sdk::promise_create(
-            nep141account,
+            nep141_account,
             b"withdraw",
             serialized_args.as_slice(),
             0,

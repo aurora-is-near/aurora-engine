@@ -6,6 +6,7 @@ use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::map::LookupMap;
 use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
+use crate::map::LookupMap;
 use crate::precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
@@ -125,6 +126,8 @@ impl ExitIntoResult for ExitReason {
     }
 }
 
+pub(crate) const TOKEN_MAP_PREFIX: &[u8] = b"t";
+
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
@@ -141,6 +144,8 @@ pub struct EngineState {
     pub upgrade_delay_blocks: u64,
     /// Mapping between relayer account id and relayer evm address
     pub relayers_evm_addresses: LookupMap<{ KeyPrefix::RelayerEvmAddressMap as KeyPrefixU8 }>,
+    /// Mapping between erc20 tokens in the EVM to nep141 in the NEAR
+    pub nep141_erc20_mapping: LookupMap,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -151,6 +156,7 @@ impl From<NewCallArgs> for EngineState {
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
             relayers_evm_addresses: LookupMap::new(),
+            nep141_erc20_mapping: LookupMap::new(TOKEN_MAP_PREFIX.to_vec()),
         }
     }
 }
@@ -469,6 +475,12 @@ impl Engine {
             .relayers_evm_addresses
             .get_raw(account_id)
             .map(|result| Address(result.as_slice().try_into().unwrap()))
+    }
+
+    pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
+        self.state
+            .nep141_erc20_mapping
+            .insert_raw(erc20_token, nep141_token);
     }
 }
 

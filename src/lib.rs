@@ -41,7 +41,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{Address, TryInto, H256, U256};
+    use crate::prelude::{Address, TryInto, Vec, H160, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
@@ -284,6 +284,28 @@ mod contract {
             // TODO(#51) ERC20 transfer
             todo!();
         }
+    }
+
+    /// Deploy ERC20 token mapped to a NEP141
+    #[no_mangle]
+    pub extern "C" fn deploy_erc20_token() {
+        // Id of the NEP141 token in Near
+        let nep141_token = sdk::read_input();
+
+        let mut engine = Engine::new(predecessor_address());
+
+        // TODO: Use proper erc20_contract
+        let erc20_contract = Default::default();
+
+        Engine::deploy_code_with_input(&mut engine, erc20_contract)
+            .map(|res| {
+                let address = H160(res.result.as_slice().try_into().unwrap());
+                engine.register_token(address.as_bytes(), nep141_token.as_slice());
+                res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
+            })
+            .sdk_process();
+
+        // TODO: charge for storage
     }
 
     ///

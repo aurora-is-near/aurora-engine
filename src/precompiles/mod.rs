@@ -11,7 +11,7 @@ use crate::precompiles::bn128::{BN128Add, BN128Mul, BN128Pair};
 use crate::precompiles::hash::{RIPEMD160, SHA256};
 use crate::precompiles::identity::Identity;
 use crate::precompiles::modexp::ModExp;
-use crate::precompiles::native::{TransferEthToNear, TransferNearToEth};
+use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::precompiles::secp256k1::ECRecover;
 use crate::prelude::{Address, Vec};
@@ -84,8 +84,8 @@ pub fn homestead_precompiles(
         1 => Some(ECRecover::run(input, target_gas, context)),
         2 => Some(SHA256::run(input, target_gas, context)),
         3 => Some(RIPEMD160::run(input, target_gas, context)),
-        EXIT_TO_NEAR_ID => Some(TransferEthToNear::run(input, target_gas, context)),
-        EXIT_TO_ETHEREUM_ID => Some(TransferNearToEth::run(input, target_gas, context)),
+        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
 }
@@ -112,8 +112,8 @@ pub fn byzantium_precompiles(
         6 => Some(BN128Add::<Byzantium>::run(input, target_gas, context)),
         7 => Some(BN128Mul::<Byzantium>::run(input, target_gas, context)),
         8 => Some(BN128Pair::<Byzantium>::run(input, target_gas, context)),
-        EXIT_TO_NEAR_ID => Some(TransferEthToNear::run(input, target_gas, context)),
-        EXIT_TO_ETHEREUM_ID => Some(TransferNearToEth::run(input, target_gas, context)),
+        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
 }
@@ -141,8 +141,8 @@ pub fn istanbul_precompiles(
         7 => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
         8 => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
         9 => Some(Blake2F::run(input, target_gas, context)),
-        EXIT_TO_NEAR_ID => Some(TransferEthToNear::run(input, target_gas, context)),
-        EXIT_TO_ETHEREUM_ID => Some(TransferNearToEth::run(input, target_gas, context)),
+        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
 }
@@ -170,8 +170,8 @@ pub fn berlin_precompiles(
         7 => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
         8 => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
         9 => Some(Blake2F::run(input, target_gas, context)),
-        EXIT_TO_NEAR_ID => Some(TransferEthToNear::run(input, target_gas, context)),
-        EXIT_TO_ETHEREUM_ID => Some(TransferNearToEth::run(input, target_gas, context)),
+        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
 }
