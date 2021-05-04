@@ -11,8 +11,8 @@ pub mod meta_parsing;
 pub mod parameters;
 mod precompiles;
 pub mod prelude;
-mod storage;
-mod transaction;
+pub mod storage;
+pub mod transaction;
 pub mod types;
 
 #[cfg(feature = "contract")]

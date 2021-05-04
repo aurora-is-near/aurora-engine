@@ -366,6 +366,7 @@ impl Engine {
             executor.transact_create(origin, value, Vec::from(input), u64::MAX),
             address,
         );
+
         let is_succeed = status.is_succeed();
         status.into_result()?;
         let used_gas = executor.used_gas();
@@ -396,6 +397,7 @@ impl Engine {
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor();
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         let is_succeed = status.is_succeed();
