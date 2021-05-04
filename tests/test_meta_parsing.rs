@@ -116,5 +116,5 @@ fn test_meta_parsing() {
     let result = parse_meta_call(&domain_separator, "evm".as_bytes(), meta_tx3)
         .unwrap_or_else(|_| panic!("Fail meta_tx3"));
 
-        assert_eq!(result.sender, signer_addr);
+    assert_eq!(result.sender, signer_addr);
 }
