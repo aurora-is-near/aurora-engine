@@ -5,6 +5,7 @@ use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
+use crate::map::LookupMap;
 use crate::precompiles;
 use crate::prelude::{Address, Vec, H256, U256};
 use crate::sdk;
@@ -124,6 +125,8 @@ impl ExitIntoResult for ExitReason {
     }
 }
 
+pub(crate) const TOKEN_MAP_PREFIX: &[u8] = b"t";
+
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
@@ -138,6 +141,8 @@ pub struct EngineState {
     pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
+    /// Mapping between erc20 tokens in the EVM to nep141 in the NEAR
+    pub nep141_erc20_mapping: LookupMap,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -147,6 +152,7 @@ impl From<NewCallArgs> for EngineState {
             owner_id: args.owner_id,
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
+            nep141_erc20_mapping: LookupMap::new(TOKEN_MAP_PREFIX.to_vec()),
         }
     }
 }
@@ -446,6 +452,12 @@ impl Engine {
         let metadata = StackSubstateMetadata::new(u64::MAX, &CONFIG);
         let state = MemoryStackState::new(metadata, self);
         StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
+    }
+
+    pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
+        self.state
+            .nep141_erc20_mapping
+            .insert_raw(erc20_token, nep141_token);
     }
 }
 
