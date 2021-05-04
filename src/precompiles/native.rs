@@ -17,12 +17,12 @@ mod costs {
     use crate::types::Gas;
 
     // TODO: Determine the correct amount of gas
-    pub(super) const TRANSFER_ETH_TO_NEAR: Gas = 0;
+    pub(super) const EXIT_TO_NEAR_GAS: Gas = 0;
 
     // TODO: Determine the correct amount of gas
-    pub(super) const TRANSFER_NEAR_TO_ETH: Gas = 0;
+    pub(super) const EXIT_TO_ETHEREUM_GAS: Gas = 0;
 
-    pub(super) const GAS_FOR_FT_TRANSFER: Gas = 50_000;
+    pub(super) const FT_TRANSFER_GAS: Gas = 50_000;
 }
 
 /// Get the current nep141 token associated with the current erc20 token.
@@ -40,7 +40,7 @@ pub struct ExitToNear; //TransferEthToNear
 impl Precompile for ExitToNear {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         //TODO
-        Ok(costs::TRANSFER_ETH_TO_NEAR)
+        Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
     fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
@@ -100,7 +100,7 @@ impl Precompile for ExitToNear {
             b"ft_transfer",
             BorshSerialize::try_to_vec(&args).ok().unwrap().as_slice(),
             0,
-            costs::GAS_FOR_FT_TRANSFER,
+            costs::FT_TRANSFER_GAS,
         );
 
         sdk::promise_return(promise0);
@@ -113,7 +113,7 @@ pub struct ExitToEthereum;
 
 impl Precompile for ExitToEthereum {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
-        Ok(costs::TRANSFER_NEAR_TO_ETH)
+        Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
     fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
