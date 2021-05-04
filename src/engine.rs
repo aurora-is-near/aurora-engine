@@ -6,7 +6,6 @@ use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::map::LookupMap;
 use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
-use crate::map::LookupMap;
 use crate::precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
