@@ -36,7 +36,7 @@ check-format:
 	$(CARGO) fmt -- --check
 
 check-clippy:
-	$(CARGO) +nightly clippy --no-default-features --features=$(FEATURES) -- -D warnings
+	$(CARGO) clippy --no-default-features --features=$(FEATURES) -- -D warnings
 
 # test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
 test: release
