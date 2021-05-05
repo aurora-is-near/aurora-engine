@@ -247,7 +247,7 @@ fn test_eth_deposit_balance_total_supply() {
 fn test_withdraw_near() {
     #[derive(BorshSerialize, BorshDeserialize)]
     pub struct WithdrawCallArgs {
-        pub recipient_id: String,
+        pub recipient_address: EthAddress,
         pub amount: Balance,
     }
 
@@ -259,7 +259,7 @@ fn test_withdraw_near() {
         CONTRACT_ACC.to_string(),
         "withdraw",
         &WithdrawCallArgs {
-            recipient_id: RECIPIENT_ETH_ADDRESS.into(),
+            recipient_address: validate_eth_address(RECIPIENT_ETH_ADDRESS),
             amount: withdraw_amount,
         }
         .try_to_vec()

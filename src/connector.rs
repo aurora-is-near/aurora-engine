@@ -358,9 +358,8 @@ impl EthConnectorContract {
         sdk::log("Start withdraw NEAR");
         let args =
             WithdrawCallArgs::try_from_slice(&sdk::read_input()[..]).expect(ERR_FAILED_PARSE);
-        let recipient_address = validate_eth_address(args.recipient_id);
         let res = WithdrawResult {
-            recipient_id: recipient_address,
+            recipient_id: args.recipient_address,
             amount: args.amount,
             eth_custodian_address: self.contract.eth_custodian_address,
         }

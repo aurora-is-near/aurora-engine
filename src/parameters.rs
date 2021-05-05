@@ -280,7 +280,7 @@ pub struct TransferCallArgs {
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct WithdrawCallArgs {
-    pub recipient_id: AccountId,
+    pub recipient_address: EthAddress,
     pub amount: Balance,
 }
 
