@@ -1,13 +1,12 @@
 use super::prelude::*;
 use super::sdk;
 use crate::engine::Engine;
-use crate::json::{self, FAILED_PARSE};
 use crate::log_entry::LogEntry;
 use crate::precompiles::ecrecover;
-use crate::types::{AccountId, EthAddress, ExpectUtf8};
-use alloc::format;
+use crate::types::{AccountId, EthAddress};
+use alloc::{format, vec::Vec};
 use borsh::{BorshDeserialize, BorshSerialize};
-use ethabi::{Bytes, Event, EventParam, Hash, Log, ParamType, RawLog, Token};
+use ethabi::{Bytes, Event, EventParam, Hash, Log, RawLog, Token};
 
 /// Validate Etherium address from string and return EthAddress
 #[allow(dead_code)]
@@ -59,7 +58,6 @@ pub struct Proof {
     pub receipt_data: Vec<u8>,
     pub header_data: Vec<u8>,
     pub proof: Vec<Vec<u8>>,
-    pub skip_bridge_call: bool,
 }
 
 #[allow(dead_code)]
@@ -76,10 +74,9 @@ impl Proof {
     }
 }
 
-/// Parameters of Etherium event
-pub type EthEventParams = Vec<(String, ParamType, bool)>;
+pub type EventParams = Vec<EventParam>;
 
-/// Etherium event
+/// Ethereum event
 pub struct EthEvent {
     pub eth_custodian_address: EthAddress,
     pub log: Log,
@@ -87,21 +84,14 @@ pub struct EthEvent {
 
 #[allow(dead_code)]
 impl EthEvent {
-    /// Get Etherium event from `log_entry_data`
-    pub fn fetch_log_entry_data(name: &str, params: EthEventParams, data: &[u8]) -> Self {
+    /// Get Ethereum event from `log_entry_data`
+    pub fn fetch_log_entry_data(name: &str, params: EventParams, data: &[u8]) -> Self {
         let event = Event {
             name: name.to_string(),
-            inputs: params
-                .into_iter()
-                .map(|(name, kind, indexed)| EventParam {
-                    name,
-                    kind,
-                    indexed,
-                })
-                .collect(),
+            inputs: params,
             anonymous: false,
         };
-        let log_entry: LogEntry = rlp::decode(data).expect("IVALID_RLP");
+        let log_entry: LogEntry = rlp::decode(data).expect("INVALID_RLP");
         let eth_custodian_address = log_entry.address.0;
         let topics = log_entry.topics.iter().map(|h| Hash::from(h.0)).collect();
 
@@ -114,39 +104,6 @@ impl EthEvent {
         Self {
             eth_custodian_address,
             log,
-        }
-    }
-}
-
-impl From<json::JsonValue> for Proof {
-    fn from(v: json::JsonValue) -> Self {
-        let log_index = v.u64("log_index").expect_utf8(FAILED_PARSE);
-        let log_entry_data: Vec<u8> = v
-            .array("log_entry_data", json::JsonValue::parse_u8)
-            .expect_utf8(FAILED_PARSE);
-        let receipt_index = v.u64("receipt_index").expect_utf8(FAILED_PARSE);
-        let receipt_data: Vec<u8> = v
-            .array("receipt_data", json::JsonValue::parse_u8)
-            .expect_utf8(FAILED_PARSE);
-        let header_data: Vec<u8> = v
-            .array("header_data", json::JsonValue::parse_u8)
-            .expect_utf8(FAILED_PARSE);
-        let proof = v
-            .array("proof", |v1| match v1 {
-                json::JsonValue::Array(arr) => arr.iter().map(json::JsonValue::parse_u8).collect(),
-                _ => sdk::panic_utf8(FAILED_PARSE),
-            })
-            .expect_utf8(FAILED_PARSE);
-
-        let skip_bridge_call = v.bool("skip_bridge_call").expect_utf8(FAILED_PARSE);
-        Self {
-            log_index,
-            log_entry_data,
-            receipt_index,
-            receipt_data,
-            header_data,
-            proof,
-            skip_bridge_call,
         }
     }
 }
@@ -202,13 +159,13 @@ fn encode_eip712(
             Token::Address(H160::from(custodian_address)),
         ])),
     ]);
-    sdk::log(format!(
+    sdk::log(&format!(
         "Domain_separator encoded: {}",
         hex::encode(domain_separator_encoded.clone())
     ));
 
     let domain_separator = sdk::keccak(&domain_separator_encoded);
-    sdk::log(format!(
+    sdk::log(&format!(
         "Domain_separator hash: {}",
         hex::encode(domain_separator)
     ));
@@ -231,13 +188,13 @@ fn encode_eip712(
             Token::Address(H160::from(custodian_address)),
         ])),
     ]);
-    sdk::log(format!(
+    sdk::log(&format!(
         "WithdrawFromEVM struct encoded: {}",
         hex::encode(withdraw_from_evm_struct_encoded.clone()),
     ));
 
     let withdraw_from_evm_struct_hash = sdk::keccak(&withdraw_from_evm_struct_encoded);
-    sdk::log(format!(
+    sdk::log(&format!(
         "WithdrawFromEVM struct hash: {}",
         hex::encode(withdraw_from_evm_struct_hash)
     ));
@@ -247,16 +204,17 @@ fn encode_eip712(
         Token::FixedBytes(domain_separator.as_bytes().to_vec()),
         Token::FixedBytes(withdraw_from_evm_struct_hash.as_bytes().to_vec()),
     ]);
-    sdk::log(format!(
+    sdk::log(&format!(
         "digest_encoded: {}",
         hex::encode(digest_encoded.clone())
     ));
 
     let digest = sdk::keccak(&digest_encoded);
-    sdk::log(format!("digest: {}", hex::encode(digest)));
+    sdk::log(&format!("digest: {}", hex::encode(digest)));
     digest
 }
 
+#[allow(dead_code)]
 pub fn verify_withdraw_eip712(
     sender: EthAddress,
     eth_recipient: EthAddress,
@@ -271,9 +229,9 @@ pub fn verify_withdraw_eip712(
         WITHDRAW_FROM_EVM_TYPEHASH,
     );
     let withdraw_msg_signer = ecrecover(res, &eip712_signature[..]).unwrap();
-    sdk::log(format!("sender: {}", hex::encode(sender)));
-    sdk::log(format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
-    sdk::log(format!(
+    sdk::log(&format!("sender: {}", hex::encode(sender)));
+    sdk::log(&format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
+    sdk::log(&format!(
         "ecrecover: {}",
         H160::from(sender) == withdraw_msg_signer
     ));
@@ -281,6 +239,7 @@ pub fn verify_withdraw_eip712(
     H160::from(sender) == withdraw_msg_signer
 }
 
+#[allow(dead_code)]
 pub fn verify_transfer_eip712(
     sender: EthAddress,
     near_recipient: AccountId,
@@ -295,9 +254,9 @@ pub fn verify_transfer_eip712(
         TRANSFER_FROM_EVM_TO_NEAR_TYPEHASH,
     );
     let withdraw_msg_signer = ecrecover(res, &eip712_signature[..]).unwrap();
-    sdk::log(format!("sender: {}", hex::encode(sender)));
-    sdk::log(format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
-    sdk::log(format!(
+    sdk::log(&format!("sender: {}", hex::encode(sender)));
+    sdk::log(&format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
+    sdk::log(&format!(
         "ecrecover: {}",
         H160::from(sender) == withdraw_msg_signer
     ));

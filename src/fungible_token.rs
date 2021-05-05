@@ -15,7 +15,7 @@ use alloc::{
 use borsh::{BorshDeserialize, BorshSerialize};
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
-const GAS_FOR_FT_TRANSFER_CALL: Gas = 25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER;
+const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
@@ -61,7 +61,7 @@ impl FungibleToken {
         Engine::get_balance(&prelude::Address(address)).as_u128()
     }
 
-    /// Internal deposit NEAR (nETH) FT
+    /// Internal deposit NEAR - NEP-141
     pub fn internal_deposit(&mut self, account_id: &str, amount: Balance) {
         let balance = self.internal_unwrap_balance_of(account_id);
         if let Some(new_balance) = balance.checked_add(amount) {
@@ -79,7 +79,7 @@ impl FungibleToken {
         }
     }
 
-    /// Internal deposit ETH FT
+    /// Internal deposit ETH (nETH)
     pub fn internal_deposit_eth(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth(address);
         if let Some(new_balance) = balance.checked_add(amount) {
@@ -149,13 +149,13 @@ impl FungibleToken {
         self.internal_withdraw(sender_id, amount);
         self.internal_deposit(receiver_id, amount);
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Transfer {} from {} to {}",
             amount, sender_id, receiver_id
         ));
         #[cfg(feature = "log")]
         if let Some(memo) = memo {
-            sdk::log(format!("Memo: {}", memo));
+            sdk::log(&format!("Memo: {}", memo));
         }
     }
 
@@ -200,7 +200,11 @@ impl FungibleToken {
         sdk::assert_one_yocto();
         let predecessor_account_id = sdk::predecessor_account_id();
         let sender_id = str_from_slice(&predecessor_account_id);
-        self.internal_transfer(sender_id, receiver_id, amount, memo);
+        // Special case for Aurora transfer itself - we shouldn't transfer
+        if sender_id != receiver_id {
+            self.internal_transfer(sender_id, receiver_id, amount, memo);
+        }
+
         let data1 = FtOnTransfer {
             amount,
             msg,
@@ -222,7 +226,7 @@ impl FungibleToken {
             b"ft_on_transfer",
             &data1[..],
             NO_DEPOSIT,
-            sdk::prepaid_gas() - GAS_FOR_FT_TRANSFER_CALL,
+            GAS_FOR_FT_ON_TRANSFER,
         );
         let promise1 = sdk::promise_then(
             promise0,
@@ -241,6 +245,7 @@ impl FungibleToken {
         receiver_id: &str,
         amount: Balance,
     ) -> (u128, u128) {
+        assert_eq!(sdk::promise_results_count(), 1);
         // Get the unused amount from the `ft_on_transfer` call result.
         let unused_amount = match sdk::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
@@ -273,7 +278,7 @@ impl FungibleToken {
                 };
                 self.accounts_insert(receiver_id, receiver_balance - refund_amount);
                 #[cfg(feature = "log")]
-                sdk::log(format!(
+                sdk::log(&format!(
                     "Decrease receiver {} balance to: {}",
                     receiver_id,
                     receiver_balance - refund_amount
@@ -283,7 +288,7 @@ impl FungibleToken {
                     let sender_balance = u128::try_from_slice(&sender_balance[..]).unwrap();
                     self.accounts_insert(sender_id, sender_balance + refund_amount);
                     #[cfg(feature = "log")]
-                    sdk::log(format!(
+                    sdk::log(&format!(
                         "Refund amount {} from {} to {}",
                         refund_amount, receiver_id, sender_id
                     ));
@@ -292,7 +297,7 @@ impl FungibleToken {
                     // Sender's account was deleted, so we need to burn tokens.
                     self.total_supply -= refund_amount;
                     #[cfg(feature = "log")]
-                    sdk::log("The account of the sender was deleted".into());
+                    sdk::log("The account of the sender was deleted");
                     (amount, refund_amount)
                 };
             }
@@ -332,7 +337,7 @@ impl FungibleToken {
             }
         } else {
             #[cfg(feature = "log")]
-            sdk::log(format!("The account {} is not registered", &account_id));
+            sdk::log(&format!("The account {} is not registered", &account_id));
             None
         }
     }
@@ -373,7 +378,7 @@ impl FungibleToken {
         let account_id = account_id.unwrap_or(&predecessor_account_id);
         if self.accounts_contains_key(account_id) {
             #[cfg(feature = "log")]
-            sdk::log("The account is already registered, refunding the deposit".into());
+            sdk::log("The account is already registered, refunding the deposit");
             if amount > 0 {
                 let promise0 = sdk::promise_batch_create(&sdk::predecessor_account_id());
                 sdk::promise_batch_action_transfer(promise0, amount);

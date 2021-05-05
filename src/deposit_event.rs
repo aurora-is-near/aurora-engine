@@ -1,113 +1,59 @@
 use crate::prover::*;
 use crate::types::*;
-use alloc::{string::ToString, vec};
-use ethabi::ParamType;
-use primitive_types::U128;
+use alloc::{
+    string::{String, ToString},
+    vec,
+};
+use ethabi::{EventParam, ParamType};
+use primitive_types::U256;
 
-const EVENT_DEPOSIT_TO_NEAR: &str = "DepositedToNear";
-const EVENT_DEPOSIT_TO_ETH: &str = "DepositedToEVM";
+const DEPOSITED_EVENT: &str = "Deposited";
 
-/// Data that was emitted by the Ethereum Deposited NEAR-token event.
+/// Data that was emitted by Deposited event.
 #[derive(Debug, PartialEq)]
-pub struct EthDepositedNearEvent {
-    pub eth_custodian_address: EthAddress,
-    pub sender: AccountId,
-    pub recipient: AccountId,
-    pub amount: U128,
-    pub fee: U128,
-}
-
-/// Data that was emitted by the Ethereum Deposited ETH-token event.
-#[derive(Debug, PartialEq)]
-pub struct EthDepositedEthEvent {
+pub struct DepositedEvent {
     pub eth_custodian_address: EthAddress,
     pub sender: EthAddress,
-    pub recipient: EthAddress,
-    pub amount: U128,
-    pub fee: U128,
+    pub recipient: String,
+    pub amount: U256,
+    pub fee: U256,
 }
 
-impl EthDepositedNearEvent {
+impl DepositedEvent {
     #[allow(dead_code)]
-    fn event_params() -> EthEventParams {
+    fn event_params() -> EventParams {
         vec![
-            ("sender".to_string(), ParamType::Address, true),
-            ("nearRecipient".to_string(), ParamType::String, false),
-            ("amount".to_string(), ParamType::Uint(256), false),
-            ("fee".to_string(), ParamType::Uint(256), false),
+            EventParam {
+                name: "sender".to_string(),
+                kind: ParamType::Address,
+                indexed: true,
+            },
+            EventParam {
+                name: "recipient".to_string(),
+                kind: ParamType::String,
+                indexed: false,
+            },
+            EventParam {
+                name: "amount".to_string(),
+                kind: ParamType::Uint(256),
+                indexed: false,
+            },
+            EventParam {
+                name: "fee".to_string(),
+                kind: ParamType::Uint(256),
+                indexed: false,
+            },
         ]
     }
 
     /// Parse raw log Etherium proof entry data.
-    #[allow(dead_code)]
     pub fn from_log_entry_data(data: &[u8]) -> Self {
-        let event =
-            EthEvent::fetch_log_entry_data(EVENT_DEPOSIT_TO_NEAR, Self::event_params(), data);
+        let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data);
         let sender = event.log.params[0].value.clone().into_address().unwrap().0;
-        let sender = hex::encode(sender);
 
         let recipient = event.log.params[1].value.clone().to_string();
-        let amount = U128::from(
-            event.log.params[2]
-                .value
-                .clone()
-                .into_uint()
-                .unwrap()
-                .as_u128(),
-        );
-        let fee = U128::from(
-            event.log.params[3]
-                .value
-                .clone()
-                .into_uint()
-                .unwrap()
-                .as_u128(),
-        );
-        Self {
-            eth_custodian_address: event.eth_custodian_address,
-            sender,
-            recipient,
-            amount,
-            fee,
-        }
-    }
-}
-
-impl EthDepositedEthEvent {
-    #[allow(dead_code)]
-    fn event_params() -> EthEventParams {
-        vec![
-            ("sender".to_string(), ParamType::Address, true),
-            ("ethRecipientOnNear".to_string(), ParamType::Address, true),
-            ("amount".to_string(), ParamType::Uint(256), false),
-            ("fee".to_string(), ParamType::Uint(256), false),
-        ]
-    }
-
-    /// Parse raw log Etherium proof entry data.
-    #[allow(dead_code)]
-    pub fn from_log_entry_data(data: &[u8]) -> Self {
-        let event =
-            EthEvent::fetch_log_entry_data(EVENT_DEPOSIT_TO_ETH, Self::event_params(), data);
-        let sender = event.log.params[0].value.clone().into_address().unwrap().0;
-
-        let recipient = event.log.params[1].value.clone().into_address().unwrap().0;
-        let amount = U128::from(
-            event.log.params[2]
-                .value
-                .clone()
-                .into_uint()
-                .unwrap()
-                .as_u128(),
-        );
-        let fee = U128::from(
-            event.log.params[3]
-                .value
-                .clone()
-                .into_uint()
-                .unwrap()
-                .as_u128(),
-        );
+        let amount = event.log.params[2].value.clone().into_uint().unwrap();
+        let fee = event.log.params[3].value.clone().into_uint().unwrap();
         Self {
             eth_custodian_address: event.eth_custodian_address,
             sender,

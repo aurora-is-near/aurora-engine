@@ -1,4 +1,4 @@
-use crate::prelude::{vec, String, Vec, H256};
+use crate::prelude::{vec, Vec, H256};
 use crate::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -288,13 +288,6 @@ pub fn keccak(input: &[u8]) -> H256 {
     }
 }
 
-/// Calls environment panic with data encoded in hex as panic message.
-pub fn panic_hex(data: &[u8]) -> ! {
-    let message = crate::types::bytes_to_hex(data).into_bytes();
-    unsafe { exports::panic_utf8(message.len() as _, message.as_ptr() as _) }
-    unreachable!()
-}
-
 /// Returns account id of the current account.
 pub fn current_account_id() -> Vec<u8> {
     unsafe {
@@ -328,10 +321,11 @@ pub fn get_contract_data<T: BorshDeserialize>(key: &str) -> T {
 }
 
 #[allow(dead_code)]
-pub fn log(data: String) {
+pub fn log(data: &str) {
     log_utf8(data.as_bytes())
 }
 
+#[allow(unused)]
 pub fn prepaid_gas() -> u64 {
     unsafe { exports::prepaid_gas() }
 }
