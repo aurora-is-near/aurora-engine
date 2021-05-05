@@ -3,9 +3,11 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::prelude::{String, Vec};
 #[cfg(feature = "contract")]
 use crate::prover::Proof;
-use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 #[cfg(feature = "contract")]
-use crate::types::{Balance, EthAddress};
+use crate::types::Balance;
+use crate::types::EthAddress;
+use crate::types::{AccountId, RawAddress, RawH256, RawU256};
+use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -36,6 +38,45 @@ pub struct MetaCallArgs {
     pub args: Vec<u8>,
 }
 
+/// Borsh-encoded log for use in a `SubmitResult`.
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct ResultLog {
+    pub topics: Vec<RawU256>,
+    pub data: Vec<u8>,
+}
+
+impl From<Log> for ResultLog {
+    fn from(log: Log) -> Self {
+        let topics = log
+            .topics
+            .into_iter()
+            .map(|topic| topic.0)
+            .collect::<Vec<_>>();
+        ResultLog {
+            topics,
+            data: log.data,
+        }
+    }
+}
+
+/// Borsh-encoded result for the `deploy` and `deploy_with_input` methods.
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct DeployResult {
+    pub status: bool,
+    pub gas_used: u64,
+    pub result: EthAddress,
+    pub logs: Vec<ResultLog>,
+}
+
+/// Borsh-encoded result for the `call` and `call_with_args` methods.
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct SubmitResult {
+    pub status: bool,
+    pub gas_used: u64,
+    pub result: Vec<u8>,
+    pub logs: Vec<ResultLog>,
+}
+
 /// Borsh-encoded parameters for the `call` function.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FunctionCallArgs {
@@ -59,11 +100,20 @@ pub struct GetStorageAtArgs {
     pub key: RawH256,
 }
 
+/// Borsh-encoded (genesis) account balance used by the `begin_chain` function.
+#[cfg(feature = "evm_bully")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct AccountBalance {
+    pub address: RawAddress,
+    pub balance: RawU256,
+}
+
 /// Borsh-encoded parameters for the `begin_chain` function.
 #[cfg(feature = "evm_bully")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct BeginChainArgs {
     pub chain_id: RawU256,
+    pub genesis_alloc: Vec<AccountBalance>,
 }
 
 /// Borsh-encoded parameters for the `begin_block` function.
@@ -73,7 +123,7 @@ pub struct BeginBlockArgs {
     /// The current block's hash (for replayer use).
     pub hash: RawU256,
     /// The current block's beneficiary address.
-    pub coinbase: RawU256,
+    pub coinbase: RawAddress,
     /// The current block's timestamp (in seconds since the Unix epoch).
     pub timestamp: RawU256,
     /// The current block's number (the genesis block is number zero).

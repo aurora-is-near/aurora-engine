@@ -66,7 +66,7 @@ impl EthConnectorContract {
             "ERR_CONTRACT_INITIALIZED"
         );
         #[cfg(feature = "log")]
-        sdk::log("[init contract]".into());
+        sdk::log("[init contract]");
         // Get initial contract arguments
         let args = InitCallArgs::try_from_slice(&sdk::read_input()[..]).expect(ERR_FAILED_PARSE);
         let current_account_id = sdk::current_account_id();
@@ -133,7 +133,7 @@ impl EthConnectorContract {
     pub fn deposit(&self) {
         use crate::prover::Proof;
         #[cfg(feature = "log")]
-        sdk::log("[Deposit tokens]".into());
+        sdk::log("[Deposit tokens]");
 
         // Get incoming deposit arguments
         let raw_proof = sdk::read_input();
@@ -142,7 +142,7 @@ impl EthConnectorContract {
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
 
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
             hex::encode(event.sender),
             event.recipient,
@@ -151,7 +151,7 @@ impl EthConnectorContract {
         ));
 
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Event's address {}, custodian address {}",
             hex::encode(&event.eth_custodian_address),
             hex::encode(&self.contract.eth_custodian_address),
@@ -165,7 +165,7 @@ impl EthConnectorContract {
 
         // Verify proof data with cross-cotract call at prover account
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Deposit verify_log_entry for prover: {}",
             self.contract.prover_account,
         ));
@@ -253,7 +253,7 @@ impl EthConnectorContract {
         let data: FinishDepositCallArgs =
             FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
         #[cfg(feature = "log")]
-        sdk::log(format!("Finish deposit NEAR amount: {}", data.amount));
+        sdk::log(&format!("Finish deposit NEAR amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
 
         // Check promise results
@@ -262,7 +262,7 @@ impl EthConnectorContract {
             _ => sdk::panic_utf8(b"ERR_PROMISE_INDEX"),
         };
         #[cfg(feature = "log")]
-        sdk::log("Check verification_success".into());
+        sdk::log("Check verification_success");
         let verification_success: bool = bool::try_from_slice(&data0).unwrap();
         assert!(verification_success, "ERR_VERIFY_PROOF");
         self.record_proof(data.proof_key);
@@ -304,7 +304,7 @@ impl EthConnectorContract {
     /// Record used proof as hash key
     fn record_proof(&mut self, key: String) {
         #[cfg(feature = "log")]
-        sdk::log("Record proof".into());
+        sdk::log("Record proof");
         let key = key.as_str();
 
         assert!(!self.check_used_event(key), "ERR_PROOF_EXIST");
@@ -314,7 +314,7 @@ impl EthConnectorContract {
     ///  Mint NEAR tokens
     fn mint_near(&mut self, owner_id: AccountId, amount: Balance) {
         #[cfg(feature = "log")]
-        sdk::log(format!("Mint NEAR {} tokens for: {}", amount, owner_id));
+        sdk::log(&format!("Mint NEAR {} tokens for: {}", amount, owner_id));
 
         if self.ft.accounts_get(&owner_id).is_none() {
             self.ft.accounts_insert(&owner_id, 0);
@@ -325,7 +325,7 @@ impl EthConnectorContract {
     ///  Mint ETH tokens
     fn mint_eth(&mut self, owner_id: EthAddress, amount: Balance) {
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Mint ETH {} tokens for: {}",
             amount,
             hex::encode(owner_id)
@@ -336,14 +336,14 @@ impl EthConnectorContract {
     /// Burn NEAR tokens
     fn burn_near(&mut self, owner_id: AccountId, amount: Balance) {
         #[cfg(feature = "log")]
-        sdk::log(format!("Burn NEAR {} tokens for: {}", amount, owner_id));
+        sdk::log(&format!("Burn NEAR {} tokens for: {}", amount, owner_id));
         self.ft.internal_withdraw(&owner_id, amount);
     }
 
     /// Burn ETH tokens
     fn burn_eth(&mut self, address: EthAddress, amount: Balance) {
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Burn ETH {} tokens for: {}",
             amount,
             hex::encode(address)
@@ -355,7 +355,7 @@ impl EthConnectorContract {
     pub fn withdraw_near(&mut self) {
         sdk::assert_one_yocto();
         #[cfg(feature = "log")]
-        sdk::log("Start withdraw NEAR".into());
+        sdk::log("Start withdraw NEAR");
         let args =
             WithdrawCallArgs::try_from_slice(&sdk::read_input()[..]).expect(ERR_FAILED_PARSE);
         let recipient_address = validate_eth_address(args.recipient_id);
@@ -379,7 +379,7 @@ impl EthConnectorContract {
         let total_supply = self.ft.ft_total_supply();
         sdk::return_output(&total_supply.to_string().as_bytes());
         #[cfg(feature = "log")]
-        sdk::log(format!("Total supply: {}", total_supply));
+        sdk::log(&format!("Total supply: {}", total_supply));
     }
 
     /// Return total supply of NEAR
@@ -387,7 +387,7 @@ impl EthConnectorContract {
         let total_supply = self.ft.ft_total_supply_near();
         sdk::return_output(&total_supply.to_string().as_bytes());
         #[cfg(feature = "log")]
-        sdk::log(format!("Total supply NEAR: {}", total_supply));
+        sdk::log(&format!("Total supply NEAR: {}", total_supply));
     }
 
     /// Return total supply of ETH
@@ -395,7 +395,7 @@ impl EthConnectorContract {
         let total_supply = self.ft.ft_total_supply_eth();
         sdk::return_output(&total_supply.to_string().as_bytes());
         #[cfg(feature = "log")]
-        sdk::log(format!("Total supply ETH: {}", total_supply));
+        sdk::log(&format!("Total supply ETH: {}", total_supply));
     }
 
     /// Return balance of NEAR
@@ -405,7 +405,7 @@ impl EthConnectorContract {
         let balance = self.ft.ft_balance_of(&args.account_id);
         sdk::return_output(&balance.to_string().as_bytes());
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Balance of NEAR [{}]: {}",
             args.account_id, balance
         ));
@@ -417,7 +417,7 @@ impl EthConnectorContract {
             BalanceOfEthCallArgs::try_from_slice(&sdk::read_input()[..]).expect(ERR_FAILED_PARSE);
         let balance = self.ft.internal_unwrap_balance_of_eth(args.address);
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Balance of ETH [{}]: {}",
             hex::encode(args.address),
             balance
@@ -433,7 +433,7 @@ impl EthConnectorContract {
             .ft_transfer(&args.receiver_id, args.amount, &args.memo);
         self.save_contract();
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Transfer amount {} to {} success with memo: {:?}",
             args.amount, args.receiver_id, args.memo
         ));
@@ -447,7 +447,7 @@ impl EthConnectorContract {
             .ft
             .ft_resolve_transfer(&args.sender_id, &args.receiver_id, args.amount);
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Resolve transfer from {} to {} success",
             args.sender_id, args.receiver_id
         ));
@@ -461,7 +461,7 @@ impl EthConnectorContract {
         let args =
             TransferCallCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Transfer call to {} amount {}",
             args.receiver_id, args.amount,
         ));
@@ -539,7 +539,7 @@ impl EthConnectorContract {
     /// ft_on_transfer call back function
     pub fn ft_on_transfer(&mut self) {
         #[cfg(feature = "log")]
-        sdk::log("Call ft_on_trasfer".into());
+        sdk::log("Call ft_on_trasfer");
         let args = FtOnTransfer::try_from_slice(&sdk::read_input()[..]).expect(ERR_FAILED_PARSE);
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
@@ -560,7 +560,7 @@ impl EthConnectorContract {
             let recipient_address = message_data.recipient;
 
             #[cfg(feature = "log")]
-            sdk::log(format!(
+            sdk::log(&format!(
                 "Call ERC20 contract: {}",
                 hex::encode(evm_token_addres),
             ));
@@ -574,7 +574,7 @@ impl EthConnectorContract {
             let mut engine =
                 Engine::new(near_account_to_evm_address(&sdk::predecessor_account_id()));
             // TODO: handle results
-            let (_status, _result) = Engine::call_with_args(&mut engine, args);
+            let _result = Engine::call_with_args(&mut engine, args);
 
             // Transfer fee to Relayer
             let fee = message_data.fee.as_u128();
@@ -583,7 +583,7 @@ impl EthConnectorContract {
                 self.ft.internal_deposit_eth(evm_relayer_addres, fee);
 
                 #[cfg(feature = "log")]
-                sdk::log(format!(
+                sdk::log(&format!(
                     "Send fee {:?} to Relayer: {}",
                     fee,
                     hex::encode(evm_relayer_addres),

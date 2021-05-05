@@ -10,6 +10,7 @@ homepage = "https://github.com/aurora-is-near/aurora-engine"
 repository = "https://github.com/aurora-is-near/aurora-engine"
 license = "CC0-1.0"
 publish = false
+autobenches = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -37,9 +38,12 @@ codegen-units = 1
 rpath = false
 
 [dependencies]
+blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
+bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm", rev = "2a8a3e9", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
+num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }
 ripemd160 = { version = "0.9.1", default-features = false }
 rlp = { version = "0.5.0", default-features = false }
@@ -56,10 +60,23 @@ hex = { version = "0.4.3", default-features = false }
 near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }
 near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }
 near-crypto = "0.1.0"
+near-vm-runner = { git = "https://github.com/near/nearcore", rev = "3744f07e13bf43a9522fb39fa8f6f128396d0e1f" }
+near-primitives-core = { git = "https://github.com/near/nearcore", rev = "3744f07e13bf43a9522fb39fa8f6f128396d0e1f" }
+near-vm-logic = { git = "https://github.com/near/nearcore", rev = "3744f07e13bf43a9522fb39fa8f6f128396d0e1f" }
+libsecp256k1 = "0.3.5"
+rand = "0.7.3"
+criterion = "0.3.4"
+git2 = "0.13"
+
+[[bench]]
+name = "benches"
+path = "benches/main.rs"
+harness = false
 
 [features]
 default = ["sha2", "std"]
-std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "lunarity-lexer/std"]
+std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "lunarity-lexer/std", "bn/std"]
+testnet = []
 contract = []
 evm_bully = []
 log = []

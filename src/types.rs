@@ -1,11 +1,9 @@
-use crate::prelude::{vec, Address, String, Vec, H256, U256};
+use crate::prelude::{Address, String, Vec, H256, U256};
 #[cfg(feature = "contract")]
 use alloc::str;
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
-
-use evm::backend::Log;
 
 #[cfg(feature = "contract")]
 use crate::sdk;
@@ -13,8 +11,8 @@ use crate::sdk;
 pub type AccountId = String;
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
-pub type RawU256 = [u8; 32];
-pub type RawH256 = [u8; 32];
+pub type RawU256 = [u8; 32]; // Little-endian large integer type.
+pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 pub type EthAddress = [u8; 20];
 pub type Gas = u64;
 pub type StorageUsage = u64;
@@ -68,19 +66,6 @@ pub type Result<T> = core::result::Result<T, ErrorKind>;
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {
     let mut result = [0u8; 32];
     value.to_big_endian(&mut result);
-    result
-}
-
-#[allow(dead_code)]
-pub fn log_to_bytes(log: Log) -> Vec<u8> {
-    let mut result = vec![0u8; 1 + log.topics.len() * 32 + log.data.len()];
-    result[0] = log.topics.len() as u8;
-    let mut index = 1;
-    for topic in log.topics.iter() {
-        result[index..index + 32].copy_from_slice(&topic.0);
-        index += 32;
-    }
-    result[index..].copy_from_slice(&log.data);
     result
 }
 
