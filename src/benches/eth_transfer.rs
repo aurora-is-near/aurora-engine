@@ -1,13 +1,13 @@
-use criterion::{criterion_group, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion};
 use secp256k1::SecretKey;
 
-use super::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};
+use crate::test_utils::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: u64 = 123;
 
-fn eth_transfer_benchmark(c: &mut Criterion) {
+pub fn eth_transfer_benchmark(c: &mut Criterion) {
     let mut runner = deploy_evm();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
@@ -47,5 +47,3 @@ fn eth_transfer_benchmark(c: &mut Criterion) {
         )
     });
 }
-
-criterion_group!(benches, eth_transfer_benchmark);

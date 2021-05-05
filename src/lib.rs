@@ -24,6 +24,11 @@ mod log_entry;
 #[cfg(feature = "contract")]
 mod sdk;
 
+#[cfg(test)]
+mod benches;
+#[cfg(test)]
+mod test_utils;
+
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
