@@ -2,34 +2,38 @@ use borsh::BorshSerialize;
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::engine::TOKEN_MAP_PREFIX;
+use crate::engine::ERC20_NEP141_PREFIX;
 use crate::map::append_slice;
 use crate::parameters::{
     BridgedTokenWithdrawArgs, BridgedTokenWithdrawEthConnectorArgs, NEP141TransferCallArgs,
 };
 use crate::prelude::{String, Vec, U256};
 use crate::sdk;
-use crate::types::{AccountId, Gas};
+use crate::types::{AccountId, U128};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 mod costs {
     use crate::types::Gas;
 
-    // TODO: Determine the correct amount of gas
+    // TODO(#51): Determine the correct amount of gas
     pub(super) const EXIT_TO_NEAR_GAS: Gas = 0;
 
-    // TODO: Determine the correct amount of gas
+    // TODO(#51): Determine the correct amount of gas
     pub(super) const EXIT_TO_ETHEREUM_GAS: Gas = 0;
 
+    // TODO(#51): Determine the correct amount of gas
     pub(super) const FT_TRANSFER_GAS: Gas = 50_000;
+
+    // TODO(#51): Determine the correct amount of gas
+    pub(super) const WITHDRAWAL_GAS: Gas = 50_000;
 }
 
 /// Get the current nep141 token associated with the current erc20 token.
 /// This will fail is none is associated.
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> String {
     String::from_utf8(
-        sdk::read_storage(append_slice(TOKEN_MAP_PREFIX, erc20_token).as_slice())
+        sdk::read_storage(append_slice(ERC20_NEP141_PREFIX, erc20_token).as_slice())
             .expect(ERR_TARGET_TOKEN_NOT_FOUND),
     )
     .unwrap()
@@ -39,7 +43,6 @@ pub struct ExitToNear; //TransferEthToNear
 
 impl Precompile for ExitToNear {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
-        //TODO
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
@@ -58,7 +61,7 @@ impl Precompile for ExitToNear {
                 String::from_utf8(sdk::current_account_id()).unwrap(),
                 NEP141TransferCallArgs {
                     receiver_id: String::from_utf8(input.to_vec()).unwrap(),
-                    amount: context.apparent_value.as_u128(),
+                    amount: U128(context.apparent_value.as_u128()),
                     memo: None,
                 },
             )
@@ -80,7 +83,7 @@ impl Precompile for ExitToNear {
             sender.copy_from_slice(&input_mut[..20]);
             input_mut = &input_mut[20..];
 
-            let amount = U256::from_little_endian(&input_mut[..32]).as_u128();
+            let amount = U128(U256::from_little_endian(&input_mut[..32]).as_u128());
             input_mut = &input_mut[32..];
 
             let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
@@ -117,8 +120,6 @@ impl Precompile for ExitToEthereum {
     }
 
     fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
-        // TODO: Determine the correct amount of gas
-        const GAS_FOR_WITHDRAW: Gas = 50_000;
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -131,7 +132,7 @@ impl Precompile for ExitToEthereum {
 
             let eth_recipient: AccountId = String::from_utf8(input.to_vec()).unwrap();
             let args = BridgedTokenWithdrawEthConnectorArgs {
-                amount: context.apparent_value.as_u128(),
+                amount: U128(context.apparent_value.as_u128()),
                 recipient: eth_recipient,
             };
 
@@ -158,7 +159,7 @@ impl Precompile for ExitToEthereum {
             sender.copy_from_slice(&input_mut[..20]);
             input_mut = &input_mut[20..];
 
-            let amount = U256::from_little_endian(&input_mut[..32]).as_u128();
+            let amount = U128(U256::from_little_endian(&input_mut[..32]).as_u128());
             input_mut = &input_mut[32..];
 
             let eth_recipient: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
@@ -178,7 +179,7 @@ impl Precompile for ExitToEthereum {
             b"withdraw",
             serialized_args.as_slice(),
             0,
-            GAS_FOR_WITHDRAW,
+            costs::WITHDRAWAL_GAS,
         );
 
         sdk::promise_return(promise0);

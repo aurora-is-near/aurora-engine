@@ -7,7 +7,7 @@ use evm::{Config, CreateScheme, ExitError, ExitReason};
 use crate::map::LookupMap;
 use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
 use crate::precompiles;
-use crate::prelude::{Address, Vec, H256, U256};
+use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
 use crate::types::{u256_to_arr, AccountId};
@@ -125,7 +125,9 @@ impl ExitIntoResult for ExitReason {
     }
 }
 
-pub(crate) const TOKEN_MAP_PREFIX: &[u8] = b"t";
+pub(crate) const NEP141_ERC20_PREFIX: &[u8] = b"a";
+pub(crate) const ERC20_NEP141_PREFIX: &[u8] = b"b";
+pub(crate) const RELAYERS_ACCOUNT_PREFIX: &[u8] = b"r";
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
@@ -141,8 +143,12 @@ pub struct EngineState {
     pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
-    /// Mapping between erc20 tokens in the EVM to nep141 in the NEAR
-    pub nep141_erc20_mapping: LookupMap,
+    /// Mapping between erc20 tokens in the EVM to nep141 in NEAR
+    pub nep141_erc20: LookupMap,
+    /// Mapping between nep141 in NEAR to erc20 tokens in the EVM
+    pub erc20_nep141: LookupMap,
+    /// Mapping between relayer account id and relayer evm address
+    pub relayers_account: LookupMap,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -152,7 +158,9 @@ impl From<NewCallArgs> for EngineState {
             owner_id: args.owner_id,
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-            nep141_erc20_mapping: LookupMap::new(TOKEN_MAP_PREFIX.to_vec()),
+            nep141_erc20: LookupMap::new(NEP141_ERC20_PREFIX.to_vec()),
+            erc20_nep141: LookupMap::new(ERC20_NEP141_PREFIX.to_vec()),
+            relayers_account: LookupMap::new(RELAYERS_ACCOUNT_PREFIX.to_vec()),
         }
     }
 }
@@ -456,8 +464,29 @@ impl Engine {
 
     pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
         self.state
-            .nep141_erc20_mapping
+            .erc20_nep141
             .insert_raw(erc20_token, nep141_token);
+
+        self.state
+            .nep141_erc20
+            .insert_raw(nep141_token, erc20_token);
+    }
+
+    pub fn get_erc20_from_nep141(&self, nep141_token: &[u8]) -> Option<Vec<u8>> {
+        self.state.nep141_erc20.get_raw(nep141_token)
+    }
+
+    pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
+        self.state
+            .relayers_account
+            .insert_raw(account_id, evm_address.as_bytes());
+    }
+
+    pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
+        self.state
+            .relayers_account
+            .get_raw(account_id)
+            .map(|result| Address(result.as_slice().try_into().unwrap()))
     }
 }
 

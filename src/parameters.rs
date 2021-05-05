@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::prelude::{String, Vec};
-use crate::types::{AccountId, RawAddress, RawH256, RawU256};
+use crate::types::{AccountId, RawAddress, RawH256, RawU256, U128};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.    
@@ -121,16 +121,13 @@ pub struct BeginBlockArgs {
     pub gaslimit: RawU256,
 }
 
-// TODO: Use proper serializer
-type StringU128 = u128;
-
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct NEP141TransferCallArgs {
     pub receiver_id: AccountId,
-    pub amount: StringU128,
+    pub amount: U128,
     pub memo: Option<String>,
 }
 
@@ -139,20 +136,20 @@ pub struct NEP141TransferCallArgs {
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct BridgedTokenWithdrawArgs {
-    pub amount: StringU128,
+    pub amount: U128,
     pub recipient: String,
 }
 
 /// Borsh-encoded parameters for the `withdraw` function.
 /// This is a function from Bridged ERC-20 in NEAR
 ///
-/// TODO: Flip arguments in Eth-Connector for consistency:
+/// TODO(#51): Flip arguments in Eth-Connector for consistency:
 ///     https://github.com/aurora-is-near/eth-connector/blob/master/evm-fungible-token/src/lib.rs#L190-L194
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct BridgedTokenWithdrawEthConnectorArgs {
     pub recipient: String,
-    pub amount: StringU128,
+    pub amount: U128,
 }
 
 #[cfg(test)]
