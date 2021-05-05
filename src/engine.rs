@@ -315,11 +315,11 @@ impl Engine {
         use crate::prelude::Add;
 
         let balance = Self::get_balance(address);
-        // Adds are intentional
-        let new_balance = balance.add(U256::one());
+        // Saturating adds are intentional
+        let new_balance = balance.saturating_add(U256::one());
 
         let account_nonce = Self::get_nonce(address);
-        account_nonce.add(U256::one());
+        account_nonce.saturating_add(U256::one());
 
         Self::set_balance(address, &new_balance);
         Ok(())
