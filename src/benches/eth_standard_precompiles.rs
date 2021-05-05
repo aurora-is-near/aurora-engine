@@ -109,7 +109,7 @@ impl ContractConstructor {
             Ok(hex) => hex,
             Err(_) => {
                 // An error occurred opening the file, maybe the contract hasn't been compiled?
-                let sources_root = Path::new("benches").join("res");
+                let sources_root = Path::new("src").join("benches").join("res");
                 solidity::compile(
                     sources_root,
                     "StandardPrecompiles.sol",

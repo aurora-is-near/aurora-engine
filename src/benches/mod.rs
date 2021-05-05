@@ -6,6 +6,7 @@ mod eth_standard_precompiles;
 mod eth_transfer;
 
 #[test]
+#[ignore] // We don't want to run in CI, so ignore. To run locally use `cargo test -- --ignored`
 fn benches() {
     let mut c = Criterion::default();
 
