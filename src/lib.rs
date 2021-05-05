@@ -59,16 +59,16 @@ mod contract {
     pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
         #[cfg(feature = "log")]
         {
-            use alloc::string::ToString;
+            use alloc::{format, string::ToString};
             if let Some(msg) = info.message() {
                 let msg = if let Some(log) = info.location() {
-                    [msg.to_string(), " [".into(), log.to_string(), "]".into()].join("")
+                    format!("{} [{}]", msg, log)
                 } else {
                     msg.to_string()
                 };
-                sdk::log(msg);
+                sdk::log(&msg);
             } else if let Some(log) = info.location() {
-                sdk::log(log.to_string());
+                sdk::log(&log.to_string());
             }
         }
 
@@ -459,9 +459,8 @@ mod contract {
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
-        use borsh::BorshSerialize;
         #[cfg(feature = "log")]
-        sdk::log("Call from verify_log_entry".into());
+        sdk::log("Call from verify_log_entry");
         let data = true.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
     }

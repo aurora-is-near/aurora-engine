@@ -149,13 +149,13 @@ impl FungibleToken {
         self.internal_withdraw(sender_id, amount);
         self.internal_deposit(receiver_id, amount);
         #[cfg(feature = "log")]
-        sdk::log(format!(
+        sdk::log(&format!(
             "Transfer {} from {} to {}",
             amount, sender_id, receiver_id
         ));
         #[cfg(feature = "log")]
         if let Some(memo) = memo {
-            sdk::log(format!("Memo: {}", memo));
+            sdk::log(&format!("Memo: {}", memo));
         }
     }
 
@@ -278,7 +278,7 @@ impl FungibleToken {
                 };
                 self.accounts_insert(receiver_id, receiver_balance - refund_amount);
                 #[cfg(feature = "log")]
-                sdk::log(format!(
+                sdk::log(&format!(
                     "Decrease receiver {} balance to: {}",
                     receiver_id,
                     receiver_balance - refund_amount
@@ -288,7 +288,7 @@ impl FungibleToken {
                     let sender_balance = u128::try_from_slice(&sender_balance[..]).unwrap();
                     self.accounts_insert(sender_id, sender_balance + refund_amount);
                     #[cfg(feature = "log")]
-                    sdk::log(format!(
+                    sdk::log(&format!(
                         "Refund amount {} from {} to {}",
                         refund_amount, receiver_id, sender_id
                     ));
@@ -297,7 +297,7 @@ impl FungibleToken {
                     // Sender's account was deleted, so we need to burn tokens.
                     self.total_supply -= refund_amount;
                     #[cfg(feature = "log")]
-                    sdk::log("The account of the sender was deleted".into());
+                    sdk::log("The account of the sender was deleted");
                     (amount, refund_amount)
                 };
             }
@@ -337,7 +337,7 @@ impl FungibleToken {
             }
         } else {
             #[cfg(feature = "log")]
-            sdk::log(format!("The account {} is not registered", &account_id));
+            sdk::log(&format!("The account {} is not registered", &account_id));
             None
         }
     }
@@ -378,7 +378,7 @@ impl FungibleToken {
         let account_id = account_id.unwrap_or(&predecessor_account_id);
         if self.accounts_contains_key(account_id) {
             #[cfg(feature = "log")]
-            sdk::log("The account is already registered, refunding the deposit".into());
+            sdk::log("The account is already registered, refunding the deposit");
             if amount > 0 {
                 let promise0 = sdk::promise_batch_create(&sdk::predecessor_account_id());
                 sdk::promise_batch_action_transfer(promise0, amount);
