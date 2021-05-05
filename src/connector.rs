@@ -137,7 +137,7 @@ impl EthConnectorContract {
 
         // Get incoming deposit arguments
         let raw_proof = sdk::read_input();
-        let proof: Proof = Proof::try_from_slice(&raw_proof).expect("ERR_FAILED_PARSE");
+        let proof: Proof = Proof::try_from_slice(&raw_proof).expect(ERR_FAILED_PARSE);
         // Fetch event data from Proof
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
 
