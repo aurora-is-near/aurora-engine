@@ -192,25 +192,15 @@ mod contract {
             None => sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
         };
 
-        let next_nonce =
-            Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
-
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
-        let result = if let Some(receiver) = signed_transaction.transaction.to {
-            if data.is_empty() {
-                // Execute a balance transfer. We need to save the incremented nonce in this case
-                // because it is not handled internally by SputnikVM like it is in the case of
-                // `call` and `deploy_code`.
-                Engine::set_nonce(&sender, &next_nonce);
-                Engine::transfer(&mut engine, &sender, &receiver, &value)
-            } else {
-                // Execute a contract call:
-                Engine::call(&mut engine, sender, receiver, value, data)
-                // TODO: charge for storage
-            }
+        if let Some(receiver) = signed_transaction.transaction.to {
+            Engine::call(&mut engine, sender, receiver, value, data)
+                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+                .sdk_process();
+            // TODO: charge for storage
         } else {
             // Execute a contract deployment:
             Engine::deploy_code(&mut engine, sender, value, &data)
@@ -236,8 +226,6 @@ mod contract {
                 sdk::panic_utf8(b"ERR_META_TX_PARSE");
             }
         };
-
-        Engine::check_nonce(&meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
 
         let mut engine = Engine::new_with_state(state, meta_call_args.sender);
         let result = engine.call(
