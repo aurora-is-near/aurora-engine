@@ -221,9 +221,27 @@ fn test_near_deposit_balance_total_supply() {
     assert_eq!(balance, 0);
 }
 
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct RegisterRelayerCallArgs {
+    pub address: EthAddress,
+}
+
 #[test]
 fn test_eth_deposit_balance_total_supply() {
     let (master_account, contract) = init(EVM_CUSTODIAN_ADDRESS);
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "register_relayer",
+        &RegisterRelayerCallArgs {
+            address: validate_eth_address(CUSTODIAN_ADDRESS),
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    res.assert_success();
+
     call_deposit_eth(&contract, CONTRACT_ACC);
 
     let balance = get_eth_balance(
@@ -231,7 +249,14 @@ fn test_eth_deposit_balance_total_supply() {
         validate_eth_address(RECIPIENT_ETH_ADDRESS),
         CONTRACT_ACC,
     );
-    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT - DEPOSITED_FEE);
+
+    let balance = get_eth_balance(
+        &master_account,
+        validate_eth_address(CUSTODIAN_ADDRESS),
+        CONTRACT_ACC,
+    );
+    assert_eq!(balance, DEPOSITED_FEE);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
@@ -327,13 +352,19 @@ fn test_ft_transfer() {
 }
 
 #[test]
-fn test_ft_transfer_call_near_eth() {
+fn test_ft_transfer_call_erc20() {
     #[derive(BorshSerialize)]
     pub struct TransferCallCallArgs {
         pub receiver_id: String,
         pub amount: Balance,
         pub memo: Option<String>,
         pub msg: String,
+    }
+
+    #[derive(BorshSerialize, BorshDeserialize)]
+    pub struct DeployEvmTokenCallArgs {
+        pub near_account_id: String,
+        pub erc20_contract: Vec<u8>,
     }
 
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
@@ -345,10 +376,38 @@ fn test_ft_transfer_call_near_eth() {
     let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_FEE);
 
-    let transfer_amount = 100;
-    let mut msg = U256::from(30).as_byte_slice().to_vec();
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "deploy_evm_token",
+        &DeployEvmTokenCallArgs {
+            near_account_id: EXTERNAL_CONTRACT_ACC.into(),
+            erc20_contract: vec![],
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    res.assert_success();
+
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "register_relayer",
+        &RegisterRelayerCallArgs {
+            address: validate_eth_address(CUSTODIAN_ADDRESS),
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    res.assert_success();
+
+    let transfer_amount = 50;
+    let fee = 30;
+    let mut msg = U256::from(fee).as_byte_slice().to_vec();
     msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
-    let message = [DEPOSITED_RECIPIENT, hex::encode(msg).as_str()].join(":");
+    let message = [CONTRACT_ACC, hex::encode(msg).as_str()].join(":");
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer_call",
@@ -364,7 +423,6 @@ fn test_ft_transfer_call_near_eth() {
         1,
     );
     res.assert_success();
-    //println!("{:#?}", res.promise_results());
 
     let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
@@ -377,7 +435,14 @@ fn test_ft_transfer_call_near_eth() {
         validate_eth_address(RECIPIENT_ETH_ADDRESS),
         CONTRACT_ACC,
     );
-    assert_eq!(balance, transfer_amount);
+    assert_eq!(balance, transfer_amount - fee);
+
+    let balance = get_eth_balance(
+        &master_account,
+        validate_eth_address(CUSTODIAN_ADDRESS),
+        CONTRACT_ACC,
+    );
+    assert_eq!(balance, fee);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT);
@@ -387,77 +452,6 @@ fn test_ft_transfer_call_near_eth() {
 
     let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, transfer_amount);
-}
-
-#[test]
-fn test_ft_transfer_call_erc20() {
-    #[derive(BorshSerialize)]
-    pub struct TransferCallCallArgs {
-        pub receiver_id: String,
-        pub amount: Balance,
-        pub memo: Option<String>,
-        pub msg: String,
-    }
-
-    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
-    let contract2 = init_contract(&master_account, EXTERNAL_CONTRACT_ACC, CUSTODIAN_ADDRESS);
-
-    call_deposit_near(&contract, CONTRACT_ACC);
-    call_deposit_near(&contract2, EXTERNAL_CONTRACT_ACC);
-
-    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
-
-    let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE);
-
-    let balance = get_near_balance(
-        &master_account,
-        EXTERNAL_CONTRACT_ACC,
-        EXTERNAL_CONTRACT_ACC,
-    );
-    assert_eq!(balance, DEPOSITED_AMOUNT);
-
-    /*
-    TODO: for testing should be completed Deploy ERC20 contract
-        let transfer_amount = 100;
-        let mut msg = U256::from(30).as_byte_slice().to_vec();
-        msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
-        let message = [DEPOSITED_RECIPIENT, hex::encode(msg).as_str()].join(":");
-        let res = contract.call(
-            CONTRACT_ACC.to_string(),
-            "ft_transfer_call",
-            &TransferCallCallArgs {
-                receiver_id: EXTERNAL_CONTRACT_ACC.into(),
-                amount: transfer_amount,
-                memo: None,
-                msg: message,
-            }
-            .try_to_vec()
-            .unwrap(),
-            DEFAULT_GAS,
-            1,
-        );
-        //res.assert_success();
-        println!("{:#?}", res.promise_results());
-
-        let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT);
-        assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
-
-        let balance = get_near_balance(&master_account, CONTRACT_ACC);
-        assert_eq!(balance, DEPOSITED_FEE - transfer_amount);
-
-        let balance = get_eth_balance(&master_account, validate_eth_address(RECIPIENT_ETH_ADDRESS));
-        assert_eq!(balance, transfer_amount);
-
-        let balance = total_supply(&master_account);
-        assert_eq!(balance, DEPOSITED_AMOUNT);
-
-        let balance = total_supply_near(&master_account);
-        assert_eq!(balance, DEPOSITED_AMOUNT - transfer_amount);
-
-        let balance = total_supply_eth(&master_account);
-        assert_eq!(balance, transfer_amount);*/
 }
 
 #[test]

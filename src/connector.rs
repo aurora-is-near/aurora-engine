@@ -105,11 +105,10 @@ impl EthConnectorContract {
         fee.copy_from_slice(&msg[..32]);
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
-
         OnTransferMessageData {
             relayer: data[0].into(),
             recipient,
-            fee: U256::from(fee),
+            fee: U256::from_little_endian(&fee[..]),
         }
     }
 
@@ -562,14 +561,14 @@ impl EthConnectorContract {
 
             // Call Eth ERC20 contract to mint ERC20 EVM tokens
             // TODO: modify inputs related to Eth contract
-            let _args = FunctionCallArgs {
+            let args = FunctionCallArgs {
                 contract: evm_token_addres,
                 input: vec![],
             };
-            let mut _engine =
+            let mut engine =
                 Engine::new(near_account_to_evm_address(&sdk::predecessor_account_id()));
             // TODO: implement sdk_expect
-            // Engine::call_with_args(&mut engine, args)
+            let _ = Engine::call_with_args(&mut engine, args);
             //     .map(|res| res.try_to_vec()
             //     .sdk_expect("ERR_SERIALIZE"))
             //     .sdk_process();
