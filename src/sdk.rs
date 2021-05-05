@@ -1,4 +1,4 @@
-use crate::prelude::{vec, String, Vec, H256};
+use crate::prelude::{vec, Vec, H256};
 use crate::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
 use borsh::{BorshDeserialize, BorshSerialize};
 

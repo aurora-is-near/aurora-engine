@@ -42,7 +42,7 @@ mod contract {
     use crate::parameters::{
         DeployEvmTokenCallArgs, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs,
     };
-    use crate::prelude::{Address, Vec, H256, U256};
+    use crate::prelude::{Address, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
@@ -226,7 +226,6 @@ mod contract {
             } else {
                 // Execute a contract call:
                 Engine::call(&mut engine, sender, receiver, value, data)
-                    .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
                 // TODO: charge for storage
             };
             result
