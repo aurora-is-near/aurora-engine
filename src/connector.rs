@@ -539,14 +539,19 @@ impl EthConnectorContract {
 
         // Special case when current_account_id is predecessor
         if current_account_id == predecessor_account_id {
+            let fee = message_data.fee.as_u128();
             self.burn_near(current_account_id, args.amount);
-            self.mint_eth(message_data.recipient, args.amount);
+            self.mint_eth(message_data.recipient, args.amount - fee);
+            // Mint fee to relayer
+            if fee > 0 {
+                let evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
+                self.mint_eth(evm_relayer_addres, fee);
+            }
         } else {
             use crate::engine::Engine;
 
             // ERC20 address
             let evm_token_addres = self.get_evm_token_address(&predecessor_account_id);
-            let evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
             let recipient_address = message_data.recipient;
 
             #[cfg(feature = "log")]
@@ -572,6 +577,7 @@ impl EthConnectorContract {
             // Transfer fee to Relayer
             let fee = message_data.fee.as_u128();
             if fee > 0 {
+                let evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
                 self.ft.internal_withdraw_eth(recipient_address, fee);
                 self.ft.internal_deposit_eth(evm_relayer_addres, fee);
 
