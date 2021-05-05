@@ -28,6 +28,8 @@ mod sdk;
 mod benches;
 #[cfg(test)]
 mod test_utils;
+#[cfg(test)]
+mod tests;
 
 #[cfg(feature = "contract")]
 mod contract {
