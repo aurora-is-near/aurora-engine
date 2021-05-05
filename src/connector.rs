@@ -4,14 +4,10 @@ use crate::sdk;
 use crate::types::*;
 
 use crate::deposit_event::*;
-use crate::prelude::{Address, U256};
+use crate::prelude::*;
 use crate::prover::validate_eth_address;
 #[cfg(feature = "log")]
 use alloc::format;
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const CONTRACT_NAME_KEY: &str = "EthConnector";
@@ -547,7 +543,6 @@ impl EthConnectorContract {
             self.mint_eth(message_data.recipient, args.amount);
         } else {
             use crate::engine::Engine;
-            use alloc::vec;
 
             // ERC20 address
             let evm_token_addres = self.get_evm_token_address(&predecessor_account_id);
@@ -562,14 +557,17 @@ impl EthConnectorContract {
 
             // Call Eth ERC20 contract to mint ERC20 EVM tokens
             // TODO: modify inputs related to Eth contract
-            let args = FunctionCallArgs {
+            let _args = FunctionCallArgs {
                 contract: evm_token_addres,
                 input: vec![],
             };
-            let mut engine =
+            let mut _engine =
                 Engine::new(near_account_to_evm_address(&sdk::predecessor_account_id()));
-            // TODO: handle results
-            let _result = Engine::call_with_args(&mut engine, args);
+            // TODO: implement sdk_expect
+            // Engine::call_with_args(&mut engine, args)
+            //     .map(|res| res.try_to_vec()
+            //     .sdk_expect("ERR_SERIALIZE"))
+            //     .sdk_process();
 
             // Transfer fee to Relayer
             let fee = message_data.fee.as_u128();

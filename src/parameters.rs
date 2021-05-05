@@ -68,7 +68,8 @@ pub struct DeployResult {
     pub logs: Vec<ResultLog>,
 }
 
-/// Borsh-encoded result for the `call` and `call_with_args` methods.
+/// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
+/// and `deploy_with_input` methods.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct SubmitResult {
     pub status: bool,
