@@ -13,3 +13,9 @@
 # Rust artifacts
 /*.wasm
 /target/
+
+# Solidity artifacts
+artifacts/
+cache/
+node_modules/
+res/

@@ -262,8 +262,7 @@ mod contract {
 
         let mut engine = Engine::new(predecessor_address());
 
-        // TODO(#51): Use proper erc20_contract
-        let erc20_contract = Default::default();
+        let erc20_contract = include_bytes!("../eth-contracts/res/EvmErc20.bin");
 
         Engine::deploy_code_with_input(&mut engine, erc20_contract)
             .map(|res| {
