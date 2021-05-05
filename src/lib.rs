@@ -12,8 +12,8 @@ pub mod meta_parsing;
 pub mod parameters;
 mod precompiles;
 pub mod prelude;
-mod storage;
-mod transaction;
+pub mod storage;
+pub mod transaction;
 pub mod types;
 
 #[cfg(feature = "contract")]
@@ -219,17 +219,19 @@ mod contract {
         if let Some(receiver) = signed_transaction.transaction.to {
             let result = if data.is_empty() {
                 // Execute a balance transfer. We need to save the incremented nonce in this case
-                // because it is not handled internally by the SputnikVM like it is in the case of
+                // because it is not handled internally by SputnikVM like it is in the case of
                 // `call` and `deploy_code`.
                 Engine::set_nonce(&sender, &next_nonce);
-                Engine::transfer(&mut engine, &sender, &receiver, &value).map(|_f| Vec::new())
+                Engine::transfer(&mut engine, &sender, &receiver, &value)
             } else {
                 // Execute a contract call:
                 Engine::call(&mut engine, sender, receiver, value, data)
                     .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
                 // TODO: charge for storage
             };
-            result.sdk_process();
+            result
+                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+                .sdk_process();
         } else {
             // Execute a contract deployment:
             Engine::deploy_code(&mut engine, sender, value, &data)

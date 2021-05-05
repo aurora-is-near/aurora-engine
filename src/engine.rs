@@ -338,7 +338,7 @@ impl Engine {
         sender: &Address,
         receiver: &Address,
         value: &U256,
-    ) -> EngineResult<()> {
+    ) -> EngineResult<SubmitResult> {
         let balance = Self::get_balance(sender);
         if balance < *value {
             return Err(ExitError::OutOfFund.into());
@@ -349,7 +349,12 @@ impl Engine {
         Self::set_balance(sender, &new_sender_balance);
         Self::set_balance(receiver, &new_receiver_balance);
 
-        Ok(())
+        Ok(SubmitResult {
+            status: true,
+            gas_used: 0, // TODO
+            result: Vec::new(),
+            logs: Vec::new(),
+        })
     }
 
     pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<DeployResult> {
