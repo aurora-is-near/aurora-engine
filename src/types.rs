@@ -1,4 +1,5 @@
 use crate::prelude::{Address, String, Vec, H256, U256};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
@@ -11,6 +12,9 @@ pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32]; // Little-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 pub type Gas = u64;
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct U128(pub u128);
 
 pub const STORAGE_PRICE_PER_BYTE: u128 = 100_000_000_000_000_000_000; // 1e20yN, 0.0001N
 
