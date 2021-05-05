@@ -7,7 +7,6 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
-mod map;
 pub mod meta_parsing;
 pub mod parameters;
 pub mod prelude;
@@ -21,6 +20,8 @@ mod engine;
 mod json;
 #[cfg(feature = "contract")]
 mod log_entry;
+#[cfg(feature = "contract")]
+mod map;
 mod precompiles;
 #[cfg(feature = "contract")]
 mod sdk;

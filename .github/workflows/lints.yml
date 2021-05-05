@@ -34,6 +34,7 @@ jobs:
           toolchain: nightly-2021-03-25
           override: true
           components: clippy
+      - run: make etc/eth-contracts/res/EvmErc20.bin
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:

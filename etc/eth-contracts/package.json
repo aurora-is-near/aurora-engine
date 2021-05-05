@@ -23,8 +23,8 @@
     "solium": "^1.2.5"
   },
   "scripts": {
-    "build": "hardhat compile",
-    "compile": "yarn build && node main.js ./artifacts/contracts/EvmErc20.sol/EvmErc20.json",
+    "compile": "hardhat compile",
+    "build": "yarn compile && node main.js ./artifacts/contracts/EvmErc20.sol/EvmErc20.json",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
     "lint:js": "eslint .",

@@ -1,7 +1,9 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::prelude::{String, Vec};
-use crate::types::{AccountId, RawAddress, RawH256, RawU256, U128};
+#[cfg(feature = "contract")]
+use crate::types::U128;
+use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.    
