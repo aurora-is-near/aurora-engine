@@ -273,14 +273,14 @@ impl EthConnectorContract {
             // Save new contract data
             self.save_contract();
 
-            let prommise0 = sdk::promise_create(
+            let promise0 = sdk::promise_create(
                 &sdk::current_account_id(),
                 b"ft_transfer_call",
                 &msg[..],
                 1,
                 GAS_FOR_TRANSFER_CALL,
             );
-            sdk::promise_return(prommise0);
+            sdk::promise_return(promise0);
         } else {
             self.mint_near(data.new_owner_id.clone(), data.amount - data.fee);
             self.mint_near(data.relayer_id, data.fee);
