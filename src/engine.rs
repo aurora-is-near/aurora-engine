@@ -312,10 +312,15 @@ impl Engine {
     #[cfg(feature = "testnet")]
     /// Credits the address with 10 coins from the faucet.
     pub fn credit(&mut self, address: &Address) -> EngineResult<()> {
+        use crate::prelude::Add;
+
         let balance = Self::get_balance(address);
-        let new_balance = balance
-            .checked_add(*amount)
-            .ok_or(EngineError::BalanceTooHigh)?;
+        // Adds are intentional
+        let new_balance = balance.add(U256::one());
+
+        let account_nonce = Self::get_nonce(address);
+        account_nonce.add(U256::one());
+
         Self::set_balance(address, &new_balance);
         Ok(())
     }

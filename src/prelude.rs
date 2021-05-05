@@ -10,8 +10,12 @@ pub use alloc::{
     vec,
     vec::Vec,
 };
+#[cfg(all(feature = "testnet", not(feature = "std")))]
+pub use core::ops::Add;
 #[cfg(not(feature = "std"))]
 pub use core::{convert::TryInto, marker::PhantomData, mem};
+#[cfg(all(feature = "testnet", feature = "std"))]
+pub use std::ops::Add;
 #[cfg(feature = "std")]
 pub use std::{
     borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, collections::HashMap, convert::TryInto,
