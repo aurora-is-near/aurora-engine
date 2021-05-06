@@ -245,7 +245,7 @@ impl Engine {
     pub fn remove_balance(address: &Address) {
         let balance = Self::get_balance(address);
         // Apply changes for eth-conenctor
-        EthConnectorContract::new().internal_remove_eth(address, &balance);
+        EthConnectorContract::get_instance().internal_remove_eth(address, &balance);
         sdk::remove_storage(&address_to_key(KeyPrefix::Balance, address))
     }
 
@@ -574,7 +574,8 @@ impl ApplyBackend for Engine {
                     // TODO: should be aligned to eth-connector balance management logic
                     //Engine::set_balance(&address, &basic.balance);
                     // Apply changes for eth-conenctor
-                    EthConnectorContract::new().internal_deposit_eth(&address, &basic.balance);
+                    EthConnectorContract::get_instance()
+                        .internal_deposit_eth(&address, &basic.balance);
                     if let Some(code) = code {
                         Engine::set_code(&address, &code)
                     }

@@ -361,82 +361,82 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn withdraw() {
-        EthConnectorContract::new().withdraw_near()
+        EthConnectorContract::get_instance().withdraw_near()
     }
 
     #[no_mangle]
     pub extern "C" fn deposit() {
-        EthConnectorContract::new().deposit()
+        EthConnectorContract::get_instance().deposit()
     }
 
     #[no_mangle]
     pub extern "C" fn finish_deposit_near() {
-        EthConnectorContract::new().finish_deposit_near();
+        EthConnectorContract::get_instance().finish_deposit_near();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_supply() {
-        EthConnectorContract::new().ft_total_supply();
+        EthConnectorContract::get_instance().ft_total_supply();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_supply_near() {
-        EthConnectorContract::new().ft_total_supply_near();
+        EthConnectorContract::get_instance().ft_total_supply_near();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_supply_eth() {
-        EthConnectorContract::new().ft_total_supply_eth();
+        EthConnectorContract::get_instance().ft_total_supply_eth();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of() {
-        EthConnectorContract::new().ft_balance_of();
+        EthConnectorContract::get_instance().ft_balance_of();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
-        EthConnectorContract::new().ft_balance_of_eth();
+        EthConnectorContract::get_instance().ft_balance_of_eth();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_transfer() {
-        EthConnectorContract::new().ft_transfer();
+        EthConnectorContract::get_instance().ft_transfer();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_resolve_transfer() {
-        EthConnectorContract::new().ft_resolve_transfer();
+        EthConnectorContract::get_instance().ft_resolve_transfer();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
-        EthConnectorContract::new().ft_transfer_call();
+        EthConnectorContract::get_instance().ft_transfer_call();
     }
 
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
-        EthConnectorContract::new().storage_deposit()
+        EthConnectorContract::get_instance().storage_deposit()
     }
 
     #[no_mangle]
     pub extern "C" fn storage_withdraw() {
-        EthConnectorContract::new().storage_withdraw()
+        EthConnectorContract::get_instance().storage_withdraw()
     }
 
     #[no_mangle]
     pub extern "C" fn storage_balance_of() {
-        EthConnectorContract::new().storage_balance_of()
+        EthConnectorContract::get_instance().storage_balance_of()
     }
 
     #[no_mangle]
     pub extern "C" fn register_relayer() {
-        EthConnectorContract::new().register_relayer()
+        EthConnectorContract::get_instance().register_relayer()
     }
 
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
-        EthConnectorContract::new().ft_on_transfer()
+        EthConnectorContract::get_instance().ft_on_transfer()
     }
 
     #[cfg(feature = "integration-test")]

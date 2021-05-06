@@ -46,7 +46,7 @@ pub struct OnTransferMessageData {
 }
 
 impl EthConnectorContract {
-    pub fn new() -> Self {
+    pub fn get_instance() -> Self {
         Self {
             contract: sdk::get_contract_data(CONTRACT_NAME_KEY),
             ft: sdk::get_contract_data(CONTRACT_FT_KEY),
