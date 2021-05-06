@@ -7,9 +7,10 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+#[cfg(feature = "contract")]
+mod map;
 pub mod meta_parsing;
 pub mod parameters;
-mod precompiles;
 pub mod prelude;
 pub mod storage;
 pub mod transaction;
@@ -21,6 +22,7 @@ mod engine;
 mod json;
 #[cfg(feature = "contract")]
 mod log_entry;
+mod precompiles;
 #[cfg(feature = "contract")]
 mod sdk;
 
@@ -39,7 +41,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{Address, H256, U256};
+    use crate::prelude::{Address, String, TryInto, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
@@ -98,7 +100,7 @@ mod contract {
 
     /// Get bridge prover id for this contract.
     #[no_mangle]
-    pub extern "C" fn get_bridge_provider() {
+    pub extern "C" fn get_bridge_prover() {
         let state = Engine::get_state();
         sdk::return_output(state.bridge_prover_id.as_bytes());
     }
@@ -257,6 +259,29 @@ mod contract {
         let mut engine = Engine::new(address);
         let result = engine.credit(&address);
         result.map(|_f| Vec::new()).sdk_process();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn register_relayer() {
+        let relayer_address = sdk::read_input();
+        let mut engine = Engine::new(predecessor_address());
+        engine.register_relayer(
+            sdk::predecessor_account_id().as_slice(),
+            Address(relayer_address.as_slice().try_into().unwrap()),
+        );
+    }
+
+    /// Allow receiving NEP141 tokens to the EVM contract
+    #[no_mangle]
+    pub extern "C" fn ft_on_transfer() {
+        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
+
+        if current_account_id == predecessor_account_id {
+            // TODO(#59) ETH transfer
+        } else {
+            // TODO(#51) ERC20 transfer
+        }
     }
 
     ///
