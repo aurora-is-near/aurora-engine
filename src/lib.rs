@@ -39,9 +39,7 @@ mod contract {
     use crate::engine::{Engine, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::parameters::{
-        DeployEvmTokenCallArgs, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs,
-    };
+    use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
     use crate::prelude::{Address, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
@@ -434,21 +432,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn register_relayer() {
         EthConnectorContract::new().register_relayer()
-    }
-
-    /// Deploy ERC20 contract and save to storage ERC20 account to NEAR account alias
-    #[no_mangle]
-    pub extern "C" fn deploy_evm_token() {
-        let args =
-            DeployEvmTokenCallArgs::try_from_slice(&sdk::read_input()).expect("ERR_ARG_PARSE");
-        let mut engine = Engine::new(predecessor_address());
-        let result = Engine::deploy_code_with_input(&mut engine, &args.erc20_contract);
-        if let Ok(dr) = &result {
-            EthConnectorContract::new().save_evm_token_address(&args.near_account_id, dr.result);
-        }
-        result
-            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-            .sdk_process();
     }
 
     #[no_mangle]

@@ -238,14 +238,6 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
-/// Deploy EVM token args
-#[cfg(feature = "contract")]
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct DeployEvmTokenCallArgs {
-    pub near_account_id: AccountId,
-    pub erc20_contract: Vec<u8>,
-}
-
 /// storage_balance_of eth-connector call args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]

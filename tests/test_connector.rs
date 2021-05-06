@@ -378,20 +378,6 @@ fn test_ft_transfer_call_erc20() {
 
     let res = contract.call(
         CONTRACT_ACC.to_string(),
-        "deploy_evm_token",
-        &DeployEvmTokenCallArgs {
-            near_account_id: EXTERNAL_CONTRACT_ACC.into(),
-            erc20_contract: vec![],
-        }
-        .try_to_vec()
-        .unwrap(),
-        DEFAULT_GAS,
-        0,
-    );
-    res.assert_success();
-
-    let res = contract.call(
-        CONTRACT_ACC.to_string(),
         "register_relayer",
         &RegisterRelayerCallArgs {
             address: validate_eth_address(CUSTODIAN_ADDRESS),

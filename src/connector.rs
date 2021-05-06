@@ -11,7 +11,6 @@ use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const CONTRACT_NAME_KEY: &str = "EthConnector";
-pub const EVM_TOKEN_NAME_KEY: &str = "evt";
 pub const EVM_RELAYER_NAME_KEY: &str = "rel";
 pub const CONTRACT_FT_KEY: &str = "EthConnector.ft";
 pub const NO_DEPOSIT: Balance = 0;
@@ -202,7 +201,7 @@ impl EthConnectorContract {
                     GAS_FOR_FINISH_DEPOSIT,
                 )
             }
-            // Deposit to Eth/ERC20 accounts
+            // Deposit to Eth accounts
             // fee mint in the `ft_on_transfer` callback method
             TokenMessageData::Eth { address, message } => {
                 // Transfer to self and then transfer ETH in `ft_on_transfer`
@@ -510,24 +509,10 @@ impl EthConnectorContract {
         sdk::write_storage(self.evm_relayer_key(&account_id).as_bytes(), &args.address)
     }
 
-    /// Save to storage erc20 address as NEAR account alias
-    pub fn save_evm_token_address(&self, account_id: &str, address: EthAddress) {
-        sdk::write_storage(self.evm_token_key(account_id).as_bytes(), &address)
-    }
-
-    /// Get EVM ERC20 token address
-    pub fn get_evm_token_address(&self, account_id: &str) -> EthAddress {
-        let acc = sdk::read_storage(self.evm_token_key(account_id).as_bytes())
-            .expect("ERR_WRONG_EVM_TOKEN_KEY");
-        let mut addr: EthAddress = Default::default();
-        addr.copy_from_slice(&acc);
-        addr
-    }
-
     /// Get EVM Relayer address
     pub fn get_evm_relayer_address(&self, account_id: &str) -> EthAddress {
         let acc = sdk::read_storage(self.evm_relayer_key(account_id).as_bytes())
-            .expect("ERR_WRONG_EVM_TOKEN_KEY");
+            .expect("ERR_WRONG_EVM_RELAYER_KEY");
         let mut addr: EthAddress = Default::default();
         addr.copy_from_slice(&acc);
         addr
@@ -554,57 +539,14 @@ impl EthConnectorContract {
                 self.mint_eth(evm_relayer_addres, fee);
             }
         } else {
-            use crate::engine::Engine;
-
-            // ERC20 address
-            let evm_token_addres = self.get_evm_token_address(&predecessor_account_id);
-            let recipient_address = message_data.recipient;
-
-            #[cfg(feature = "log")]
-            sdk::log(&format!(
-                "Call ERC20 contract: {}",
-                hex::encode(evm_token_addres),
-            ));
-
-            // Call Eth ERC20 contract to mint ERC20 EVM tokens
-            // TODO: modify inputs related to Eth contract
-            let args = FunctionCallArgs {
-                contract: evm_token_addres,
-                input: vec![],
-            };
-            let mut engine =
-                Engine::new(near_account_to_evm_address(&sdk::predecessor_account_id()));
-            // TODO: implement sdk_expect
-            let _ = Engine::call_with_args(&mut engine, args);
-            //     .map(|res| res.try_to_vec()
-            //     .sdk_expect("ERR_SERIALIZE"))
-            //     .sdk_process();
-
-            // Transfer fee to Relayer
-            let fee = message_data.fee.as_u128();
-            if fee > 0 {
-                let evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
-                self.ft.internal_withdraw_eth(recipient_address, fee);
-                self.ft.internal_deposit_eth(evm_relayer_addres, fee);
-
-                #[cfg(feature = "log")]
-                sdk::log(&format!(
-                    "Send fee {:?} to Relayer: {}",
-                    fee,
-                    hex::encode(evm_relayer_addres),
-                ));
-            }
+            // Implement new scheme when PR #62 is merged
+            todo!();
         }
         self.save_contract();
 
         // Return unused tokens
         let data = 0u128.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
-    }
-
-    /// EVM ERC20 token key
-    fn evm_token_key(&self, account_id: &str) -> String {
-        [EVM_TOKEN_NAME_KEY, account_id].join(":")
     }
 
     /// EVM relayer address key
