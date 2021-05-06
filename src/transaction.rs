@@ -106,11 +106,7 @@ impl Decodable for EthSignedTransaction {
         let to = {
             let value = rlp.at(3)?;
             if value.is_empty() {
-                if value.is_data() {
-                    None
-                } else {
-                    return Err(rlp::DecoderError::RlpExpectedToBeData);
-                }
+                return Err(rlp::DecoderError::RlpExpectedToBeData);
             } else {
                 Some(value.as_val()?)
             }
@@ -184,6 +180,12 @@ mod tests {
             tx.sender().unwrap(),
             address_from_arr(&hex::decode("2c7536e3605d9c16a7a3d7b1898e529396a65c23").unwrap())
         );
+    }
+
+    #[test]
+    fn test_none_decode_eth_signed_transaction() {
+        let encoded_tx = hex::decode("f8c58001831e84808080b874600060005560648060106000396000f360e060020a6000350480638ada066e146028578063d09de08a1460365780632baeceb714604d57005b5060005460005260206000f3005b5060016000540160005560005460005260206000f3005b5060016000540360005560005460005260206000f300849c8a82cba07bea58c20d614248f6f1607704ee209eee14190f6187d6c7dc935b6599199cd5a02fe682dec51911f02d6a2812f301419d3f181acd3ef5b3609ac28b1dc42b0531").unwrap();
+        assert!(matches!(EthSignedTransaction::decode(&Rlp::new(&encoded_tx)), Err(rlp::DecoderError::RlpExpectedToBeData)));
     }
 
     fn address_from_arr(arr: &[u8]) -> Address {
