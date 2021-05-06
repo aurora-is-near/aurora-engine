@@ -10,6 +10,8 @@ pub enum KeyPrefix {
     Code = 0x3,
     Storage = 0x4,
     RelayerEvmAddressMap = 0x5,
+    Nep141Erc20Map = 0x6,
+    Erc20Nep141Map = 0x7,
 }
 
 /// We can't use const generic over Enum, but we can do it over integral type
@@ -25,6 +27,8 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x3 => Self::Code,
             0x4 => Self::Storage,
             0x5 => Self::RelayerEvmAddressMap,
+            0x6 => Self::Nep141Erc20Map,
+            0x7 => Self::Erc20Nep141Map,
             _ => unreachable!(),
         }
     }

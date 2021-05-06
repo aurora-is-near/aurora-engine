@@ -2,13 +2,12 @@ use borsh::BorshSerialize;
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::engine::ERC20_NEP141_PREFIX;
-use crate::map::append_slice;
 use crate::parameters::{
     BridgedTokenWithdrawArgs, BridgedTokenWithdrawEthConnectorArgs, NEP141TransferCallArgs,
 };
 use crate::prelude::{String, Vec, U256};
 use crate::sdk;
+use crate::storage::{bytes_to_key, KeyPrefix};
 use crate::types::{AccountId, U128};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
@@ -31,9 +30,9 @@ mod costs {
 
 /// Get the current nep141 token associated with the current erc20 token.
 /// This will fail is none is associated.
-fn get_nep141_from_erc20(erc20_token: &[u8]) -> String {
-    String::from_utf8(
-        sdk::read_storage(append_slice(ERC20_NEP141_PREFIX, erc20_token).as_slice())
+fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
+    AccountId::from_utf8(
+        sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
             .expect(ERR_TARGET_TOKEN_NOT_FOUND),
     )
     .unwrap()

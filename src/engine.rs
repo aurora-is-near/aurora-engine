@@ -4,13 +4,14 @@ use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
+use crate::contract::{SdkExpect, SdkProcess};
 use crate::map::LookupMap;
 use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
 use crate::precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
-use crate::types::{u256_to_arr, AccountId};
+use crate::types::{u256_to_arr, AccountId, U128};
 
 macro_rules! as_ref_err_impl {
     ($err: ty) => {
@@ -125,10 +126,6 @@ impl ExitIntoResult for ExitReason {
     }
 }
 
-pub(crate) const NEP141_ERC20_PREFIX: &[u8] = b"a";
-pub(crate) const ERC20_NEP141_PREFIX: &[u8] = b"b";
-pub(crate) const RELAYERS_ACCOUNT_PREFIX: &[u8] = b"r";
-
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
@@ -146,9 +143,9 @@ pub struct EngineState {
     /// Mapping between relayer account id and relayer evm address
     pub relayers_evm_addresses: LookupMap<{ KeyPrefix::RelayerEvmAddressMap as KeyPrefixU8 }>,
     /// Mapping between erc20 tokens in the EVM to nep141 in NEAR
-    pub nep141_erc20: LookupMap,
+    pub nep141_erc20: LookupMap<{ KeyPrefix::Nep141Erc20Map as KeyPrefixU8 }>,
     /// Mapping between nep141 in NEAR to erc20 tokens in the EVM
-    pub erc20_nep141: LookupMap,
+    pub erc20_nep141: LookupMap<{ KeyPrefix::Erc20Nep141Map as KeyPrefixU8 }>,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -159,8 +156,8 @@ impl From<NewCallArgs> for EngineState {
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
             relayers_evm_addresses: LookupMap::new(),
-            nep141_erc20: LookupMap::new(NEP141_ERC20_PREFIX.to_vec()),
-            erc20_nep141: LookupMap::new(ERC20_NEP141_PREFIX.to_vec()),
+            nep141_erc20: LookupMap::new(),
+            erc20_nep141: LookupMap::new(),
         }
     }
 }
@@ -482,6 +479,9 @@ impl Engine {
     }
 
     pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
+        // Check that this nep141 token was not registered before, they can only be registered once.
+        assert!(self.state.nep141_erc20.get_raw(nep141_token).is_none());
+
         self.state
             .erc20_nep141
             .insert_raw(erc20_token, nep141_token);
@@ -495,17 +495,73 @@ impl Engine {
         self.state.nep141_erc20.get_raw(nep141_token)
     }
 
-    pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
-        self.state
-            .relayers_account
-            .insert_raw(account_id, evm_address.as_bytes());
-    }
+    pub fn receive_erc20_tokens(&mut self) {
+        let _input = sdk::read_input();
 
-    pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
-        self.state
-            .relayers_account
-            .get_raw(account_id)
-            .map(|result| Address(result.as_slice().try_into().unwrap()))
+        // TODO(#51): Parse input
+        let _sender_id = AccountId::default();
+        let _amount = U128(0);
+        let msg = crate::prelude::String::default();
+
+        // TODO: Handle case when the NEP141 is the EVM.
+        //  In this case it means that this is an ETH transfer.
+
+        let token = sdk::predecessor_account_id();
+
+        // Parse message to determine recipient and fee
+        let (recipient, fee) = {
+            // Message format:
+            //      Recipient of the transaction - 40 characters (Address in hex)
+            //      Fee to be paid in ETH (Optional) - 64 bytes (Encoded in little endian / hex)
+            let mut message = msg.as_bytes();
+            assert!(message.len() >= 40);
+
+            let recipient = Address(
+                hex::decode(&message[..40])
+                    .unwrap()
+                    .as_slice()
+                    .try_into()
+                    .unwrap(),
+            );
+            message = &message[40..];
+
+            let fee = if message.is_empty() {
+                U256::from(0)
+            } else {
+                assert_eq!(message.len(), 64);
+                U256::from_little_endian(hex::decode(message).unwrap().as_slice())
+            };
+
+            (recipient, fee)
+        };
+
+        let erc20_token = Address(
+            self.get_erc20_from_nep141(token.as_slice())
+                .expect("Token not found on the EVM")
+                .as_slice()
+                .try_into()
+                .unwrap(),
+        );
+
+        // TODO(#51): Use proper input value
+        self.call(
+            Address(Default::default()),
+            erc20_token,
+            U256::from(0),
+            Default::default(),
+        )
+        .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+        .sdk_process();
+
+        if fee != U256::from(0) {
+            let relayer_account_id = sdk::signer_account_id();
+            let relayer_address = self
+                .get_relayer(relayer_account_id.as_slice())
+                .expect("Relayer not found");
+            self.transfer(&recipient, &relayer_address, &fee)
+                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+                .sdk_process();
+        }
     }
 }
 

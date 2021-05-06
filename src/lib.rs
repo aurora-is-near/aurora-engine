@@ -41,9 +41,9 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{Address, TryInto, Vec, H160, H256, U256};
+    use crate::prelude::{Address, TryInto, H160, H256, U256};
     use crate::sdk;
-    use crate::types::{near_account_to_evm_address, u256_to_arr, AccountId, U128};
+    use crate::types::{near_account_to_evm_address, u256_to_arr};
 
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -281,8 +281,8 @@ mod contract {
             // TODO(#59) ETH transfer
             todo!();
         } else {
-            // TODO(#51) ERC20 transfer
-            todo!();
+            let mut engine = Engine::new(predecessor_address());
+            engine.receive_erc20_tokens();
         }
     }
 
@@ -305,91 +305,6 @@ mod contract {
             .sdk_process();
 
         // TODO: charge for storage
-    }
-
-    #[no_mangle]
-    pub extern "C" fn register_relayer() {
-        let relayer_address = sdk::read_input();
-        let mut engine = Engine::new(predecessor_address());
-        engine.register_relayer(
-            sdk::predecessor_account_id().as_slice(),
-            Address(relayer_address.as_slice().try_into().unwrap()),
-        );
-    }
-
-    /// Allow receiving NEP141 tokens to the EVM contract
-    #[no_mangle]
-    pub extern "C" fn ft_on_transfer() {
-        let _input = sdk::read_input();
-
-        // TODO(#51): Parse input
-        let _sender_id = AccountId::default();
-        let _amount = U128(0);
-        let msg = crate::prelude::String::default();
-
-        // TODO: Handle case when the NEP141 is the EVM.
-        //  In this case it means that this is an ETH transfer.
-
-        let token = sdk::predecessor_account_id();
-        let mut engine = Engine::new(near_account_to_evm_address(&token));
-
-        // Parse message to determine recipient and fee
-        let (recipient, fee) = {
-            // Message format:
-            //      Recipient of the transaction - 40 characters (Address in hex)
-            //      Fee to be paid in ETH (Optional) - 64 bytes (Encoded in little endian / hex)
-            let mut message = msg.as_bytes();
-            assert!(message.len() >= 40);
-
-            let recipient = Address(
-                hex::decode(&message[..40])
-                    .unwrap()
-                    .as_slice()
-                    .try_into()
-                    .unwrap(),
-            );
-            message = &message[40..];
-
-            let fee = if message.is_empty() {
-                U256::from(0)
-            } else {
-                assert_eq!(message.len(), 64);
-                U256::from_little_endian(hex::decode(message).unwrap().as_slice())
-            };
-
-            (recipient, fee)
-        };
-
-        let erc20_token = Address(
-            engine
-                .get_erc20_from_nep141(token.as_slice())
-                .expect("Token not found on the EVM")
-                .as_slice()
-                .try_into()
-                .unwrap(),
-        );
-
-        // TODO(#51): Use proper input value
-        engine
-            .call(
-                Address(Default::default()),
-                erc20_token,
-                U256::from(0),
-                Default::default(),
-            )
-            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-            .sdk_process();
-
-        if fee != U256::from(0) {
-            let relayer_account_id = sdk::signer_account_id();
-            let relayer_address = engine
-                .get_relayer(relayer_account_id.as_slice())
-                .expect("Relayer not found");
-            engine
-                .transfer(&recipient, &relayer_address, &fee)
-                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-                .sdk_process();
-        }
     }
 
     ///
@@ -482,7 +397,7 @@ mod contract {
         near_account_to_evm_address(&sdk::predecessor_account_id())
     }
 
-    trait SdkExpect<T> {
+    pub(crate) trait SdkExpect<T> {
         fn sdk_expect(self, msg: &str) -> T;
     }
 
@@ -504,7 +419,7 @@ mod contract {
         }
     }
 
-    trait SdkUnwrap<T> {
+    pub(crate) trait SdkUnwrap<T> {
         fn sdk_unwrap(self) -> T;
     }
 
@@ -526,7 +441,7 @@ mod contract {
         }
     }
 
-    trait SdkProcess<T> {
+    pub(crate) trait SdkProcess<T> {
         fn sdk_process(self);
     }
 
