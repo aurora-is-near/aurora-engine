@@ -1,18 +1,18 @@
-use aurora_engine::parameters::SubmitResult;
-use aurora_engine::prelude::{Address, U256};
-use aurora_engine::transaction::EthTransaction;
+use crate::parameters::SubmitResult;
+use crate::prelude::{Address, U256};
+use crate::transaction::EthTransaction;
 use borsh::BorshDeserialize;
-use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
+use criterion::{BatchSize, BenchmarkId, Criterion};
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
-use super::{address_from_secret_key, deploy_evm, sign_transaction, SUBMIT};
-use crate::solidity;
+use crate::test_utils::solidity;
+use crate::test_utils::{address_from_secret_key, deploy_evm, sign_transaction, SUBMIT};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
 
-fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
+pub fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
     let mut runner = deploy_evm();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
@@ -63,7 +63,7 @@ fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
         assert!(maybe_err.is_none());
         let output = output.unwrap();
         let gas = output.burnt_gas;
-        let eth_gas = super::parse_eth_gas(&output);
+        let eth_gas = crate::test_utils::parse_eth_gas(&output);
         // TODO(#45): capture this in a file
         println!("ETH_STANDARD_PRECOMPILES_{} NEAR GAS: {:?}", name, gas);
         println!("ETH_STANDARD_PRECOMPILES_{} ETH GAS: {:?}", name, eth_gas);
@@ -109,7 +109,7 @@ impl ContractConstructor {
             Ok(hex) => hex,
             Err(_) => {
                 // An error occurred opening the file, maybe the contract hasn't been compiled?
-                let sources_root = Path::new("benches").join("res");
+                let sources_root = Path::new("src").join("benches").join("res");
                 solidity::compile(
                     sources_root,
                     "StandardPrecompiles.sol",
@@ -183,5 +183,3 @@ impl Contract {
         ]
     }
 }
-
-criterion_group!(benches, eth_standard_precompiles_benchmark);

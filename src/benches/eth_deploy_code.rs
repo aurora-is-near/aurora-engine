@@ -1,13 +1,13 @@
-use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
 use secp256k1::SecretKey;
 
-use super::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};
+use crate::test_utils::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: u64 = 0;
 
-fn eth_deploy_code_benchmark(c: &mut Criterion) {
+pub fn eth_deploy_code_benchmark(c: &mut Criterion) {
     let mut runner = deploy_evm();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
@@ -44,7 +44,7 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
         assert!(maybe_err.is_none());
         let output = output.unwrap();
         let gas = output.burnt_gas;
-        let eth_gas = super::parse_eth_gas(&output);
+        let eth_gas = crate::test_utils::parse_eth_gas(&output);
         // TODO(#45): capture this in a file
         println!("ETH_DEPLOY_CODE_{:?} NEAR GAS: {:?}", input_size, gas);
         println!("ETH_DEPLOY_CODE_{:?} ETH GAS: {:?}", input_size, eth_gas);
@@ -66,5 +66,3 @@ fn eth_deploy_code_benchmark(c: &mut Criterion) {
     }
     group.finish();
 }
-
-criterion_group!(benches, eth_deploy_code_benchmark);
