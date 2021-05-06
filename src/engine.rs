@@ -4,11 +4,12 @@ use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
+use crate::map::LookupMap;
 use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
 use crate::precompiles;
-use crate::prelude::{Address, Vec, H256, U256};
+use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
-use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
+use crate::storage::{address_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId};
 
 macro_rules! as_ref_err_impl {
@@ -138,6 +139,8 @@ pub struct EngineState {
     pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
+    /// Mapping between relayer account id and relayer evm address
+    pub relayers_evm_addresses: LookupMap<{ KeyPrefix::RelayerEvmAddressMap as KeyPrefixU8 }>,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -147,6 +150,7 @@ impl From<NewCallArgs> for EngineState {
             owner_id: args.owner_id,
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
+            relayers_evm_addresses: LookupMap::new(),
         }
     }
 }
@@ -451,6 +455,20 @@ impl Engine {
         let metadata = StackSubstateMetadata::new(u64::MAX, &CONFIG);
         let state = MemoryStackState::new(metadata, self);
         StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
+    }
+
+    pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
+        self.state
+            .relayers_evm_addresses
+            .insert_raw(account_id, evm_address.as_bytes());
+    }
+
+    #[allow(dead_code)]
+    pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
+        self.state
+            .relayers_evm_addresses
+            .get_raw(account_id)
+            .map(|result| Address(result.as_slice().try_into().unwrap()))
     }
 }
 

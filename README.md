@@ -94,7 +94,7 @@ aurora initialize --chain 1313161556 --owner test.near
 ```sh
 aurora get-version
 aurora get-owner
-aurora get-bridge-provider
+aurora get-bridge-prover
 aurora get-chain-id
 ```
 
@@ -151,7 +151,7 @@ aurora dump-storage
 
 #### `get_owner`
 
-#### `get_bridge_provider`
+#### `get_bridge_prover`
 
 #### `get_chain_id`
 
