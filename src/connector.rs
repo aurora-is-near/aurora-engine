@@ -157,7 +157,7 @@ impl EthConnectorContract {
         );
         assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
 
-        // Verify proof data with cross-cotract call at prover account
+        // Verify proof data with cross-contract call to prover account
         #[cfg(feature = "log")]
         sdk::log(&format!(
             "Deposit verify_log_entry for prover: {}",
@@ -202,7 +202,7 @@ impl EthConnectorContract {
                 )
             }
             // Deposit to Eth accounts
-            // fee mint in the `ft_on_transfer` callback method
+            // fee is being minted in the `ft_on_transfer` callback method
             TokenMessageData::Eth { address, message } => {
                 // Transfer to self and then transfer ETH in `ft_on_transfer`
                 // address - is NEAR account
@@ -432,7 +432,7 @@ impl EthConnectorContract {
     /// FT resolve transfer logic
     pub fn ft_resolve_transfer(&mut self) {
         sdk::assert_private_call();
-        // Check is previous promiss success
+        // Check if previous promise succeded
         assert!(sdk::promise_results_count() > 0);
         match sdk::promise_result(0) {
             PromiseResult::Successful(_) => {}
@@ -448,7 +448,7 @@ impl EthConnectorContract {
             "Resolve transfer from {} to {} success",
             args.sender_id, args.receiver_id
         ));
-        // `ft_resolve_transfer` can changed `total_supply` so we should save contract
+        // `ft_resolve_transfer` can change `total_supply` so we should save the contract
         self.save_contract();
         sdk::return_output(&amount.to_string().as_bytes());
     }
@@ -518,7 +518,7 @@ impl EthConnectorContract {
         addr
     }
 
-    /// ft_on_transfer call back function
+    /// ft_on_transfer callback function
     pub fn ft_on_transfer(&mut self) {
         #[cfg(feature = "log")]
         sdk::log("Call ft_on_trasfer");
@@ -528,7 +528,7 @@ impl EthConnectorContract {
         // Parse message with specific rules
         let message_data = self.parse_on_transfer_message(&args.msg);
 
-        // Special case when current_account_id is predecessor
+        // Special case when predecessor_account_id is current_account_id
         if current_account_id == predecessor_account_id {
             let fee = message_data.fee.as_u128();
             self.burn_near(current_account_id, args.amount);
