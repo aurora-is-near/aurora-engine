@@ -197,8 +197,8 @@ mod contract {
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
-        if let Some(receiver) = signed_transaction.transaction.to {
-            let result = if data.is_empty() {
+        let result = if let Some(receiver) = signed_transaction.transaction.to {
+            if data.is_empty() {
                 // Execute a balance transfer. We need to save the incremented nonce in this case
                 // because it is not handled internally by SputnikVM like it is in the case of
                 // `call` and `deploy_code`.
@@ -208,17 +208,15 @@ mod contract {
                 // Execute a contract call:
                 Engine::call(&mut engine, sender, receiver, value, data)
                 // TODO: charge for storage
-            };
-            result
-                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-                .sdk_process();
+            }
         } else {
             // Execute a contract deployment:
             Engine::deploy_code(&mut engine, sender, value, &data)
-                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-                .sdk_process();
             // TODO: charge for storage
-        }
+        };
+        result
+            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .sdk_process();
     }
 
     #[no_mangle]
