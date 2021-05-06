@@ -7,8 +7,6 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
-#[cfg(feature = "contract")]
-mod map;
 pub mod meta_parsing;
 pub mod parameters;
 pub mod prelude;
@@ -22,6 +20,8 @@ mod engine;
 mod json;
 #[cfg(feature = "contract")]
 mod log_entry;
+#[cfg(feature = "contract")]
+mod map;
 mod precompiles;
 #[cfg(feature = "contract")]
 mod sdk;
@@ -294,8 +294,7 @@ mod contract {
 
         let mut engine = Engine::new(predecessor_address());
 
-        // TODO(#51): Use proper erc20_contract
-        let erc20_contract = Default::default();
+        let erc20_contract = include_bytes!("../etc/eth-contracts/res/EvmErc20.bin");
 
         Engine::deploy_code_with_input(&mut engine, erc20_contract)
             .map(|res| {

@@ -34,8 +34,18 @@ jobs:
           toolchain: nightly-2021-03-25
           override: true
           components: clippy
+      - run: make etc/eth-contracts/res/EvmErc20.bin
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: --no-default-features --features=contract -- -D warnings
+  contracts:
+    name: eth-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Run yarn lint
+        working-directory: etc/eth-contracts
+        run: yarn && yarn lint
