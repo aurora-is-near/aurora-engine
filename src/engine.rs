@@ -9,7 +9,7 @@ use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArg
 use crate::precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
-use crate::storage::{address_to_key, storage_to_key, KeyPrefix};
+use crate::storage::{address_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId};
 
 macro_rules! as_ref_err_impl {
@@ -140,7 +140,7 @@ pub struct EngineState {
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
     /// Mapping between relayer account id and relayer evm address
-    pub relayers_evm_addresses: LookupMap<{ KeyPrefix::RelayerEvmAddressMap as u8 }>,
+    pub relayers_evm_addresses: LookupMap<{ KeyPrefix::RelayerEvmAddressMap as KeyPrefixU8 }>,
 }
 
 impl From<NewCallArgs> for EngineState {

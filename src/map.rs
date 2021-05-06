@@ -2,16 +2,15 @@ use crate::prelude::Vec;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::sdk;
-use crate::storage::bytes_to_key;
-
-type KeyPrefixU8 = u8;
+use crate::storage::{bytes_to_key, KeyPrefixU8};
 
 /// An non-iterable implementation of a map that stores its content directly on the trie.
+/// Use `key_prefix` as a unique prefix for keys.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
 pub struct LookupMap<const K: KeyPrefixU8> {}
 
 impl<const K: KeyPrefixU8> LookupMap<K> {
-    /// Create a new map. Use `key_prefix` as a unique prefix for keys.
+    /// Create a new map.
     pub fn new() -> Self {
         Self {}
     }

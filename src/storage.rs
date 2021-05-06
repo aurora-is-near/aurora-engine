@@ -12,9 +12,12 @@ pub enum KeyPrefix {
     RelayerEvmAddressMap = 0x5,
 }
 
+/// We can't use const generic over Enum, but we can do it over integral type
+pub type KeyPrefixU8 = u8;
+
 // TODO: Derive From<u8> using macro to avoid missing new arguments in the future
-impl From<u8> for KeyPrefix {
-    fn from(value: u8) -> Self {
+impl From<KeyPrefixU8> for KeyPrefix {
+    fn from(value: KeyPrefixU8) -> Self {
         match value {
             0x0 => Self::Config,
             0x1 => Self::Nonce,
