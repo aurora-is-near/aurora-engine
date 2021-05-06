@@ -15,6 +15,7 @@ use secp256k1::{self, Message, PublicKey, SecretKey};
 use crate::parameters::{NewCallArgs, SubmitResult};
 use crate::prelude::Address;
 use crate::storage;
+use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 use crate::transaction::{EthSignedTransaction, EthTransaction};
 use crate::types;
 
@@ -122,6 +123,28 @@ impl AuroraRunner {
 
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
+    }
+
+    pub fn deploy_contract<F: FnOnce(&T) -> EthTransaction, T: Into<ContractConstructor>>(
+        &mut self,
+        account: &SecretKey,
+        constructor_tx: F,
+        contract_constructor: T,
+    ) -> DeployedContract {
+        let calling_account_id = "some-account.near".to_string();
+        let tx = constructor_tx(&contract_constructor);
+        let signed_tx = sign_transaction(tx, Some(self.chain_id), &account);
+        let (output, maybe_err) =
+            self.call(SUBMIT, calling_account_id, rlp::encode(&signed_tx).to_vec());
+        assert!(maybe_err.is_none());
+        let submit_result =
+            SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();
+        let address = Address::from_slice(&submit_result.result);
+        let contract_constructor: ContractConstructor = contract_constructor.into();
+        DeployedContract {
+            abi: contract_constructor.abi,
+            address,
+        }
     }
 
     pub fn get_balance(&self, address: Address) -> U256 {

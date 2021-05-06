@@ -1,16 +1,11 @@
-use crate::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
 use crate::transaction::EthTransaction;
-use borsh::BorshDeserialize;
 use criterion::{BatchSize, BenchmarkId, Criterion};
-use near_vm_logic::VMOutcome;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
 use crate::test_utils::solidity;
-use crate::test_utils::{
-    address_from_secret_key, deploy_evm, sign_transaction, AuroraRunner, SUBMIT,
-};
+use crate::test_utils::{address_from_secret_key, deploy_evm, sign_transaction, SUBMIT};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -29,18 +24,11 @@ pub(crate) fn eth_erc20_benchmark(c: &mut Criterion) {
 
     // deploy the erc20 contract
     let constructor = ERC20Constructor::load();
-    let output = exec_transaction(
-        &mut runner,
-        constructor.deploy("Benchmarker", "BENCH", INITIAL_NONCE.into()),
+    let contract = ERC20(runner.deploy_contract(
         &source_account,
-    );
-    let submit_result =
-        SubmitResult::try_from_slice(&output.return_data.as_value().unwrap()).unwrap();
-    let erc20_address = Address::from_slice(&submit_result.result);
-    let contract = ERC20 {
-        abi: constructor.abi,
-        address: erc20_address,
-    };
+        |c| c.deploy("Benchmarker", "BENCH", INITIAL_NONCE.into()),
+        constructor,
+    ));
 
     // create the transaction for minting
     let tx = contract.mint(
@@ -124,49 +112,34 @@ pub(crate) fn eth_erc20_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-struct ERC20Constructor {
-    abi: ethabi::Contract,
-    code: Vec<u8>,
-}
+struct ERC20Constructor(solidity::ContractConstructor);
 
-struct ERC20 {
-    abi: ethabi::Contract,
-    address: Address,
+struct ERC20(solidity::DeployedContract);
+
+impl From<ERC20Constructor> for solidity::ContractConstructor {
+    fn from(c: ERC20Constructor) -> Self {
+        c.0
+    }
 }
 
 impl ERC20Constructor {
     fn load() -> Self {
-        let artifacts_base_path = Self::solidity_artifacts_path();
-        let hex_path = artifacts_base_path.join("ERC20PresetMinterPauser.bin");
-        let hex_rep = match std::fs::read_to_string(&hex_path) {
-            Ok(hex) => hex,
-            Err(_) => {
-                // An error occurred opening the file, maybe the contract hasn't been compiled?
-                let sources_root = Self::download_solidity_sources();
-                solidity::compile(
-                    sources_root,
-                    "token/ERC20/presets/ERC20PresetMinterPauser.sol",
-                    &artifacts_base_path,
-                );
-                // If another error occurs, then we can't handle it so we just unwrap.
-                std::fs::read_to_string(hex_path).unwrap()
-            }
-        };
-        let code = hex::decode(&hex_rep).unwrap();
-        let abi_path = artifacts_base_path.join("ERC20PresetMinterPauser.abi");
-        let reader = std::fs::File::open(abi_path).unwrap();
-        let abi = ethabi::Contract::load(reader).unwrap();
-
-        Self { abi, code }
+        Self(solidity::ContractConstructor::compile_from_source(
+            Self::download_solidity_sources(),
+            Self::solidity_artifacts_path(),
+            "token/ERC20/presets/ERC20PresetMinterPauser.sol",
+            "ERC20PresetMinterPauser",
+        ))
     }
 
     fn deploy(&self, name: &str, symbol: &str, nonce: U256) -> EthTransaction {
         let data = self
+            .0
             .abi
             .constructor()
             .unwrap()
             .encode_input(
-                self.code.clone(),
+                self.0.code.clone(),
                 &[
                     ethabi::Token::String(name.to_string()),
                     ethabi::Token::String(symbol.to_string()),
@@ -204,6 +177,7 @@ impl ERC20Constructor {
 impl ERC20 {
     fn mint(&self, recipient: Address, amount: U256, nonce: U256) -> EthTransaction {
         let data = self
+            .0
             .abi
             .function("mint")
             .unwrap()
@@ -216,7 +190,7 @@ impl ERC20 {
             nonce,
             gas_price: Default::default(),
             gas: Default::default(),
-            to: Some(self.address),
+            to: Some(self.0.address),
             value: Default::default(),
             data,
         }
@@ -224,6 +198,7 @@ impl ERC20 {
 
     fn transfer(&self, recipient: Address, amount: U256, nonce: U256) -> EthTransaction {
         let data = self
+            .0
             .abi
             .function("transfer")
             .unwrap()
@@ -236,22 +211,9 @@ impl ERC20 {
             nonce,
             gas_price: Default::default(),
             gas: Default::default(),
-            to: Some(self.address),
+            to: Some(self.0.address),
             value: Default::default(),
             data,
         }
     }
-}
-
-fn exec_transaction(
-    runner: &mut AuroraRunner,
-    tx: EthTransaction,
-    account: &SecretKey,
-) -> VMOutcome {
-    let calling_account_id = "some-account.near".to_string();
-    let signed_tx = sign_transaction(tx, Some(runner.chain_id), &account);
-    let (output, maybe_err) =
-        runner.call(SUBMIT, calling_account_id, rlp::encode(&signed_tx).to_vec());
-    assert!(maybe_err.is_none());
-    output.unwrap()
 }
