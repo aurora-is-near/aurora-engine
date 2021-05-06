@@ -433,6 +433,13 @@ impl EthConnectorContract {
     /// FT resolve transfer logic
     pub fn ft_resolve_transfer(&mut self) {
         sdk::assert_private_call();
+        // Check is previous promiss success
+        assert!(sdk::promise_results_count() > 0);
+        match sdk::promise_result(0) {
+            PromiseResult::Successful(_) => {}
+            _ => sdk::panic_utf8(b"ERR_PROMISE_RESULT"),
+        }
+
         let args = ResolveTransferCallArgs::try_from_slice(&sdk::read_input()).unwrap();
         let amount = self
             .ft

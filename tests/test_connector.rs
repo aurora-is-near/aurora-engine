@@ -135,7 +135,7 @@ fn call_deposit_eth(master_account: &UserAccount, contract: &str) {
         10,
     );
     res.assert_success();
-    //println!("{:#?}", res.promise_results());
+    println!("{:#?}", res.promise_results());
 }
 
 fn get_near_balance(master_account: &UserAccount, acc: &str, contract: &str) -> u128 {

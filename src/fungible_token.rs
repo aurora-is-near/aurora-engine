@@ -245,7 +245,6 @@ impl FungibleToken {
         receiver_id: &str,
         amount: Balance,
     ) -> (u128, u128) {
-        assert_eq!(sdk::promise_results_count(), 1);
         // Get the unused amount from the `ft_on_transfer` call result.
         let unused_amount = match sdk::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
