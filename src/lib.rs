@@ -41,7 +41,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{Address, String, TryInto, H256, U256};
+    use crate::prelude::{Address, TryInto, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
@@ -264,6 +264,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn register_relayer() {
         let relayer_address = sdk::read_input();
+        assert_eq!(relayer_address.len(), 20);
+
         let mut engine = Engine::new(predecessor_address());
         engine.register_relayer(
             sdk::predecessor_account_id().as_slice(),
@@ -274,13 +276,13 @@ mod contract {
     /// Allow receiving NEP141 tokens to the EVM contract
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-        let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
-
-        if current_account_id == predecessor_account_id {
+        #[allow(clippy::if_same_then_else)]
+        if sdk::predecessor_account_id() == sdk::current_account_id() {
             // TODO(#59) ETH transfer
+            todo!();
         } else {
             // TODO(#51) ERC20 transfer
+            todo!();
         }
     }
 
