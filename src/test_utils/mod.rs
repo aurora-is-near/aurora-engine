@@ -27,6 +27,7 @@ pub(crate) const SUBMIT: &str = "submit";
 
 pub(crate) mod erc20;
 pub(crate) mod solidity;
+pub(crate) mod standard_precompiles;
 
 pub(crate) struct AuroraRunner {
     pub aurora_account_id: String,
