@@ -25,6 +25,7 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
 
 pub(crate) const SUBMIT: &str = "submit";
 
+pub(crate) mod erc20;
 pub(crate) mod solidity;
 
 pub(crate) struct AuroraRunner {
