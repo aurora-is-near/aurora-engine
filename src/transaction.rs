@@ -116,7 +116,7 @@ impl Decodable for EthSignedTransaction {
                 if v == Address::zero() {
                     None
                 } else {
-                    Some(value.as_val()?)
+                    Some(v)
                 }
             }
         };
