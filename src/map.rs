@@ -2,29 +2,23 @@ use crate::prelude::Vec;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::sdk;
-use crate::storage::{bytes_to_key, KeyPrefix};
+use crate::storage::bytes_to_key;
+
+type KeyPrefixU8 = u8;
 
 /// An non-iterable implementation of a map that stores its content directly on the trie.
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct LookupMap {
-    key_prefix: KeyPrefix,
-}
+#[derive(BorshSerialize, BorshDeserialize, Default)]
+pub struct LookupMap<const K: KeyPrefixU8> {}
 
-impl Default for LookupMap {
-    fn default() -> Self {
-        Self::new(KeyPrefix::RelayerEvmAddressMap)
-    }
-}
-
-impl LookupMap {
+impl<const K: KeyPrefixU8> LookupMap<K> {
     /// Create a new map. Use `key_prefix` as a unique prefix for keys.
-    pub fn new(key_prefix: KeyPrefix) -> Self {
-        Self { key_prefix }
+    pub fn new() -> Self {
+        Self {}
     }
 
     /// Build key for this map scope
     fn raw_key_to_storage_key(&self, key_raw: &[u8]) -> Vec<u8> {
-        bytes_to_key(self.key_prefix, key_raw)
+        bytes_to_key(K.into(), key_raw)
     }
 
     /// Returns `true` if the serialized key is present in the map.

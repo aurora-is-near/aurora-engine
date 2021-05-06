@@ -140,7 +140,7 @@ pub struct EngineState {
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
     /// Mapping between relayer account id and relayer evm address
-    pub relayers_evm_addresses: LookupMap,
+    pub relayers_evm_addresses: LookupMap<{ KeyPrefix::RelayerEvmAddressMap as u8 }>,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -150,7 +150,7 @@ impl From<NewCallArgs> for EngineState {
             owner_id: args.owner_id,
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-            relayers_evm_addresses: LookupMap::new(KeyPrefix::RelayerEvmAddressMap),
+            relayers_evm_addresses: LookupMap::new(),
         }
     }
 }

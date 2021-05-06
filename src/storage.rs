@@ -12,6 +12,21 @@ pub enum KeyPrefix {
     RelayerEvmAddressMap = 0x5,
 }
 
+// TODO: Derive From<u8> using macro to avoid missing new arguments in the future
+impl From<u8> for KeyPrefix {
+    fn from(value: u8) -> Self {
+        match value {
+            0x0 => Self::Config,
+            0x1 => Self::Nonce,
+            0x2 => Self::Balance,
+            0x3 => Self::Code,
+            0x4 => Self::Storage,
+            0x5 => Self::RelayerEvmAddressMap,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub fn bytes_to_key(prefix: KeyPrefix, bytes: &[u8]) -> Vec<u8> {
     [&[prefix as u8], bytes].concat()
