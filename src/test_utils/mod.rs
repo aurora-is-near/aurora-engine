@@ -22,11 +22,11 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
 }
 
-pub const SUBMIT: &str = "submit";
+pub(crate) const SUBMIT: &str = "submit";
 
-pub mod solidity;
+pub(crate) mod solidity;
 
-pub struct AuroraRunner {
+pub(crate) struct AuroraRunner {
     pub aurora_account_id: String,
     pub chain_id: u64,
     pub code: ContractCode,
@@ -42,7 +42,7 @@ pub struct AuroraRunner {
 /// Same as `AuroraRunner`, but consumes `self` on execution (thus preventing building on
 /// the `ext` post-state with future calls to the contract.
 #[derive(Clone)]
-pub struct OneShotAuroraRunner<'a> {
+pub(crate) struct OneShotAuroraRunner<'a> {
     pub base: &'a AuroraRunner,
     pub ext: MockedExternal,
     pub context: VMContext,
@@ -194,7 +194,7 @@ impl Default for AuroraRunner {
     }
 }
 
-pub fn deploy_evm() -> AuroraRunner {
+pub(crate) fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     let args = NewCallArgs {
         chain_id: types::u256_to_arr(&U256::from(runner.chain_id)),
@@ -214,7 +214,7 @@ pub fn deploy_evm() -> AuroraRunner {
     runner
 }
 
-pub fn create_eth_transaction(
+pub(crate) fn create_eth_transaction(
     to: Option<Address>,
     value: U256,
     data: Vec<u8>,
@@ -233,7 +233,7 @@ pub fn create_eth_transaction(
     sign_transaction(tx, chain_id, secret_key)
 }
 
-pub fn sign_transaction(
+pub(crate) fn sign_transaction(
     tx: EthTransaction,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
@@ -258,13 +258,13 @@ pub fn sign_transaction(
     }
 }
 
-pub fn address_from_secret_key(sk: &SecretKey) -> Address {
+pub(crate) fn address_from_secret_key(sk: &SecretKey) -> Address {
     let pk = PublicKey::from_secret_key(sk);
     let hash = types::keccak(&pk.serialize()[1..]);
     Address::from_slice(&hash[12..])
 }
 
-pub fn parse_eth_gas(output: &VMOutcome) -> u64 {
+pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
     let submit_result_bytes = match &output.return_data {
         ReturnData::Value(bytes) => bytes.as_slice(),
         ReturnData::None | ReturnData::ReceiptIndex(_) => panic!("Unexpected ReturnData"),
@@ -273,7 +273,7 @@ pub fn parse_eth_gas(output: &VMOutcome) -> u64 {
     submit_result.gas_used
 }
 
-pub fn validate_address_balance_and_nonce(
+pub(crate) fn validate_address_balance_and_nonce(
     runner: &AuroraRunner,
     address: Address,
     expected_balance: U256,

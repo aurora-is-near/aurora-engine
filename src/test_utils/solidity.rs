@@ -6,7 +6,7 @@ use std::process::Command;
 /// source files to consider (including imports). `contract_file` must be
 /// given relative to `source_path`. `output_path` gives the directory where the compiled
 /// artifacts are written. Requires Docker to be installed.
-pub fn compile<P1, P2, P3>(source_path: P1, contract_file: P2, output_path: P3)
+pub(crate) fn compile<P1, P2, P3>(source_path: P1, contract_file: P2, output_path: P3)
 where
     P1: AsRef<Path>,
     P2: AsRef<Path>,

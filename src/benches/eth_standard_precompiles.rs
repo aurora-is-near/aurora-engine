@@ -12,7 +12,7 @@ use crate::test_utils::{address_from_secret_key, deploy_evm, sign_transaction, S
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
 
-pub fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
+pub(crate) fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
     let mut runner = deploy_evm();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
