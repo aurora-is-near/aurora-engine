@@ -11,8 +11,8 @@ use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const CONTRACT_NAME_KEY: &str = "EthConnector";
-pub const EVM_RELAYER_NAME_KEY: &str = "rel";
-pub const CONTRACT_FT_KEY: &str = "EthConnector.ft";
+pub const EVM_RELAYER_NAME_KEY: &str = "rel:";
+pub const CONTRACT_FT_KEY: &str = "ft:";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
@@ -73,6 +73,8 @@ impl EthConnectorContract {
             prover_account: args.prover_account,
             eth_custodian_address: validate_eth_address(args.eth_custodian_address),
         };
+        // Save th-connector specific data
+        sdk::save_contract(CONTRACT_NAME_KEY.as_bytes(), &contract_data);
         Self {
             contract: contract_data,
             ft,
@@ -556,7 +558,6 @@ impl EthConnectorContract {
 
     /// Save eth-connector contract data
     fn save_contract(&mut self) {
-        sdk::save_contract(CONTRACT_NAME_KEY.as_bytes(), &self.contract);
         sdk::save_contract(CONTRACT_FT_KEY.as_bytes(), &self.ft);
     }
 

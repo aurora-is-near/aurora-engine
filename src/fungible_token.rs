@@ -438,9 +438,4 @@ impl FungibleToken {
     pub fn accounts_get(&self, account_id: &str) -> Option<Vec<u8>> {
         sdk::read_storage(&self.ft_key(account_id)[..])
     }
-
-    pub fn accounts_get_eth(&self, account_id: &str) -> Option<Vec<u8>> {
-        // TODO: modify
-        sdk::read_storage(&self.ft_key(account_id)[..])
-    }
 }
