@@ -243,9 +243,13 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn make_it_rain() {
         let input = sdk::read_input();
-        let address = Address::from_slice(&input);
-        let mut engine = Engine::new(address);
-        let result = engine.credit(&address);
+        let dest_address = Address::from_slice(&input);
+        let source_address = predecessor_address();
+        let engine = Engine::new(dest_address);
+
+        engine.increment_nonce(&source_address);
+
+        let result = engine.credit(&dest_address);
         result.map(|_f| Vec::new()).sdk_process();
     }
 

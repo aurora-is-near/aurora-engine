@@ -310,16 +310,20 @@ impl Engine {
     }
 
     #[cfg(feature = "testnet")]
+    pub fn increment_nonce(&self, address: &Address) {
+        let account_nonce = Self::get_nonce(address);
+        account_nonce.saturating_add(U256::one());
+        Self::set_nonce(address, &account_nonce);
+    }
+
+    #[cfg(feature = "testnet")]
     /// Credits the address with 10 coins from the faucet.
-    pub fn credit(&mut self, address: &Address) -> EngineResult<()> {
+    pub fn credit(&self, address: &Address) -> EngineResult<()> {
         use crate::prelude::Add;
 
         let balance = Self::get_balance(address);
         // Saturating adds are intentional
         let new_balance = balance.saturating_add(U256::one());
-
-        let account_nonce = Self::get_nonce(address);
-        account_nonce.saturating_add(U256::one());
 
         Self::set_balance(address, &new_balance);
         Ok(())
