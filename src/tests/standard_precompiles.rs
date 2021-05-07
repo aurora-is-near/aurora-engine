@@ -1,4 +1,3 @@
-use crate::prelude::{Address, U256};
 use crate::test_utils::{
     self,
     standard_precompiles::{PrecompilesConstructor, PrecompilesContract},
