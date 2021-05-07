@@ -107,4 +107,22 @@ impl ERC20 {
             data,
         }
     }
+
+    pub fn balance_of(&self, address: Address, nonce: U256) -> EthTransaction {
+        let data = self
+            .0
+            .abi
+            .function("balanceOf")
+            .unwrap()
+            .encode_input(&[ethabi::Token::Address(address)])
+            .unwrap();
+        EthTransaction {
+            nonce,
+            gas_price: Default::default(),
+            gas: Default::default(),
+            to: Some(self.0.address),
+            value: Default::default(),
+            data,
+        }
+    }
 }

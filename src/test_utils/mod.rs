@@ -127,6 +127,27 @@ impl AuroraRunner {
         trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
     }
 
+    pub fn submit_transaction(
+        &mut self,
+        account: &SecretKey,
+        transaction: EthTransaction,
+    ) -> Result<SubmitResult, VMError> {
+        let calling_account_id = "some-account.near".to_string();
+        let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
+
+        let (output, maybe_err) =
+            self.call(SUBMIT, calling_account_id, rlp::encode(&signed_tx).to_vec());
+
+        if let Some(err) = maybe_err {
+            Err(err)
+        } else {
+            let submit_result =
+                SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap())
+                    .unwrap();
+            Ok(submit_result)
+        }
+    }
+
     pub fn deploy_contract<F: FnOnce(&T) -> EthTransaction, T: Into<ContractConstructor>>(
         &mut self,
         account: &SecretKey,
@@ -135,7 +156,7 @@ impl AuroraRunner {
     ) -> DeployedContract {
         let calling_account_id = "some-account.near".to_string();
         let tx = constructor_tx(&contract_constructor);
-        let signed_tx = sign_transaction(tx, Some(self.chain_id), &account);
+        let signed_tx = sign_transaction(tx, Some(self.chain_id), account);
         let (output, maybe_err) =
             self.call(SUBMIT, calling_account_id, rlp::encode(&signed_tx).to_vec());
         assert!(maybe_err.is_none());
