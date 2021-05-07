@@ -19,6 +19,8 @@ pub enum EngineError {
     EvmError(ExitError),
     /// Fatal EVM errors.
     EvmFatal(ExitFatal),
+    /// Incorrect nonce.
+    IncorrectNonce,
 }
 
 impl EngineError {
@@ -42,6 +44,7 @@ impl EngineError {
             EvmFatal(ExitFatal::UnhandledInterrupt) => "ERR_UNHANDLED_INTERRUPT",
             EvmFatal(ExitFatal::Other(m)) => m,
             EvmFatal(_) => unreachable!(), // unused misc
+            IncorrectNonce => "ERR_NONCE_INCORRECT",
         }
     }
 }
@@ -177,6 +180,19 @@ impl Engine {
 
     pub fn remove_nonce(address: &Address) {
         sdk::remove_storage(&address_to_key(KeyPrefix::Nonce, address))
+    }
+
+    /// Checks the nonce to ensure that the address matches the transaction
+    /// nonce.
+    #[inline]
+    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> EngineResult<()> {
+        let account_nonce = Self::get_nonce(address);
+
+        if transaction_nonce != &account_nonce {
+            return Err(EngineError::IncorrectNonce);
+        }
+
+        Ok(())
     }
 
     pub fn get_nonce(address: &Address) -> U256 {

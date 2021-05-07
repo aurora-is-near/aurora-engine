@@ -192,14 +192,14 @@ mod contract {
             None => sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
         };
 
+        Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
+
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
-        if let Some(receiver) = signed_transaction.transaction.to {
+        let result = if let Some(receiver) = signed_transaction.transaction.to {
             Engine::call(&mut engine, sender, receiver, value, data)
-                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-                .sdk_process();
             // TODO: charge for storage
         } else {
             // Execute a contract deployment:
