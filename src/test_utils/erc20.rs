@@ -2,6 +2,7 @@ use crate::prelude::{Address, U256};
 use crate::test_utils::solidity;
 use crate::transaction::EthTransaction;
 use std::path::{Path, PathBuf};
+use std::sync::Once;
 
 pub(crate) struct ERC20Constructor(pub solidity::ContractConstructor);
 
@@ -12,6 +13,8 @@ impl From<ERC20Constructor> for solidity::ContractConstructor {
         c.0
     }
 }
+
+static DOWNLOAD_ONCE: Once = Once::new();
 
 impl ERC20Constructor {
     pub fn load() -> Self {
@@ -53,10 +56,13 @@ impl ERC20Constructor {
         if contracts_dir.exists() {
             contracts_dir
         } else {
-            let url = "https://github.com/OpenZeppelin/openzeppelin-contracts";
-            let repo = git2::Repository::clone(url, sources_dir).unwrap();
-            // repo.path() gives the path of the .git directory, so we need to use the parent
-            repo.path().parent().unwrap().join("contracts")
+            // Contracts not already present, so download them (but only once, even
+            // if multiple tests running in parallel saw `contracts_dir` does not exist).
+            DOWNLOAD_ONCE.call_once(|| {
+                let url = "https://github.com/OpenZeppelin/openzeppelin-contracts";
+                git2::Repository::clone(url, sources_dir).unwrap();
+            });
+            contracts_dir
         }
     }
 
