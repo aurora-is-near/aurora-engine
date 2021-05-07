@@ -5,6 +5,7 @@ use crate::prelude::{String, Vec};
 use crate::prover::Proof;
 #[cfg(feature = "contract")]
 use crate::types::Balance;
+#[cfg(feature = "contract")]
 use crate::types::EthAddress;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 use evm::backend::Log;

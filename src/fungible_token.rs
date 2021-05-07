@@ -197,7 +197,6 @@ impl FungibleToken {
         memo: &Option<String>,
         msg: String,
     ) {
-        sdk::assert_one_yocto();
         let predecessor_account_id = sdk::predecessor_account_id();
         let sender_id = str_from_slice(&predecessor_account_id);
         // Special case for Aurora transfer itself - we shouldn't transfer
@@ -404,7 +403,6 @@ impl FungibleToken {
     }
 
     pub fn storage_withdraw(&mut self, amount: Option<u128>) -> StorageBalance {
-        sdk::assert_one_yocto();
         let predecessor_account_id_bytes = sdk::predecessor_account_id();
         let predecessor_account_id = str_from_slice(&predecessor_account_id_bytes);
         if let Some(storage_balance) = self.internal_storage_balance_of(predecessor_account_id) {

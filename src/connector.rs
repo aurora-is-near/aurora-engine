@@ -420,6 +420,7 @@ impl EthConnectorContract {
 
     /// Transfer between NEAR accounts
     pub fn ft_transfer(&mut self) {
+        sdk::assert_one_yocto();
         let args = TransferCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         self.ft
             .ft_transfer(&args.receiver_id, args.amount, &args.memo);
@@ -457,6 +458,7 @@ impl EthConnectorContract {
 
     /// FT transfer call from sender account (invoker account) to receiver
     pub fn ft_transfer_call(&mut self) {
+        sdk::assert_one_yocto();
         let args =
             TransferCallCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         #[cfg(feature = "log")]
@@ -484,6 +486,7 @@ impl EthConnectorContract {
 
     /// FT storage withdraw
     pub fn storage_withdraw(&mut self) {
+        sdk::assert_one_yocto();
         let args =
             StorageWithdrawCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         let res = self.ft.storage_withdraw(args.amount).try_to_vec().unwrap();
