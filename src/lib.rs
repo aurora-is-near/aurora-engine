@@ -40,8 +40,10 @@ mod contract {
     use crate::engine::{Engine, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{Address, TryInto, H160, H256, U256};
+    use crate::parameters::{
+        DeployErc20TokenArgs, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs,
+    };
+    use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
@@ -290,19 +292,29 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_erc20_token() {
         // Id of the NEP141 token in Near
-        let nep141_token = sdk::read_input();
+        let args: DeployErc20TokenArgs =
+            DeployErc20TokenArgs::try_from_slice(&sdk::read_input()).sdk_expect("ERR_ARG_PARSE");
 
         let mut engine = Engine::new(predecessor_address());
 
         let erc20_contract = include_bytes!("../etc/eth-contracts/res/EvmErc20.bin");
+        let deploy_args = ethabi::encode(&[
+            ethabi::Token::String("TestToken".to_string()),
+            ethabi::Token::String("TT".to_string()),
+            ethabi::Token::Uint(ethabi::Uint::from(0)),
+            ethabi::Token::Address(current_address().into()),
+        ]);
 
-        Engine::deploy_code_with_input(&mut engine, erc20_contract)
-            .map(|res| {
-                let address = H160(res.result.as_slice().try_into().unwrap());
-                engine.register_token(address.as_bytes(), nep141_token.as_slice());
-                res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
-            })
-            .sdk_process();
+        Engine::deploy_code_with_input(
+            &mut engine,
+            &[erc20_contract, deploy_args.as_slice()].concat(),
+        )
+        .map(|res| {
+            let address = H160(res.result.as_slice().try_into().unwrap());
+            engine.register_token(address.as_bytes(), args.nep141.as_bytes());
+            res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
+        })
+        .sdk_process();
 
         // TODO: charge for storage
     }
@@ -395,6 +407,10 @@ mod contract {
 
     fn predecessor_address() -> Address {
         near_account_to_evm_address(&sdk::predecessor_account_id())
+    }
+
+    fn current_address() -> Address {
+        near_account_to_evm_address(&sdk::current_account_id())
     }
 
     pub(crate) trait SdkExpect<T> {

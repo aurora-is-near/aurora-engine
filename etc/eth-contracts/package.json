@@ -1,5 +1,5 @@
 {
-  "name": "vanilla-erc20-token",
+  "name": "evm-erc20-token",
   "version": "0.1.0",
   "description": "ERC20 token implementation on EVM mapped from Native NEP-141",
   "dependencies": {

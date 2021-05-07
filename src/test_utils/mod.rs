@@ -81,7 +81,7 @@ impl AuroraRunner {
         }
     }
 
-    fn update_context(context: &mut VMContext, caller_account_id: String, input: Vec<u8>) {
+    pub fn update_context(context: &mut VMContext, caller_account_id: String, input: Vec<u8>) {
         context.block_index += 1;
         context.block_timestamp += 100;
         context.input = input;

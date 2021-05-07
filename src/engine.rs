@@ -6,12 +6,14 @@ use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::contract::{SdkExpect, SdkProcess};
 use crate::map::LookupMap;
-use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
+use crate::parameters::{
+    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, SubmitResult, ViewCallArgs,
+};
 use crate::precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
-use crate::types::{u256_to_arr, AccountId, U128};
+use crate::types::{u256_to_arr, AccountId};
 
 macro_rules! as_ref_err_impl {
     ($err: ty) => {
@@ -496,15 +498,10 @@ impl Engine {
     }
 
     pub fn receive_erc20_tokens(&mut self) {
-        let _input = sdk::read_input();
+        let input = sdk::read_input();
 
-        // TODO(#51): Parse input
-        let _sender_id = AccountId::default();
-        let _amount = U128(0);
-        let msg = crate::prelude::String::default();
-
-        // TODO: Handle case when the NEP141 is the EVM.
-        //  In this case it means that this is an ETH transfer.
+        let args: NEP141FtOnTransferArgs =
+            NEP141FtOnTransferArgs::try_from_slice(input.as_slice()).unwrap();
 
         let token = sdk::predecessor_account_id();
 
@@ -513,7 +510,7 @@ impl Engine {
             // Message format:
             //      Recipient of the transaction - 40 characters (Address in hex)
             //      Fee to be paid in ETH (Optional) - 64 bytes (Encoded in little endian / hex)
-            let mut message = msg.as_bytes();
+            let mut message = args.msg.as_bytes();
             assert!(message.len() >= 40);
 
             let recipient = Address(

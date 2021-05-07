@@ -14,7 +14,7 @@ import "./AdminControlled.sol";
 contract EvmErc20 is Context, ERC20, AdminControlled {
     uint8 private _decimals;
 
-    constructor (string memory name, string memory symbol, uint8 decimal)  ERC20(name, symbol) AdminControlled(address(0), 0) {
+    constructor (string memory name, string memory symbol, uint8 decimal, address admin)  ERC20(name, symbol) AdminControlled(admin, 0) {
         _decimals = decimal;
     }
 

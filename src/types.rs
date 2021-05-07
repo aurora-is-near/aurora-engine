@@ -12,6 +12,7 @@ pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32]; // Little-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 pub type Gas = u64;
+pub type Balance = u128;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct U128(pub u128);
