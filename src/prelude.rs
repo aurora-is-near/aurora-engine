@@ -10,8 +10,6 @@ pub use alloc::{
     vec,
     vec::Vec,
 };
-#[cfg(all(feature = "testnet", not(feature = "std")))]
-pub use core::ops::Add;
 #[cfg(not(feature = "std"))]
 pub use core::{convert::TryInto, marker::PhantomData, mem};
 #[cfg(all(feature = "testnet", feature = "std"))]

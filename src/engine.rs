@@ -335,8 +335,6 @@ impl Engine {
     #[cfg(feature = "testnet")]
     /// Credits the address with 10 coins from the faucet.
     pub fn credit(&self, address: &Address) -> EngineResult<()> {
-        use crate::prelude::Add;
-
         let balance = Self::get_balance(address);
         // Saturating adds are intentional
         let new_balance = balance.saturating_add(U256::one());
