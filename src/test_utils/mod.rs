@@ -1,5 +1,4 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use criterion::criterion_main;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
@@ -13,20 +12,11 @@ use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
-use aurora_engine::parameters::{NewCallArgs, SubmitResult};
-use aurora_engine::prelude::Address;
-use aurora_engine::storage;
-use aurora_engine::transaction::{EthSignedTransaction, EthTransaction};
-use aurora_engine::types;
-
-#[cfg(feature = "profile_eth_gas")]
-use aurora_engine::prelude::ETH_GAS_USED;
-
-mod eth_deploy_code;
-mod eth_erc20;
-mod eth_standard_precompiles;
-mod eth_transfer;
-mod solidity;
+use crate::parameters::{NewCallArgs, SubmitResult};
+use crate::prelude::Address;
+use crate::storage;
+use crate::transaction::{EthSignedTransaction, EthTransaction};
+use crate::types;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
@@ -34,12 +24,7 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
 
 pub const SUBMIT: &str = "submit";
 
-criterion_main!(
-    eth_deploy_code::benches,
-    eth_erc20::benches,
-    eth_standard_precompiles::benches,
-    eth_transfer::benches
-);
+pub mod solidity;
 
 pub struct AuroraRunner {
     pub aurora_account_id: String,
@@ -137,6 +122,40 @@ impl AuroraRunner {
 
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
+    }
+
+    pub fn get_balance(&self, address: Address) -> U256 {
+        self.getter_method_call("get_balance", address)
+    }
+
+    pub fn get_nonce(&self, address: Address) -> U256 {
+        self.getter_method_call("get_nonce", address)
+    }
+
+    // Used in `get_balance` and `get_nonce`. This function exists to avoid code duplication
+    // since the contract's `get_nonce` and `get_balance` have the same type signature.
+    fn getter_method_call(&self, method_name: &str, address: Address) -> U256 {
+        let mut context = self.context.clone();
+        Self::update_context(
+            &mut context,
+            "GETTER".to_string(),
+            address.as_bytes().to_vec(),
+        );
+        let (outcome, maybe_error) = near_vm_runner::run(
+            &self.code,
+            method_name,
+            &mut self.ext.clone(),
+            context,
+            &self.wasm_config,
+            &self.fees_config,
+            &[],
+            self.current_protocol_version,
+            Some(&self.cache),
+            &self.profile,
+        );
+        assert!(maybe_error.is_none());
+        let bytes = outcome.unwrap().return_data.as_value().unwrap();
+        U256::from_big_endian(&bytes)
     }
 }
 
@@ -252,4 +271,14 @@ pub fn parse_eth_gas(output: &VMOutcome) -> u64 {
     };
     let submit_result = SubmitResult::try_from_slice(submit_result_bytes).unwrap();
     submit_result.gas_used
+}
+
+pub fn validate_address_balance_and_nonce(
+    runner: &AuroraRunner,
+    address: Address,
+    expected_balance: U256,
+    expected_nonce: U256,
+) {
+    assert_eq!(runner.get_balance(address), expected_balance);
+    assert_eq!(runner.get_nonce(address), expected_nonce);
 }

@@ -68,11 +68,6 @@ rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
 
-[[bench]]
-name = "benches"
-path = "benches/main.rs"
-harness = false
-
 [features]
 default = ["sha2", "std"]
 std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "lunarity-lexer/std", "bn/std"]

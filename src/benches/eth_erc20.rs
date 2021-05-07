@@ -1,20 +1,22 @@
-use aurora_engine::parameters::SubmitResult;
-use aurora_engine::prelude::{Address, U256};
-use aurora_engine::transaction::EthTransaction;
+use crate::parameters::SubmitResult;
+use crate::prelude::{Address, U256};
+use crate::transaction::EthTransaction;
 use borsh::BorshDeserialize;
-use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
+use criterion::{BatchSize, BenchmarkId, Criterion};
 use near_vm_logic::VMOutcome;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
-use super::{address_from_secret_key, deploy_evm, sign_transaction, AuroraRunner, SUBMIT};
-use crate::solidity;
+use crate::test_utils::solidity;
+use crate::test_utils::{
+    address_from_secret_key, deploy_evm, sign_transaction, AuroraRunner, SUBMIT,
+};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: u64 = 67;
 
-fn eth_erc20_benchmark(c: &mut Criterion) {
+pub fn eth_erc20_benchmark(c: &mut Criterion) {
     let mut runner = deploy_evm();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
@@ -85,7 +87,7 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
     assert!(maybe_error.is_none());
     let output = output.unwrap();
     let gas = output.burnt_gas;
-    let eth_gas = super::parse_eth_gas(&output);
+    let eth_gas = crate::test_utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("ETH_ERC20_MINT NEAR GAS: {:?}", gas);
     println!("ETH_ERC20_MINT ETH GAS: {:?}", eth_gas);
@@ -99,7 +101,7 @@ fn eth_erc20_benchmark(c: &mut Criterion) {
     assert!(maybe_err.is_none());
     let output = output.unwrap();
     let gas = output.burnt_gas;
-    let eth_gas = super::parse_eth_gas(&output);
+    let eth_gas = crate::test_utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("ETH_ERC20_TRANSFER NEAR GAS: {:?}", gas);
     println!("ETH_ERC20_TRANSFER ETH GAS: {:?}", eth_gas);
@@ -253,5 +255,3 @@ fn exec_transaction(
     assert!(maybe_err.is_none());
     output.unwrap()
 }
-
-criterion_group!(benches, eth_erc20_benchmark);

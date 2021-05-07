@@ -8,9 +8,10 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+#[cfg(feature = "contract")]
+mod map;
 pub mod meta_parsing;
 pub mod parameters;
-mod precompiles;
 pub mod prelude;
 pub mod storage;
 pub mod transaction;
@@ -26,10 +27,18 @@ mod engine;
 mod fungible_token;
 #[cfg(feature = "contract")]
 mod log_entry;
+mod precompiles;
 #[cfg(feature = "contract")]
 mod prover;
 #[cfg(feature = "contract")]
 mod sdk;
+
+#[cfg(test)]
+mod benches;
+#[cfg(test)]
+mod test_utils;
+#[cfg(test)]
+mod tests;
 
 #[cfg(feature = "contract")]
 mod contract {
@@ -40,7 +49,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{Address, H256, U256};
+    use crate::prelude::{Address, TryInto, H256, U256};
     use crate::sdk;
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
@@ -115,7 +124,7 @@ mod contract {
 
     /// Get bridge prover id for this contract.
     #[no_mangle]
-    pub extern "C" fn get_bridge_provider() {
+    pub extern "C" fn get_bridge_prover() {
         let state = Engine::get_state();
         sdk::return_output(state.bridge_prover_id.as_bytes());
     }
@@ -214,8 +223,8 @@ mod contract {
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
-        if let Some(receiver) = signed_transaction.transaction.to {
-            let result = if data.is_empty() {
+        let result = if let Some(receiver) = signed_transaction.transaction.to {
+            if data.is_empty() {
                 // Execute a balance transfer. We need to save the incremented nonce in this case
                 // because it is not handled internally by SputnikVM like it is in the case of
                 // `call` and `deploy_code`.
@@ -225,17 +234,15 @@ mod contract {
                 // Execute a contract call:
                 Engine::call(&mut engine, sender, receiver, value, data)
                 // TODO: charge for storage
-            };
-            result
-                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-                .sdk_process();
+            }
         } else {
             // Execute a contract deployment:
             Engine::deploy_code(&mut engine, sender, value, &data)
-                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-                .sdk_process();
             // TODO: charge for storage
-        }
+        };
+        result
+            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .sdk_process();
     }
 
     #[no_mangle]
@@ -276,6 +283,18 @@ mod contract {
         let mut engine = Engine::new(address);
         let result = engine.credit(&address);
         result.map(|_f| Vec::new()).sdk_process();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn register_relayer() {
+        let relayer_address = sdk::read_input();
+        assert_eq!(relayer_address.len(), 20);
+
+        let mut engine = Engine::new(predecessor_address());
+        engine.register_relayer(
+            sdk::predecessor_account_id().as_slice(),
+            Address(relayer_address.as_slice().try_into().unwrap()),
+        );
     }
 
     ///
@@ -430,13 +449,9 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn register_relayer() {
-        EthConnectorContract::get_instance().register_relayer()
-    }
-
-    #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
-        EthConnectorContract::get_instance().ft_on_transfer()
+        let engine = Engine::new(predecessor_address());
+        EthConnectorContract::get_instance().ft_on_transfer(&engine)
     }
 
     #[cfg(feature = "integration-test")]

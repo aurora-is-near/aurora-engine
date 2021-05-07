@@ -59,15 +59,6 @@ impl From<Log> for ResultLog {
     }
 }
 
-/// Borsh-encoded result for the `deploy` and `deploy_with_input` methods.
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
-pub struct DeployResult {
-    pub status: bool,
-    pub gas_used: u64,
-    pub result: EthAddress,
-    pub logs: Vec<ResultLog>,
-}
-
 /// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
 /// and `deploy_with_input` methods.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]

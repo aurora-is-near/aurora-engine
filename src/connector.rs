@@ -4,6 +4,7 @@ use crate::sdk;
 use crate::types::*;
 
 use crate::deposit_event::*;
+use crate::engine::Engine;
 use crate::prelude::*;
 use crate::prover::validate_eth_address;
 #[cfg(feature = "log")]
@@ -11,7 +12,6 @@ use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const CONTRACT_NAME_KEY: &str = "EthConnector";
-pub const EVM_RELAYER_NAME_KEY: &str = "rel:";
 pub const CONTRACT_FT_KEY: &str = "ft:";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
@@ -503,25 +503,8 @@ impl EthConnectorContract {
         sdk::return_output(&res[..]);
     }
 
-    /// Save to storage Relayed address as NEAR account alias
-    pub fn register_relayer(&self) {
-        let args: RegisterRelayerCallArgs =
-            RegisterRelayerCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
-        let account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-        sdk::write_storage(self.evm_relayer_key(&account_id).as_bytes(), &args.address)
-    }
-
-    /// Get EVM Relayer address
-    pub fn get_evm_relayer_address(&self, account_id: &str) -> EthAddress {
-        let acc = sdk::read_storage(self.evm_relayer_key(account_id).as_bytes())
-            .expect("ERR_WRONG_EVM_RELAYER_KEY");
-        let mut addr: EthAddress = Default::default();
-        addr.copy_from_slice(&acc);
-        addr
-    }
-
     /// ft_on_transfer callback function
-    pub fn ft_on_transfer(&mut self) {
+    pub fn ft_on_transfer(&mut self, engine: &Engine) {
         #[cfg(feature = "log")]
         sdk::log("Call ft_on_trasfer");
         let args = FtOnTransfer::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
@@ -537,7 +520,11 @@ impl EthConnectorContract {
             self.mint_eth(message_data.recipient, args.amount - fee);
             // Mint fee to relayer
             if fee > 0 {
-                let evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
+                let evm_relayer_addres: EthAddress = engine
+                    .get_relayer(&message_data.relayer.as_bytes())
+                    .expect("ERR_WRONG_RELAYER_ID")
+                    .0;
+                //let evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
                 self.mint_eth(evm_relayer_addres, fee);
             }
         } else {
@@ -549,11 +536,6 @@ impl EthConnectorContract {
         // Return unused tokens
         let data = 0u128.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
-    }
-
-    /// EVM relayer address key
-    fn evm_relayer_key(&self, account_id: &str) -> String {
-        [EVM_RELAYER_NAME_KEY, account_id].join(":")
     }
 
     /// Save eth-connector contract data
