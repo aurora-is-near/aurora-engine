@@ -279,6 +279,6 @@ pub fn validate_address_balance_and_nonce(
     expected_balance: U256,
     expected_nonce: U256,
 ) {
-    assert_eq!(runner.get_balance(address), expected_balance);
-    assert_eq!(runner.get_nonce(address), expected_nonce);
+    assert_eq!(runner.get_balance(address), expected_balance, "balance");
+    assert_eq!(runner.get_nonce(address), expected_nonce, "nonce");
 }

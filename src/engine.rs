@@ -44,7 +44,7 @@ impl EngineError {
             EvmFatal(ExitFatal::UnhandledInterrupt) => "ERR_UNHANDLED_INTERRUPT",
             EvmFatal(ExitFatal::Other(m)) => m,
             EvmFatal(_) => unreachable!(), // unused misc
-            IncorrectNonce => "ERR_NONCE_INCORRECT",
+            IncorrectNonce => "ERR_INCORRECT_NONCE",
         }
     }
 }
@@ -312,7 +312,12 @@ impl Engine {
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         let is_succeed = status.is_succeed();
-        status.into_result()?;
+
+        if let Err(e) = status.into_result() {
+            Engine::increment_nonce(&origin);
+            return Err(e);
+        }
+
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
@@ -325,11 +330,10 @@ impl Engine {
         })
     }
 
-    #[cfg(feature = "testnet")]
-    pub fn increment_nonce(&self, address: &Address) {
+    pub fn increment_nonce(address: &Address) {
         let account_nonce = Self::get_nonce(address);
-        account_nonce.saturating_add(U256::one());
-        Self::set_nonce(address, &account_nonce);
+        let new_nonce = account_nonce.saturating_add(U256::one());
+        Self::set_nonce(address, &new_nonce);
     }
 
     #[cfg(feature = "testnet")]
