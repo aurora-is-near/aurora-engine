@@ -359,7 +359,7 @@ impl Engine {
     }
 
     /// Transfers an amount from a given sender to a receiver, provided that
-    /// the have enough in their balance.
+    /// they have enough in their balance.
     ///
     /// If the sender can send, and the receiver can receive, then the transfer
     /// will execute successfully.
@@ -582,6 +582,19 @@ impl Engine {
             output_on_fail
         ));
 
+        if fee != U256::from(0) {
+            let relayer_account_id = sdk::signer_account_id();
+            let relayer_address = unwrap_res_or_finish!(
+                self.get_relayer(relayer_account_id.as_slice()).ok_or(()),
+                output_on_fail
+            );
+
+            unwrap_res_or_finish!(
+                self.transfer(&recipient, &relayer_address, &fee),
+                output_on_fail
+            );
+        }
+
         let selector = &sdk::keccak("mint(address,uint256)".as_bytes())[..4];
         let tail = ethabi::encode(&[
             ethabi::Token::Address(recipient.into()),
@@ -597,19 +610,6 @@ impl Engine {
             ),
             output_on_fail
         );
-
-        if fee != U256::from(0) {
-            let relayer_account_id = sdk::signer_account_id();
-            let relayer_address = unwrap_res_or_finish!(
-                self.get_relayer(relayer_account_id.as_slice()).ok_or(()),
-                output_on_fail
-            );
-
-            unwrap_res_or_finish!(
-                self.transfer(&recipient, &relayer_address, &fee),
-                output_on_fail
-            );
-        }
 
         // Everything succeed so return "0"
         sdk::return_output(b"0");

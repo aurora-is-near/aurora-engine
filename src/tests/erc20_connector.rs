@@ -1,7 +1,8 @@
 use crate::parameters::{FunctionCallArgs, NEP141FtOnTransferArgs, SubmitResult};
 use crate::prelude::*;
 use crate::test_utils;
-use crate::test_utils::AuroraRunner;
+use crate::test_utils::{create_eth_transaction, AuroraRunner};
+use crate::transaction::EthSignedTransaction;
 use crate::types::{AccountId, Balance, RawAddress};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
@@ -56,6 +57,17 @@ fn build_input(str_selector: &str, inputs: &[Token]) -> Vec<u8> {
     [sel.as_slice(), inputs.as_slice()].concat().to_vec()
 }
 
+fn create_ethereum_address() -> Address {
+    let mut rng = rand::thread_rng();
+    let source_account = SecretKey::random(&mut rng);
+    test_utils::address_from_secret_key(&source_account)
+}
+
+struct EthereumAddress {
+    secret_key: SecretKey,
+    address: RawAddress,
+}
+
 impl test_utils::AuroraRunner {
     pub fn new() -> Self {
         test_utils::deploy_evm()
@@ -71,6 +83,18 @@ impl test_utils::AuroraRunner {
         CallResult { outcome, error }
     }
 
+    pub fn make_call_with_signer(
+        &mut self,
+        method_name: &str,
+        caller_account_id: String,
+        signer_account_id: String,
+        input: Vec<u8>,
+    ) -> CallResult {
+        let (outcome, error) =
+            self.call_with_signer(method_name, caller_account_id, signer_account_id, input);
+        CallResult { outcome, error }
+    }
+
     pub fn evm_call(
         &mut self,
         contract: RawAddress,
@@ -82,6 +106,10 @@ impl test_utils::AuroraRunner {
             origin,
             (FunctionCallArgs { contract, input }).try_to_vec().unwrap(),
         )
+    }
+
+    pub fn evm_submit(&mut self, input: EthSignedTransaction, origin: AccountId) -> CallResult {
+        self.make_call("submit", origin, rlp::encode(&input).to_vec())
     }
 
     pub fn deploy_erc20_token(&mut self, nep141: &AccountId) -> RawAddress {
@@ -99,12 +127,15 @@ impl test_utils::AuroraRunner {
             .unwrap()
     }
 
-    fn create_account(&mut self) -> RawAddress {
+    fn create_account(&mut self) -> EthereumAddress {
         let mut rng = rand::thread_rng();
         let source_account = SecretKey::random(&mut rng);
         let source_address = test_utils::address_from_secret_key(&source_account);
         self.create_address(source_address, INITIAL_BALANCE.into(), INITIAL_NONCE.into());
-        source_address.into()
+        EthereumAddress {
+            secret_key: source_account,
+            address: source_address.into(),
+        }
     }
 
     pub fn balance_of(&mut self, token: RawAddress, target: RawAddress, origin: AccountId) -> U256 {
@@ -128,7 +159,33 @@ impl test_utils::AuroraRunner {
                 Token::Uint(U256::from(amount).into()),
             ],
         );
+        println!("{:?} {}", hex::encode(target), amount);
+        println!("{}", hex::encode(input.clone()));
         let result = self.evm_call(token, input, origin);
+        result.check_ok();
+        result
+    }
+
+    pub fn transfer_erc20(
+        &mut self,
+        token: RawAddress,
+        sender: SecretKey,
+        receiver: RawAddress,
+        amount: u64,
+        origin: AccountId,
+    ) -> CallResult {
+        // transfer(address recipient, uint256 amount)
+        let input = build_input(
+            "transfer(address,uint256)",
+            &[
+                Token::Address(receiver.into()),
+                Token::Uint(U256::from(amount)),
+            ],
+        );
+
+        let input = create_eth_transaction(Some(token.into()), U256::from(0), input, None, &sender);
+
+        let result = self.evm_submit(input, origin); // create_eth_transaction()
         result.check_ok();
         result
     }
@@ -137,12 +194,14 @@ impl test_utils::AuroraRunner {
         &mut self,
         nep141: AccountId,
         sender_id: AccountId,
+        relayer_id: AccountId,
         amount: Balance,
         msg: String,
     ) -> String {
-        let res = self.make_call(
+        let res = self.make_call_with_signer(
             "ft_on_transfer",
             nep141,
+            relayer_id,
             NEP141FtOnTransferArgs {
                 sender_id,
                 amount,
@@ -154,6 +213,18 @@ impl test_utils::AuroraRunner {
         res.check_ok();
         String::from_utf8(res.value()).unwrap()
     }
+
+    pub fn register_relayer(
+        &mut self,
+        relayer_account_id: AccountId,
+        relayer_address: Address,
+    ) -> CallResult {
+        self.make_call(
+            "register_relayer",
+            relayer_account_id,
+            relayer_address.as_fixed_bytes().try_to_vec().unwrap(),
+        )
+    }
 }
 
 #[test]
@@ -162,24 +233,27 @@ fn test_deploy_erc20_token() {
     runner.deploy_erc20_token(&"tt.testnet".to_string());
 }
 
+// TODO(#51): Fix test
 #[test]
 fn test_mint() {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
-    let address = runner.create_account();
+    let address = runner.create_account().address;
     let balance = runner.balance_of(token, address, get_origin());
     assert_eq!(balance, U256::from(0));
     let amount = 10;
-    runner.mint(token, address, amount, get_origin());
+    let result = runner.mint(token, address, amount, get_origin());
+    println!("Value: {:?}", result.value());
+    println!("Error: {:?}", result.error);
     let balance = runner.balance_of(token, address, get_origin());
-    assert_eq!(balance, U256::from(balance));
+    assert_eq!(balance, U256::from(amount));
 }
 
 #[test]
 fn test_mint_not_admin() {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
-    let address = runner.create_account();
+    let address = runner.create_account().address;
     let balance = runner.balance_of(token, address, get_origin());
     assert_eq!(balance, U256::from(0));
     let amount = 10;
@@ -195,12 +269,12 @@ fn test_ft_on_transfer() {
     let alice = "alice".to_string();
     let token = runner.deploy_erc20_token(&nep141);
     let amount = 10;
-    let recipient = runner.create_account();
+    let recipient = runner.create_account().address;
 
     let balance = runner.balance_of(token, recipient, get_origin());
     assert_eq!(balance, U256::from(0));
 
-    let res = runner.ft_on_transfer(nep141, alice, amount, hex::encode(recipient));
+    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, hex::encode(recipient));
     // Transaction should succeed so return amount is 0
     assert_eq!(res, "0");
 
@@ -215,10 +289,96 @@ fn test_ft_on_transfer_fail() {
     let alice = "alice".to_string();
     let amount = 10;
 
-    let recipient = runner.create_account();
+    let recipient = runner.create_account().address;
 
-    let res = runner.ft_on_transfer(nep141, alice, amount, hex::encode(recipient));
+    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, hex::encode(recipient));
 
     // Transaction should fail so it must return everything
     assert_eq!(res, amount.to_string());
+}
+
+#[test]
+fn test_relayer_charge_fee() {
+    let mut runner = AuroraRunner::new();
+    let amount = 10;
+    let fee = 51;
+    let nep141 = "tt.testnet".to_string();
+    let alice = "alice".to_string();
+    let token = runner.deploy_erc20_token(&nep141);
+    let recipient = runner.create_account().address;
+
+    let recipient_balance = runner.get_balance(recipient.into());
+    assert_eq!(recipient_balance, U256::from(INITIAL_BALANCE));
+
+    let relayer = create_ethereum_address();
+    runner.register_relayer(alice.clone(), relayer);
+    let relayer_balance = runner.get_balance(relayer);
+    assert_eq!(relayer_balance, U256::from(0));
+
+    let balance = runner.balance_of(token, recipient, get_origin());
+    assert_eq!(balance, U256::from(0));
+
+    let fee_encoded = &mut [0; 32];
+    U256::from(fee).to_big_endian(fee_encoded);
+
+    runner.ft_on_transfer(
+        nep141,
+        alice.clone(),
+        alice,
+        amount,
+        hex::encode(recipient) + &hex::encode(fee_encoded),
+    );
+
+    let recipient_balance_end = runner.get_balance(recipient.into());
+    assert_eq!(recipient_balance_end, U256::from(INITIAL_BALANCE - fee));
+    let relayer_balance = runner.get_balance(relayer);
+    assert_eq!(relayer_balance, U256::from(fee));
+
+    let balance = runner.balance_of(token, recipient, get_origin());
+    assert_eq!(balance, U256::from(amount));
+}
+
+// TODO(#51): Fix test
+#[test]
+fn test_transfer_erc20_token() {
+    let mut runner = AuroraRunner::new();
+    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let peer0 = runner.create_account();
+    let peer1 = runner.create_account();
+
+    let to_mint = 51;
+    let to_transfer = 43;
+
+    assert_eq!(
+        runner.balance_of(token, peer0.address, get_origin()),
+        U256::zero()
+    );
+    assert_eq!(
+        runner.balance_of(token, peer1.address, get_origin()),
+        U256::zero()
+    );
+
+    runner.mint(token, peer0.address, to_mint, get_origin());
+
+    assert_eq!(
+        runner.balance_of(token, peer0.address, get_origin()),
+        U256::from(to_mint)
+    );
+
+    runner.transfer_erc20(
+        token,
+        peer0.secret_key,
+        peer1.address,
+        to_transfer,
+        get_origin(),
+    );
+    assert_eq!(
+        runner.balance_of(token, peer0.address, get_origin()),
+        U256::from(to_mint - to_transfer)
+    );
+
+    assert_eq!(
+        runner.balance_of(token, peer1.address, get_origin()),
+        U256::from(to_transfer)
+    );
 }
