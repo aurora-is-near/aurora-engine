@@ -409,7 +409,7 @@ mod contract {
         near_account_to_evm_address(&sdk::predecessor_account_id())
     }
 
-    fn current_address() -> Address {
+    pub fn current_address() -> Address {
         near_account_to_evm_address(&sdk::current_account_id())
     }
 

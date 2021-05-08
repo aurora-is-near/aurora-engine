@@ -4,13 +4,13 @@ use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
-use crate::contract::{SdkExpect, SdkProcess};
+use crate::contract::current_address;
 use crate::map::LookupMap;
 use crate::parameters::{
     FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, SubmitResult, ViewCallArgs,
 };
 use crate::precompiles;
-use crate::prelude::{Address, TryInto, Vec, H256, U256};
+use crate::prelude::{Address, ToString, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId};
@@ -27,6 +27,27 @@ macro_rules! as_ref_err_impl {
             fn as_ref(&self) -> &[u8] {
                 self.to_str().as_bytes()
             }
+        }
+    };
+}
+
+macro_rules! unwrap_res_or_finish {
+    ($e:expr, $output:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(_) => {
+                sdk::return_output($output);
+                return;
+            }
+        }
+    };
+}
+
+macro_rules! assert_or_finish {
+    ($e:expr, $output:expr) => {
+        if !$e {
+            sdk::return_output($output);
+            return;
         }
     };
 }
@@ -497,11 +518,31 @@ impl Engine {
         self.state.nep141_erc20.get_raw(nep141_token)
     }
 
+    /// Mint tokens for recipient on a particular ERC20 token
+    /// This function should return the amount of tokens unused,
+    /// which will be always all (<amount>) if there is any problem
+    /// with the input, or 0 if tokens were minted successfully.
+    ///
+    /// The output will be serialized as a String
+    /// https://github.com/near/NEPs/discussions/146
+    ///
+    /// IMPORTANT: This function should not panic, otherwise it won't
+    /// be possible to return the tokens to the sender.
+    ///
+    /// TODO(#51): Carefully review that this function can't fail,
+    ///     and returns appropriate value
     pub fn receive_erc20_tokens(&mut self) {
         let input = sdk::read_input();
 
-        let args: NEP141FtOnTransferArgs =
-            NEP141FtOnTransferArgs::try_from_slice(input.as_slice()).unwrap();
+        let args: NEP141FtOnTransferArgs = unwrap_res_or_finish!(
+            NEP141FtOnTransferArgs::try_from_slice(input.as_slice()),
+            // At this point the amount is not known yet.
+            // It is responsibility of the NEP141 to provide correct arguments.
+            b"0"
+        );
+
+        let str_amount = args.amount.to_string();
+        let output_on_fail = str_amount.as_bytes();
 
         let token = sdk::predecessor_account_id();
 
@@ -509,56 +550,66 @@ impl Engine {
         let (recipient, fee) = {
             // Message format:
             //      Recipient of the transaction - 40 characters (Address in hex)
-            //      Fee to be paid in ETH (Optional) - 64 bytes (Encoded in little endian / hex)
+            //      Fee to be paid in ETH (Optional) - 64 characters (Encoded in big endian / hex)
             let mut message = args.msg.as_bytes();
-            assert!(message.len() >= 40);
+            assert_or_finish!(message.len() >= 40, output_on_fail);
 
-            let recipient = Address(
-                hex::decode(&message[..40])
-                    .unwrap()
-                    .as_slice()
-                    .try_into()
-                    .unwrap(),
-            );
+            let recipient = Address(unwrap_res_or_finish!(
+                hex::decode(&message[..40]).unwrap().as_slice().try_into(),
+                output_on_fail
+            ));
             message = &message[40..];
 
             let fee = if message.is_empty() {
                 U256::from(0)
             } else {
-                assert_eq!(message.len(), 64);
-                U256::from_little_endian(hex::decode(message).unwrap().as_slice())
+                assert_or_finish!(message.len() == 64, output_on_fail);
+                U256::from_big_endian(
+                    unwrap_res_or_finish!(hex::decode(message), output_on_fail).as_slice(),
+                )
             };
 
             (recipient, fee)
         };
 
-        let erc20_token = Address(
+        let erc20_token = Address(unwrap_res_or_finish!(
             self.get_erc20_from_nep141(token.as_slice())
                 .expect("Token not found on the EVM")
                 .as_slice()
-                .try_into()
-                .unwrap(),
-        );
+                .try_into(),
+            output_on_fail
+        ));
 
-        // TODO(#51): Use proper input value
-        self.call(
-            Address(Default::default()),
-            erc20_token,
-            U256::from(0),
-            Default::default(),
-        )
-        .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-        .sdk_process();
+        let selector = &sdk::keccak("mint(address,uint256)".as_bytes())[..4];
+        let tail = ethabi::encode(&[
+            ethabi::Token::Address(recipient.into()),
+            ethabi::Token::Uint(args.amount.into()),
+        ]);
+
+        unwrap_res_or_finish!(
+            self.call(
+                current_address(),
+                erc20_token,
+                U256::from(0),
+                [selector, tail.as_slice()].concat(),
+            ),
+            output_on_fail
+        );
 
         if fee != U256::from(0) {
             let relayer_account_id = sdk::signer_account_id();
-            let relayer_address = self
-                .get_relayer(relayer_account_id.as_slice())
-                .expect("Relayer not found");
-            self.transfer(&recipient, &relayer_address, &fee)
-                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-                .sdk_process();
+            let relayer_address = unwrap_res_or_finish!(
+                self.get_relayer(relayer_account_id.as_slice()).ok_or(()),
+                output_on_fail
+            );
+
+            unwrap_res_or_finish!(
+                self.transfer(&recipient, &relayer_address, &fee),
+                output_on_fail
+            );
         }
+
+        sdk::return_output(b"0");
     }
 }
 

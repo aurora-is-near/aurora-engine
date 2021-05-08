@@ -1,8 +1,8 @@
-use crate::parameters::{FunctionCallArgs, SubmitResult};
+use crate::parameters::{FunctionCallArgs, NEP141FtOnTransferArgs, SubmitResult};
 use crate::prelude::*;
 use crate::test_utils;
 use crate::test_utils::AuroraRunner;
-use crate::types::{AccountId, RawAddress};
+use crate::types::{AccountId, Balance, RawAddress};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
 use near_vm_logic::VMOutcome;
@@ -89,7 +89,7 @@ impl test_utils::AuroraRunner {
         )
     }
 
-    pub fn deploy_erc20_token(&mut self, nep141: AccountId) -> RawAddress {
+    pub fn deploy_erc20_token(&mut self, nep141: &AccountId) -> RawAddress {
         let result = self.make_call(
             "deploy_erc20_token",
             get_origin(),
@@ -137,24 +137,41 @@ impl test_utils::AuroraRunner {
             ],
         );
         let result = self.evm_call(token, input, origin);
-        println!("{:?}", result.error);
         result.check_ok();
         result
     }
 
-    fn submit(&mut self) {}
+    pub fn ft_on_transfer(
+        &mut self,
+        nep141: AccountId,
+        sender_id: AccountId,
+        amount: Balance,
+        msg: String,
+    ) -> CallResult {
+        self.make_call(
+            "ft_on_transfer",
+            nep141,
+            NEP141FtOnTransferArgs {
+                sender_id,
+                amount,
+                msg,
+            }
+            .try_to_vec()
+            .unwrap(),
+        )
+    }
 }
 
 #[test]
 fn test_deploy_erc20_token() {
     let mut runner = AuroraRunner::new();
-    runner.deploy_erc20_token("tt.testnet".to_string());
+    runner.deploy_erc20_token(&"tt.testnet".to_string());
 }
 
 #[test]
 fn test_mint() {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token("tt.testnet".to_string());
+    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
     let address = runner.create_account();
     let balance = runner.balance_of(token, address.address, get_origin());
     assert_eq!(balance, U256::from(0));
@@ -167,7 +184,7 @@ fn test_mint() {
 #[test]
 fn test_mint_not_admin() {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token("tt.testnet".to_string());
+    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
     let address = runner.create_account();
     let balance = runner.balance_of(token, address.address, get_origin());
     assert_eq!(balance, U256::from(0));
@@ -175,4 +192,15 @@ fn test_mint_not_admin() {
     runner.mint(token, address.address, amount, "not_admin".to_string());
     let balance = runner.balance_of(token, address.address, get_origin());
     assert_eq!(balance, U256::from(0));
+}
+
+#[test]
+fn test_ft_on_transfer() {
+    let mut runner = AuroraRunner::new();
+    let nep141 = "tt.testnet".to_string();
+    let alice = "alice".to_string();
+    let token = runner.deploy_erc20_token(&nep141);
+
+    let res = runner.ft_on_transfer(nep141, alice, 10, "".to_string());
+    println!("{:?}", res.error);
 }

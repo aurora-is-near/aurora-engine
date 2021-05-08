@@ -140,7 +140,6 @@ pub struct NEP141TransferCallArgs {
 
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
-#[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
