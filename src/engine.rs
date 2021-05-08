@@ -573,10 +573,12 @@ impl Engine {
         };
 
         let erc20_token = Address(unwrap_res_or_finish!(
-            self.get_erc20_from_nep141(token.as_slice())
-                .expect("Token not found on the EVM")
-                .as_slice()
-                .try_into(),
+            unwrap_res_or_finish!(
+                self.get_erc20_from_nep141(token.as_slice()).ok_or(()),
+                output_on_fail
+            )
+            .as_slice()
+            .try_into(),
             output_on_fail
         ));
 
@@ -609,6 +611,7 @@ impl Engine {
             );
         }
 
+        // Everything succeed so return "0"
         sdk::return_output(b"0");
     }
 }

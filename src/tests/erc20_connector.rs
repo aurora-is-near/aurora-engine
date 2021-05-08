@@ -56,11 +56,6 @@ fn build_input(str_selector: &str, inputs: &[Token]) -> Vec<u8> {
     [sel.as_slice(), inputs.as_slice()].concat().to_vec()
 }
 
-struct EthereumAccount {
-    key: SecretKey,
-    address: RawAddress,
-}
-
 impl test_utils::AuroraRunner {
     pub fn new() -> Self {
         test_utils::deploy_evm()
@@ -104,15 +99,12 @@ impl test_utils::AuroraRunner {
             .unwrap()
     }
 
-    fn create_account(&mut self) -> EthereumAccount {
+    fn create_account(&mut self) -> RawAddress {
         let mut rng = rand::thread_rng();
         let source_account = SecretKey::random(&mut rng);
         let source_address = test_utils::address_from_secret_key(&source_account);
         self.create_address(source_address, INITIAL_BALANCE.into(), INITIAL_NONCE.into());
-        EthereumAccount {
-            key: source_account,
-            address: source_address.into(),
-        }
+        source_address.into()
     }
 
     pub fn balance_of(&mut self, token: RawAddress, target: RawAddress, origin: AccountId) -> U256 {
@@ -147,8 +139,8 @@ impl test_utils::AuroraRunner {
         sender_id: AccountId,
         amount: Balance,
         msg: String,
-    ) -> CallResult {
-        self.make_call(
+    ) -> String {
+        let res = self.make_call(
             "ft_on_transfer",
             nep141,
             NEP141FtOnTransferArgs {
@@ -158,7 +150,9 @@ impl test_utils::AuroraRunner {
             }
             .try_to_vec()
             .unwrap(),
-        )
+        );
+        res.check_ok();
+        String::from_utf8(res.value()).unwrap()
     }
 }
 
@@ -173,11 +167,11 @@ fn test_mint() {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
     let address = runner.create_account();
-    let balance = runner.balance_of(token, address.address, get_origin());
+    let balance = runner.balance_of(token, address, get_origin());
     assert_eq!(balance, U256::from(0));
     let amount = 10;
-    runner.mint(token, address.address, amount, get_origin());
-    let balance = runner.balance_of(token, address.address, get_origin());
+    runner.mint(token, address, amount, get_origin());
+    let balance = runner.balance_of(token, address, get_origin());
     assert_eq!(balance, U256::from(balance));
 }
 
@@ -186,11 +180,11 @@ fn test_mint_not_admin() {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
     let address = runner.create_account();
-    let balance = runner.balance_of(token, address.address, get_origin());
+    let balance = runner.balance_of(token, address, get_origin());
     assert_eq!(balance, U256::from(0));
     let amount = 10;
-    runner.mint(token, address.address, amount, "not_admin".to_string());
-    let balance = runner.balance_of(token, address.address, get_origin());
+    runner.mint(token, address, amount, "not_admin".to_string());
+    let balance = runner.balance_of(token, address, get_origin());
     assert_eq!(balance, U256::from(0));
 }
 
@@ -200,7 +194,31 @@ fn test_ft_on_transfer() {
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
     let token = runner.deploy_erc20_token(&nep141);
+    let amount = 10;
+    let recipient = runner.create_account();
 
-    let res = runner.ft_on_transfer(nep141, alice, 10, "".to_string());
-    println!("{:?}", res.error);
+    let balance = runner.balance_of(token, recipient, get_origin());
+    assert_eq!(balance, U256::from(0));
+
+    let res = runner.ft_on_transfer(nep141, alice, amount, hex::encode(recipient));
+    // Transaction should succeed so return amount is 0
+    assert_eq!(res, "0");
+
+    let balance = runner.balance_of(token, recipient, get_origin());
+    assert_eq!(balance, U256::from(amount));
+}
+
+#[test]
+fn test_ft_on_transfer_fail() {
+    let mut runner = AuroraRunner::new();
+    let nep141 = "tt.testnet".to_string();
+    let alice = "alice".to_string();
+    let amount = 10;
+
+    let recipient = runner.create_account();
+
+    let res = runner.ft_on_transfer(nep141, alice, amount, hex::encode(recipient));
+
+    // Transaction should fail so it must return everything
+    assert_eq!(res, amount.to_string());
 }
