@@ -10,6 +10,7 @@ pub enum KeyPrefix {
     Code = 0x3,
     Storage = 0x4,
     RelayerEvmAddressMap = 0x5,
+    EthConnector = 0x6,
 }
 
 /// We can't use const generic over Enum, but we can do it over integral type

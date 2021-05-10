@@ -7,12 +7,11 @@ use crate::deposit_event::*;
 use crate::engine::Engine;
 use crate::prelude::*;
 use crate::prover::validate_eth_address;
+use crate::storage::KeyPrefix;
 #[cfg(feature = "log")]
 use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-pub const CONTRACT_NAME_KEY: &str = "EthConnector";
-pub const CONTRACT_FT_KEY: &str = "ft:";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
@@ -38,6 +37,14 @@ pub enum TokenMessageData {
     Eth { address: AccountId, message: String },
 }
 
+/// Key prefix to creating key for storage
+#[derive(Clone, Copy, BorshSerialize, BorshDeserialize)]
+pub enum EthConnectorKeyPrefix {
+    Contract = 0x0,
+    FungibleToken = 0x1,
+    UsedEvent = 0x2,
+}
+
 /// On-transfer message
 pub struct OnTransferMessageData {
     pub relayer: AccountId,
@@ -48,16 +55,26 @@ pub struct OnTransferMessageData {
 impl EthConnectorContract {
     pub fn get_instance() -> Self {
         Self {
-            contract: sdk::get_contract_data(CONTRACT_NAME_KEY),
-            ft: sdk::get_contract_data(CONTRACT_FT_KEY),
+            contract: Self::get_contract_data(&EthConnectorKeyPrefix::Contract),
+            ft: Self::get_contract_data(&EthConnectorKeyPrefix::FungibleToken),
         }
+    }
+
+    fn get_contract_key(suffix: &EthConnectorKeyPrefix) -> Vec<u8> {
+        [KeyPrefix::EthConnector as u8, *suffix as u8].to_vec()
+    }
+
+    fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorKeyPrefix) -> T {
+        let data =
+            sdk::read_storage(&Self::get_contract_key(&suffix)).expect("Failed read storage");
+        T::try_from_slice(&data[..]).unwrap()
     }
 
     /// Init eth-connector contract specific data
     pub fn init_contract() {
         // Check is it already initialized
         assert!(
-            !sdk::storage_has_key(CONTRACT_NAME_KEY.as_bytes()),
+            !sdk::storage_has_key(&Self::get_contract_key(&EthConnectorKeyPrefix::Contract)),
             "ERR_CONTRACT_INITIALIZED"
         );
         #[cfg(feature = "log")]
@@ -74,7 +91,10 @@ impl EthConnectorContract {
             eth_custodian_address: validate_eth_address(args.eth_custodian_address),
         };
         // Save th-connector specific data
-        sdk::save_contract(CONTRACT_NAME_KEY.as_bytes(), &contract_data);
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorKeyPrefix::Contract),
+            &contract_data,
+        );
         Self {
             contract: contract_data,
             ft,
@@ -261,7 +281,7 @@ impl EthConnectorContract {
         sdk::log("Check verification_success");
         let verification_success: bool = bool::try_from_slice(&data0).unwrap();
         assert!(verification_success, "ERR_VERIFY_PROOF");
-        self.record_proof(data.proof_key);
+        self.record_proof(&data.proof_key);
 
         // Mint tokens to recipient minus fee
         if let Some(msg) = data.msg {
@@ -298,10 +318,9 @@ impl EthConnectorContract {
     }
 
     /// Record used proof as hash key
-    fn record_proof(&mut self, key: String) {
+    fn record_proof(&mut self, key: &str) {
         #[cfg(feature = "log")]
-        sdk::log("Record proof");
-        let key = key.as_str();
+        sdk::log(&format!("Record proof: {}", key));
 
         assert!(!self.check_used_event(key), "ERR_PROOF_EXIST");
         self.save_used_event(key);
@@ -542,21 +561,33 @@ impl EthConnectorContract {
 
     /// Save eth-connector contract data
     fn save_contract(&mut self) {
-        sdk::save_contract(CONTRACT_FT_KEY.as_bytes(), &self.ft);
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorKeyPrefix::FungibleToken),
+            &self.ft,
+        );
     }
 
     /// Generate key for used events from Prood
-    fn used_event_key(&self, key: &str) -> String {
-        [CONTRACT_NAME_KEY, "used-event", key].join(".")
+    fn used_event_key(&self, key: &str) -> Vec<u8> {
+        let mut v = Self::get_contract_key(&EthConnectorKeyPrefix::UsedEvent).to_vec();
+        v.extend_from_slice(key.as_bytes());
+        v
+    }
+
+    /// Fungible token key
+    pub fn ft_key(account_id: &str) -> Vec<u8> {
+        let mut v = Self::get_contract_key(&EthConnectorKeyPrefix::FungibleToken).to_vec();
+        v.extend_from_slice(account_id.as_bytes());
+        v
     }
 
     /// Save already used event proof as hash key
     fn save_used_event(&self, key: &str) {
-        sdk::save_contract(&self.used_event_key(key).as_bytes(), &0u8);
+        sdk::save_contract(&self.used_event_key(key), &0u8);
     }
 
     /// Check is event of proof already used
     fn check_used_event(&self, key: &str) -> bool {
-        sdk::storage_has_key(&self.used_event_key(key).as_bytes())
+        sdk::storage_has_key(&self.used_event_key(key))
     }
 }

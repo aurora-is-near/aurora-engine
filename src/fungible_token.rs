@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use super::*;
-use crate::connector::{CONTRACT_FT_KEY, NO_DEPOSIT};
+use crate::connector::{EthConnectorContract, NO_DEPOSIT};
 use crate::engine::Engine;
 use crate::parameters::*;
 use crate::prelude;
@@ -417,23 +417,19 @@ impl FungibleToken {
         }
     }
 
-    fn ft_key(&self, account_id: &str) -> Vec<u8> {
-        [CONTRACT_FT_KEY, &account_id].join(".").as_bytes().to_vec()
-    }
-
     pub fn accounts_insert(&self, account_id: &str, amount: Balance) {
-        sdk::save_contract(&self.ft_key(account_id), &amount)
+        sdk::save_contract(&EthConnectorContract::ft_key(account_id), &amount)
     }
 
     fn accounts_contains_key(&self, account_id: &str) -> bool {
-        sdk::storage_has_key(&self.ft_key(account_id))
+        sdk::storage_has_key(&EthConnectorContract::ft_key(account_id))
     }
 
     fn accounts_remove(&self, account_id: &str) {
-        sdk::remove_storage(&self.ft_key(account_id))
+        sdk::remove_storage(&EthConnectorContract::ft_key(account_id))
     }
 
     pub fn accounts_get(&self, account_id: &str) -> Option<Vec<u8>> {
-        sdk::read_storage(&self.ft_key(account_id)[..])
+        sdk::read_storage(&EthConnectorContract::ft_key(account_id))
     }
 }

@@ -1,6 +1,6 @@
 use crate::prelude::{vec, Vec, H256};
 use crate::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshSerialize;
 
 mod exports {
     #[allow(unused)]
@@ -313,11 +313,6 @@ pub fn self_deploy(code_key: &[u8]) {
 
 pub fn save_contract<T: BorshSerialize>(key: &[u8], data: &T) {
     write_storage(key, &data.try_to_vec().unwrap()[..]);
-}
-
-pub fn get_contract_data<T: BorshDeserialize>(key: &str) -> T {
-    let data = read_storage(key.as_bytes()).expect("Failed read storage");
-    T::try_from_slice(&data[..]).unwrap()
 }
 
 #[allow(dead_code)]
