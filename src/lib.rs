@@ -247,7 +247,7 @@ mod contract {
         let input = sdk::read_input();
         let dest_address = Address::from_slice(&input);
         let source_address = predecessor_address();
-        let engine = Engine::new(dest_address);
+        let engine = Engine::new(source_address);
 
         engine.increment_nonce(&source_address);
 
