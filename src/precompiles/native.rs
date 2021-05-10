@@ -25,7 +25,7 @@ mod costs {
     pub(super) const FT_TRANSFER_GAS: Gas = 100_000_000_000_000;
 
     // TODO(#51): Determine the correct amount of gas
-    pub(super) const WITHDRAWAL_GAS: Gas = 50_000;
+    pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
 }
 
 /// Get the current nep141 token associated with the current erc20 token.
@@ -121,15 +121,15 @@ impl Precompile for ExitToEthereum {
             // Input slice format:
             //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
 
-            let eth_recipient: AccountId = String::from_utf8(input.to_vec()).unwrap();
-            let args = BridgedTokenWithdrawEthConnectorArgs {
-                amount: U128(context.apparent_value.as_u128()),
-                recipient: eth_recipient,
-            };
+            let eth_recipient: String = hex::encode(input);
 
             (
                 String::from_utf8(sdk::current_account_id()).unwrap(),
-                BorshSerialize::try_to_vec(&args).ok().unwrap(),
+                crate::prelude::format!(
+                    r#"{{"amount": "{}", "recipient": "{}"}}"#,
+                    context.apparent_value.as_u128(),
+                    eth_recipient
+                ),
             )
         } else {
             // ERC-20 transfer
@@ -145,26 +145,29 @@ impl Precompile for ExitToEthereum {
 
             let mut input_mut = input;
 
-            let amount = U128(U256::from_big_endian(&input_mut[..32]).as_u128());
+            let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
             input_mut = &input_mut[32..];
 
-            let eth_recipient: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
-            let args = BridgedTokenWithdrawArgs {
-                recipient: eth_recipient,
-                amount,
-            };
+            assert_eq!(input_mut.len(), 20);
+
+            // Parse ethereum address in hex
+            let eth_recipient: String = hex::encode(input_mut.to_vec());
 
             (
                 nep141_address,
-                BorshSerialize::try_to_vec(&args).ok().unwrap(),
+                crate::prelude::format!(
+                    r#"{{"amount": "{}", "recipient": "{}"}}"#,
+                    amount,
+                    eth_recipient
+                ),
             )
         };
 
         let promise0 = sdk::promise_create(
             nep141_address,
             b"withdraw",
-            serialized_args.as_slice(),
-            0,
+            serialized_args.as_bytes(),
+            1,
             costs::WITHDRAWAL_GAS,
         );
 

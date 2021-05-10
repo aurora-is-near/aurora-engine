@@ -13,7 +13,7 @@ release: release.wasm
 release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	ln -sf $< $@
 
-target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/**/*.rs) etc/eth-contracts/res/EvmErc20.bin
+target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 
 etc/eth-contracts/res/EvmErc20.bin: $(wildcard etc/eth-contracts/contracts/*.sol) etc/eth-contracts/package.json
