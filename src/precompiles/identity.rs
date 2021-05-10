@@ -33,7 +33,7 @@ impl Precompile for Identity {
     fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
-            return Err(ExitError::OutOfGas);
+            Err(ExitError::OutOfGas)
         } else {
             Ok((ExitSucceed::Returned, input.to_vec(), cost))
         }

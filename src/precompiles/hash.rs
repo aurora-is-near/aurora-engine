@@ -53,7 +53,7 @@ impl Precompile for SHA256 {
 
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
-            return Err(ExitError::OutOfGas);
+            Err(ExitError::OutOfGas)
         } else {
             Ok((
                 ExitSucceed::Returned,
@@ -84,7 +84,7 @@ impl Precompile for RIPEMD160 {
 
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
-            return Err(ExitError::OutOfGas);
+            Err(ExitError::OutOfGas)
         } else {
             let hash = ripemd160::Ripemd160::digest(input);
             // The result needs to be padded with leading zeros because it is only 20 bytes, but
