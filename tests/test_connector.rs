@@ -26,7 +26,7 @@ const DEPOSITED_EVM_AMOUNT: u128 = 800400;
 const DEPOSITED_EVM_FEE: u128 = 400;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "test.wasm"
+    EVM_WASM_BYTES => "release.wasm"
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]

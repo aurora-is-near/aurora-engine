@@ -27,9 +27,8 @@ target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(
 
 test-build:
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=contract,integration-test -Z avoid-dev-deps
-	ln -sf target/wasm32-unknown-unknown/release/aurora_engine.wasm test.wasm 
+	ln -sf target/wasm32-unknown-unknown/release/aurora_engine.wasm release.wasm 
 	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm 
-
 
 .PHONY: all release debug
 
