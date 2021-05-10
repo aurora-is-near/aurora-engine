@@ -12,46 +12,6 @@ use crate::sdk;
 use crate::storage::{address_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId};
 
-macro_rules! as_ref_err_impl {
-    ($err: ty) => {
-        impl AsRef<str> for $err {
-            fn as_ref(&self) -> &str {
-                self.to_str()
-            }
-        }
-
-        impl AsRef<[u8]> for $err {
-            fn as_ref(&self) -> &[u8] {
-                self.to_str().as_bytes()
-            }
-        }
-    };
-}
-
-/// Errors involving the nonce
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum NonceError {
-    /// Attempted to increment the nonce, but overflow occurred
-    NonceOverflow,
-    /// Account nonce did not match the transaction nonce
-    IncorrectNonce,
-}
-
-impl NonceError {
-    pub fn to_str(&self) -> &str {
-        use NonceError::*;
-        match self {
-            NonceOverflow => "ERR_NONCE_OVERFLOW",
-            IncorrectNonce => "ERR_INCORRECT_NONCE",
-        }
-    }
-}
-
-as_ref_err_impl!(NonceError);
-
-/// A result for nonces.
-pub type NonceResult<T> = Result<T, NonceError>;
-
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum EngineError {
@@ -59,10 +19,8 @@ pub enum EngineError {
     EvmError(ExitError),
     /// Fatal EVM errors.
     EvmFatal(ExitFatal),
-    /// Balance is too high, over max value.
-    BalanceTooHigh,
-    /// Balance is too low, cannot cover costs.
-    BalanceTooLow,
+    /// Incorrect nonce.
+    IncorrectNonce,
 }
 
 impl EngineError {
@@ -86,13 +44,22 @@ impl EngineError {
             EvmFatal(ExitFatal::UnhandledInterrupt) => "ERR_UNHANDLED_INTERRUPT",
             EvmFatal(ExitFatal::Other(m)) => m,
             EvmFatal(_) => unreachable!(), // unused misc
-            BalanceTooHigh => "ERR_BALANCE_HIGH",
-            BalanceTooLow => "ERR_BALANCE_LOW",
+            IncorrectNonce => "ERR_INCORRECT_NONCE",
         }
     }
 }
 
-as_ref_err_impl!(EngineError);
+impl AsRef<str> for EngineError {
+    fn as_ref(&self) -> &str {
+        self.to_str()
+    }
+}
+
+impl AsRef<[u8]> for EngineError {
+    fn as_ref(&self) -> &[u8] {
+        self.to_str().as_bytes()
+    }
+}
 
 impl From<ExitError> for EngineError {
     fn from(e: ExitError) -> Self {
@@ -215,21 +182,17 @@ impl Engine {
         sdk::remove_storage(&address_to_key(KeyPrefix::Nonce, address))
     }
 
-    /// Checks the nonce for the address matches the transaction nonce, and if so
-    /// returns the next nonce (if it exists). Note: this does not modify the actual
-    /// nonce of the account in storage. The nonce still needs to be set to the new value
-    /// if this is required.
+    /// Checks the nonce to ensure that the address matches the transaction
+    /// nonce.
     #[inline]
-    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> NonceResult<U256> {
+    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> EngineResult<()> {
         let account_nonce = Self::get_nonce(address);
 
         if transaction_nonce != &account_nonce {
-            return Err(NonceError::IncorrectNonce);
+            return Err(EngineError::IncorrectNonce);
         }
 
-        account_nonce
-            .checked_add(U256::one())
-            .ok_or(NonceError::NonceOverflow)
+        Ok(())
     }
 
     pub fn get_nonce(address: &Address) -> U256 {
@@ -253,38 +216,6 @@ impl Engine {
         sdk::read_storage(&address_to_key(KeyPrefix::Balance, address))
             .map(|value| U256::from_big_endian(&value))
             .unwrap_or_else(U256::zero)
-    }
-
-    /// Checks if the balance can be increased by an amount for a given address.
-    ///
-    /// Returns the new balance on success.
-    ///
-    /// # Errors
-    ///
-    /// * If the balance is > `U256::MAX`
-    fn check_increase_balance(address: &Address, amount: &U256) -> EngineResult<U256> {
-        let balance = Self::get_balance(address);
-        if let Some(new_balance) = balance.checked_add(*amount) {
-            Ok(new_balance)
-        } else {
-            Err(EngineError::BalanceTooHigh)
-        }
-    }
-
-    /// Checks if the balance can be decreased by an amount for a given address.
-    ///
-    /// Returns the new balance on success.
-    ///
-    /// # Errors
-    ///
-    /// * If the balance is < `U256::zero()`
-    fn check_decrease_balance(address: &Address, amount: &U256) -> EngineResult<U256> {
-        let balance = Self::get_balance(address);
-        if let Some(new_balance) = balance.checked_sub(*amount) {
-            Ok(new_balance)
-        } else {
-            Err(EngineError::BalanceTooLow)
-        }
     }
 
     pub fn remove_storage(address: &Address, key: &H256) {
@@ -326,35 +257,6 @@ impl Engine {
         if Self::is_account_empty(address) {
             Self::remove_account(address);
         }
-    }
-
-    /// Transfers an amount from a given sender to a receiver, provided that
-    /// the have enough in their balance.
-    ///
-    /// If the sender can send, and the receiver can receive, then the transfer
-    /// will execute successfully.
-    pub fn transfer(
-        &mut self,
-        sender: &Address,
-        receiver: &Address,
-        value: &U256,
-    ) -> EngineResult<SubmitResult> {
-        let balance = Self::get_balance(sender);
-        if balance < *value {
-            return Err(ExitError::OutOfFund.into());
-        }
-
-        let new_receiver_balance = Self::check_increase_balance(receiver, value)?;
-        let new_sender_balance = Self::check_decrease_balance(sender, value)?;
-        Self::set_balance(sender, &new_sender_balance);
-        Self::set_balance(receiver, &new_receiver_balance);
-
-        Ok(SubmitResult {
-            status: true,
-            gas_used: 0, // TODO
-            result: Vec::new(),
-            logs: Vec::new(),
-        })
     }
 
     pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<SubmitResult> {
@@ -410,7 +312,12 @@ impl Engine {
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         let is_succeed = status.is_succeed();
-        status.into_result()?;
+
+        if let Err(e) = status.into_result() {
+            Engine::increment_nonce(&origin);
+            return Err(e);
+        }
+
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
@@ -423,11 +330,20 @@ impl Engine {
         })
     }
 
+    pub fn increment_nonce(address: &Address) {
+        let account_nonce = Self::get_nonce(address);
+        let new_nonce = account_nonce.saturating_add(U256::one());
+        Self::set_nonce(address, &new_nonce);
+    }
+
     #[cfg(feature = "testnet")]
     /// Credits the address with 10 coins from the faucet.
-    pub fn credit(&mut self, address: &Address) -> EngineResult<()> {
-        let new_bal = Self::check_increase_balance(address, &U256::from(10))?;
-        Self::set_balance(address, &new_bal);
+    pub fn credit(&self, address: &Address) -> EngineResult<()> {
+        let balance = Self::get_balance(address);
+        // Saturating adds are intentional
+        let new_balance = balance.saturating_add(U256::from(10_000_000_000_000_000_000));
+
+        Self::set_balance(address, &new_balance);
         Ok(())
     }
 

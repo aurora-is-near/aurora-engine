@@ -192,25 +192,15 @@ mod contract {
             None => sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
         };
 
-        let next_nonce =
-            Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
+        Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
         let data = signed_transaction.transaction.data;
         let result = if let Some(receiver) = signed_transaction.transaction.to {
-            if data.is_empty() {
-                // Execute a balance transfer. We need to save the incremented nonce in this case
-                // because it is not handled internally by SputnikVM like it is in the case of
-                // `call` and `deploy_code`.
-                Engine::set_nonce(&sender, &next_nonce);
-                Engine::transfer(&mut engine, &sender, &receiver, &value)
-            } else {
-                // Execute a contract call:
-                Engine::call(&mut engine, sender, receiver, value, data)
-                // TODO: charge for storage
-            }
+            Engine::call(&mut engine, sender, receiver, value, data)
+            // TODO: charge for storage
         } else {
             // Execute a contract deployment:
             Engine::deploy_code(&mut engine, sender, value, &data)
@@ -255,9 +245,13 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn make_it_rain() {
         let input = sdk::read_input();
-        let address = Address::from_slice(&input);
-        let mut engine = Engine::new(address);
-        let result = engine.credit(&address);
+        let dest_address = Address::from_slice(&input);
+        let source_address = predecessor_address();
+        let engine = Engine::new(source_address);
+
+        engine.increment_nonce(&source_address);
+
+        let result = engine.credit(&dest_address);
         result.map(|_f| Vec::new()).sdk_process();
     }
 
