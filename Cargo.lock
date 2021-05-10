@@ -111,6 +111,7 @@ dependencies = [
  "aurora-bn",
  "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh",
+ "bstr",
  "criterion",
  "ethabi",
  "evm",
