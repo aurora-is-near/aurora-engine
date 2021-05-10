@@ -523,12 +523,11 @@ impl EthConnectorContract {
             self.mint_eth(message_data.recipient, args.amount - fee);
             // Mint fee to relayer
             if fee > 0 {
-                let evm_relayer_addres: EthAddress = engine
+                let evm_relayer_address: EthAddress = engine
                     .get_relayer(&message_data.relayer.as_bytes())
                     .expect("ERR_WRONG_RELAYER_ID")
                     .0;
-                //let evm_relayer_addres = self.get_evm_relayer_address(&message_data.relayer);
-                self.mint_eth(evm_relayer_addres, fee);
+                self.mint_eth(evm_relayer_address, fee);
             }
         } else {
             // Implement new scheme when PR #62 is merged

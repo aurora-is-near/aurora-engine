@@ -27,7 +27,7 @@ const DEPOSITED_EVM_AMOUNT: u128 = 800400;
 const DEPOSITED_EVM_FEE: u128 = 400;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "release.wasm"
+    EVM_WASM_BYTES => "test.wasm"
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
@@ -113,7 +113,7 @@ fn call_deposit_near(master_account: &UserAccount, contract: &str) -> Vec<Option
         DEFAULT_GAS,
         0,
     );
-    //res.assert_success();
+    res.assert_success();
     //println!("{:#?}", res.promise_results());
     res.promise_results()
 }
