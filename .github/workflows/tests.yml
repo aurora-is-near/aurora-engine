@@ -15,7 +15,6 @@ jobs:
           toolchain: nightly-2021-03-25
           override: true
       - run: make test-build
-      - run: ls -lH release.wasm
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
