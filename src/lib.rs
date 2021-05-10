@@ -227,6 +227,8 @@ mod contract {
             }
         };
 
+        Engine::check_nonce(&meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
+
         let mut engine = Engine::new_with_state(state, meta_call_args.sender);
         let result = engine.call(
             meta_call_args.sender,
