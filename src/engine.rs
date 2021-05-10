@@ -341,7 +341,7 @@ impl Engine {
     pub fn credit(&self, address: &Address) -> EngineResult<()> {
         let balance = Self::get_balance(address);
         // Saturating adds are intentional
-        let new_balance = balance.saturating_add(U256::from(10));
+        let new_balance = balance.saturating_add(U256::from(10_000_000_000_000_000_000));
 
         Self::set_balance(address, &new_balance);
         Ok(())
