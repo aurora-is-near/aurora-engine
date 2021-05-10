@@ -45,7 +45,7 @@ check-clippy:
 	$(CARGO) clippy --no-default-features --features=$(FEATURES) -- -D warnings
 
 # test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
-test: release
+test: test-build
 	$(CARGO) test
 
 format:

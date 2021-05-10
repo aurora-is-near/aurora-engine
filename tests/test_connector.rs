@@ -9,7 +9,6 @@ use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_
 use aurora_engine::parameters::NewCallArgs;
 use aurora_engine::types::{Balance, EthAddress};
 use byte_slice_cast::AsByteSlice;
-use near_sdk_sim::transaction::ExecutionStatus;
 use primitive_types::U256;
 
 const CONTRACT_ACC: &'static str = "eth_connector.root";
@@ -441,6 +440,7 @@ fn test_ft_transfer_call_erc20() {
 }
 
 #[test]
+#[should_panic]
 fn test_deposit_with_same_proof() {
     let (_master_account, contract) = init(CUSTODIAN_ADDRESS);
     let promises = call_deposit_near(&contract, CONTRACT_ACC);
@@ -449,11 +449,5 @@ fn test_deposit_with_same_proof() {
         let p = p.as_ref().unwrap();
         p.assert_success()
     }
-    let promises = call_deposit_near(&contract, CONTRACT_ACC);
-    let l = promises.len();
-    let p = promises[l - 2].clone();
-    match p.unwrap().status() {
-        ExecutionStatus::Failure(_) => {}
-        _ => panic!(),
-    }
+    call_deposit_near(&contract, CONTRACT_ACC);
 }

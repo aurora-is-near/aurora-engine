@@ -348,10 +348,9 @@ impl EthConnectorContract {
     }
 
     /// Withdraw from NEAR accounts
+    /// NOTE: it should be without any log data
     pub fn withdraw_near(&mut self) {
         sdk::assert_one_yocto();
-        #[cfg(feature = "log")]
-        sdk::log("Start withdraw NEAR");
         let args = WithdrawCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         let res = WithdrawResult {
             recipient_id: args.recipient_address,
@@ -362,7 +361,8 @@ impl EthConnectorContract {
         .unwrap();
         // Burn tokens to recipient
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-        self.burn_near(predecessor_account_id, args.amount);
+        self.ft
+            .internal_withdraw(&predecessor_account_id, args.amount);
         // Save new contract data
         self.save_contract();
         sdk::return_output(&res[..]);
