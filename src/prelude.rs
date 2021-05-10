@@ -12,8 +12,6 @@ pub use alloc::{
 };
 #[cfg(not(feature = "std"))]
 pub use core::{convert::TryInto, marker::PhantomData, mem};
-#[cfg(all(feature = "testnet", feature = "std"))]
-pub use std::ops::Add;
 #[cfg(feature = "std")]
 pub use std::{
     borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, collections::HashMap, convert::TryInto,
