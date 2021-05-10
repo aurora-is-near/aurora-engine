@@ -25,4 +25,23 @@ contract EvmErc20 is Context, ERC20, AdminControlled {
     function mint(address account, uint256 amount) public onlyAdmin {
         _mint(account, amount);
     }
+
+    function withdrawToNear(bytes memory recipient, uint256 amount) public {
+        _burn(msg.sender, amount);
+
+        // TODO: How to concatenate bytes in solidity?
+        bytes32 amount_b = bytes32(amount);
+        uint input_size = 32 + recipient.length;
+        bytes memory input = new bytes(32 + recipient.length);
+        for (uint i = 0; i < 32; i++) {
+            input[i] = amount_b[i];
+        }
+        for (uint i = 0; i < recipient.length; i++) {
+            input[i + 32] = recipient[i];
+        }
+
+        assembly {
+            let res := staticcall(gas(), 11421322804619973199, add(input, 32), input_size, 0, 32)
+        }
+    }
 }

@@ -22,7 +22,7 @@ mod costs {
     pub(super) const EXIT_TO_ETHEREUM_GAS: Gas = 0;
 
     // TODO(#51): Determine the correct amount of gas
-    pub(super) const FT_TRANSFER_GAS: Gas = 50_000;
+    pub(super) const FT_TRANSFER_GAS: Gas = 100_000_000_000_000;
 
     // TODO(#51): Determine the correct amount of gas
     pub(super) const WITHDRAWAL_GAS: Gas = 50_000;
@@ -50,7 +50,7 @@ impl Precompile for ExitToNear {
             return Err(ExitError::OutOfGas);
         }
 
-        let (nep141_account, args) = if context.apparent_value != U256::from(0) {
+        let (nep141_address, args) = if context.apparent_value != U256::from(0) {
             // ETH transfer
             //
             // Input slice format:
@@ -58,11 +58,11 @@ impl Precompile for ExitToNear {
 
             (
                 String::from_utf8(sdk::current_account_id()).unwrap(),
-                NEP141TransferCallArgs {
-                    receiver_id: String::from_utf8(input.to_vec()).unwrap(),
-                    amount: U128(context.apparent_value.as_u128()),
-                    memo: None,
-                },
+                crate::prelude::format!(
+                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                    String::from_utf8(input.to_vec()).unwrap(),
+                    context.apparent_value.as_u128()
+                ),
             )
         } else {
             // ERC20 transfer
@@ -70,38 +70,30 @@ impl Precompile for ExitToNear {
             // This precompile branch is expected to be called from the ERC20 burn function\
             //
             // Input slice format:
-            //      sender (20 bytes) - Eth address of the address that burned his erc20 tokens
             //      amount (U256 le bytes) - the amount that was burned
             //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
 
             let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
             let mut input_mut = input;
-
-            let mut sender = [0u8; 20];
-            sender.copy_from_slice(&input_mut[..20]);
-            input_mut = &input_mut[20..];
-
-            let amount = U128(U256::from_little_endian(&input_mut[..32]).as_u128());
+            let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
             input_mut = &input_mut[32..];
-
             let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
-
             (
                 nep141_address,
-                NEP141TransferCallArgs {
-                    receiver_id: receiver_account_id,
-                    amount,
-                    memo: None,
-                },
+                crate::prelude::format!(
+                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                    receiver_account_id,
+                    amount
+                ),
             )
         };
 
         let promise0 = sdk::promise_create(
-            nep141_account,
+            nep141_address,
             b"ft_transfer",
-            BorshSerialize::try_to_vec(&args).ok().unwrap().as_slice(),
-            0,
+            args.as_bytes(),
+            1,
             costs::FT_TRANSFER_GAS,
         );
 
@@ -123,7 +115,7 @@ impl Precompile for ExitToEthereum {
             return Err(ExitError::OutOfGas);
         }
 
-        let (nep141_account, serialized_args) = if context.apparent_value != U256::from(0) {
+        let (nep141_address, serialized_args) = if context.apparent_value != U256::from(0) {
             // ETH transfer
             //
             // Input slice format:
@@ -146,7 +138,6 @@ impl Precompile for ExitToEthereum {
             // (or burn function with some flag provided that this is expected to be withdrawn)
             //
             // Input slice format:
-            //      sender (20 bytes) - Eth address of the address that burned his erc20 tokens
             //      amount (U256 le bytes) - the amount that was burned
             //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
 
@@ -154,11 +145,7 @@ impl Precompile for ExitToEthereum {
 
             let mut input_mut = input;
 
-            let mut sender = [0u8; 20];
-            sender.copy_from_slice(&input_mut[..20]);
-            input_mut = &input_mut[20..];
-
-            let amount = U128(U256::from_little_endian(&input_mut[..32]).as_u128());
+            let amount = U128(U256::from_big_endian(&input_mut[..32]).as_u128());
             input_mut = &input_mut[32..];
 
             let eth_recipient: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
@@ -174,7 +161,7 @@ impl Precompile for ExitToEthereum {
         };
 
         let promise0 = sdk::promise_create(
-            nep141_account,
+            nep141_address,
             b"withdraw",
             serialized_args.as_slice(),
             0,
