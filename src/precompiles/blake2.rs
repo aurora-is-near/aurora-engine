@@ -38,13 +38,14 @@ impl Precompile for Blake2F {
             return Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")));
         }
 
+        let cost = Self::required_gas(input)?;
+        if cost > target_gas {
+            return Err(ExitError::OutOfGas);
+        }
+
         let mut rounds_bytes = [0u8; 4];
         rounds_bytes.copy_from_slice(&input[0..4]);
         let rounds = u32::from_be_bytes(rounds_bytes);
-
-        if Self::required_gas(input)? > target_gas {
-            return Err(ExitError::OutOfGas);
-        }
 
         let mut h = [0u64; 8];
         for (mut x, value) in h.iter_mut().enumerate() {
@@ -76,7 +77,7 @@ impl Precompile for Blake2F {
         let finished = input[212] != 0;
 
         let res = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
-        Ok((ExitSucceed::Returned, res, 0))
+        Ok((ExitSucceed::Returned, res, cost))
     }
 }
 

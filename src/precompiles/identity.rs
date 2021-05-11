@@ -31,10 +31,11 @@ impl Precompile for Identity {
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000004
     fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
-        if Self::required_gas(input)? > target_gas {
+        let cost = Self::required_gas(input)?;
+        if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            Ok((ExitSucceed::Returned, input.to_vec(), 0))
+            Ok((ExitSucceed::Returned, input.to_vec(), cost))
         }
     }
 }

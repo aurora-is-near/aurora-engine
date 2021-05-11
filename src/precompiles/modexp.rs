@@ -70,7 +70,8 @@ impl Precompile for ModExp<Byzantium> {
     /// See: https://eips.ethereum.org/EIPS/eip-198
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
     fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
-        if Self::required_gas(input)? > target_gas {
+        let cost = Self::required_gas(input)?;
+        if cost > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
@@ -127,7 +128,7 @@ impl Precompile for ModExp<Byzantium> {
             }
         };
 
-        Ok((ExitSucceed::Returned, result, 0))
+        Ok((ExitSucceed::Returned, result, cost))
     }
 }
 
