@@ -265,20 +265,6 @@ mod contract {
             .sdk_process();
     }
 
-    #[cfg(feature = "testnet")]
-    #[no_mangle]
-    pub extern "C" fn make_it_rain() {
-        let input = sdk::read_input();
-        let dest_address = Address::from_slice(&input);
-        let source_address = predecessor_address();
-        let engine = Engine::new(source_address);
-
-        engine.increment_nonce(&source_address);
-
-        let result = engine.credit(&dest_address);
-        result.map(|_f| Vec::new()).sdk_process();
-    }
-
     #[no_mangle]
     pub extern "C" fn register_relayer() {
         let relayer_address = sdk::read_input();

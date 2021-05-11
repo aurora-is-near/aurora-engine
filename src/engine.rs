@@ -339,17 +339,6 @@ impl Engine {
         Self::set_nonce(address, &new_nonce);
     }
 
-    #[cfg(feature = "testnet")]
-    /// Credits the address with 10 coins from the faucet.
-    pub fn credit(&self, address: &Address) -> EngineResult<()> {
-        let balance = Self::get_balance(address);
-        // Saturating adds are intentional
-        let new_balance = balance.saturating_add(U256::from(10_000_000_000_000_000_000));
-
-        Self::set_balance(address, &new_balance);
-        Ok(())
-    }
-
     pub fn view_with_args(&self, args: ViewCallArgs) -> EngineResult<Vec<u8>> {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
