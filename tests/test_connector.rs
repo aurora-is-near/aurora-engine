@@ -10,6 +10,7 @@ use aurora_engine::parameters::NewCallArgs;
 use aurora_engine::types::{Balance, EthAddress};
 use byte_slice_cast::AsByteSlice;
 use primitive_types::U256;
+use near_sdk_sim::transaction::ExecutionStatus;
 
 const CONTRACT_ACC: &'static str = "eth_connector.root";
 const EXTERNAL_CONTRACT_ACC: &'static str = "eth_recipient.root";
@@ -112,7 +113,7 @@ fn call_deposit_near(master_account: &UserAccount, contract: &str) -> Vec<Option
         DEFAULT_GAS,
         0,
     );
-    res.assert_success();
+    //res.assert_success();
     //println!("{:#?}", res.promise_results());
     // let total_gas_burnt = res
     //     .promise_results()
@@ -445,7 +446,6 @@ fn test_ft_transfer_call_erc20() {
 }
 
 #[test]
-#[should_panic]
 fn test_deposit_with_same_proof() {
     let (_master_account, contract) = init(CUSTODIAN_ADDRESS);
     let promises = call_deposit_near(&contract, CONTRACT_ACC);
@@ -454,5 +454,11 @@ fn test_deposit_with_same_proof() {
         let p = p.as_ref().unwrap();
         p.assert_success()
     }
-    call_deposit_near(&contract, CONTRACT_ACC);
+    let promises = call_deposit_near(&contract, CONTRACT_ACC);
+    let l = promises.len();
+    let p = promises[l - 2].clone();
+    match p.unwrap().status() {
+        ExecutionStatus::Failure(_) => {}
+        _ => panic!(),
+    }
 }
