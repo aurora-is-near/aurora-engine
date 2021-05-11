@@ -404,11 +404,28 @@ impl evm::backend::Backend for Engine {
 
     /// Returns a block hash from a given index.
     ///
-    /// Currently this returns zero, but may be changed in the future.
+    /// Currently, this returns
+    /// 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff if
+    /// only for the 256 most recent blocks, excluding of the current one.
+    /// Otherwise, it returns 0x0.
+    ///
+    /// In other words, if the requested block index is less than the current
+    /// block index, return
+    /// 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.
+    /// Otherwise, return 0.
+    /// 
+    /// This functionality may change in the future. Follow
+    /// [nearcore#3456](https://github.com/near/nearcore/issues/3456) for more
+    /// details.
     ///
     /// See: https://doc.aurora.dev/develop/compat/evm#blockhash
-    fn block_hash(&self, _number: U256) -> H256 {
-        H256::zero() // TODO: https://github.com/near/nearcore/issues/3456
+    fn block_hash(&self, number: U256) -> H256 {
+        let idx = U256::from(sdk::block_index());
+        if number < idx {
+            H256::from(U256::max_value())
+        } else {
+            H256::zero()
+        }
     }
 
     /// Returns the current block index number.
