@@ -495,9 +495,7 @@ impl ApplyBackend for Engine {
                     reset_storage,
                 } => {
                     Engine::set_nonce(&address, &basic.nonce);
-                    // TODO: should be aligned to eth-connector balance management logic
-                    //Engine::set_balance(&address, &basic.balance);
-                    // Apply changes for eth-conenctor
+                    // Apply changes for eth-connector
                     EthConnectorContract::get_instance()
                         .internal_set_eth_balance(&address, &basic.balance);
                     if let Some(code) = code {
