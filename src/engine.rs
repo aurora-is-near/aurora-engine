@@ -422,7 +422,7 @@ impl evm::backend::Backend for Engine {
     fn block_hash(&self, number: U256) -> H256 {
         let idx = U256::from(sdk::block_index());
         if number < idx {
-            H256::from(U256::max_value())
+            H256::from([255u8; 32])
         } else {
             H256::zero()
         }
