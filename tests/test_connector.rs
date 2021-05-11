@@ -9,8 +9,8 @@ use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_
 use aurora_engine::parameters::NewCallArgs;
 use aurora_engine::types::{Balance, EthAddress};
 use byte_slice_cast::AsByteSlice;
-use primitive_types::U256;
 use near_sdk_sim::transaction::ExecutionStatus;
+use primitive_types::U256;
 
 const CONTRACT_ACC: &'static str = "eth_connector.root";
 const EXTERNAL_CONTRACT_ACC: &'static str = "eth_recipient.root";
@@ -281,15 +281,23 @@ fn test_withdraw_near() {
         pub amount: Balance,
     }
 
+    #[derive(BorshDeserialize, Debug)]
+    pub struct WithdrawResult {
+        pub amount: Balance,
+        pub recipient_id: EthAddress,
+        pub eth_custodian_address: EthAddress,
+    }
+
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
     call_deposit_near(&contract, CONTRACT_ACC);
 
     let withdraw_amount = 100;
+    let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "withdraw",
         &WithdrawCallArgs {
-            recipient_address: validate_eth_address(RECIPIENT_ETH_ADDRESS),
+            recipient_address: recipient_addr,
             amount: withdraw_amount,
         }
         .try_to_vec()
@@ -298,6 +306,19 @@ fn test_withdraw_near() {
         1,
     );
     res.assert_success();
+    let data = res.promise_results();
+    assert!(data.len() > 1);
+    assert!(data[0].is_some());
+    match data[1].clone().unwrap().outcome().status {
+        ExecutionStatus::SuccessValue(ref v) => {
+            let d: WithdrawResult = WithdrawResult::try_from_slice(&v).unwrap();
+            assert_eq!(d.amount, withdraw_amount);
+            assert_eq!(d.recipient_id, recipient_addr);
+            let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
+            assert_eq!(d.eth_custodian_address, custodian_addr);
+        }
+        _ => panic!(),
+    }
 
     let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_FEE - withdraw_amount as u128);
