@@ -213,7 +213,6 @@ pub struct FinishDepositEthCallArgs {
 }
 
 /// eth-connector initial args
-#[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct InitCallArgs {
     pub prover_account: AccountId,

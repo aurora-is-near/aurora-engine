@@ -12,7 +12,7 @@ use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
-use crate::parameters::{NewCallArgs, SubmitResult};
+use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
 use crate::prelude::Address;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
@@ -245,12 +245,24 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     let args = NewCallArgs {
         chain_id: types::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: runner.aurora_account_id.clone(),
-        bridge_prover_id: "prover.near".to_string(),
+        bridge_prover_id: "bridge_prover.near".to_string(),
         upgrade_delay_blocks: 1,
     };
 
     let (_, maybe_error) = runner.call(
         "new",
+        runner.aurora_account_id.clone(),
+        args.try_to_vec().unwrap(),
+    );
+
+    assert!(maybe_error.is_none());
+
+    let args = InitCallArgs {
+        prover_account: "prover.near".to_string(),
+        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+    };
+    let (_, maybe_error) = runner.call(
+        "new_eth_connector",
         runner.aurora_account_id.clone(),
         args.try_to_vec().unwrap(),
     );
