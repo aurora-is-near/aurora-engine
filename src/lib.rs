@@ -73,9 +73,9 @@ mod contract {
                 } else {
                     msg.to_string()
                 };
-                sdk::log(&msg);
+                sdk::panic_utf8(msg.as_bytes());
             } else if let Some(log) = info.location() {
-                sdk::log(&log.to_string());
+                sdk::panic_utf8(log.to_string().as_bytes());
             }
         }
 
