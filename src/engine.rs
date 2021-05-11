@@ -421,7 +421,7 @@ impl evm::backend::Backend for Engine {
     /// See: https://doc.aurora.dev/develop/compat/evm#blockhash
     fn block_hash(&self, number: U256) -> H256 {
         let idx = U256::from(sdk::block_index());
-        if number < idx {
+        if idx.saturating_sub(256) <= number && number < idx {
             H256::from([255u8; 32])
         } else {
             H256::zero()
