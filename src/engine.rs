@@ -413,7 +413,7 @@ impl evm::backend::Backend for Engine {
     /// block index, return
     /// 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.
     /// Otherwise, return 0.
-    /// 
+    ///
     /// This functionality may change in the future. Follow
     /// [nearcore#3456](https://github.com/near/nearcore/issues/3456) for more
     /// details.
