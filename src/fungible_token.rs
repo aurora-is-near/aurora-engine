@@ -89,7 +89,7 @@ impl FungibleToken {
         let current_balance = self.internal_unwrap_balance_of_eth(address);
         match current_balance.cmp(&new_balance) {
             Ordering::Less => {
-                // new current_balance is smaller, so we need to deposit
+                // current_balance is smaller, so we need to deposit
                 let diff = new_balance - current_balance;
                 self.internal_deposit_eth(address, diff);
             }
