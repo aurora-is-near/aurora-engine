@@ -23,7 +23,6 @@ mod connector;
 mod deposit_event;
 #[cfg(feature = "contract")]
 mod engine;
-#[cfg(feature = "contract")]
 mod fungible_token;
 #[cfg(feature = "contract")]
 mod log_entry;
@@ -263,20 +262,6 @@ mod contract {
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();
-    }
-
-    #[cfg(feature = "testnet")]
-    #[no_mangle]
-    pub extern "C" fn make_it_rain() {
-        let input = sdk::read_input();
-        let dest_address = Address::from_slice(&input);
-        let source_address = predecessor_address();
-        let engine = Engine::new(source_address);
-
-        engine.increment_nonce(&source_address);
-
-        let result = engine.credit(&dest_address);
-        result.map(|_f| Vec::new()).sdk_process();
     }
 
     #[no_mangle]

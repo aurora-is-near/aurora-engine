@@ -13,6 +13,14 @@ pub enum KeyPrefix {
     EthConnector = 0x6,
 }
 
+/// Enum used to differentiate different storage keys used by eth-connector
+#[derive(Clone, Copy, BorshSerialize, BorshDeserialize)]
+pub enum EthConnectorStorageId {
+    Contract = 0x0,
+    FungibleToken = 0x1,
+    UsedEvent = 0x2,
+}
+
 /// We can't use const generic over Enum, but we can do it over integral type
 pub type KeyPrefixU8 = u8;
 

@@ -339,17 +339,6 @@ impl Engine {
         Self::set_nonce(address, &new_nonce);
     }
 
-    #[cfg(feature = "testnet")]
-    /// Credits the address with 10 coins from the faucet.
-    pub fn credit(&self, address: &Address) -> EngineResult<()> {
-        let balance = Self::get_balance(address);
-        // Saturating adds are intentional
-        let new_balance = balance.saturating_add(U256::from(10_000_000_000_000_000_000));
-
-        Self::set_balance(address, &new_balance);
-        Ok(())
-    }
-
     pub fn view_with_args(&self, args: ViewCallArgs) -> EngineResult<Vec<u8>> {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
@@ -506,11 +495,9 @@ impl ApplyBackend for Engine {
                     reset_storage,
                 } => {
                     Engine::set_nonce(&address, &basic.nonce);
-                    // TODO: should be aligned to eth-connector balance management logic
-                    //Engine::set_balance(&address, &basic.balance);
-                    // Apply changes for eth-conenctor
+                    // Apply changes for eth-connector
                     EthConnectorContract::get_instance()
-                        .internal_deposit_eth(&address, &basic.balance);
+                        .internal_set_eth_balance(&address, &basic.balance);
                     if let Some(code) = code {
                         Engine::set_code(&address, &code)
                     }
