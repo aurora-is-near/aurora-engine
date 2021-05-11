@@ -61,7 +61,7 @@ contract EvmErc20 is Context, ERC20, AdminControlled {
         }
 
         assembly {
-            let res := staticcall(gas(), 17176159495920586411, input, 52, 0, 32)
+            let res := staticcall(gas(), 17176159495920586411, add(input, 32), 52, 0, 32)
         }
     }
 }
