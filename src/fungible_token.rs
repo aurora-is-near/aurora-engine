@@ -1,23 +1,20 @@
-#![allow(dead_code)]
-use super::*;
-use crate::connector::{EthConnectorContract, NO_DEPOSIT};
-use crate::engine::Engine;
+#[cfg(feature = "contract")]
 use crate::parameters::*;
-use crate::prelude;
-use crate::prelude::U256;
+#[cfg(feature = "contract")]
+use crate::prelude::{self, Ordering, String, ToString, Vec, U256};
 use crate::types::*;
+#[cfg(feature = "contract")]
+use crate::{connector, engine, sdk, storage};
 #[cfg(feature = "log")]
 use alloc::format;
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
 use borsh::{BorshDeserialize, BorshSerialize};
 
+#[cfg(feature = "contract")]
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
+#[cfg(feature = "contract")]
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
-#[derive(Debug, BorshDeserialize, BorshSerialize)]
+#[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
     /// Total supply of the all token.
     pub total_supply: Balance,
@@ -32,22 +29,8 @@ pub struct FungibleToken {
     pub account_storage_usage: StorageUsage,
 }
 
-impl Default for fungible_token::FungibleToken {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
+#[cfg(feature = "contract")]
 impl FungibleToken {
-    pub fn new() -> Self {
-        Self {
-            total_supply: 0,
-            total_supply_near: 0,
-            total_supply_eth: 0,
-            account_storage_usage: 0,
-        }
-    }
-
     /// Balance of NEAR tokens
     pub fn internal_unwrap_balance_of(&self, account_id: &str) -> Balance {
         match self.accounts_get(account_id) {
@@ -58,7 +41,7 @@ impl FungibleToken {
 
     /// Balance of ETH tokens
     pub fn internal_unwrap_balance_of_eth(&self, address: EthAddress) -> Balance {
-        Engine::get_balance(&prelude::Address(address)).as_u128()
+        engine::Engine::get_balance(&prelude::Address(address)).as_u128()
     }
 
     /// Internal deposit NEAR - NEP-141
@@ -83,7 +66,7 @@ impl FungibleToken {
     pub fn internal_deposit_eth(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth(address);
         if let Some(new_balance) = balance.checked_add(amount) {
-            Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
+            engine::Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
             self.total_supply_eth = self
                 .total_supply_eth
                 .checked_add(amount)
@@ -94,6 +77,25 @@ impl FungibleToken {
                 .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
         } else {
             sdk::panic_utf8(b"ERR_BALANCE_OVERFLOW");
+        }
+    }
+
+    /// Needed by engine to update balances after a transaction (see ApplyBackend for Engine)
+    pub(crate) fn internal_set_eth_balance(&mut self, address: EthAddress, new_balance: Balance) {
+        let current_balance = self.internal_unwrap_balance_of_eth(address);
+        match current_balance.cmp(&new_balance) {
+            Ordering::Less => {
+                // new current_balance is smaller, so we need to deposit
+                let diff = new_balance - current_balance;
+                self.internal_deposit_eth(address, diff);
+            }
+            Ordering::Greater => {
+                // current_balance is larger, so we need to withdraw
+                let diff = current_balance - new_balance;
+                self.internal_withdraw_eth(address, diff);
+            }
+            // if the balances are equal then we do not need to do anything
+            Ordering::Equal => (),
         }
     }
 
@@ -119,7 +121,7 @@ impl FungibleToken {
     pub fn internal_withdraw_eth(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth(address);
         if let Some(new_balance) = balance.checked_sub(amount) {
-            Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
+            engine::Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
             self.total_supply_eth = self
                 .total_supply_eth
                 .checked_sub(amount)
@@ -224,7 +226,7 @@ impl FungibleToken {
             receiver_id.as_bytes(),
             b"ft_on_transfer",
             &data1[..],
-            NO_DEPOSIT,
+            connector::NO_DEPOSIT,
             GAS_FOR_FT_ON_TRANSFER,
         );
         let promise1 = sdk::promise_then(
@@ -232,7 +234,7 @@ impl FungibleToken {
             &sdk::current_account_id(),
             b"ft_resolve_transfer",
             &data2[..],
-            NO_DEPOSIT,
+            connector::NO_DEPOSIT,
             GAS_FOR_RESOLVE_TRANSFER,
         );
         sdk::promise_return(promise1);
@@ -398,6 +400,7 @@ impl FungibleToken {
         self.internal_storage_balance_of(account_id).unwrap()
     }
 
+    #[allow(dead_code)]
     pub fn storage_unregister(&mut self, force: Option<bool>) -> bool {
         self.internal_storage_unregister(force).is_some()
     }
@@ -418,18 +421,28 @@ impl FungibleToken {
     }
 
     pub fn accounts_insert(&self, account_id: &str, amount: Balance) {
-        sdk::save_contract(&EthConnectorContract::ft_key(account_id), &amount)
+        sdk::save_contract(&Self::account_to_key(account_id), &amount)
     }
 
     fn accounts_contains_key(&self, account_id: &str) -> bool {
-        sdk::storage_has_key(&EthConnectorContract::ft_key(account_id))
+        sdk::storage_has_key(&Self::account_to_key(account_id))
     }
 
     fn accounts_remove(&self, account_id: &str) {
-        sdk::remove_storage(&EthConnectorContract::ft_key(account_id))
+        sdk::remove_storage(&Self::account_to_key(account_id))
     }
 
     pub fn accounts_get(&self, account_id: &str) -> Option<Vec<u8>> {
-        sdk::read_storage(&EthConnectorContract::ft_key(account_id))
+        sdk::read_storage(&Self::account_to_key(account_id))
+    }
+
+    /// Fungible token key
+    fn account_to_key(account_id: &str) -> Vec<u8> {
+        let mut key = storage::bytes_to_key(
+            storage::KeyPrefix::EthConnector,
+            &[storage::EthConnectorStorageId::FungibleToken as u8],
+        );
+        key.extend_from_slice(account_id.as_bytes());
+        key
     }
 }

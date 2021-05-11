@@ -11,11 +11,12 @@ pub use alloc::{
     vec::Vec,
 };
 #[cfg(not(feature = "std"))]
-pub use core::{convert::TryInto, marker::PhantomData, mem};
+pub use core::{cmp::Ordering, convert::TryInto, marker::PhantomData, mem};
 #[cfg(feature = "std")]
 pub use std::{
-    borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, collections::HashMap, convert::TryInto,
-    error::Error, fmt, marker::PhantomData, mem, string::String, string::ToString, vec, vec::Vec,
+    borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, cmp::Ordering, collections::HashMap,
+    convert::TryInto, error::Error, fmt, marker::PhantomData, mem, string::String,
+    string::ToString, vec, vec::Vec,
 };
 
 pub use primitive_types::{H160, H256, U256};

@@ -499,7 +499,7 @@ impl ApplyBackend for Engine {
                     //Engine::set_balance(&address, &basic.balance);
                     // Apply changes for eth-conenctor
                     EthConnectorContract::get_instance()
-                        .internal_deposit_eth(&address, &basic.balance);
+                        .internal_set_eth_balance(&address, &basic.balance);
                     if let Some(code) = code {
                         Engine::set_code(&address, &code)
                     }

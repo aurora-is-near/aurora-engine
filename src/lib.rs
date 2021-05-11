@@ -23,7 +23,6 @@ mod connector;
 mod deposit_event;
 #[cfg(feature = "contract")]
 mod engine;
-#[cfg(feature = "contract")]
 mod fungible_token;
 #[cfg(feature = "contract")]
 mod log_entry;

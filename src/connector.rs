@@ -7,7 +7,7 @@ use crate::deposit_event::*;
 use crate::engine::Engine;
 use crate::prelude::*;
 use crate::prover::validate_eth_address;
-use crate::storage::KeyPrefix;
+use crate::storage::{EthConnectorStorageId, KeyPrefix};
 #[cfg(feature = "log")]
 use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -37,14 +37,6 @@ pub enum TokenMessageData {
     Eth { address: AccountId, message: String },
 }
 
-/// Key prefix to creating key for storage
-#[derive(Clone, Copy, BorshSerialize, BorshDeserialize)]
-pub enum EthConnectorKeyPrefix {
-    Contract = 0x0,
-    FungibleToken = 0x1,
-    UsedEvent = 0x2,
-}
-
 /// On-transfer message
 pub struct OnTransferMessageData {
     pub relayer: AccountId,
@@ -55,16 +47,16 @@ pub struct OnTransferMessageData {
 impl EthConnectorContract {
     pub fn get_instance() -> Self {
         Self {
-            contract: Self::get_contract_data(&EthConnectorKeyPrefix::Contract),
-            ft: Self::get_contract_data(&EthConnectorKeyPrefix::FungibleToken),
+            contract: Self::get_contract_data(&EthConnectorStorageId::Contract),
+            ft: Self::get_contract_data(&EthConnectorStorageId::FungibleToken),
         }
     }
 
-    fn get_contract_key(suffix: &EthConnectorKeyPrefix) -> Vec<u8> {
+    fn get_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
         [KeyPrefix::EthConnector as u8, *suffix as u8].to_vec()
     }
 
-    fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorKeyPrefix) -> T {
+    fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorStorageId) -> T {
         let data =
             sdk::read_storage(&Self::get_contract_key(&suffix)).expect("Failed read storage");
         T::try_from_slice(&data[..]).unwrap()
@@ -74,7 +66,7 @@ impl EthConnectorContract {
     pub fn init_contract() {
         // Check is it already initialized
         assert!(
-            !sdk::storage_has_key(&Self::get_contract_key(&EthConnectorKeyPrefix::Contract)),
+            !sdk::storage_has_key(&Self::get_contract_key(&EthConnectorStorageId::Contract)),
             "ERR_CONTRACT_INITIALIZED"
         );
         #[cfg(feature = "log")]
@@ -83,7 +75,7 @@ impl EthConnectorContract {
         let args = InitCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         let current_account_id = sdk::current_account_id();
         let owner_id = String::from_utf8(current_account_id).unwrap();
-        let mut ft = FungibleToken::new();
+        let mut ft = FungibleToken::default();
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
         let contract_data = EthConnector {
@@ -92,7 +84,7 @@ impl EthConnectorContract {
         };
         // Save th-connector specific data
         sdk::save_contract(
-            &Self::get_contract_key(&EthConnectorKeyPrefix::Contract),
+            &Self::get_contract_key(&EthConnectorStorageId::Contract),
             &contract_data,
         );
         Self {
@@ -305,9 +297,12 @@ impl EthConnectorContract {
         }
     }
 
-    /// Internal ETH deposit logic
-    pub(crate) fn internal_deposit_eth(&mut self, address: &Address, amount: &U256) {
-        self.ft.internal_deposit_eth(address.0, amount.as_u128());
+    /// Internal logic for explicitly setting an eth balance (needed by ApplyBackend for Engine)
+    pub(crate) fn internal_set_eth_balance(&mut self, address: &Address, amount: &U256) {
+        // TODO: this `as_u128` looks pretty dangerous! We need to somehow handle the case where
+        // `amount` does not fit into a u128...
+        self.ft
+            .internal_set_eth_balance(address.0, amount.as_u128());
         self.save_contract();
     }
 
@@ -562,22 +557,15 @@ impl EthConnectorContract {
     /// Save eth-connector contract data
     fn save_contract(&mut self) {
         sdk::save_contract(
-            &Self::get_contract_key(&EthConnectorKeyPrefix::FungibleToken),
+            &Self::get_contract_key(&EthConnectorStorageId::FungibleToken),
             &self.ft,
         );
     }
 
     /// Generate key for used events from Prood
     fn used_event_key(&self, key: &str) -> Vec<u8> {
-        let mut v = Self::get_contract_key(&EthConnectorKeyPrefix::UsedEvent).to_vec();
+        let mut v = Self::get_contract_key(&EthConnectorStorageId::UsedEvent).to_vec();
         v.extend_from_slice(key.as_bytes());
-        v
-    }
-
-    /// Fungible token key
-    pub fn ft_key(account_id: &str) -> Vec<u8> {
-        let mut v = Self::get_contract_key(&EthConnectorKeyPrefix::FungibleToken).to_vec();
-        v.extend_from_slice(account_id.as_bytes());
         v
     }
 
