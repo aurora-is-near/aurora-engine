@@ -56,6 +56,7 @@ hex = { version = "0.4", default-features = false, features = ["alloc"] }
 byte-slice-cast = { version = "1.0", default-features = false }
 
 [dev-dependencies]
+bstr = "0.2"
 hex = { version = "0.4.3", default-features = false }
 near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }
 near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }

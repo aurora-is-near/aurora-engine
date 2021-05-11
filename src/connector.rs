@@ -549,7 +549,7 @@ impl EthConnectorContract {
                 self.mint_eth(evm_relayer_address, fee);
             }
         } else {
-            // Implement new scheme when PR #62 is merged
+            // Implement new scheme for ERC20
             todo!();
         }
         self.save_contract();
