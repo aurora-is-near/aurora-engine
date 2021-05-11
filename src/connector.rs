@@ -75,7 +75,7 @@ impl EthConnectorContract {
         let args = InitCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         let current_account_id = sdk::current_account_id();
         let owner_id = String::from_utf8(current_account_id).unwrap();
-        let mut ft = FungibleToken::default();
+        let mut ft = FungibleToken::new();
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
         let contract_data = EthConnector {

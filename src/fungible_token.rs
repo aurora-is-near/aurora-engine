@@ -31,6 +31,10 @@ pub struct FungibleToken {
 
 #[cfg(feature = "contract")]
 impl FungibleToken {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Balance of NEAR tokens
     pub fn internal_unwrap_balance_of(&self, account_id: &str) -> Balance {
         match self.accounts_get(account_id) {
