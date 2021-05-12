@@ -171,6 +171,7 @@ pub fn read_input_arr20() -> [u8; 20] {
     unsafe {
         exports::input(0);
         let bytes = [0u8; 20];
+        // TODO: Is it fine to not check the length of the input register here?
         exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
         bytes
     }
@@ -210,6 +211,7 @@ pub fn read_u64(key: &[u8]) -> Option<u64> {
     unsafe {
         if exports::storage_read(key.len() as u64, key.as_ptr() as u64, 0) == 1 {
             let result = [0u8; 8];
+            // TODO: Are you sure the register length is correct?
             exports::read_register(0, result.as_ptr() as _);
             Some(u64::from_le_bytes(result))
         } else {
@@ -328,6 +330,8 @@ pub fn self_deploy(code_key: &[u8]) {
         // Remove code from storage and store it in register 1.
         exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1);
         exports::promise_batch_action_deploy_contract(promise_id, u64::MAX as _, 1);
+        // TODO: Call upgrade on the same promise to make sure the state has migrated successfully.
+        //     Otherwise, you may have to handle non-latest state in every other method call, which might be inefficient.
     }
 }
 

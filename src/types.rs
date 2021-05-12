@@ -11,7 +11,8 @@ pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32]; // Little-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 
-pub const STORAGE_PRICE_PER_BYTE: u128 = 100_000_000_000_000_000_000; // 1e20yN, 0.0001N
+// NOTE: Upgraded to current correct storage price
+pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
 
 /// Internal args format for meta call.
 #[derive(Debug)]

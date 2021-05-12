@@ -147,7 +147,7 @@ mod contract {
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
         let mut engine = Engine::new(predecessor_address());
-        Engine::deploy_code_with_input(&mut engine, &input)
+        Engine::deploy_code_with_input(&mut engine, input)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();
         // TODO: charge for storage
@@ -156,6 +156,7 @@ mod contract {
     /// Call method on the EVM contract.
     #[no_mangle]
     pub extern "C" fn call() {
+        // TODO: Borsh input pattern is so common here. It worth writing sdk::read_input_borsh().
         let input = sdk::read_input();
         let args = FunctionCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
         let mut engine = Engine::new(predecessor_address());
@@ -174,7 +175,6 @@ mod contract {
 
         let input = sdk::read_input();
         let signed_transaction = EthSignedTransaction::decode(&Rlp::new(&input))
-            .map_err(|_| ())
             .sdk_expect("ERR_INVALID_TX");
 
         let state = Engine::get_state();
@@ -187,10 +187,7 @@ mod contract {
         }
 
         // Retrieve the signer of the transaction:
-        let sender = match signed_transaction.sender() {
-            Some(sender) => sender,
-            None => sdk::panic_utf8(b"ERR_INVALID_ECDSA_SIGNATURE"),
-        };
+        let sender = signed_transaction.sender().sdk_expect("ERR_INVALID_ECDSA_SIGNATURE");
 
         Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
 
@@ -203,7 +200,7 @@ mod contract {
             // TODO: charge for storage
         } else {
             // Execute a contract deployment:
-            Engine::deploy_code(&mut engine, sender, value, &data)
+            Engine::deploy_code(&mut engine, sender, value, data)
             // TODO: charge for storage
         };
         result
@@ -216,16 +213,11 @@ mod contract {
         let input = sdk::read_input();
         let state = Engine::get_state();
         let domain_separator = crate::meta_parsing::near_erc712_domain(U256::from(state.chain_id));
-        let meta_call_args = match crate::meta_parsing::parse_meta_call(
+        let meta_call_args = crate::meta_parsing::parse_meta_call(
             &domain_separator,
             &sdk::current_account_id(),
             input,
-        ) {
-            Ok(args) => args,
-            Err(_error_kind) => {
-                sdk::panic_utf8(b"ERR_META_TX_PARSE");
-            }
-        };
+        ).sdk_expect("ERR_META_TX_PARSE");
 
         Engine::check_nonce(&meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
 
@@ -258,6 +250,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn register_relayer() {
         let relayer_address = sdk::read_input();
+        // NOTE: Why not `sdk::read_input_arr20();`?
         assert_eq!(relayer_address.len(), 20);
 
         let mut engine = Engine::new(predecessor_address());
