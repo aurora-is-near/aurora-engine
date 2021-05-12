@@ -1,21 +1,10 @@
 use crate::prelude::{Address, Vec, H256};
 use borsh::{BorshDeserialize, BorshSerialize};
 
-pub type VersionPrefixU8 = u8;
-
 // NOTE: We start at 0x7 as our initial value as our original storage was not
 // version prefixed and ended as 0x6.
 pub enum VersionPrefix {
     V1 = 0x7,
-}
-
-impl From<VersionPrefixU8> for VersionPrefix {
-    fn from(value: VersionPrefixU8) -> Self {
-        match value {
-            0x7 => Self::V1,
-            _ => unreachable!(),
-        }
-    }
 }
 
 #[allow(dead_code)]
