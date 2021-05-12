@@ -170,6 +170,7 @@ impl Engine {
     }
 
     pub fn get_code_size(address: &Address) -> usize {
+        // TODO: Seems this can be optimized to only read the register length.
         Engine::get_code(&address).len()
     }
 
@@ -247,6 +248,13 @@ impl Engine {
     /// Removes all storage for the given address.
     pub fn remove_all_storage(_address: &Address) {
         // FIXME: there is presently no way to prefix delete trie state.
+        // NOTE: There is not going to be a method on runtime for this.
+        //     You may need to store all keys in a list if you want to do this in a contract.
+        //     Maybe you can incentivize people to delete dead old keys. They can observe them from
+        //     external indexer node and then issue special cleaning transaction.
+        //     Either way you may have to store the nonce per storage address root. When the account
+        //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
+        //     can be deleted over time. That's how TurboGeth does storage.
     }
 
     /// Removes an account.
@@ -264,7 +272,7 @@ impl Engine {
         }
     }
 
-    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<SubmitResult> {
+    pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let value = U256::zero();
         self.deploy_code(origin, value, input)
@@ -274,12 +282,12 @@ impl Engine {
         &mut self,
         origin: Address,
         value: U256,
-        input: &[u8],
+        input: Vec<u8>,
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
-            executor.transact_create(origin, value, Vec::from(input), u64::MAX),
+            executor.transact_create(origin, value, input, u64::MAX),
             address,
         );
         let is_succeed = status.is_succeed();
@@ -396,11 +404,28 @@ impl evm::backend::Backend for Engine {
 
     /// Returns a block hash from a given index.
     ///
-    /// Currently this returns zero, but may be changed in the future.
+    /// Currently, this returns
+    /// 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff if
+    /// only for the 256 most recent blocks, excluding of the current one.
+    /// Otherwise, it returns 0x0.
+    ///
+    /// In other words, if the requested block index is less than the current
+    /// block index, return
+    /// 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.
+    /// Otherwise, return 0.
+    ///
+    /// This functionality may change in the future. Follow
+    /// [nearcore#3456](https://github.com/near/nearcore/issues/3456) for more
+    /// details.
     ///
     /// See: https://doc.aurora.dev/develop/compat/evm#blockhash
-    fn block_hash(&self, _number: U256) -> H256 {
-        H256::zero() // TODO: https://github.com/near/nearcore/issues/3456
+    fn block_hash(&self, number: U256) -> H256 {
+        let idx = U256::from(sdk::block_index());
+        if idx.saturating_sub(U256::from(256)) <= number && number < idx {
+            H256::from([255u8; 32])
+        } else {
+            H256::zero()
+        }
     }
 
     /// Returns the current block index number.

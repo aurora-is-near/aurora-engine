@@ -17,7 +17,7 @@ pub type EthAddress = [u8; 20];
 pub type Gas = u64;
 pub type StorageUsage = u64;
 
-pub const STORAGE_PRICE_PER_BYTE: u128 = 100_000_000_000_000_000_000; // 1e20yN, 0.0001N
+pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
 pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
 
 /// Internal args format for meta call.
