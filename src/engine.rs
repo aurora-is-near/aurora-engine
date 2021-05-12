@@ -168,6 +168,7 @@ impl Engine {
     }
 
     pub fn get_code_size(address: &Address) -> usize {
+        // TODO: Seems this can be optimized to only read the register length.
         Engine::get_code(&address).len()
     }
 
@@ -242,6 +243,13 @@ impl Engine {
     /// Removes all storage for the given address.
     pub fn remove_all_storage(_address: &Address) {
         // FIXME: there is presently no way to prefix delete trie state.
+        // NOTE: There is not going to be a method on runtime for this.
+        //     You may need to store all keys in a list if you want to do this in a contract.
+        //     Maybe you can incentivize people to delete dead old keys. They can observe them from
+        //     external indexer node and then issue special cleaning transaction.
+        //     Either way you may have to store the nonce per storage address root. When the account
+        //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
+        //     can be deleted over time. That's how TurboGeth does storage.
     }
 
     /// Removes an account.
@@ -259,7 +267,7 @@ impl Engine {
         }
     }
 
-    pub fn deploy_code_with_input(&mut self, input: &[u8]) -> EngineResult<SubmitResult> {
+    pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let value = U256::zero();
         self.deploy_code(origin, value, input)
@@ -269,12 +277,12 @@ impl Engine {
         &mut self,
         origin: Address,
         value: U256,
-        input: &[u8],
+        input: Vec<u8>,
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
-            executor.transact_create(origin, value, Vec::from(input), u64::MAX),
+            executor.transact_create(origin, value, input, u64::MAX),
             address,
         );
 

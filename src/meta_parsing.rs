@@ -507,6 +507,7 @@ pub fn prepare_meta_call_args(
     let args_decoded: Vec<RlpValue> = rlp_decode(&input.input)?;
     for (i, arg) in args_decoded.iter().enumerate() {
         arg_bytes.extend_from_slice(&eip_712_hash_argument(
+            // TODO: Check that method.args.len() == args_decoded.len(). Otherwise it may panic here.
             &methods.method.args[i].t,
             arg,
             &methods.types,
@@ -534,7 +535,7 @@ pub fn prepare_meta_call_args(
 }
 
 /// Parse encoded `MetaCallArgs`, validate with given domain and account and recover the sender's address from the signature.
-/// Returns error if method definition or arguments are wrong, invalid signature or EC recovery failed.  
+/// Returns error if method definition or arguments are wrong, invalid signature or EC recovery failed.
 pub fn parse_meta_call(
     domain_separator: &RawU256,
     account_id: &[u8],
