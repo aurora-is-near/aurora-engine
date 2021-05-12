@@ -15,8 +15,8 @@ mod exports {
         // # Context API #
         // ###############
         pub(crate) fn current_account_id(register_id: u64);
-        fn signer_account_id(register_id: u64);
-        fn signer_account_pk(register_id: u64);
+        pub(crate) fn signer_account_id(register_id: u64);
+        pub(crate) fn signer_account_pk(register_id: u64);
         pub(crate) fn predecessor_account_id(register_id: u64);
         pub(crate) fn input(register_id: u64);
         // TODO #1903 fn block_height() -> u64;
