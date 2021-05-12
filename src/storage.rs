@@ -1,6 +1,23 @@
 use crate::prelude::{Address, Vec, H256};
 use borsh::{BorshDeserialize, BorshSerialize};
 
+pub type VersionPrefixU8 = u8;
+
+// NOTE: We start at 0x7 as our initial value as our original storage was not
+// version prefixed and ended as 0x6.
+pub enum VersionPrefix {
+    V1 = 0x7,
+}
+
+impl From<VersionPrefixU8> for VersionPrefix {
+    fn from(value: VersionPrefixU8) -> Self {
+        match value {
+            0x7 => Self::V1,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Copy, BorshSerialize, BorshDeserialize)]
 pub enum KeyPrefix {
@@ -10,6 +27,7 @@ pub enum KeyPrefix {
     Code = 0x3,
     Storage = 0x4,
     RelayerEvmAddressMap = 0x5,
+    // EthConnector = 0x6,
 }
 
 /// We can't use const generic over Enum, but we can do it over integral type
@@ -25,6 +43,7 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x3 => Self::Code,
             0x4 => Self::Storage,
             0x5 => Self::RelayerEvmAddressMap,
+            // 0x6 used
             _ => unreachable!(),
         }
     }
@@ -32,33 +51,36 @@ impl From<KeyPrefixU8> for KeyPrefix {
 
 #[allow(dead_code)]
 pub fn bytes_to_key(prefix: KeyPrefix, bytes: &[u8]) -> Vec<u8> {
-    [&[prefix as u8], bytes].concat()
+    [&[VersionPrefix::V1 as u8], &[prefix as u8], bytes].concat()
 }
 
 #[allow(dead_code)]
 pub fn address_to_key(prefix: KeyPrefix, address: &Address) -> [u8; 21] {
     let mut result = [0u8; 21];
-    result[0] = prefix as u8;
-    result[1..].copy_from_slice(&address.0);
+    result[0] = VersionPrefix::V1 as u8;
+    result[1] = prefix as u8;
+    result[2..].copy_from_slice(&address.0);
     result
 }
 
 #[allow(dead_code)]
-pub fn storage_to_key(address: &Address, key: &H256) -> [u8; 53] {
-    let mut result = [0u8; 53];
-    result[0] = KeyPrefix::Storage as u8;
-    result[1..21].copy_from_slice(&address.0);
-    result[21..].copy_from_slice(&key.0);
+pub fn storage_to_key(address: &Address, key: &H256) -> [u8; 54] {
+    let mut result = [0u8; 54];
+    result[0] = VersionPrefix::V1 as u8;
+    result[1] = KeyPrefix::Storage as u8;
+    result[2..22].copy_from_slice(&address.0);
+    result[22..].copy_from_slice(&key.0);
     result
 }
 
 #[allow(dead_code)]
 pub fn storage_to_key_nonced(address: &Address, storage_nonce: u32, key: &H256) -> [u8; 57] {
     let mut result = [0u8; 57];
-    result[0] = KeyPrefix::Storage as u8;
-    result[1..21].copy_from_slice(&address.0);
-    result[21..25].copy_from_slice(&storage_nonce.to_le_bytes());
-    result[25..].copy_from_slice(&key.0);
+    result[0] = VersionPrefix::V1 as u8;
+    result[1] = KeyPrefix::Storage as u8;
+    result[2..22].copy_from_slice(&address.0);
+    result[22..26].copy_from_slice(&storage_nonce.to_le_bytes());
+    result[26..].copy_from_slice(&key.0);
     result
 }
 
