@@ -1,7 +1,7 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::prelude::{String, ToString, Vec, U256};
+use crate::prelude::{Cow, String, ToString, Vec, U256};
 use crate::types::AccountId;
 
 mod costs {
@@ -23,7 +23,7 @@ mod costs {
 /// Get the current nep141 token associated with the current erc20 token.
 /// This will fail is none is associated.
 fn get_nep141_from_erc20(_erc20_token: &[u8]) -> AccountId {
-    // TODO:
+    // TODO(#51): Already implemented
     "".to_string()
 }
 
@@ -103,9 +103,9 @@ impl Precompile for ExitToNear {
                     ),
                 )
             } else {
-                // TODO: Which is the expected result in case of failure
-                //  Stopped vs Returned vs Suicided
-                return Ok((ExitSucceed::Stopped, Vec::new(), 0));
+                return Err(ExitError::Other(Cow::from(
+                    "ERR_INVALID_RECEIVER_ACCOUNT_ID",
+                )));
             }
         } else {
             // ERC20 transfer
@@ -133,9 +133,9 @@ impl Precompile for ExitToNear {
                     ),
                 )
             } else {
-                // TODO: Which is the expected result in case of failure
-                //  Stopped vs Returned vs Suicided
-                return Ok((ExitSucceed::Stopped, Vec::new(), 0));
+                return Err(ExitError::Other(Cow::from(
+                    "ERR_INVALID_RECEIVER_ACCOUNT_ID",
+                )));
             }
         };
 
@@ -193,9 +193,7 @@ impl Precompile for ExitToEthereum {
                     ),
                 )
             } else {
-                // TODO: Which is the expected result in case of failure
-                //  Stopped vs Returned vs Suicided
-                return Ok((ExitSucceed::Stopped, Vec::new(), 0));
+                return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
             }
         } else {
             // ERC-20 transfer
@@ -227,9 +225,7 @@ impl Precompile for ExitToEthereum {
                     ),
                 )
             } else {
-                // TODO: Which is the expected result in case of failure
-                //  Stopped vs Returned vs Suicided
-                return Ok((ExitSucceed::Stopped, Vec::new(), 0));
+                return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
             }
         };
 
