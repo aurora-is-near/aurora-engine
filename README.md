@@ -7,14 +7,14 @@
 [![Builds](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml)
 
 Aurora Engine implements an Ethereum Virtual Machine (EVM) on the NEAR Protocol.
-See [NEAR docs](https://docs.near.org/docs/develop/evm/introduction)for
-additional documentation.
+See [doc.aurora.dev](https://doc.aurora.dev/develop/compat/evm) for additional
+documentation.
 
 ## Deployments
 
 Network | Contract ID         | Chain ID   | Status
 ------- | ------------------- | ---------- | ------
-MainNet | [`aurora`][MainNet] | 1313161554 | ❌
+MainNet | [`aurora`][MainNet] | 1313161554 | 🚧
 TestNet | [`aurora`][TestNet] | 1313161555 | 🚧
 BetaNet | [`aurora`][BetaNet] | 1313161556 | 🚧
 Local   | `aurora.test.near`  | 1313161556 | ✅
@@ -140,51 +140,3 @@ aurora call 0xFc481F4037887e10708552c0D7563Ec6858640d6 0x2baeceb7  # decrement()
 near state aurora.test.near
 aurora dump-storage
 ```
-
-## Interface
-
-### Administrative methods
-
-#### `new`
-
-#### `get_version`
-
-#### `get_owner`
-
-#### `get_bridge_prover`
-
-#### `get_chain_id`
-
-#### `get_upgrade_index`
-
-#### `stage_upgrade`
-
-#### `deploy_upgrade`
-
-### Mutative methods
-
-#### `deploy_code`
-
-#### `call`
-
-#### `raw_call`
-
-#### `meta_call`
-
-### Nonmutative methods
-
-#### `view`
-
-#### `get_code`
-
-#### `get_balance`
-
-#### `get_nonce`
-
-#### `get_storage_at`
-
-### Benchmarking methods
-
-#### `begin_chain`
-
-#### `begin_block`
