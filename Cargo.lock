@@ -124,6 +124,7 @@ dependencies = [
  "criterion",
  "ethabi",
  "evm",
+ "evm-core",
  "git2",
  "hex",
  "libsecp256k1",
