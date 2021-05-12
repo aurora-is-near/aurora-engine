@@ -41,6 +41,14 @@ rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
 
 ## Development
 
+### Branches
+
+- [`master`] is the current stable branch.
+  It must be ready, anytime, to deployed on chain at a moment's notice.
+
+- [`develop`] is our bleeding-edge development branch.
+  In general, kindly target all pull requests to this branch.
+
 ### Building the EVM binary
 
 ```sh
@@ -140,3 +148,6 @@ aurora call 0xFc481F4037887e10708552c0D7563Ec6858640d6 0x2baeceb7  # decrement()
 near state aurora.test.near
 aurora dump-storage
 ```
+
+[`master`]:  https://github.com/aurora-is-near/aurora-engine/commits/master
+[`develop`]: https://github.com/aurora-is-near/aurora-engine/commits/develop
