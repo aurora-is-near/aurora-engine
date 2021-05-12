@@ -63,11 +63,11 @@ pub fn bytes_to_key(prefix: KeyPrefix, bytes: &[u8]) -> Vec<u8> {
 }
 
 #[allow(dead_code)]
-pub fn address_to_key(prefix: KeyPrefix, address: &Address) -> [u8; 21] {
-    let mut result = [0u8; 21];
+pub fn address_to_key(prefix: KeyPrefix, address: &Address) -> [u8; 22] {
+    let mut result = [0u8; 22];
     result[0] = VersionPrefix::V1 as u8;
     result[1] = prefix as u8;
-    result[2..].copy_from_slice(&address.0);
+    result[2..22].copy_from_slice(&address.0);
     result
 }
 
@@ -77,18 +77,18 @@ pub fn storage_to_key(address: &Address, key: &H256) -> [u8; 54] {
     result[0] = VersionPrefix::V1 as u8;
     result[1] = KeyPrefix::Storage as u8;
     result[2..22].copy_from_slice(&address.0);
-    result[22..].copy_from_slice(&key.0);
+    result[22..54].copy_from_slice(&key.0);
     result
 }
 
 #[allow(dead_code)]
-pub fn storage_to_key_nonced(address: &Address, storage_nonce: u32, key: &H256) -> [u8; 57] {
-    let mut result = [0u8; 57];
+pub fn storage_to_key_nonced(address: &Address, storage_nonce: u32, key: &H256) -> [u8; 58] {
+    let mut result = [0u8; 58];
     result[0] = VersionPrefix::V1 as u8;
     result[1] = KeyPrefix::Storage as u8;
     result[2..22].copy_from_slice(&address.0);
     result[22..26].copy_from_slice(&storage_nonce.to_le_bytes());
-    result[26..].copy_from_slice(&key.0);
+    result[26..58].copy_from_slice(&key.0);
     result
 }
 

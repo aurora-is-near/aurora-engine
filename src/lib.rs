@@ -50,13 +50,14 @@ mod contract {
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
     use crate::prelude::{Address, TryInto, H256, U256};
     use crate::sdk;
+    use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-    const CODE_KEY: &[u8; 5] = b"\0CODE";
-    const CODE_STAGE_KEY: &[u8; 11] = b"\0CODE_STAGE";
+    const CODE_KEY: &[u8; 4] = b"CODE";
+    const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 
     #[cfg(target_arch = "wasm32")]
     #[panic_handler]
@@ -137,7 +138,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let state = Engine::get_state();
-        let index = sdk::read_u64(CODE_STAGE_KEY).sdk_expect("ERR_NO_UPGRADE");
+        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
+            .sdk_expect("ERR_NO_UPGRADE");
         sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
 
@@ -146,19 +148,22 @@ mod contract {
     pub extern "C" fn stage_upgrade() {
         let state = Engine::get_state();
         require_owner_only(&state);
-        sdk::read_input_and_store(CODE_KEY);
-        sdk::write_storage(CODE_STAGE_KEY, &sdk::block_index().to_le_bytes());
+        sdk::read_input_and_store(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
+        sdk::write_storage(
+            &bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY),
+            &sdk::block_index().to_le_bytes(),
+        );
     }
 
     /// Deploy staged upgrade.
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
         let state = Engine::get_state();
-        let index = sdk::read_u64(CODE_STAGE_KEY).sdk_unwrap();
+        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)).sdk_unwrap();
         if sdk::block_index() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }
-        sdk::self_deploy(CODE_KEY);
+        sdk::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
     }
 
     ///

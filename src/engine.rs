@@ -11,7 +11,7 @@ use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArg
 use crate::precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
-use crate::storage::{address_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
+use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId};
 
 /// Errors with the EVM engine.
@@ -133,7 +133,7 @@ pub struct Engine {
 const CONFIG: &Config = &Config::istanbul();
 
 /// Key for storing the state of the engine.
-const STATE_KEY: &[u8; 6] = b"\0STATE";
+const STATE_KEY: &[u8; 5] = b"STATE";
 
 impl Engine {
     pub fn new(origin: Address) -> Self {
@@ -146,12 +146,15 @@ impl Engine {
 
     /// Saves state into the storage.
     pub fn set_state(state: EngineState) {
-        sdk::write_storage(STATE_KEY, &state.try_to_vec().expect("ERR_SER"));
+        sdk::write_storage(
+            &bytes_to_key(KeyPrefix::Config, STATE_KEY),
+            &state.try_to_vec().expect("ERR_SER"),
+        );
     }
 
     /// Fails if state is not found.
     pub fn get_state() -> EngineState {
-        match sdk::read_storage(STATE_KEY) {
+        match sdk::read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
             None => Default::default(),
             Some(bytes) => EngineState::try_from_slice(&bytes).expect("ERR_DESER"),
         }
