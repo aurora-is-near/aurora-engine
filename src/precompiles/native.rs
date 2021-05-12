@@ -1,9 +1,8 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::prelude::{String, Vec, U256, ToString};
-use crate::sdk;
-use crate::types::{AccountId};
+use crate::prelude::{String, ToString, Vec, U256};
+use crate::types::AccountId;
 
 mod costs {
     use crate::types::Gas;
@@ -28,6 +27,44 @@ fn get_nep141_from_erc20(_erc20_token: &[u8]) -> AccountId {
     "".to_string()
 }
 
+/// The minimum length of a valid account ID.
+const MIN_ACCOUNT_ID_LEN: u64 = 2;
+/// The maximum length of a valid account ID.
+const MAX_ACCOUNT_ID_LEN: u64 = 64;
+
+/// Returns `true` if the given account ID is valid and `false` otherwise.
+///
+/// Taken from near-sdk-rs:
+/// (https://github.com/near/near-sdk-rs/blob/42f62384c3acd024829501ee86e480917da03896/near-sdk/src/environment/env.rs#L816-L843)
+pub fn is_valid_account_id(account_id: &[u8]) -> bool {
+    if (account_id.len() as u64) < MIN_ACCOUNT_ID_LEN
+        || (account_id.len() as u64) > MAX_ACCOUNT_ID_LEN
+    {
+        return false;
+    }
+
+    // NOTE: We don't want to use Regex here, because it requires extra time to compile it.
+    // The valid account ID regex is /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/
+    // Instead the implementation is based on the previous character checks.
+
+    // We can safely assume that last char was a separator.
+    let mut last_char_is_separator = true;
+
+    for c in account_id {
+        let current_char_is_separator = match *c {
+            b'a'..=b'z' | b'0'..=b'9' => false,
+            b'-' | b'_' | b'.' => true,
+            _ => return false,
+        };
+        if current_char_is_separator && last_char_is_separator {
+            return false;
+        }
+        last_char_is_separator = current_char_is_separator;
+    }
+    // The account can't end as separator.
+    !last_char_is_separator
+}
+
 pub struct ExitToNear; //TransferEthToNear
 
 impl Precompile for ExitToNear {
@@ -35,6 +72,16 @@ impl Precompile for ExitToNear {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
+    #[cfg(not(feature = "contract"))]
+    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+        if Self::required_gas(input)? > target_gas {
+            return Err(ExitError::OutOfGas);
+        }
+
+        Ok((ExitSucceed::Returned, Vec::new(), 0))
+    }
+
+    #[cfg(feature = "contract")]
     fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
@@ -46,14 +93,20 @@ impl Precompile for ExitToNear {
             // Input slice format:
             //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
-            (
-                String::from_utf8(sdk::current_account_id()).unwrap(),
-                crate::prelude::format!(
-                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                    String::from_utf8(input.to_vec()).unwrap(),
-                    context.apparent_value.as_u128()
-                ),
-            )
+            if is_valid_account_id(input) {
+                (
+                    String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                    crate::prelude::format!(
+                        r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                        String::from_utf8(input.to_vec()).unwrap(),
+                        context.apparent_value.as_u128()
+                    ),
+                )
+            } else {
+                // TODO: Which is the expected result in case of failure
+                //  Stopped vs Returned vs Suicided
+                return Ok((ExitSucceed::Stopped, Vec::new(), 0));
+            }
         } else {
             // ERC20 transfer
             //
@@ -68,18 +121,25 @@ impl Precompile for ExitToNear {
             let mut input_mut = input;
             let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
             input_mut = &input_mut[32..];
-            let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
-            (
-                nep141_address,
-                crate::prelude::format!(
-                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                    receiver_account_id,
-                    amount
-                ),
-            )
+
+            if is_valid_account_id(input_mut) {
+                let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
+                (
+                    nep141_address,
+                    crate::prelude::format!(
+                        r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                        receiver_account_id,
+                        amount
+                    ),
+                )
+            } else {
+                // TODO: Which is the expected result in case of failure
+                //  Stopped vs Returned vs Suicided
+                return Ok((ExitSucceed::Stopped, Vec::new(), 0));
+            }
         };
 
-        let promise0 = sdk::promise_create(
+        let promise0 = crate::sdk::promise_create(
             nep141_address,
             b"ft_transfer",
             args.as_bytes(),
@@ -87,7 +147,7 @@ impl Precompile for ExitToNear {
             costs::FT_TRANSFER_GAS,
         );
 
-        sdk::promise_return(promise0);
+        crate::sdk::promise_return(promise0);
 
         Ok((ExitSucceed::Returned, Vec::new(), 0))
     }
@@ -100,6 +160,16 @@ impl Precompile for ExitToEthereum {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
+    #[cfg(not(feature = "contract"))]
+    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+        if Self::required_gas(input)? > target_gas {
+            return Err(ExitError::OutOfGas);
+        }
+
+        Ok((ExitSucceed::Returned, Vec::new(), 0))
+    }
+
+    #[cfg(feature = "contract")]
     fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
@@ -113,14 +183,20 @@ impl Precompile for ExitToEthereum {
 
             let eth_recipient: String = hex::encode(input);
 
-            (
-                String::from_utf8(sdk::current_account_id()).unwrap(),
-                crate::prelude::format!(
-                    r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                    context.apparent_value.as_u128(),
-                    eth_recipient
-                ),
-            )
+            if eth_recipient.len() == 20 {
+                (
+                    String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                    crate::prelude::format!(
+                        r#"{{"amount": "{}", "recipient": "{}"}}"#,
+                        context.apparent_value.as_u128(),
+                        eth_recipient
+                    ),
+                )
+            } else {
+                // TODO: Which is the expected result in case of failure
+                //  Stopped vs Returned vs Suicided
+                return Ok((ExitSucceed::Stopped, Vec::new(), 0));
+            }
         } else {
             // ERC-20 transfer
             //
@@ -138,22 +214,26 @@ impl Precompile for ExitToEthereum {
             let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
             input_mut = &input_mut[32..];
 
-            assert_eq!(input_mut.len(), 20);
+            if input_mut.len() == 20 {
+                // Parse ethereum address in hex
+                let eth_recipient: String = hex::encode(input_mut.to_vec());
 
-            // Parse ethereum address in hex
-            let eth_recipient: String = hex::encode(input_mut.to_vec());
-
-            (
-                nep141_address,
-                crate::prelude::format!(
-                    r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                    amount,
-                    eth_recipient
-                ),
-            )
+                (
+                    nep141_address,
+                    crate::prelude::format!(
+                        r#"{{"amount": "{}", "recipient": "{}"}}"#,
+                        amount,
+                        eth_recipient
+                    ),
+                )
+            } else {
+                // TODO: Which is the expected result in case of failure
+                //  Stopped vs Returned vs Suicided
+                return Ok((ExitSucceed::Stopped, Vec::new(), 0));
+            }
         };
 
-        let promise0 = sdk::promise_create(
+        let promise0 = crate::sdk::promise_create(
             nep141_address,
             b"withdraw",
             serialized_args.as_bytes(),
@@ -161,7 +241,7 @@ impl Precompile for ExitToEthereum {
             costs::WITHDRAWAL_GAS,
         );
 
-        sdk::promise_return(promise0);
+        crate::sdk::promise_return(promise0);
 
         Ok((ExitSucceed::Returned, Vec::new(), 0))
     }

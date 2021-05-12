@@ -278,26 +278,6 @@ pub fn predecessor_account_id() -> Vec<u8> {
     }
 }
 
-#[allow(dead_code)]
-pub fn signer_account_id() -> Vec<u8> {
-    unsafe {
-        exports::signer_account_id(1);
-        let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
-        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
-        bytes
-    }
-}
-
-#[allow(dead_code)]
-pub fn signer_account_pk() -> Vec<u8> {
-    unsafe {
-        exports::signer_account_pk(1);
-        let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
-        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
-        bytes
-    }
-}
-
 /// Calls environment sha256 on given input.
 #[allow(dead_code)]
 pub fn sha256(input: &[u8]) -> H256 {
