@@ -174,8 +174,8 @@ mod contract {
         use rlp::{Decodable, Rlp};
 
         let input = sdk::read_input();
-        let signed_transaction = EthSignedTransaction::decode(&Rlp::new(&input))
-            .sdk_expect("ERR_INVALID_TX");
+        let signed_transaction =
+            EthSignedTransaction::decode(&Rlp::new(&input)).sdk_expect("ERR_INVALID_TX");
 
         let state = Engine::get_state();
 
@@ -187,7 +187,9 @@ mod contract {
         }
 
         // Retrieve the signer of the transaction:
-        let sender = signed_transaction.sender().sdk_expect("ERR_INVALID_ECDSA_SIGNATURE");
+        let sender = signed_transaction
+            .sender()
+            .sdk_expect("ERR_INVALID_ECDSA_SIGNATURE");
 
         Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
 
@@ -217,7 +219,8 @@ mod contract {
             &domain_separator,
             &sdk::current_account_id(),
             input,
-        ).sdk_expect("ERR_META_TX_PARSE");
+        )
+        .sdk_expect("ERR_META_TX_PARSE");
 
         Engine::check_nonce(&meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
 

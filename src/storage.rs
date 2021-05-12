@@ -52,5 +52,15 @@ pub fn storage_to_key(address: &Address, key: &H256) -> [u8; 53] {
     result
 }
 
+#[allow(dead_code)]
+pub fn storage_to_key_nonced(address: &Address, storage_nonce: u32, key: &H256) -> [u8; 57] {
+    let mut result = [0u8; 57];
+    result[0] = KeyPrefix::Storage as u8;
+    result[1..21].copy_from_slice(&address.0);
+    result[21..25].copy_from_slice(&storage_nonce.to_le_bytes());
+    result[25..].copy_from_slice(&key.0);
+    result
+}
+
 #[cfg(test)]
 mod tests {}
