@@ -114,7 +114,7 @@ fn call_deposit_near(master_account: &UserAccount, contract: &str) -> Vec<Option
         0,
     );
     //res.assert_success();
-    //println!("{:#?}", res.promise_results());
+    println!("{:#?}", res.promise_results());
     // let total_gas_burnt = res
     //     .promise_results()
     //     .iter()

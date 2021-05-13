@@ -522,6 +522,7 @@ impl EthConnectorContract {
     }
 
     /// ft_on_transfer callback function
+    #[allow(clippy::unnecessary_unwrap)]
     pub fn ft_on_transfer(&mut self, engine: &Engine) {
         #[cfg(feature = "log")]
         sdk::log("Call ft_on_trasfer");
@@ -535,14 +536,14 @@ impl EthConnectorContract {
         if current_account_id == predecessor_account_id {
             let fee = message_data.fee.as_u128();
             self.burn_near(current_account_id, args.amount);
-            self.mint_eth(message_data.recipient, args.amount - fee);
             // Mint fee to relayer
-            if fee > 0 {
-                let evm_relayer_address: EthAddress = engine
-                    .get_relayer(&message_data.relayer.as_bytes())
-                    .expect("ERR_WRONG_RELAYER_ID")
-                    .0;
+            let relayer = engine.get_relayer(&message_data.relayer.as_bytes());
+            if fee > 0 && relayer.is_some() {
+                self.mint_eth(message_data.recipient, args.amount - fee);
+                let evm_relayer_address: EthAddress = relayer.unwrap().0;
                 self.mint_eth(evm_relayer_address, fee);
+            } else {
+                self.mint_eth(message_data.recipient, args.amount);
             }
         } else {
             // Implement new scheme for ERC20
