@@ -2,6 +2,8 @@ use crate::prelude::{vec, String, Vec, H256};
 use crate::types::STORAGE_PRICE_PER_BYTE;
 use borsh::{BorshDeserialize, BorshSerialize};
 
+const READ_STORAGE_REGISTER_ID: u64 = 0;
+
 mod exports {
 
     #[allow(unused)]
@@ -198,11 +200,25 @@ pub fn return_output(value: &[u8]) {
 
 #[allow(dead_code)]
 pub fn read_storage(key: &[u8]) -> Option<Vec<u8>> {
+    read_storage_len(key).map(|value_size| unsafe {
+        let bytes = vec![0u8; value_size];
+        exports::read_register(
+            READ_STORAGE_REGISTER_ID,
+            bytes.as_ptr() as *const u64 as u64,
+        );
+        bytes
+    })
+}
+
+pub fn read_storage_len(key: &[u8]) -> Option<usize> {
     unsafe {
-        if exports::storage_read(key.len() as u64, key.as_ptr() as u64, 0) == 1 {
-            let bytes: Vec<u8> = vec![0u8; exports::register_len(0) as usize];
-            exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
-            Some(bytes)
+        if exports::storage_read(
+            key.len() as u64,
+            key.as_ptr() as u64,
+            READ_STORAGE_REGISTER_ID,
+        ) == 1
+        {
+            Some(exports::register_len(READ_STORAGE_REGISTER_ID) as usize)
         } else {
             None
         }
