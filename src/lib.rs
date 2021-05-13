@@ -116,7 +116,8 @@ mod contract {
     pub extern "C" fn get_upgrade_index() {
         let state = Engine::get_state();
         let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
-            .sdk_expect("ERR_NO_UPGRADE");
+            .sdk_expect("ERR_NO_UPGRADE")
+            .sdk_unwrap();
         sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
 
@@ -136,7 +137,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
         let state = Engine::get_state();
-        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)).sdk_unwrap();
+        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
+            .sdk_expect("ERR_NO_UPGRADE")
+            .sdk_unwrap();
         if sdk::block_index() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }

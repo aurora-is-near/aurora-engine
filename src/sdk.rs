@@ -230,17 +230,16 @@ pub fn read_storage_len(key: &[u8]) -> Option<usize> {
 }
 
 /// Read u64 from storage at given key.
-pub fn read_u64(key: &[u8]) -> Option<u64> {
-    unsafe {
-        if exports::storage_read(key.len() as u64, key.as_ptr() as u64, 0) == 1 {
+pub(crate) fn read_u64(key: &[u8]) -> Option<Result<u64, InvalidU64>> {
+    read_storage_len(key).map(|value_size| unsafe {
+        if value_size == 8 {
             let result = [0u8; 8];
-            // TODO: Are you sure the register length is correct?
-            exports::read_register(0, result.as_ptr() as _);
-            Some(u64::from_le_bytes(result))
+            exports::read_register(READ_STORAGE_REGISTER_ID, result.as_ptr() as _);
+            Ok(u64::from_le_bytes(result))
         } else {
-            None
+            Err(InvalidU64)
         }
-    }
+    })
 }
 
 #[allow(dead_code)]
@@ -519,5 +518,12 @@ pub(crate) struct ArgParseErr;
 impl AsRef<[u8]> for ArgParseErr {
     fn as_ref(&self) -> &[u8] {
         b"ERR_ARG_PARSE"
+    }
+}
+
+pub(crate) struct InvalidU64;
+impl AsRef<[u8]> for InvalidU64 {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_NOT_U64"
     }
 }
