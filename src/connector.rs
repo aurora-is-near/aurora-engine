@@ -255,7 +255,11 @@ impl EthConnectorContract {
         sdk::promise_return(promise1);
     }
 
-    /// Finish deposit for NEAR accounts
+    /// Finish deposit NEAR (private method)
+    /// NOTE: we should `record_proof` only after `mint` operation. The reason
+    /// is that in this case we only calculate the amount to be credited but
+    /// do not save it, however, if an error occurs during the calculation,
+    /// this will happen before `record_proof`. After that contract will save.
     pub fn finish_deposit_near(&mut self) {
         sdk::assert_private_call();
         let data: FinishDepositCallArgs =
@@ -273,11 +277,13 @@ impl EthConnectorContract {
         sdk::log("Check verification_success");
         let verification_success: bool = bool::try_from_slice(&data0).unwrap();
         assert!(verification_success, "ERR_VERIFY_PROOF");
-        self.record_proof(&data.proof_key);
 
         // Mint tokens to recipient minus fee
         if let Some(msg) = data.msg {
+            // Mint - calculate new balances
             self.mint_near(data.new_owner_id, data.amount);
+            // Store proof only after `mint` calculations
+            self.record_proof(&data.proof_key);
             // Save new contract data
             self.save_contract();
 
@@ -290,8 +296,11 @@ impl EthConnectorContract {
             );
             sdk::promise_return(promise0);
         } else {
+            // Mint - calculate new balances
             self.mint_near(data.new_owner_id.clone(), data.amount - data.fee);
             self.mint_near(data.relayer_id, data.fee);
+            // Store proof only after `mint` calculations
+            self.record_proof(&data.proof_key);
             // Save new contract data
             self.save_contract();
         }
