@@ -546,3 +546,63 @@ fn test_ft_transfer_call_without_relayer() {
     let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, transfer_amount);
 }
+
+#[test]
+fn test_ft_transfer_call_fee_greater_than_amount() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_near(&contract, CONTRACT_ACC);
+
+    let transfer_amount = 10;
+    let fee = transfer_amount + 10;
+    let mut msg = U256::from(fee).as_byte_slice().to_vec();
+    msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
+    let relayer_id = "relayer.root";
+    let message = [relayer_id, hex::encode(msg).as_str()].join(":");
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "ft_transfer_call",
+        &TransferCallCallArgs {
+            receiver_id: CONTRACT_ACC.into(),
+            amount: transfer_amount,
+            memo: None,
+            msg: message,
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        1,
+    );
+    match res.outcome().status {
+        ExecutionStatus::Failure(_) => {}
+        _ => panic!(),
+    }
+
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
+
+    let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE);
+
+    let balance = get_eth_balance(
+        &master_account,
+        validate_eth_address(RECIPIENT_ETH_ADDRESS),
+        CONTRACT_ACC,
+    );
+    assert_eq!(balance, 0);
+
+    let balance = get_eth_balance(
+        &master_account,
+        validate_eth_address(CUSTODIAN_ADDRESS),
+        CONTRACT_ACC,
+    );
+    assert_eq!(balance, 0);
+
+    let balance = total_supply(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT);
+
+    let balance = total_supply_near(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT);
+
+    let balance = total_supply_eth(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, 0);
+}
