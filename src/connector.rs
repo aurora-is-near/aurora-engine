@@ -7,7 +7,7 @@ use crate::deposit_event::*;
 use crate::engine::Engine;
 use crate::prelude::*;
 use crate::prover::validate_eth_address;
-use crate::storage::{EthConnectorStorageId, KeyPrefix};
+use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
 #[cfg(feature = "log")]
 use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -53,7 +53,7 @@ impl EthConnectorContract {
     }
 
     fn get_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
-        [KeyPrefix::EthConnector as u8, *suffix as u8].to_vec()
+        storage::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
     }
 
     fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorStorageId) -> T {
