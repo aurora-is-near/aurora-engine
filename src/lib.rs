@@ -35,7 +35,7 @@ mod tests;
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::{BorshDeserialize, BorshSerialize};
+    use borsh::BorshSerialize;
 
     use crate::engine::{Engine, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
@@ -78,7 +78,7 @@ mod contract {
         if !state.owner_id.is_empty() {
             require_owner_only(&state);
         }
-        let args = NewCallArgs::try_from_slice(&sdk::read_input()).sdk_expect("ERR_ARG_PARSE");
+        let args: NewCallArgs = sdk::read_input_borsh().sdk_unwrap();
         Engine::set_state(args.into());
     }
 
@@ -161,9 +161,7 @@ mod contract {
     /// Call method on the EVM contract.
     #[no_mangle]
     pub extern "C" fn call() {
-        // TODO: Borsh input pattern is so common here. It worth writing sdk::read_input_borsh().
-        let input = sdk::read_input();
-        let args = FunctionCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: FunctionCallArgs = sdk::read_input_borsh().sdk_unwrap();
         let mut engine = Engine::new(predecessor_address());
         Engine::call_with_args(&mut engine, args)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
@@ -285,8 +283,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn view() {
-        let input = sdk::read_input();
-        let args = ViewCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: ViewCallArgs = sdk::read_input_borsh().sdk_unwrap();
         let engine = Engine::new(Address::from_slice(&args.sender));
         let result = Engine::view_with_args(&engine, args);
         result.sdk_process()
@@ -315,8 +312,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
-        let input = sdk::read_input();
-        let args = GetStorageAtArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: GetStorageAtArgs = sdk::read_input_borsh().sdk_unwrap();
         let value = Engine::get_storage(&Address(args.address), &H256(args.key));
         sdk::return_output(&value.0)
     }
@@ -331,7 +327,7 @@ mod contract {
         let mut state = Engine::get_state();
         require_owner_only(&state);
         let input = sdk::read_input();
-        let args = BeginChainArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
         Engine::set_state(state);
         // set genesis block balances
@@ -351,7 +347,7 @@ mod contract {
         let state = Engine::get_state();
         require_owner_only(&state);
         let input = sdk::read_input();
-        let _args = BeginBlockArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let _args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 

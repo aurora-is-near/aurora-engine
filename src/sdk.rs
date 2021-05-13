@@ -158,7 +158,6 @@ mod exports {
     }
 }
 
-#[allow(dead_code)]
 pub fn read_input() -> Vec<u8> {
     unsafe {
         exports::input(0);
@@ -166,6 +165,11 @@ pub fn read_input() -> Vec<u8> {
         exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
         bytes
     }
+}
+
+pub(crate) fn read_input_borsh<T: BorshDeserialize>() -> Result<T, ArgParseErr> {
+    let bytes = read_input();
+    T::try_from_slice(&bytes).map_err(|_| ArgParseErr)
 }
 
 pub(crate) fn read_input_arr20() -> Result<[u8; 20], IncorrectInputLength> {
@@ -508,5 +512,12 @@ pub(crate) struct IncorrectInputLength;
 impl AsRef<[u8]> for IncorrectInputLength {
     fn as_ref(&self) -> &[u8] {
         b"ERR_INCORRECT_INPUT_LENGTH"
+    }
+}
+
+pub(crate) struct ArgParseErr;
+impl AsRef<[u8]> for ArgParseErr {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_ARG_PARSE"
     }
 }
