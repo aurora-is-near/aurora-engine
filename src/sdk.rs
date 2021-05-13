@@ -166,14 +166,17 @@ pub fn read_input() -> Vec<u8> {
     }
 }
 
-#[allow(dead_code)]
-pub fn read_input_arr20() -> [u8; 20] {
+pub(crate) fn read_input_arr20() -> Result<[u8; 20], IncorrectInputLength> {
+    const REGISTER_ID: u64 = 0;
     unsafe {
-        exports::input(0);
-        let bytes = [0u8; 20];
-        // TODO: Is it fine to not check the length of the input register here?
-        exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
-        bytes
+        exports::input(REGISTER_ID);
+        if exports::register_len(REGISTER_ID) == 20 {
+            let bytes = [0u8; 20];
+            exports::read_register(REGISTER_ID, bytes.as_ptr() as *const u64 as u64);
+            Ok(bytes)
+        } else {
+            Err(IncorrectInputLength)
+        }
     }
 }
 
@@ -483,4 +486,11 @@ pub fn promise_batch_create(account_id: String) -> u64 {
 #[allow(dead_code)]
 pub fn storage_has_key(key: &[u8]) -> bool {
     unsafe { exports::storage_has_key(key.len() as u64, key.as_ptr() as u64) == 1 }
+}
+
+pub(crate) struct IncorrectInputLength;
+impl AsRef<[u8]> for IncorrectInputLength {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_INCORRECT_INPUT_LENGTH"
+    }
 }

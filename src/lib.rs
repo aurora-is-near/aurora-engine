@@ -41,7 +41,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{Address, TryInto, H256, U256};
+    use crate::prelude::{Address, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{near_account_to_evm_address, u256_to_arr};
@@ -257,14 +257,12 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn register_relayer() {
-        let relayer_address = sdk::read_input();
-        // NOTE: Why not `sdk::read_input_arr20();`?
-        assert_eq!(relayer_address.len(), 20);
+        let relayer_address = sdk::read_input_arr20().sdk_unwrap();
 
         let mut engine = Engine::new(predecessor_address());
         engine.register_relayer(
             sdk::predecessor_account_id().as_slice(),
-            Address(relayer_address.as_slice().try_into().unwrap()),
+            Address(relayer_address),
         );
     }
 
@@ -296,21 +294,21 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_code() {
-        let address = sdk::read_input_arr20();
+        let address = sdk::read_input_arr20().sdk_unwrap();
         let code = Engine::get_code(&Address(address));
         sdk::return_output(&code)
     }
 
     #[no_mangle]
     pub extern "C" fn get_balance() {
-        let address = sdk::read_input_arr20();
+        let address = sdk::read_input_arr20().sdk_unwrap();
         let balance = Engine::get_balance(&Address(address));
         sdk::return_output(&u256_to_arr(&balance))
     }
 
     #[no_mangle]
     pub extern "C" fn get_nonce() {
-        let address = sdk::read_input_arr20();
+        let address = sdk::read_input_arr20().sdk_unwrap();
         let nonce = Engine::get_nonce(&Address(address));
         sdk::return_output(&u256_to_arr(&nonce))
     }
