@@ -1,6 +1,7 @@
 use crate::prelude::{Address, String, Vec, H256, U256};
 #[cfg(feature = "contract")]
 use alloc::str;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
@@ -16,6 +17,9 @@ pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 pub type EthAddress = [u8; 20];
 pub type Gas = u64;
 pub type StorageUsage = u64;
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct U128(pub u128);
 
 pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
 pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
