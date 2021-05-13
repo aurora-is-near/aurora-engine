@@ -13,6 +13,7 @@ pub enum ParsingError {
     InvalidMetaTransactionMethodName,
     InvalidMetaTransactionFunctionArg,
     InvalidEcRecoverSignature,
+    ArgsLengthMismatch,
 }
 
 pub type ParsingResult<T> = core::result::Result<T, ParsingError>;
@@ -505,9 +506,11 @@ pub fn prepare_meta_call_args(
     let mut arg_bytes = Vec::new();
     arg_bytes.extend_from_slice(&keccak(arguments.as_bytes()).as_bytes());
     let args_decoded: Vec<RlpValue> = rlp_decode(&input.input)?;
+    if methods.method.args.len() != args_decoded.len() {
+        return Err(ParsingError::ArgsLengthMismatch);
+    }
     for (i, arg) in args_decoded.iter().enumerate() {
         arg_bytes.extend_from_slice(&eip_712_hash_argument(
-            // TODO: Check that method.args.len() == args_decoded.len(). Otherwise it may panic here.
             &methods.method.args[i].t,
             arg,
             &methods.types,
