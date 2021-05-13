@@ -7,8 +7,6 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
-#[cfg(feature = "contract")]
-mod map;
 pub mod meta_parsing;
 pub mod parameters;
 pub mod prelude;
@@ -22,6 +20,8 @@ mod engine;
 mod json;
 #[cfg(feature = "contract")]
 mod log_entry;
+#[cfg(feature = "contract")]
+mod map;
 mod precompiles;
 #[cfg(feature = "contract")]
 mod sdk;
@@ -40,8 +40,10 @@ mod contract {
     use crate::engine::{Engine, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{Address, TryInto, H256, U256};
+    use crate::parameters::{
+        DeployErc20TokenArgs, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs,
+    };
+    use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{near_account_to_evm_address, u256_to_arr};
@@ -276,9 +278,40 @@ mod contract {
             // TODO(#59) ETH transfer
             todo!();
         } else {
-            // TODO(#51) ERC20 transfer
-            todo!();
+            let mut engine = Engine::new(predecessor_address());
+            engine.receive_erc20_tokens();
         }
+    }
+
+    /// Deploy ERC20 token mapped to a NEP141
+    #[no_mangle]
+    pub extern "C" fn deploy_erc20_token() {
+        // Id of the NEP141 token in Near
+        let args: DeployErc20TokenArgs =
+            DeployErc20TokenArgs::try_from_slice(&sdk::read_input()).sdk_expect("ERR_ARG_PARSE");
+
+        let mut engine = Engine::new(predecessor_address());
+
+        let erc20_contract = include_bytes!("../etc/eth-contracts/res/EvmErc20.bin");
+        let deploy_args = ethabi::encode(&[
+            ethabi::Token::String("TestToken".to_string()),
+            ethabi::Token::String("TT".to_string()),
+            ethabi::Token::Uint(ethabi::Uint::from(0)),
+            ethabi::Token::Address(current_address().into()),
+        ]);
+
+        Engine::deploy_code_with_input(
+            &mut engine,
+            (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec(),
+        )
+        .map(|res| {
+            let address = H160(res.result.as_slice().try_into().unwrap());
+            engine.register_token(address.as_bytes(), args.nep141.as_bytes());
+            res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
+        })
+        .sdk_process();
+
+        // TODO: charge for storage
     }
 
     ///
@@ -371,7 +404,11 @@ mod contract {
         near_account_to_evm_address(&sdk::predecessor_account_id())
     }
 
-    trait SdkExpect<T> {
+    pub fn current_address() -> Address {
+        near_account_to_evm_address(&sdk::current_account_id())
+    }
+
+    pub(crate) trait SdkExpect<T> {
         fn sdk_expect(self, msg: &str) -> T;
     }
 
@@ -393,7 +430,7 @@ mod contract {
         }
     }
 
-    trait SdkUnwrap<T> {
+    pub(crate) trait SdkUnwrap<T> {
         fn sdk_unwrap(self) -> T;
     }
 
@@ -415,7 +452,7 @@ mod contract {
         }
     }
 
-    trait SdkProcess<T> {
+    pub(crate) trait SdkProcess<T> {
         fn sdk_process(self);
     }
 

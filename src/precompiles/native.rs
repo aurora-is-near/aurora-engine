@@ -1,8 +1,12 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::prelude::{Cow, String, ToString, Vec, U256};
+use crate::prelude::{Cow, String, Vec, U256};
+use crate::sdk;
+use crate::storage::{bytes_to_key, KeyPrefix};
 use crate::types::AccountId;
+
+const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 mod costs {
     use crate::types::Gas;
@@ -18,13 +22,6 @@ mod costs {
 
     // TODO(#51): Determine the correct amount of gas
     pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
-}
-
-/// Get the current nep141 token associated with the current erc20 token.
-/// This will fail is none is associated.
-fn get_nep141_from_erc20(_erc20_token: &[u8]) -> AccountId {
-    // TODO(#51): Already implemented
-    "".to_string()
 }
 
 /// The minimum length of a valid account ID.
@@ -63,6 +60,14 @@ pub fn is_valid_account_id(account_id: &[u8]) -> bool {
     }
     // The account can't end as separator.
     !last_char_is_separator
+}
+
+fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
+    AccountId::from_utf8(
+        sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
+            .expect(ERR_TARGET_TOKEN_NOT_FOUND),
+    )
+    .unwrap()
 }
 
 pub struct ExitToNear; //TransferEthToNear

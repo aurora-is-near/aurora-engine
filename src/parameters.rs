@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::prelude::{String, Vec};
-use crate::types::{AccountId, RawAddress, RawH256, RawU256};
+use crate::types::{AccountId, Balance, RawAddress, RawH256, RawU256};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -80,6 +80,11 @@ pub struct ViewCallArgs {
     pub input: Vec<u8>,
 }
 
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
+pub struct DeployErc20TokenArgs {
+    pub nep141: AccountId,
+}
+
 /// Borsh-encoded parameters for the `get_storage_at` function.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct GetStorageAtArgs {
@@ -119,6 +124,15 @@ pub struct BeginBlockArgs {
     pub difficulty: RawU256,
     /// The current block's gas limit.
     pub gaslimit: RawU256,
+}
+
+/// Borsh-encoded parameters for the `ft_transfer_call` function
+/// for regular NEP-141 tokens.
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct NEP141FtOnTransferArgs {
+    pub sender_id: AccountId,
+    pub amount: Balance,
+    pub msg: String,
 }
 
 #[cfg(test)]

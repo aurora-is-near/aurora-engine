@@ -58,7 +58,12 @@ impl<'a> OneShotAuroraRunner<'a> {
         caller_account_id: String,
         input: Vec<u8>,
     ) -> (Option<VMOutcome>, Option<VMError>) {
-        AuroraRunner::update_context(&mut self.context, caller_account_id, input);
+        AuroraRunner::update_context(
+            &mut self.context,
+            caller_account_id.clone(),
+            caller_account_id,
+            input,
+        );
 
         near_vm_runner::run(
             &self.base.code,
@@ -84,11 +89,16 @@ impl AuroraRunner {
         }
     }
 
-    fn update_context(context: &mut VMContext, caller_account_id: String, input: Vec<u8>) {
+    pub fn update_context(
+        context: &mut VMContext,
+        caller_account_id: String,
+        signer_account_id: String,
+        input: Vec<u8>,
+    ) {
         context.block_index += 1;
         context.block_timestamp += 100;
         context.input = input;
-        context.signer_account_id = caller_account_id.clone();
+        context.signer_account_id = signer_account_id;
         context.predecessor_account_id = caller_account_id;
     }
 
@@ -98,7 +108,27 @@ impl AuroraRunner {
         caller_account_id: String,
         input: Vec<u8>,
     ) -> (Option<VMOutcome>, Option<VMError>) {
-        Self::update_context(&mut self.context, caller_account_id, input);
+        self.call_with_signer(
+            method_name,
+            caller_account_id.clone(),
+            caller_account_id,
+            input,
+        )
+    }
+
+    pub fn call_with_signer(
+        &mut self,
+        method_name: &str,
+        caller_account_id: String,
+        signer_account_id: String,
+        input: Vec<u8>,
+    ) -> (Option<VMOutcome>, Option<VMError>) {
+        Self::update_context(
+            &mut self.context,
+            caller_account_id,
+            signer_account_id,
+            input,
+        );
 
         near_vm_runner::run(
             &self.code,
@@ -184,6 +214,7 @@ impl AuroraRunner {
         let mut context = self.context.clone();
         Self::update_context(
             &mut context,
+            "GETTER".to_string(),
             "GETTER".to_string(),
             address.as_bytes().to_vec(),
         );
