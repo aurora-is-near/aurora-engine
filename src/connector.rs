@@ -472,6 +472,8 @@ impl EthConnectorContract {
     }
 
     /// FT transfer call from sender account (invoker account) to receiver
+    /// We starting early checking for message data to avoid `ft_on_transfer` call panics
+    /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
     pub fn ft_transfer_call(&mut self) {
         sdk::assert_one_yocto();
         let args =
@@ -481,6 +483,13 @@ impl EthConnectorContract {
             "Transfer call to {} amount {}",
             args.receiver_id, args.amount,
         ));
+        // Verify message data before `ft_on_transfer` call to avoid verification panics
+        let message_data = self.parse_on_transfer_message(&args.msg);
+        // Check is transfer amount >= fee
+        assert!(
+            args.amount >= message_data.fee.as_u128(),
+            "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"
+        );
 
         self.ft
             .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
