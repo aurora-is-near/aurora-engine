@@ -494,11 +494,20 @@ impl EthConnectorContract {
         ));
         // Verify message data before `ft_on_transfer` call to avoid verification panics
         let message_data = self.parse_on_transfer_message(&args.msg);
-        // Check is transfer amount >= fee
+        // Check is transfer amount > fee
         assert!(
-            args.amount >= message_data.fee.as_u128(),
+            args.amount > message_data.fee.as_u128(),
             "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"
         );
+
+        // Additional check overflow before process `ft_on_transfer`
+        // But don't check overflow for relayer
+        let amount_for_check = self
+            .ft
+            .internal_unwrap_balance_of_eth(message_data.recipient);
+        assert!(amount_for_check.checked_add(args.amount).is_some());
+        assert!(self.ft.total_supply_eth.checked_add(args.amount).is_some());
+        assert!(self.ft.total_supply.checked_add(args.amount).is_some());
 
         self.ft
             .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
