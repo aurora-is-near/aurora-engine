@@ -1,4 +1,6 @@
 use crate::prelude::Address;
+use near_sdk::serde_json;
+use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -11,6 +13,12 @@ pub(crate) struct ContractConstructor {
 pub(crate) struct DeployedContract {
     pub abi: ethabi::Contract,
     pub address: Address,
+}
+
+#[derive(Deserialize)]
+struct ExtendedJsonSolidityArtifact {
+    abi: ethabi::Contract,
+    bytecode: String,
 }
 
 impl ContractConstructor {
@@ -44,6 +52,26 @@ impl ContractConstructor {
         let abi = ethabi::Contract::load(reader).unwrap();
 
         Self { abi, code }
+    }
+
+    pub fn compile_from_extended_json<P>(contract_path: P) -> Self
+    where
+        P: AsRef<Path>,
+    {
+        let reader = std::fs::File::open(contract_path).unwrap();
+        let contract: ExtendedJsonSolidityArtifact = serde_json::from_reader(reader).unwrap();
+
+        Self {
+            abi: contract.abi,
+            code: hex::decode(&contract.bytecode[2..]).unwrap(),
+        }
+    }
+
+    pub fn deployed_at(&self, address: Address) -> DeployedContract {
+        DeployedContract {
+            abi: self.abi.clone(),
+            address,
+        }
     }
 }
 

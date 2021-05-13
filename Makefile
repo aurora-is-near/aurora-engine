@@ -24,6 +24,9 @@ debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
 	$(CARGO) build --target wasm32-unknown-unknown --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 
+etc/eth-contracts/artifacts/contracts/StateTest.sol/SelfDestructFactory.json: etc/eth-contracts/contracts/StateTest.sol
+	cd etc/eth-contracts && yarn && yarn compile
+
 .PHONY: all release debug
 
 deploy: release.wasm
@@ -38,7 +41,7 @@ check-clippy:
 	$(CARGO) +nightly clippy --no-default-features --features=$(FEATURES) -- -D warnings
 
 # test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
-test: release
+test: release etc/eth-contracts/artifacts/contracts/StateTest.sol/SelfDestructFactory.json
 	$(CARGO) test
 
 format:

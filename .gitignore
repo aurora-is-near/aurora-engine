@@ -13,3 +13,7 @@
 # Rust artifacts
 /*.wasm
 /target/
+
+node_modules/
+artifacts/
+cache
