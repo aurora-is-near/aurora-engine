@@ -1,7 +1,7 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::prelude::{Cow, String, ToString, Vec, U256};
+use crate::prelude::{Cow, String, Vec, U256};
 use crate::types::AccountId;
 
 mod costs {
@@ -22,9 +22,9 @@ mod costs {
 
 /// Get the current nep141 token associated with the current erc20 token.
 /// This will fail is none is associated.
-fn get_nep141_from_erc20(_erc20_token: &[u8]) -> AccountId {
+fn get_nep141_from_erc20(_erc20_token: &[u8]) -> Vec<u8> {
     // TODO(#51): Already implemented
-    "".to_string()
+    Vec::new()
 }
 
 /// The minimum length of a valid account ID.
@@ -95,7 +95,7 @@ impl Precompile for ExitToNear {
 
             if is_valid_account_id(input) {
                 (
-                    String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                    crate::sdk::current_account_id(),
                     crate::prelude::format!(
                         r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
                         String::from_utf8(input.to_vec()).unwrap(),
@@ -140,7 +140,7 @@ impl Precompile for ExitToNear {
         };
 
         let promise0 = crate::sdk::promise_create(
-            nep141_address,
+            &nep141_address,
             b"ft_transfer",
             args.as_bytes(),
             1,
@@ -185,7 +185,7 @@ impl Precompile for ExitToEthereum {
 
             if eth_recipient.len() == 20 {
                 (
-                    String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                    crate::sdk::current_account_id(),
                     crate::prelude::format!(
                         r#"{{"amount": "{}", "recipient": "{}"}}"#,
                         context.apparent_value.as_u128(),
@@ -230,7 +230,7 @@ impl Precompile for ExitToEthereum {
         };
 
         let promise0 = crate::sdk::promise_create(
-            nep141_address,
+            &nep141_address,
             b"withdraw",
             serialized_args.as_bytes(),
             1,
