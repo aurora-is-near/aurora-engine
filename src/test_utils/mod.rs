@@ -100,7 +100,7 @@ impl AuroraRunner {
     ) -> (Option<VMOutcome>, Option<VMError>) {
         Self::update_context(&mut self.context, caller_account_id, input);
 
-        near_vm_runner::run(
+        let (maybe_outcome, maybe_error) = near_vm_runner::run(
             &self.code,
             method_name,
             &mut self.ext,
@@ -111,7 +111,12 @@ impl AuroraRunner {
             self.current_protocol_version,
             Some(&self.cache),
             &self.profile,
-        )
+        );
+
+        if let Some(outcome) = &maybe_outcome {
+            self.context.storage_usage = outcome.storage_usage;
+        }
+        (maybe_outcome, maybe_error)
     }
 
     pub fn create_address(&mut self, address: Address, init_balance: U256, init_nonce: U256) {
