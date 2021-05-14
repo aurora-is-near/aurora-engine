@@ -93,8 +93,8 @@ pub fn generation_storage_key(address: &Address, key: &H256, generation: u32) ->
     result[0] = VersionPrefix::V1 as u8;
     result[1] = KeyPrefix::Storage as u8;
     result[2..22].copy_from_slice(&address.0);
-    result[22..54].copy_from_slice(&key.0);
-    result[54..58].copy_from_slice(&generation.to_le_bytes());
+    result[22..54].copy_from_slice(&generation.to_le_bytes());
+    result[54..58].copy_from_slice(&key.0);
     result
 }
 
