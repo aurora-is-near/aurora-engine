@@ -26,6 +26,8 @@ mod engine;
 mod fungible_token;
 #[cfg(feature = "contract")]
 mod log_entry;
+#[cfg(feature = "contract")]
+mod admin_controlled;
 mod precompiles;
 #[cfg(feature = "contract")]
 mod prover;
@@ -432,6 +434,16 @@ mod contract {
     pub extern "C" fn ft_on_transfer() {
         let engine = Engine::new(predecessor_address());
         EthConnectorContract::get_instance().ft_on_transfer(&engine)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_eth_connector_paused_flags() {
+        EthConnectorContract::get_instance().get_paused_flags()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_eth_connector_paused_flags() {
+        EthConnectorContract::get_instance().set_paused_flags()
     }
 
     #[cfg(feature = "integration-test")]

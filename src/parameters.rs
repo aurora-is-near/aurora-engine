@@ -7,6 +7,8 @@ use crate::prover::Proof;
 use crate::types::Balance;
 #[cfg(feature = "contract")]
 use crate::types::EthAddress;
+#[cfg(feature = "contract")]
+use crate::admin_controlled::PausedMask;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 use evm::backend::Log;
 
@@ -285,6 +287,12 @@ pub struct BalanceOfEthCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RegisterRelayerCallArgs {
     pub address: EthAddress,
+}
+
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct PauseEthConnectorCallArgs {
+    pub paused_mask: PausedMask,
 }
 
 #[cfg(test)]
