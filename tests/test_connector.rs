@@ -12,6 +12,11 @@ use byte_slice_cast::AsByteSlice;
 use near_sdk_sim::transaction::ExecutionStatus;
 use primitive_types::U256;
 
+pub type PausedMask = u8;
+const UNPAUSE_ALL: PausedMask = 0;
+const PAUSE_DEPOSIT: PausedMask = 1 << 0;
+const PAUSE_WITHDRAW: PausedMask = 1 << 1;
+
 const CONTRACT_ACC: &'static str = "eth_connector.root";
 const EXTERNAL_CONTRACT_ACC: &'static str = "eth_recipient.root";
 const PROOF_DATA_NEAR: &'static str = r#"{"log_index":0,"log_entry_data":[248,251,148,208,69,247,225,155,36,136,146,75,151,249,193,69,181,229,29,13,137,90,101,248,66,160,209,66,67,156,39,142,37,218,217,165,7,102,241,83,208,227,210,215,191,43,209,111,194,120,28,75,212,148,178,177,90,157,160,0,0,0,0,0,0,0,0,0,0,0,0,137,27,39,73,35,139,39,255,88,233,81,8,142,85,176,77,231,29,195,116,184,160,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,96,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12,54,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,101,116,104,95,114,101,99,105,112,105,101,110,116,46,114,111,111,116,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"receipt_index":0,"receipt_data":[249,2,6,1,130,98,214,185,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,128,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,248,253,248,251,148,208,69,247,225,155,36,136,146,75,151,249,193,69,181,229,29,13,137,90,101,248,66,160,209,66,67,156,39,142,37,218,217,165,7,102,241,83,208,227,210,215,191,43,209,111,194,120,28,75,212,148,178,177,90,157,160,0,0,0,0,0,0,0,0,0,0,0,0,137,27,39,73,35,139,39,255,88,233,81,8,142,85,176,77,231,29,195,116,184,160,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,96,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12,54,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,101,116,104,95,114,101,99,105,112,105,101,110,116,46,114,111,111,116,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"header_data":[249,2,12,160,102,166,216,90,249,113,19,154,192,123,231,73,72,196,109,178,111,87,24,184,77,224,31,222,203,163,83,46,31,10,152,43,160,29,204,77,232,222,199,93,122,171,133,181,103,182,204,212,26,211,18,69,27,148,138,116,19,240,161,66,253,64,212,147,71,148,242,208,170,209,213,87,125,27,67,170,77,108,7,250,150,14,95,185,72,147,160,137,203,214,211,135,51,122,241,224,192,99,143,5,175,60,50,48,16,91,79,30,234,202,0,238,225,35,173,175,9,255,207,160,249,6,155,103,84,64,218,62,146,22,213,216,147,200,45,35,251,112,156,10,248,160,1,51,149,35,84,11,204,144,224,202,160,57,88,18,64,136,9,46,94,250,29,211,240,5,167,101,181,222,218,72,245,140,165,214,183,59,172,200,197,244,43,114,203,185,1,0,0,32,0,0,0,0,0,0,4,0,0,32,128,0,128,0,0,0,0,32,0,0,0,0,128,1,16,0,0,0,0,0,0,0,0,1,0,0,0,0,18,128,0,2,0,32,8,0,0,0,0,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,0,0,0,0,1,0,0,2,0,8,0,16,0,32,0,0,0,8,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,10,0,32,0,0,0,0,2,0,0,8,0,0,34,0,0,0,0,0,0,0,0,0,144,0,0,32,0,0,0,8,0,0,0,0,0,64,64,0,0,0,0,0,0,0,0,0,32,0,0,0,8,0,0,0,64,0,0,128,64,0,0,16,0,0,0,0,1,64,0,0,0,0,0,2,18,0,0,0,16,0,0,0,16,0,16,0,0,0,4,0,0,128,0,0,2,0,0,0,32,0,0,0,0,0,0,32,0,0,64,0,64,0,0,128,16,0,0,0,0,2,0,32,16,0,0,68,0,0,0,0,129,0,0,0,0,2,0,128,8,0,0,0,128,0,8,16,8,0,0,0,4,0,0,0,0,132,146,162,104,46,131,154,200,13,131,122,18,29,131,12,132,130,132,96,139,224,9,142,68,117,98,98,97,32,119,97,115,32,104,101,114,101,160,3,77,225,44,138,47,145,239,76,233,166,87,199,16,138,239,111,218,83,244,238,103,225,253,101,162,63,83,80,97,14,44,136,210,143,251,125,3,6,84,139],"proof":[[248,81,160,101,193,98,201,122,99,79,150,77,201,152,125,142,203,159,193,180,191,202,17,225,169,97,183,162,211,201,36,49,254,236,143,128,128,128,128,128,128,128,160,234,163,244,31,238,12,182,10,192,199,135,253,80,240,8,202,13,199,117,5,77,122,34,235,11,193,102,240,148,211,231,117,128,128,128,128,128,128,128,128],[249,2,13,48,185,2,9,249,2,6,1,130,98,214,185,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,128,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,248,253,248,251,148,208,69,247,225,155,36,136,146,75,151,249,193,69,181,229,29,13,137,90,101,248,66,160,209,66,67,156,39,142,37,218,217,165,7,102,241,83,208,227,210,215,191,43,209,111,194,120,28,75,212,148,178,177,90,157,160,0,0,0,0,0,0,0,0,0,0,0,0,137,27,39,73,35,139,39,255,88,233,81,8,142,85,176,77,231,29,195,116,184,160,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,96,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12,54,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,101,116,104,95,114,101,99,105,112,105,101,110,116,46,114,111,111,116,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}"#;
@@ -46,6 +51,20 @@ pub struct InitCallArgs {
     pub prover_account: String,
     pub eth_custodian_address: String,
 }
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct WithdrawCallArgs {
+    pub recipient_address: EthAddress,
+    pub amount: Balance,
+}
+
+#[derive(BorshDeserialize, Debug)]
+pub struct WithdrawResult {
+    pub amount: Balance,
+    pub recipient_id: EthAddress,
+    pub eth_custodian_address: EthAddress,
+}
+
 
 fn init(custodian_address: &str) -> (UserAccount, UserAccount) {
     let master_account = near_sdk_sim::init_simulator(None);
@@ -140,7 +159,7 @@ fn call_deposit_eth(master_account: &UserAccount, contract: &str) {
         10,
     );
     res.assert_success();
-    println!("{:#?}", res.promise_results());
+    //println!("{:#?}", res.promise_results());
 }
 
 fn get_near_balance(master_account: &UserAccount, acc: &str, contract: &str) -> u128 {
@@ -275,19 +294,6 @@ fn test_eth_deposit_balance_total_supply() {
 
 #[test]
 fn test_withdraw_near() {
-    #[derive(BorshSerialize, BorshDeserialize)]
-    pub struct WithdrawCallArgs {
-        pub recipient_address: EthAddress,
-        pub amount: Balance,
-    }
-
-    #[derive(BorshDeserialize, Debug)]
-    pub struct WithdrawResult {
-        pub amount: Balance,
-        pub recipient_id: EthAddress,
-        pub eth_custodian_address: EthAddress,
-    }
-
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
     call_deposit_near(&contract, CONTRACT_ACC);
 
@@ -605,4 +611,252 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
 
     let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, 0);
+}
+
+fn call_deposit_with_proof(account: &UserAccount, contract: &str, proof: &str) -> Vec<Option<ExecutionResult>> {
+    let proof: Proof = serde_json::from_str(proof).unwrap();
+    let res = account.call(
+        contract.to_string(),
+        "deposit",
+        &proof.try_to_vec().unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    res.promise_results()
+}
+
+fn call_set_paused_flags(account: &UserAccount, contract: &str, paused_mask: PausedMask) -> ExecutionResult {
+    let res = account.call(
+        contract.to_string(),
+        "set_eth_connector_paused_flags",
+        &paused_mask.try_to_vec().unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    res
+}
+
+fn create_user_account(master_account: &UserAccount) -> UserAccount {
+    let user_account = master_account.create_user(
+        "eth_recipient.root".to_string(),
+        to_yocto("100")
+    );
+    user_account
+}
+
+#[test]
+fn test_admin_controlled_only_admin_can_pause() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    let user_account = create_user_account(&master_account);
+
+    // Try to pause from the user - should fail
+    let res = call_set_paused_flags(&user_account, CONTRACT_ACC, PAUSE_DEPOSIT);
+    let promises = res.promise_results();
+    let p = promises[1].clone();
+    match p.unwrap().status() {
+        ExecutionStatus::Failure(_) => {}
+        _ => panic!(),
+    }
+
+    // Try to pause from the admin - should succeed
+    let res = call_set_paused_flags(&contract, CONTRACT_ACC, PAUSE_DEPOSIT);
+    res.assert_success();
+}
+
+#[test]
+fn test_admin_controlled_admin_can_peform_actions_when_paused() {
+    let (_master_account, contract) = init(CUSTODIAN_ADDRESS);
+
+    // 1st deposit call when unpaused - should succeed
+    let promises = call_deposit_with_proof(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
+
+    let withdraw_amount = 100;
+    let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
+
+    // 1st withdraw call when unpaused  - should succeed
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "withdraw",
+        &WithdrawCallArgs {
+            recipient_address: recipient_addr,
+            amount: withdraw_amount,
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+    let promises = res.promise_results();
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
+
+    // Pause deposit
+    let res = call_set_paused_flags(&contract, CONTRACT_ACC, PAUSE_DEPOSIT);
+    res.assert_success();
+
+    // 2nd deposit call when paused, but the admin is calling it - should succeed
+    // NB: We can use `PROOF_DATA_ETH` this will be just a different proof but the same deposit
+    // method which should be paused
+    let promises = call_deposit_with_proof(&contract, CONTRACT_ACC, PROOF_DATA_ETH);
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
+
+    // Pause withdraw
+    let res = call_set_paused_flags(&contract, CONTRACT_ACC, PAUSE_WITHDRAW);
+    res.assert_success();
+
+    // 2nd withdraw call when paused, but the admin is calling it - should succeed
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "withdraw",
+        &WithdrawCallArgs {
+            recipient_address: recipient_addr,
+            amount: withdraw_amount,
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+    let promises = res.promise_results();
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
+}
+
+#[test]
+fn test_deposit_pausability() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    let user_account = create_user_account(&master_account);
+
+    // 1st deposit call - should succeed
+    let promises = call_deposit_with_proof(&user_account, CONTRACT_ACC, PROOF_DATA_NEAR);
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
+
+    // Pause deposit
+    let res = call_set_paused_flags(&contract, CONTRACT_ACC, PAUSE_DEPOSIT);
+    res.assert_success();
+
+    // 2nd deposit call - should fail
+    // NB: We can use `PROOF_DATA_ETH` this will be just a different proof but the same deposit
+    // method which should be paused
+    let promises = call_deposit_with_proof(&user_account, CONTRACT_ACC, PROOF_DATA_ETH);
+    let num_promises = promises.len();
+    let p = promises[num_promises - 2].clone();
+    match p.unwrap().status() {
+        ExecutionStatus::Failure(_) => {}
+        _ => panic!(),
+    }
+
+    // Unpause all
+    let res = call_set_paused_flags(&contract, CONTRACT_ACC, UNPAUSE_ALL);
+    res.assert_success();
+
+    // 3rd deposit call - should succeed
+    let promises = call_deposit_with_proof(&user_account, CONTRACT_ACC, PROOF_DATA_ETH);
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
+}
+
+#[test]
+fn test_withdraw_near_pausability() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    let user_account = create_user_account(&master_account);
+
+    call_deposit_near(&contract, CONTRACT_ACC);
+
+    let withdraw_amount = 100;
+    let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
+    // 1st withdraw - should succeed
+    let res = user_account.call(
+        CONTRACT_ACC.to_string(),
+        "withdraw",
+        &WithdrawCallArgs {
+            recipient_address: recipient_addr,
+            amount: withdraw_amount,
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+    let promises = res.promise_results();
+    assert!(promises.len() > 1);
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
+
+    // Pause withdraw
+    let res = call_set_paused_flags(&contract, CONTRACT_ACC, PAUSE_WITHDRAW);
+    res.assert_success();
+
+    // 2nd withdraw - should fail
+    let res = user_account.call(
+        CONTRACT_ACC.to_string(),
+        "withdraw",
+        &WithdrawCallArgs {
+            recipient_address: recipient_addr,
+            amount: withdraw_amount,
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        1,
+    );
+    let promises = res.promise_results();
+    let p = promises[1].clone();
+    match p.unwrap().status() {
+        ExecutionStatus::Failure(_) => {}
+        _ => panic!(),
+    }
+
+    // Unpause all
+    let res = call_set_paused_flags(&contract, CONTRACT_ACC, UNPAUSE_ALL);
+    res.assert_success();
+
+    let res = user_account.call(
+        CONTRACT_ACC.to_string(),
+        "withdraw",
+        &WithdrawCallArgs {
+            recipient_address: recipient_addr,
+            amount: withdraw_amount,
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+    let promises = res.promise_results();
+    assert!(promises.len() > 1);
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
 }
