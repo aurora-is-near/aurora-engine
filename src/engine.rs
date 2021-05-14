@@ -222,16 +222,16 @@ impl Engine {
             .unwrap_or_else(U256::zero)
     }
 
-    pub fn remove_storage(address: &Address, key: &H256) {
-        sdk::remove_storage(&storage_to_key(address, key));
+    pub fn remove_storage(address: &Address, key: &H256, generation: u32) {
+        sdk::remove_storage(&storage_to_key(address, key, generation).as_ref());
     }
 
-    pub fn set_storage(address: &Address, key: &H256, value: &H256) {
-        sdk::write_storage(&storage_to_key(address, key), &value.0);
+    pub fn set_storage(address: &Address, key: &H256, value: &H256, generation: u32) {
+        sdk::write_storage(&storage_to_key(address, key, generation).as_ref(), &value.0);
     }
 
-    pub fn get_storage(address: &Address, key: &H256) -> H256 {
-        sdk::read_storage(&storage_to_key(address, key))
+    pub fn get_storage(address: &Address, key: &H256, generation: u32) -> H256 {
+        sdk::read_storage(storage_to_key(address, key, generation).as_ref())
             .map(|value| H256::from_slice(&value))
             .unwrap_or_else(H256::default)
     }
@@ -241,6 +241,24 @@ impl Engine {
         let nonce = Self::get_nonce(address);
         let code_len = Self::get_code_size(address);
         balance == U256::zero() && nonce == U256::zero() && code_len == 0
+    }
+
+    /// Increments storage generation for a given address.
+    pub fn set_generation(address: &Address, generation: u32) {
+        sdk::write_storage(
+            &address_to_key(KeyPrefix::Generation, address),
+            &generation.to_be_bytes(),
+        );
+    }
+
+    pub fn get_generation(address: &Address) -> u32 {
+        sdk::read_storage(&address_to_key(KeyPrefix::Generation, address))
+            .map(|value| {
+                let mut bytes = [0u8; 4];
+                bytes[0..4].copy_from_slice(&value[0..4]);
+                u32::from_be_bytes(bytes)
+            })
+            .unwrap_or(0)
     }
 
     /// Removes all storage for the given address.
@@ -253,20 +271,25 @@ impl Engine {
         //     Either way you may have to store the nonce per storage address root. When the account
         //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
         //     can be deleted over time. That's how TurboGeth does storage.
+
+        // We deleted a storage, so, we mock this by incrementing a generation
+        // which gives us access to a new storage for that address. We also must
+        // invoke `storage_to_key_generation` instead.
     }
 
     /// Removes an account.
-    pub fn remove_account(address: &Address) {
+    pub fn remove_account(address: &Address, generation: u32) {
         Self::remove_nonce(address);
         Self::remove_balance(address);
         Self::remove_code(address);
         Self::remove_all_storage(address);
+        Self::set_generation(address, generation + 1);
     }
 
     /// Removes an account if it is empty.
-    pub fn remove_account_if_empty(address: &Address) {
+    pub fn remove_account_if_empty(address: &Address, generation: u32) {
         if Self::is_account_empty(address) {
-            Self::remove_account(address);
+            Self::remove_account(address, generation);
         }
     }
 
@@ -503,7 +526,8 @@ impl evm::backend::Backend for Engine {
 
     /// Get storage value of address at index.
     fn storage(&self, address: Address, index: H256) -> H256 {
-        Engine::get_storage(&address, &index)
+        let generation = Self::get_generation(&address);
+        Engine::get_storage(&address, &index, generation)
     }
 
     /// Get original storage value of address at index, if available.
@@ -530,6 +554,7 @@ impl ApplyBackend for Engine {
                     storage,
                     reset_storage,
                 } => {
+                    let generation = Self::get_generation(&address);
                     Engine::set_nonce(&address, &basic.nonce);
                     Engine::set_balance(&address, &basic.balance);
                     if let Some(code) = code {
@@ -542,17 +567,20 @@ impl ApplyBackend for Engine {
 
                     for (index, value) in storage {
                         if value == H256::default() {
-                            Engine::remove_storage(&address, &index)
+                            Engine::remove_storage(&address, &index, generation)
                         } else {
-                            Engine::set_storage(&address, &index, &value)
+                            Engine::set_storage(&address, &index, &value, generation)
                         }
                     }
 
                     if delete_empty {
-                        Engine::remove_account_if_empty(&address)
+                        Engine::remove_account_if_empty(&address, generation)
                     }
                 }
-                Apply::Delete { address } => Engine::remove_account(&address),
+                Apply::Delete { address } => {
+                    let generation = Self::get_generation(&address);
+                    Engine::remove_account(&address, generation);
+                }
             }
         }
     }

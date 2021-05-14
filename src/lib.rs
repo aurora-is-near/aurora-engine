@@ -1,3 +1,4 @@
+#![feature(array_methods)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(core_intrinsics))]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
@@ -319,7 +320,8 @@ mod contract {
     pub extern "C" fn get_storage_at() {
         let input = sdk::read_input();
         let args = GetStorageAtArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
-        let value = Engine::get_storage(&Address(args.address), &H256(args.key));
+        let generation = Engine::get_generation(&args.address);
+        let value = Engine::get_storage(&Address(args.address), &H256(args.key), generation);
         sdk::return_output(&value.0)
     }
 
