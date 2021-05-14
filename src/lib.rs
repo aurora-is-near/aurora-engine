@@ -320,8 +320,9 @@ mod contract {
     pub extern "C" fn get_storage_at() {
         let input = sdk::read_input();
         let args = GetStorageAtArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
-        let generation = Engine::get_generation(&args.address);
-        let value = Engine::get_storage(&Address(args.address), &H256(args.key), generation);
+        let address = Address(args.address);
+        let generation = Engine::get_generation(&address);
+        let value = Engine::get_storage(&address, &H256(args.key), generation);
         sdk::return_output(&value.0)
     }
 
