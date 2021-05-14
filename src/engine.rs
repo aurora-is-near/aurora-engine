@@ -271,10 +271,6 @@ impl Engine {
         //     Either way you may have to store the nonce per storage address root. When the account
         //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
         //     can be deleted over time. That's how TurboGeth does storage.
-
-        // We deleted a storage, so, we mock this by incrementing a generation
-        // which gives us access to a new storage for that address. We also must
-        // invoke `storage_to_key_generation` instead.
     }
 
     /// Removes an account.
