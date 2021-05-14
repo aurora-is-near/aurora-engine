@@ -1,5 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
+#[cfg(feature = "contract")]
+use crate::admin_controlled::PausedMask;
 use crate::prelude::{String, Vec};
 #[cfg(feature = "contract")]
 use crate::prover::Proof;
@@ -7,8 +9,6 @@ use crate::prover::Proof;
 use crate::types::Balance;
 #[cfg(feature = "contract")]
 use crate::types::EthAddress;
-#[cfg(feature = "contract")]
-use crate::admin_controlled::PausedMask;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 use evm::backend::Log;
 

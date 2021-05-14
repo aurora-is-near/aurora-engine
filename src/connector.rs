@@ -3,12 +3,12 @@ use crate::parameters::*;
 use crate::sdk;
 use crate::types::*;
 
+use crate::admin_controlled::{AdminControlled, PausedMask};
 use crate::deposit_event::*;
 use crate::engine::Engine;
 use crate::prelude::*;
 use crate::prover::validate_eth_address;
 use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
-use crate::admin_controlled::{AdminControlled, PausedMask};
 #[cfg(feature = "log")]
 use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -102,8 +102,8 @@ impl EthConnectorContract {
         );
         Self {
             contract: contract_data,
-            ft: ft,
-            paused_mask: paused_mask,
+            ft,
+            paused_mask,
         }
         .save_contract();
     }
@@ -640,7 +640,8 @@ impl EthConnectorContract {
     pub fn set_paused_flags(&mut self) {
         sdk::assert_private_call();
 
-        let args = PauseEthConnectorCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+        let args =
+            PauseEthConnectorCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         self.set_paused(args.paused_mask);
     }
 }

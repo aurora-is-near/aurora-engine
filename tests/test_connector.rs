@@ -65,7 +65,6 @@ pub struct WithdrawResult {
     pub eth_custodian_address: EthAddress,
 }
 
-
 fn init(custodian_address: &str) -> (UserAccount, UserAccount) {
     let master_account = near_sdk_sim::init_simulator(None);
     let contract = init_contract(&master_account, CONTRACT_ACC, custodian_address);
@@ -613,7 +612,11 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
     assert_eq!(balance, 0);
 }
 
-fn call_deposit_with_proof(account: &UserAccount, contract: &str, proof: &str) -> Vec<Option<ExecutionResult>> {
+fn call_deposit_with_proof(
+    account: &UserAccount,
+    contract: &str,
+    proof: &str,
+) -> Vec<Option<ExecutionResult>> {
     let proof: Proof = serde_json::from_str(proof).unwrap();
     let res = account.call(
         contract.to_string(),
@@ -625,7 +628,11 @@ fn call_deposit_with_proof(account: &UserAccount, contract: &str, proof: &str) -
     res.promise_results()
 }
 
-fn call_set_paused_flags(account: &UserAccount, contract: &str, paused_mask: PausedMask) -> ExecutionResult {
+fn call_set_paused_flags(
+    account: &UserAccount,
+    contract: &str,
+    paused_mask: PausedMask,
+) -> ExecutionResult {
     let res = account.call(
         contract.to_string(),
         "set_eth_connector_paused_flags",
@@ -639,7 +646,7 @@ fn call_set_paused_flags(account: &UserAccount, contract: &str, paused_mask: Pau
 fn create_user_account(master_account: &UserAccount) -> UserAccount {
     let user_account = master_account.create_user(
         "eth_recipient.root".to_string(),
-        to_yocto("100")
+        to_yocto("100"), // initial balance
     );
     user_account
 }

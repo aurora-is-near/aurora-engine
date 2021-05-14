@@ -18,6 +18,8 @@ pub mod transaction;
 pub mod types;
 
 #[cfg(feature = "contract")]
+mod admin_controlled;
+#[cfg(feature = "contract")]
 mod connector;
 #[cfg(feature = "contract")]
 mod deposit_event;
@@ -26,8 +28,6 @@ mod engine;
 mod fungible_token;
 #[cfg(feature = "contract")]
 mod log_entry;
-#[cfg(feature = "contract")]
-mod admin_controlled;
 mod precompiles;
 #[cfg(feature = "contract")]
 mod prover;
