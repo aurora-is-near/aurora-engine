@@ -114,11 +114,11 @@ impl AuroraRunner {
         )
     }
 
-    pub fn create_address(&mut self, address: Address, init_balance: U256, init_nonce: U256) {
+    pub fn create_address(&mut self, address: Address, init_balance: types::Wei, init_nonce: U256) {
         let trie = &mut self.ext.fake_trie;
 
         let balance_key = storage::address_to_key(storage::KeyPrefix::Balance, &address);
-        let balance_value = types::u256_to_arr(&init_balance);
+        let balance_value = init_balance.to_bytes();
 
         let nonce_key = storage::address_to_key(storage::KeyPrefix::Nonce, &address);
         let nonce_value = types::u256_to_arr(&init_nonce);
@@ -170,8 +170,8 @@ impl AuroraRunner {
         }
     }
 
-    pub fn get_balance(&self, address: Address) -> U256 {
-        self.getter_method_call("get_balance", address)
+    pub fn get_balance(&self, address: Address) -> types::Wei {
+        types::Wei::new(self.getter_method_call("get_balance", address))
     }
 
     pub fn get_nonce(&self, address: Address) -> U256 {
@@ -262,7 +262,7 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
 
 pub(crate) fn create_eth_transaction(
     to: Option<Address>,
-    value: U256,
+    value: types::Wei,
     data: Vec<u8>,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
@@ -322,7 +322,7 @@ pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
 pub(crate) fn validate_address_balance_and_nonce(
     runner: &AuroraRunner,
     address: Address,
-    expected_balance: U256,
+    expected_balance: types::Wei,
     expected_nonce: U256,
 ) {
     assert_eq!(runner.get_balance(address), expected_balance, "balance");

@@ -303,7 +303,7 @@ mod contract {
     pub extern "C" fn get_balance() {
         let address = sdk::read_input_arr20().sdk_unwrap();
         let balance = Engine::get_balance(&Address(address));
-        sdk::return_output(&u256_to_arr(&balance))
+        sdk::return_output(&balance.to_bytes())
     }
 
     #[no_mangle]

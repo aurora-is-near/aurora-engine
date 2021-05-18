@@ -4,8 +4,9 @@ use secp256k1::SecretKey;
 
 use crate::test_utils::standard_precompiles::{PrecompilesConstructor, PrecompilesContract};
 use crate::test_utils::{address_from_secret_key, deploy_evm, sign_transaction, SUBMIT};
+use crate::types::Wei;
 
-const INITIAL_BALANCE: u64 = 1000;
+const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 
 pub(crate) fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
@@ -14,7 +15,7 @@ pub(crate) fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
     let source_account = SecretKey::random(&mut rng);
     runner.create_address(
         address_from_secret_key(&source_account),
-        INITIAL_BALANCE.into(),
+        INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
     let calling_account_id = "some-account.near".to_string();
