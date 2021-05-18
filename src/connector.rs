@@ -153,7 +153,7 @@ impl EthConnectorContract {
 
     /// Deposit all types of tokens
     pub fn deposit(&self) {
-        self.check_not_paused(PAUSE_DEPOSIT);
+        self.assert_not_paused(PAUSE_DEPOSIT);
 
         use crate::prover::Proof;
         #[cfg(feature = "log")]
@@ -390,7 +390,7 @@ impl EthConnectorContract {
     /// Withdraw from NEAR accounts
     /// NOTE: it should be without any log data
     pub fn withdraw_near(&mut self) {
-        self.check_not_paused(PAUSE_WITHDRAW);
+        self.assert_not_paused(PAUSE_WITHDRAW);
 
         sdk::assert_one_yocto();
         let args = WithdrawCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
@@ -502,8 +502,6 @@ impl EthConnectorContract {
     /// We starting early checking for message data to avoid `ft_on_transfer` call panics
     /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
     pub fn ft_transfer_call(&mut self) {
-        //TODO: perhaps need to add pausability functionality here as well?
-
         sdk::assert_one_yocto();
         let args =
             TransferCallCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
@@ -571,8 +569,6 @@ impl EthConnectorContract {
     /// ft_on_transfer callback function
     #[allow(clippy::unnecessary_unwrap)]
     pub fn ft_on_transfer(&mut self, engine: &Engine) {
-        //TODO: perhaps need to add pausability functionality here as well?
-
         #[cfg(feature = "log")]
         sdk::log("Call ft_on_trasfer");
         let args = FtOnTransfer::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);

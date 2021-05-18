@@ -3,6 +3,7 @@ use crate::sdk;
 pub type PausedMask = u8;
 
 pub trait AdminControlled {
+    /// Returns true if the current account is owner
     fn is_owner(&self) -> bool {
         sdk::current_account_id() == sdk::predecessor_account_id()
     }
@@ -20,7 +21,7 @@ pub trait AdminControlled {
         (self.get_paused() & flag) != 0 && !self.is_owner()
     }
 
-    fn check_not_paused(&self, flag: PausedMask) {
+    fn assert_not_paused(&self, flag: PausedMask) {
         assert!(!self.is_paused(flag), "ERR_PAUSED");
     }
 }
