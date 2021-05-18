@@ -1,8 +1,6 @@
 ---
 on: [push, pull_request]
 name: Tests
-env:
-  CARGO_INCREMENTAL: 0
 jobs:
   test:
     name: Test suite
@@ -33,3 +31,4 @@ jobs:
           args: --verbose
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
