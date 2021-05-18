@@ -28,7 +28,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --verbose
+          args: --locked --verbose
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
