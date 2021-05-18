@@ -57,6 +57,12 @@ impl FungibleToken {
                 .total_supply_near
                 .checked_add(amount)
                 .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
+            // Note: Reusing total supply for a sum of ETH and NEAR is very weird. It doesn't give
+            // mean anything reasonable. I guess the goal is to just report changing numbers for the
+            // total supply when either ETH or NEAR balances are changing. In this case it's probably
+            // okay to report only one of them, e.g. ETH total_supply and not report NEAR total
+            // supply through `ft_total_supply`.
+            // TODO: Remove total_supply for NEAR
             self.total_supply = self
                 .total_supply
                 .checked_add(amount)
@@ -209,6 +215,8 @@ impl FungibleToken {
         if sender_id != receiver_id {
             self.internal_transfer(sender_id, receiver_id, amount, memo);
         }
+        // Note: This seems to be breaking the invariant that sender_id != receiver_id. You need to
+        //    make sure the ft implementation doesn't break after this change.
 
         let data1 = FtOnTransfer {
             amount,
@@ -254,6 +262,7 @@ impl FungibleToken {
         let unused_amount = match sdk::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(value) => {
+                // TODO: This has to use `JSON` instead of Borsh to match the FT standard.
                 if let Ok(unused_amount) = Balance::try_from_slice(&value[..]) {
                     if amount > unused_amount {
                         unused_amount

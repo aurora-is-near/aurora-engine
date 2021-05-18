@@ -97,7 +97,7 @@ impl Precompile for ExitToNear {
                 (
                     crate::sdk::current_account_id(),
                     crate::prelude::format!(
-                        r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                        r#"{{"receiver_id": "{}", "amount": "{}"}}"#,
                         String::from_utf8(input.to_vec()).unwrap(),
                         context.apparent_value.as_u128()
                     ),
@@ -122,12 +122,14 @@ impl Precompile for ExitToNear {
             let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
             input_mut = &input_mut[32..];
 
+            // TODO: You have to charge caller's account balance for this transfer.
+
             if is_valid_account_id(input_mut) {
                 let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
                 (
                     nep141_address,
                     crate::prelude::format!(
-                        r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                        r#"{{"receiver_id": "{}", "amount": "{}"}}"#,
                         receiver_account_id,
                         amount
                     ),
@@ -211,6 +213,8 @@ impl Precompile for ExitToEthereum {
 
             let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
             input_mut = &input_mut[32..];
+
+            // TODO: Charge the caller's account balance?
 
             if input_mut.len() == 20 {
                 // Parse ethereum address in hex
