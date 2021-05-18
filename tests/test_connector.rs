@@ -662,7 +662,7 @@ fn test_admin_controlled_only_admin_can_pause() {
     let p = promises[1].clone();
     match p.unwrap().status() {
         ExecutionStatus::Failure(_) => {}
-        _ => panic!(),
+        _ => panic!("Expected failure as only admin can pause, but user successfully paused"),
     }
 
     // Try to pause from the admin - should succeed
@@ -771,7 +771,7 @@ fn test_deposit_pausability() {
     let p = promises[num_promises - 2].clone();
     match p.unwrap().status() {
         ExecutionStatus::Failure(_) => {}
-        _ => panic!(),
+        _ => panic!("Expected failure due to pause, but deposit succeeded"),
     }
 
     // Unpause all
@@ -839,7 +839,7 @@ fn test_withdraw_near_pausability() {
     let p = promises[1].clone();
     match p.unwrap().status() {
         ExecutionStatus::Failure(_) => {}
-        _ => panic!(),
+        _ => panic!("Expected failure due to pause, but withdraw succeeded"),
     }
 
     // Unpause all

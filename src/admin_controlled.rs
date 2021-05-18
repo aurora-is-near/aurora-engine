@@ -21,6 +21,6 @@ pub trait AdminControlled {
     }
 
     fn check_not_paused(&self, flag: PausedMask) {
-        assert!(!self.is_paused(flag));
+        assert!(!self.is_paused(flag), "ERR_PAUSED");
     }
 }
