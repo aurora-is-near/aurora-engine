@@ -10,7 +10,7 @@ use crate::precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
-use crate::types::{u256_to_arr, AccountId};
+use crate::types::{u256_to_arr, AccountId, Wei};
 
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -205,10 +205,10 @@ impl Engine {
             .unwrap_or_else(U256::zero)
     }
 
-    pub fn set_balance(address: &Address, balance: &U256) {
+    pub fn set_balance(address: &Address, balance: &Wei) {
         sdk::write_storage(
             &address_to_key(KeyPrefix::Balance, address),
-            &u256_to_arr(balance),
+            &balance.to_bytes(),
         );
     }
 
@@ -216,10 +216,11 @@ impl Engine {
         sdk::remove_storage(&address_to_key(KeyPrefix::Balance, address))
     }
 
-    pub fn get_balance(address: &Address) -> U256 {
-        sdk::read_storage(&address_to_key(KeyPrefix::Balance, address))
+    pub fn get_balance(address: &Address) -> Wei {
+        let raw = sdk::read_storage(&address_to_key(KeyPrefix::Balance, address))
             .map(|value| U256::from_big_endian(&value))
-            .unwrap_or_else(U256::zero)
+            .unwrap_or_else(U256::zero);
+        Wei::new(raw)
     }
 
     pub fn remove_storage(address: &Address, key: &H256) {
@@ -240,7 +241,7 @@ impl Engine {
         let balance = Self::get_balance(address);
         let nonce = Self::get_nonce(address);
         let code_len = Self::get_code_size(address);
-        balance == U256::zero() && nonce == U256::zero() && code_len == 0
+        balance.is_zero() && nonce.is_zero() && code_len == 0
     }
 
     /// Removes all storage for the given address.
@@ -272,20 +273,20 @@ impl Engine {
 
     pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
         let origin = self.origin();
-        let value = U256::zero();
+        let value = Wei::zero();
         self.deploy_code(origin, value, input)
     }
 
     pub fn deploy_code(
         &mut self,
         origin: Address,
-        value: U256,
+        value: Wei,
         input: Vec<u8>,
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor();
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
-            executor.transact_create(origin, value, input, u64::MAX),
+            executor.transact_create(origin, value.raw(), input, u64::MAX),
             address,
         );
 
@@ -306,7 +307,7 @@ impl Engine {
     pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let contract = Address(args.contract);
-        let value = U256::zero();
+        let value = Wei::zero();
         self.call(origin, contract, value, args.input)
     }
 
@@ -314,11 +315,12 @@ impl Engine {
         &mut self,
         origin: Address,
         contract: Address,
-        value: U256,
+        value: Wei,
         input: Vec<u8>,
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor();
-        let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+        let (status, result) =
+            executor.transact_call(origin, contract, value.raw(), input, u64::MAX);
 
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
@@ -362,18 +364,19 @@ impl Engine {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
-        self.view(origin, contract, value, args.input)
+        self.view(origin, contract, Wei::new(value), args.input)
     }
 
     pub fn view(
         &self,
         origin: Address,
         contract: Address,
-        value: U256,
+        value: Wei,
         input: Vec<u8>,
     ) -> EngineResult<Vec<u8>> {
         let mut executor = self.make_executor();
-        let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+        let (status, result) =
+            executor.transact_call(origin, contract, value.raw(), input, u64::MAX);
         status.into_result()?;
         Ok(result)
     }
@@ -492,7 +495,7 @@ impl evm::backend::Backend for Engine {
     fn basic(&self, address: Address) -> Basic {
         Basic {
             nonce: Engine::get_nonce(&address),
-            balance: Engine::get_balance(&address),
+            balance: Engine::get_balance(&address).raw(),
         }
     }
 
@@ -531,7 +534,7 @@ impl ApplyBackend for Engine {
                     reset_storage,
                 } => {
                     Engine::set_nonce(&address, &basic.nonce);
-                    Engine::set_balance(&address, &basic.balance);
+                    Engine::set_balance(&address, &Wei::new(basic.balance));
                     if let Some(code) = code {
                         Engine::set_code(&address, &code)
                     }

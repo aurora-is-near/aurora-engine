@@ -5,7 +5,7 @@ use rlp::{Decodable, DecoderError, Rlp};
 
 use crate::parameters::MetaCallArgs;
 use crate::prelude::{vec, Address, Box, HashMap, String, ToOwned, ToString, Vec, H256, U256};
-use crate::types::{keccak, u256_to_arr, InternalMetaCallArgs, RawU256};
+use crate::types::{keccak, u256_to_arr, InternalMetaCallArgs, RawU256, Wei};
 
 /// Internal errors to propagate up and format in the single place.
 pub enum ParsingError {
@@ -493,10 +493,10 @@ pub fn prepare_meta_call_args(
     bytes.extend_from_slice(&keccak(types.as_bytes()).as_bytes());
     bytes.extend_from_slice(&keccak(account_id).as_bytes());
     bytes.extend_from_slice(&u256_to_arr(&input.nonce));
-    bytes.extend_from_slice(&u256_to_arr(&input.fee_amount));
+    bytes.extend_from_slice(&input.fee_amount.to_bytes());
     bytes.extend_from_slice(&encode_address(input.fee_address));
     bytes.extend_from_slice(&encode_address(input.contract_address));
-    bytes.extend_from_slice(&u256_to_arr(&input.value));
+    bytes.extend_from_slice(&input.value.to_bytes());
 
     let methods = MethodAndTypes::parse(&method_def)?;
     let method_sig = method_signature(&methods);
@@ -544,10 +544,10 @@ pub fn parse_meta_call(
     let meta_tx =
         MetaCallArgs::try_from_slice(&args).map_err(|_| ParsingError::ArgumentParseError)?;
     let nonce = U256::from(meta_tx.nonce);
-    let fee_amount = U256::from(meta_tx.fee_amount);
+    let fee_amount = Wei::new(U256::from(meta_tx.fee_amount));
     let fee_address = Address::from(meta_tx.fee_address);
     let contract_address = Address::from(meta_tx.contract_address);
-    let value = U256::from(meta_tx.value);
+    let value = Wei::new(U256::from(meta_tx.value));
 
     let mut result = InternalMetaCallArgs {
         sender: Address::zero(),
