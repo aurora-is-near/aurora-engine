@@ -35,13 +35,13 @@ mod tests;
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::{BorshDeserialize, BorshSerialize};
+    use borsh::BorshSerialize;
 
     use crate::engine::{Engine, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
-    use crate::prelude::{Address, TryInto, H256, U256};
+    use crate::prelude::{Address, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{near_account_to_evm_address, u256_to_arr};
@@ -78,7 +78,7 @@ mod contract {
         if !state.owner_id.is_empty() {
             require_owner_only(&state);
         }
-        let args = NewCallArgs::try_from_slice(&sdk::read_input()).sdk_expect("ERR_ARG_PARSE");
+        let args: NewCallArgs = sdk::read_input_borsh().sdk_unwrap();
         Engine::set_state(args.into());
     }
 
@@ -116,7 +116,8 @@ mod contract {
     pub extern "C" fn get_upgrade_index() {
         let state = Engine::get_state();
         let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
-            .sdk_expect("ERR_NO_UPGRADE");
+            .sdk_expect("ERR_NO_UPGRADE")
+            .sdk_unwrap();
         sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
 
@@ -136,7 +137,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
         let state = Engine::get_state();
-        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)).sdk_unwrap();
+        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
+            .sdk_expect("ERR_NO_UPGRADE")
+            .sdk_unwrap();
         if sdk::block_index() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }
@@ -161,9 +164,7 @@ mod contract {
     /// Call method on the EVM contract.
     #[no_mangle]
     pub extern "C" fn call() {
-        // TODO: Borsh input pattern is so common here. It worth writing sdk::read_input_borsh().
-        let input = sdk::read_input();
-        let args = FunctionCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: FunctionCallArgs = sdk::read_input_borsh().sdk_unwrap();
         let mut engine = Engine::new(predecessor_address());
         Engine::call_with_args(&mut engine, args)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
@@ -257,14 +258,12 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn register_relayer() {
-        let relayer_address = sdk::read_input();
-        // NOTE: Why not `sdk::read_input_arr20();`?
-        assert_eq!(relayer_address.len(), 20);
+        let relayer_address = sdk::read_input_arr20().sdk_unwrap();
 
         let mut engine = Engine::new(predecessor_address());
         engine.register_relayer(
             sdk::predecessor_account_id().as_slice(),
-            Address(relayer_address.as_slice().try_into().unwrap()),
+            Address(relayer_address),
         );
     }
 
@@ -287,8 +286,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn view() {
-        let input = sdk::read_input();
-        let args = ViewCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: ViewCallArgs = sdk::read_input_borsh().sdk_unwrap();
         let engine = Engine::new(Address::from_slice(&args.sender));
         let result = Engine::view_with_args(&engine, args);
         result.sdk_process()
@@ -296,29 +294,28 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_code() {
-        let address = sdk::read_input_arr20();
+        let address = sdk::read_input_arr20().sdk_unwrap();
         let code = Engine::get_code(&Address(address));
         sdk::return_output(&code)
     }
 
     #[no_mangle]
     pub extern "C" fn get_balance() {
-        let address = sdk::read_input_arr20();
+        let address = sdk::read_input_arr20().sdk_unwrap();
         let balance = Engine::get_balance(&Address(address));
         sdk::return_output(&u256_to_arr(&balance))
     }
 
     #[no_mangle]
     pub extern "C" fn get_nonce() {
-        let address = sdk::read_input_arr20();
+        let address = sdk::read_input_arr20().sdk_unwrap();
         let nonce = Engine::get_nonce(&Address(address));
         sdk::return_output(&u256_to_arr(&nonce))
     }
 
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
-        let input = sdk::read_input();
-        let args = GetStorageAtArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: GetStorageAtArgs = sdk::read_input_borsh().sdk_unwrap();
         let value = Engine::get_storage(&Address(args.address), &H256(args.key));
         sdk::return_output(&value.0)
     }
@@ -333,7 +330,7 @@ mod contract {
         let mut state = Engine::get_state();
         require_owner_only(&state);
         let input = sdk::read_input();
-        let args = BeginChainArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
         Engine::set_state(state);
         // set genesis block balances
@@ -353,7 +350,7 @@ mod contract {
         let state = Engine::get_state();
         require_owner_only(&state);
         let input = sdk::read_input();
-        let _args = BeginBlockArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let _args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 

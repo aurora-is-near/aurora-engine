@@ -171,8 +171,7 @@ impl Engine {
     }
 
     pub fn get_code_size(address: &Address) -> usize {
-        // TODO: Seems this can be optimized to only read the register length.
-        Engine::get_code(&address).len()
+        sdk::read_storage_len(&address_to_key(KeyPrefix::Code, address)).unwrap_or(0)
     }
 
     pub fn set_nonce(address: &Address, nonce: &U256) {
