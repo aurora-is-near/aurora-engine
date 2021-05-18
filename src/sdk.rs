@@ -3,6 +3,7 @@ use crate::types::STORAGE_PRICE_PER_BYTE;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 const READ_STORAGE_REGISTER_ID: u64 = 0;
+const INPUT_REGISTER_ID: u64 = 0;
 
 mod exports {
 
@@ -160,9 +161,9 @@ mod exports {
 
 pub fn read_input() -> Vec<u8> {
     unsafe {
-        exports::input(0);
-        let bytes: Vec<u8> = vec![0; exports::register_len(0) as usize];
-        exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
+        exports::input(INPUT_REGISTER_ID);
+        let bytes: Vec<u8> = vec![0; exports::register_len(INPUT_REGISTER_ID) as usize];
+        exports::read_register(INPUT_REGISTER_ID, bytes.as_ptr() as *const u64 as u64);
         bytes
     }
 }
@@ -173,12 +174,11 @@ pub(crate) fn read_input_borsh<T: BorshDeserialize>() -> Result<T, ArgParseErr> 
 }
 
 pub(crate) fn read_input_arr20() -> Result<[u8; 20], IncorrectInputLength> {
-    const REGISTER_ID: u64 = 0;
     unsafe {
-        exports::input(REGISTER_ID);
-        if exports::register_len(REGISTER_ID) == 20 {
+        exports::input(INPUT_REGISTER_ID);
+        if exports::register_len(INPUT_REGISTER_ID) == 20 {
             let bytes = [0u8; 20];
-            exports::read_register(REGISTER_ID, bytes.as_ptr() as *const u64 as u64);
+            exports::read_register(INPUT_REGISTER_ID, bytes.as_ptr() as *const u64 as u64);
             Ok(bytes)
         } else {
             Err(IncorrectInputLength)
