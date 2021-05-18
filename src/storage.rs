@@ -78,7 +78,7 @@ pub fn storage_to_key(address: &Address, key: &H256, generation: u32) -> Storage
 }
 
 #[allow(dead_code)]
-pub fn normal_storage_key(address: &Address, key: &H256) -> [u8; 54] {
+fn normal_storage_key(address: &Address, key: &H256) -> [u8; 54] {
     let mut result = [0u8; 54];
     result[0] = VersionPrefix::V1 as u8;
     result[1] = KeyPrefix::Storage as u8;
@@ -88,7 +88,7 @@ pub fn normal_storage_key(address: &Address, key: &H256) -> [u8; 54] {
 }
 
 #[allow(dead_code)]
-pub fn generation_storage_key(address: &Address, key: &H256, generation: u32) -> [u8; 58] {
+fn generation_storage_key(address: &Address, key: &H256, generation: u32) -> [u8; 58] {
     let mut result = [0u8; 58];
     result[0] = VersionPrefix::V1 as u8;
     result[1] = KeyPrefix::Storage as u8;
