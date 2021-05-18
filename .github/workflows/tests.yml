@@ -3,8 +3,6 @@ on: [push, pull_request]
 name: Tests
 env:
   CARGO_INCREMENTAL: 0
-  CARGO_PROFILE_RELEASE_DEBUG: false
-  CARGO_PROFILE_DEV_DEBUG: false
 jobs:
   test:
     name: Test suite
