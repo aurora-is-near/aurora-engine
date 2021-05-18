@@ -3,6 +3,7 @@
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json;
+use near_sdk::serde_json::json;
 use near_sdk::test_utils::accounts;
 use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
 
@@ -11,7 +12,6 @@ use aurora_engine::types::{Balance, EthAddress};
 use byte_slice_cast::AsByteSlice;
 use near_sdk_sim::transaction::ExecutionStatus;
 use primitive_types::U256;
-use serde::json;
 
 const CONTRACT_ACC: &'static str = "eth_connector.root";
 const EXTERNAL_CONTRACT_ACC: &'static str = "eth_recipient.root";
@@ -153,11 +153,7 @@ fn get_near_balance(master_account: &UserAccount, acc: &str, contract: &str) -> 
     let balance = master_account.view(
         contract.to_string(),
         "ft_balance_of",
-        &BalanceOfCallArgs {
-            account_id: acc.into(),
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({ "account_id": acc }).to_string().as_bytes(),
     );
     String::from_utf8(balance.unwrap())
         .unwrap()
