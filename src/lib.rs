@@ -146,6 +146,15 @@ mod contract {
         sdk::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
     }
 
+    /// Called as part of the upgrade process (see `sdk::self_deploy`). This function is meant
+    /// to make any necessary changes to the state such that it aligns with the newly deployed
+    /// code.
+    #[no_mangle]
+    pub extern "C" fn state_migration() {
+        // This function is purposely left empty because we do not have any state migration
+        // to do.
+    }
+
     ///
     /// MUTATIVE METHODS
     ///
