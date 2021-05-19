@@ -25,6 +25,8 @@ mod deposit_event;
 mod engine;
 mod fungible_token;
 #[cfg(feature = "contract")]
+mod json;
+#[cfg(feature = "contract")]
 mod log_entry;
 mod precompiles;
 #[cfg(feature = "contract")]

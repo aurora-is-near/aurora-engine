@@ -1,8 +1,12 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
+#[cfg(feature = "contract")]
+use crate::json;
 use crate::prelude::{String, Vec};
 #[cfg(feature = "contract")]
 use crate::prover::Proof;
+#[cfg(feature = "contract")]
+use crate::sdk;
 #[cfg(feature = "contract")]
 use crate::types::Balance;
 #[cfg(feature = "contract")]
@@ -285,7 +289,9 @@ pub struct BalanceOfEthCallArgs {
 impl From<json::JsonValue> for BalanceOfCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            account_id: v.string("account_id").expect_utf8(ERR_FAILED_PARSE),
+            account_id: v
+                .string("account_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         }
     }
 }
@@ -325,9 +331,13 @@ impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
 impl From<json::JsonValue> for ResolveTransferCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            sender_id: v.string("sender_id").expect_utf8(ERR_FAILED_PARSE),
-            receiver_id: v.string("receiver_id").expect_utf8(ERR_FAILED_PARSE),
-            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE),
+            sender_id: v
+                .string("sender_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            receiver_id: v
+                .string("receiver_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         }
     }
 }

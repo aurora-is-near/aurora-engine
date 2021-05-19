@@ -1,7 +1,7 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::prelude::{Cow, String, Vec, U256, is_valid_account_id};
+use crate::prelude::{is_valid_account_id, Cow, String, Vec, U256};
 use crate::types::AccountId;
 
 mod costs {

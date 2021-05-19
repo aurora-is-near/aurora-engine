@@ -55,6 +55,7 @@ lunarity-lexer = { git = "https://github.com/ilblackdragon/lunarity", rev = "520
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 byte-slice-cast = { version = "1.0", default-features = false }
+rjson = { version = "0.3.1", default-features = false }
 
 [dev-dependencies]
 bstr = "0.2"
@@ -69,7 +70,7 @@ libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
-rjson = { version = "0.3.1", default-features = false }
+serde = "1.0"
 
 [features]
 default = ["sha2", "std"]

@@ -5,6 +5,7 @@ use crate::types::*;
 
 use crate::deposit_event::*;
 use crate::engine::Engine;
+use crate::json::parse_json;
 use crate::prelude::*;
 use crate::prover::validate_eth_address;
 use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
@@ -102,7 +103,10 @@ impl EthConnectorContract {
         assert!(data.len() < 3);
         if data.len() == 1 {
             let account_id = data[0];
-            assert!(is_valid_account_id(account_id.as_bytes()), "ERR_WRONG_ACCOUNT");
+            assert!(
+                is_valid_account_id(account_id.as_bytes()),
+                "ERR_WRONG_ACCOUNT"
+            );
             TokenMessageData::Near(account_id.into())
         } else {
             TokenMessageData::Eth {
@@ -125,7 +129,10 @@ impl EthConnectorContract {
         recipient.copy_from_slice(&msg[32..52]);
         // Checkk account
         let account_id = data[0];
-        assert!(is_valid_account_id(account_id.as_bytes()), "ERR_WRONG_ACCOUNT");
+        assert!(
+            is_valid_account_id(account_id.as_bytes()),
+            "ERR_WRONG_ACCOUNT"
+        );
         OnTransferMessageData {
             relayer: account_id.into(),
             recipient,
@@ -435,7 +442,9 @@ impl EthConnectorContract {
     /// Return balance of NEAR
     pub fn ft_balance_of(&self) {
         // TODO: Standard expects JSON input
-        let args = BalanceOfCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+        let args = BalanceOfCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
         let balance = self.ft.ft_balance_of(&args.account_id);
         // TODO: int -> str
         sdk::return_output(&balance.to_string().as_bytes());

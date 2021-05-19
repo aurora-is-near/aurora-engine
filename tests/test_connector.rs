@@ -11,6 +11,7 @@ use aurora_engine::types::{Balance, EthAddress};
 use byte_slice_cast::AsByteSlice;
 use near_sdk_sim::transaction::ExecutionStatus;
 use primitive_types::U256;
+use serde::json;
 
 const CONTRACT_ACC: &'static str = "eth_connector.root";
 const EXTERNAL_CONTRACT_ACC: &'static str = "eth_recipient.root";
