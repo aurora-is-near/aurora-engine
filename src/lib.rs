@@ -74,10 +74,10 @@ mod contract {
     /// Should be called on deployment.
     #[no_mangle]
     pub extern "C" fn new() {
-        let state = Engine::get_state();
-        if !state.owner_id.is_empty() {
+        if let Ok(state) = Engine::get_state() {
             require_owner_only(&state);
         }
+
         let args: NewCallArgs = sdk::read_input_borsh().sdk_unwrap();
         Engine::set_state(args.into());
     }
@@ -95,26 +95,26 @@ mod contract {
     /// Get owner account id for this contract.
     #[no_mangle]
     pub extern "C" fn get_owner() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         sdk::return_output(state.owner_id.as_bytes());
     }
 
     /// Get bridge prover id for this contract.
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         sdk::return_output(state.bridge_prover_id.as_bytes());
     }
 
     /// Get chain id for this contract.
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
-        sdk::return_output(&Engine::get_state().chain_id)
+        sdk::return_output(&Engine::get_state().sdk_unwrap().chain_id)
     }
 
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
             .sdk_expect("ERR_NO_UPGRADE")
             .sdk_unwrap();
@@ -124,7 +124,7 @@ mod contract {
     /// Stage new code for deployment.
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         require_owner_only(&state);
         sdk::read_input_and_store(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
         sdk::write_storage(
@@ -136,7 +136,7 @@ mod contract {
     /// Deploy staged upgrade.
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
             .sdk_expect("ERR_NO_UPGRADE")
             .sdk_unwrap();
@@ -154,7 +154,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
-        let mut engine = Engine::new(predecessor_address());
+        let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
         Engine::deploy_code_with_input(&mut engine, input)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();
@@ -165,7 +165,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn call() {
         let args: FunctionCallArgs = sdk::read_input_borsh().sdk_unwrap();
-        let mut engine = Engine::new(predecessor_address());
+        let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
         Engine::call_with_args(&mut engine, args)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();
@@ -183,7 +183,7 @@ mod contract {
         let signed_transaction =
             EthSignedTransaction::decode(&Rlp::new(&input)).sdk_expect("ERR_INVALID_TX");
 
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
 
         // Validate the chain ID, if provided inside the signature:
         if let Some(chain_id) = signed_transaction.chain_id() {
@@ -219,7 +219,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn meta_call() {
         let input = sdk::read_input();
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         let domain_separator = crate::meta_parsing::near_erc712_domain(U256::from(state.chain_id));
         let meta_call_args = crate::meta_parsing::parse_meta_call(
             &domain_separator,
@@ -248,7 +248,7 @@ mod contract {
         let input = sdk::read_input();
         let dest_address = Address::from_slice(&input);
         let source_address = predecessor_address();
-        let engine = Engine::new(source_address);
+        let engine = Engine::new(source_address).sdk_unwrap();
 
         engine.increment_nonce(&source_address);
 
@@ -260,7 +260,7 @@ mod contract {
     pub extern "C" fn register_relayer() {
         let relayer_address = sdk::read_input_arr20().sdk_unwrap();
 
-        let mut engine = Engine::new(predecessor_address());
+        let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
         engine.register_relayer(
             sdk::predecessor_account_id().as_slice(),
             Address(relayer_address),
@@ -287,7 +287,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn view() {
         let args: ViewCallArgs = sdk::read_input_borsh().sdk_unwrap();
-        let engine = Engine::new(Address::from_slice(&args.sender));
+        let engine = Engine::new(Address::from_slice(&args.sender)).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args);
         result.sdk_process()
     }
@@ -327,7 +327,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_chain() {
-        let mut state = Engine::get_state();
+        let mut state = Engine::get_state().sdk_unwrap();
         require_owner_only(&state);
         let input = sdk::read_input();
         let args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();
@@ -347,7 +347,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_block() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         require_owner_only(&state);
         let input = sdk::read_input();
         let _args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();

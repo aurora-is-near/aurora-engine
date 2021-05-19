@@ -92,6 +92,20 @@ impl ExitIntoResult for ExitReason {
     }
 }
 
+pub enum EngineStateError {
+    NotFound,
+    DeserializationFailed,
+}
+
+impl AsRef<[u8]> for EngineStateError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::NotFound => b"ERR_STATE_NOT_FOUND",
+            Self::DeserializationFailed => b"ERR_STATE_CORRUPTED",
+        }
+    }
+}
+
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
@@ -134,8 +148,8 @@ const CONFIG: &Config = &Config::istanbul();
 const STATE_KEY: &[u8; 5] = b"STATE";
 
 impl Engine {
-    pub fn new(origin: Address) -> Self {
-        Self::new_with_state(Engine::get_state(), origin)
+    pub fn new(origin: Address) -> Result<Self, EngineStateError> {
+        Engine::get_state().map(|state| Self::new_with_state(state, origin))
     }
 
     pub fn new_with_state(state: EngineState, origin: Address) -> Self {
@@ -151,10 +165,11 @@ impl Engine {
     }
 
     /// Fails if state is not found.
-    pub fn get_state() -> EngineState {
+    pub fn get_state() -> Result<EngineState, EngineStateError> {
         match sdk::read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
-            None => Default::default(),
-            Some(bytes) => EngineState::try_from_slice(&bytes).expect("ERR_DESER"),
+            None => Err(EngineStateError::NotFound),
+            Some(bytes) => EngineState::try_from_slice(&bytes)
+                .map_err(|_| EngineStateError::DeserializationFailed),
         }
     }
 
