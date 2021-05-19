@@ -329,15 +329,14 @@ mod contract {
     pub extern "C" fn begin_chain() {
         let mut state = Engine::get_state();
         require_owner_only(&state);
-        let input = sdk::read_input();
-        let args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();
+        let args: BeginChainArgs = sdk::read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
         Engine::set_state(state);
         // set genesis block balances
         for account_balance in args.genesis_alloc {
             Engine::set_balance(
                 &Address(account_balance.address),
-                &U256::from(account_balance.balance),
+                &crate::types::Wei::new(U256::from(account_balance.balance)),
             )
         }
         // return new chain ID
@@ -349,7 +348,6 @@ mod contract {
     pub extern "C" fn begin_block() {
         let state = Engine::get_state();
         require_owner_only(&state);
-        let input = sdk::read_input();
         let _args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
