@@ -7,7 +7,7 @@ use crate::prover::Proof;
 use crate::types::Balance;
 #[cfg(feature = "contract")]
 use crate::types::EthAddress;
-use crate::types::{AccountId, RawAddress, RawH256, RawU256};
+use crate::types::{AccountId, RawAddress, RawH256, RawU256, ERR_FAILED_PARSE};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -282,9 +282,54 @@ pub struct BalanceOfEthCallArgs {
 }
 
 #[cfg(feature = "contract")]
+impl From<json::JsonValue> for BalanceOfCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            account_id: v.string("account_id").expect_utf8(ERR_FAILED_PARSE),
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RegisterRelayerCallArgs {
     pub address: EthAddress,
+}
+
+#[cfg(feature = "contract")]
+pub trait ExpectUtf8<T> {
+    fn expect_utf8(self, message: &[u8]) -> T;
+}
+
+#[cfg(feature = "contract")]
+impl<T> ExpectUtf8<T> for Option<T> {
+    fn expect_utf8(self, message: &[u8]) -> T {
+        match self {
+            Some(t) => t,
+            None => sdk::panic_utf8(message),
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
+    fn expect_utf8(self, message: &[u8]) -> T {
+        match self {
+            Ok(t) => t,
+            Err(_) => sdk::panic_utf8(message),
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for ResolveTransferCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            sender_id: v.string("sender_id").expect_utf8(ERR_FAILED_PARSE),
+            receiver_id: v.string("receiver_id").expect_utf8(ERR_FAILED_PARSE),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE),
+        }
+    }
 }
 
 #[cfg(test)]

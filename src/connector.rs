@@ -98,12 +98,12 @@ impl EthConnectorContract {
 
     /// Parse event message data for tokens
     fn parse_event_message(&self, message: &str) -> TokenMessageData {
-        // TODO: Why not use borsh here? Does message guarantee to not have `:` as part of inner fields
         let data: Vec<_> = message.split(':').collect();
         assert!(data.len() < 3);
-        // TODO: Do you need to verify validity of account ID in the data[0]?
         if data.len() == 1 {
-            TokenMessageData::Near(data[0].into())
+            let account_id = data[0];
+            assert!(is_valid_account_id(account_id.as_bytes()), "ERR_WRONG_ACCOUNT");
+            TokenMessageData::Near(account_id.into())
         } else {
             TokenMessageData::Eth {
                 address: data[0].into(),
@@ -119,13 +119,15 @@ impl EthConnectorContract {
 
         let msg = hex::decode(data[1]).expect(ERR_FAILED_PARSE);
         let mut fee: [u8; 32] = Default::default();
-        // TODO: Check msg length?
+        assert_eq!(msg.len(), 52, "ERR_WRONG_MESSAGE_LENGTH");
         fee.copy_from_slice(&msg[..32]);
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
-        // TODO: Do you need to verify validity of account ID in the data[0]?
+        // Checkk account
+        let account_id = data[0];
+        assert!(is_valid_account_id(account_id.as_bytes()), "ERR_WRONG_ACCOUNT");
         OnTransferMessageData {
-            relayer: data[0].into(),
+            relayer: account_id.into(),
             recipient,
             fee: U256::from_little_endian(&fee[..]),
         }

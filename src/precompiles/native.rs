@@ -1,7 +1,7 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::prelude::{Cow, String, Vec, U256};
+use crate::prelude::{Cow, String, Vec, U256, is_valid_account_id};
 use crate::types::AccountId;
 
 mod costs {
@@ -25,44 +25,6 @@ mod costs {
 fn get_nep141_from_erc20(_erc20_token: &[u8]) -> Vec<u8> {
     // TODO(#51): Already implemented
     Vec::new()
-}
-
-/// The minimum length of a valid account ID.
-const MIN_ACCOUNT_ID_LEN: u64 = 2;
-/// The maximum length of a valid account ID.
-const MAX_ACCOUNT_ID_LEN: u64 = 64;
-
-/// Returns `true` if the given account ID is valid and `false` otherwise.
-///
-/// Taken from near-sdk-rs:
-/// (https://github.com/near/near-sdk-rs/blob/42f62384c3acd024829501ee86e480917da03896/near-sdk/src/environment/env.rs#L816-L843)
-pub fn is_valid_account_id(account_id: &[u8]) -> bool {
-    if (account_id.len() as u64) < MIN_ACCOUNT_ID_LEN
-        || (account_id.len() as u64) > MAX_ACCOUNT_ID_LEN
-    {
-        return false;
-    }
-
-    // NOTE: We don't want to use Regex here, because it requires extra time to compile it.
-    // The valid account ID regex is /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/
-    // Instead the implementation is based on the previous character checks.
-
-    // We can safely assume that last char was a separator.
-    let mut last_char_is_separator = true;
-
-    for c in account_id {
-        let current_char_is_separator = match *c {
-            b'a'..=b'z' | b'0'..=b'9' => false,
-            b'-' | b'_' | b'.' => true,
-            _ => return false,
-        };
-        if current_char_is_separator && last_char_is_separator {
-            return false;
-        }
-        last_char_is_separator = current_char_is_separator;
-    }
-    // The account can't end as separator.
-    !last_char_is_separator
 }
 
 pub struct ExitToNear; //TransferEthToNear
