@@ -447,6 +447,11 @@ mod contract {
         EthConnectorContract::get_instance().ft_on_transfer(&engine)
     }
 
+    #[no_mangle]
+    pub extern "C" fn get_accounts_counter() {
+        EthConnectorContract::get_instance().get_accounts_counter()
+    }
+
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
