@@ -343,13 +343,13 @@ fn test_ft_transfer() {
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer",
-        &TransferCallArgs {
-            receiver_id: DEPOSITED_RECIPIENT.into(),
-            amount: transfer_amount,
-            memo: None,
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({
+            "receiver_id": DEPOSITED_RECIPIENT,
+            "amount": transfer_amount,
+            "memo": "transfer memo"
+        })
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );

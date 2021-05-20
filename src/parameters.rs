@@ -233,6 +233,20 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for TransferCallCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            receiver_id: v
+                .string("receiver_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            memo: v.string("memo").ok(),
+            msg: v.string("msg").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
+}
+
 /// storage_balance_of eth-connector call args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -262,6 +276,19 @@ pub struct TransferCallArgs {
     pub receiver_id: AccountId,
     pub amount: Balance,
     pub memo: Option<String>,
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for TransferCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            receiver_id: v
+                .string("receiver_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            memo: v.string("memo").ok(),
+        }
+    }
 }
 
 /// withdraw NEAR eth-connector call args

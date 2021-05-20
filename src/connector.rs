@@ -105,7 +105,7 @@ impl EthConnectorContract {
             let account_id = data[0];
             assert!(
                 is_valid_account_id(account_id.as_bytes()),
-                "ERR_WRONG_ACCOUNT"
+                "ERR_INVALID_ACCOUNT_ID"
             );
             TokenMessageData::Near(account_id.into())
         } else {
@@ -131,7 +131,7 @@ impl EthConnectorContract {
         let account_id = data[0];
         assert!(
             is_valid_account_id(account_id.as_bytes()),
-            "ERR_WRONG_ACCOUNT"
+            "ERR_INVALID_ACCOUNT_ID"
         );
         OnTransferMessageData {
             relayer: account_id.into(),
@@ -414,8 +414,6 @@ impl EthConnectorContract {
     /// Return total supply of NEAR + ETH
     pub fn ft_total_supply(&self) {
         let total_supply = self.ft.ft_total_supply();
-        // TODO: To make it match the standard, it has to be a string instead of an integer.
-        //    So we need to wrap the `100` into a string like `"100". This is due to JSON int limits.
         sdk::return_output(&total_supply.to_string().as_bytes());
         #[cfg(feature = "log")]
         sdk::log(&format!("Total supply: {}", total_supply));
@@ -424,7 +422,6 @@ impl EthConnectorContract {
     /// Return total supply of NEAR
     pub fn ft_total_supply_near(&self) {
         let total_supply = self.ft.ft_total_supply_near();
-        // TODO: int -> str
         sdk::return_output(&total_supply.to_string().as_bytes());
         #[cfg(feature = "log")]
         sdk::log(&format!("Total supply NEAR: {}", total_supply));
@@ -433,7 +430,6 @@ impl EthConnectorContract {
     /// Return total supply of ETH
     pub fn ft_total_supply_eth(&self) {
         let total_supply = self.ft.ft_total_supply_eth();
-        // TODO: int -> str
         sdk::return_output(&total_supply.to_string().as_bytes());
         #[cfg(feature = "log")]
         sdk::log(&format!("Total supply ETH: {}", total_supply));
@@ -441,12 +437,10 @@ impl EthConnectorContract {
 
     /// Return balance of NEAR
     pub fn ft_balance_of(&self) {
-        // TODO: Standard expects JSON input
         let args = BalanceOfCallArgs::from(
             parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
         let balance = self.ft.ft_balance_of(&args.account_id);
-        // TODO: int -> str
         sdk::return_output(&balance.to_string().as_bytes());
         #[cfg(feature = "log")]
         sdk::log(&format!(
@@ -472,8 +466,9 @@ impl EthConnectorContract {
     /// Transfer between NEAR accounts
     pub fn ft_transfer(&mut self) {
         sdk::assert_one_yocto();
-        // TODO: Standard expects JSON input
-        let args = TransferCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+        let args = TransferCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
         self.ft
             .ft_transfer(&args.receiver_id, args.amount, &args.memo);
         self.save_ft_contract();
@@ -489,14 +484,6 @@ impl EthConnectorContract {
         sdk::assert_private_call();
         // Check if previous promise succeeded
         assert_eq!(sdk::promise_results_count(), 1);
-        // TODO: The handling of `sdk::promise_result(0)` is done in `internal_ft_resolve_transfer`.
-        //    If the promise result fails, the transfer is not reverted, but the FT standard
-        //    says it should revert the transfer. `internal_ft_resolve_transfer` handles it correctly.
-        //    So the following 4 lines should be removed.
-        match sdk::promise_result(0) {
-            PromiseResult::Successful(_) => {}
-            _ => sdk::panic_utf8(b"ERR_PROMISE_RESULT"),
-        }
 
         let args = ResolveTransferCallArgs::try_from_slice(&sdk::read_input()).unwrap();
         let amount = self
@@ -509,7 +496,6 @@ impl EthConnectorContract {
         ));
         // `ft_resolve_transfer` can change `total_supply` so we should save the contract
         self.save_ft_contract();
-        // TODO: int -> str
         sdk::return_output(&amount.to_string().as_bytes());
     }
 
@@ -620,11 +606,8 @@ impl EthConnectorContract {
             todo!();
         }
         self.save_ft_contract();
-
-        // Return unused tokens
-        let data = 0u128.try_to_vec().unwrap();
-        // TODO: JSON return
-        sdk::return_output(&data[..]);
+        // JSON Return unused tokens
+        sdk::return_output(0.to_string().as_bytes());
     }
 
     /// Save eth-connector contract data
