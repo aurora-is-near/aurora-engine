@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(core_intrinsics))]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 
 #[cfg(not(feature = "std"))]
@@ -424,12 +423,12 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[panic_handler]
 #[no_mangle]
 pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
-    ::core::intrinsics::abort();
+    ::core::arch::wasm32::unreachable();
 }
 
 #[cfg(target_arch = "wasm32")]
 #[alloc_error_handler]
 #[no_mangle]
 pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
-    ::core::intrinsics::abort();
+    ::core::arch::wasm32::unreachable();
 }

@@ -474,9 +474,8 @@ pub fn assert_private_call() {
 }
 
 pub fn attached_deposit() -> u128 {
-    use core::intrinsics::size_of;
     unsafe {
-        let data = [0u8; size_of::<u128>()];
+        let data = [0u8; core::mem::size_of::<u128>()];
         exports::attached_deposit(data.as_ptr() as u64);
         u128::from_le_bytes(data)
     }
