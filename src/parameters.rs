@@ -2,6 +2,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 #[cfg(feature = "contract")]
 use crate::json;
+#[cfg(feature = "contract")]
+use crate::prelude::ToString;
 use crate::prelude::{String, Vec};
 #[cfg(feature = "contract")]
 use crate::prover::Proof;
@@ -170,10 +172,23 @@ pub struct FtResolveTransfer {
 
 /// Fungible token storage balance
 #[cfg(feature = "contract")]
-#[derive(BorshSerialize)]
 pub struct StorageBalance {
     pub total: Balance,
     pub available: Balance,
+}
+
+#[cfg(feature = "contract")]
+impl StorageBalance {
+    pub fn to_json_bytes(&self) -> Vec<u8> {
+        use alloc::format;
+        format!(
+            "{{\"total\": \"{}\", \"available\": \"{}\",}}",
+            self.total.to_string(),
+            self.available.to_string()
+        )
+        .as_bytes()
+        .to_vec()
+    }
 }
 
 /// resolve_transfer eth-connector call args
@@ -254,6 +269,17 @@ pub struct StorageBalanceOfCallArgs {
     pub account_id: AccountId,
 }
 
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for StorageBalanceOfCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            account_id: v
+                .string("account_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
+}
+
 /// storage_deposit eth-connector call args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -262,11 +288,30 @@ pub struct StorageDepositCallArgs {
     pub registration_only: Option<bool>,
 }
 
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for StorageDepositCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            account_id: v.string("account_id").ok(),
+            registration_only: v.bool("registration_only").ok(),
+        }
+    }
+}
+
 /// storage_withdraw eth-connector call args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StorageWithdrawCallArgs {
     pub amount: Option<u128>,
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for StorageWithdrawCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            amount: v.u128("amount").ok(),
+        }
+    }
 }
 
 /// transfer args for json invocation

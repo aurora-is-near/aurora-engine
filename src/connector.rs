@@ -520,43 +520,36 @@ impl EthConnectorContract {
 
     /// FT storage deposit logic
     pub fn storage_deposit(&mut self) {
-        // TODO: Json args
-        let args =
-            StorageDepositCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+        let args = StorageDepositCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
+
         let res = self
             .ft
-            .storage_deposit(args.account_id.as_ref(), args.registration_only)
-            .try_to_vec()
-            .unwrap();
+            .storage_deposit(args.account_id.as_ref(), args.registration_only);
         self.save_ft_contract();
-        // TODO: Json return
-        sdk::return_output(&res[..]);
+        sdk::return_output(&res.to_json_bytes());
     }
 
     /// FT storage withdraw
     pub fn storage_withdraw(&mut self) {
         sdk::assert_one_yocto();
-        // TODO: Json args
-        let args =
-            StorageWithdrawCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
-        let res = self.ft.storage_withdraw(args.amount).try_to_vec().unwrap();
+        let args = StorageWithdrawCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
+        let res = self.ft.storage_withdraw(args.amount);
         self.save_ft_contract();
-        // TODO: Json return
-        sdk::return_output(&res[..]);
+        sdk::return_output(&res.to_json_bytes());
     }
 
     /// Get balance of storage
     pub fn storage_balance_of(&self) {
-        // TODO: Json args
-        let args =
-            StorageBalanceOfCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
-        let res = self
-            .ft
-            .storage_balance_of(&args.account_id)
-            .try_to_vec()
-            .unwrap();
-        // TODO: Json return
-        sdk::return_output(&res[..]);
+        let args = StorageBalanceOfCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
+        let res = self.ft.storage_balance_of(&args.account_id);
+        let res = res.map_or(vec![], |v| v.to_json_bytes());
+        sdk::return_output(&res);
     }
 
     /// ft_on_transfer callback function
@@ -588,7 +581,6 @@ impl EthConnectorContract {
             todo!();
         }
         self.save_ft_contract();
-        // JSON Return unused tokens
         sdk::return_output(0.to_string().as_bytes());
     }
 
