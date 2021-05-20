@@ -421,7 +421,7 @@ impl FungibleToken {
     }
 
     /// Insert account.
-    /// Calculate total unique accounts 
+    /// Calculate total unique accounts
     pub fn accounts_insert(&self, account_id: &str, amount: Balance) {
         if !self.accounts_contains_key(account_id) {
             let key = Self::get_statistic_key();
