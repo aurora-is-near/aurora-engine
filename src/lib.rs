@@ -7,7 +7,7 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod map;
 pub mod meta_parsing;
 pub mod parameters;
@@ -16,14 +16,14 @@ pub mod storage;
 pub mod transaction;
 pub mod types;
 
-#[cfg(feature = "contract")]
-mod engine;
+#[cfg(feature = "engine")]
+pub mod engine;
 #[cfg(feature = "contract")]
 mod json;
 #[cfg(feature = "contract")]
 mod log_entry;
 mod precompiles;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod sdk;
 
 #[cfg(test)]
@@ -46,25 +46,8 @@ mod contract {
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
-    #[global_allocator]
-    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
-
-    #[cfg(target_arch = "wasm32")]
-    #[panic_handler]
-    #[no_mangle]
-    pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
-        ::core::intrinsics::abort();
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    #[alloc_error_handler]
-    #[no_mangle]
-    pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
-        ::core::intrinsics::abort();
-    }
 
     ///
     /// ADMINISTRATIVE METHODS
@@ -431,4 +414,22 @@ mod contract {
             }
         }
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+#[cfg(target_arch = "wasm32")]
+#[panic_handler]
+#[no_mangle]
+pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
+    ::core::intrinsics::abort();
+}
+
+#[cfg(target_arch = "wasm32")]
+#[alloc_error_handler]
+#[no_mangle]
+pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
+    ::core::intrinsics::abort();
 }
