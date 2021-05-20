@@ -9,9 +9,9 @@ use crate::prover::Proof;
 use crate::sdk;
 #[cfg(feature = "contract")]
 use crate::types::Balance;
+use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 #[cfg(feature = "contract")]
-use crate::types::EthAddress;
-use crate::types::{AccountId, RawAddress, RawH256, RawU256, ERR_FAILED_PARSE};
+use crate::types::{EthAddress, ERR_FAILED_PARSE};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.

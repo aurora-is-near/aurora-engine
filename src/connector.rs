@@ -17,7 +17,6 @@ pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
 // Note: Is 40Tgas always enough?
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
-const GAS_FOR_TRANSFER_CALL: Gas = 40_000_000_000_000;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnectorContract {
@@ -301,19 +300,8 @@ impl EthConnectorContract {
             self.record_proof(&data.proof_key);
             // Save new contract data
             self.save_ft_contract();
-
-            // TODO: Why return a promise here instead of just call it here directly?
-            // Also passing 40Tgas out of total 50Tgas is a bit risky and close to the limit, because the
-            // a new promise cost is 4.5Tgas, but there are some extra data read/writes in this
-            // method, so it may not fit into the remaining 5.5Tgas
-            let promise0 = sdk::promise_create(
-                &sdk::current_account_id(),
-                b"ft_transfer_call",
-                &msg[..],
-                1,
-                GAS_FOR_TRANSFER_CALL,
-            );
-            sdk::promise_return(promise0);
+            let transfer_call_args = TransferCallCallArgs::try_from_slice(&msg).unwrap();
+            self.ft_transfer_call(transfer_call_args);
         } else {
             // Mint - calculate new balances
             self.mint_near(data.new_owner_id.clone(), data.amount - data.fee);
@@ -502,13 +490,7 @@ impl EthConnectorContract {
     /// FT transfer call from sender account (invoker account) to receiver
     /// We starting early checking for message data to avoid `ft_on_transfer` call panics
     /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
-    pub fn ft_transfer_call(&mut self) {
-        sdk::assert_one_yocto();
-        // TODO: Using borsh for arguments serialization doesn't match the FT standard. In order for
-        //     this contract to be a valid fungible token, it has to use JSON serialization.
-        //     As right now the standard tools/contracts such as Ref or Pulse can not integrate it.
-        let args =
-            TransferCallCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+    pub fn ft_transfer_call(&mut self, args: TransferCallCallArgs) {
         #[cfg(feature = "log")]
         sdk::log(&format!(
             "Transfer call to {} amount {}",

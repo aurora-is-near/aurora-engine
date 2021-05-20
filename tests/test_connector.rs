@@ -329,13 +329,6 @@ fn test_withdraw_near() {
 
 #[test]
 fn test_ft_transfer() {
-    #[derive(BorshSerialize, BorshDeserialize)]
-    pub struct TransferCallArgs {
-        pub receiver_id: String,
-        pub amount: Balance,
-        pub memo: Option<String>,
-    }
-
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
     call_deposit_near(&contract, CONTRACT_ACC);
 
@@ -372,14 +365,6 @@ fn test_ft_transfer() {
 
     let balance = total_supply_near(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT);
-}
-
-#[derive(BorshSerialize)]
-pub struct TransferCallCallArgs {
-    pub receiver_id: String,
-    pub amount: Balance,
-    pub memo: Option<String>,
-    pub msg: String,
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -420,14 +405,13 @@ fn test_ft_transfer_call_eth() {
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer_call",
-        &TransferCallCallArgs {
-            receiver_id: CONTRACT_ACC.into(),
-            amount: transfer_amount,
-            memo: None,
-            msg: message,
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({
+            "receiver_id": CONTRACT_ACC,
+            "amount": transfer_amount as u64,
+            "msg": message,
+        })
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -501,14 +485,13 @@ fn test_ft_transfer_call_without_relayer() {
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer_call",
-        &TransferCallCallArgs {
-            receiver_id: CONTRACT_ACC.into(),
-            amount: transfer_amount,
-            memo: None,
-            msg: message,
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({
+            "receiver_id": CONTRACT_ACC,
+            "amount": transfer_amount as u64,
+            "msg": message,
+        })
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -558,14 +541,13 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer_call",
-        &TransferCallCallArgs {
-            receiver_id: CONTRACT_ACC.into(),
-            amount: transfer_amount,
-            memo: None,
-            msg: message,
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({
+            "receiver_id": CONTRACT_ACC,
+            "amount": transfer_amount as u64,
+            "msg": message,
+        })
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
