@@ -436,7 +436,6 @@ impl FungibleToken {
     pub fn accounts_insert(&self, account_id: &str, amount: Balance) {
         if self.accounts_contains_key(account_id) {
             let key = Self::get_statistic_key();
-            sdk::log(&format!("accounts_insert: {}", account_id));
             let accounts_counter = sdk::read_u64(&key)
                 .unwrap_or(0)
                 .checked_add(1)
