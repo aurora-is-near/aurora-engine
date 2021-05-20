@@ -584,7 +584,8 @@ impl EthConnectorContract {
         sdk::return_output(0.to_string().as_bytes());
     }
 
-    /// Get accounts counter for statistics
+    /// Get accounts counter for statistics.
+    /// It represents total unique accounts.
     pub fn get_accounts_counter(&self) {
         sdk::return_output(self.ft.get_accounts_counter().to_string().as_bytes());
     }

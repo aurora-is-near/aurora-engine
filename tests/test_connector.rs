@@ -590,7 +590,7 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
 fn test_get_accounts_counter() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
     call_deposit_near(&contract, CONTRACT_ACC);
-
+    
     let counter = master_account.view(CONTRACT_ACC.into(), "get_accounts_counter", &[]);
     let counter: u128 = String::from_utf8(counter.unwrap())
         .unwrap()
