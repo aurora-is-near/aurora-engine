@@ -635,7 +635,7 @@ fn call_set_paused_flags(
 ) -> ExecutionResult {
     let res = account.call(
         contract.to_string(),
-        "set_eth_connector_paused_flags",
+        "set_paused_flags",
         &paused_mask.try_to_vec().unwrap(),
         DEFAULT_GAS,
         0,
