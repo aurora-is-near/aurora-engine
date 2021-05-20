@@ -24,7 +24,7 @@ mod json;
 mod log_entry;
 mod precompiles;
 #[cfg(feature = "engine")]
-mod sdk;
+pub mod sdk;
 
 #[cfg(test)]
 mod benches;
