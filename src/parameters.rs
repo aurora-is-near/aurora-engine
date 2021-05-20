@@ -172,6 +172,7 @@ pub struct FtResolveTransfer {
 
 /// Fungible token storage balance
 #[cfg(feature = "contract")]
+#[derive(Default)]
 pub struct StorageBalance {
     pub total: Balance,
     pub available: Balance,

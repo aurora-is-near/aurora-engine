@@ -351,18 +351,18 @@ impl FungibleToken {
         }
     }
 
-    pub fn internal_storage_balance_of(&self, account_id: &str) -> Option<StorageBalance> {
+    pub fn internal_storage_balance_of(&self, account_id: &str) -> StorageBalance {
         if self.accounts_contains_key(account_id) {
-            Some(StorageBalance {
+            StorageBalance {
                 total: self.storage_balance_bounds().min,
                 available: 0,
-            })
+            }
         } else {
-            None
+            StorageBalance::default()
         }
     }
 
-    pub fn storage_balance_of(&self, account_id: &str) -> Option<StorageBalance> {
+    pub fn storage_balance_of(&self, account_id: &str) -> StorageBalance {
         self.internal_storage_balance_of(account_id)
     }
 
@@ -397,7 +397,7 @@ impl FungibleToken {
                 sdk::promise_batch_action_transfer(promise0, refund);
             }
         }
-        self.internal_storage_balance_of(account_id).unwrap()
+        self.internal_storage_balance_of(account_id)
     }
 
     #[allow(dead_code)]
@@ -406,17 +406,14 @@ impl FungibleToken {
     }
 
     pub fn storage_withdraw(&mut self, amount: Option<u128>) -> StorageBalance {
-        let predecessor_account_id_bytes = sdk::predecessor_account_id();
-        let predecessor_account_id = str_from_slice(&predecessor_account_id_bytes);
-        if let Some(storage_balance) = self.internal_storage_balance_of(predecessor_account_id) {
-            match amount {
-                Some(amount) if amount > 0 => {
-                    sdk::panic_utf8(b"ERR_WRONG_AMOUNT");
-                }
-                _ => storage_balance,
+        let acc_id = sdk::predecessor_account_id();
+        let predecessor_account_id = str_from_slice(&acc_id);
+        let storage_balance = self.internal_storage_balance_of(predecessor_account_id);
+        match amount {
+            Some(amount) if amount > 0 => {
+                sdk::panic_utf8(b"ERR_WRONG_AMOUNT");
             }
-        } else {
-            sdk::panic_utf8(b"ERR_ACCOUNT_NOT_REGISTERED");
+            _ => storage_balance,
         }
     }
 
