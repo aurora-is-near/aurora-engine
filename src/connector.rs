@@ -628,7 +628,7 @@ impl EthConnectorContract {
 
     /// Get Eth connector paused flags
     pub fn get_paused_flags(&self) {
-        let data = self.get_paused().try_to_vec().unwrap();
+        let data = self.get_paused().try_to_vec().expect(ERR_FAILED_PARSE);
         sdk::return_output(&data[..]);
     }
 

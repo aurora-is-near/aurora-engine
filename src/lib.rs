@@ -437,12 +437,12 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn get_eth_connector_paused_flags() {
+    pub extern "C" fn get_paused_flags() {
         EthConnectorContract::get_instance().get_paused_flags()
     }
 
     #[no_mangle]
-    pub extern "C" fn set_eth_connector_paused_flags() {
+    pub extern "C" fn set_paused_flags() {
         EthConnectorContract::get_instance().set_paused_flags()
     }
 
