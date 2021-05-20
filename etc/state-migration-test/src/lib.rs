@@ -29,7 +29,7 @@ pub extern "C" fn state_migration() {
 }
 
 #[no_mangle]
-pub extern "C" fn some_new_facy_function() {
+pub extern "C" fn some_new_fancy_function() {
     let state = sdk::read_storage(&state_key())
         .and_then(|bytes| NewFancyState::try_from_slice(&bytes).ok())
         .unwrap();
