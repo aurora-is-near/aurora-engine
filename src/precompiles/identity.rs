@@ -1,9 +1,10 @@
-use crate::precompiles::{Precompile, PrecompileResult};
-use crate::prelude::Vec;
-use crate::state::{AuroraStackState, AuroraState};
-use bn::prelude::PhantomData;
+use crate::prelude::PhantomData;
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
+
+use crate::precompiles::{Precompile, PrecompileResult};
+use crate::prelude::Vec;
+use crate::AuroraState;
 
 /// Identity precompile costs.
 mod costs {
@@ -51,33 +52,30 @@ impl<S: AuroraState> Precompile<S> for Identity<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use evm::ExitError;
 
-    fn new_context() -> Context {
-        Context {
-            address: Default::default(),
-            caller: Default::default(),
-            apparent_value: Default::default(),
-        }
-    }
+    use crate::test_utils::{new_context, new_state};
+
+    use super::*;
 
     #[test]
     fn test_identity() {
         let input = [0u8, 1, 2, 3];
 
         let expected = input[0..2].to_vec();
-        let res = Identity::run(&input[0..2], 18, &new_context())
+        let res = Identity::run(&input[0..2], 18, &new_context(), &mut new_state())
             .unwrap()
             .output;
         assert_eq!(res, expected);
 
         let expected = input.to_vec();
-        let res = Identity::run(&input, 18, &new_context()).unwrap().output;
+        let res = Identity::run(&input, 18, &new_context(), &mut new_state())
+            .unwrap()
+            .output;
         assert_eq!(res, expected);
 
         // gas fail
-        let res = Identity::run(&input[0..2], 17, &new_context());
+        let res = Identity::run(&input[0..2], 17, &new_context(), &mut new_state());
 
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
@@ -86,7 +84,9 @@ mod tests {
             0u8, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
             24, 25, 26, 27, 28, 29, 30, 31, 32,
         ];
-        let res = Identity::run(&input, 21, &new_context()).unwrap().output;
+        let res = Identity::run(&input, 21, &new_context(), &mut new_state())
+            .unwrap()
+            .output;
         assert_eq!(res, input.to_vec());
     }
 }

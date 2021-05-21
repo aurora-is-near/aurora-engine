@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use evm::Context;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
@@ -7,19 +8,16 @@ use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome};
 use near_vm_runner::{MockCompiledContractCache, VMError};
-
 use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
-use crate::parameters::{NewCallArgs, SubmitResult};
+use crate::parameters::{NewCallArgs, PromiseCreateArgs, SubmitResult};
 use crate::prelude::Address;
-use crate::state::AuroraStackState;
-use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 use crate::transaction::{EthSignedTransaction, EthTransaction};
 use crate::types;
-use evm::Context;
+use crate::{storage, AuroraState};
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
@@ -370,4 +368,13 @@ pub fn new_context() -> Context {
     }
 }
 
-pub fn new_state() -> AuroraStackState {}
+#[derive(Default)]
+struct MockState;
+
+impl AuroraState for MockState {
+    fn add_promise(&mut self, _promise: PromiseCreateArgs) {}
+}
+
+pub fn new_state() -> MockState {
+    Default::default()
+}

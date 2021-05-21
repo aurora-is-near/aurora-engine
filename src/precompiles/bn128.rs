@@ -1,8 +1,9 @@
-use crate::precompiles::{Byzantium, HardFork, Istanbul, Precompile, PrecompileResult};
-use crate::prelude::*;
-use crate::state::{AuroraStackState, AuroraState};
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
+
+use crate::precompiles::{Byzantium, HardFork, Istanbul, Precompile, PrecompileResult};
+use crate::prelude::*;
+use crate::AuroraState;
 
 /// bn128 costs.
 mod costs {
@@ -373,15 +374,9 @@ impl<S: AuroraState> Precompile<S> for BN128Pair<Istanbul, S> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::test_utils::{new_context, new_state};
 
-    fn new_context() -> Context {
-        Context {
-            address: Default::default(),
-            caller: Default::default(),
-            apparent_value: Default::default(),
-        }
-    }
+    use super::*;
 
     #[test]
     fn test_alt_bn128_add() {
@@ -400,7 +395,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Add::<Byzantium>::run(&input, 500, &new_context())
+        let res = BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -421,7 +416,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Add::<Byzantium>::run(&input, 500, &new_context())
+        let res = BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -435,7 +430,7 @@ mod tests {
             0000000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = BN128Add::<Byzantium>::run(&input, 499, &new_context());
+        let res = BN128Add::<Byzantium, _>::run(&input, 499, &new_context(), &mut new_state());
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -447,7 +442,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Add::<Byzantium>::run(&input, 500, &new_context())
+        let res = BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -462,7 +457,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Add::<Byzantium>::run(&input, 500, &new_context());
+        let res = BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state());
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -485,7 +480,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context())
+        let res = BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -498,7 +493,7 @@ mod tests {
             0200000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = BN128Mul::<Byzantium>::run(&input, 39_999, &new_context());
+        let res = BN128Mul::<Byzantium, _>::run(&input, 39_999, &new_context(), &mut new_state());
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // zero multiplication test
@@ -516,7 +511,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context())
+        let res = BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -530,7 +525,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context())
+        let res = BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -544,7 +539,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context());
+        let res = BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state());
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -573,7 +568,7 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context())
+        let res = BN128Pair::<Byzantium, _>::run(&input, 260_000, &new_context(), &mut new_state())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -595,7 +590,7 @@ mod tests {
             12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
         )
         .unwrap();
-        let res = BN128Pair::<Byzantium>::run(&input, 259_999, &new_context());
+        let res = BN128Pair::<Byzantium, _>::run(&input, 259_999, &new_context(), &mut new_state());
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -604,7 +599,7 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context())
+        let res = BN128Pair::<Byzantium, _>::run(&input, 260_000, &new_context(), &mut new_state())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -621,7 +616,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context());
+        let res = BN128Pair::<Byzantium, _>::run(&input, 260_000, &new_context(), &mut new_state());
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
@@ -637,7 +632,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context());
+        let res = BN128Pair::<Byzantium, _>::run(&input, 260_000, &new_context(), &mut new_state());
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN",)))

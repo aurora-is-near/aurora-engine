@@ -1,9 +1,11 @@
-use crate::engine::Engine;
-use crate::parameters::PromiseCreateArgs;
-use crate::prelude::{Vec, H160, H256, U256};
 use evm::backend::{Apply, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackState, StackSubstateMetadata};
 use evm::{ExitError, Transfer};
+
+use crate::engine::Engine;
+use crate::parameters::PromiseCreateArgs;
+use crate::prelude::{Vec, H160, H256, U256};
+use crate::AuroraState;
 
 pub struct AuroraStackState<'backend, 'config> {
     memory_stack_state: MemoryStackState<'backend, 'config, Engine>,
@@ -29,10 +31,6 @@ impl<'backend, 'config> AuroraStackState<'backend, 'config> {
         let (apply_iter, log_iter) = self.memory_stack_state.deconstruct();
         (apply_iter, log_iter, self.promises.stack)
     }
-}
-
-pub trait AuroraState {
-    fn add_promise(&mut self, promise: PromiseCreateArgs);
 }
 
 impl<'backend, 'config> AuroraState for AuroraStackState<'backend, 'config> {

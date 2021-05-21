@@ -7,6 +7,8 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+use crate::parameters::PromiseCreateArgs;
+
 pub mod meta_parsing;
 pub mod parameters;
 pub mod prelude;
@@ -28,6 +30,7 @@ mod sdk;
 
 #[cfg(test)]
 mod benches;
+#[cfg(feature = "contract")]
 mod state;
 #[cfg(test)]
 mod test_utils;
@@ -465,4 +468,8 @@ mod contract {
             }
         }
     }
+}
+
+pub trait AuroraState {
+    fn add_promise(&mut self, promise: PromiseCreateArgs);
 }

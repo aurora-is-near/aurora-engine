@@ -1,8 +1,9 @@
-use crate::precompiles::{Precompile, PrecompileResult, Vec};
-use crate::state::{AuroraStackState, AuroraState};
-use bn::prelude::PhantomData;
+use crate::prelude::{PhantomData, Vec};
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
+
+use crate::precompiles::{Precompile, PrecompileResult};
+use crate::AuroraState;
 
 mod costs {
     pub(super) const SHA256_BASE: u64 = 60;
@@ -112,15 +113,9 @@ impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::test_utils::{new_context, new_state};
 
-    fn new_context() -> Context {
-        Context {
-            address: Default::default(),
-            caller: Default::default(),
-            apparent_value: Default::default(),
-        }
-    }
+    use super::*;
 
     #[test]
     fn test_sha256() {
@@ -129,7 +124,9 @@ mod tests {
             hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
                 .unwrap();
 
-        let res = SHA256::run(input, 60, &new_context()).unwrap().output;
+        let res = SHA256::run(input, 60, &new_context(), &mut new_state())
+            .unwrap()
+            .output;
         assert_eq!(res, expected);
     }
 
@@ -140,7 +137,9 @@ mod tests {
             hex::decode("0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31")
                 .unwrap();
 
-        let res = RIPEMD160::run(input, 600, &new_context()).unwrap().output;
+        let res = RIPEMD160::run(input, 600, &new_context(), &mut new_state())
+            .unwrap()
+            .output;
         assert_eq!(res, expected);
     }
 }

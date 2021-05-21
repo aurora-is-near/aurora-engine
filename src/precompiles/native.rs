@@ -1,16 +1,17 @@
-use evm::{Context, ExitError, ExitSucceed};
-
-use super::{Precompile, PrecompileResult};
-use crate::parameters::PromiseCreateArgs;
-use crate::precompiles::exit_to_near_address;
-use crate::prelude::{Cow, String, ToString, Vec, U256};
-use crate::state::{AuroraStackState, AuroraState};
-use crate::storage::{bytes_to_key, KeyPrefix};
-use crate::types::AccountId;
-use bn::prelude::PhantomData;
+use crate::prelude::PhantomData;
 use borsh::BorshSerialize;
 use evm::backend::Log;
 use evm::executor::PrecompileOutput;
+use evm::{Context, ExitError, ExitSucceed};
+
+use crate::parameters::PromiseCreateArgs;
+use crate::precompiles::exit_to_near_address;
+use crate::prelude::{Cow, String, ToString, Vec, U256};
+use crate::storage::{bytes_to_key, KeyPrefix};
+use crate::types::AccountId;
+use crate::AuroraState;
+
+use super::{Precompile, PrecompileResult};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
@@ -291,9 +292,10 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::precompiles::{EXIT_TO_ETHEREUM_ID, EXIT_TO_NEAR_ID};
     use crate::types::near_account_to_evm_address;
+
+    use super::*;
 
     #[test]
     fn test_precompile_id() {
