@@ -44,6 +44,7 @@ pub fn exit_to_ethereum_address() -> Address {
 /// This address is computed as: `&keccak("exitToNear")[12..]`
 const EXIT_TO_NEAR_ID: u64 = 11421322804619973199;
 
+#[allow(dead_code)]
 pub fn exit_to_near_address() -> Address {
     Address::from_slice(
         hex::decode("e9217bc70b7ed1f598ddd3199e80b093fa71124f")

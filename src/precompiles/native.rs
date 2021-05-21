@@ -1,11 +1,8 @@
 use crate::prelude::PhantomData;
-use borsh::BorshSerialize;
-use evm::backend::Log;
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 
 use crate::parameters::PromiseCreateArgs;
-use crate::precompiles::exit_to_near_address;
 use crate::prelude::{Cow, String, ToString, Vec, U256};
 use crate::storage::{bytes_to_key, KeyPrefix};
 use crate::types::AccountId;
@@ -99,7 +96,7 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -164,22 +161,7 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
             attached_gas: costs::FT_TRANSFER_GAS,
         };
 
-        // let promise0 = crate::sdk::promise_create(
-        //     nep141_address,
-        //     b"ft_transfer",
-        //     args.as_bytes(),
-        //     1,
-        //     costs::FT_TRANSFER_GAS,
-        // );
-
-        // crate::sdk::promise_return(promise0);
-
-        let mut logs = Vec::new();
-        logs.push(Log {
-            address: exit_to_near_address(),
-            topics: Vec::new(),
-            data: promise.try_to_vec().unwrap(),
-        });
+        state.add_promise(promise);
 
         Ok(PrecompileOutput {
             exit_status: ExitSucceed::Returned,
