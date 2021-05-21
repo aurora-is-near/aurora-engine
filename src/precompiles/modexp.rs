@@ -72,7 +72,7 @@ impl<S: AuroraState> Precompile<S> for ModExp<Byzantium, S> {
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
-    fn run(input: &[u8], target_gas: u64, _context: &Context, state: &mut S) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, _context: &Context, _state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             return Err(ExitError::OutOfGas);
@@ -145,7 +145,7 @@ impl<S: AuroraState> Precompile<S> for ModExp<Berlin, S> {
         todo!()
     }
 
-    fn run(_input: &[u8], _target_gas: u64, _context: &Context, state: &mut S) -> PrecompileResult {
+    fn run(_input: &[u8], _target_gas: u64, _context: &Context, _state: &mut S) -> PrecompileResult {
         todo!()
     }
 }

@@ -29,6 +29,7 @@ use crate::AuroraState;
 /// This address is computed as: `&keccak("exitToEthereum")[12..]`
 const EXIT_TO_ETHEREUM_ID: u64 = 17176159495920586411;
 
+#[allow(dead_code)]
 pub fn exit_to_ethereum_address() -> Address {
     Address::from_slice(
         hex::decode("b0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab")
@@ -60,7 +61,7 @@ pub trait Precompile<S: AuroraState> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError>;
 
     /// Runs the precompile function.
-    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult;
+    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult;
 }
 
 /// Hard fork marker.

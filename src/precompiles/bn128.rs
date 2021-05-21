@@ -356,7 +356,7 @@ impl<S: AuroraState> Precompile<S> for BN128Pair<Istanbul, S> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
-    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)

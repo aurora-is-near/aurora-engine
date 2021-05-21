@@ -35,7 +35,7 @@ impl<S: AuroraState> Precompile<S> for Identity<S> {
     ///
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000004
-    fn run(input: &[u8], target_gas: u64, _context: &Context, state: &mut S) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, _context: &Context, _state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)

@@ -324,7 +324,7 @@ impl Engine {
         status.into_result()?;
         let used_gas = executor.used_gas();
         // TODO(MarX): Handle promises
-        let (values, logs, promises) = executor.into_state().deconstruct();
+        let (values, logs, _promises) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult {
@@ -354,7 +354,7 @@ impl Engine {
 
         let used_gas = executor.used_gas();
         // TODO(MarX): Handle promises
-        let (values, logs, promises) = executor.into_state().deconstruct();
+        let (values, logs, _promises) = executor.into_state().deconstruct();
         let is_succeed = status.is_succeed();
 
         if let Err(e) = status.into_result() {
