@@ -362,8 +362,9 @@ impl FungibleToken {
         }
     }
 
-    pub fn storage_balance_of(&self, account_id: &str) -> Option<StorageBalance> {
+    pub fn storage_balance_of(&self, account_id: &str) -> StorageBalance {
         self.internal_storage_balance_of(account_id)
+            .unwrap_or_default()
     }
 
     // `registration_only` doesn't affect the implementation for vanilla fungible token.

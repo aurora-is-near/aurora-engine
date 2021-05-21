@@ -547,9 +547,7 @@ impl EthConnectorContract {
         let args = StorageBalanceOfCallArgs::from(
             parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
-        let res = self.ft.storage_balance_of(&args.account_id);
-        let res = res.map_or(vec![], |v| v.to_json_bytes());
-        sdk::return_output(&res);
+        sdk::return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
     }
 
     /// ft_on_transfer callback function
