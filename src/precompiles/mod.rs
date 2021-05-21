@@ -3,6 +3,7 @@ mod bn128;
 mod hash;
 mod identity;
 mod modexp;
+#[cfg(feature = "contract")]
 mod native;
 mod secp256k1;
 
@@ -11,11 +12,13 @@ use crate::precompiles::bn128::{BN128Add, BN128Mul, BN128Pair};
 use crate::precompiles::hash::{RIPEMD160, SHA256};
 use crate::precompiles::identity::Identity;
 use crate::precompiles::modexp::ModExp;
+#[cfg(feature = "contract")]
 use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::precompiles::secp256k1::ECRecover;
 use crate::prelude::{Address, Vec};
-use evm::{Context, ExitError, ExitSucceed};
+use evm::executor::PrecompileOutput;
+use evm::{Context, ExitError};
 
 /// Exit to Ethereum precompile address (truncated to 8 bytes)
 ///
@@ -23,14 +26,30 @@ use evm::{Context, ExitError, ExitSucceed};
 /// This address is computed as: `&keccak("exitToEthereum")[12..]`
 const EXIT_TO_ETHEREUM_ID: u64 = 17176159495920586411;
 
+fn exit_to_ethereum_address() -> Address {
+    Address::from_slice(
+        hex::decode("b0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab")
+            .unwrap()
+            .as_slice(),
+    )
+}
+
 /// Exit to NEAR precompile address (truncated to 8 bytes)
 ///
 /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
 /// This address is computed as: `&keccak("exitToNear")[12..]`
 const EXIT_TO_NEAR_ID: u64 = 11421322804619973199;
 
+fn exit_to_near_address() -> Address {
+    Address::from_slice(
+        hex::decode("e9217bc70b7ed1f598ddd3199e80b093fa71124f")
+            .unwrap()
+            .as_slice(),
+    )
+}
+
 /// A precompile operation result.
-type PrecompileResult = Result<(ExitSucceed, Vec<u8>, u64), ExitError>;
+type PrecompileResult = Result<PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
 trait Precompile {
@@ -92,7 +111,9 @@ pub fn homestead_precompiles(
         1 => Some(ECRecover::run(input, target_gas, context)),
         2 => Some(SHA256::run(input, target_gas, context)),
         3 => Some(RIPEMD160::run(input, target_gas, context)),
+        #[cfg(feature = "contract")]
         EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        #[cfg(feature = "contract")]
         EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
@@ -120,7 +141,9 @@ pub fn byzantium_precompiles(
         6 => Some(BN128Add::<Byzantium>::run(input, target_gas, context)),
         7 => Some(BN128Mul::<Byzantium>::run(input, target_gas, context)),
         8 => Some(BN128Pair::<Byzantium>::run(input, target_gas, context)),
+        #[cfg(feature = "contract")]
         EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        #[cfg(feature = "contract")]
         EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
@@ -149,7 +172,9 @@ pub fn istanbul_precompiles(
         7 => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
         8 => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
         9 => Some(Blake2F::run(input, target_gas, context)),
+        #[cfg(feature = "contract")]
         EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        #[cfg(feature = "contract")]
         EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }

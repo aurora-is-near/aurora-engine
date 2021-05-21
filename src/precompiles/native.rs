@@ -1,10 +1,14 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::prelude::{Cow, String, Vec, U256};
-use crate::sdk;
+use crate::parameters::PromiseCreateArgs;
+use crate::precompiles::exit_to_near_address;
+use crate::prelude::{Cow, String, ToString, Vec, U256};
 use crate::storage::{bytes_to_key, KeyPrefix};
 use crate::types::AccountId;
+use borsh::BorshSerialize;
+use evm::backend::Log;
+use evm::executor::PrecompileOutput;
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
@@ -64,7 +68,7 @@ pub fn is_valid_account_id(account_id: &[u8]) -> bool {
 
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
     AccountId::from_utf8(
-        sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
+        crate::sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
             .expect(ERR_TARGET_TOKEN_NOT_FOUND),
     )
     .unwrap()
@@ -83,7 +87,12 @@ impl Precompile for ExitToNear {
             return Err(ExitError::OutOfGas);
         }
 
-        Ok((ExitSucceed::Returned, Vec::new(), 0))
+        Ok(PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output: Vec::new(),
+            cost: 0,
+            logs: Vec::new(),
+        })
     }
 
     #[cfg(feature = "contract")]
@@ -144,17 +153,37 @@ impl Precompile for ExitToNear {
             }
         };
 
-        let promise0 = crate::sdk::promise_create(
-            nep141_address,
-            b"ft_transfer",
-            args.as_bytes(),
-            1,
-            costs::FT_TRANSFER_GAS,
-        );
+        let promise = PromiseCreateArgs {
+            target_account_id: nep141_address,
+            method: "ft_transfer".to_string(),
+            args: args.as_bytes().to_vec(),
+            attached_balance: 1,
+            attached_gas: costs::FT_TRANSFER_GAS,
+        };
 
-        crate::sdk::promise_return(promise0);
+        // let promise0 = crate::sdk::promise_create(
+        //     nep141_address,
+        //     b"ft_transfer",
+        //     args.as_bytes(),
+        //     1,
+        //     costs::FT_TRANSFER_GAS,
+        // );
 
-        Ok((ExitSucceed::Returned, Vec::new(), 0))
+        // crate::sdk::promise_return(promise0);
+
+        let mut logs = Vec::new();
+        logs.push(Log {
+            address: exit_to_near_address(),
+            topics: Vec::new(),
+            data: promise.try_to_vec().unwrap(),
+        });
+
+        Ok(PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output: Vec::new(),
+            cost: 0,
+            logs: Vec::new(),
+        })
     }
 }
 
@@ -171,7 +200,12 @@ impl Precompile for ExitToEthereum {
             return Err(ExitError::OutOfGas);
         }
 
-        Ok((ExitSucceed::Returned, Vec::new(), 0))
+        Ok(PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output: Vec::new(),
+            cost: 0,
+            logs: Vec::new(),
+        })
     }
 
     #[cfg(feature = "contract")]
@@ -244,7 +278,12 @@ impl Precompile for ExitToEthereum {
 
         crate::sdk::promise_return(promise0);
 
-        Ok((ExitSucceed::Returned, Vec::new(), 0))
+        Ok(PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output: Vec::new(),
+            cost: 0,
+            logs: Vec::new(),
+        })
     }
 }
 

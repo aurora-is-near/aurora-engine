@@ -1,4 +1,5 @@
-use crate::precompiles::{Precompile, PrecompileResult};
+use crate::precompiles::{Precompile, PrecompileResult, Vec};
+use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 
 mod costs {
@@ -41,7 +42,12 @@ impl Precompile for SHA256 {
         }
 
         let hash = sha2::Sha256::digest(input);
-        Ok((ExitSucceed::Returned, hash.to_vec(), 0))
+        Ok(PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output: hash.to_vec(),
+            cost: 0,
+            logs: Vec::new(),
+        })
     }
 
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
@@ -55,11 +61,12 @@ impl Precompile for SHA256 {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            Ok((
-                ExitSucceed::Returned,
-                sdk::sha256(input).as_bytes().to_vec(),
+            Ok(PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: sdk::sha256(input).as_bytes().to_vec(),
                 cost,
-            ))
+                logs: Vec::new(),
+            })
         }
     }
 }
@@ -91,7 +98,12 @@ impl Precompile for RIPEMD160 {
             // the evm works with 32-byte words.
             let mut result = [0u8; 32];
             result[12..].copy_from_slice(&hash);
-            Ok((ExitSucceed::Returned, result.to_vec(), cost))
+            Ok(PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: result.to_vec(),
+                cost,
+                logs: Vec::new(),
+            })
         }
     }
 }
@@ -115,7 +127,7 @@ mod tests {
             hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
                 .unwrap();
 
-        let res = SHA256::run(input, 60, &new_context()).unwrap().1;
+        let res = SHA256::run(input, 60, &new_context()).unwrap().output;
         assert_eq!(res, expected);
     }
 
@@ -126,7 +138,7 @@ mod tests {
             hex::decode("0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31")
                 .unwrap();
 
-        let res = RIPEMD160::run(input, 600, &new_context()).unwrap().1;
+        let res = RIPEMD160::run(input, 600, &new_context()).unwrap().output;
         assert_eq!(res, expected);
     }
 }

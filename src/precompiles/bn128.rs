@@ -1,5 +1,6 @@
 use crate::precompiles::{Byzantium, HardFork, Istanbul, Precompile, PrecompileResult};
 use crate::prelude::*;
+use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 
 /// bn128 costs.
@@ -104,7 +105,12 @@ impl Precompile for BN128Add<Byzantium> {
             Err(ExitError::OutOfGas)
         } else {
             let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            Ok(PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: res,
+                cost,
+                logs: Vec::new(),
+            })
         }
     }
 }
@@ -125,7 +131,12 @@ impl Precompile for BN128Add<Istanbul> {
             Err(ExitError::OutOfGas)
         } else {
             let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            Ok(PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: res,
+                cost,
+                logs: Vec::new(),
+            })
         }
     }
 }
@@ -172,7 +183,12 @@ impl Precompile for BN128Mul<Byzantium> {
             Err(ExitError::OutOfGas)
         } else {
             let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            Ok(PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: res,
+                cost,
+                logs: Vec::new(),
+            })
         }
     }
 }
@@ -192,7 +208,12 @@ impl Precompile for BN128Mul<Istanbul> {
             Err(ExitError::OutOfGas)
         } else {
             let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            Ok(PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: res,
+                cost,
+                logs: Vec::new(),
+            })
         }
     }
 }
@@ -311,7 +332,12 @@ impl Precompile for BN128Pair<Byzantium> {
             Err(ExitError::OutOfGas)
         } else {
             let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            Ok(PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: res,
+                cost,
+                logs: Vec::new(),
+            })
         }
     }
 }
@@ -334,7 +360,12 @@ impl Precompile for BN128Pair<Istanbul> {
             Err(ExitError::OutOfGas)
         } else {
             let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            Ok(PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: res,
+                cost,
+                logs: Vec::new(),
+            })
         }
     }
 }
@@ -370,7 +401,7 @@ mod tests {
 
         let res = BN128Add::<Byzantium>::run(&input, 500, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // zero sum test
@@ -391,7 +422,7 @@ mod tests {
 
         let res = BN128Add::<Byzantium>::run(&input, 500, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -417,7 +448,7 @@ mod tests {
 
         let res = BN128Add::<Byzantium>::run(&input, 500, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -455,7 +486,7 @@ mod tests {
 
         let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -486,7 +517,7 @@ mod tests {
 
         let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // no input test
@@ -500,7 +531,7 @@ mod tests {
 
         let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -543,7 +574,7 @@ mod tests {
 
         let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -574,7 +605,7 @@ mod tests {
 
         let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // point not on curve fail

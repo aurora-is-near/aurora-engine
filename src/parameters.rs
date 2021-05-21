@@ -135,6 +135,15 @@ pub struct NEP141FtOnTransferArgs {
     pub msg: String,
 }
 
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct PromiseCreateArgs {
+    pub target_account_id: AccountId,
+    pub method: String,
+    pub args: Vec<u8>,
+    pub attached_balance: u128,
+    pub attached_gas: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
