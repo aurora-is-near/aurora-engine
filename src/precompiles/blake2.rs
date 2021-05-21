@@ -1,5 +1,6 @@
 use crate::precompiles::{Precompile, PrecompileResult};
-use crate::prelude::{mem, Borrowed, TryInto, Vec};
+use crate::prelude::{mem, Borrowed, PhantomData, TryInto, Vec};
+use crate::state::{AuroraStackState, AuroraState};
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 
@@ -14,9 +15,9 @@ mod consts {
     pub(super) const INPUT_LENGTH: usize = 213;
 }
 
-pub(super) struct Blake2F;
+pub(super) struct Blake2F<S>(PhantomData<S>);
 
-impl Precompile for Blake2F {
+impl<S: AuroraState> Precompile<S> for Blake2F<S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         let (int_bytes, _) = input.split_at(mem::size_of::<u32>());
         Ok(u64::from(u32::from_be_bytes(
@@ -34,7 +35,7 @@ impl Precompile for Blake2F {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-152
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, _context: &Context, _state: &mut S) -> PrecompileResult {
         if input.len() != consts::INPUT_LENGTH {
             return Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")));
         }

@@ -1,6 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
+use evm::executor::{StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
@@ -12,6 +12,7 @@ use crate::parameters::{
 use crate::precompiles;
 use crate::prelude::{Address, ToString, TryInto, Vec, H256, U256};
 use crate::sdk;
+use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId};
 
@@ -322,7 +323,8 @@ impl Engine {
         let is_succeed = status.is_succeed();
         status.into_result()?;
         let used_gas = executor.used_gas();
-        let (values, logs) = executor.into_state().deconstruct();
+        // TODO(MarX): Handle promises
+        let (values, logs, promises) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult {
@@ -351,7 +353,8 @@ impl Engine {
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
 
         let used_gas = executor.used_gas();
-        let (values, logs) = executor.into_state().deconstruct();
+        // TODO(MarX): Handle promises
+        let (values, logs, promises) = executor.into_state().deconstruct();
         let is_succeed = status.is_succeed();
 
         if let Err(e) = status.into_result() {
@@ -408,9 +411,9 @@ impl Engine {
         Ok(result)
     }
 
-    fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {
+    fn make_executor(&self) -> StackExecutor<AuroraStackState> {
         let metadata = StackSubstateMetadata::new(u64::MAX, &CONFIG);
-        let state = MemoryStackState::new(metadata, self);
+        let state = AuroraStackState::new(metadata, self);
         StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
     }
 

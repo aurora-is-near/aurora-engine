@@ -28,6 +28,7 @@ mod sdk;
 
 #[cfg(test)]
 mod benches;
+mod state;
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]

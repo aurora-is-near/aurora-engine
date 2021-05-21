@@ -17,6 +17,7 @@ use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::precompiles::secp256k1::ECRecover;
 use crate::prelude::{Address, Vec};
+use crate::state::{AuroraStackState, AuroraState};
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError};
 
@@ -52,12 +53,12 @@ fn exit_to_near_address() -> Address {
 type PrecompileResult = Result<PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
-trait Precompile {
+trait Precompile<S: AuroraState> {
     /// The required gas in order to run the precompile function.
     fn required_gas(input: &[u8]) -> Result<u64, ExitError>;
 
     /// Runs the precompile function.
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult;
+    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult;
 }
 
 /// Hard fork marker.
@@ -90,6 +91,7 @@ pub fn no_precompiles(
     _input: &[u8],
     _target_gas: Option<u64>,
     _context: &Context,
+    _state: &mut AuroraStackState,
 ) -> Option<PrecompileResult> {
     None // no precompiles supported
 }
@@ -101,6 +103,7 @@ pub fn homestead_precompiles(
     input: &[u8],
     target_gas: Option<u64>,
     context: &Context,
+    state: &mut AuroraStackState,
 ) -> Option<PrecompileResult> {
     let target_gas = match target_gas {
         Some(t) => t,
@@ -108,13 +111,13 @@ pub fn homestead_precompiles(
     };
 
     match address.to_low_u64_be() {
-        1 => Some(ECRecover::run(input, target_gas, context)),
-        2 => Some(SHA256::run(input, target_gas, context)),
-        3 => Some(RIPEMD160::run(input, target_gas, context)),
+        1 => Some(ECRecover::<AuroraStackState>::run(input, target_gas, context, state)),
+        2 => Some(SHA256::<AuroraStackState>::run(input, target_gas, context, state)),
+        3 => Some(RIPEMD160::<AuroraStackState>::run(input, target_gas, context, state)),
         #[cfg(feature = "contract")]
-        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        EXIT_TO_NEAR_ID => Some(ExitToNear::<AuroraStackState>::run(input, target_gas, context, state)),
         #[cfg(feature = "contract")]
-        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
+        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state)),
         _ => None,
     }
 }
@@ -126,6 +129,7 @@ pub fn byzantium_precompiles(
     input: &[u8],
     target_gas: Option<u64>,
     context: &Context,
+    state: &mut AuroraStackState,
 ) -> Option<PrecompileResult> {
     let target_gas = match target_gas {
         Some(t) => t,
@@ -133,18 +137,26 @@ pub fn byzantium_precompiles(
     };
 
     match address.to_low_u64_be() {
-        1 => Some(ECRecover::run(input, target_gas, context)),
-        2 => Some(SHA256::run(input, target_gas, context)),
-        3 => Some(RIPEMD160::run(input, target_gas, context)),
-        4 => Some(Identity::run(input, target_gas, context)),
-        5 => Some(ModExp::<Byzantium>::run(input, target_gas, context)),
-        6 => Some(BN128Add::<Byzantium>::run(input, target_gas, context)),
-        7 => Some(BN128Mul::<Byzantium>::run(input, target_gas, context)),
-        8 => Some(BN128Pair::<Byzantium>::run(input, target_gas, context)),
+        1 => Some(ECRecover::<AuroraStackState>::run(
+            input, target_gas, context, state,
+        )),
+        2 => Some(SHA256::<AuroraStackState>::run(input, target_gas, context, state)),
+        3 => Some(RIPEMD160::<AuroraStackState>::run(input, target_gas, context, state)),
+        4 => Some(Identity::<AuroraStackState>::run(input, target_gas, context, state)),
+        5 => Some(ModExp::<Byzantium, AuroraStackState>::run(input, target_gas, context, state)),
+        6 => Some(BN128Add::<Byzantium, AuroraStackState>::run(
+            input, target_gas, context, state,
+        )),
+        7 => Some(BN128Mul::<Byzantium, AuroraStackState>::run(
+            input, target_gas, context, state,
+        )),
+        8 => Some(BN128Pair::<Byzantium, AuroraStackState>::run(
+            input, target_gas, context, state,
+        )),
         #[cfg(feature = "contract")]
-        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        EXIT_TO_NEAR_ID => Some(ExitToNear::<AuroraStackState>::run(input, target_gas, context, state)),
         #[cfg(feature = "contract")]
-        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
+        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state)),
         _ => None,
     }
 }
@@ -156,6 +168,7 @@ pub fn istanbul_precompiles(
     input: &[u8],
     target_gas: Option<u64>,
     context: &Context,
+    state: &mut AuroraStackState,
 ) -> Option<PrecompileResult> {
     let target_gas = match target_gas {
         Some(t) => t,
@@ -163,19 +176,21 @@ pub fn istanbul_precompiles(
     };
 
     match address.to_low_u64_be() {
-        1 => Some(ECRecover::run(input, target_gas, context)),
-        2 => Some(SHA256::run(input, target_gas, context)),
-        3 => Some(RIPEMD160::run(input, target_gas, context)),
-        4 => Some(Identity::run(input, target_gas, context)),
-        5 => Some(ModExp::<Byzantium>::run(input, target_gas, context)),
-        6 => Some(BN128Add::<Istanbul>::run(input, target_gas, context)),
-        7 => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
-        8 => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
-        9 => Some(Blake2F::run(input, target_gas, context)),
+        1 => Some(ECRecover::<AuroraStackState>::run(input, target_gas, context, state)),
+        2 => Some(SHA256::<AuroraStackState>::run(input, target_gas, context, state)),
+        3 => Some(RIPEMD160::<AuroraStackState>::run(input, target_gas, context, state)),
+        4 => Some(Identity::<AuroraStackState>::run(input, target_gas, context, state)),
+        5 => Some(ModExp::<Byzantium, AuroraStackState>::run(input, target_gas, context, state)),
+        6 => Some(BN128Add::<Istanbul, AuroraStackState>::run(input, target_gas, context, state)),
+        7 => Some(BN128Mul::<Istanbul, AuroraStackState>::run(input, target_gas, context, state)),
+        8 => Some(BN128Pair::<Istanbul, AuroraStackState>::run(
+            input, target_gas, context, state,
+        )),
+        9 => Some(Blake2F::<AuroraStackState>::run(input, target_gas, context, state)),
         #[cfg(feature = "contract")]
-        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        EXIT_TO_NEAR_ID => Some(ExitToNear::<AuroraStackState>::run(input, target_gas, context, state)),
         #[cfg(feature = "contract")]
-        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
+        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state)),
         _ => None,
     }
 }
@@ -187,6 +202,7 @@ pub fn berlin_precompiles(
     input: &[u8],
     target_gas: Option<u64>,
     context: &Context,
+    state: &mut AuroraStackState,
 ) -> Option<PrecompileResult> {
     let target_gas = match target_gas {
         Some(t) => t,
@@ -194,19 +210,21 @@ pub fn berlin_precompiles(
     };
 
     match address.to_low_u64_be() {
-        1 => Some(ECRecover::run(input, target_gas, context)),
-        2 => Some(SHA256::run(input, target_gas, context)),
-        3 => Some(RIPEMD160::run(input, target_gas, context)),
-        4 => Some(Identity::run(input, target_gas, context)),
-        5 => Some(ModExp::<Berlin>::run(input, target_gas, context)), // TODO gas changes
-        6 => Some(BN128Add::<Istanbul>::run(input, target_gas, context)),
-        7 => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
-        8 => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
-        9 => Some(Blake2F::run(input, target_gas, context)),
+        1 => Some(ECRecover::<AuroraStackState>::run(input, target_gas, context, state)),
+        2 => Some(SHA256::<AuroraStackState>::run(input, target_gas, context, state)),
+        3 => Some(RIPEMD160::<AuroraStackState>::run(input, target_gas, context, state)),
+        4 => Some(Identity::<AuroraStackState>::run(input, target_gas, context, state)),
+        5 => Some(ModExp::<Berlin, AuroraStackState>::run(input, target_gas, context, state)), // TODO gas changes
+        6 => Some(BN128Add::<Istanbul, AuroraStackState>::run(input, target_gas, context, state)),
+        7 => Some(BN128Mul::<Istanbul, AuroraStackState>::run(input, target_gas, context, state)),
+        8 => Some(BN128Pair::<Istanbul, AuroraStackState>::run(
+            input, target_gas, context, state,
+        )),
+        9 => Some(Blake2F::<AuroraStackState>::run(input, target_gas, context, state)),
         #[cfg(feature = "contract")]
-        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        EXIT_TO_NEAR_ID => Some(ExitToNear::<AuroraStackState>::run(input, target_gas, context, state)),
         #[cfg(feature = "contract")]
-        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
+        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state)),
         _ => None,
     }
 }

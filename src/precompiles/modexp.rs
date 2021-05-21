@@ -1,12 +1,13 @@
 use crate::precompiles::{Berlin, Byzantium, HardFork, Precompile, PrecompileResult};
 use crate::prelude::{PhantomData, Vec, U256};
+use crate::state::{AuroraStackState, AuroraState};
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 use num::BigUint;
 
-pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
+pub(super) struct ModExp<HF: HardFork, S>(PhantomData<HF>, PhantomData<S>);
 
-impl ModExp<Byzantium> {
+impl<S> ModExp<Byzantium, S> {
     fn adj_exp_len(exp_len: U256, base_len: U256, bytes: &[u8]) -> U256 {
         let mut exp32_bytes = Vec::with_capacity(32);
         for i in 0..32 {
@@ -51,7 +52,7 @@ impl ModExp<Byzantium> {
     }
 }
 
-impl Precompile for ModExp<Byzantium> {
+impl<S: AuroraState> Precompile<S> for ModExp<Byzantium, S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         let base_len = U256::from(&input[0..32]);
         let exp_len = U256::from(&input[32..64]);
@@ -70,7 +71,7 @@ impl Precompile for ModExp<Byzantium> {
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, _context: &Context, state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             return Err(ExitError::OutOfGas);
@@ -138,12 +139,12 @@ impl Precompile for ModExp<Byzantium> {
     }
 }
 
-impl Precompile for ModExp<Berlin> {
+impl<S: AuroraState> Precompile<S> for ModExp<Berlin, S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         todo!()
     }
 
-    fn run(_input: &[u8], _target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(_input: &[u8], _target_gas: u64, _context: &Context, state: &mut S) -> PrecompileResult {
         todo!()
     }
 }

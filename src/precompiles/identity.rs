@@ -1,5 +1,7 @@
 use crate::precompiles::{Precompile, PrecompileResult};
 use crate::prelude::Vec;
+use crate::state::{AuroraStackState, AuroraState};
+use bn::prelude::PhantomData;
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 
@@ -17,9 +19,9 @@ mod consts {
     pub(super) const IDENTITY_WORD_LEN: u64 = 32;
 }
 
-pub struct Identity;
+pub struct Identity<S>(PhantomData<S>);
 
-impl Precompile for Identity {
+impl<S: AuroraState> Precompile<S> for Identity<S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             (input.len() as u64 + consts::IDENTITY_WORD_LEN - 1) / consts::IDENTITY_WORD_LEN
@@ -32,7 +34,7 @@ impl Precompile for Identity {
     ///
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000004
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, _context: &Context, state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)

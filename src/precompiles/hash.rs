@@ -1,4 +1,6 @@
 use crate::precompiles::{Precompile, PrecompileResult, Vec};
+use crate::state::{AuroraStackState, AuroraState};
+use bn::prelude::PhantomData;
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 
@@ -19,9 +21,9 @@ mod consts {
 }
 
 /// SHA256 precompile.
-pub struct SHA256;
+pub struct SHA256<S>(PhantomData<S>);
 
-impl Precompile for SHA256 {
+impl<S: AuroraState> Precompile<S> for SHA256<S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             (input.len() as u64 + consts::SHA256_WORD_LEN - 1) / consts::SHA256_WORD_LEN
@@ -34,7 +36,7 @@ impl Precompile for SHA256 {
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, _context: &Context, state: &mut S) -> PrecompileResult {
         use sha2::Digest;
 
         if Self::required_gas(input)? > target_gas {
@@ -54,7 +56,7 @@ impl Precompile for SHA256 {
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, _context: &Context, state: &mut S) -> PrecompileResult {
         use crate::sdk;
 
         let cost = Self::required_gas(input)?;
@@ -72,9 +74,9 @@ impl Precompile for SHA256 {
 }
 
 /// RIPEMD160 precompile.
-pub struct RIPEMD160;
+pub struct RIPEMD160<S>(PhantomData<S>);
 
-impl Precompile for RIPEMD160 {
+impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             (input.len() as u64 + consts::RIPEMD_WORD_LEN - 1) / consts::RIPEMD_WORD_LEN
@@ -86,7 +88,7 @@ impl Precompile for RIPEMD160 {
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000003
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, _context: &Context, state: &mut S) -> PrecompileResult {
         use ripemd160::Digest;
 
         let cost = Self::required_gas(input)?;

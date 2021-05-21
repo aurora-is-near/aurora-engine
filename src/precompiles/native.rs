@@ -4,8 +4,10 @@ use super::{Precompile, PrecompileResult};
 use crate::parameters::PromiseCreateArgs;
 use crate::precompiles::exit_to_near_address;
 use crate::prelude::{Cow, String, ToString, Vec, U256};
+use crate::state::{AuroraStackState, AuroraState};
 use crate::storage::{bytes_to_key, KeyPrefix};
 use crate::types::AccountId;
+use bn::prelude::PhantomData;
 use borsh::BorshSerialize;
 use evm::backend::Log;
 use evm::executor::PrecompileOutput;
@@ -74,15 +76,15 @@ fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
     .unwrap()
 }
 
-pub struct ExitToNear; //TransferEthToNear
+pub struct ExitToNear<S>(PhantomData<S>); //TransferEthToNear
 
-impl Precompile for ExitToNear {
+impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
     #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -96,7 +98,7 @@ impl Precompile for ExitToNear {
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -187,15 +189,15 @@ impl Precompile for ExitToNear {
     }
 }
 
-pub struct ExitToEthereum;
+pub struct ExitToEthereum<S>(PhantomData<S>);
 
-impl Precompile for ExitToEthereum {
+impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
     #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -209,7 +211,7 @@ impl Precompile for ExitToEthereum {
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }

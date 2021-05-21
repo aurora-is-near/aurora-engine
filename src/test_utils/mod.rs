@@ -14,10 +14,12 @@ use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::parameters::{NewCallArgs, SubmitResult};
 use crate::prelude::Address;
+use crate::state::AuroraStackState;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 use crate::transaction::{EthSignedTransaction, EthTransaction};
 use crate::types;
+use evm::Context;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
@@ -359,3 +361,13 @@ pub(crate) fn validate_address_balance_and_nonce(
     assert_eq!(runner.get_balance(address), expected_balance, "balance");
     assert_eq!(runner.get_nonce(address), expected_nonce, "nonce");
 }
+
+pub fn new_context() -> Context {
+    Context {
+        address: Default::default(),
+        caller: Default::default(),
+        apparent_value: Default::default(),
+    }
+}
+
+pub fn new_state() -> AuroraStackState {}

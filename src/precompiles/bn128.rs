@@ -1,5 +1,6 @@
 use crate::precompiles::{Byzantium, HardFork, Istanbul, Precompile, PrecompileResult};
 use crate::prelude::*;
+use crate::state::{AuroraStackState, AuroraState};
 use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 
@@ -65,9 +66,9 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
     })
 }
 
-pub(super) struct BN128Add<HF: HardFork>(PhantomData<HF>);
+pub(super) struct BN128Add<HF: HardFork, S>(PhantomData<HF>, PhantomData<S>);
 
-impl<HF: HardFork> BN128Add<HF> {
+impl<HF: HardFork, S> BN128Add<HF, S> {
     fn run_inner(input: &[u8], _context: &Context) -> Result<Vec<u8>, ExitError> {
         use bn::AffineG1;
 
@@ -89,7 +90,7 @@ impl<HF: HardFork> BN128Add<HF> {
     }
 }
 
-impl Precompile for BN128Add<Byzantium> {
+impl<S: AuroraState> Precompile<S> for BN128Add<Byzantium, S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::BYZANTIUM_ADD)
     }
@@ -99,7 +100,7 @@ impl Precompile for BN128Add<Byzantium> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -115,7 +116,7 @@ impl Precompile for BN128Add<Byzantium> {
     }
 }
 
-impl Precompile for BN128Add<Istanbul> {
+impl<S: AuroraState> Precompile<S> for BN128Add<Istanbul, S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::ISTANBUL_ADD)
     }
@@ -125,7 +126,7 @@ impl Precompile for BN128Add<Istanbul> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -141,9 +142,9 @@ impl Precompile for BN128Add<Istanbul> {
     }
 }
 
-pub(super) struct BN128Mul<HF: HardFork>(PhantomData<HF>);
+pub(super) struct BN128Mul<HF: HardFork, S>(PhantomData<HF>, PhantomData<S>);
 
-impl<HF: HardFork> BN128Mul<HF> {
+impl<HF: HardFork, S> BN128Mul<HF, S> {
     fn run_inner(input: &[u8], _context: &Context) -> Result<Vec<u8>, ExitError> {
         use bn::AffineG1;
 
@@ -168,7 +169,7 @@ impl<HF: HardFork> BN128Mul<HF> {
     }
 }
 
-impl Precompile for BN128Mul<Byzantium> {
+impl<S: AuroraState> Precompile<S> for BN128Mul<Byzantium, S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::BYZANTIUM_MUL)
     }
@@ -177,7 +178,7 @@ impl Precompile for BN128Mul<Byzantium> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -193,7 +194,7 @@ impl Precompile for BN128Mul<Byzantium> {
     }
 }
 
-impl Precompile for BN128Mul<Istanbul> {
+impl<S: AuroraState> Precompile<S> for BN128Mul<Istanbul, S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::ISTANBUL_MUL)
     }
@@ -202,7 +203,7 @@ impl Precompile for BN128Mul<Istanbul> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -218,9 +219,9 @@ impl Precompile for BN128Mul<Istanbul> {
     }
 }
 
-pub(super) struct BN128Pair<HF: HardFork>(PhantomData<HF>);
+pub(super) struct BN128Pair<HF: HardFork, S>(PhantomData<HF>, PhantomData<S>);
 
-impl<HF: HardFork> BN128Pair<HF> {
+impl<HF: HardFork, S> BN128Pair<HF, S> {
     fn run_inner(input: &[u8], _context: &Context) -> Result<Vec<u8>, ExitError> {
         use bn::{arith::U256, AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
 
@@ -314,7 +315,7 @@ impl<HF: HardFork> BN128Pair<HF> {
     }
 }
 
-impl Precompile for BN128Pair<Byzantium> {
+impl<S: AuroraState> Precompile<S> for BN128Pair<Byzantium, S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             costs::BYZANTIUM_PAIR_PER_POINT * input.len() as u64 / consts::PAIR_ELEMENT_LEN as u64
@@ -326,7 +327,7 @@ impl Precompile for BN128Pair<Byzantium> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -342,7 +343,7 @@ impl Precompile for BN128Pair<Byzantium> {
     }
 }
 
-impl Precompile for BN128Pair<Istanbul> {
+impl<S: AuroraState> Precompile<S> for BN128Pair<Istanbul, S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             costs::ISTANBUL_PAIR_PER_POINT * input.len() as u64 / consts::PAIR_ELEMENT_LEN as u64
@@ -354,7 +355,7 @@ impl Precompile for BN128Pair<Istanbul> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
