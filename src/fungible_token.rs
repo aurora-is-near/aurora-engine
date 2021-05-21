@@ -466,7 +466,7 @@ impl FungibleToken {
     fn get_statistic_key() -> Vec<u8> {
         storage::bytes_to_key(
             storage::KeyPrefix::EthConnector,
-            &[storage::EthConnectorStorageId::Statistic as u8],
+            &[storage::EthConnectorStorageId::StatisticsAuroraAccountsCounter as u8],
         )
     }
 }
