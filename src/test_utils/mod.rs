@@ -369,7 +369,7 @@ pub fn new_context() -> Context {
 }
 
 #[derive(Default)]
-struct MockState;
+pub struct MockState;
 
 impl AuroraState for MockState {
     fn add_promise(&mut self, _promise: PromiseCreateArgs) {}
