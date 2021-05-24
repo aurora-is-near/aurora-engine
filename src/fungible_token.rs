@@ -421,8 +421,24 @@ impl FungibleToken {
         }
     }
 
+    /// Insert account.
+    /// Calculate total unique accounts
     pub fn accounts_insert(&self, account_id: &str, amount: Balance) {
-        sdk::save_contract(&Self::account_to_key(account_id), &amount)
+        if !self.accounts_contains_key(account_id) {
+            let key = Self::get_statistic_key();
+            let accounts_counter = sdk::read_u64(&key)
+                .unwrap_or(0)
+                .checked_add(1)
+                .expect("ERR_ACCOUNTS_COUNTER_OVERFLOW");
+            sdk::write_storage(&key, &accounts_counter.to_le_bytes());
+        }
+        sdk::save_contract(&Self::account_to_key(account_id), &amount);
+    }
+
+    /// Get accounts counter for statistics
+    /// It represents total unique accounts.
+    pub fn get_accounts_counter(&self) -> u64 {
+        sdk::read_u64(&Self::get_statistic_key()).unwrap_or(0)
     }
 
     fn accounts_contains_key(&self, account_id: &str) -> bool {
@@ -445,5 +461,13 @@ impl FungibleToken {
         );
         key.extend_from_slice(account_id.as_bytes());
         key
+    }
+
+    /// Key for store contract statistics data
+    fn get_statistic_key() -> Vec<u8> {
+        storage::bytes_to_key(
+            storage::KeyPrefix::EthConnector,
+            &[storage::EthConnectorStorageId::StatisticsAuroraAccountsCounter as u8],
+        )
     }
 }
