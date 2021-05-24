@@ -585,7 +585,7 @@ impl EthConnectorContract {
     /// Get accounts counter for statistics.
     /// It represents total unique accounts (all-time, including accounts which now have zero balance).
     pub fn get_accounts_counter(&self) {
-        sdk::return_output(self.ft.get_accounts_counter().to_string().as_bytes());
+        sdk::return_output(&self.ft.get_accounts_counter().to_le_bytes());
     }
 
     /// Save eth-connector contract data

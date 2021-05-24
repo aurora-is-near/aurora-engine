@@ -591,10 +591,58 @@ fn test_get_accounts_counter() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
     call_deposit_near(&contract, CONTRACT_ACC);
 
-    let counter = master_account.view(CONTRACT_ACC.into(), "get_accounts_counter", &[]);
-    let counter: u128 = String::from_utf8(counter.unwrap())
-        .unwrap()
-        .parse()
+    let counter = master_account
+        .view(CONTRACT_ACC.into(), "get_accounts_counter", &[])
         .unwrap();
-    assert_eq!(counter, 2);
+    assert_eq!(u64::try_from_slice(&counter[..]).unwrap(), 2);
+}
+
+#[test]
+fn test_get_accounts_counter_and_transfer() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_near(&contract, CONTRACT_ACC);
+
+    let counter = master_account
+        .view(CONTRACT_ACC.into(), "get_accounts_counter", &[])
+        .unwrap();
+    assert_eq!(u64::try_from_slice(&counter[..]).unwrap(), 2);
+
+    let transfer_amount = 70;
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "ft_transfer",
+        json!({
+            "receiver_id": DEPOSITED_RECIPIENT,
+            "amount": transfer_amount,
+            "memo": "transfer memo"
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
+    assert_eq!(
+        balance,
+        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
+    );
+
+    let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE - transfer_amount as u128);
+
+    let balance = total_supply(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+
+    let balance = total_supply_eth(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, 0);
+
+    let balance = total_supply_near(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT);
+
+    let counter = master_account
+        .view(CONTRACT_ACC.into(), "get_accounts_counter", &[])
+        .unwrap();
+    assert_eq!(u64::try_from_slice(&counter[..]).unwrap(), 2);
 }
