@@ -4,7 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 const READ_STORAGE_REGISTER_ID: u64 = 0;
 const INPUT_REGISTER_ID: u64 = 0;
-const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
+const GAS_FOR_STATE_MIGRATION: u64 = 250_000_000_000_000;
 
 mod exports {
 
