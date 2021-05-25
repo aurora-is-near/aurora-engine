@@ -32,6 +32,24 @@ mod test_utils;
 #[cfg(test)]
 mod tests;
 
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+#[cfg(target_arch = "wasm32")]
+#[panic_handler]
+#[no_mangle]
+pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
+    ::core::arch::wasm32::unreachable();
+}
+
+#[cfg(target_arch = "wasm32")]
+#[alloc_error_handler]
+#[no_mangle]
+pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
+    ::core::arch::wasm32::unreachable();
+}
+
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::BorshSerialize;
@@ -413,22 +431,4 @@ mod contract {
             }
         }
     }
-}
-
-#[cfg(target_arch = "wasm32")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-#[cfg(target_arch = "wasm32")]
-#[panic_handler]
-#[no_mangle]
-pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
-    ::core::arch::wasm32::unreachable();
-}
-
-#[cfg(target_arch = "wasm32")]
-#[alloc_error_handler]
-#[no_mangle]
-pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
-    ::core::arch::wasm32::unreachable();
 }
