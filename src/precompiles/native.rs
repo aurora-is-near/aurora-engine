@@ -1,7 +1,7 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::prelude::{Cow, String, Vec, U256};
+use crate::prelude::{is_valid_account_id, Cow, String, Vec, U256};
 use crate::types::AccountId;
 
 mod costs {
@@ -25,44 +25,6 @@ mod costs {
 fn get_nep141_from_erc20(_erc20_token: &[u8]) -> Vec<u8> {
     // TODO(#51): Already implemented
     Vec::new()
-}
-
-/// The minimum length of a valid account ID.
-const MIN_ACCOUNT_ID_LEN: u64 = 2;
-/// The maximum length of a valid account ID.
-const MAX_ACCOUNT_ID_LEN: u64 = 64;
-
-/// Returns `true` if the given account ID is valid and `false` otherwise.
-///
-/// Taken from near-sdk-rs:
-/// (https://github.com/near/near-sdk-rs/blob/42f62384c3acd024829501ee86e480917da03896/near-sdk/src/environment/env.rs#L816-L843)
-pub fn is_valid_account_id(account_id: &[u8]) -> bool {
-    if (account_id.len() as u64) < MIN_ACCOUNT_ID_LEN
-        || (account_id.len() as u64) > MAX_ACCOUNT_ID_LEN
-    {
-        return false;
-    }
-
-    // NOTE: We don't want to use Regex here, because it requires extra time to compile it.
-    // The valid account ID regex is /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/
-    // Instead the implementation is based on the previous character checks.
-
-    // We can safely assume that last char was a separator.
-    let mut last_char_is_separator = true;
-
-    for c in account_id {
-        let current_char_is_separator = match *c {
-            b'a'..=b'z' | b'0'..=b'9' => false,
-            b'-' | b'_' | b'.' => true,
-            _ => return false,
-        };
-        if current_char_is_separator && last_char_is_separator {
-            return false;
-        }
-        last_char_is_separator = current_char_is_separator;
-    }
-    // The account can't end as separator.
-    !last_char_is_separator
 }
 
 pub struct ExitToNear; //TransferEthToNear
@@ -97,7 +59,7 @@ impl Precompile for ExitToNear {
                 (
                     crate::sdk::current_account_id(),
                     crate::prelude::format!(
-                        r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                        r#"{{"receiver_id": "{}", "amount": "{}"}}"#,
                         String::from_utf8(input.to_vec()).unwrap(),
                         context.apparent_value.as_u128()
                     ),
@@ -122,12 +84,14 @@ impl Precompile for ExitToNear {
             let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
             input_mut = &input_mut[32..];
 
+            // TODO: You have to charge caller's account balance for this transfer.
+
             if is_valid_account_id(input_mut) {
                 let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
                 (
                     nep141_address,
                     crate::prelude::format!(
-                        r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                        r#"{{"receiver_id": "{}", "amount": "{}"}}"#,
                         receiver_account_id,
                         amount
                     ),
@@ -211,6 +175,8 @@ impl Precompile for ExitToEthereum {
 
             let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
             input_mut = &input_mut[32..];
+
+            // TODO: Charge the caller's account balance?
 
             if input_mut.len() == 20 {
                 // Parse ethereum address in hex

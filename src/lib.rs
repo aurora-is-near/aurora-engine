@@ -25,6 +25,8 @@ mod deposit_event;
 mod engine;
 mod fungible_token;
 #[cfg(feature = "contract")]
+mod json;
+#[cfg(feature = "contract")]
 mod log_entry;
 mod precompiles;
 #[cfg(feature = "contract")]
@@ -47,11 +49,14 @@ mod contract {
     use crate::engine::{Engine, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
+    use crate::parameters::{
+        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, TransferCallCallArgs,
+        ViewCallArgs,
+    };
     use crate::prelude::{Address, TryInto, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
-    use crate::types::{near_account_to_evm_address, u256_to_arr};
+    use crate::types::{near_account_to_evm_address, u256_to_arr, ERR_FAILED_PARSE};
 
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -410,7 +415,15 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
-        EthConnectorContract::get_instance().ft_transfer_call();
+        use crate::json::parse_json;
+
+        // Check is payable
+        sdk::assert_one_yocto();
+
+        let args = TransferCallCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
+        EthConnectorContract::get_instance().ft_transfer_call(args);
     }
 
     #[no_mangle]
@@ -432,6 +445,11 @@ mod contract {
     pub extern "C" fn ft_on_transfer() {
         let engine = Engine::new(predecessor_address());
         EthConnectorContract::get_instance().ft_on_transfer(&engine)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_accounts_counter() {
+        EthConnectorContract::get_instance().get_accounts_counter()
     }
 
     #[cfg(feature = "integration-test")]

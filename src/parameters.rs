@@ -1,13 +1,19 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
+#[cfg(feature = "contract")]
+use crate::json;
+#[cfg(feature = "contract")]
+use crate::prelude::ToString;
 use crate::prelude::{String, Vec};
 #[cfg(feature = "contract")]
 use crate::prover::Proof;
 #[cfg(feature = "contract")]
-use crate::types::Balance;
+use crate::sdk;
 #[cfg(feature = "contract")]
-use crate::types::EthAddress;
+use crate::types::Balance;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
+#[cfg(feature = "contract")]
+use crate::types::{EthAddress, ERR_FAILED_PARSE};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -166,10 +172,24 @@ pub struct FtResolveTransfer {
 
 /// Fungible token storage balance
 #[cfg(feature = "contract")]
-#[derive(BorshSerialize)]
+#[derive(Default)]
 pub struct StorageBalance {
     pub total: Balance,
     pub available: Balance,
+}
+
+#[cfg(feature = "contract")]
+impl StorageBalance {
+    pub fn to_json_bytes(&self) -> Vec<u8> {
+        use alloc::format;
+        format!(
+            "{{\"total\": \"{}\", \"available\": \"{}\",}}",
+            self.total.to_string(),
+            self.available.to_string()
+        )
+        .as_bytes()
+        .to_vec()
+    }
 }
 
 /// resolve_transfer eth-connector call args
@@ -229,11 +249,36 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for TransferCallCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            receiver_id: v
+                .string("receiver_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            memo: v.string("memo").ok(),
+            msg: v.string("msg").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
+}
+
 /// storage_balance_of eth-connector call args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StorageBalanceOfCallArgs {
     pub account_id: AccountId,
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for StorageBalanceOfCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            account_id: v
+                .string("account_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
 }
 
 /// storage_deposit eth-connector call args
@@ -244,11 +289,30 @@ pub struct StorageDepositCallArgs {
     pub registration_only: Option<bool>,
 }
 
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for StorageDepositCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            account_id: v.string("account_id").ok(),
+            registration_only: v.bool("registration_only").ok(),
+        }
+    }
+}
+
 /// storage_withdraw eth-connector call args
 #[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StorageWithdrawCallArgs {
     pub amount: Option<u128>,
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for StorageWithdrawCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            amount: v.u128("amount").ok(),
+        }
+    }
 }
 
 /// transfer args for json invocation
@@ -258,6 +322,19 @@ pub struct TransferCallArgs {
     pub receiver_id: AccountId,
     pub amount: Balance,
     pub memo: Option<String>,
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for TransferCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            receiver_id: v
+                .string("receiver_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            memo: v.string("memo").ok(),
+        }
+    }
 }
 
 /// withdraw NEAR eth-connector call args
@@ -282,9 +359,60 @@ pub struct BalanceOfEthCallArgs {
 }
 
 #[cfg(feature = "contract")]
+impl From<json::JsonValue> for BalanceOfCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            account_id: v
+                .string("account_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RegisterRelayerCallArgs {
     pub address: EthAddress,
+}
+
+#[cfg(feature = "contract")]
+pub trait ExpectUtf8<T> {
+    fn expect_utf8(self, message: &[u8]) -> T;
+}
+
+#[cfg(feature = "contract")]
+impl<T> ExpectUtf8<T> for Option<T> {
+    fn expect_utf8(self, message: &[u8]) -> T {
+        match self {
+            Some(t) => t,
+            None => sdk::panic_utf8(message),
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
+    fn expect_utf8(self, message: &[u8]) -> T {
+        match self {
+            Ok(t) => t,
+            Err(_) => sdk::panic_utf8(message),
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+impl From<json::JsonValue> for ResolveTransferCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            sender_id: v
+                .string("sender_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            receiver_id: v
+                .string("receiver_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
 }
 
 #[cfg(test)]
