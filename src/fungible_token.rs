@@ -19,9 +19,6 @@ pub struct FungibleToken {
     /// Total supply of the all token.
     pub total_supply: Balance,
 
-    /// Total supply of the all NEAR token.
-    pub total_supply_near: Balance,
-
     /// Total supply of the all ETH token.
     pub total_supply_eth: Balance,
 
@@ -53,16 +50,6 @@ impl FungibleToken {
         let balance = self.internal_unwrap_balance_of(account_id);
         if let Some(new_balance) = balance.checked_add(amount) {
             self.accounts_insert(account_id, new_balance);
-            self.total_supply_near = self
-                .total_supply_near
-                .checked_add(amount)
-                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
-            // Note: Reusing total supply for a sum of ETH and NEAR is very weird. It doesn't give
-            // mean anything reasonable. I guess the goal is to just report changing numbers for the
-            // total supply when either ETH or NEAR balances are changing. In this case it's probably
-            // okay to report only one of them, e.g. ETH total_supply and not report NEAR total
-            // supply through `ft_total_supply`.
-            // TODO: Remove total_supply for NEAR
             self.total_supply = self
                 .total_supply
                 .checked_add(amount)
@@ -114,10 +101,6 @@ impl FungibleToken {
         let balance = self.internal_unwrap_balance_of(account_id);
         if let Some(new_balance) = balance.checked_sub(amount) {
             self.accounts_insert(account_id, new_balance);
-            self.total_supply_near = self
-                .total_supply_near
-                .checked_sub(amount)
-                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
             self.total_supply = self
                 .total_supply
                 .checked_sub(amount)
@@ -187,7 +170,7 @@ impl FungibleToken {
     }
 
     pub fn ft_total_supply_near(&self) -> u128 {
-        self.total_supply_near
+        self.total_supply - self.total_supply_eth
     }
 
     pub fn ft_total_supply_eth(&self) -> u128 {
@@ -262,8 +245,12 @@ impl FungibleToken {
         let unused_amount = match sdk::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(value) => {
-                // TODO: This has to use `JSON` instead of Borsh to match the FT standard.
-                if let Ok(unused_amount) = Balance::try_from_slice(&value[..]) {
+                if let Ok(unused_amount) = String::from_utf8(value) {
+                    let unused_amount = if let Ok(v) = unused_amount.parse::<u128>() {
+                        v
+                    } else {
+                        amount
+                    };
                     if amount > unused_amount {
                         unused_amount
                     } else {
@@ -375,8 +362,9 @@ impl FungibleToken {
         }
     }
 
-    pub fn storage_balance_of(&self, account_id: &str) -> Option<StorageBalance> {
+    pub fn storage_balance_of(&self, account_id: &str) -> StorageBalance {
         self.internal_storage_balance_of(account_id)
+            .unwrap_or_default()
     }
 
     // `registration_only` doesn't affect the implementation for vanilla fungible token.
@@ -433,8 +421,24 @@ impl FungibleToken {
         }
     }
 
+    /// Insert account.
+    /// Calculate total unique accounts
     pub fn accounts_insert(&self, account_id: &str, amount: Balance) {
-        sdk::save_contract(&Self::account_to_key(account_id), &amount)
+        if !self.accounts_contains_key(account_id) {
+            let key = Self::get_statistic_key();
+            let accounts_counter = sdk::read_u64(&key)
+                .unwrap_or(0)
+                .checked_add(1)
+                .expect("ERR_ACCOUNTS_COUNTER_OVERFLOW");
+            sdk::write_storage(&key, &accounts_counter.to_le_bytes());
+        }
+        sdk::save_contract(&Self::account_to_key(account_id), &amount);
+    }
+
+    /// Get accounts counter for statistics
+    /// It represents total unique accounts.
+    pub fn get_accounts_counter(&self) -> u64 {
+        sdk::read_u64(&Self::get_statistic_key()).unwrap_or(0)
     }
 
     fn accounts_contains_key(&self, account_id: &str) -> bool {
@@ -457,5 +461,13 @@ impl FungibleToken {
         );
         key.extend_from_slice(account_id.as_bytes());
         key
+    }
+
+    /// Key for store contract statistics data
+    fn get_statistic_key() -> Vec<u8> {
+        storage::bytes_to_key(
+            storage::KeyPrefix::EthConnector,
+            &[storage::EthConnectorStorageId::StatisticsAuroraAccountsCounter as u8],
+        )
     }
 }

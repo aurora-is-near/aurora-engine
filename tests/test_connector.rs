@@ -3,6 +3,7 @@
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json;
+use near_sdk::serde_json::json;
 use near_sdk::test_utils::accounts;
 use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
 
@@ -152,11 +153,7 @@ fn get_near_balance(master_account: &UserAccount, acc: &str, contract: &str) -> 
     let balance = master_account.view(
         contract.to_string(),
         "ft_balance_of",
-        &BalanceOfCallArgs {
-            account_id: acc.into(),
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({ "account_id": acc }).to_string().as_bytes(),
     );
     String::from_utf8(balance.unwrap())
         .unwrap()
@@ -332,13 +329,6 @@ fn test_withdraw_near() {
 
 #[test]
 fn test_ft_transfer() {
-    #[derive(BorshSerialize, BorshDeserialize)]
-    pub struct TransferCallArgs {
-        pub receiver_id: String,
-        pub amount: Balance,
-        pub memo: Option<String>,
-    }
-
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
     call_deposit_near(&contract, CONTRACT_ACC);
 
@@ -346,13 +336,13 @@ fn test_ft_transfer() {
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer",
-        &TransferCallArgs {
-            receiver_id: DEPOSITED_RECIPIENT.into(),
-            amount: transfer_amount,
-            memo: None,
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({
+            "receiver_id": DEPOSITED_RECIPIENT,
+            "amount": transfer_amount,
+            "memo": "transfer memo"
+        })
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -375,14 +365,6 @@ fn test_ft_transfer() {
 
     let balance = total_supply_near(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT);
-}
-
-#[derive(BorshSerialize)]
-pub struct TransferCallCallArgs {
-    pub receiver_id: String,
-    pub amount: Balance,
-    pub memo: Option<String>,
-    pub msg: String,
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -423,14 +405,13 @@ fn test_ft_transfer_call_eth() {
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer_call",
-        &TransferCallCallArgs {
-            receiver_id: CONTRACT_ACC.into(),
-            amount: transfer_amount,
-            memo: None,
-            msg: message,
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({
+            "receiver_id": CONTRACT_ACC,
+            "amount": transfer_amount as u64,
+            "msg": message,
+        })
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -504,14 +485,13 @@ fn test_ft_transfer_call_without_relayer() {
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer_call",
-        &TransferCallCallArgs {
-            receiver_id: CONTRACT_ACC.into(),
-            amount: transfer_amount,
-            memo: None,
-            msg: message,
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({
+            "receiver_id": CONTRACT_ACC,
+            "amount": transfer_amount as u64,
+            "msg": message,
+        })
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -561,14 +541,13 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
     let res = contract.call(
         CONTRACT_ACC.to_string(),
         "ft_transfer_call",
-        &TransferCallCallArgs {
-            receiver_id: CONTRACT_ACC.into(),
-            amount: transfer_amount,
-            memo: None,
-            msg: message,
-        }
-        .try_to_vec()
-        .unwrap(),
+        json!({
+            "receiver_id": CONTRACT_ACC,
+            "amount": transfer_amount as u64,
+            "msg": message,
+        })
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -605,4 +584,65 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
 
     let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, 0);
+}
+
+#[test]
+fn test_get_accounts_counter() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_near(&contract, CONTRACT_ACC);
+
+    let counter = master_account
+        .view(CONTRACT_ACC.into(), "get_accounts_counter", &[])
+        .unwrap();
+    assert_eq!(u64::try_from_slice(&counter[..]).unwrap(), 2);
+}
+
+#[test]
+fn test_get_accounts_counter_and_transfer() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_near(&contract, CONTRACT_ACC);
+
+    let counter = master_account
+        .view(CONTRACT_ACC.into(), "get_accounts_counter", &[])
+        .unwrap();
+    assert_eq!(u64::try_from_slice(&counter[..]).unwrap(), 2);
+
+    let transfer_amount = 70;
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "ft_transfer",
+        json!({
+            "receiver_id": DEPOSITED_RECIPIENT,
+            "amount": transfer_amount,
+            "memo": "transfer memo"
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+
+    let balance = get_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
+    assert_eq!(
+        balance,
+        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
+    );
+
+    let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE - transfer_amount as u128);
+
+    let balance = total_supply(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+
+    let balance = total_supply_eth(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, 0);
+
+    let balance = total_supply_near(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT);
+
+    let counter = master_account
+        .view(CONTRACT_ACC.into(), "get_accounts_counter", &[])
+        .unwrap();
+    assert_eq!(u64::try_from_slice(&counter[..]).unwrap(), 2);
 }
