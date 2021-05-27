@@ -32,6 +32,7 @@ const EVM_CUSTODIAN_ADDRESS: &'static str = "096DE9C2B8A5B8c22cEe3289B101f6960d6
 const DEPOSITED_EVM_AMOUNT: u128 = 10200;
 const DEPOSITED_EVM_FEE: u128 = 200;
 const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &'static str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
+const ERR_PAUSED: &'static str = "ERR_PAUSED";
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
@@ -562,7 +563,7 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
         DEFAULT_GAS,
         1,
     );
-    match res.outcome().status {
+    match res.outcome().clone().status {
         ExecutionStatus::Failure(_) => {}
         _ => panic!(),
     }
@@ -645,7 +646,7 @@ fn test_admin_controlled_only_admin_can_pause() {
     let res = call_set_paused_flags(&user_account, CONTRACT_ACC, PAUSE_DEPOSIT);
     let promises = res.promise_results();
     let p = promises[1].clone();
-    match p.unwrap().status() {
+    match p.unwrap().outcome().clone().status {
         ExecutionStatus::Failure(_) => {}
         _ => panic!("Expected failure as only admin can pause, but user successfully paused"),
     }
@@ -754,10 +755,7 @@ fn test_deposit_pausability() {
     let promises = call_deposit_with_proof(&user_account, CONTRACT_ACC, PROOF_DATA_ETH);
     let num_promises = promises.len();
     let p = promises[num_promises - 2].clone();
-    match p.unwrap().status() {
-        ExecutionStatus::Failure(_) => {}
-        _ => panic!("Expected failure due to pause, but deposit succeeded"),
-    }
+    check_execution_status_failure(p.unwrap().outcome().clone().status, ERR_PAUSED);
 
     // Unpause all
     let res = call_set_paused_flags(&contract, CONTRACT_ACC, UNPAUSE_ALL);
@@ -822,10 +820,7 @@ fn test_withdraw_near_pausability() {
     );
     let promises = res.promise_results();
     let p = promises[1].clone();
-    match p.unwrap().status() {
-        ExecutionStatus::Failure(_) => {}
-        _ => panic!("Expected failure due to pause, but withdraw succeeded"),
-    }
+    check_execution_status_failure(p.unwrap().outcome().clone().status, ERR_PAUSED);
 
     // Unpause all
     let res = call_set_paused_flags(&contract, CONTRACT_ACC, UNPAUSE_ALL);
