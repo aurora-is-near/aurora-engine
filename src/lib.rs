@@ -18,6 +18,8 @@ pub mod transaction;
 pub mod types;
 
 #[cfg(feature = "contract")]
+mod admin_controlled;
+#[cfg(feature = "contract")]
 mod connector;
 #[cfg(feature = "contract")]
 mod deposit_event;
@@ -50,8 +52,8 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, TransferCallCallArgs,
-        ViewCallArgs,
+        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, PauseEthConnectorCallArgs,
+        TransferCallCallArgs, ViewCallArgs,
     };
     use crate::prelude::{Address, TryInto, H256, U256};
     use crate::sdk;
@@ -445,6 +447,22 @@ mod contract {
     pub extern "C" fn ft_on_transfer() {
         let engine = Engine::new(predecessor_address());
         EthConnectorContract::get_instance().ft_on_transfer(&engine)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_paused_flags() {
+        let paused_flags = EthConnectorContract::get_instance().get_paused_flags();
+        let data = paused_flags.try_to_vec().expect(ERR_FAILED_PARSE);
+        sdk::return_output(&data[..]);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_paused_flags() {
+        sdk::assert_private_call();
+
+        let args =
+            PauseEthConnectorCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+        EthConnectorContract::get_instance().set_paused_flags(args);
     }
 
     #[no_mangle]

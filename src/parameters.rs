@@ -1,6 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[cfg(feature = "contract")]
+use crate::admin_controlled::PausedMask;
+#[cfg(feature = "contract")]
 use crate::json;
 #[cfg(feature = "contract")]
 use crate::prelude::ToString;
@@ -373,6 +375,12 @@ impl From<json::JsonValue> for BalanceOfCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RegisterRelayerCallArgs {
     pub address: EthAddress,
+}
+
+#[cfg(feature = "contract")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct PauseEthConnectorCallArgs {
+    pub paused_mask: PausedMask,
 }
 
 #[cfg(feature = "contract")]

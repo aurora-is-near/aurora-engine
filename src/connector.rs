@@ -3,6 +3,7 @@ use crate::parameters::*;
 use crate::sdk;
 use crate::types::*;
 
+use crate::admin_controlled::{AdminControlled, PausedMask};
 use crate::deposit_event::*;
 use crate::engine::Engine;
 use crate::json::parse_json;
@@ -18,10 +19,15 @@ const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
 // Note: Is 40Tgas always enough?
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
 
+const UNPAUSE_ALL: PausedMask = 0;
+const PAUSE_DEPOSIT: PausedMask = 1 << 0;
+const PAUSE_WITHDRAW: PausedMask = 1 << 1;
+
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnectorContract {
     contract: EthConnector,
     ft: FungibleToken,
+    paused_mask: PausedMask,
 }
 
 /// eth-connector specific data
@@ -51,6 +57,7 @@ impl EthConnectorContract {
         Self {
             contract: Self::get_contract_data(&EthConnectorStorageId::Contract),
             ft: Self::get_contract_data(&EthConnectorStorageId::FungibleToken),
+            paused_mask: Self::get_contract_data(&EthConnectorStorageId::PausedMask),
         }
     }
 
@@ -84,14 +91,21 @@ impl EthConnectorContract {
             prover_account: args.prover_account,
             eth_custodian_address: validate_eth_address(args.eth_custodian_address),
         };
-        // Save th-connector specific data
+        // Save eth-connector specific data
         sdk::save_contract(
             &Self::get_contract_key(&EthConnectorStorageId::Contract),
             &contract_data,
         );
+
+        let paused_mask = UNPAUSE_ALL;
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorStorageId::PausedMask),
+            &paused_mask,
+        );
         Self {
             contract: contract_data,
             ft,
+            paused_mask,
         }
         .save_ft_contract();
     }
@@ -153,6 +167,8 @@ impl EthConnectorContract {
 
     /// Deposit all types of tokens
     pub fn deposit(&self) {
+        self.assert_not_paused(PAUSE_DEPOSIT);
+
         use crate::prover::Proof;
         #[cfg(feature = "log")]
         sdk::log("[Deposit tokens]");
@@ -381,6 +397,8 @@ impl EthConnectorContract {
     /// Withdraw from NEAR accounts
     /// NOTE: it should be without any log data
     pub fn withdraw_near(&mut self) {
+        self.assert_not_paused(PAUSE_WITHDRAW);
+
         sdk::assert_one_yocto();
         let args = WithdrawCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         let res = WithdrawResult {
@@ -611,5 +629,29 @@ impl EthConnectorContract {
     /// Check is event of proof already used
     fn check_used_event(&self, key: &str) -> bool {
         sdk::storage_has_key(&self.used_event_key(key))
+    }
+
+    /// Get Eth connector paused flags
+    pub fn get_paused_flags(&self) -> PausedMask {
+        self.get_paused()
+    }
+
+    /// Set Eth connector paused flags
+    pub fn set_paused_flags(&mut self, args: PauseEthConnectorCallArgs) {
+        self.set_paused(args.paused_mask);
+    }
+}
+
+impl AdminControlled for EthConnectorContract {
+    fn get_paused(&self) -> PausedMask {
+        self.paused_mask
+    }
+
+    fn set_paused(&mut self, paused_mask: PausedMask) {
+        self.paused_mask = paused_mask;
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorStorageId::PausedMask),
+            &self.paused_mask,
+        );
     }
 }
