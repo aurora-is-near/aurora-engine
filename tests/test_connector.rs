@@ -92,8 +92,8 @@ fn init_contract(
                 bridge_prover_id: accounts(0).to_string(),
                 upgrade_delay_blocks: 1,
             }
-                .try_to_vec()
-                .unwrap(),
+            .try_to_vec()
+            .unwrap(),
             DEFAULT_GAS,
             STORAGE_AMOUNT,
         )
@@ -106,8 +106,8 @@ fn init_contract(
                 prover_account: PROVER_ACCOUNT.into(),
                 eth_custodian_address: custodian_address.into(),
             }
-                .try_to_vec()
-                .unwrap(),
+            .try_to_vec()
+            .unwrap(),
             DEFAULT_GAS,
             0,
         )
@@ -255,8 +255,8 @@ fn test_eth_deposit_balance_total_supply() {
         &RegisterRelayerCallArgs {
             address: validate_eth_address(CUSTODIAN_ADDRESS),
         }
-            .try_to_vec()
-            .unwrap(),
+        .try_to_vec()
+        .unwrap(),
         DEFAULT_GAS,
         0,
     );
@@ -302,8 +302,8 @@ fn test_withdraw_near() {
             recipient_address: recipient_addr,
             amount: withdraw_amount,
         }
-            .try_to_vec()
-            .unwrap(),
+        .try_to_vec()
+        .unwrap(),
         DEFAULT_GAS,
         1,
     );
@@ -346,8 +346,8 @@ fn test_ft_transfer() {
             "amount": transfer_amount,
             "memo": "transfer memo"
         })
-            .to_string()
-            .as_bytes(),
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -395,8 +395,8 @@ fn test_ft_transfer_call_eth() {
         &RegisterRelayerCallArgs {
             address: validate_eth_address(CUSTODIAN_ADDRESS),
         }
-            .try_to_vec()
-            .unwrap(),
+        .try_to_vec()
+        .unwrap(),
         DEFAULT_GAS,
         0,
     );
@@ -415,8 +415,8 @@ fn test_ft_transfer_call_eth() {
             "amount": transfer_amount as u64,
             "msg": message,
         })
-            .to_string()
-            .as_bytes(),
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -495,8 +495,8 @@ fn test_ft_transfer_call_without_relayer() {
             "amount": transfer_amount as u64,
             "msg": message,
         })
-            .to_string()
-            .as_bytes(),
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -551,8 +551,8 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
             "amount": transfer_amount as u64,
             "msg": message,
         })
-            .to_string()
-            .as_bytes(),
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
@@ -847,7 +847,6 @@ fn test_withdraw_near_pausability() {
     }
 }
 
-
 #[test]
 fn test_get_accounts_counter() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
@@ -878,8 +877,8 @@ fn test_get_accounts_counter_and_transfer() {
             "amount": transfer_amount,
             "memo": "transfer memo"
         })
-            .to_string()
-            .as_bytes(),
+        .to_string()
+        .as_bytes(),
         DEFAULT_GAS,
         1,
     );
