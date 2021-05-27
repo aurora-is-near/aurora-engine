@@ -140,6 +140,7 @@ dependencies = [
  "primitive-types",
  "rand 0.7.3",
  "ripemd160",
+ "rjson",
  "rlp",
  "sha2 0.9.5",
  "sha3 0.9.1",
@@ -3309,6 +3310,12 @@ dependencies = [
  "digest 0.9.0",
  "opaque-debug 0.3.0",
 ]
+
+[[package]]
+name = "rjson"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5510dbde48c4c37bf69123b1f636b6dd5f8dffe1f4e358af03c46a4947dca219"
 
 [[package]]
 name = "rlp"

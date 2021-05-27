@@ -6,6 +6,7 @@ use crate::types::*;
 use crate::admin_controlled::{AdminControlled, PausedMask};
 use crate::deposit_event::*;
 use crate::engine::Engine;
+use crate::json::parse_json;
 use crate::prelude::*;
 use crate::prover::validate_eth_address;
 use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
@@ -15,8 +16,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
+// Note: Is 40Tgas always enough?
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
-const GAS_FOR_TRANSFER_CALL: Gas = 40_000_000_000_000;
 
 const UNPAUSE_ALL: PausedMask = 0;
 const PAUSE_DEPOSIT: PausedMask = 1 << 0;
@@ -37,7 +38,8 @@ pub struct EthConnector {
 }
 
 /// Token message data
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub enum TokenMessageData {
     Near(AccountId),
     Eth { address: AccountId, message: String },
@@ -105,7 +107,7 @@ impl EthConnectorContract {
             ft,
             paused_mask,
         }
-        .save_contract();
+        .save_ft_contract();
     }
 
     /// Parse event message data for tokens
@@ -113,7 +115,12 @@ impl EthConnectorContract {
         let data: Vec<_> = message.split(':').collect();
         assert!(data.len() < 3);
         if data.len() == 1 {
-            TokenMessageData::Near(data[0].into())
+            let account_id = data[0];
+            assert!(
+                is_valid_account_id(account_id.as_bytes()),
+                "ERR_INVALID_ACCOUNT_ID"
+            );
+            TokenMessageData::Near(account_id.into())
         } else {
             TokenMessageData::Eth {
                 address: data[0].into(),
@@ -129,11 +136,18 @@ impl EthConnectorContract {
 
         let msg = hex::decode(data[1]).expect(ERR_FAILED_PARSE);
         let mut fee: [u8; 32] = Default::default();
+        assert_eq!(msg.len(), 52, "ERR_WRONG_MESSAGE_LENGTH");
         fee.copy_from_slice(&msg[..32]);
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
+        // Checkk account
+        let account_id = data[0];
+        assert!(
+            is_valid_account_id(account_id.as_bytes()),
+            "ERR_INVALID_ACCOUNT_ID"
+        );
         OnTransferMessageData {
-            relayer: data[0].into(),
+            relayer: account_id.into(),
             recipient,
             fee: U256::from_little_endian(&fee[..]),
         }
@@ -147,7 +161,7 @@ impl EthConnectorContract {
         let relayer_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let mut data = fee.as_byte_slice().to_vec();
         let message = hex::decode(message).expect(ERR_FAILED_PARSE);
-        data.append(&mut message.to_vec());
+        data.extend(message);
         [relayer_account_id, hex::encode(data)].join(":")
     }
 
@@ -291,7 +305,7 @@ impl EthConnectorContract {
         };
         #[cfg(feature = "log")]
         sdk::log("Check verification_success");
-        let verification_success: bool = bool::try_from_slice(&data0).unwrap();
+        let verification_success = bool::try_from_slice(&data0).unwrap();
         assert!(verification_success, "ERR_VERIFY_PROOF");
 
         // Mint tokens to recipient minus fee
@@ -301,16 +315,9 @@ impl EthConnectorContract {
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key);
             // Save new contract data
-            self.save_contract();
-
-            let promise0 = sdk::promise_create(
-                &sdk::current_account_id(),
-                b"ft_transfer_call",
-                &msg[..],
-                1,
-                GAS_FOR_TRANSFER_CALL,
-            );
-            sdk::promise_return(promise0);
+            self.save_ft_contract();
+            let transfer_call_args = TransferCallCallArgs::try_from_slice(&msg).unwrap();
+            self.ft_transfer_call(transfer_call_args);
         } else {
             // Mint - calculate new balances
             self.mint_near(data.new_owner_id.clone(), data.amount - data.fee);
@@ -318,7 +325,7 @@ impl EthConnectorContract {
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key);
             // Save new contract data
-            self.save_contract();
+            self.save_ft_contract();
         }
     }
 
@@ -329,13 +336,13 @@ impl EthConnectorContract {
         // the balance of a single account.
         self.ft
             .internal_set_eth_balance(address.0, amount.as_u128());
-        self.save_contract();
+        self.save_ft_contract();
     }
 
     /// Internal ETH withdraw ETH logic
     pub(crate) fn internal_remove_eth(&mut self, address: &Address, amount: &U256) {
         self.burn_eth(address.0, amount.as_u128());
-        self.save_contract();
+        self.save_ft_contract();
     }
 
     /// Record used proof as hash key
@@ -406,7 +413,7 @@ impl EthConnectorContract {
         self.ft
             .internal_withdraw(&predecessor_account_id, args.amount);
         // Save new contract data
-        self.save_contract();
+        self.save_ft_contract();
         sdk::return_output(&res[..]);
     }
 
@@ -436,7 +443,9 @@ impl EthConnectorContract {
 
     /// Return balance of NEAR
     pub fn ft_balance_of(&self) {
-        let args = BalanceOfCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+        let args = BalanceOfCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
         let balance = self.ft.ft_balance_of(&args.account_id);
         sdk::return_output(&balance.to_string().as_bytes());
         #[cfg(feature = "log")]
@@ -463,10 +472,12 @@ impl EthConnectorContract {
     /// Transfer between NEAR accounts
     pub fn ft_transfer(&mut self) {
         sdk::assert_one_yocto();
-        let args = TransferCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+        let args = TransferCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
         self.ft
             .ft_transfer(&args.receiver_id, args.amount, &args.memo);
-        self.save_contract();
+        self.save_ft_contract();
         #[cfg(feature = "log")]
         sdk::log(&format!(
             "Transfer amount {} to {} success with memo: {:?}",
@@ -477,12 +488,8 @@ impl EthConnectorContract {
     /// FT resolve transfer logic
     pub fn ft_resolve_transfer(&mut self) {
         sdk::assert_private_call();
-        // Check if previous promise succeded
-        assert!(sdk::promise_results_count() > 0);
-        match sdk::promise_result(0) {
-            PromiseResult::Successful(_) => {}
-            _ => sdk::panic_utf8(b"ERR_PROMISE_RESULT"),
-        }
+        // Check if previous promise succeeded
+        assert_eq!(sdk::promise_results_count(), 1);
 
         let args = ResolveTransferCallArgs::try_from_slice(&sdk::read_input()).unwrap();
         let amount = self
@@ -494,17 +501,14 @@ impl EthConnectorContract {
             args.sender_id, args.receiver_id
         ));
         // `ft_resolve_transfer` can change `total_supply` so we should save the contract
-        self.save_contract();
+        self.save_ft_contract();
         sdk::return_output(&amount.to_string().as_bytes());
     }
 
     /// FT transfer call from sender account (invoker account) to receiver
     /// We starting early checking for message data to avoid `ft_on_transfer` call panics
     /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
-    pub fn ft_transfer_call(&mut self) {
-        sdk::assert_one_yocto();
-        let args =
-            TransferCallCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+    pub fn ft_transfer_call(&mut self, args: TransferCallCallArgs) {
         #[cfg(feature = "log")]
         sdk::log(&format!(
             "Transfer call to {} amount {}",
@@ -520,6 +524,7 @@ impl EthConnectorContract {
 
         // Additional check overflow before process `ft_on_transfer`
         // But don't check overflow for relayer
+        // Note: It can't overflow because the total supply doesn't change during transfer.
         let amount_for_check = self
             .ft
             .internal_unwrap_balance_of_eth(message_data.recipient);
@@ -533,44 +538,41 @@ impl EthConnectorContract {
 
     /// FT storage deposit logic
     pub fn storage_deposit(&mut self) {
-        let args =
-            StorageDepositCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+        let args = StorageDepositCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
+
         let res = self
             .ft
-            .storage_deposit(args.account_id.as_ref(), args.registration_only)
-            .try_to_vec()
-            .unwrap();
-        self.save_contract();
-        sdk::return_output(&res[..]);
+            .storage_deposit(args.account_id.as_ref(), args.registration_only);
+        self.save_ft_contract();
+        sdk::return_output(&res.to_json_bytes());
     }
 
     /// FT storage withdraw
     pub fn storage_withdraw(&mut self) {
         sdk::assert_one_yocto();
-        let args =
-            StorageWithdrawCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
-        let res = self.ft.storage_withdraw(args.amount).try_to_vec().unwrap();
-        self.save_contract();
-        sdk::return_output(&res[..]);
+        let args = StorageWithdrawCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
+        let res = self.ft.storage_withdraw(args.amount);
+        self.save_ft_contract();
+        sdk::return_output(&res.to_json_bytes());
     }
 
     /// Get balance of storage
     pub fn storage_balance_of(&self) {
-        let args =
-            StorageBalanceOfCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
-        let res = self
-            .ft
-            .storage_balance_of(&args.account_id)
-            .try_to_vec()
-            .unwrap();
-        sdk::return_output(&res[..]);
+        let args = StorageBalanceOfCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
+        sdk::return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
     }
 
     /// ft_on_transfer callback function
     #[allow(clippy::unnecessary_unwrap)]
     pub fn ft_on_transfer(&mut self, engine: &Engine) {
         #[cfg(feature = "log")]
-        sdk::log("Call ft_on_trasfer");
+        sdk::log("Call ft_on_transfer");
         let args = FtOnTransfer::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
@@ -594,15 +596,18 @@ impl EthConnectorContract {
             // Implement new scheme for ERC20
             todo!();
         }
-        self.save_contract();
+        self.save_ft_contract();
+        sdk::return_output(0.to_string().as_bytes());
+    }
 
-        // Return unused tokens
-        let data = 0u128.try_to_vec().unwrap();
-        sdk::return_output(&data[..]);
+    /// Get accounts counter for statistics.
+    /// It represents total unique accounts (all-time, including accounts which now have zero balance).
+    pub fn get_accounts_counter(&self) {
+        sdk::return_output(&self.ft.get_accounts_counter().to_le_bytes());
     }
 
     /// Save eth-connector contract data
-    fn save_contract(&mut self) {
+    fn save_ft_contract(&mut self) {
         sdk::save_contract(
             &Self::get_contract_key(&EthConnectorStorageId::FungibleToken),
             &self.ft,
