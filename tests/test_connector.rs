@@ -458,12 +458,23 @@ fn test_deposit_with_same_proof() {
         p.assert_success()
     }
     let promises = call_deposit_near(&contract, CONTRACT_ACC);
-    let l = promises.len();
-    let p = promises[l - 2].clone();
-    match p.unwrap().status() {
-        ExecutionStatus::Failure(_) => {}
-        _ => panic!(),
-    }
+    let promise = &promises[promises.len() - 2];
+    check_execution_status_failure(
+        promise.as_ref().unwrap().outcome().clone().status,
+        "ERR_PROOF_EXIST",
+    );
+}
+
+#[test]
+fn test_deposit_wrong_custodian_address() {
+    let custodian_address = "096DE9C2B8A5B8c22cEe3289B101f6960d68E510";
+    let (_master_account, contract) = init(custodian_address);
+    let promises = call_deposit_near(&contract, CONTRACT_ACC);
+    let promise = &promises[promises.len() - 2];
+    check_execution_status_failure(
+        promise.as_ref().unwrap().outcome().clone().status,
+        "ERR_WRONG_EVENT_ADDRESS",
+    );
 }
 
 #[test]
