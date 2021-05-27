@@ -67,6 +67,15 @@ pub fn is_valid_account_id(account_id: &[u8]) -> bool {
 
 pub struct ExitToNear; //TransferEthToNear
 
+impl ExitToNear {
+    /// Exit to NEAR precompile address
+    ///
+    /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
+    /// This address is computed as: `&keccak("exitToNear")[12..]`
+    pub(super) const ADDRESS: [u8; 20] =
+        super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
+}
+
 impl Precompile for ExitToNear {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
@@ -154,6 +163,15 @@ impl Precompile for ExitToNear {
 }
 
 pub struct ExitToEthereum;
+
+impl ExitToEthereum {
+    /// Exit to Ethereum precompile address
+    ///
+    /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
+    /// This address is computed as: `&keccak("exitToEthereum")[12..]`
+    pub(super) const ADDRESS: [u8; 20] =
+        super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
+}
 
 impl Precompile for ExitToEthereum {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
@@ -245,19 +263,18 @@ impl Precompile for ExitToEthereum {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::precompiles::{EXIT_TO_ETHEREUM_ID, EXIT_TO_NEAR_ID};
+    use super::{ExitToEthereum, ExitToNear};
     use crate::types::near_account_to_evm_address;
 
     #[test]
     fn test_precompile_id() {
         assert_eq!(
-            EXIT_TO_ETHEREUM_ID,
-            near_account_to_evm_address("exitToEthereum".as_bytes()).to_low_u64_be()
+            ExitToEthereum::ADDRESS,
+            near_account_to_evm_address("exitToEthereum".as_bytes()).0
         );
         assert_eq!(
-            EXIT_TO_NEAR_ID,
-            near_account_to_evm_address("exitToNear".as_bytes()).to_low_u64_be()
+            ExitToNear::ADDRESS,
+            near_account_to_evm_address("exitToNear".as_bytes()).0
         );
     }
 }

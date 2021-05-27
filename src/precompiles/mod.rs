@@ -17,18 +17,6 @@ use crate::precompiles::secp256k1::ECRecover;
 use crate::prelude::{Address, Vec};
 use evm::{Context, ExitError, ExitSucceed};
 
-/// Exit to Ethereum precompile address (truncated to 8 bytes)
-///
-/// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
-/// This address is computed as: `&keccak("exitToEthereum")[12..]`
-const EXIT_TO_ETHEREUM_ID: u64 = 17176159495920586411;
-
-/// Exit to NEAR precompile address (truncated to 8 bytes)
-///
-/// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
-/// This address is computed as: `&keccak("exitToNear")[12..]`
-const EXIT_TO_NEAR_ID: u64 = 11421322804619973199;
-
 /// A precompile operation result.
 type PrecompileResult = Result<(ExitSucceed, Vec<u8>, u64), ExitError>;
 
@@ -88,12 +76,12 @@ pub fn homestead_precompiles(
         None => return Some(PrecompileResult::Err(ExitError::OutOfGas)),
     };
 
-    match address.to_low_u64_be() {
-        1 => Some(ECRecover::run(input, target_gas, context)),
-        2 => Some(SHA256::run(input, target_gas, context)),
-        3 => Some(RIPEMD160::run(input, target_gas, context)),
-        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
-        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
+    match address.0 {
+        ECRecover::ADDRESS => Some(ECRecover::run(input, target_gas, context)),
+        SHA256::ADDRESS => Some(SHA256::run(input, target_gas, context)),
+        RIPEMD160::ADDRESS => Some(RIPEMD160::run(input, target_gas, context)),
+        ExitToNear::ADDRESS => Some(ExitToNear::run(input, target_gas, context)),
+        ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
 }
@@ -111,17 +99,17 @@ pub fn byzantium_precompiles(
         None => return Some(PrecompileResult::Err(ExitError::OutOfGas)),
     };
 
-    match address.to_low_u64_be() {
-        1 => Some(ECRecover::run(input, target_gas, context)),
-        2 => Some(SHA256::run(input, target_gas, context)),
-        3 => Some(RIPEMD160::run(input, target_gas, context)),
-        4 => Some(Identity::run(input, target_gas, context)),
-        5 => Some(ModExp::<Byzantium>::run(input, target_gas, context)),
-        6 => Some(BN128Add::<Byzantium>::run(input, target_gas, context)),
-        7 => Some(BN128Mul::<Byzantium>::run(input, target_gas, context)),
-        8 => Some(BN128Pair::<Byzantium>::run(input, target_gas, context)),
-        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
-        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
+    match address.0 {
+        ECRecover::ADDRESS => Some(ECRecover::run(input, target_gas, context)),
+        SHA256::ADDRESS => Some(SHA256::run(input, target_gas, context)),
+        RIPEMD160::ADDRESS => Some(RIPEMD160::run(input, target_gas, context)),
+        Identity::ADDRESS => Some(Identity::run(input, target_gas, context)),
+        modexp::ADDRESS => Some(ModExp::<Byzantium>::run(input, target_gas, context)),
+        bn128::addresses::ADD => Some(BN128Add::<Byzantium>::run(input, target_gas, context)),
+        bn128::addresses::MUL => Some(BN128Mul::<Byzantium>::run(input, target_gas, context)),
+        bn128::addresses::PAIR => Some(BN128Pair::<Byzantium>::run(input, target_gas, context)),
+        ExitToNear::ADDRESS => Some(ExitToNear::run(input, target_gas, context)),
+        ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
 }
@@ -139,18 +127,18 @@ pub fn istanbul_precompiles(
         None => return Some(PrecompileResult::Err(ExitError::OutOfGas)),
     };
 
-    match address.to_low_u64_be() {
-        1 => Some(ECRecover::run(input, target_gas, context)),
-        2 => Some(SHA256::run(input, target_gas, context)),
-        3 => Some(RIPEMD160::run(input, target_gas, context)),
-        4 => Some(Identity::run(input, target_gas, context)),
-        5 => Some(ModExp::<Byzantium>::run(input, target_gas, context)),
-        6 => Some(BN128Add::<Istanbul>::run(input, target_gas, context)),
-        7 => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
-        8 => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
-        9 => Some(Blake2F::run(input, target_gas, context)),
-        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
-        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
+    match address.0 {
+        ECRecover::ADDRESS => Some(ECRecover::run(input, target_gas, context)),
+        SHA256::ADDRESS => Some(SHA256::run(input, target_gas, context)),
+        RIPEMD160::ADDRESS => Some(RIPEMD160::run(input, target_gas, context)),
+        Identity::ADDRESS => Some(Identity::run(input, target_gas, context)),
+        modexp::ADDRESS => Some(ModExp::<Byzantium>::run(input, target_gas, context)),
+        bn128::addresses::ADD => Some(BN128Add::<Istanbul>::run(input, target_gas, context)),
+        bn128::addresses::MUL => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
+        bn128::addresses::PAIR => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
+        Blake2F::ADDRESS => Some(Blake2F::run(input, target_gas, context)),
+        ExitToNear::ADDRESS => Some(ExitToNear::run(input, target_gas, context)),
+        ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
 }
@@ -168,20 +156,50 @@ pub fn berlin_precompiles(
         None => return Some(PrecompileResult::Err(ExitError::OutOfGas)),
     };
 
-    match address.to_low_u64_be() {
-        1 => Some(ECRecover::run(input, target_gas, context)),
-        2 => Some(SHA256::run(input, target_gas, context)),
-        3 => Some(RIPEMD160::run(input, target_gas, context)),
-        4 => Some(Identity::run(input, target_gas, context)),
-        5 => Some(ModExp::<Berlin>::run(input, target_gas, context)), // TODO gas changes
-        6 => Some(BN128Add::<Istanbul>::run(input, target_gas, context)),
-        7 => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
-        8 => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
-        9 => Some(Blake2F::run(input, target_gas, context)),
+    match address.0 {
+        ECRecover::ADDRESS => Some(ECRecover::run(input, target_gas, context)),
+        SHA256::ADDRESS => Some(SHA256::run(input, target_gas, context)),
+        RIPEMD160::ADDRESS => Some(RIPEMD160::run(input, target_gas, context)),
+        Identity::ADDRESS => Some(Identity::run(input, target_gas, context)),
+        modexp::ADDRESS => Some(ModExp::<Berlin>::run(input, target_gas, context)), // TODO gas changes
+        bn128::addresses::ADD => Some(BN128Add::<Istanbul>::run(input, target_gas, context)),
+        bn128::addresses::MUL => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
+        bn128::addresses::PAIR => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
+        Blake2F::ADDRESS => Some(Blake2F::run(input, target_gas, context)),
         #[cfg(feature = "contract")]
-        EXIT_TO_NEAR_ID => Some(ExitToNear::run(input, target_gas, context)),
+        ExitToNear::ADDRESS => Some(ExitToNear::run(input, target_gas, context)),
         #[cfg(feature = "contract")]
-        EXIT_TO_ETHEREUM_ID => Some(ExitToEthereum::run(input, target_gas, context)),
+        ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
+}
+
+/// const fn for making an address by concatenating the bytes from two given numbers,
+/// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
+/// as a convenience for specifying the addresses of the various precompiles.
+const fn make_address(x: u32, y: u128) -> [u8; 20] {
+    let x_bytes = x.to_be_bytes();
+    let y_bytes = y.to_be_bytes();
+    [
+        x_bytes[0],
+        x_bytes[1],
+        x_bytes[2],
+        x_bytes[3],
+        y_bytes[0],
+        y_bytes[1],
+        y_bytes[2],
+        y_bytes[3],
+        y_bytes[4],
+        y_bytes[5],
+        y_bytes[6],
+        y_bytes[7],
+        y_bytes[8],
+        y_bytes[9],
+        y_bytes[10],
+        y_bytes[11],
+        y_bytes[12],
+        y_bytes[13],
+        y_bytes[14],
+        y_bytes[15],
+    ]
 }
