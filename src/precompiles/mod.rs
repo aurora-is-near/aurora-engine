@@ -203,3 +203,52 @@ const fn make_address(x: u32, y: u128) -> [u8; 20] {
         y_bytes[15],
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use rand::Rng;
+
+    #[test]
+    fn test_precompile_addresses() {
+        assert_eq!(super::secp256k1::ECRecover::ADDRESS, u8_to_address(1));
+        assert_eq!(super::hash::SHA256::ADDRESS, u8_to_address(2));
+        assert_eq!(super::hash::RIPEMD160::ADDRESS, u8_to_address(3));
+        assert_eq!(super::identity::Identity::ADDRESS, u8_to_address(4));
+        assert_eq!(super::modexp::ADDRESS, u8_to_address(5));
+        assert_eq!(super::bn128::addresses::ADD, u8_to_address(6));
+        assert_eq!(super::bn128::addresses::MUL, u8_to_address(7));
+        assert_eq!(super::bn128::addresses::PAIR, u8_to_address(8));
+        assert_eq!(super::blake2::Blake2F::ADDRESS, u8_to_address(9));
+    }
+
+    #[test]
+    fn test_make_address() {
+        for i in 0..u8::MAX {
+            assert_eq!(super::make_address(0, i as u128), u8_to_address(i));
+        }
+
+        let mut rng = rand::thread_rng();
+        for _ in 0..u8::MAX {
+            let address: [u8; 20] = rng.gen();
+            let (x, y) = split_address(address);
+            assert_eq!(address, super::make_address(x, y))
+        }
+    }
+
+    fn u8_to_address(x: u8) -> [u8; 20] {
+        let mut bytes = [0u8; 20];
+        bytes[19] = x;
+        bytes
+    }
+
+    // Inverse function of `super::make_address`.
+    fn split_address(a: [u8; 20]) -> (u32, u128) {
+        let mut x_bytes = [0u8; 4];
+        let mut y_bytes = [0u8; 16];
+
+        x_bytes.copy_from_slice(&a[0..4]);
+        y_bytes.copy_from_slice(&a[4..20]);
+
+        (u32::from_be_bytes(x_bytes), u128::from_be_bytes(y_bytes))
+    }
+}
