@@ -368,12 +368,6 @@ fn test_ft_transfer() {
     assert_eq!(balance, DEPOSITED_AMOUNT);
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct DeployEvmTokenCallArgs {
-    pub near_account_id: String,
-    pub erc20_contract: Vec<u8>,
-}
-
 #[test]
 fn test_ft_transfer_call_eth() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
@@ -467,8 +461,8 @@ fn test_deposit_with_same_proof() {
 
 #[test]
 fn test_deposit_wrong_custodian_address() {
-    let custodian_address = "096DE9C2B8A5B8c22cEe3289B101f6960d68E510";
-    let (_master_account, contract) = init(custodian_address);
+    let wrong_custodian_address = "0000000000000000000000000000000000000001";
+    let (_master_account, contract) = init(wrong_custodian_address);
     let promises = call_deposit_near(&contract, CONTRACT_ACC);
     let promise = &promises[promises.len() - 2];
     check_execution_status_failure(
