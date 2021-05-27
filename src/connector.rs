@@ -632,17 +632,12 @@ impl EthConnectorContract {
     }
 
     /// Get Eth connector paused flags
-    pub fn get_paused_flags(&self) {
-        let data = self.get_paused().try_to_vec().expect(ERR_FAILED_PARSE);
-        sdk::return_output(&data[..]);
+    pub fn get_paused_flags(&self) -> PausedMask {
+        self.get_paused()
     }
 
     /// Set Eth connector paused flags
-    pub fn set_paused_flags(&mut self) {
-        sdk::assert_private_call();
-
-        let args =
-            PauseEthConnectorCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+    pub fn set_paused_flags(&mut self, args: PauseEthConnectorCallArgs) {
         self.set_paused(args.paused_mask);
     }
 }
