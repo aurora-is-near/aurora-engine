@@ -94,7 +94,6 @@ impl ExitIntoResult for ExitReason {
     }
 }
 
-//TODO: check as I added `Debug` trait there. Perhaps this wasn't added earlier intentionally.
 #[derive(Debug)]
 pub enum EngineStateError {
     NotFound,
@@ -544,7 +543,6 @@ impl ApplyBackend for Engine {
                 } => {
                     Engine::set_nonce(&address, &basic.nonce);
 
-                    //TODO: check this part
                     // Apply changes for eth-connector
                     EthConnectorContract::get_instance()
                         .internal_set_eth_balance(&address, &basic.balance);
