@@ -367,6 +367,9 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn new_eth_connector() {
+        // Only the owner can initialize the EthConnector
+        sdk::assert_private_call();
+
         EthConnectorContract::init_contract()
     }
 
