@@ -1,9 +1,14 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
-use crate::prelude::{is_valid_account_id, Cow, String, Vec, U256};
-use crate::types::AccountId;
+use crate::prelude::Vec;
+#[cfg(feature = "exit-precompiles")]
+use crate::{
+    prelude::{is_valid_account_id, Cow, String, U256},
+    types::AccountId,
+};
 
+#[cfg(feature = "exit-precompiles")]
 mod costs {
     use crate::types::Gas;
 
@@ -22,6 +27,7 @@ mod costs {
 
 /// Get the current nep141 token associated with the current erc20 token.
 /// This will fail is none is associated.
+#[cfg(feature = "exit-precompiles")]
 fn get_nep141_from_erc20(_erc20_token: &[u8]) -> Vec<u8> {
     // TODO(#51): Already implemented
     Vec::new()
@@ -43,8 +49,8 @@ impl Precompile for ExitToNear {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
-    #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    #[cfg(not(feature = "exit-precompiles"))]
+    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -52,7 +58,7 @@ impl Precompile for ExitToNear {
         Ok((ExitSucceed::Returned, Vec::new(), 0))
     }
 
-    #[cfg(feature = "contract")]
+    #[cfg(feature = "exit-precompiles")]
     fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
@@ -142,8 +148,8 @@ impl Precompile for ExitToEthereum {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
-    #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    #[cfg(not(feature = "exit-precompiles"))]
+    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -151,7 +157,7 @@ impl Precompile for ExitToEthereum {
         Ok((ExitSucceed::Returned, Vec::new(), 0))
     }
 
-    #[cfg(feature = "contract")]
+    #[cfg(feature = "exit-precompiles")]
     fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);

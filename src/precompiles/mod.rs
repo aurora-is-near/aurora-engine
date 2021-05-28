@@ -3,6 +3,7 @@ mod bn128;
 mod hash;
 mod identity;
 mod modexp;
+#[cfg(feature = "exit-precompiles")]
 mod native;
 mod secp256k1;
 
@@ -11,6 +12,7 @@ use crate::precompiles::bn128::{BN128Add, BN128Mul, BN128Pair};
 use crate::precompiles::hash::{RIPEMD160, SHA256};
 use crate::precompiles::identity::Identity;
 use crate::precompiles::modexp::ModExp;
+#[cfg(feature = "exit-precompiles")]
 use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::precompiles::secp256k1::ECRecover;
@@ -80,7 +82,9 @@ pub fn homestead_precompiles(
         ECRecover::ADDRESS => Some(ECRecover::run(input, target_gas, context)),
         SHA256::ADDRESS => Some(SHA256::run(input, target_gas, context)),
         RIPEMD160::ADDRESS => Some(RIPEMD160::run(input, target_gas, context)),
+        #[cfg(feature = "exit-precompiles")]
         ExitToNear::ADDRESS => Some(ExitToNear::run(input, target_gas, context)),
+        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
@@ -108,7 +112,9 @@ pub fn byzantium_precompiles(
         bn128::addresses::ADD => Some(BN128Add::<Byzantium>::run(input, target_gas, context)),
         bn128::addresses::MUL => Some(BN128Mul::<Byzantium>::run(input, target_gas, context)),
         bn128::addresses::PAIR => Some(BN128Pair::<Byzantium>::run(input, target_gas, context)),
+        #[cfg(feature = "exit-precompiles")]
         ExitToNear::ADDRESS => Some(ExitToNear::run(input, target_gas, context)),
+        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
@@ -137,7 +143,9 @@ pub fn istanbul_precompiles(
         bn128::addresses::MUL => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
         bn128::addresses::PAIR => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
         Blake2F::ADDRESS => Some(Blake2F::run(input, target_gas, context)),
+        #[cfg(feature = "exit-precompiles")]
         ExitToNear::ADDRESS => Some(ExitToNear::run(input, target_gas, context)),
+        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
@@ -166,9 +174,9 @@ pub fn berlin_precompiles(
         bn128::addresses::MUL => Some(BN128Mul::<Istanbul>::run(input, target_gas, context)),
         bn128::addresses::PAIR => Some(BN128Pair::<Istanbul>::run(input, target_gas, context)),
         Blake2F::ADDRESS => Some(Blake2F::run(input, target_gas, context)),
-        #[cfg(feature = "contract")]
+        #[cfg(feature = "exit-precompiles")]
         ExitToNear::ADDRESS => Some(ExitToNear::run(input, target_gas, context)),
-        #[cfg(feature = "contract")]
+        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     }
