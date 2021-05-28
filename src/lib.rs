@@ -6,7 +6,7 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod map;
 pub mod meta_parsing;
 pub mod parameters;
@@ -15,15 +15,15 @@ pub mod storage;
 pub mod transaction;
 pub mod types;
 
-#[cfg(feature = "contract")]
-mod engine;
+#[cfg(feature = "engine")]
+pub mod engine;
 #[cfg(feature = "contract")]
 mod json;
 #[cfg(feature = "contract")]
 mod log_entry;
 mod precompiles;
-#[cfg(feature = "contract")]
-mod sdk;
+#[cfg(feature = "engine")]
+pub mod sdk;
 
 #[cfg(test)]
 mod benches;
@@ -31,6 +31,24 @@ mod benches;
 mod test_utils;
 #[cfg(test)]
 mod tests;
+
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+#[cfg(target_arch = "wasm32")]
+#[panic_handler]
+#[no_mangle]
+pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
+    ::core::arch::wasm32::unreachable();
+}
+
+#[cfg(target_arch = "wasm32")]
+#[alloc_error_handler]
+#[no_mangle]
+pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
+    ::core::arch::wasm32::unreachable();
+}
 
 #[cfg(feature = "contract")]
 mod contract {
@@ -45,25 +63,8 @@ mod contract {
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{near_account_to_evm_address, u256_to_arr};
 
-    #[global_allocator]
-    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
-
-    #[cfg(target_arch = "wasm32")]
-    #[panic_handler]
-    #[no_mangle]
-    pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
-        ::core::arch::wasm32::unreachable();
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    #[alloc_error_handler]
-    #[no_mangle]
-    pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
-        ::core::arch::wasm32::unreachable();
-    }
 
     ///
     /// ADMINISTRATIVE METHODS
@@ -143,6 +144,15 @@ mod contract {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }
         sdk::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
+    }
+
+    /// Called as part of the upgrade process (see `sdk::self_deploy`). This function is meant
+    /// to make any necessary changes to the state such that it aligns with the newly deployed
+    /// code.
+    #[no_mangle]
+    pub extern "C" fn state_migration() {
+        // This function is purposely left empty because we do not have any state migration
+        // to do.
     }
 
     ///
