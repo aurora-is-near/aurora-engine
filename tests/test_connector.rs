@@ -100,7 +100,7 @@ fn init_contract(
             STORAGE_AMOUNT,
         )
         .assert_success();
-    master_account
+    contract_account
         .call(
             contract_name.to_string(),
             "new_eth_connector",
