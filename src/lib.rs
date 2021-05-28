@@ -24,7 +24,7 @@ mod connector;
 mod deposit_event;
 #[cfg(feature = "engine")]
 pub mod engine;
-//TODO: add feature contract conditional compilation?
+#[cfg(any(feature = "engine", test))]
 mod fungible_token;
 #[cfg(feature = "engine")]
 mod json;
