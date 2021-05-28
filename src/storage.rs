@@ -16,7 +16,17 @@ pub enum KeyPrefix {
     Code = 0x3,
     Storage = 0x4,
     RelayerEvmAddressMap = 0x5,
-    // EthConnector = 0x6,
+    EthConnector = 0x6,
+}
+
+/// Enum used to differentiate different storage keys used by eth-connector
+#[derive(Clone, Copy, BorshSerialize, BorshDeserialize)]
+pub enum EthConnectorStorageId {
+    Contract = 0x0,
+    FungibleToken = 0x1,
+    UsedEvent = 0x2,
+    PausedMask = 0x3,
+    StatisticsAuroraAccountsCounter = 0x4,
 }
 
 /// We can't use const generic over Enum, but we can do it over integral type
@@ -32,7 +42,7 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x3 => Self::Code,
             0x4 => Self::Storage,
             0x5 => Self::RelayerEvmAddressMap,
-            // 0x6 used
+            0x6 => Self::EthConnector,
             _ => unreachable!(),
         }
     }

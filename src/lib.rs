@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![cfg_attr(feature = "log", feature(panic_info_message))]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -16,12 +17,22 @@ pub mod transaction;
 pub mod types;
 
 #[cfg(feature = "engine")]
+mod admin_controlled;
+#[cfg(feature = "engine")]
+mod connector;
+#[cfg(feature = "engine")]
+mod deposit_event;
+#[cfg(feature = "engine")]
 pub mod engine;
-#[cfg(feature = "contract")]
+#[cfg(any(feature = "engine", test))]
+mod fungible_token;
+#[cfg(feature = "engine")]
 mod json;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod log_entry;
 mod precompiles;
+#[cfg(feature = "engine")]
+mod prover;
 #[cfg(feature = "engine")]
 pub mod sdk;
 
@@ -38,8 +49,24 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[cfg(target_arch = "wasm32")]
 #[panic_handler]
+#[cfg_attr(not(feature = "log"), allow(unused_variables))]
 #[no_mangle]
-pub unsafe fn on_panic(_info: &::core::panic::PanicInfo) -> ! {
+pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
+    #[cfg(feature = "log")]
+    {
+        use alloc::{format, string::ToString};
+        if let Some(msg) = info.message() {
+            let msg = if let Some(log) = info.location() {
+                format!("{} [{}]", msg, log)
+            } else {
+                msg.to_string()
+            };
+            sdk::panic_utf8(msg.as_bytes());
+        } else if let Some(log) = info.location() {
+            sdk::panic_utf8(log.to_string().as_bytes());
+        }
+    }
+
     ::core::arch::wasm32::unreachable();
 }
 
@@ -52,16 +79,20 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::BorshSerialize;
+    use borsh::{BorshDeserialize, BorshSerialize};
 
+    use crate::connector::EthConnectorContract;
     use crate::engine::{Engine, EngineResult, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::parameters::{FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs};
+    use crate::parameters::{
+        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs, NewCallArgs,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
+    };
     use crate::prelude::{Address, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
-    use crate::types::{near_account_to_evm_address, u256_to_arr};
+    use crate::types::{near_account_to_evm_address, u256_to_arr, ERR_FAILED_PARSE};
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -251,20 +282,6 @@ mod contract {
             .sdk_process();
     }
 
-    #[cfg(feature = "testnet")]
-    #[no_mangle]
-    pub extern "C" fn make_it_rain() {
-        let input = sdk::read_input();
-        let dest_address = Address::from_slice(&input);
-        let source_address = predecessor_address();
-        let engine = Engine::new(source_address).sdk_unwrap();
-
-        engine.increment_nonce(&source_address);
-
-        let result = engine.credit(&dest_address);
-        result.map(|_f| Vec::new()).sdk_process();
-    }
-
     #[no_mangle]
     pub extern "C" fn register_relayer() {
         let relayer_address = sdk::read_input_arr20().sdk_unwrap();
@@ -274,19 +291,6 @@ mod contract {
             sdk::predecessor_account_id().as_slice(),
             Address(relayer_address),
         );
-    }
-
-    /// Allow receiving NEP141 tokens to the EVM contract
-    #[no_mangle]
-    pub extern "C" fn ft_on_transfer() {
-        #[allow(clippy::if_same_then_else)]
-        if sdk::predecessor_account_id() == sdk::current_account_id() {
-            // TODO(#59) ETH transfer
-            todo!();
-        } else {
-            // TODO(#51) ERC20 transfer
-            todo!();
-        }
     }
 
     ///
@@ -359,6 +363,141 @@ mod contract {
         require_owner_only(&state);
         let _args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
+    }
+
+    #[no_mangle]
+    pub extern "C" fn new_eth_connector() {
+        // Only the owner can initialize the EthConnector
+        sdk::assert_private_call();
+
+        let args = InitCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+
+        EthConnectorContract::init_contract(args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_eth_connector_contract_data() {
+        // Only the owner can set the EthConnector contract data
+        sdk::assert_private_call();
+
+        let args =
+            SetContractDataCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+
+        EthConnectorContract::set_contract_data(args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn withdraw() {
+        EthConnectorContract::get_instance().withdraw_near()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn deposit() {
+        EthConnectorContract::get_instance().deposit()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn finish_deposit_near() {
+        EthConnectorContract::get_instance().finish_deposit_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_total_supply() {
+        EthConnectorContract::get_instance().ft_total_supply();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_total_supply_near() {
+        EthConnectorContract::get_instance().ft_total_supply_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_total_supply_eth() {
+        EthConnectorContract::get_instance().ft_total_supply_eth();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_balance_of() {
+        EthConnectorContract::get_instance().ft_balance_of();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_balance_of_eth() {
+        EthConnectorContract::get_instance().ft_balance_of_eth();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_transfer() {
+        EthConnectorContract::get_instance().ft_transfer();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_resolve_transfer() {
+        EthConnectorContract::get_instance().ft_resolve_transfer();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_transfer_call() {
+        use crate::json::parse_json;
+
+        // Check is payable
+        sdk::assert_one_yocto();
+
+        let args = TransferCallCallArgs::from(
+            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        );
+        EthConnectorContract::get_instance().ft_transfer_call(args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_deposit() {
+        EthConnectorContract::get_instance().storage_deposit()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_withdraw() {
+        EthConnectorContract::get_instance().storage_withdraw()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_balance_of() {
+        EthConnectorContract::get_instance().storage_balance_of()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_on_transfer() {
+        let engine = Engine::new(predecessor_address()).sdk_unwrap();
+        EthConnectorContract::get_instance().ft_on_transfer(&engine)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_paused_flags() {
+        let paused_flags = EthConnectorContract::get_instance().get_paused_flags();
+        let data = paused_flags.try_to_vec().expect(ERR_FAILED_PARSE);
+        sdk::return_output(&data[..]);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_paused_flags() {
+        sdk::assert_private_call();
+
+        let args =
+            PauseEthConnectorCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+        EthConnectorContract::get_instance().set_paused_flags(args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_accounts_counter() {
+        EthConnectorContract::get_instance().get_accounts_counter()
+    }
+
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn verify_log_entry() {
+        #[cfg(feature = "log")]
+        sdk::log("Call from verify_log_entry");
+        let data = true.try_to_vec().unwrap();
+        sdk::return_output(&data[..]);
     }
 
     ///

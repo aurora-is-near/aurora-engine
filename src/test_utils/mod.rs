@@ -12,7 +12,8 @@ use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
-use crate::parameters::{NewCallArgs, SubmitResult};
+use crate::fungible_token::FungibleToken;
+use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
 use crate::prelude::Address;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
@@ -123,8 +124,23 @@ impl AuroraRunner {
         let nonce_key = storage::address_to_key(storage::KeyPrefix::Nonce, &address);
         let nonce_value = types::u256_to_arr(&init_nonce);
 
+        let ft_key = storage::bytes_to_key(
+            storage::KeyPrefix::EthConnector,
+            &[storage::EthConnectorStorageId::FungibleToken as u8],
+        );
+        let ft_value = {
+            let mut current_ft: FungibleToken = trie
+                .get(&ft_key)
+                .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
+                .unwrap_or_default();
+            current_ft.total_supply += init_balance.raw().as_u128();
+            current_ft.total_supply_eth += init_balance.raw().as_u128();
+            current_ft
+        };
+
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
+        trie.insert(ft_key, ft_value.try_to_vec().unwrap());
     }
 
     pub fn submit_transaction(
@@ -245,12 +261,24 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     let args = NewCallArgs {
         chain_id: types::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: runner.aurora_account_id.clone(),
-        bridge_prover_id: "prover.near".to_string(),
+        bridge_prover_id: "bridge_prover.near".to_string(),
         upgrade_delay_blocks: 1,
     };
 
     let (_, maybe_error) = runner.call(
         "new",
+        runner.aurora_account_id.clone(),
+        args.try_to_vec().unwrap(),
+    );
+
+    assert!(maybe_error.is_none());
+
+    let args = InitCallArgs {
+        prover_account: "prover.near".to_string(),
+        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+    };
+    let (_, maybe_error) = runner.call(
+        "new_eth_connector",
         runner.aurora_account_id.clone(),
         args.try_to_vec().unwrap(),
     );

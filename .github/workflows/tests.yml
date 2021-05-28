@@ -22,8 +22,7 @@ jobs:
           profile: minimal
           toolchain: nightly-2021-03-25
           override: true
-      - run: make release
-      - run: ls -lH release.wasm
+      - run: make test-build
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
