@@ -16,25 +16,25 @@ pub mod storage;
 pub mod transaction;
 pub mod types;
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod admin_controlled;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod connector;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod deposit_event;
 #[cfg(feature = "engine")]
 pub mod engine;
 //TODO: add feature contract conditional compilation?
 mod fungible_token;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod json;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod log_entry;
 mod precompiles;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod prover;
 #[cfg(feature = "engine")]
-mod sdk;
+pub mod sdk;
 
 #[cfg(test)]
 mod benches;

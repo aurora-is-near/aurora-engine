@@ -1,17 +1,17 @@
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 use crate::parameters::*;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 use crate::prelude::{self, Ordering, String, ToString, Vec, U256};
 use crate::types::*;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 use crate::{connector, engine, sdk, storage};
 #[cfg(feature = "log")]
 use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
@@ -26,7 +26,7 @@ pub struct FungibleToken {
     pub account_storage_usage: StorageUsage,
 }
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 impl FungibleToken {
     pub fn new() -> Self {
         Self::default()

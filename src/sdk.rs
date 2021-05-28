@@ -1,12 +1,11 @@
 use crate::prelude::{vec, Vec, H256};
-#[cfg(feature = "contract")]
 use crate::types::PromiseResult;
 use crate::types::STORAGE_PRICE_PER_BYTE;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 const READ_STORAGE_REGISTER_ID: u64 = 0;
 const INPUT_REGISTER_ID: u64 = 0;
-const GAS_FOR_STATE_MIGRATION: u64 = 250_000_000_000_000;
+const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
 
 mod exports {
     #[allow(unused)]
@@ -415,7 +414,6 @@ pub fn promise_results_count() -> u64 {
     unsafe { exports::promise_results_count() }
 }
 
-#[cfg(feature = "contract")]
 pub fn promise_result(result_idx: u64) -> PromiseResult {
     unsafe {
         match exports::promise_result(result_idx, 0) {

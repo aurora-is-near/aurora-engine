@@ -1,5 +1,5 @@
 use crate::prelude::{self, Address, String, Vec, H256, U256};
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 use alloc::str;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -96,7 +96,7 @@ pub struct StorageBalanceBounds {
 }
 
 /// promise results structure
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 pub enum PromiseResult {
     NotReady,
     Successful(Vec<u8>),
@@ -104,7 +104,7 @@ pub enum PromiseResult {
 }
 
 /// ft_resolve_transfer result of eth-connector
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 pub struct FtResolveTransferResult {
     pub amount: Balance,
     pub refund_amount: Balance,
@@ -156,7 +156,7 @@ pub fn near_account_to_evm_address(addr: &[u8]) -> Address {
     Address::from_slice(&keccak(addr)[12..])
 }
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 pub fn str_from_slice(inp: &[u8]) -> &str {
     str::from_utf8(inp).unwrap()
 }
