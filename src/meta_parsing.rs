@@ -1,6 +1,6 @@
 use borsh::BorshDeserialize;
 use ethabi::{encode, Token as ABIToken};
-use lunarity_lexer::{Lexer, Token};
+use logos::Logos;
 use rlp::{Decodable, DecoderError, Rlp};
 
 use crate::parameters::MetaCallArgs;
@@ -17,6 +17,70 @@ pub enum ParsingError {
 }
 
 pub type ParsingResult<T> = core::result::Result<T, ParsingError>;
+
+mod type_lexer {
+    use logos::{Lexer, Logos};
+
+    #[derive(Logos, Debug, PartialEq)]
+    pub(super) enum Token {
+        #[regex("byte|bytes[1-2][0-9]?|bytes3[0-2]?|bytes[4-9]", fixed_bytes_size)]
+        FixedBytes(u8),
+        #[regex("uint(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)?", |lex| fixed_int_size(lex, "uint"))]
+        Uint(usize),
+        #[regex("int(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)?", |lex| fixed_int_size(lex, "int"))]
+        Int(usize),
+        #[regex("bool")]
+        Bool,
+        #[regex("address")]
+        Address,
+        #[regex("bytes")]
+        Bytes,
+        #[regex("string")]
+        String,
+        #[regex("\\[[0-9]*\\]", reference_type_size)]
+        ReferenceType(Option<u64>),
+        #[regex("[a-zA-Z_$][a-zA-Z0-9_$]*")]
+        Identifier,
+
+        #[error]
+        Error,
+    }
+
+    fn fixed_bytes_size(lex: &mut Lexer<Token>) -> u8 {
+        let slice = lex.slice();
+
+        if slice == "byte" {
+            return 1;
+        }
+
+        let n = slice["bytes".len()..].parse();
+        n.ok().unwrap_or(1)
+    }
+
+    fn fixed_int_size(lex: &mut Lexer<Token>, prefix: &str) -> usize {
+        let slice = lex.slice();
+
+        if slice == prefix {
+            // the default int size is 32
+            return 32;
+        }
+
+        let n = slice[prefix.len()..].parse();
+        n.unwrap_or(32)
+    }
+
+    fn reference_type_size(lex: &mut Lexer<Token>) -> Option<u64> {
+        let slice = lex.slice();
+
+        if slice == "[]" {
+            return None;
+        }
+
+        let end_index = slice.len() - 1;
+        let n = slice[1..end_index].parse();
+        n.ok()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgType {
@@ -38,71 +102,35 @@ pub enum ArgType {
 /// field_type: A single evm function arg type in string, without the argument name
 /// e.g. "bytes" "uint256[][3]" "CustomStructName"
 pub fn parse_type(field_type: &str) -> ParsingResult<ArgType> {
-    #[derive(PartialEq)]
-    enum State {
-        Open,
-        Close,
-    }
+    let mut lexer = type_lexer::Token::lexer(field_type);
+    let mut current_token = lexer.next();
+    let mut inner_type: Option<ArgType> = None;
 
-    let mut lexer = Lexer::new(field_type);
-    let mut token = None;
-    let mut state = State::Close;
-    let mut array_depth = 0;
-    let mut current_array_length: Option<u64> = None;
-
-    while lexer.token != Token::EndOfProgram {
-        let type_ = match lexer.token {
-            Token::Identifier => ArgType::Custom(lexer.slice().to_owned()),
-            Token::TypeByte => ArgType::Byte(lexer.extras.0),
-            Token::TypeBytes => ArgType::Bytes,
-            Token::TypeBool => ArgType::Bool,
-            Token::TypeUint => ArgType::Uint,
-            Token::TypeInt => ArgType::Int,
-            Token::TypeString => ArgType::String,
-            Token::TypeAddress => ArgType::Address,
-            Token::LiteralInteger => {
-                let length = lexer.slice();
-                current_array_length = Some(
-                    length
-                        .parse()
-                        .map_err(|_| ParsingError::InvalidMetaTransactionMethodName)?,
-                );
-                lexer.advance();
-                continue;
-            }
-            Token::BracketOpen if token.is_some() && state == State::Close => {
-                state = State::Open;
-                lexer.advance();
-                continue;
-            }
-            Token::BracketClose if array_depth < 10 => {
-                if state == State::Open && token.is_some() {
-                    let length = current_array_length.take();
-                    state = State::Close;
-                    token = Some(ArgType::Array {
-                        inner: Box::new(token.expect("if statement checks for some; qed")),
-                        length,
-                    });
-                    lexer.advance();
-                    array_depth += 1;
-                    continue;
-                } else {
-                    return Err(ParsingError::InvalidMetaTransactionMethodName);
-                }
-            }
-            Token::BracketClose if array_depth == 10 => {
-                return Err(ParsingError::InvalidMetaTransactionMethodName);
-            }
-            _ => {
-                return Err(ParsingError::InvalidMetaTransactionMethodName);
-            }
+    loop {
+        let typ = match current_token {
+            None => break,
+            Some(type_lexer::Token::Address) => ArgType::Address,
+            Some(type_lexer::Token::Bool) => ArgType::Bool,
+            Some(type_lexer::Token::String) => ArgType::String,
+            Some(type_lexer::Token::Bytes) => ArgType::Bytes,
+            Some(type_lexer::Token::Identifier) => ArgType::Custom(lexer.slice().to_owned()),
+            Some(type_lexer::Token::FixedBytes(size)) => ArgType::Byte(size),
+            Some(type_lexer::Token::Int(_)) => ArgType::Int,
+            Some(type_lexer::Token::Uint(_)) => ArgType::Uint,
+            Some(type_lexer::Token::ReferenceType(length)) => match inner_type {
+                None => return Err(ParsingError::ArgumentParseError),
+                Some(t) => ArgType::Array {
+                    length,
+                    inner: Box::new(t),
+                },
+            },
+            Some(type_lexer::Token::Error) => return Err(ParsingError::ArgumentParseError),
         };
-
-        token = Some(type_);
-        lexer.advance();
+        inner_type = Some(typ);
+        current_token = lexer.next();
     }
 
-    token.ok_or(ParsingError::InvalidMetaTransactionMethodName)
+    inner_type.ok_or(ParsingError::ArgumentParseError)
 }
 
 /// NEAR's domainSeparator
