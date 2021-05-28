@@ -1,9 +1,12 @@
 use crate::prelude::{vec, Vec, H256};
-use crate::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
+#[cfg(feature = "contract")]
+use crate::types::PromiseResult;
+use crate::types::STORAGE_PRICE_PER_BYTE;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 const READ_STORAGE_REGISTER_ID: u64 = 0;
 const INPUT_REGISTER_ID: u64 = 0;
+const GAS_FOR_STATE_MIGRATION: u64 = 250_000_000_000_000;
 
 mod exports {
     #[allow(unused)]
@@ -84,7 +87,7 @@ mod exports {
             code_len: u64,
             code_ptr: u64,
         );
-        fn promise_batch_action_function_call(
+        pub(crate) fn promise_batch_action_function_call(
             promise_index: u64,
             method_name_len: u64,
             method_name_ptr: u64,
@@ -333,9 +336,14 @@ pub fn self_deploy(code_key: &[u8]) {
         let promise_id = exports::promise_batch_create(u64::MAX as _, 0);
         // Remove code from storage and store it in register 1.
         exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1);
-        exports::promise_batch_action_deploy_contract(promise_id, u64::MAX as _, 1);
-        // TODO: Call upgrade on the same promise to make sure the state has migrated successfully.
-        //     Otherwise, you may have to handle non-latest state in every other method call, which might be inefficient.
+        exports::promise_batch_action_deploy_contract(promise_id, u64::MAX, 1);
+        promise_batch_action_function_call(
+            promise_id,
+            b"state_migration",
+            &[],
+            0,
+            GAS_FOR_STATE_MIGRATION,
+        )
     }
 }
 
@@ -407,6 +415,7 @@ pub fn promise_results_count() -> u64 {
     unsafe { exports::promise_results_count() }
 }
 
+#[cfg(feature = "contract")]
 pub fn promise_result(result_idx: u64) -> PromiseResult {
     unsafe {
         match exports::promise_result(result_idx, 0) {
@@ -456,6 +465,27 @@ pub fn promise_batch_create(account_id: &[u8]) -> u64 {
     unsafe { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) }
 }
 
+pub fn promise_batch_action_function_call(
+    promise_idx: u64,
+    method_name: &[u8],
+    arguments: &[u8],
+    amount: u128,
+    gas: u64,
+) {
+    unsafe {
+        exports::promise_batch_action_function_call(
+            promise_idx,
+            method_name.len() as _,
+            method_name.as_ptr() as _,
+            arguments.len() as _,
+            arguments.as_ptr() as _,
+            &amount as *const u128 as _,
+            gas,
+        )
+    }
+}
+
+#[allow(dead_code)]
 pub fn storage_has_key(key: &[u8]) -> bool {
     unsafe { exports::storage_has_key(key.len() as _, key.as_ptr() as _) == 1 }
 }

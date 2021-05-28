@@ -20,6 +20,10 @@ mod consts {
 /// SHA256 precompile.
 pub struct SHA256;
 
+impl SHA256 {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 2);
+}
+
 impl Precompile for SHA256 {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
@@ -66,6 +70,10 @@ impl Precompile for SHA256 {
 
 /// RIPEMD160 precompile.
 pub struct RIPEMD160;
+
+impl RIPEMD160 {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 3);
+}
 
 impl Precompile for RIPEMD160 {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
