@@ -130,7 +130,7 @@ fn encode_eip712(
     custodian_address: EthAddress,
     type_hash: &str,
 ) -> H256 {
-    let chain_id = U256::from(Engine::get_state().chain_id);
+    let chain_id = U256::from(Engine::get_state().unwrap().chain_id);
 
     let domain_separator_encoded = encode_packed(&[
         Token::FixedBytes(

@@ -15,6 +15,10 @@ mod consts {
 
 pub(super) struct Blake2F;
 
+impl Blake2F {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 9);
+}
+
 impl Precompile for Blake2F {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         let (int_bytes, _) = input.split_at(mem::size_of::<u32>());

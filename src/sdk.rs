@@ -1,6 +1,11 @@
 use crate::prelude::{vec, Vec, H256};
-use crate::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
-use borsh::BorshSerialize;
+use crate::types::PromiseResult;
+use crate::types::STORAGE_PRICE_PER_BYTE;
+use borsh::{BorshDeserialize, BorshSerialize};
+
+const READ_STORAGE_REGISTER_ID: u64 = 0;
+const INPUT_REGISTER_ID: u64 = 0;
+const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
 
 mod exports {
     #[allow(unused)]
@@ -81,7 +86,7 @@ mod exports {
             code_len: u64,
             code_ptr: u64,
         );
-        fn promise_batch_action_function_call(
+        pub(crate) fn promise_batch_action_function_call(
             promise_index: u64,
             method_name_len: u64,
             method_name_ptr: u64,
@@ -157,20 +162,28 @@ mod exports {
 
 pub fn read_input() -> Vec<u8> {
     unsafe {
-        exports::input(0);
-        let bytes: Vec<u8> = vec![0; exports::register_len(0) as usize];
-        exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
+        exports::input(INPUT_REGISTER_ID);
+        let bytes: Vec<u8> = vec![0; exports::register_len(INPUT_REGISTER_ID) as usize];
+        exports::read_register(INPUT_REGISTER_ID, bytes.as_ptr() as *const u64 as u64);
         bytes
     }
 }
 
-pub fn read_input_arr20() -> [u8; 20] {
+pub(crate) fn read_input_borsh<T: BorshDeserialize>() -> Result<T, ArgParseErr> {
+    let bytes = read_input();
+    T::try_from_slice(&bytes).map_err(|_| ArgParseErr)
+}
+
+pub(crate) fn read_input_arr20() -> Result<[u8; 20], IncorrectInputLength> {
     unsafe {
-        exports::input(0);
-        let bytes = [0u8; 20];
-        // TODO: Is it fine to not check the length of the input register here?
-        exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
-        bytes
+        exports::input(INPUT_REGISTER_ID);
+        if exports::register_len(INPUT_REGISTER_ID) == 20 {
+            let bytes = [0u8; 20];
+            exports::read_register(INPUT_REGISTER_ID, bytes.as_ptr() as *const u64 as u64);
+            Ok(bytes)
+        } else {
+            Err(IncorrectInputLength)
+        }
     }
 }
 
@@ -191,11 +204,25 @@ pub fn return_output(value: &[u8]) {
 
 #[allow(dead_code)]
 pub fn read_storage(key: &[u8]) -> Option<Vec<u8>> {
+    read_storage_len(key).map(|value_size| unsafe {
+        let bytes = vec![0u8; value_size];
+        exports::read_register(
+            READ_STORAGE_REGISTER_ID,
+            bytes.as_ptr() as *const u64 as u64,
+        );
+        bytes
+    })
+}
+
+pub fn read_storage_len(key: &[u8]) -> Option<usize> {
     unsafe {
-        if exports::storage_read(key.len() as u64, key.as_ptr() as u64, 0) == 1 {
-            let bytes: Vec<u8> = vec![0u8; exports::register_len(0) as usize];
-            exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
-            Some(bytes)
+        if exports::storage_read(
+            key.len() as u64,
+            key.as_ptr() as u64,
+            READ_STORAGE_REGISTER_ID,
+        ) == 1
+        {
+            Some(exports::register_len(READ_STORAGE_REGISTER_ID) as usize)
         } else {
             None
         }
@@ -203,17 +230,16 @@ pub fn read_storage(key: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// Read u64 from storage at given key.
-pub fn read_u64(key: &[u8]) -> Option<u64> {
-    unsafe {
-        if exports::storage_read(key.len() as u64, key.as_ptr() as u64, 0) == 1 {
+pub(crate) fn read_u64(key: &[u8]) -> Option<Result<u64, InvalidU64>> {
+    read_storage_len(key).map(|value_size| unsafe {
+        if value_size == 8 {
             let result = [0u8; 8];
-            // TODO: Are you sure the register length is correct?
-            exports::read_register(0, result.as_ptr() as _);
-            Some(u64::from_le_bytes(result))
+            exports::read_register(READ_STORAGE_REGISTER_ID, result.as_ptr() as _);
+            Ok(u64::from_le_bytes(result))
         } else {
-            None
+            Err(InvalidU64)
         }
-    }
+    })
 }
 
 pub fn write_storage(key: &[u8], value: &[u8]) {
@@ -309,9 +335,14 @@ pub fn self_deploy(code_key: &[u8]) {
         let promise_id = exports::promise_batch_create(u64::MAX as _, 0);
         // Remove code from storage and store it in register 1.
         exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1);
-        exports::promise_batch_action_deploy_contract(promise_id, u64::MAX as _, 1);
-        // TODO: Call upgrade on the same promise to make sure the state has migrated successfully.
-        //     Otherwise, you may have to handle non-latest state in every other method call, which might be inefficient.
+        exports::promise_batch_action_deploy_contract(promise_id, u64::MAX, 1);
+        promise_batch_action_function_call(
+            promise_id,
+            b"state_migration",
+            &[],
+            0,
+            GAS_FOR_STATE_MIGRATION,
+        )
     }
 }
 
@@ -407,9 +438,8 @@ pub fn assert_private_call() {
 }
 
 pub fn attached_deposit() -> u128 {
-    use core::intrinsics::size_of;
     unsafe {
-        let data = [0u8; size_of::<u128>()];
+        let data = [0u8; core::mem::size_of::<u128>()];
         exports::attached_deposit(data.as_ptr() as u64);
         u128::from_le_bytes(data)
     }
@@ -433,6 +463,48 @@ pub fn promise_batch_create(account_id: &[u8]) -> u64 {
     unsafe { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) }
 }
 
+pub fn promise_batch_action_function_call(
+    promise_idx: u64,
+    method_name: &[u8],
+    arguments: &[u8],
+    amount: u128,
+    gas: u64,
+) {
+    unsafe {
+        exports::promise_batch_action_function_call(
+            promise_idx,
+            method_name.len() as _,
+            method_name.as_ptr() as _,
+            arguments.len() as _,
+            arguments.as_ptr() as _,
+            &amount as *const u128 as _,
+            gas,
+        )
+    }
+}
+
+#[allow(dead_code)]
 pub fn storage_has_key(key: &[u8]) -> bool {
     unsafe { exports::storage_has_key(key.len() as _, key.as_ptr() as _) == 1 }
+}
+
+pub(crate) struct IncorrectInputLength;
+impl AsRef<[u8]> for IncorrectInputLength {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_INCORRECT_INPUT_LENGTH"
+    }
+}
+
+pub(crate) struct ArgParseErr;
+impl AsRef<[u8]> for ArgParseErr {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_ARG_PARSE"
+    }
+}
+
+pub(crate) struct InvalidU64;
+impl AsRef<[u8]> for InvalidU64 {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_NOT_U64"
+    }
 }

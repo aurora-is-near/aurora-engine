@@ -1,0 +1,41 @@
+[package]
+name = "aurora-engine-state-migration-test"
+version = "1.0.0"
+authors = ["NEAR <hello@near.org>"]
+edition = "2018"
+description = ""
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "CC0-1.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "z"
+debug = false
+debug-assertions = false
+overflow-checks = true
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[profile.dev]
+opt-level = "z"
+debug = false
+debug-assertions = true
+overflow-checks = true
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[dependencies]
+borsh = { version = "0.8.2", default-features = false }
+aurora-engine = { path = "../../", default-features = false, features = ["engine", "sha2"] }

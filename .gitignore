@@ -13,3 +13,4 @@
 # Rust artifacts
 /*.wasm
 /target/
+etc/state-migration-test/target/

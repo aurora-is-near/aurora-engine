@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(core_intrinsics))]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
 
@@ -8,7 +7,7 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod map;
 pub mod meta_parsing;
 pub mod parameters;
@@ -17,24 +16,25 @@ pub mod storage;
 pub mod transaction;
 pub mod types;
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod admin_controlled;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod connector;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod deposit_event;
-#[cfg(feature = "contract")]
-mod engine;
+#[cfg(feature = "engine")]
+pub mod engine;
+#[cfg(any(feature = "engine", test))]
 mod fungible_token;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod json;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod log_entry;
 mod precompiles;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod prover;
-#[cfg(feature = "contract")]
-mod sdk;
+#[cfg(feature = "engine")]
+pub mod sdk;
 
 #[cfg(test)]
 mod benches;
@@ -42,6 +42,40 @@ mod benches;
 mod test_utils;
 #[cfg(test)]
 mod tests;
+
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+#[cfg(target_arch = "wasm32")]
+#[panic_handler]
+#[cfg_attr(not(feature = "log"), allow(unused_variables))]
+#[no_mangle]
+pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
+    #[cfg(feature = "log")]
+    {
+        use alloc::{format, string::ToString};
+        if let Some(msg) = info.message() {
+            let msg = if let Some(log) = info.location() {
+                format!("{} [{}]", msg, log)
+            } else {
+                msg.to_string()
+            };
+            sdk::panic_utf8(msg.as_bytes());
+        } else if let Some(log) = info.location() {
+            sdk::panic_utf8(log.to_string().as_bytes());
+        }
+    }
+
+    ::core::arch::wasm32::unreachable();
+}
+
+#[cfg(target_arch = "wasm32")]
+#[alloc_error_handler]
+#[no_mangle]
+pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
+    ::core::arch::wasm32::unreachable();
+}
 
 #[cfg(feature = "contract")]
 mod contract {
@@ -55,46 +89,13 @@ mod contract {
         ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, PauseEthConnectorCallArgs,
         TransferCallCallArgs, ViewCallArgs,
     };
-    use crate::prelude::{Address, TryInto, H256, U256};
+    use crate::prelude::{Address, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{near_account_to_evm_address, u256_to_arr, ERR_FAILED_PARSE};
 
-    #[global_allocator]
-    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
-
-    #[cfg(target_arch = "wasm32")]
-    #[panic_handler]
-    #[cfg_attr(not(feature = "log"), allow(unused_variables))]
-    #[no_mangle]
-    pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
-        #[cfg(feature = "log")]
-        {
-            use alloc::{format, string::ToString};
-            if let Some(msg) = info.message() {
-                let msg = if let Some(log) = info.location() {
-                    format!("{} [{}]", msg, log)
-                } else {
-                    msg.to_string()
-                };
-                sdk::panic_utf8(msg.as_bytes());
-            } else if let Some(log) = info.location() {
-                sdk::panic_utf8(log.to_string().as_bytes());
-            }
-        }
-
-        ::core::intrinsics::abort();
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    #[alloc_error_handler]
-    #[no_mangle]
-    pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
-        ::core::intrinsics::abort();
-    }
 
     ///
     /// ADMINISTRATIVE METHODS
@@ -104,11 +105,11 @@ mod contract {
     /// Should be called on deployment.
     #[no_mangle]
     pub extern "C" fn new() {
-        let state = Engine::get_state();
-        if !state.owner_id.is_empty() {
+        if let Ok(state) = Engine::get_state() {
             require_owner_only(&state);
         }
-        let args = NewCallArgs::try_from_slice(&sdk::read_input()).sdk_expect("ERR_ARG_PARSE");
+
+        let args: NewCallArgs = sdk::read_input_borsh().sdk_unwrap();
         Engine::set_state(args.into());
     }
 
@@ -125,35 +126,36 @@ mod contract {
     /// Get owner account id for this contract.
     #[no_mangle]
     pub extern "C" fn get_owner() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         sdk::return_output(state.owner_id.as_bytes());
     }
 
     /// Get bridge prover id for this contract.
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         sdk::return_output(state.bridge_prover_id.as_bytes());
     }
 
     /// Get chain id for this contract.
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
-        sdk::return_output(&Engine::get_state().chain_id)
+        sdk::return_output(&Engine::get_state().sdk_unwrap().chain_id)
     }
 
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
-            .sdk_expect("ERR_NO_UPGRADE");
+            .sdk_expect("ERR_NO_UPGRADE")
+            .sdk_unwrap();
         sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
 
     /// Stage new code for deployment.
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         require_owner_only(&state);
         sdk::read_input_and_store(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
         sdk::write_storage(
@@ -165,12 +167,23 @@ mod contract {
     /// Deploy staged upgrade.
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
-        let state = Engine::get_state();
-        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)).sdk_unwrap();
+        let state = Engine::get_state().sdk_unwrap();
+        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
+            .sdk_expect("ERR_NO_UPGRADE")
+            .sdk_unwrap();
         if sdk::block_index() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }
         sdk::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
+    }
+
+    /// Called as part of the upgrade process (see `sdk::self_deploy`). This function is meant
+    /// to make any necessary changes to the state such that it aligns with the newly deployed
+    /// code.
+    #[no_mangle]
+    pub extern "C" fn state_migration() {
+        // This function is purposely left empty because we do not have any state migration
+        // to do.
     }
 
     ///
@@ -181,7 +194,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
-        let mut engine = Engine::new(predecessor_address());
+        let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
         Engine::deploy_code_with_input(&mut engine, input)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();
@@ -191,10 +204,8 @@ mod contract {
     /// Call method on the EVM contract.
     #[no_mangle]
     pub extern "C" fn call() {
-        // TODO: Borsh input pattern is so common here. It worth writing sdk::read_input_borsh().
-        let input = sdk::read_input();
-        let args = FunctionCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
-        let mut engine = Engine::new(predecessor_address());
+        let args: FunctionCallArgs = sdk::read_input_borsh().sdk_unwrap();
+        let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
         Engine::call_with_args(&mut engine, args)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();
@@ -212,7 +223,7 @@ mod contract {
         let signed_transaction =
             EthSignedTransaction::decode(&Rlp::new(&input)).sdk_expect("ERR_INVALID_TX");
 
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
 
         // Validate the chain ID, if provided inside the signature:
         if let Some(chain_id) = signed_transaction.chain_id() {
@@ -248,7 +259,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn meta_call() {
         let input = sdk::read_input();
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         let domain_separator = crate::meta_parsing::near_erc712_domain(U256::from(state.chain_id));
         let meta_call_args = crate::meta_parsing::parse_meta_call(
             &domain_separator,
@@ -273,14 +284,12 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn register_relayer() {
-        let relayer_address = sdk::read_input();
-        // NOTE: Why not `sdk::read_input_arr20();`?
-        assert_eq!(relayer_address.len(), 20);
+        let relayer_address = sdk::read_input_arr20().sdk_unwrap();
 
-        let mut engine = Engine::new(predecessor_address());
+        let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
         engine.register_relayer(
             sdk::predecessor_account_id().as_slice(),
-            Address(relayer_address.as_slice().try_into().unwrap()),
+            Address(relayer_address),
         );
     }
 
@@ -290,38 +299,36 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn view() {
-        let input = sdk::read_input();
-        let args = ViewCallArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
-        let engine = Engine::new(Address::from_slice(&args.sender));
+        let args: ViewCallArgs = sdk::read_input_borsh().sdk_unwrap();
+        let engine = Engine::new(Address::from_slice(&args.sender)).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args);
         result.sdk_process()
     }
 
     #[no_mangle]
     pub extern "C" fn get_code() {
-        let address = sdk::read_input_arr20();
+        let address = sdk::read_input_arr20().sdk_unwrap();
         let code = Engine::get_code(&Address(address));
         sdk::return_output(&code)
     }
 
     #[no_mangle]
     pub extern "C" fn get_balance() {
-        let address = sdk::read_input_arr20();
+        let address = sdk::read_input_arr20().sdk_unwrap();
         let balance = Engine::get_balance(&Address(address));
-        sdk::return_output(&u256_to_arr(&balance))
+        sdk::return_output(&balance.to_bytes())
     }
 
     #[no_mangle]
     pub extern "C" fn get_nonce() {
-        let address = sdk::read_input_arr20();
+        let address = sdk::read_input_arr20().sdk_unwrap();
         let nonce = Engine::get_nonce(&Address(address));
         sdk::return_output(&u256_to_arr(&nonce))
     }
 
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
-        let input = sdk::read_input();
-        let args = GetStorageAtArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: GetStorageAtArgs = sdk::read_input_borsh().sdk_unwrap();
         let value = Engine::get_storage(&Address(args.address), &H256(args.key));
         sdk::return_output(&value.0)
     }
@@ -333,17 +340,16 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_chain() {
-        let mut state = Engine::get_state();
+        let mut state = Engine::get_state().sdk_unwrap();
         require_owner_only(&state);
-        let input = sdk::read_input();
-        let args = BeginChainArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let args: BeginChainArgs = sdk::read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
         Engine::set_state(state);
         // set genesis block balances
         for account_balance in args.genesis_alloc {
             Engine::set_balance(
                 &Address(account_balance.address),
-                &U256::from(account_balance.balance),
+                &crate::types::Wei::new(U256::from(account_balance.balance)),
             )
         }
         // return new chain ID
@@ -353,10 +359,9 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_block() {
-        let state = Engine::get_state();
+        let state = Engine::get_state().sdk_unwrap();
         require_owner_only(&state);
-        let input = sdk::read_input();
-        let _args = BeginBlockArgs::try_from_slice(&input).sdk_expect("ERR_ARG_PARSE");
+        let _args: BeginBlockArgs = sdk::read_input_borsh().sdk_unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 
@@ -445,7 +450,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
-        let engine = Engine::new(predecessor_address());
+        let engine = Engine::new(predecessor_address()).sdk_unwrap();
         EthConnectorContract::get_instance().ft_on_transfer(&engine)
     }
 

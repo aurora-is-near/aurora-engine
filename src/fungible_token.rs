@@ -1,17 +1,17 @@
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 use crate::parameters::*;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 use crate::prelude::{self, Ordering, String, ToString, Vec, U256};
 use crate::types::*;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 use crate::{connector, engine, sdk, storage};
 #[cfg(feature = "log")]
 use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
@@ -26,7 +26,7 @@ pub struct FungibleToken {
     pub account_storage_usage: StorageUsage,
 }
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 impl FungibleToken {
     pub fn new() -> Self {
         Self::default()
@@ -42,7 +42,9 @@ impl FungibleToken {
 
     /// Balance of ETH tokens
     pub fn internal_unwrap_balance_of_eth(&self, address: EthAddress) -> Balance {
-        engine::Engine::get_balance(&prelude::Address(address)).as_u128()
+        engine::Engine::get_balance(&prelude::Address(address))
+            .raw()
+            .as_u128()
     }
 
     /// Internal deposit NEAR - NEP-141
@@ -63,7 +65,10 @@ impl FungibleToken {
     pub fn internal_deposit_eth(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth(address);
         if let Some(new_balance) = balance.checked_add(amount) {
-            engine::Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
+            engine::Engine::set_balance(
+                &prelude::Address(address),
+                &Wei::new(U256::from(new_balance)),
+            );
             self.total_supply_eth = self
                 .total_supply_eth
                 .checked_add(amount)
@@ -114,7 +119,10 @@ impl FungibleToken {
     pub fn internal_withdraw_eth(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth(address);
         if let Some(new_balance) = balance.checked_sub(amount) {
-            engine::Engine::set_balance(&prelude::Address(address), &U256::from(new_balance));
+            engine::Engine::set_balance(
+                &prelude::Address(address),
+                &Wei::new(U256::from(new_balance)),
+            );
             self.total_supply_eth = self
                 .total_supply_eth
                 .checked_sub(amount)
@@ -427,6 +435,7 @@ impl FungibleToken {
         if !self.accounts_contains_key(account_id) {
             let key = Self::get_statistic_key();
             let accounts_counter = sdk::read_u64(&key)
+                .unwrap_or(Ok(0))
                 .unwrap_or(0)
                 .checked_add(1)
                 .expect("ERR_ACCOUNTS_COUNTER_OVERFLOW");
@@ -438,7 +447,9 @@ impl FungibleToken {
     /// Get accounts counter for statistics
     /// It represents total unique accounts.
     pub fn get_accounts_counter(&self) -> u64 {
-        sdk::read_u64(&Self::get_statistic_key()).unwrap_or(0)
+        sdk::read_u64(&Self::get_statistic_key())
+            .unwrap_or(Ok(0))
+            .unwrap_or(0)
     }
 
     fn accounts_contains_key(&self, account_id: &str) -> bool {
