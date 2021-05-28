@@ -459,9 +459,10 @@ fn test_deposit_with_same_proof() {
     }
     let promises = call_deposit_near(&contract, CONTRACT_ACC);
     let promise = &promises[promises.len() - 2];
-    check_execution_status_failure(
+    assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         "ERR_PROOF_EXIST",
+        "Expected failure as the provided proof already exists, but deposit succeeded",
     );
 }
 
@@ -471,9 +472,10 @@ fn test_deposit_wrong_custodian_address() {
     let (_master_account, contract) = init(wrong_custodian_address);
     let promises = call_deposit_near(&contract, CONTRACT_ACC);
     let promise = &promises[promises.len() - 2];
-    check_execution_status_failure(
+    assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         "ERR_WRONG_EVENT_ADDRESS",
+        "Expected failure as the provided proof originated from wrong EthCustodian contract, but deposit succeeded",
     );
 }
 
@@ -755,7 +757,11 @@ fn test_deposit_pausability() {
     let promises = call_deposit_with_proof(&user_account, CONTRACT_ACC, PROOF_DATA_ETH);
     let num_promises = promises.len();
     let p = promises[num_promises - 2].clone();
-    check_execution_status_failure(p.unwrap().outcome().clone().status, ERR_PAUSED);
+    assert_execution_status_failure(
+        p.unwrap().outcome().clone().status,
+        ERR_PAUSED,
+        "Expected failure due to pause, but deposit succeeded",
+    );
 
     // Unpause all
     let res = call_set_paused_flags(&contract, CONTRACT_ACC, UNPAUSE_ALL);
@@ -820,7 +826,11 @@ fn test_withdraw_near_pausability() {
     );
     let promises = res.promise_results();
     let p = promises[1].clone();
-    check_execution_status_failure(p.unwrap().outcome().clone().status, ERR_PAUSED);
+    assert_execution_status_failure(
+        p.unwrap().outcome().clone().status,
+        ERR_PAUSED,
+        "Expected failure due to pause, but withdraw succeeded",
+    );
 
     // Unpause all
     let res = call_set_paused_flags(&contract, CONTRACT_ACC, UNPAUSE_ALL);
@@ -1008,9 +1018,10 @@ fn test_deposit_near_amount_less_fee() {
         0,
     );
     let promise = &res.promise_results()[res.promise_results().len() - 2];
-    check_execution_status_failure(
+    assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
+        "Expected failure as the deposited amount is less than fee, but deposit to NEP-141 succeeded",
     );
 }
 
@@ -1028,9 +1039,10 @@ fn test_deposit_evm_amount_less_fee() {
         0,
     );
     let promise = &res.promise_results()[res.promise_results().len() - 2];
-    check_execution_status_failure(
+    assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
+        "Expected failure as the deposited amount is less than fee, but deposit to Aurora succeeded",
     );
 }
 
@@ -1048,9 +1060,10 @@ fn test_deposit_near_amount_zero_fee_non_zero() {
         0,
     );
     let promise = &res.promise_results()[res.promise_results().len() - 2];
-    check_execution_status_failure(
+    assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
+        "Expected failure as the deposited amount is zero and the fee is not zero, but deposit to NEP-141 succeeded",
     );
 }
 
@@ -1068,9 +1081,10 @@ fn test_deposit_evm_amount_zero_fee_non_zero() {
         0,
     );
     let promise = &res.promise_results()[res.promise_results().len() - 2];
-    check_execution_status_failure(
+    assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
+        "Expected failure as the deposited amount is zero and the fee is not zero, but deposit to Aurora succeeded",
     );
 }
 
@@ -1088,9 +1102,10 @@ fn test_deposit_near_amount_equal_fee_non_zero() {
         0,
     );
     let promise = &res.promise_results()[res.promise_results().len() - 2];
-    check_execution_status_failure(
+    assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
+        "Expected failure as the deposited amount is equal to fee, but deposit to NEP-141 succeeded",
     );
 }
 
@@ -1109,17 +1124,30 @@ fn test_deposit_evm_amount_equal_fee_non_zero() {
         0,
     );
     let promise = &res.promise_results()[res.promise_results().len() - 2];
-    check_execution_status_failure(
+    assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
+        "Expected failure as the deposited amount is equal to fee, but deposit to Aurora succeeded",
     );
 }
 
-fn check_execution_status_failure(es: ExecutionStatus, err_msg: &str) {
-    match es {
+fn assert_execution_status_failure(
+    execution_status: ExecutionStatus,
+    err_msg: &str,
+    panic_msg: &str,
+) {
+    // Usually the converted to string has either of following two messages formats:
+    // "Action #0: Smart contract panicked: ERR_MSG [src/some_file.rs:LINE_NUMBER:COLUMN_NUMBER]"
+    // "right: 'MISMATCHED_DATA': ERR_MSG [src/some_file.rs:LINE_NUMBER:COLUMN_NUMBER]"
+    // So the ": ERR_MSG [" pattern should catch all invariants of error, even if one of the errors
+    // message is a subset of another one (e.g. `ERR_MSG_FAILED` is a subset of `ERR_MSG_FAILED_FOO`)
+    let expected_err_msg_pattern = format!(": {} [", err_msg);
+
+    match execution_status {
         ExecutionStatus::Failure(err) => {
-            assert!(err.to_string().contains(err_msg));
+            println!("Error: {}", err);
+            assert!(err.to_string().contains(&expected_err_msg_pattern));
         }
-        _ => panic!(),
+        _ => panic!("{}", panic_msg),
     }
 }
