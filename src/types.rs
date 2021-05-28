@@ -1,4 +1,4 @@
-use crate::prelude::{Address, String, Vec, H256, U256};
+use crate::prelude::{self, Address, String, Vec, H256, U256};
 #[cfg(feature = "contract")]
 use alloc::str;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -18,6 +18,60 @@ pub type EthAddress = [u8; 20];
 pub type Gas = u64;
 pub type StorageUsage = u64;
 
+/// Newtype to distinguish balances (denominated in Wei) from other U256 types.
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
+pub struct Wei(U256);
+impl Wei {
+    const ETH_TO_WEI: U256 = U256([1_000_000_000_000_000_000, 0, 0, 0]);
+
+    pub const fn zero() -> Self {
+        Self(U256([0, 0, 0, 0]))
+    }
+
+    pub fn new(amount: U256) -> Self {
+        Self(amount)
+    }
+
+    // Purposely not implementing `From<u64>` because I want the call site to always
+    // say `Wei::<something>`. If `From` is implemented then the caller might write
+    // `amount.into()` without thinking too hard about the units. Explicitly writing
+    // `Wei` reminds the developer to think about whether the amount they enter is really
+    // in units of `Wei` or not.
+    pub const fn new_u64(amount: u64) -> Self {
+        Self(U256([amount, 0, 0, 0]))
+    }
+
+    pub fn from_eth(amount: U256) -> Option<Self> {
+        amount.checked_mul(Self::ETH_TO_WEI).map(Self)
+    }
+
+    pub fn to_bytes(&self) -> [u8; 32] {
+        u256_to_arr(&self.0)
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
+
+    pub fn raw(self) -> U256 {
+        self.0
+    }
+}
+impl prelude::Sub for Wei {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self(self.0 - other.0)
+    }
+}
+impl prelude::Add for Wei {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        Self(self.0 + other.0)
+    }
+}
+
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct U128(pub u128);
 
@@ -29,10 +83,10 @@ pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
 pub struct InternalMetaCallArgs {
     pub sender: Address,
     pub nonce: U256,
-    pub fee_amount: U256,
+    pub fee_amount: Wei,
     pub fee_address: Address,
     pub contract_address: Address,
-    pub value: U256,
+    pub value: Wei,
     pub input: Vec<u8>,
 }
 
@@ -142,5 +196,18 @@ mod tests {
             bytes_to_hex(&[0u8, 1u8, 255u8, 16u8]),
             "0001ff10".to_string()
         );
+    }
+
+    #[test]
+    fn test_wei_from_u64() {
+        let x: u64 = rand::random();
+        assert_eq!(Wei::new_u64(x).raw().as_u64(), x);
+    }
+
+    #[test]
+    fn test_wei_from_eth() {
+        let eth_amount: u64 = rand::random();
+        let wei_amount = U256::from(eth_amount) * U256::from(10).pow(18.into());
+        assert_eq!(Wei::from_eth(eth_amount.into()), Some(Wei::new(wei_amount)));
     }
 }
