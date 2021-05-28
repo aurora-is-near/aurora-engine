@@ -86,8 +86,8 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, PauseEthConnectorCallArgs,
-        TransferCallCallArgs, ViewCallArgs,
+        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs, NewCallArgs,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
     };
     use crate::prelude::{Address, H256, U256};
     use crate::sdk;
@@ -370,7 +370,20 @@ mod contract {
         // Only the owner can initialize the EthConnector
         sdk::assert_private_call();
 
-        EthConnectorContract::init_contract()
+        let args = InitCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+
+        EthConnectorContract::init_contract(args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_eth_connector_contract_data() {
+        // Only the owner can set the EthConnector contract data
+        sdk::assert_private_call();
+
+        let args =
+            SetContractDataCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+
+        EthConnectorContract::set_contract_data(args);
     }
 
     #[no_mangle]

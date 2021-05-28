@@ -72,7 +72,7 @@ impl EthConnectorContract {
     }
 
     /// Init eth-connector contract specific data
-    pub fn init_contract() {
+    pub fn init_contract(args: InitCallArgs) {
         // Check is it already initialized
         assert!(
             !sdk::storage_has_key(&Self::get_contract_key(&EthConnectorStorageId::Contract)),
@@ -80,13 +80,35 @@ impl EthConnectorContract {
         );
         #[cfg(feature = "log")]
         sdk::log("[init contract]");
-        // Get initial contract arguments
-        let args = InitCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+
+        let contract_data = Self::set_contract_data(SetContractDataCallArgs {
+            prover_account: args.prover_account,
+            eth_custodian_address: args.eth_custodian_address,
+        });
+
         let current_account_id = sdk::current_account_id();
         let owner_id = String::from_utf8(current_account_id).unwrap();
         let mut ft = FungibleToken::new();
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
+
+        let paused_mask = UNPAUSE_ALL;
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorStorageId::PausedMask),
+            &paused_mask,
+        );
+
+        Self {
+            contract: contract_data,
+            ft,
+            paused_mask,
+        }
+        .save_ft_contract();
+    }
+
+    /// Sets the contract data and returns it back
+    pub fn set_contract_data(args: SetContractDataCallArgs) -> EthConnector {
+        // Get initial contract arguments
         let contract_data = EthConnector {
             prover_account: args.prover_account,
             eth_custodian_address: validate_eth_address(args.eth_custodian_address),
@@ -97,17 +119,7 @@ impl EthConnectorContract {
             &contract_data,
         );
 
-        let paused_mask = UNPAUSE_ALL;
-        sdk::save_contract(
-            &Self::get_contract_key(&EthConnectorStorageId::PausedMask),
-            &paused_mask,
-        );
-        Self {
-            contract: contract_data,
-            ft,
-            paused_mask,
-        }
-        .save_ft_contract();
+        contract_data
     }
 
     /// Parse event message data for tokens
