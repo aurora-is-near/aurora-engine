@@ -36,7 +36,7 @@ impl<S: AuroraState> Precompile<S> for Blake2F<S> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-152
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
-    fn run(input: &[u8], target_gas: u64, _context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, _context: &Context, _state: &mut S, _is_static: bool) -> PrecompileResult {
         if input.len() != consts::INPUT_LENGTH {
             return Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")));
         }

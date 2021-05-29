@@ -49,7 +49,13 @@ impl<S: AuroraState> Precompile<S> for ECRecover<S> {
         Ok(costs::ECRECOVER_BASE)
     }
 
-    fn run(input: &[u8], target_gas: u64, _context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             return Err(ExitError::OutOfGas);

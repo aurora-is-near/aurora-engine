@@ -37,7 +37,13 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: u64, _context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         use sha2::Digest;
 
         if Self::required_gas(input)? > target_gas {
@@ -57,7 +63,13 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: u64, _context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         use crate::sdk;
 
         let cost = Self::required_gas(input)?;
@@ -89,7 +101,13 @@ impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000003
-    fn run(input: &[u8], target_gas: u64, _context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         use ripemd160::Digest;
 
         let cost = Self::required_gas(input)?;

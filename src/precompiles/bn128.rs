@@ -101,7 +101,13 @@ impl<S: AuroraState> Precompile<S> for BN128Add<Byzantium, S> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -127,7 +133,13 @@ impl<S: AuroraState> Precompile<S> for BN128Add<Istanbul, S> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -179,7 +191,13 @@ impl<S: AuroraState> Precompile<S> for BN128Mul<Byzantium, S> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -204,7 +222,13 @@ impl<S: AuroraState> Precompile<S> for BN128Mul<Istanbul, S> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -328,7 +352,13 @@ impl<S: AuroraState> Precompile<S> for BN128Pair<Byzantium, S> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -356,7 +386,13 @@ impl<S: AuroraState> Precompile<S> for BN128Pair<Istanbul, S> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)

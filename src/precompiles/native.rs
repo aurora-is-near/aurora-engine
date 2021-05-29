@@ -82,7 +82,13 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
     }
 
     #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -96,7 +102,13 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: u64, context: &Context, state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        state: &mut S,
+        is_static: bool,
+    ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -201,7 +213,13 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
     }
 
     #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -215,7 +233,13 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: u64, context: &Context, _state: &mut S) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        state: &mut S,
+        is_static: bool,
+    ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
