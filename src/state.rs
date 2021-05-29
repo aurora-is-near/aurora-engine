@@ -176,6 +176,7 @@ impl<'backend, 'config> StackState<'config> for AuroraStackState<'backend, 'conf
     }
 }
 
+// TODO(MarX): Make tests suggested by Michael (Check other suggestion by him)
 struct Stack<T> {
     stack: Vec<T>,
     boundaries: Vec<usize>,
@@ -183,10 +184,11 @@ struct Stack<T> {
 
 impl<T> Stack<T> {
     fn new() -> Self {
+        let mut boundaries = Vec::new();
+        boundaries.push(0);
         Self {
             stack: Vec::new(),
-            // TODO(MarX): Figure out if this should start with value (0)
-            boundaries: Vec::new(),
+            boundaries,
         }
     }
 

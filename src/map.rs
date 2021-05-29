@@ -48,3 +48,45 @@ impl<const K: KeyPrefixU8> LookupMap<K> {
         sdk::remove_storage(&storage_key);
     }
 }
+
+#[derive(BorshSerialize, BorshDeserialize, Default)]
+pub struct BijectionMap<const LR: KeyPrefixU8, const RL: KeyPrefixU8> {
+    left_to_right: LookupMap<LR>,
+    right_to_left: LookupMap<RL>,
+}
+
+impl<const LR: KeyPrefixU8, const RL: KeyPrefixU8> BijectionMap<LR, RL> {
+    pub fn new() -> Self {
+        Self {
+            left_to_right: LookupMap::<LR>::new(),
+            right_to_left: LookupMap::<RL>::new(),
+        }
+    }
+
+    pub fn insert(&mut self, value_left: &[u8], value_right: &[u8]) {
+        self.left_to_right.insert_raw(value_left, value_right);
+        self.right_to_left.insert_raw(value_right, value_left);
+    }
+
+    pub fn lookup_left(&self, value_left: &[u8]) -> Option<Vec<u8>> {
+        self.left_to_right.get_raw(value_left)
+    }
+
+    pub fn lookup_right(&self, value_right: &[u8]) -> Option<Vec<u8>> {
+        self.right_to_left.get_raw(value_right)
+    }
+
+    pub fn remove_left(&mut self, value_left: &[u8]) {
+        self.left_to_right.remove_raw(value_left);
+        if let Some(value_right) = sdk::storage_get_evicted() {
+            self.right_to_left.remove_raw(value_right.as_slice());
+        }
+    }
+
+    pub fn remove_right(&mut self, value_right: &[u8]) {
+        self.right_to_left.remove_raw(value_right);
+        if let Some(value_left) = sdk::storage_get_evicted() {
+            self.left_to_right.remove_raw(value_left.as_slice());
+        }
+    }
+}

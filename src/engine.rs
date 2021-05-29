@@ -5,9 +5,10 @@ use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::contract::current_address;
-use crate::map::LookupMap;
+use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
-    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, SubmitResult, ViewCallArgs,
+    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
+    ViewCallArgs,
 };
 use crate::precompiles;
 use crate::prelude::{Address, ToString, TryInto, Vec, H256, U256};
@@ -133,10 +134,11 @@ pub struct EngineState {
     pub upgrade_delay_blocks: u64,
     /// Mapping between relayer account id and relayer evm address
     pub relayers_evm_addresses: LookupMap<{ KeyPrefix::RelayerEvmAddressMap as KeyPrefixU8 }>,
-    /// Mapping between erc20 tokens in the EVM to nep141 in NEAR
-    pub nep141_erc20: LookupMap<{ KeyPrefix::Nep141Erc20Map as KeyPrefixU8 }>,
     /// Mapping between nep141 in NEAR to erc20 tokens in the EVM
-    pub erc20_nep141: LookupMap<{ KeyPrefix::Erc20Nep141Map as KeyPrefixU8 }>,
+    pub nep141_erc20: BijectionMap<
+        { KeyPrefix::Nep141Erc20Map as KeyPrefixU8 },
+        { KeyPrefix::Erc20Nep141Map as KeyPrefixU8 },
+    >,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -147,8 +149,7 @@ impl From<NewCallArgs> for EngineState {
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
             relayers_evm_addresses: LookupMap::new(),
-            nep141_erc20: LookupMap::new(),
-            erc20_nep141: LookupMap::new(),
+            nep141_erc20: BijectionMap::new(),
         }
     }
 }
@@ -323,9 +324,9 @@ impl Engine {
         let is_succeed = status.is_succeed();
         status.into_result()?;
         let used_gas = executor.used_gas();
-        // TODO(MarX): Handle promises
-        let (values, logs, _promises) = executor.into_state().deconstruct();
+        let (values, logs, promises) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
+        Self::schedule_promises(promises);
 
         Ok(SubmitResult {
             status: is_succeed,
@@ -352,19 +353,19 @@ impl Engine {
         let mut executor = self.make_executor();
         let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
 
-        let used_gas = executor.used_gas();
-        // TODO(MarX): Handle promises
-        let (values, logs, _promises) = executor.into_state().deconstruct();
         let is_succeed = status.is_succeed();
-
         if let Err(e) = status.into_result() {
             Engine::increment_nonce(&origin);
             return Err(e);
         }
+        let used_gas = executor.used_gas();
+
+        let (values, logs, promises) = executor.into_state().deconstruct();
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
+        Self::schedule_promises(promises);
 
         Ok(SubmitResult {
             status: is_succeed,
@@ -433,19 +434,12 @@ impl Engine {
 
     pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
         // Check that this nep141 token was not registered before, they can only be registered once.
-        assert!(self.state.nep141_erc20.get_raw(nep141_token).is_none());
-
-        self.state
-            .erc20_nep141
-            .insert_raw(erc20_token, nep141_token);
-
-        self.state
-            .nep141_erc20
-            .insert_raw(nep141_token, erc20_token);
+        assert!(self.state.nep141_erc20.lookup_left(nep141_token).is_none());
+        self.state.nep141_erc20.insert(nep141_token, erc20_token);
     }
 
     pub fn get_erc20_from_nep141(&self, nep141_token: &[u8]) -> Option<Vec<u8>> {
-        self.state.nep141_erc20.get_raw(nep141_token)
+        self.state.nep141_erc20.lookup_left(nep141_token)
     }
 
     /// Transfers an amount from a given sender to a receiver, provided that
@@ -557,6 +551,18 @@ impl Engine {
 
         // Everything succeed so return "0"
         sdk::return_output(b"0");
+    }
+
+    fn schedule_promises(promises: impl IntoIterator<Item = PromiseCreateArgs>) {
+        for promise in promises {
+            sdk::promise_create(
+                promise.target_account_id,
+                promise.method.as_bytes(),
+                promise.args.as_slice(),
+                promise.attached_balance,
+                promise.attached_gas,
+            );
+        }
     }
 }
 

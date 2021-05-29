@@ -240,6 +240,30 @@ pub fn remove_storage(key: &[u8]) {
     }
 }
 
+pub fn register_len(register_id: u64) -> Option<u64> {
+    let len = unsafe { exports::register_len(register_id) };
+
+    if len == u64::MAX {
+        None
+    } else {
+        Some(len)
+    }
+}
+
+/// Register used to record evicted values from the storage.
+const EVICTED_REGISTER: u64 = u64::MAX - 1;
+
+// TODO(MarX): Test this function
+/// Reads the most recent value that was evicted with `storage_write` or `storage_remove` command.
+pub fn storage_get_evicted() -> Option<Vec<u8>> {
+    let len = register_len(EVICTED_REGISTER)?;
+    let bytes: Vec<u8> = vec![0u8; len as usize];
+    unsafe {
+        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
+    };
+    Some(bytes)
+}
+
 #[allow(dead_code)]
 pub fn block_timestamp() -> u64 {
     unsafe { exports::block_timestamp() }
