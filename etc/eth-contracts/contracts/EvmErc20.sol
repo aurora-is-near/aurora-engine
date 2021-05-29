@@ -1,9 +1,9 @@
+// SPDX-License-Identifier: CC0 1.0 Universal
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./AdminControlled.sol";
-
 
 /**
  * @title SimpleToken
@@ -29,16 +29,9 @@ contract EvmErc20 is Context, ERC20, AdminControlled {
     function withdrawToNear(bytes memory recipient, uint256 amount) public {
         _burn(msg.sender, amount);
 
-        // TODO(#51): How to concatenate bytes in solidity?
         bytes32 amount_b = bytes32(amount);
-        uint input_size = 32 + recipient.length;
-        bytes memory input = new bytes(32 + recipient.length);
-        for (uint i = 0; i < 32; i++) {
-            input[i] = amount_b[i];
-        }
-        for (uint i = 0; i < recipient.length; i++) {
-            input[i + 32] = recipient[i];
-        }
+        bytes memory input = abi.encodePacked("\x01", amount_b, recipient);
+        uint input_size = 1 + 32 + recipient.length;
 
         assembly {
             let res := staticcall(gas(), 11421322804619973199, add(input, 32), input_size, 0, 32)
@@ -48,20 +41,13 @@ contract EvmErc20 is Context, ERC20, AdminControlled {
     function withdrawToEthereum(address recipient, uint256 amount) public {
         _burn(msg.sender, amount);
 
-        // TODO(#51): How to concatenate bytes in solidity?
         bytes32 amount_b = bytes32(amount);
-
-        bytes memory input = new bytes(32 + 20);
-        for (uint i = 0; i < 32; i++) {
-            input[i] = amount_b[i];
-        }
         bytes20 recipient_b = bytes20(recipient);
-        for (uint i = 0; i < 20; i++) {
-            input[i + 32] = recipient_b[i];
-        }
+        bytes memory input = abi.encodePacked("\x01", amount_b, recipient_b);
+        uint input_size = 1 + 32 + 20;
 
         assembly {
-            let res := staticcall(gas(), 17176159495920586411, add(input, 32), 52, 0, 32)
+            let res := staticcall(gas(), 17176159495920586411, add(input, 32), input_size, 0, 32)
         }
     }
 }

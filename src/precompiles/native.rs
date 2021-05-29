@@ -101,56 +101,77 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
             return Err(ExitError::OutOfGas);
         }
 
-        let (nep141_address, args) = if context.apparent_value != U256::from(0) {
-            // ETH transfer
-            //
-            // Input slice format:
-            //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
+        // First byte of the input is a flag, selecting the behavior to be triggered:
+        //      0x0 -> Eth transfer
+        //      0x1 -> Erc20 transfer
+        let mut input_mut = input;
+        let flag = input[0];
+        input_mut = &input_mut[1..];
 
-            if is_valid_account_id(input) {
-                (
-                    String::from_utf8(crate::sdk::current_account_id()).unwrap(),
-                    crate::prelude::format!(
-                        r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                        String::from_utf8(input.to_vec()).unwrap(),
-                        context.apparent_value.as_u128()
-                    ),
-                )
-            } else {
-                return Err(ExitError::Other(Cow::from(
-                    "ERR_INVALID_RECEIVER_ACCOUNT_ID",
-                )));
+        let (nep141_address, args) = match flag {
+            0x0 => {
+                // ETH transfer
+                //
+                // Input slice format:
+                //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
+
+                if is_valid_account_id(input) {
+                    (
+                        String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                        // There is no way to inject json, given the encoding of both arguments
+                        // as decimal and valid account id respectively.
+                        crate::prelude::format!(
+                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                            String::from_utf8(input.to_vec()).unwrap(),
+                            context.apparent_value.as_u128()
+                        ),
+                    )
+                } else {
+                    return Err(ExitError::Other(Cow::from(
+                        "ERR_INVALID_RECEIVER_ACCOUNT_ID",
+                    )));
+                }
             }
-        } else {
-            // ERC20 transfer
-            //
-            // This precompile branch is expected to be called from the ERC20 burn function\
-            //
-            // Input slice format:
-            //      amount (U256 le bytes) - the amount that was burned
-            //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
+            0x1 => {
+                // ERC20 transfer
+                //
+                // This precompile branch is expected to be called from the ERC20 burn function\
+                //
+                // Input slice format:
+                //      amount (U256 le bytes) - the amount that was burned
+                //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
 
-            let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
+                if context.apparent_value != U256::from(0) {
+                    return Err(ExitError::Other(Cow::from(
+                        "ERR_ETH_ATTACHED_FOR_ERC20_EXIT",
+                    )));
+                }
 
-            let mut input_mut = input;
-            let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
-            input_mut = &input_mut[32..];
+                let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
-            if is_valid_account_id(input_mut) {
-                let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
-                (
-                    nep141_address,
-                    crate::prelude::format!(
-                        r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                        receiver_account_id,
-                        amount
-                    ),
-                )
-            } else {
-                return Err(ExitError::Other(Cow::from(
-                    "ERR_INVALID_RECEIVER_ACCOUNT_ID",
-                )));
+                let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
+                input_mut = &input_mut[32..];
+
+                if is_valid_account_id(input_mut) {
+                    let receiver_account_id: AccountId =
+                        String::from_utf8(input_mut.to_vec()).unwrap();
+                    (
+                        nep141_address,
+                        // There is no way to inject json, given the encoding of both arguments
+                        // as decimal and valid account id respectively.
+                        crate::prelude::format!(
+                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                            receiver_account_id,
+                            amount
+                        ),
+                    )
+                } else {
+                    return Err(ExitError::Other(Cow::from(
+                        "ERR_INVALID_RECEIVER_ACCOUNT_ID",
+                    )));
+                }
             }
+            _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
         };
 
         let promise = PromiseCreateArgs {
@@ -199,57 +220,80 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
             return Err(ExitError::OutOfGas);
         }
 
-        let (nep141_address, serialized_args) = if context.apparent_value != U256::from(0) {
-            // ETH transfer
-            //
-            // Input slice format:
-            //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
+        // First byte of the input is a flag, selecting the behavior to be triggered:
+        //      0x0 -> Eth transfer
+        //      0x1 -> Erc20 transfer
+        let mut input_mut = input;
+        let flag = input[0];
+        input_mut = &input_mut[1..];
 
-            let eth_recipient: String = hex::encode(input);
+        let (nep141_address, serialized_args) = match flag {
+            0x0 => {
+                // ETH transfer
+                //
+                // Input slice format:
+                //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
 
-            if eth_recipient.len() == 20 {
-                (
-                    String::from_utf8(crate::sdk::current_account_id()).unwrap(),
-                    crate::prelude::format!(
-                        r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                        context.apparent_value.as_u128(),
-                        eth_recipient
-                    ),
-                )
-            } else {
-                return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
+                let eth_recipient: String = hex::encode(input);
+
+                if eth_recipient.len() == 20 {
+                    (
+                        String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                        // There is no way to inject json, given the encoding of both arguments
+                        // as decimal and hexadecimal respectively.
+                        crate::prelude::format!(
+                            r#"{{"amount": "{}", "recipient": "{}"}}"#,
+                            context.apparent_value.as_u128(),
+                            eth_recipient
+                        ),
+                    )
+                } else {
+                    return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
+                }
             }
-        } else {
-            // ERC-20 transfer
-            //
-            // This precompile branch is expected to be called from the ERC20 withdraw function
-            // (or burn function with some flag provided that this is expected to be withdrawn)
-            //
-            // Input slice format:
-            //      amount (U256 le bytes) - the amount that was burned
-            //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
+            0x1 => {
+                // ERC-20 transfer
+                //
+                // This precompile branch is expected to be called from the ERC20 withdraw function
+                // (or burn function with some flag provided that this is expected to be withdrawn)
+                //
+                // Input slice format:
+                //      amount (U256 le bytes) - the amount that was burned
+                //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
 
-            let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
+                if context.apparent_value != U256::from(0) {
+                    return Err(ExitError::Other(Cow::from(
+                        "ERR_ETH_ATTACHED_FOR_ERC20_EXIT",
+                    )));
+                }
 
-            let mut input_mut = input;
+                let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
-            let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
-            input_mut = &input_mut[32..];
+                let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
+                input_mut = &input_mut[32..];
 
-            if input_mut.len() == 20 {
-                // Parse ethereum address in hex
-                let eth_recipient: String = hex::encode(input_mut.to_vec());
+                if input_mut.len() == 20 {
+                    // Parse ethereum address in hex
+                    let eth_recipient: String = hex::encode(input_mut.to_vec());
 
-                (
-                    nep141_address,
-                    crate::prelude::format!(
-                        r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                        amount,
-                        eth_recipient
-                    ),
-                )
-            } else {
-                return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
+                    (
+                        nep141_address,
+                        // There is no way to inject json, given the encoding of both arguments
+                        // as decimal and hexadecimal respectively.
+                        crate::prelude::format!(
+                            r#"{{"amount": "{}", "recipient": "{}"}}"#,
+                            amount,
+                            eth_recipient
+                        ),
+                    )
+                } else {
+                    return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
+                }
+            }
+            _ => {
+                return Err(ExitError::Other(Cow::from(
+                    "ERR_INVALID_RECEIVER_ACCOUNT_ID",
+                )));
             }
         };
 

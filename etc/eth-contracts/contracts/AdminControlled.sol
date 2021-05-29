@@ -1,5 +1,5 @@
+// SPDX-License-Identifier: CC0 1.0 Universal
 pragma solidity ^0.8.0;
-
 
 contract AdminControlled {
     address public admin;
