@@ -113,6 +113,10 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
             return Err(ExitError::OutOfGas);
         }
 
+        if is_static {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        }
+
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
@@ -244,6 +248,10 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
             return Err(ExitError::OutOfGas);
         }
 
+        if is_static {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        }
+
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
@@ -321,15 +329,15 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
             }
         };
 
-        let promise0 = crate::sdk::promise_create(
-            nep141_address,
-            b"withdraw",
-            serialized_args.as_bytes(),
-            1,
-            costs::WITHDRAWAL_GAS,
-        );
+        let promise = PromiseCreateArgs {
+            target_account_id: nep141_address,
+            method: "withdraw".to_string(),
+            args: serialized_args.as_bytes().to_vec(),
+            attached_balance: 1,
+            attached_gas: costs::WITHDRAWAL_GAS,
+        };
 
-        crate::sdk::promise_return(promise0);
+        state.add_promise(promise);
 
         Ok(PrecompileOutput {
             exit_status: ExitSucceed::Returned,
