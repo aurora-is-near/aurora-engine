@@ -180,10 +180,15 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
         )
         .unwrap();
-        let modexp_res =
-            ModExp::<Byzantium, _>::run(&test_input1, 12_288, &new_context(), &mut new_state())
-                .unwrap()
-                .output;
+        let modexp_res = ModExp::<Byzantium, _>::run(
+            &test_input1,
+            12_288,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         let res = U256::from_big_endian(&modexp_res);
 
         assert_eq!(res, U256::from(1));
@@ -196,10 +201,15 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
         )
         .unwrap();
-        let modexp_res =
-            ModExp::<Byzantium, _>::run(&test_input2, 12_288, &new_context(), &mut new_state())
-                .unwrap()
-                .output;
+        let modexp_res = ModExp::<Byzantium, _>::run(
+            &test_input2,
+            12_288,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         let res = U256::from_big_endian(&modexp_res);
 
         assert_eq!(res, U256::from(0));
@@ -212,9 +222,14 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd",
         )
         .unwrap();
-        assert!(
-            ModExp::<Byzantium, _>::run(&test_input3, 0, &new_context(), &mut new_state()).is_err()
-        );
+        assert!(ModExp::<Byzantium, _>::run(
+            &test_input3,
+            0,
+            &new_context(),
+            &mut new_state(),
+            false
+        )
+        .is_err());
 
         let test_input4 = hex::decode(
             "0000000000000000000000000000000000000000000000000000000000000001\
@@ -230,10 +245,15 @@ mod tests {
             &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
                 .unwrap(),
         );
-        let modexp_res =
-            ModExp::<Byzantium, _>::run(&test_input4, 12_288, &new_context(), &mut new_state())
-                .unwrap()
-                .output;
+        let modexp_res = ModExp::<Byzantium, _>::run(
+            &test_input4,
+            12_288,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         let res = U256::from_big_endian(&modexp_res);
         assert_eq!(res, expected);
 
@@ -250,10 +270,15 @@ mod tests {
             &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
                 .unwrap(),
         );
-        let modexp_res =
-            ModExp::<Byzantium, _>::run(&test_input5, 12_288, &new_context(), &mut new_state())
-                .unwrap()
-                .output;
+        let modexp_res = ModExp::<Byzantium, _>::run(
+            &test_input5,
+            12_288,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         let res = U256::from_big_endian(&modexp_res);
         assert_eq!(res, expected);
     }

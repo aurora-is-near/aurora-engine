@@ -69,19 +69,19 @@ mod tests {
         let input = [0u8, 1, 2, 3];
 
         let expected = input[0..2].to_vec();
-        let res = Identity::run(&input[0..2], 18, &new_context(), &mut new_state())
+        let res = Identity::run(&input[0..2], 18, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
 
         let expected = input.to_vec();
-        let res = Identity::run(&input, 18, &new_context(), &mut new_state())
+        let res = Identity::run(&input, 18, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
 
         // gas fail
-        let res = Identity::run(&input[0..2], 17, &new_context(), &mut new_state());
+        let res = Identity::run(&input[0..2], 17, &new_context(), &mut new_state(), false);
 
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
@@ -90,7 +90,7 @@ mod tests {
             0u8, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
             24, 25, 26, 27, 28, 29, 30, 31, 32,
         ];
-        let res = Identity::run(&input, 21, &new_context(), &mut new_state())
+        let res = Identity::run(&input, 21, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, input.to_vec());

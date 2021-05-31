@@ -431,9 +431,10 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state())
-            .unwrap()
-            .output;
+        let res =
+            BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state(), false)
+                .unwrap()
+                .output;
         assert_eq!(res, expected);
 
         // zero sum test
@@ -452,9 +453,10 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state())
-            .unwrap()
-            .output;
+        let res =
+            BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state(), false)
+                .unwrap()
+                .output;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -466,7 +468,8 @@ mod tests {
             0000000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = BN128Add::<Byzantium, _>::run(&input, 499, &new_context(), &mut new_state());
+        let res =
+            BN128Add::<Byzantium, _>::run(&input, 499, &new_context(), &mut new_state(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -478,9 +481,10 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state())
-            .unwrap()
-            .output;
+        let res =
+            BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state(), false)
+                .unwrap()
+                .output;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -493,7 +497,8 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state());
+        let res =
+            BN128Add::<Byzantium, _>::run(&input, 500, &new_context(), &mut new_state(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -516,9 +521,10 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state())
-            .unwrap()
-            .output;
+        let res =
+            BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state(), false)
+                .unwrap()
+                .output;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -529,7 +535,8 @@ mod tests {
             0200000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = BN128Mul::<Byzantium, _>::run(&input, 39_999, &new_context(), &mut new_state());
+        let res =
+            BN128Mul::<Byzantium, _>::run(&input, 39_999, &new_context(), &mut new_state(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // zero multiplication test
@@ -547,9 +554,10 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state())
-            .unwrap()
-            .output;
+        let res =
+            BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state(), false)
+                .unwrap()
+                .output;
         assert_eq!(res, expected);
 
         // no input test
@@ -561,9 +569,10 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state())
-            .unwrap()
-            .output;
+        let res =
+            BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state(), false)
+                .unwrap()
+                .output;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -575,7 +584,8 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state());
+        let res =
+            BN128Mul::<Byzantium, _>::run(&input, 40_000, &new_context(), &mut new_state(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -604,9 +614,15 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = BN128Pair::<Byzantium, _>::run(&input, 260_000, &new_context(), &mut new_state())
-            .unwrap()
-            .output;
+        let res = BN128Pair::<Byzantium, _>::run(
+            &input,
+            260_000,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -626,7 +642,13 @@ mod tests {
             12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
         )
         .unwrap();
-        let res = BN128Pair::<Byzantium, _>::run(&input, 259_999, &new_context(), &mut new_state());
+        let res = BN128Pair::<Byzantium, _>::run(
+            &input,
+            259_999,
+            &new_context(),
+            &mut new_state(),
+            false,
+        );
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -635,9 +657,15 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = BN128Pair::<Byzantium, _>::run(&input, 260_000, &new_context(), &mut new_state())
-            .unwrap()
-            .output;
+        let res = BN128Pair::<Byzantium, _>::run(
+            &input,
+            260_000,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -652,7 +680,13 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Pair::<Byzantium, _>::run(&input, 260_000, &new_context(), &mut new_state());
+        let res = BN128Pair::<Byzantium, _>::run(
+            &input,
+            260_000,
+            &new_context(),
+            &mut new_state(),
+            false,
+        );
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
@@ -668,7 +702,13 @@ mod tests {
         )
         .unwrap();
 
-        let res = BN128Pair::<Byzantium, _>::run(&input, 260_000, &new_context(), &mut new_state());
+        let res = BN128Pair::<Byzantium, _>::run(
+            &input,
+            260_000,
+            &new_context(),
+            &mut new_state(),
+            false,
+        );
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN",)))

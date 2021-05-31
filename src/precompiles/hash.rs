@@ -142,7 +142,7 @@ mod tests {
             hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
                 .unwrap();
 
-        let res = SHA256::run(input, 60, &new_context(), &mut new_state())
+        let res = SHA256::run(input, 60, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -155,7 +155,7 @@ mod tests {
             hex::decode("0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31")
                 .unwrap();
 
-        let res = RIPEMD160::run(input, 600, &new_context(), &mut new_state())
+        let res = RIPEMD160::run(input, 600, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
