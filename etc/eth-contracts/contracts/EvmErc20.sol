@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./AdminControlled.sol";
+import "./IExit.sol";
 
 /**
  * @title SimpleToken
@@ -11,7 +12,7 @@ import "./AdminControlled.sol";
  * Note they can later distribute these tokens as they wish using `transfer` and other
  * `ERC20` functions.
  */
-contract EvmErc20 is Context, ERC20, AdminControlled {
+contract EvmErc20 is Context, ERC20, AdminControlled, IExit {
     uint8 private _decimals;
 
     constructor (string memory name, string memory symbol, uint8 decimal, address admin)  ERC20(name, symbol) AdminControlled(admin, 0) {
@@ -26,7 +27,7 @@ contract EvmErc20 is Context, ERC20, AdminControlled {
         _mint(account, amount);
     }
 
-    function withdrawToNear(bytes memory recipient, uint256 amount) public {
+    function withdrawToNear(bytes memory recipient, uint256 amount) external override {
         _burn(msg.sender, amount);
 
         bytes32 amount_b = bytes32(amount);
@@ -38,7 +39,7 @@ contract EvmErc20 is Context, ERC20, AdminControlled {
         }
     }
 
-    function withdrawToEthereum(address recipient, uint256 amount) public {
+    function withdrawToEthereum(address recipient, uint256 amount) external override {
         _burn(msg.sender, amount);
 
         bytes32 amount_b = bytes32(amount);
