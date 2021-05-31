@@ -603,3 +603,121 @@ pub fn parse_meta_call(
         Err(_) => Err(ParsingError::InvalidEcRecoverSignature),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ArgType;
+    use rand::Rng;
+
+    #[test]
+    fn test_parse_type() {
+        // # atomic types
+
+        // ## bytesN
+        for n in 1..=32 {
+            let s = format!("bytes{}", n);
+            assert_arg_type(&s, ArgType::Byte(n));
+        }
+        assert_arg_type("byte", ArgType::Byte(1));
+
+        // ## uintN
+        for n in 1..=32 {
+            let s = format!("uint{}", 8 * n);
+            assert_arg_type(&s, ArgType::Uint);
+        }
+        assert_arg_type("uint", ArgType::Uint);
+
+        // ## intN
+        for n in 1..=32 {
+            let s = format!("int{}", 8 * n);
+            assert_arg_type(&s, ArgType::Int);
+        }
+        assert_arg_type("int", ArgType::Int);
+
+        // ## bool
+        assert_arg_type("bool", ArgType::Bool);
+
+        // ## address
+        assert_arg_type("address", ArgType::Address);
+
+        // ## custom
+        let mut rng = rand::thread_rng();
+        for _ in 0..u8::MAX {
+            let name = rand_identifier(&mut rng);
+            assert_arg_type(&name, ArgType::Custom(name.clone()));
+        }
+
+        // # dynamic types
+
+        // ## bytes
+        assert_arg_type("bytes", ArgType::Bytes);
+
+        // ## string
+        assert_arg_type("string", ArgType::String);
+
+        // # arrays
+        let inner_types: Vec<String> = (1..=32)
+            .map(|n| format!("bytes{}", n))
+            .chain((1..=32).map(|n| format!("uint{}", 8 * n)))
+            .chain((1..=32).map(|n| format!("int{}", 8 * n)))
+            .chain(std::iter::once("bool".to_string()))
+            .chain(std::iter::once("address".to_string()))
+            .chain(std::iter::once(rand_identifier(&mut rng)))
+            .chain(std::iter::once("bytes".to_string()))
+            .chain(std::iter::once("string".to_string()))
+            .collect();
+        for t in inner_types {
+            let inner_type = super::parse_type(&t).ok().unwrap();
+            let size: Option<u8> = rng.gen();
+
+            // single array
+            let single_array_string = create_array_type_string(&t, size);
+            let expected = ArgType::Array {
+                length: size.map(|x| x as u64),
+                inner: Box::new(inner_type),
+            };
+            assert_arg_type(&single_array_string, expected.clone());
+
+            // nested array
+            let inner_type = expected;
+            let size: Option<u8> = rng.gen();
+            let nested_array_string = create_array_type_string(&single_array_string, size);
+            let expected = ArgType::Array {
+                length: size.map(|x| x as u64),
+                inner: Box::new(inner_type),
+            };
+            assert_arg_type(&nested_array_string, expected);
+        }
+
+        // # errors
+        // ## only numbers
+        super::parse_type("27182818").unwrap_err();
+        // ## invalid characters
+        super::parse_type("Some.InvalidType").unwrap_err();
+        super::parse_type("Some::NotType").unwrap_err();
+        super::parse_type("*AThing*").unwrap_err();
+    }
+
+    fn create_array_type_string(inner_type: &str, size: Option<u8>) -> String {
+        format!(
+            "{}[{}]",
+            inner_type,
+            size.map(|x| x.to_string()).unwrap_or(String::new())
+        )
+    }
+
+    fn assert_arg_type(s: &str, expected: ArgType) {
+        assert_eq!(super::parse_type(s).ok().unwrap(), expected);
+    }
+
+    fn rand_identifier<T: Rng>(rng: &mut T) -> String {
+        use rand::distributions::Alphanumeric;
+        use rand::seq::IteratorRandom;
+
+        // The first character must be a letter, so we sample that separately.
+        let first_char = ('a'..='z').chain('A'..='Z').choose(rng).unwrap();
+        let other_letters = (0..7).map(|_| char::from(rng.sample(Alphanumeric)));
+
+        std::iter::once(first_char).chain(other_letters).collect()
+    }
+}
