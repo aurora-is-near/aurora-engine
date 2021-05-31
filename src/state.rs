@@ -5,6 +5,7 @@ use evm::{ExitError, Transfer};
 use crate::engine::Engine;
 use crate::parameters::PromiseCreateArgs;
 use crate::prelude::{Vec, H160, H256, U256};
+use crate::types::Stack;
 use crate::AuroraState;
 
 pub struct AuroraStackState<'backend, 'config> {
@@ -29,13 +30,13 @@ impl<'backend, 'config> AuroraStackState<'backend, 'config> {
         impl IntoIterator<Item = PromiseCreateArgs>,
     ) {
         let (apply_iter, log_iter) = self.memory_stack_state.deconstruct();
-        (apply_iter, log_iter, self.promises.stack)
+        (apply_iter, log_iter, self.promises.into_vec())
     }
 }
 
 impl<'backend, 'config> AuroraState for AuroraStackState<'backend, 'config> {
     fn add_promise(&mut self, promise: PromiseCreateArgs) {
-        self.promises.add(promise);
+        self.promises.push(promise);
     }
 }
 
@@ -173,41 +174,5 @@ impl<'backend, 'config> StackState<'config> for AuroraStackState<'backend, 'conf
 
     fn touch(&mut self, address: H160) {
         self.memory_stack_state.touch(address)
-    }
-}
-
-// TODO(MarX): Make tests suggested by Michael (Check other suggestion by him)
-struct Stack<T> {
-    stack: Vec<T>,
-    boundaries: Vec<usize>,
-}
-
-impl<T> Stack<T> {
-    fn new() -> Self {
-        let mut boundaries = Vec::new();
-        boundaries.push(0);
-        Self {
-            stack: Vec::new(),
-            boundaries,
-        }
-    }
-
-    fn enter(&mut self) {
-        self.boundaries.push(self.stack.len());
-    }
-
-    fn commit(&mut self) {
-        self.boundaries.pop().unwrap();
-    }
-
-    fn discard(&mut self) {
-        let boundary = self.boundaries.pop().unwrap();
-        while self.stack.len() > boundary {
-            self.stack.pop().unwrap();
-        }
-    }
-
-    fn add(&mut self, value: T) {
-        self.stack.push(value);
     }
 }
