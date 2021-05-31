@@ -466,19 +466,7 @@ impl Engine {
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
-    ///
-    /// TODO(#51): Carefully review that this function can't fail,
-    ///     and returns appropriate value
-    pub fn receive_erc20_tokens(&mut self) {
-        let input = sdk::read_input();
-
-        let args: NEP141FtOnTransferArgs = unwrap_res_or_finish!(
-            NEP141FtOnTransferArgs::try_from_slice(input.as_slice()),
-            // At this point the amount is not known yet.
-            // It is responsibility of the NEP141 to provide correct arguments.
-            b"0"
-        );
-
+    pub fn receive_erc20_tokens(&mut self, args: NEP141FtOnTransferArgs) {
         let str_amount = args.amount.to_string();
         let output_on_fail = str_amount.as_bytes();
 

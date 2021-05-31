@@ -45,7 +45,8 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        DeployErc20TokenArgs, FunctionCallArgs, GetStorageAtArgs, NewCallArgs, ViewCallArgs,
+        DeployErc20TokenArgs, FunctionCallArgs, GetStorageAtArgs, NEP141FtOnTransferArgs,
+        NewCallArgs, ViewCallArgs,
     };
     use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
     use crate::sdk;
@@ -274,7 +275,11 @@ mod contract {
         );
     }
 
-    /// Allow receiving NEP141 tokens to the EVM contract
+    /// Allow receiving NEP141 tokens to the EVM contract.
+    ///
+    /// This function returns the amount of tokens to return to the sender.
+    /// Either all tokens are transferred tokens are returned in case of an
+    /// error, or no token is returned if tx was successful.
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
         #[allow(clippy::if_same_then_else)]
@@ -283,7 +288,19 @@ mod contract {
             todo!();
         } else {
             let mut engine = Engine::new(predecessor_address());
-            engine.receive_erc20_tokens();
+
+            let input = sdk::read_input();
+
+            let args = if let Ok(args) = NEP141FtOnTransferArgs::try_from_slice(input.as_slice()) {
+                args
+            } else {
+                // At this point the amount is not known yet.
+                // It is responsibility of the NEP141 to provide correct arguments.
+                sdk::return_output(b"0");
+                return;
+            };
+
+            engine.receive_erc20_tokens(args);
         }
     }
 
@@ -298,8 +315,8 @@ mod contract {
 
         let erc20_contract = include_bytes!("../etc/eth-contracts/res/EvmErc20.bin");
         let deploy_args = ethabi::encode(&[
-            ethabi::Token::String("TestToken".to_string()),
-            ethabi::Token::String("TT".to_string()),
+            ethabi::Token::String("Empty".to_string()),
+            ethabi::Token::String("EMPTY".to_string()),
             ethabi::Token::Uint(ethabi::Uint::from(0)),
             ethabi::Token::Address(current_address().into()),
         ]);
