@@ -292,6 +292,7 @@ impl Engine {
         //     Either way you may have to store the nonce per storage address root. When the account
         //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
         //     can be deleted over time. That's how TurboGeth does storage.
+        Self::set_generation(address, generation + 1);
     }
 
     /// Removes an account.
@@ -300,7 +301,6 @@ impl Engine {
         Self::remove_balance(address);
         Self::remove_code(address);
         Self::remove_all_storage(address);
-        Self::set_generation(address, generation + 1);
     }
 
     /// Removes an account if it is empty.
