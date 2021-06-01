@@ -1,5 +1,5 @@
-use crate::precompiles::{Precompile, PrecompileResult};
-use evm::{Context, ExitError, ExitSucceed};
+use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
+use evm::{Context, ExitError};
 
 /// Identity precompile costs.
 mod costs {
@@ -39,7 +39,11 @@ impl Precompile for Identity {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            Ok((ExitSucceed::Returned, input.to_vec(), cost))
+            Ok(PrecompileOutput {
+                output: input.to_vec(),
+                cost,
+                ..Default::default()
+            })
         }
     }
 }

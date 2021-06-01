@@ -1,7 +1,7 @@
-use crate::precompiles::{Precompile, PrecompileResult};
+use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use crate::prelude::*;
 use ethabi::Address;
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError};
 
 mod costs {
     pub(super) const ECRECOVER_BASE: u64 = 3_000;
@@ -72,7 +72,11 @@ impl Precompile for ECRecover {
         let v_bit = match v[31] {
             27 | 28 if v[..31] == [0; 31] => v[31] - 27,
             _ => {
-                return Ok((ExitSucceed::Returned, vec![255u8; 32], 0)); // Not confident on this return.
+                return Ok(PrecompileOutput {
+                    cost: 0,
+                    output: vec![255u8; 32],
+                    ..Default::default()
+                });
             }
         };
         signature[64] = v_bit; // v
@@ -89,7 +93,11 @@ impl Precompile for ECRecover {
             }
         };
 
-        Ok((ExitSucceed::Returned, output.to_vec(), cost))
+        Ok(PrecompileOutput {
+            cost,
+            output,
+            ..Default::default()
+        })
     }
 }
 

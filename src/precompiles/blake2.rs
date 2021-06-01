@@ -1,6 +1,6 @@
-use crate::precompiles::{Precompile, PrecompileResult};
+use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use crate::prelude::{mem, Borrowed, TryInto};
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError};
 
 /// Blake2 costs.
 mod costs {
@@ -80,8 +80,12 @@ impl Precompile for Blake2F {
         }
         let finished = input[212] != 0;
 
-        let res = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
-        Ok((ExitSucceed::Returned, res, cost))
+        let output = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
+        Ok(PrecompileOutput {
+            cost,
+            output,
+            ..Default::default()
+        })
     }
 }
 

@@ -17,10 +17,41 @@ use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::precompiles::secp256k1::ECRecover;
 use crate::prelude::{Address, Vec};
+use evm::backend::Log;
 use evm::{Context, ExitError, ExitSucceed};
 
+#[derive(Debug)]
+pub struct PrecompileOutput {
+    pub cost: u64,
+    pub output: Vec<u8>,
+    pub logs: Vec<Log>,
+}
+
+impl Default for PrecompileOutput {
+    fn default() -> Self {
+        PrecompileOutput {
+            cost: 0,
+            output: Vec::new(),
+            logs: Vec::new(),
+        }
+    }
+}
+
+impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
+    fn from(output: PrecompileOutput) -> Self {
+        evm::executor::PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            cost: output.cost,
+            output: output.output,
+            logs: output.logs,
+        }
+    }
+}
+
 /// A precompile operation result.
-type PrecompileResult = Result<(ExitSucceed, Vec<u8>, u64), ExitError>;
+type PrecompileResult = Result<PrecompileOutput, ExitError>;
+
+type EvmPrecompileResult = Result<evm::executor::PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
 trait Precompile {
@@ -61,7 +92,7 @@ pub fn no_precompiles(
     _input: &[u8],
     _target_gas: Option<u64>,
     _context: &Context,
-) -> Option<PrecompileResult> {
+) -> Option<EvmPrecompileResult> {
     None // no precompiles supported
 }
 
@@ -72,13 +103,13 @@ pub fn homestead_precompiles(
     input: &[u8],
     target_gas: Option<u64>,
     context: &Context,
-) -> Option<PrecompileResult> {
+) -> Option<EvmPrecompileResult> {
     let target_gas = match target_gas {
         Some(t) => t,
-        None => return Some(PrecompileResult::Err(ExitError::OutOfGas)),
+        None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
     };
 
-    match address.0 {
+    let output = match address.0 {
         ECRecover::ADDRESS => Some(ECRecover::run(input, target_gas, context)),
         SHA256::ADDRESS => Some(SHA256::run(input, target_gas, context)),
         RIPEMD160::ADDRESS => Some(RIPEMD160::run(input, target_gas, context)),
@@ -87,7 +118,8 @@ pub fn homestead_precompiles(
         #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
-    }
+    };
+    output.map(|res| res.map(|o| o.into()))
 }
 
 /// Matches the address given to Byzantium precompiles.
@@ -97,13 +129,13 @@ pub fn byzantium_precompiles(
     input: &[u8],
     target_gas: Option<u64>,
     context: &Context,
-) -> Option<PrecompileResult> {
+) -> Option<EvmPrecompileResult> {
     let target_gas = match target_gas {
         Some(t) => t,
-        None => return Some(PrecompileResult::Err(ExitError::OutOfGas)),
+        None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
     };
 
-    match address.0 {
+    let output = match address.0 {
         ECRecover::ADDRESS => Some(ECRecover::run(input, target_gas, context)),
         SHA256::ADDRESS => Some(SHA256::run(input, target_gas, context)),
         RIPEMD160::ADDRESS => Some(RIPEMD160::run(input, target_gas, context)),
@@ -117,7 +149,8 @@ pub fn byzantium_precompiles(
         #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
-    }
+    };
+    output.map(|res| res.map(|o| o.into()))
 }
 
 /// Matches the address given to Istanbul precompiles.
@@ -127,13 +160,13 @@ pub fn istanbul_precompiles(
     input: &[u8],
     target_gas: Option<u64>,
     context: &Context,
-) -> Option<PrecompileResult> {
+) -> Option<EvmPrecompileResult> {
     let target_gas = match target_gas {
         Some(t) => t,
-        None => return Some(PrecompileResult::Err(ExitError::OutOfGas)),
+        None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
     };
 
-    match address.0 {
+    let output = match address.0 {
         ECRecover::ADDRESS => Some(ECRecover::run(input, target_gas, context)),
         SHA256::ADDRESS => Some(SHA256::run(input, target_gas, context)),
         RIPEMD160::ADDRESS => Some(RIPEMD160::run(input, target_gas, context)),
@@ -148,7 +181,8 @@ pub fn istanbul_precompiles(
         #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
-    }
+    };
+    output.map(|res| res.map(|o| o.into()))
 }
 
 /// Matches the address given to Berlin precompiles.
@@ -158,13 +192,13 @@ pub fn berlin_precompiles(
     input: &[u8],
     target_gas: Option<u64>,
     context: &Context,
-) -> Option<PrecompileResult> {
+) -> Option<EvmPrecompileResult> {
     let target_gas = match target_gas {
         Some(t) => t,
-        None => return Some(PrecompileResult::Err(ExitError::OutOfGas)),
+        None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
     };
 
-    match address.0 {
+    let output = match address.0 {
         ECRecover::ADDRESS => Some(ECRecover::run(input, target_gas, context)),
         SHA256::ADDRESS => Some(SHA256::run(input, target_gas, context)),
         RIPEMD160::ADDRESS => Some(RIPEMD160::run(input, target_gas, context)),
@@ -179,7 +213,8 @@ pub fn berlin_precompiles(
         #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
-    }
+    };
+    output.map(|res| res.map(|o| o.into()))
 }
 
 /// const fn for making an address by concatenating the bytes from two given numbers,

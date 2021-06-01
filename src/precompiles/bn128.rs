@@ -1,6 +1,8 @@
-use crate::precompiles::{Byzantium, HardFork, Istanbul, Precompile, PrecompileResult};
+use crate::precompiles::{
+    Byzantium, HardFork, Istanbul, Precompile, PrecompileOutput, PrecompileResult,
+};
 use crate::prelude::*;
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError};
 
 /// bn128 costs.
 mod costs {
@@ -112,8 +114,12 @@ impl Precompile for BN128Add<Byzantium> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput {
+                cost,
+                output,
+                ..Default::default()
+            })
         }
     }
 }
@@ -133,8 +139,12 @@ impl Precompile for BN128Add<Istanbul> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput {
+                cost,
+                output,
+                ..Default::default()
+            })
         }
     }
 }
@@ -180,8 +190,12 @@ impl Precompile for BN128Mul<Byzantium> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput {
+                cost,
+                output,
+                ..Default::default()
+            })
         }
     }
 }
@@ -200,8 +214,12 @@ impl Precompile for BN128Mul<Istanbul> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput {
+                cost,
+                output,
+                ..Default::default()
+            })
         }
     }
 }
@@ -319,8 +337,12 @@ impl Precompile for BN128Pair<Byzantium> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput {
+                cost,
+                output,
+                ..Default::default()
+            })
         }
     }
 }
@@ -342,8 +364,12 @@ impl Precompile for BN128Pair<Istanbul> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok((ExitSucceed::Returned, res, cost))
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput {
+                cost,
+                output,
+                ..Default::default()
+            })
         }
     }
 }
