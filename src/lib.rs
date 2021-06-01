@@ -329,7 +329,6 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
-        let input = sdk::read_input();
         let args: GetStorageAtArgs = sdk::read_input_borsh().sdk_unwrap();
         let address = Address(args.address);
         let generation = Engine::get_generation(&address);

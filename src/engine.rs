@@ -283,7 +283,7 @@ impl Engine {
     }
 
     /// Removes all storage for the given address.
-    pub fn remove_all_storage(_address: &Address) {
+    pub fn remove_all_storage(address: &Address, generation: u32) {
         // FIXME: there is presently no way to prefix delete trie state.
         // NOTE: There is not going to be a method on runtime for this.
         //     You may need to store all keys in a list if you want to do this in a contract.
@@ -300,7 +300,7 @@ impl Engine {
         Self::remove_nonce(address);
         Self::remove_balance(address);
         Self::remove_code(address);
-        Self::remove_all_storage(address);
+        Self::remove_all_storage(address, generation);
     }
 
     /// Removes an account if it is empty.
@@ -574,7 +574,7 @@ impl ApplyBackend for Engine {
                     }
 
                     if reset_storage {
-                        Engine::remove_all_storage(&address)
+                        Engine::remove_all_storage(&address, generation)
                     }
 
                     for (index, value) in storage {
