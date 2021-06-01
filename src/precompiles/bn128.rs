@@ -405,7 +405,7 @@ mod tests {
 
         let res = BN128Add::<Byzantium>::run(&input, 500, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // zero sum test
@@ -426,7 +426,7 @@ mod tests {
 
         let res = BN128Add::<Byzantium>::run(&input, 500, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -452,7 +452,7 @@ mod tests {
 
         let res = BN128Add::<Byzantium>::run(&input, 500, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -490,7 +490,7 @@ mod tests {
 
         let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -521,7 +521,7 @@ mod tests {
 
         let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // no input test
@@ -535,7 +535,7 @@ mod tests {
 
         let res = BN128Mul::<Byzantium>::run(&input, 40_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // point not on curve fail
@@ -578,7 +578,7 @@ mod tests {
 
         let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // out of gas test
@@ -609,7 +609,7 @@ mod tests {
 
         let res = BN128Pair::<Byzantium>::run(&input, 260_000, &new_context())
             .unwrap()
-            .1;
+            .output;
         assert_eq!(res, expected);
 
         // point not on curve fail

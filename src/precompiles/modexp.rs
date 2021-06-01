@@ -176,7 +176,7 @@ mod tests {
         .unwrap();
         let modexp_res = ModExp::<Byzantium>::run(&test_input1, 12_288, &new_context())
             .unwrap()
-            .1;
+            .output;
         let res = U256::from_big_endian(&modexp_res);
 
         assert_eq!(res, U256::from(1));
@@ -191,7 +191,7 @@ mod tests {
         .unwrap();
         let modexp_res = ModExp::<Byzantium>::run(&test_input2, 12_288, &new_context())
             .unwrap()
-            .1;
+            .output;
         let res = U256::from_big_endian(&modexp_res);
 
         assert_eq!(res, U256::from(0));
@@ -222,7 +222,7 @@ mod tests {
         );
         let modexp_res = ModExp::<Byzantium>::run(&test_input4, 12_288, &new_context())
             .unwrap()
-            .1;
+            .output;
         let res = U256::from_big_endian(&modexp_res);
         assert_eq!(res, expected);
 
@@ -241,7 +241,7 @@ mod tests {
         );
         let modexp_res = ModExp::<Byzantium>::run(&test_input5, 12_288, &new_context())
             .unwrap()
-            .1;
+            .output;
         let res = U256::from_big_endian(&modexp_res);
         assert_eq!(res, expected);
     }

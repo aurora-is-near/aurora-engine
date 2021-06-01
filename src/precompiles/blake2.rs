@@ -199,12 +199,12 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context()).unwrap().1
+        Blake2F::run(&input, 12, &new_context()).unwrap().output
     }
 
     fn test_blake2f_r_12() -> Vec<u8> {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, 12, &new_context()).unwrap().1
+        Blake2F::run(&input, 12, &new_context()).unwrap().output
     }
 
     fn test_blake2f_final_block_false() -> Vec<u8> {
@@ -222,7 +222,7 @@ mod tests {
             00",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context()).unwrap().1
+        Blake2F::run(&input, 12, &new_context()).unwrap().output
     }
 
     #[test]

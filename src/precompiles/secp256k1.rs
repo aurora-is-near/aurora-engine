@@ -138,7 +138,9 @@ mod tests {
             hex::decode("000000000000000000000000c08b5542d177ac6686946920409741463a15dddb")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context()).unwrap().1;
+        let res = ECRecover::run(&input, 3_000, &new_context())
+            .unwrap()
+            .output;
         assert_eq!(res, expected);
 
         // out of gas
@@ -153,7 +155,9 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context()).unwrap().1;
+        let res = ECRecover::run(&input, 3_000, &new_context())
+            .unwrap()
+            .output;
         assert_eq!(res, expected);
 
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b000000000000000000000000000000000000000000000000000000000000001b0000000000000000000000000000000000000000000000000000000000000000").unwrap();
@@ -161,7 +165,9 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context()).unwrap().1;
+        let res = ECRecover::run(&input, 3_000, &new_context())
+            .unwrap()
+            .output;
         assert_eq!(res, expected);
 
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001b").unwrap();
@@ -169,7 +175,9 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context()).unwrap().1;
+        let res = ECRecover::run(&input, 3_000, &new_context())
+            .unwrap()
+            .output;
         assert_eq!(res, expected);
 
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000001b").unwrap();
@@ -177,14 +185,16 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context()).unwrap().1;
+        let res = ECRecover::run(&input, 3_000, &new_context())
+            .unwrap()
+            .output;
         assert_eq!(res, expected);
 
         // Why is this test returning an address???
         // let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b000000000000000000000000000000000000000000000000000000000000001bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
         // let expected = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
         //
-        // let res = ecrecover_raw(&input, Some(500)).unwrap().1;
+        // let res = ecrecover_raw(&input, Some(500)).unwrap().output;
         // assert_eq!(res, expected);
     }
 }

@@ -45,8 +45,17 @@ impl Precompile for SHA256 {
             return Err(ExitError::OutOfGas);
         }
 
-        let hash = sha2::Sha256::digest(input);
-        Ok((ExitSucceed::Returned, hash.to_vec(), 0))
+        let cost = Self::required_gas(input)?;
+        if cost > target_gas {
+            Err(ExitError::OutOfGas)
+        } else {
+            let output = sha2::Sha256::digest(input).to_vec();
+            Ok(PrecompileOutput {
+                cost,
+                output,
+                ..Default::default()
+            })
+        }
     }
 
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
@@ -129,7 +138,7 @@ mod tests {
             hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
                 .unwrap();
 
-        let res = SHA256::run(input, 60, &new_context()).unwrap().1;
+        let res = SHA256::run(input, 60, &new_context()).unwrap().output;
         assert_eq!(res, expected);
     }
 
@@ -140,7 +149,7 @@ mod tests {
             hex::decode("0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31")
                 .unwrap();
 
-        let res = RIPEMD160::run(input, 600, &new_context()).unwrap().1;
+        let res = RIPEMD160::run(input, 600, &new_context()).unwrap().output;
         assert_eq!(res, expected);
     }
 }
