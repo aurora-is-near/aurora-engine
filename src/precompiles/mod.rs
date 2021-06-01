@@ -27,6 +27,16 @@ pub struct PrecompileOutput {
     pub logs: Vec<Log>,
 }
 
+impl PrecompileOutput {
+    pub fn without_logs(cost: u64, output: Vec<u8>) -> Self {
+        Self {
+            cost,
+            output,
+            logs: Vec::new(),
+        }
+    }
+}
+
 impl Default for PrecompileOutput {
     fn default() -> Self {
         PrecompileOutput {

@@ -72,11 +72,7 @@ impl Precompile for ECRecover {
         let v_bit = match v[31] {
             27 | 28 if v[..31] == [0; 31] => v[31] - 27,
             _ => {
-                return Ok(PrecompileOutput {
-                    cost: 0,
-                    output: vec![255u8; 32],
-                    ..Default::default()
-                });
+                return Ok(PrecompileOutput::without_logs(0, vec![255u8; 32]));
             }
         };
         signature[64] = v_bit; // v
@@ -93,11 +89,7 @@ impl Precompile for ECRecover {
             }
         };
 
-        Ok(PrecompileOutput {
-            cost,
-            output,
-            ..Default::default()
-        })
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

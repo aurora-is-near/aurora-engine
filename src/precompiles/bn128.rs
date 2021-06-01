@@ -115,11 +115,7 @@ impl Precompile for BN128Add<Byzantium> {
             Err(ExitError::OutOfGas)
         } else {
             let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                cost,
-                output,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -140,11 +136,7 @@ impl Precompile for BN128Add<Istanbul> {
             Err(ExitError::OutOfGas)
         } else {
             let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                cost,
-                output,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -191,11 +183,7 @@ impl Precompile for BN128Mul<Byzantium> {
             Err(ExitError::OutOfGas)
         } else {
             let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                cost,
-                output,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -215,11 +203,7 @@ impl Precompile for BN128Mul<Istanbul> {
             Err(ExitError::OutOfGas)
         } else {
             let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                cost,
-                output,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -338,11 +322,7 @@ impl Precompile for BN128Pair<Byzantium> {
             Err(ExitError::OutOfGas)
         } else {
             let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                cost,
-                output,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -365,11 +345,7 @@ impl Precompile for BN128Pair<Istanbul> {
             Err(ExitError::OutOfGas)
         } else {
             let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                cost,
-                output,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }

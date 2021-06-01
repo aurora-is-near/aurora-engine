@@ -39,11 +39,7 @@ impl Precompile for Identity {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            Ok(PrecompileOutput {
-                output: input.to_vec(),
-                cost,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, input.to_vec()))
         }
     }
 }

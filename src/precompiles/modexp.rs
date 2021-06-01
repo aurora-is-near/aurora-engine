@@ -132,11 +132,7 @@ impl Precompile for ModExp<Byzantium> {
             }
         };
 
-        Ok(PrecompileOutput {
-            cost,
-            output,
-            ..Default::default()
-        })
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

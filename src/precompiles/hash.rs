@@ -50,11 +50,7 @@ impl Precompile for SHA256 {
             Err(ExitError::OutOfGas)
         } else {
             let output = sha2::Sha256::digest(input).to_vec();
-            Ok(PrecompileOutput {
-                cost,
-                output,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 
@@ -70,11 +66,7 @@ impl Precompile for SHA256 {
             Err(ExitError::OutOfGas)
         } else {
             let output = sdk::sha256(input).as_bytes().to_vec();
-            Ok(PrecompileOutput {
-                cost,
-                output,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -110,11 +102,7 @@ impl Precompile for RIPEMD160 {
             // the evm works with 32-byte words.
             let mut output = vec![0u8; 32];
             output[12..].copy_from_slice(&hash);
-            Ok(PrecompileOutput {
-                cost,
-                output,
-                ..Default::default()
-            })
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
