@@ -1,12 +1,10 @@
 use super::prelude::*;
 use crate::sdk;
 
+use crate::types::ERR_FAILED_PARSE;
 use alloc::collections::BTreeMap;
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
-
-#[allow(dead_code)]
-pub const FAILED_PARSE: &[u8; 22] = b"\0ERR_FAILED_PARSE_JSON";
 
 pub enum JsonValue {
     Null,
@@ -69,7 +67,7 @@ impl JsonValue {
     pub fn parse_u8(v: &JsonValue) -> u8 {
         match v {
             JsonValue::Number(n) => *n as u8,
-            _ => sdk::panic_utf8(FAILED_PARSE),
+            _ => sdk::panic_utf8(ERR_FAILED_PARSE.as_bytes()),
         }
     }
 

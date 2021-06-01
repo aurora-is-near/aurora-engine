@@ -1,9 +1,13 @@
-use crate::prelude::{vec, String, Vec, H256};
+use crate::prelude::{vec, Vec, H256};
+use crate::types::PromiseResult;
 use crate::types::STORAGE_PRICE_PER_BYTE;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-mod exports {
+const READ_STORAGE_REGISTER_ID: u64 = 0;
+const INPUT_REGISTER_ID: u64 = 0;
+const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
 
+mod exports {
     #[allow(unused)]
     extern "C" {
         // #############
@@ -15,8 +19,8 @@ mod exports {
         // # Context API #
         // ###############
         pub(crate) fn current_account_id(register_id: u64);
-        fn signer_account_id(register_id: u64);
-        fn signer_account_pk(register_id: u64);
+        pub(crate) fn signer_account_id(register_id: u64);
+        pub(crate) fn signer_account_pk(register_id: u64);
         pub(crate) fn predecessor_account_id(register_id: u64);
         pub(crate) fn input(register_id: u64);
         // TODO #1903 fn block_height() -> u64;
@@ -82,7 +86,7 @@ mod exports {
             code_len: u64,
             code_ptr: u64,
         );
-        fn promise_batch_action_function_call(
+        pub(crate) fn promise_batch_action_function_call(
             promise_index: u64,
             method_name_len: u64,
             method_name_ptr: u64,
@@ -156,24 +160,30 @@ mod exports {
     }
 }
 
-#[allow(dead_code)]
 pub fn read_input() -> Vec<u8> {
     unsafe {
-        exports::input(0);
-        let bytes: Vec<u8> = vec![0; exports::register_len(0) as usize];
-        exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
+        exports::input(INPUT_REGISTER_ID);
+        let bytes: Vec<u8> = vec![0; exports::register_len(INPUT_REGISTER_ID) as usize];
+        exports::read_register(INPUT_REGISTER_ID, bytes.as_ptr() as *const u64 as u64);
         bytes
     }
 }
 
-#[allow(dead_code)]
-pub fn read_input_arr20() -> [u8; 20] {
+pub(crate) fn read_input_borsh<T: BorshDeserialize>() -> Result<T, ArgParseErr> {
+    let bytes = read_input();
+    T::try_from_slice(&bytes).map_err(|_| ArgParseErr)
+}
+
+pub(crate) fn read_input_arr20() -> Result<[u8; 20], IncorrectInputLength> {
     unsafe {
-        exports::input(0);
-        let bytes = [0u8; 20];
-        // TODO: Is it fine to not check the length of the input register here?
-        exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
-        bytes
+        exports::input(INPUT_REGISTER_ID);
+        if exports::register_len(INPUT_REGISTER_ID) == 20 {
+            let bytes = [0u8; 20];
+            exports::read_register(INPUT_REGISTER_ID, bytes.as_ptr() as *const u64 as u64);
+            Ok(bytes)
+        } else {
+            Err(IncorrectInputLength)
+        }
     }
 }
 
@@ -186,7 +196,6 @@ pub fn read_input_and_store(key: &[u8]) {
     }
 }
 
-#[allow(dead_code)]
 pub fn return_output(value: &[u8]) {
     unsafe {
         exports::value_return(value.len() as u64, value.as_ptr() as u64);
@@ -195,11 +204,25 @@ pub fn return_output(value: &[u8]) {
 
 #[allow(dead_code)]
 pub fn read_storage(key: &[u8]) -> Option<Vec<u8>> {
+    read_storage_len(key).map(|value_size| unsafe {
+        let bytes = vec![0u8; value_size];
+        exports::read_register(
+            READ_STORAGE_REGISTER_ID,
+            bytes.as_ptr() as *const u64 as u64,
+        );
+        bytes
+    })
+}
+
+pub fn read_storage_len(key: &[u8]) -> Option<usize> {
     unsafe {
-        if exports::storage_read(key.len() as u64, key.as_ptr() as u64, 0) == 1 {
-            let bytes: Vec<u8> = vec![0u8; exports::register_len(0) as usize];
-            exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
-            Some(bytes)
+        if exports::storage_read(
+            key.len() as u64,
+            key.as_ptr() as u64,
+            READ_STORAGE_REGISTER_ID,
+        ) == 1
+        {
+            Some(exports::register_len(READ_STORAGE_REGISTER_ID) as usize)
         } else {
             None
         }
@@ -207,20 +230,18 @@ pub fn read_storage(key: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// Read u64 from storage at given key.
-pub fn read_u64(key: &[u8]) -> Option<u64> {
-    unsafe {
-        if exports::storage_read(key.len() as u64, key.as_ptr() as u64, 0) == 1 {
+pub(crate) fn read_u64(key: &[u8]) -> Option<Result<u64, InvalidU64>> {
+    read_storage_len(key).map(|value_size| unsafe {
+        if value_size == 8 {
             let result = [0u8; 8];
-            // TODO: Are you sure the register length is correct?
-            exports::read_register(0, result.as_ptr() as _);
-            Some(u64::from_le_bytes(result))
+            exports::read_register(READ_STORAGE_REGISTER_ID, result.as_ptr() as _);
+            Ok(u64::from_le_bytes(result))
         } else {
-            None
+            Err(InvalidU64)
         }
-    }
+    })
 }
 
-#[allow(dead_code)]
 pub fn write_storage(key: &[u8], value: &[u8]) {
     unsafe {
         exports::storage_write(
@@ -233,19 +254,16 @@ pub fn write_storage(key: &[u8], value: &[u8]) {
     }
 }
 
-#[allow(dead_code)]
 pub fn remove_storage(key: &[u8]) {
     unsafe {
         exports::storage_remove(key.len() as u64, key.as_ptr() as u64, 0);
     }
 }
 
-#[allow(dead_code)]
 pub fn block_timestamp() -> u64 {
     unsafe { exports::block_timestamp() }
 }
 
-#[allow(dead_code)]
 pub fn block_index() -> u64 {
     unsafe { exports::block_index() }
 }
@@ -255,7 +273,6 @@ pub fn panic() {
     unsafe { exports::panic() }
 }
 
-#[allow(dead_code)]
 pub fn panic_utf8(bytes: &[u8]) -> ! {
     unsafe {
         exports::panic_utf8(bytes.len() as u64, bytes.as_ptr() as u64);
@@ -270,7 +287,6 @@ pub fn log_utf8(bytes: &[u8]) {
     }
 }
 
-#[allow(dead_code)]
 pub fn predecessor_account_id() -> Vec<u8> {
     unsafe {
         exports::predecessor_account_id(1);
@@ -281,7 +297,6 @@ pub fn predecessor_account_id() -> Vec<u8> {
 }
 
 /// Calls environment sha256 on given input.
-#[allow(dead_code)]
 pub fn sha256(input: &[u8]) -> H256 {
     unsafe {
         exports::sha256(input.len() as u64, input.as_ptr() as u64, 1);
@@ -292,7 +307,6 @@ pub fn sha256(input: &[u8]) -> H256 {
 }
 
 /// Calls environment keccak256 on given input.
-#[allow(dead_code)]
 pub fn keccak(input: &[u8]) -> H256 {
     unsafe {
         exports::keccak256(input.len() as u64, input.as_ptr() as u64, 1);
@@ -300,14 +314,6 @@ pub fn keccak(input: &[u8]) -> H256 {
         exports::read_register(1, bytes.0.as_ptr() as *const u64 as u64);
         bytes
     }
-}
-
-/// Calls environment panic with data encoded in hex as panic message.
-#[allow(dead_code)]
-pub fn panic_hex(data: &[u8]) -> ! {
-    let message = crate::types::bytes_to_hex(data).into_bytes();
-    unsafe { exports::panic_utf8(message.len() as _, message.as_ptr() as _) }
-    unreachable!()
 }
 
 /// Returns account id of the current account.
@@ -329,21 +335,19 @@ pub fn self_deploy(code_key: &[u8]) {
         let promise_id = exports::promise_batch_create(u64::MAX as _, 0);
         // Remove code from storage and store it in register 1.
         exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1);
-        exports::promise_batch_action_deploy_contract(promise_id, u64::MAX as _, 1);
-        // TODO: Call upgrade on the same promise to make sure the state has migrated successfully.
-        //     Otherwise, you may have to handle non-latest state in every other method call, which might be inefficient.
+        exports::promise_batch_action_deploy_contract(promise_id, u64::MAX, 1);
+        promise_batch_action_function_call(
+            promise_id,
+            b"state_migration",
+            &[],
+            0,
+            GAS_FOR_STATE_MIGRATION,
+        )
     }
 }
 
-#[allow(dead_code)]
-pub fn save_contract<T: BorshSerialize>(key: &str, data: &T) {
-    write_storage(key.as_bytes(), &data.try_to_vec().unwrap()[..]);
-}
-
-#[allow(dead_code)]
-pub fn get_contract_data<T: BorshDeserialize>(key: &str) -> T {
-    let data = read_storage(key.as_bytes()).expect("Failed read storage");
-    T::try_from_slice(&data[..]).unwrap()
+pub fn save_contract<T: BorshSerialize>(key: &[u8], data: &T) {
+    write_storage(key, &data.try_to_vec().unwrap()[..]);
 }
 
 #[allow(dead_code)]
@@ -351,25 +355,18 @@ pub fn log(data: &str) {
     log_utf8(data.as_bytes())
 }
 
-#[allow(dead_code)]
-pub fn storage_usage() -> u64 {
-    unsafe { exports::storage_usage() }
-}
-
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn prepaid_gas() -> u64 {
     unsafe { exports::prepaid_gas() }
 }
 
-#[allow(dead_code)]
 pub fn promise_create(
-    account_id: String,
+    account_id: &[u8],
     method_name: &[u8],
     arguments: &[u8],
     amount: u128,
     gas: u64,
 ) -> u64 {
-    let account_id = account_id.as_bytes();
     unsafe {
         exports::promise_create(
             account_id.len() as _,
@@ -384,16 +381,14 @@ pub fn promise_create(
     }
 }
 
-#[allow(dead_code)]
 pub fn promise_then(
     promise_idx: u64,
-    account_id: String,
+    account_id: &[u8],
     method_name: &[u8],
     arguments: &[u8],
     amount: u128,
     gas: u64,
 ) -> u64 {
-    let account_id = account_id.as_bytes();
     unsafe {
         exports::promise_then(
             promise_idx,
@@ -409,19 +404,17 @@ pub fn promise_then(
     }
 }
 
-#[allow(dead_code)]
 pub fn promise_return(promise_idx: u64) {
     unsafe {
         exports::promise_return(promise_idx);
     }
 }
 
-#[allow(dead_code)]
 pub fn promise_results_count() -> u64 {
     unsafe { exports::promise_results_count() }
 }
 
-/*pub fn promise_result(result_idx: u64) -> PromiseResult {
+pub fn promise_result(result_idx: u64) -> PromiseResult {
     unsafe {
         match exports::promise_result(result_idx, 0) {
             0 => PromiseResult::NotReady,
@@ -431,56 +424,87 @@ pub fn promise_results_count() -> u64 {
                 PromiseResult::Successful(bytes)
             }
             2 => PromiseResult::Failed,
-            _ => panic!("{}", RETURN_CODE_ERR),
+            _ => panic_utf8(b"ERR_PROMISE_RETURN_CODE"),
         }
     }
-}*/
+}
 
-#[allow(dead_code)]
 pub fn assert_private_call() {
     assert_eq!(
         predecessor_account_id(),
         current_account_id(),
-        "Function is private"
+        "ERR_PRIVATE_CALL"
     );
 }
 
 pub fn attached_deposit() -> u128 {
-    use core::intrinsics::size_of;
     unsafe {
-        let data = [0u8; size_of::<u128>()];
+        let data = [0u8; core::mem::size_of::<u128>()];
         exports::attached_deposit(data.as_ptr() as u64);
         u128::from_le_bytes(data)
     }
 }
 
-#[allow(dead_code)]
 pub fn assert_one_yocto() {
-    assert_eq!(
-        attached_deposit(),
-        1,
-        "Requires attached deposit of exactly 1 yoctoNEAR"
-    )
+    assert_eq!(attached_deposit(), 1, "ERR_1YOCTO_ATTACH")
 }
 
-#[allow(dead_code)]
 pub fn promise_batch_action_transfer(promise_index: u64, amount: u128) {
     unsafe {
         exports::promise_batch_action_transfer(promise_index, &amount as *const u128 as _);
     }
 }
 
-#[allow(dead_code)]
 pub fn storage_byte_cost() -> u128 {
     STORAGE_PRICE_PER_BYTE
 }
 
-#[allow(dead_code)]
-pub fn promise_batch_create(account_id: String) -> u64 {
+pub fn promise_batch_create(account_id: &[u8]) -> u64 {
     unsafe { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) }
+}
+
+pub fn promise_batch_action_function_call(
+    promise_idx: u64,
+    method_name: &[u8],
+    arguments: &[u8],
+    amount: u128,
+    gas: u64,
+) {
+    unsafe {
+        exports::promise_batch_action_function_call(
+            promise_idx,
+            method_name.len() as _,
+            method_name.as_ptr() as _,
+            arguments.len() as _,
+            arguments.as_ptr() as _,
+            &amount as *const u128 as _,
+            gas,
+        )
+    }
 }
 
 #[allow(dead_code)]
 pub fn storage_has_key(key: &[u8]) -> bool {
-    unsafe { exports::storage_has_key(key.len() as u64, key.as_ptr() as u64) == 1 }
+    unsafe { exports::storage_has_key(key.len() as _, key.as_ptr() as _) == 1 }
+}
+
+pub(crate) struct IncorrectInputLength;
+impl AsRef<[u8]> for IncorrectInputLength {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_INCORRECT_INPUT_LENGTH"
+    }
+}
+
+pub(crate) struct ArgParseErr;
+impl AsRef<[u8]> for ArgParseErr {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_ARG_PARSE"
+    }
+}
+
+pub(crate) struct InvalidU64;
+impl AsRef<[u8]> for InvalidU64 {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_NOT_U64"
+    }
 }

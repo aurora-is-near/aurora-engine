@@ -41,6 +41,10 @@ pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitErr
 
 pub(super) struct ECRecover;
 
+impl ECRecover {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 1);
+}
+
 impl Precompile for ECRecover {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::ECRECOVER_BASE)

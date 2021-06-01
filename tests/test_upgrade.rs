@@ -8,7 +8,7 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
 }
 
-fn init() -> (UserAccount, UserAccount) {
+pub fn init() -> (UserAccount, UserAccount) {
     let master_account = near_sdk_sim::init_simulator(None);
     let contract_account =
         master_account.deploy(*EVM_WASM_BYTES, accounts(0).to_string(), to_yocto("1000"));

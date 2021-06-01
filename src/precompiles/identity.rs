@@ -17,6 +17,10 @@ mod consts {
 
 pub struct Identity;
 
+impl Identity {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 4);
+}
+
 impl Precompile for Identity {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(

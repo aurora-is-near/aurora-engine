@@ -3,6 +3,8 @@ use crate::prelude::{PhantomData, Vec, U256};
 use evm::{Context, ExitError, ExitSucceed};
 use num::BigUint;
 
+pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
+
 pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl ModExp<Byzantium> {
