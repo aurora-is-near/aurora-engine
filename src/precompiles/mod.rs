@@ -129,7 +129,7 @@ pub fn homestead_precompiles(
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     };
-    output.map(|res| res.map(|o| o.into()))
+    output.map(|res| res.map(Into::into))
 }
 
 /// Matches the address given to Byzantium precompiles.
@@ -160,7 +160,7 @@ pub fn byzantium_precompiles(
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     };
-    output.map(|res| res.map(|o| o.into()))
+    output.map(|res| res.map(Into::into))
 }
 
 /// Matches the address given to Istanbul precompiles.
@@ -192,7 +192,7 @@ pub fn istanbul_precompiles(
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     };
-    output.map(|res| res.map(|o| o.into()))
+    output.map(|res| res.map(Into::into))
 }
 
 /// Matches the address given to Berlin precompiles.
@@ -224,7 +224,7 @@ pub fn berlin_precompiles(
         ExitToEthereum::ADDRESS => Some(ExitToEthereum::run(input, target_gas, context)),
         _ => None,
     };
-    output.map(|res| res.map(|o| o.into()))
+    output.map(|res| res.map(Into::into))
 }
 
 /// const fn for making an address by concatenating the bytes from two given numbers,
