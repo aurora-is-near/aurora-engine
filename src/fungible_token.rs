@@ -435,7 +435,6 @@ impl FungibleToken {
         if !self.accounts_contains_key(account_id) {
             let key = Self::get_statistic_key();
             let accounts_counter = sdk::read_u64(&key)
-                .unwrap_or(Ok(0))
                 .unwrap_or(0)
                 .checked_add(1)
                 .expect("ERR_ACCOUNTS_COUNTER_OVERFLOW");
@@ -447,9 +446,7 @@ impl FungibleToken {
     /// Get accounts counter for statistics
     /// It represents total unique accounts.
     pub fn get_accounts_counter(&self) -> u64 {
-        sdk::read_u64(&Self::get_statistic_key())
-            .unwrap_or(Ok(0))
-            .unwrap_or(0)
+        sdk::read_u64(&Self::get_statistic_key()).unwrap_or(0)
     }
 
     fn accounts_contains_key(&self, account_id: &str) -> bool {
