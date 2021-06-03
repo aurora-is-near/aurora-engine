@@ -10,12 +10,16 @@ contract Tester {
         erc20Token = _erc20Token;
     }
 
+    function helloWorld(string memory name) public pure returns(string memory) {
+        return string(abi.encodePacked("Hello ", name, "!"));
+    }
+
     // Use flag to indicate if should withdraw to NEAR (true) or to Ethereum (false)
     function withdraw(bool toNear) external {
         if (toNear) {
             erc20Token.withdrawToNear("target.aurora", 1);
         } else {
-            erc20Token.withdrawToNear("0xE0f5206BBD039e7b0592d8918820024e2a7437b9", 1);
+            erc20Token.withdrawToEthereum(0xE0f5206BBD039e7b0592d8918820024e2a7437b9, 1);
         }
     }
 

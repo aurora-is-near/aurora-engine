@@ -1,7 +1,7 @@
 use crate::parameters::{FunctionCallArgs, NEP141FtOnTransferArgs, SubmitResult};
 use crate::prelude::*;
 use crate::test_utils;
-use crate::test_utils::{create_eth_transaction, AuroraRunner};
+use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use crate::transaction::EthSignedTransaction;
 use crate::types::{near_account_to_evm_address, AccountId, Balance, RawAddress};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -13,10 +13,6 @@ use sha3::Digest;
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
-
-fn origin() -> AccountId {
-    "aurora".to_string()
-}
 
 pub struct CallResult {
     outcome: Option<VMOutcome>,
@@ -63,9 +59,9 @@ fn create_ethereum_address() -> Address {
     test_utils::address_from_secret_key(&source_account)
 }
 
-struct EthereumAddress {
-    secret_key: SecretKey,
-    address: RawAddress,
+pub struct EthereumAddress {
+    pub secret_key: SecretKey,
+    pub address: RawAddress,
 }
 
 impl test_utils::AuroraRunner {
@@ -123,7 +119,7 @@ impl test_utils::AuroraRunner {
             .unwrap()
     }
 
-    fn create_account(&mut self) -> EthereumAddress {
+    pub fn create_account(&mut self) -> EthereumAddress {
         let mut rng = rand::thread_rng();
         let source_account = SecretKey::random(&mut rng);
         let source_address = test_utils::address_from_secret_key(&source_account);
@@ -238,7 +234,6 @@ fn test_deploy_erc20_token() {
 fn test_mint() {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
-    let result = runner.admin(token, origin());
     let address = runner.create_account().address;
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(0));

@@ -543,6 +543,10 @@ impl Engine {
 
     fn schedule_promises(promises: impl IntoIterator<Item = PromiseCreateArgs>) {
         for promise in promises {
+            sdk::log_utf8(
+                crate::prelude::format!("{}.{}", promise.target_account_id, promise.method)
+                    .as_bytes(),
+            );
             sdk::promise_create(
                 promise.target_account_id,
                 promise.method.as_bytes(),

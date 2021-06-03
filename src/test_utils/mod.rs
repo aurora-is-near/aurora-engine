@@ -17,14 +17,47 @@ use crate::prelude::Address;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 use crate::transaction::{EthSignedTransaction, EthTransaction};
 use crate::types;
+use crate::types::AccountId;
 use crate::{storage, AuroraState};
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
 }
 
+// TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
+pub(crate) struct Signer {
+    pub nonce: u64,
+    pub secret_key: SecretKey,
+}
+
+pub fn origin() -> AccountId {
+    "aurora".to_string()
+}
+
+impl Signer {
+    pub fn new(secret_key: SecretKey) -> Self {
+        Self {
+            nonce: 0,
+            secret_key,
+        }
+    }
+
+    pub fn random() -> Self {
+        let mut rng = rand::thread_rng();
+        let sk = SecretKey::random(&mut rng);
+        Self::new(sk)
+    }
+
+    pub fn use_nonce(&mut self) -> u64 {
+        let nonce = self.nonce;
+        self.nonce += 1;
+        nonce
+    }
+}
+
 pub(crate) const SUBMIT: &str = "submit";
 
+pub(crate) mod contract_call;
 pub(crate) mod erc20;
 pub(crate) mod solidity;
 pub(crate) mod standard_precompiles;
@@ -40,6 +73,7 @@ pub(crate) struct AuroraRunner {
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
     pub profile: ProfileData,
+    pub previous_logs: Vec<String>,
 }
 
 /// Same as `AuroraRunner`, but consumes `self` on execution (thus preventing building on
@@ -130,7 +164,7 @@ impl AuroraRunner {
             input,
         );
 
-        near_vm_runner::run(
+        let (maybe_outcome, maybe_error) = near_vm_runner::run(
             &self.code,
             method_name,
             &mut self.ext,
@@ -141,7 +175,12 @@ impl AuroraRunner {
             self.current_protocol_version,
             Some(&self.cache),
             &self.profile,
-        )
+        );
+        if let Some(outcome) = &maybe_outcome {
+            self.context.storage_usage = outcome.storage_usage;
+            self.previous_logs = outcome.logs.clone();
+        }
+        (maybe_outcome, maybe_error)
     }
 
     pub fn create_address(&mut self, address: Address, init_balance: U256, init_nonce: U256) {
@@ -267,6 +306,7 @@ impl Default for AuroraRunner {
             fees_config: Default::default(),
             current_protocol_version: u32::MAX,
             profile: Default::default(),
+            previous_logs: Default::default(),
         }
     }
 }

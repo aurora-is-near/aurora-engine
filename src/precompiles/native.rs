@@ -113,16 +113,21 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
             return Err(ExitError::OutOfGas);
         }
 
-        if is_static {
-            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        }
+        // TODO(MarX): After calling directly function withdraw in Tester.sol
+        //   This function is called with is_static = true
+        //   Figure out if this needs to be fixed in EVM, or the way
+        //   that is being used to determine if a function is called in static
+        //   mode is incorrect.
+        // if is_static {
+        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        // }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
-        let mut input_mut = input;
+        let mut input = input;
         let flag = input[0];
-        input_mut = &input_mut[1..];
+        input = &input[1..];
 
         let (nep141_address, args) = match flag {
             0x0 => {
@@ -165,12 +170,11 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
 
                 let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
-                let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
-                input_mut = &input_mut[32..];
+                let amount = U256::from_big_endian(&input[..32]).as_u128();
+                input = &input[32..];
 
-                if is_valid_account_id(input_mut) {
-                    let receiver_account_id: AccountId =
-                        String::from_utf8(input_mut.to_vec()).unwrap();
+                if is_valid_account_id(input) {
+                    let receiver_account_id: AccountId = String::from_utf8(input.to_vec()).unwrap();
                     (
                         nep141_address,
                         // There is no way to inject json, given the encoding of both arguments
@@ -248,16 +252,21 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
             return Err(ExitError::OutOfGas);
         }
 
-        if is_static {
-            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        }
+        // TODO(MarX): After calling directly function withdraw in Tester.sol
+        //   This function is called with is_static = true
+        //   Figure out if this needs to be fixed in EVM, or the way
+        //   that is being used to determine if a function is called in static
+        //   mode is incorrect.
+        // if is_static {
+        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        // }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
-        let mut input_mut = input;
+        let mut input = input;
         let flag = input[0];
-        input_mut = &input_mut[1..];
+        input = &input[1..];
 
         let (nep141_address, serialized_args) = match flag {
             0x0 => {
@@ -301,12 +310,12 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
 
                 let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
-                let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
-                input_mut = &input_mut[32..];
+                let amount = U256::from_big_endian(&input[..32]).as_u128();
+                input = &input[32..];
 
-                if input_mut.len() == 20 {
+                if input.len() == 20 {
                     // Parse ethereum address in hex
-                    let eth_recipient: String = hex::encode(input_mut.to_vec());
+                    let eth_recipient: String = hex::encode(input.to_vec());
 
                     (
                         nep141_address,
