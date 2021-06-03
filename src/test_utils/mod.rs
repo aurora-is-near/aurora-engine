@@ -299,7 +299,7 @@ pub(crate) fn create_eth_transaction(
     let tx = EthTransaction {
         nonce: Default::default(),
         gas_price: Default::default(),
-        gas: Default::default(),
+        gas: u64::MAX.into(),
         to,
         value,
         data,

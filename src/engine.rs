@@ -145,7 +145,7 @@ pub struct Engine {
 }
 
 // TODO: upgrade to Berlin HF
-const CONFIG: &Config = &Config::istanbul();
+pub(crate) const CONFIG: &Config = &Config::istanbul();
 
 /// Key for storing the state of the engine.
 const STATE_KEY: &[u8; 5] = b"STATE";

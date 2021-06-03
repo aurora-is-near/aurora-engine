@@ -36,6 +36,31 @@ impl EthTransaction {
             s.append(&0u8);
         }
     }
+
+    #[cfg(feature = "contract")]
+    pub(crate) fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
+        let is_contract_creation = self.to.is_none();
+
+        let base_gas = if is_contract_creation {
+            config.gas_transaction_create
+        } else {
+            config.gas_transaction_call
+        };
+
+        let num_zero_bytes = self.data.iter().filter(|b| **b == 0).count();
+        let num_non_zero_bytes = self.data.len() - num_zero_bytes;
+
+        let gas_zero_bytes = config
+            .gas_transaction_zero_data
+            .checked_mul(num_zero_bytes as u64)?;
+        let gas_non_zero_bytes = config
+            .gas_transaction_non_zero_data
+            .checked_mul(num_non_zero_bytes as u64)?;
+
+        base_gas
+            .checked_add(gas_zero_bytes)
+            .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]

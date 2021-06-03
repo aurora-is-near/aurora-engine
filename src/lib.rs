@@ -239,6 +239,18 @@ mod contract {
 
         Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
 
+        match signed_transaction
+            .transaction
+            .intrinsic_gas(&crate::engine::CONFIG)
+        {
+            None => sdk::panic_utf8(b"ERR_GAS_OVERFLOW"),
+            Some(intrinsic_gas) => {
+                if signed_transaction.transaction.gas < intrinsic_gas.into() {
+                    sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
+                }
+            }
+        }
+
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
