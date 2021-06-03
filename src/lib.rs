@@ -86,8 +86,9 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
+        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
+        NewCallArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs,
+        ViewCallArgs,
     };
     use crate::prelude::{Address, H256, U256};
     use crate::sdk;
@@ -399,6 +400,14 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn finish_deposit_near() {
         EthConnectorContract::get_instance().finish_deposit_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn is_used_proof() {
+        let args = IsUsedProofCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+
+        let is_used_proof = EthConnectorContract::get_instance().is_used_proof(args.proof);
+        sdk::return_output(&is_used_proof.try_to_vec().unwrap());
     }
 
     #[no_mangle]
