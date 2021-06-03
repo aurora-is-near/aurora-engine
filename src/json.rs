@@ -56,7 +56,7 @@ impl JsonValue {
     pub fn u128_string(&self, key: &str) -> Result<u128, ()> {
         match self {
             JsonValue::Object(o) => match o.get(key).ok_or(())? {
-                JsonValue::String(s) => u128::from_str_radix(s, 10).map_err(|_| ()),
+                JsonValue::String(s) => s.parse::<u128>().map_err(|_| ()),
                 _ => Err(()),
             },
             _ => Err(()),
