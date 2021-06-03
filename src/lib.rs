@@ -239,6 +239,7 @@ mod contract {
 
         Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
 
+        // Check intrinsic gas is covered by transaction gas limit
         match signed_transaction
             .transaction
             .intrinsic_gas(&crate::engine::CONFIG)
@@ -254,13 +255,14 @@ mod contract {
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
+        let gas_limit = u256_to_u64(signed_transaction.transaction.gas);
         let data = signed_transaction.transaction.data;
         let result = if let Some(receiver) = signed_transaction.transaction.to {
-            Engine::call(&mut engine, sender, receiver, value, data)
+            Engine::call(&mut engine, sender, receiver, value, data, gas_limit)
             // TODO: charge for storage
         } else {
             // Execute a contract deployment:
-            Engine::deploy_code(&mut engine, sender, value, data)
+            Engine::deploy_code(&mut engine, sender, value, data, gas_limit)
             // TODO: charge for storage
         };
         result
@@ -288,6 +290,7 @@ mod contract {
             meta_call_args.contract_address,
             meta_call_args.value,
             meta_call_args.input,
+            u64::MAX, // TODO: is there a gas limit with meta calls?
         );
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
@@ -515,6 +518,11 @@ mod contract {
     ///
     /// Utility methods.
     ///
+
+    /// Returns x % (u64::MAX + 1)
+    fn u256_to_u64(x: U256) -> u64 {
+        x.0[0]
+    }
 
     fn require_owner_only(state: &EngineState) {
         if state.owner_id.as_bytes() != sdk::predecessor_account_id() {

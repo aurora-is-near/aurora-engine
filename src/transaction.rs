@@ -2,7 +2,7 @@ use crate::prelude::{Address, Vec, U256};
 use crate::types::Wei;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct EthTransaction {
     /// A monotonically increasing transaction counter for this sender
     pub nonce: U256,
@@ -37,8 +37,7 @@ impl EthTransaction {
         }
     }
 
-    #[cfg(feature = "contract")]
-    pub(crate) fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
+    pub fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
         let is_contract_creation = self.to.is_none();
 
         let base_gas = if is_contract_creation {
