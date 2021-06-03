@@ -407,7 +407,8 @@ mod contract {
         let args = IsUsedProofCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
 
         let is_used_proof = EthConnectorContract::get_instance().is_used_proof(args.proof);
-        sdk::return_output(&is_used_proof.try_to_vec().unwrap());
+        let res = is_used_proof.try_to_vec().unwrap();
+        sdk::return_output(&res[..]);
     }
 
     #[no_mangle]
