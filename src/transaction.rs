@@ -60,6 +60,12 @@ impl EthTransaction {
             .checked_add(gas_zero_bytes)
             .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
     }
+
+    /// Returns self.gas as a u64, or None if self.gas > u64::MAX
+    pub fn get_gas_limit(&self) -> Option<u64> {
+        use crate::prelude::TryInto;
+        self.gas.try_into().ok()
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]

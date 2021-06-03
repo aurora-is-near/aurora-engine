@@ -96,6 +96,7 @@ mod contract {
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
+    const GAS_OVERFLOW: &str = "ERR_GAS_OVERFLOW";
 
     ///
     /// ADMINISTRATIVE METHODS
@@ -244,7 +245,7 @@ mod contract {
             .transaction
             .intrinsic_gas(&crate::engine::CONFIG)
         {
-            None => sdk::panic_utf8(b"ERR_GAS_OVERFLOW"),
+            None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
             Some(intrinsic_gas) => {
                 if signed_transaction.transaction.gas < intrinsic_gas.into() {
                     sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
@@ -255,7 +256,10 @@ mod contract {
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
-        let gas_limit = u256_to_u64(signed_transaction.transaction.gas);
+        let gas_limit = signed_transaction
+            .transaction
+            .get_gas_limit()
+            .sdk_expect(GAS_OVERFLOW);
         let data = signed_transaction.transaction.data;
         let result = if let Some(receiver) = signed_transaction.transaction.to {
             Engine::call(&mut engine, sender, receiver, value, data, gas_limit)
@@ -518,11 +522,6 @@ mod contract {
     ///
     /// Utility methods.
     ///
-
-    /// Returns x % (u64::MAX + 1)
-    fn u256_to_u64(x: U256) -> u64 {
-        x.0[0]
-    }
 
     fn require_owner_only(state: &EngineState) {
         if state.owner_id.as_bytes() != sdk::predecessor_account_id() {
