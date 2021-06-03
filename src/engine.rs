@@ -377,7 +377,7 @@ impl Engine {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
-        self.view(origin, contract, Wei::new(value), args.input)
+        self.view(origin, contract, Wei::new(value), args.input, u64::MAX)
     }
 
     pub fn view(
@@ -386,10 +386,11 @@ impl Engine {
         contract: Address,
         value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<Vec<u8>> {
-        let mut executor = self.make_executor(u64::MAX);
+        let mut executor = self.make_executor(gas_limit);
         let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, u64::MAX);
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
         status.into_result()?;
         Ok(result)
     }
