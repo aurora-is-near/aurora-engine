@@ -148,7 +148,8 @@ mod tests {
 
     #[test]
     fn test_stack() {
-        let mut stack = Stack::new();
+        let mut stack = Stack::new(); // [ $ ]
+        check_stack(&stack, vec![None]);
 
         stack.push(1); // [ $, 1]
         check_stack(&stack, vec![None, Some(1)]);
@@ -190,7 +191,7 @@ mod tests {
         check_stack(&stack, vec![None, Some(1), Some(2), Some(6), None, None]);
         stack.discard(); // [$, 1, 2, 6, $]
         check_stack(&stack, vec![None, Some(1), Some(2), Some(6), None]);
-        stack.push(7);
+        stack.push(7); // [$, 1, 2, 6, $, 7]
 
         assert_eq!(stack.into_vec(), vec![1, 2, 6, 7]);
     }
