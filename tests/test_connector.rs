@@ -155,25 +155,13 @@ fn call_deposit_near(master_account: &UserAccount, contract: &str) -> Vec<Option
 
 fn call_is_used_proof(account: &UserAccount, contract: &str, proof: &str) -> bool {
     let proof: Proof = serde_json::from_str(proof).unwrap();
-    let res = account.call(
+    let res = account.view(
         contract.to_string(),
         "is_used_proof",
         &proof.try_to_vec().unwrap(),
-        DEFAULT_GAS,
-        0,
     );
-    res.assert_success();
-
-    let promise_results = res.promise_results();
-    assert!(promise_results.len() > 1);
-    assert!(promise_results[0].is_some());
-    match &promise_results[1].clone().unwrap().outcome().status {
-        ExecutionStatus::SuccessValue(ref v) => {
-            let result = IsUsedProofResult::try_from_slice(&v).unwrap();
-            return result.is_used_proof;
-        }
-        _ => panic!(),
-    }
+    let result = IsUsedProofResult::try_from_slice(&res.unwrap()).unwrap();
+    result.is_used_proof
 }
 
 #[allow(dead_code)]
