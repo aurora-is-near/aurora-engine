@@ -47,6 +47,49 @@ fn erc20_mint() {
 }
 
 #[test]
+fn erc20_mint_out_of_gas() {
+    let (mut runner, source_account, dest_address, contract) = initialize_erc20();
+
+    // Validate pre-state
+    assert_eq!(
+        U256::zero(),
+        get_address_erc20_balance(
+            &mut runner,
+            &source_account,
+            (INITIAL_NONCE + 1).into(),
+            dest_address,
+            &contract
+        )
+    );
+
+    // Try mint transaction
+    let mint_amount: u64 = rand::random();
+    let mut mint_tx = contract.mint(dest_address, mint_amount.into(), (INITIAL_NONCE + 2).into());
+
+    // not enough gas to cover intrinsic cost
+    mint_tx.gas = (mint_tx.intrinsic_gas(&evm::Config::istanbul()).unwrap() - 1).into();
+    let outcome = runner.submit_transaction(&source_account, mint_tx.clone());
+    let error = outcome.unwrap_err();
+    let error_message = format!("{:?}", error);
+    assert!(error_message.contains("ERR_INTRINSIC_GAS"));
+
+    // not enough gas to complete transaction
+    mint_tx.gas = U256::from(67_000);
+    let outcome = runner.submit_transaction(&source_account, mint_tx);
+    let error = outcome.unwrap_err();
+    let error_message = format!("{:?}", error);
+    assert!(error_message.contains("ERR_OUT_OF_GAS"));
+
+    // Validate post-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        test_utils::address_from_secret_key(&source_account),
+        Wei::new_u64(INITIAL_BALANCE),
+        (INITIAL_NONCE + 3).into(),
+    );
+}
+
+#[test]
 fn erc20_transfer_success() {
     let (mut runner, source_account, dest_address, contract) = initialize_erc20();
     let source_address = test_utils::address_from_secret_key(&source_account);
@@ -183,6 +226,48 @@ fn erc20_transfer_insufficient_balance() {
             dest_address,
             &contract
         )
+    );
+}
+
+#[test]
+fn deploy_erc_20_out_of_gas() {
+    let mut runner = test_utils::deploy_evm();
+    let mut rng = rand::thread_rng();
+    let source_account = SecretKey::random(&mut rng);
+    let source_address = test_utils::address_from_secret_key(&source_account);
+    runner.create_address(
+        source_address,
+        Wei::new_u64(INITIAL_BALANCE),
+        INITIAL_NONCE.into(),
+    );
+
+    let constructor = ERC20Constructor::load();
+    let mut deploy_transaction = constructor.deploy("OutOfGas", "OOG", INITIAL_NONCE.into());
+
+    // not enough gas to cover intrinsic cost
+    deploy_transaction.gas = (deploy_transaction
+        .intrinsic_gas(&evm::Config::istanbul())
+        .unwrap()
+        - 1)
+    .into();
+    let outcome = runner.submit_transaction(&source_account, deploy_transaction.clone());
+    let error = outcome.unwrap_err();
+    let error_message = format!("{:?}", error);
+    assert!(error_message.contains("ERR_INTRINSIC_GAS"));
+
+    // not enough gas to complete transaction
+    deploy_transaction.gas = U256::from(3_200_000);
+    let outcome = runner.submit_transaction(&source_account, deploy_transaction);
+    let error = outcome.unwrap_err();
+    let error_message = format!("{:?}", error);
+    assert!(error_message.contains("ERR_OUT_OF_GAS"));
+
+    // Validate post-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        test_utils::address_from_secret_key(&source_account),
+        Wei::new_u64(INITIAL_BALANCE),
+        (INITIAL_NONCE + 1).into(),
     );
 }
 
