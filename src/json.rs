@@ -1,6 +1,7 @@
 use super::prelude::*;
 use crate::sdk;
 
+use crate::parameters::ExpectUtf8;
 use crate::types::ERR_FAILED_PARSE;
 use alloc::collections::BTreeMap;
 use core::convert::From;
@@ -45,7 +46,7 @@ impl JsonValue {
     pub fn u128(&self, key: &str) -> Result<u128, ()> {
         match self {
             JsonValue::Object(o) => match o.get(key).ok_or(())? {
-                JsonValue::Number(n) => Ok(*n as u128),
+                JsonValue::String(n) => Ok(n.parse::<u128>().expect_utf8(b"ERR_FAILED_PARSE_U128")),
                 _ => Err(()),
             },
             _ => Err(()),
