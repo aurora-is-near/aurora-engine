@@ -345,7 +345,7 @@ fn test_ft_transfer() {
         "ft_transfer",
         json!({
             "receiver_id": DEPOSITED_RECIPIENT,
-            "amount": transfer_amount,
+            "amount": transfer_amount.to_string(),
             "memo": "transfer memo"
         })
         .to_string()
@@ -408,7 +408,7 @@ fn test_ft_transfer_call_eth() {
         "ft_transfer_call",
         json!({
             "receiver_id": CONTRACT_ACC,
-            "amount": transfer_amount as u64,
+            "amount": transfer_amount.to_string(),
             "msg": message,
         })
         .to_string()
@@ -501,7 +501,7 @@ fn test_ft_transfer_call_without_relayer() {
         "ft_transfer_call",
         json!({
             "receiver_id": CONTRACT_ACC,
-            "amount": transfer_amount as u64,
+            "amount": transfer_amount.to_string(),
             "msg": message,
         })
         .to_string()
@@ -885,7 +885,7 @@ fn test_get_accounts_counter_and_transfer() {
         "ft_transfer",
         json!({
             "receiver_id": DEPOSITED_RECIPIENT,
-            "amount": transfer_amount,
+            "amount": transfer_amount.to_string(),
             "memo": "transfer memo"
         })
         .to_string()

@@ -261,7 +261,9 @@ impl From<json::JsonValue> for TransferCallCallArgs {
             receiver_id: v
                 .string("receiver_id")
                 .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v
+                .u128_string("amount")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
             memo: v.string("memo").ok(),
             msg: v.string("msg").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         }
@@ -315,7 +317,7 @@ pub struct StorageWithdrawCallArgs {
 impl From<json::JsonValue> for StorageWithdrawCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            amount: v.u128("amount").ok(),
+            amount: v.u128_string("amount").ok(),
         }
     }
 }
@@ -336,7 +338,9 @@ impl From<json::JsonValue> for TransferCallArgs {
             receiver_id: v
                 .string("receiver_id")
                 .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v
+                .u128_string("amount")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
             memo: v.string("memo").ok(),
         }
     }
@@ -421,7 +425,9 @@ impl From<json::JsonValue> for ResolveTransferCallArgs {
             receiver_id: v
                 .string("receiver_id")
                 .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v
+                .u128_string("amount")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         }
     }
 }
