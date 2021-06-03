@@ -1177,7 +1177,7 @@ fn test_ft_transfer_max_value() {
     assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         "ERR_NOT_ENOUGH_BALANCE",
-        "Expected failure as the amount too large",
+        "Expected failure as the amount is too large",
     );
 }
 
