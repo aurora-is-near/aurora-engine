@@ -33,10 +33,6 @@ const DEPOSITED_EVM_AMOUNT: u128 = 10200;
 const DEPOSITED_EVM_FEE: u128 = 200;
 const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &'static str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 const ERR_PAUSED: &'static str = "ERR_PAUSED";
-const ERR_PROOF_USED: &'static str =
-    "Expected not to fail and to have an unused proof but it was already used";
-const ERR_PROOF_NOT_USED: &'static str =
-    "Expected not to fail because the proof should have been already used";
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
@@ -164,6 +160,24 @@ fn call_is_used_proof(account: &UserAccount, contract: &str, proof: &str) -> boo
     result.is_used_proof
 }
 
+fn assert_proof_was_used(account: &UserAccount, contract: &str, proof: &str) {
+    let is_used_proof = call_is_used_proof(account, contract, proof);
+    assert!(
+        is_used_proof,
+        "{}",
+        "Expected not to fail because the proof should have been already used",
+    );
+}
+
+fn assert_proof_was_not_used(account: &UserAccount, contract: &str, proof: &str) {
+    let is_used_proof = call_is_used_proof(account, contract, proof);
+    assert!(
+        !is_used_proof,
+        "{}",
+        "Expected not to fail and to have an unused proof but it was already used",
+    );
+}
+
 #[allow(dead_code)]
 fn print_logs(logs: &Vec<String>) {
     for l in logs {
@@ -285,6 +299,7 @@ fn test_eth_deposit_balance_total_supply() {
     res.assert_success();
 
     call_deposit_eth(&contract, CONTRACT_ACC);
+    assert_proof_was_used(&contract, CONTRACT_ACC, PROOF_DATA_ETH);
 
     let balance = get_eth_balance(
         &master_account,
@@ -472,8 +487,7 @@ fn test_ft_transfer_call_eth() {
 fn test_deposit_with_same_proof() {
     let (_master_account, contract) = init(CUSTODIAN_ADDRESS);
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
-    assert!(!is_used_proof, "{}", ERR_PROOF_USED);
+    assert_proof_was_not_used(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
 
     let promises = call_deposit_near(&contract, CONTRACT_ACC);
     for p in promises.iter() {
@@ -482,8 +496,7 @@ fn test_deposit_with_same_proof() {
         p.assert_success()
     }
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
-    assert!(is_used_proof, "{}", ERR_PROOF_NOT_USED);
+    assert_proof_was_used(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
 
     let promises = call_deposit_near(&contract, CONTRACT_ACC);
     let promise = &promises[promises.len() - 2];
@@ -506,8 +519,7 @@ fn test_deposit_wrong_custodian_address() {
         "Expected failure as the provided proof originated from wrong EthCustodian contract, but deposit succeeded",
     );
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
-    assert!(!is_used_proof, "{}", ERR_PROOF_USED);
+    assert_proof_was_not_used(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
 }
 
 #[test]
@@ -964,8 +976,7 @@ fn test_deposit_near_with_zero_fee() {
     );
     res.assert_success();
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, proof_str);
-    assert!(is_used_proof, "{}", ERR_PROOF_NOT_USED);
+    assert_proof_was_used(&contract, CONTRACT_ACC, proof_str);
 
     let deposited_amount = 3000;
 
@@ -1012,8 +1023,7 @@ fn test_deposit_evm_with_zero_fee() {
     );
     res.assert_success();
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, proof_str);
-    assert!(is_used_proof, "{}", ERR_PROOF_NOT_USED);
+    assert_proof_was_used(&contract, CONTRACT_ACC, proof_str);
 
     let deposited_amount = 2000;
 
@@ -1061,8 +1071,7 @@ fn test_deposit_near_amount_less_fee() {
         "Expected failure as the deposited amount is less than fee, but deposit to NEP-141 succeeded",
     );
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, proof_str);
-    assert!(!is_used_proof, "{}", ERR_PROOF_USED);
+    assert_proof_was_not_used(&contract, CONTRACT_ACC, proof_str);
 }
 
 #[test]
@@ -1085,8 +1094,7 @@ fn test_deposit_evm_amount_less_fee() {
         "Expected failure as the deposited amount is less than fee, but deposit to Aurora succeeded",
     );
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, proof_str);
-    assert!(!is_used_proof, "{}", ERR_PROOF_USED);
+    assert_proof_was_not_used(&contract, CONTRACT_ACC, proof_str);
 }
 
 #[test]
@@ -1109,8 +1117,7 @@ fn test_deposit_near_amount_zero_fee_non_zero() {
         "Expected failure as the deposited amount is zero and the fee is not zero, but deposit to NEP-141 succeeded",
     );
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, proof_str);
-    assert!(!is_used_proof, "{}", ERR_PROOF_USED);
+    assert_proof_was_not_used(&contract, CONTRACT_ACC, proof_str);
 }
 
 #[test]
@@ -1133,8 +1140,7 @@ fn test_deposit_evm_amount_zero_fee_non_zero() {
         "Expected failure as the deposited amount is zero and the fee is not zero, but deposit to Aurora succeeded",
     );
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, proof_str);
-    assert!(!is_used_proof, "{}", ERR_PROOF_USED);
+    assert_proof_was_not_used(&contract, CONTRACT_ACC, proof_str);
 }
 
 #[test]
@@ -1157,8 +1163,7 @@ fn test_deposit_near_amount_equal_fee_non_zero() {
         "Expected failure as the deposited amount is equal to fee, but deposit to NEP-141 succeeded",
     );
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, proof_str);
-    assert!(!is_used_proof, "{}", ERR_PROOF_USED);
+    assert_proof_was_not_used(&contract, CONTRACT_ACC, proof_str);
 }
 
 #[test]
@@ -1182,8 +1187,7 @@ fn test_deposit_evm_amount_equal_fee_non_zero() {
         "Expected failure as the deposited amount is equal to fee, but deposit to Aurora succeeded",
     );
 
-    let is_used_proof = call_is_used_proof(&contract, CONTRACT_ACC, proof_str);
-    assert!(!is_used_proof, "{}", ERR_PROOF_USED);
+    assert_proof_was_not_used(&contract, CONTRACT_ACC, proof_str);
 }
 
 fn assert_execution_status_failure(
