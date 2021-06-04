@@ -1,4 +1,5 @@
 use crate::prelude::{Address, Vec, U256};
+use crate::types::Wei;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 #[derive(Debug, Eq, PartialEq)]
@@ -12,7 +13,7 @@ pub struct EthTransaction {
     /// The receiving address (`None` for the zero address)
     pub to: Option<Address>,
     /// The amount of ETH to transfer
-    pub value: U256,
+    pub value: Wei,
     /// Arbitrary binary data for a contract call invocation
     pub data: Vec<u8>,
 }
@@ -27,7 +28,7 @@ impl EthTransaction {
             None => s.append(&""),
             Some(address) => s.append(address),
         };
-        s.append(&self.value);
+        s.append(&self.value.raw());
         s.append(&self.data);
         if let Some(chain_id) = chain_id {
             s.append(&chain_id);
@@ -87,7 +88,7 @@ impl Encodable for EthSignedTransaction {
             None => s.append(&""),
             Some(address) => s.append(address),
         };
-        s.append(&self.transaction.value);
+        s.append(&self.transaction.value.raw());
         s.append(&self.transaction.data);
         s.append(&self.v);
         s.append(&self.r);
@@ -120,7 +121,7 @@ impl Decodable for EthSignedTransaction {
                 }
             }
         };
-        let value = rlp.val_at(4)?;
+        let value = Wei::new(rlp.val_at(4)?);
         let data = rlp.val_at(5)?;
         let v = rlp.val_at(6)?;
         let r = rlp.val_at(7)?;
@@ -181,7 +182,7 @@ mod tests {
                 to: Some(address_from_arr(
                     &hex::decode("F0109fC8DF283027b6285cc889F5aA624EaC1F55").unwrap()
                 )),
-                value: U256::from(1000000000),
+                value: Wei::new_u64(1000000000),
                 data: vec![],
             }
         );

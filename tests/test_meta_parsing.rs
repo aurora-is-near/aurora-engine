@@ -5,16 +5,16 @@ use near_crypto::{InMemorySigner, KeyType, PublicKey, Signature, Signer};
 use aurora_engine::meta_parsing::{near_erc712_domain, parse_meta_call, prepare_meta_call_args};
 use aurora_engine::parameters::MetaCallArgs;
 use aurora_engine::prelude::{Address, U256};
-use aurora_engine::types::{keccak, u256_to_arr, InternalMetaCallArgs};
+use aurora_engine::types::{keccak, u256_to_arr, InternalMetaCallArgs, Wei};
 
 pub fn encode_meta_call_function_args(
     signer: &dyn Signer,
     chain_id: u64,
     nonce: U256,
-    fee_amount: U256,
+    fee_amount: Wei,
     fee_address: Address,
     contract_address: Address,
-    value: U256,
+    value: Wei,
     method_def: &str,
     args: Vec<u8>,
 ) -> Vec<u8> {
@@ -47,10 +47,10 @@ pub fn encode_meta_call_function_args(
                 // Add 27 to align eth-sig-util signature format
                 v: 27,
                 nonce: u256_to_arr(&nonce),
-                fee_amount: u256_to_arr(&fee_amount),
+                fee_amount: fee_amount.to_bytes(),
                 fee_address: fee_address.0,
                 contract_address: contract_address.0,
-                value: u256_to_arr(&value),
+                value: value.to_bytes(),
                 method_def: method_def.to_string(),
                 args,
             }
@@ -84,10 +84,10 @@ fn test_meta_parsing() {
         &signer,
         chain_id,
         U256::from(14),
-        U256::from(6),
+        Wei::new_u64(6),
         Address::from_slice(&[0u8; 20]),
         signer_addr.clone(),
-        U256::from(0),
+        Wei::zero(),
         "adopt(uint256 petId)",
         // RLP encode of ["0x09"]
         hex::decode("c109").unwrap(),
@@ -104,10 +104,10 @@ fn test_meta_parsing() {
         &signer,
         chain_id,
         U256::from(14),
-        U256::from(6),
+        Wei::new_u64(6),
         Address::from_slice(&[0u8; 20]),
         signer_addr.clone(),
-        U256::from(0),
+        Wei::zero(),
         "adopt(uint256 petId,PetObj petObject)PetObj(string petName,address owner)",
         // RLP encode of ["0x09", ["0x436170734C6F636B", "0x0123456789012345678901234567890123456789"]]
         hex::decode("e009de88436170734c6f636b940123456789012345678901234567890123456789").unwrap(),

@@ -54,6 +54,7 @@ wee_alloc = { version = "0.4.5", default-features = false }
 lunarity-lexer = { git = "https://github.com/ilblackdragon/lunarity", rev = "5201d9a76f7e491082b7f74af7e64049271e387f", default-features = false }
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
+byte-slice-cast = { version = "1.0", default-features = false }
 rjson = { version = "0.3.1", default-features = false }
 
 [dev-dependencies]
@@ -76,5 +77,9 @@ git2 = "0.13"
 default = ["sha2", "std"]
 std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "lunarity-lexer/std", "bn/std"]
 testnet = []
-contract = []
+engine = []
+contract = ["engine"]
 evm_bully = []
+log = []
+exit-precompiles = ["contract"]
+integration-test = ["log"]

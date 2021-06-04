@@ -41,6 +41,15 @@ mod consts {
     pub(super) const PAIR_ELEMENT_LEN: usize = 192;
 }
 
+/// bn128 precompile addresses
+pub(super) mod addresses {
+    use crate::precompiles;
+
+    pub const ADD: [u8; 20] = precompiles::make_address(0, 6);
+    pub const MUL: [u8; 20] = precompiles::make_address(0, 7);
+    pub const PAIR: [u8; 20] = precompiles::make_address(0, 8);
+}
+
 /// Reads the `x` and `y` points from an input at a given position.
 fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
     use bn::{AffineG1, Fq, Group, G1};

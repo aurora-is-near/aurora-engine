@@ -3,6 +3,7 @@ use crate::test_utils::{
     self,
     erc20::{ERC20Constructor, ERC20},
 };
+use crate::types::Wei;
 use bstr::ByteSlice;
 use secp256k1::SecretKey;
 
@@ -211,7 +212,11 @@ fn initialize_erc20() -> (test_utils::AuroraRunner, SecretKey, Address, ERC20) {
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
     let source_address = test_utils::address_from_secret_key(&source_account);
-    runner.create_address(source_address, INITIAL_BALANCE.into(), INITIAL_NONCE.into());
+    runner.create_address(
+        source_address,
+        Wei::new_u64(INITIAL_BALANCE),
+        INITIAL_NONCE.into(),
+    );
     let dest_address = test_utils::address_from_secret_key(&SecretKey::random(&mut rng));
 
     let constructor = ERC20Constructor::load();
