@@ -353,7 +353,7 @@ mod contract {
             )
         }
         // return new chain ID
-        sdk::return_output(&Engine::get_state().chain_id)
+        sdk::return_output(&Engine::get_state().sdk_unwrap().chain_id)
     }
 
     #[cfg(feature = "evm_bully")]
