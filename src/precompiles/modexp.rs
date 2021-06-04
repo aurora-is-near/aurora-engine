@@ -1,6 +1,8 @@
-use crate::precompiles::{Berlin, Byzantium, HardFork, Precompile, PrecompileResult};
+use crate::precompiles::{
+    Berlin, Byzantium, HardFork, Precompile, PrecompileOutput, PrecompileResult,
+};
 use crate::prelude::{PhantomData, Vec, U256};
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError};
 use num::BigUint;
 
 pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
@@ -115,7 +117,7 @@ impl Precompile for ModExp<Byzantium> {
         let exponent = BigUint::from_bytes_be(&exp_bytes);
         let modulus = BigUint::from_bytes_be(&mod_bytes);
 
-        let result = {
+        let output = {
             let computed_result = base.modpow(&exponent, &modulus).to_bytes_be();
             // The result must be the same length as the input modulus.
             // To ensure this we pad on the left with zeros.
@@ -130,7 +132,7 @@ impl Precompile for ModExp<Byzantium> {
             }
         };
 
-        Ok((ExitSucceed::Returned, result, cost))
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -170,7 +172,7 @@ mod tests {
         .unwrap();
         let modexp_res = ModExp::<Byzantium>::run(&test_input1, 12_288, &new_context())
             .unwrap()
-            .1;
+            .output;
         let res = U256::from_big_endian(&modexp_res);
 
         assert_eq!(res, U256::from(1));
@@ -185,7 +187,7 @@ mod tests {
         .unwrap();
         let modexp_res = ModExp::<Byzantium>::run(&test_input2, 12_288, &new_context())
             .unwrap()
-            .1;
+            .output;
         let res = U256::from_big_endian(&modexp_res);
 
         assert_eq!(res, U256::from(0));
@@ -216,7 +218,7 @@ mod tests {
         );
         let modexp_res = ModExp::<Byzantium>::run(&test_input4, 12_288, &new_context())
             .unwrap()
-            .1;
+            .output;
         let res = U256::from_big_endian(&modexp_res);
         assert_eq!(res, expected);
 
@@ -235,7 +237,7 @@ mod tests {
         );
         let modexp_res = ModExp::<Byzantium>::run(&test_input5, 12_288, &new_context())
             .unwrap()
-            .1;
+            .output;
         let res = U256::from_big_endian(&modexp_res);
         assert_eq!(res, expected);
     }
