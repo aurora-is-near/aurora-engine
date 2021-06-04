@@ -11,11 +11,9 @@ use crate::prelude::{String, Vec};
 use crate::prover::Proof;
 #[cfg(feature = "engine")]
 use crate::sdk;
-#[cfg(feature = "engine")]
-use crate::types::Balance;
 use crate::types::{AccountId, RawAddress, RawH256, RawU256};
 #[cfg(feature = "engine")]
-use crate::types::{EthAddress, ERR_FAILED_PARSE};
+use crate::types::{Balance, EthAddress, SdkUnwrap};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -258,12 +256,10 @@ pub struct TransferCallCallArgs {
 impl From<json::JsonValue> for TransferCallCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            receiver_id: v
-                .string("receiver_id")
-                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            receiver_id: v.string("receiver_id").sdk_unwrap(),
+            amount: v.u128("amount").sdk_unwrap(),
             memo: v.string("memo").ok(),
-            msg: v.string("msg").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            msg: v.string("msg").sdk_unwrap(),
         }
     }
 }
@@ -279,9 +275,7 @@ pub struct StorageBalanceOfCallArgs {
 impl From<json::JsonValue> for StorageBalanceOfCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            account_id: v
-                .string("account_id")
-                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            account_id: v.string("account_id").sdk_unwrap(),
         }
     }
 }
@@ -333,10 +327,8 @@ pub struct TransferCallArgs {
 impl From<json::JsonValue> for TransferCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            receiver_id: v
-                .string("receiver_id")
-                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            receiver_id: v.string("receiver_id").sdk_unwrap(),
+            amount: v.u128("amount").sdk_unwrap(),
             memo: v.string("memo").ok(),
         }
     }
@@ -367,9 +359,7 @@ pub struct BalanceOfEthCallArgs {
 impl From<json::JsonValue> for BalanceOfCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            account_id: v
-                .string("account_id")
-                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            account_id: v.string("account_id").sdk_unwrap(),
         }
     }
 }
@@ -415,13 +405,9 @@ impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
 impl From<json::JsonValue> for ResolveTransferCallArgs {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            sender_id: v
-                .string("sender_id")
-                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-            receiver_id: v
-                .string("receiver_id")
-                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            sender_id: v.string("sender_id").sdk_unwrap(),
+            receiver_id: v.string("receiver_id").sdk_unwrap(),
+            amount: v.u128("amount").sdk_unwrap(),
         }
     }
 }

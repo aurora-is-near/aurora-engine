@@ -6,7 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 use crate::sdk;
 
 pub type AccountId = String;
@@ -182,6 +182,56 @@ impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
         match self {
             Ok(t) => t,
             Err(_) => sdk::panic_utf8(message),
+        }
+    }
+}
+
+#[cfg(feature = "engine")]
+pub trait SdkExpect<T> {
+    fn sdk_expect(self, msg: &str) -> T;
+}
+
+#[cfg(feature = "engine")]
+impl<T> SdkExpect<T> for Option<T> {
+    fn sdk_expect(self, msg: &str) -> T {
+        match self {
+            Some(t) => t,
+            None => sdk::panic_utf8(msg.as_ref()),
+        }
+    }
+}
+
+#[cfg(feature = "engine")]
+impl<T, E> SdkExpect<T> for core::result::Result<T, E> {
+    fn sdk_expect(self, msg: &str) -> T {
+        match self {
+            Ok(t) => t,
+            Err(_) => sdk::panic_utf8(msg.as_ref()),
+        }
+    }
+}
+
+#[cfg(feature = "engine")]
+pub trait SdkUnwrap<T> {
+    fn sdk_unwrap(self) -> T;
+}
+
+#[cfg(feature = "engine")]
+impl<T> SdkUnwrap<T> for Option<T> {
+    fn sdk_unwrap(self) -> T {
+        match self {
+            Some(t) => t,
+            None => sdk::panic_utf8("ERR_UNWRAP".as_bytes()),
+        }
+    }
+}
+
+#[cfg(feature = "engine")]
+impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for core::result::Result<T, E> {
+    fn sdk_unwrap(self) -> T {
+        match self {
+            Ok(t) => t,
+            Err(e) => sdk::panic_utf8(e.as_ref()),
         }
     }
 }
