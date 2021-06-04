@@ -1,6 +1,7 @@
 use evm::{Context, ExitError, ExitSucceed};
 
 use super::{Precompile, PrecompileResult};
+use crate::precompiles::PrecompileOutput;
 use crate::prelude::Vec;
 #[cfg(feature = "exit-precompiles")]
 use crate::{
@@ -128,7 +129,7 @@ impl Precompile for ExitToNear {
 
         crate::sdk::promise_return(promise0);
 
-        Ok((ExitSucceed::Returned, Vec::new(), 0))
+        Ok(PrecompileOutput::default())
     }
 }
 
@@ -229,7 +230,7 @@ impl Precompile for ExitToEthereum {
 
         crate::sdk::promise_return(promise0);
 
-        Ok((ExitSucceed::Returned, Vec::new(), 0))
+        Ok(PrecompileOutput::default())
     }
 }
 
