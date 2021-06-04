@@ -96,6 +96,7 @@ mod contract {
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
+    const GAS_OVERFLOW: &str = "ERR_GAS_OVERFLOW";
 
     ///
     /// ADMINISTRATIVE METHODS
@@ -239,16 +240,33 @@ mod contract {
 
         Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
 
+        // Check intrinsic gas is covered by transaction gas limit
+        match signed_transaction
+            .transaction
+            .intrinsic_gas(&crate::engine::CONFIG)
+        {
+            None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
+            Some(intrinsic_gas) => {
+                if signed_transaction.transaction.gas < intrinsic_gas.into() {
+                    sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
+                }
+            }
+        }
+
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
+        let gas_limit = signed_transaction
+            .transaction
+            .get_gas_limit()
+            .sdk_expect(GAS_OVERFLOW);
         let data = signed_transaction.transaction.data;
         let result = if let Some(receiver) = signed_transaction.transaction.to {
-            Engine::call(&mut engine, sender, receiver, value, data)
+            Engine::call(&mut engine, sender, receiver, value, data, gas_limit)
             // TODO: charge for storage
         } else {
             // Execute a contract deployment:
-            Engine::deploy_code(&mut engine, sender, value, data)
+            Engine::deploy_code(&mut engine, sender, value, data, gas_limit)
             // TODO: charge for storage
         };
         result
@@ -276,6 +294,7 @@ mod contract {
             meta_call_args.contract_address,
             meta_call_args.value,
             meta_call_args.input,
+            u64::MAX, // TODO: is there a gas limit with meta calls?
         );
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
