@@ -148,9 +148,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let state = Engine::get_state().sdk_unwrap();
-        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
-            .sdk_expect("ERR_NO_UPGRADE")
-            .sdk_unwrap();
+        let index = internal_get_upgrade_index();
         sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
 
@@ -170,9 +168,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
         let state = Engine::get_state().sdk_unwrap();
-        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
-            .sdk_expect("ERR_NO_UPGRADE")
-            .sdk_unwrap();
+        let index = internal_get_upgrade_index();
         if sdk::block_index() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }
@@ -532,6 +528,14 @@ mod contract {
     ///
     /// Utility methods.
     ///
+
+    fn internal_get_upgrade_index() -> u64 {
+        match sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)) {
+            Ok(index) => index,
+            Err(sdk::ReadU64Error::InvalidU64) => sdk::panic_utf8(b"ERR_INVALID_UPGRADE"),
+            Err(sdk::ReadU64Error::MissingValue) => sdk::panic_utf8(b"ERR_NO_UPGRADE"),
+        }
+    }
 
     fn require_owner_only(state: &EngineState) {
         if state.owner_id.as_bytes() != sdk::predecessor_account_id() {

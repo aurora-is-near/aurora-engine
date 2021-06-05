@@ -230,16 +230,18 @@ pub fn read_storage_len(key: &[u8]) -> Option<usize> {
 }
 
 /// Read u64 from storage at given key.
-pub(crate) fn read_u64(key: &[u8]) -> Option<Result<u64, InvalidU64>> {
-    read_storage_len(key).map(|value_size| unsafe {
-        if value_size == 8 {
-            let result = [0u8; 8];
-            exports::read_register(READ_STORAGE_REGISTER_ID, result.as_ptr() as _);
-            Ok(u64::from_le_bytes(result))
-        } else {
-            Err(InvalidU64)
-        }
-    })
+pub(crate) fn read_u64(key: &[u8]) -> Result<u64, ReadU64Error> {
+    read_storage_len(key)
+        .ok_or(ReadU64Error::MissingValue)
+        .and_then(|value_size| unsafe {
+            if value_size == 8 {
+                let result = [0u8; 8];
+                exports::read_register(READ_STORAGE_REGISTER_ID, result.as_ptr() as _);
+                Ok(u64::from_le_bytes(result))
+            } else {
+                Err(ReadU64Error::InvalidU64)
+            }
+        })
 }
 
 pub fn write_storage(key: &[u8], value: &[u8]) {
@@ -502,9 +504,15 @@ impl AsRef<[u8]> for ArgParseErr {
     }
 }
 
-pub(crate) struct InvalidU64;
-impl AsRef<[u8]> for InvalidU64 {
+pub(crate) enum ReadU64Error {
+    InvalidU64,
+    MissingValue,
+}
+impl AsRef<[u8]> for ReadU64Error {
     fn as_ref(&self) -> &[u8] {
-        b"ERR_NOT_U64"
+        match self {
+            Self::InvalidU64 => b"ERR_NOT_U64",
+            Self::MissingValue => b"ERR_U64_NOT_FOUND",
+        }
     }
 }
