@@ -8,7 +8,7 @@ use crate::deposit_event::*;
 use crate::engine::Engine;
 use crate::json::parse_json;
 use crate::prelude::*;
-use crate::prover::validate_eth_address;
+use crate::prover::{validate_eth_address, Proof};
 use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
 #[cfg(feature = "log")]
 use alloc::format;
@@ -181,7 +181,6 @@ impl EthConnectorContract {
     pub fn deposit(&self) {
         self.assert_not_paused(PAUSE_DEPOSIT);
 
-        use crate::prover::Proof;
         #[cfg(feature = "log")]
         sdk::log("[Deposit tokens]");
 
@@ -641,6 +640,11 @@ impl EthConnectorContract {
     /// Check is event of proof already used
     fn check_used_event(&self, key: &str) -> bool {
         sdk::storage_has_key(&self.used_event_key(key))
+    }
+
+    /// Checks whether the provided proof was already used
+    pub fn is_used_proof(&self, proof: Proof) -> bool {
+        self.check_used_event(&proof.get_key())
     }
 
     /// Get Eth connector paused flags
