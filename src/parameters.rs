@@ -145,6 +145,14 @@ pub struct DepositCallArgs {
     pub relayer_eth_account: Option<EthAddress>,
 }
 
+/// Eth-connector isUsedProof arguments
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct IsUsedProofCallArgs {
+    /// Proof data
+    pub proof: Proof,
+}
+
 /// withdraw result for eth-connector
 #[cfg(feature = "engine")]
 #[derive(BorshSerialize)]

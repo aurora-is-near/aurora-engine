@@ -45,7 +45,7 @@ impl Wei {
         amount.checked_mul(Self::ETH_TO_WEI).map(Self)
     }
 
-    pub fn to_bytes(&self) -> [u8; 32] {
+    pub fn to_bytes(self) -> [u8; 32] {
         u256_to_arr(&self.0)
     }
 

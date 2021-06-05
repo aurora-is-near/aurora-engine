@@ -34,7 +34,7 @@ impl PrecompilesConstructor {
         EthTransaction {
             nonce,
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: u64::MAX.into(),
             to: None,
             value: Default::default(),
             data,
@@ -62,7 +62,7 @@ impl PrecompilesContract {
         EthTransaction {
             nonce,
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: u64::MAX.into(),
             to: Some(self.0.address),
             value: Default::default(),
             data,
