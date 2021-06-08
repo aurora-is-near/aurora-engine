@@ -328,8 +328,8 @@ mod contract {
         } else {
             let args: NEP141FtOnTransferArgs = sdk::read_input_borsh().sdk_unwrap();
 
-            // TODO: Find correct gas_limit (do we need this here?)
-            let gas_limit = 0;
+            // TODO: Find correct gas_limit
+            let gas_limit = 100_000;
 
             engine.receive_erc20_tokens(args, gas_limit);
         }

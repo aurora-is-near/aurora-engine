@@ -1,7 +1,7 @@
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError};
 
 use crate::parameters::PromiseCreateArgs;
-use crate::prelude::{is_valid_account_id, Cow, PhantomData, String, ToString, Vec, U256};
+use crate::prelude::{is_valid_account_id, Cow, PhantomData, String, ToString, U256};
 use crate::storage::{bytes_to_key, KeyPrefix};
 use crate::types::AccountId;
 use crate::AuroraState;
@@ -10,7 +10,6 @@ use super::{Precompile, PrecompileResult};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
-use crate::engine::Engine;
 use crate::precompiles::PrecompileOutput;
 
 mod costs {
@@ -29,11 +28,6 @@ mod costs {
     pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
 }
 
-/// The minimum length of a valid account ID.
-const MIN_ACCOUNT_ID_LEN: u64 = 2;
-/// The maximum length of a valid account ID.
-const MAX_ACCOUNT_ID_LEN: u64 = 64;
-
 pub struct ExitToNear<S>(PhantomData<S>); //TransferEthToNear
 
 impl<S> ExitToNear<S> {
@@ -46,7 +40,7 @@ impl<S> ExitToNear<S> {
 }
 
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
-    Engine::AccountId::from_utf8(
+    AccountId::from_utf8(
         crate::sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
             .expect(ERR_TARGET_TOKEN_NOT_FOUND),
     )
@@ -84,7 +78,7 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
         target_gas: u64,
         context: &Context,
         state: &mut S,
-        is_static: bool,
+        _is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
@@ -227,7 +221,7 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
         target_gas: u64,
         context: &Context,
         state: &mut S,
-        is_static: bool,
+        _is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);

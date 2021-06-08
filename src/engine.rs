@@ -23,7 +23,9 @@ macro_rules! unwrap_res_or_finish {
     ($e:expr, $output:expr) => {
         match $e {
             Ok(v) => v,
-            Err(_) => {
+            Err(e) => {
+                #[cfg(feature = "log")]
+                sdk::log(crate::prelude::format!("{:?}", e).as_str());
                 sdk::return_output($output);
                 return;
             }
@@ -571,8 +573,12 @@ impl Engine {
         for promise in promises {
             #[cfg(feature = "log")]
             sdk::log_utf8(
-                crate::prelude::format!("{}.{}", promise.target_account_id, promise.method)
-                    .as_bytes(),
+                crate::prelude::format!(
+                    "Call contract: {}.{}",
+                    promise.target_account_id,
+                    promise.method
+                )
+                .as_bytes(),
             );
             sdk::promise_create(
                 promise.target_account_id.as_bytes(),

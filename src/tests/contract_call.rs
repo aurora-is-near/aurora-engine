@@ -51,14 +51,14 @@ fn withdraw() {
     let (mut runner, mut signer, token, tester) = setup_test();
 
     let test_data = vec![
-        (true, "tt.testnet.ft_transfer"),
-        (false, "tt.testnet.withdraw"),
+        (true, "Call contract: tt.testnet.ft_transfer"),
+        (false, "Call contract: tt.testnet.withdraw"),
     ];
 
     for (flag, expected) in test_data {
         assert!(tester.withdraw(&mut runner, &mut signer, flag).is_ok());
         // One promise is scheduled
-        assert_eq!(runner.previous_logs, vec![expected.to_string()]);
+        assert!(runner.previous_logs.contains(&expected.to_string()));
     }
 }
 
@@ -66,13 +66,18 @@ fn withdraw() {
 fn withdraw_and_fail() {
     let (mut runner, mut signer, token, tester) = setup_test();
 
-    for flag in vec![true, false] {
+    let test_data = vec![
+        (true, "Call contract: tt.testnet.ft_transfer"),
+        (false, "Call contract: tt.testnet.withdraw"),
+    ];
+
+    for (flag, not_expected) in test_data {
         assert!(tester
             .withdraw_and_fail(&mut runner, &mut signer, flag)
             .is_err());
 
         // No promise is scheduled
-        assert!(runner.previous_logs.is_empty());
+        assert!(!runner.previous_logs.contains(&not_expected.to_string()));
     }
 }
 
@@ -80,13 +85,18 @@ fn withdraw_and_fail() {
 fn try_withdraw_and_avoid_fail() {
     let (mut runner, mut signer, token, tester) = setup_test();
 
-    for flag in vec![true, false] {
+    let test_data = vec![
+        (true, "Call contract: tt.testnet.ft_transfer"),
+        (false, "Call contract: tt.testnet.withdraw"),
+    ];
+
+    for (flag, not_expected) in test_data {
         assert!(tester
             .try_withdraw_and_avoid_fail(&mut runner, &mut signer, flag)
             .is_ok());
 
         // No promise is scheduled
-        assert!(runner.previous_logs.is_empty());
+        assert!(!runner.previous_logs.contains(&not_expected.to_string()));
     }
 }
 
@@ -95,15 +105,17 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
     let (mut runner, mut signer, token, tester) = setup_test();
 
     let test_data = vec![
-        (true, "tt.testnet.ft_transfer"),
-        (false, "tt.testnet.withdraw"),
+        (true, "Call contract: tt.testnet.ft_transfer"),
+        (false, "Call contract: tt.testnet.withdraw"),
     ];
 
     for (flag, expected) in test_data {
+        println!("{}", flag);
         assert!(tester
             .try_withdraw_and_avoid_fail_and_succeed(&mut runner, &mut signer, flag)
             .is_ok());
         // One promise is scheduled
-        assert_eq!(runner.previous_logs, vec![expected.to_string()]);
+        println!("{:?} {:?}", runner.previous_logs, expected.to_string());
+        assert!(runner.previous_logs.contains(&expected.to_string()));
     }
 }

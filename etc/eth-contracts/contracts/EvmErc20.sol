@@ -35,9 +35,8 @@ contract EvmErc20 is Context, ERC20, AdminControlled, IExit {
         bytes memory input = abi.encodePacked("\x01", amount_b, recipient);
         uint input_size = 1 + 32 + recipient.length;
 
-        // TODO: Change this values after PR fixing location of precompiles
         assembly {
-            let res := staticcall(gas(), 11421322804619973199, add(input, 32), input_size, 0, 32)
+            let res := staticcall(gas(), 0xe9217bc70b7ed1f598ddd3199e80b093fa71124f, add(input, 32), input_size, 0, 32)
         }
     }
 
@@ -49,9 +48,8 @@ contract EvmErc20 is Context, ERC20, AdminControlled, IExit {
         bytes memory input = abi.encodePacked("\x01", amount_b, recipient_b);
         uint input_size = 1 + 32 + 20;
 
-        // TODO: Change this values after PR fixing location of precompiles
         assembly {
-            let res := staticcall(gas(), 17176159495920586411, add(input, 32), input_size, 0, 32)
+            let res := staticcall(gas(), 0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab, add(input, 32), input_size, 0, 32)
         }
     }
 }

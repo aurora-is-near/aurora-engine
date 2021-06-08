@@ -1,11 +1,13 @@
 use crate::parameters::{FunctionCallArgs, SubmitResult};
-use crate::prelude::Address;
+use crate::prelude::{Address, U256};
 use crate::test_utils::{solidity, AuroraRunner, Signer};
 use crate::transaction::EthTransaction;
 use borsh::BorshSerialize;
 use std::convert::TryInto;
 
 pub(crate) struct TesterConstructor(pub solidity::ContractConstructor);
+
+const DEPLOY_CONTRACT_GAS: u64 = 1_000_000_000;
 
 impl TesterConstructor {
     pub fn load() -> Self {
@@ -26,7 +28,7 @@ impl TesterConstructor {
         EthTransaction {
             nonce: nonce.into(),
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: U256::from(DEPLOY_CONTRACT_GAS),
             to: None,
             value: Default::default(),
             data,
@@ -70,7 +72,7 @@ impl Tester {
         let tx = EthTransaction {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: U256::from(DEPLOY_CONTRACT_GAS),
             to: Some(self.contract.address),
             value: Default::default(),
             data,
