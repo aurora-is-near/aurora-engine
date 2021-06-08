@@ -14,14 +14,14 @@ documentation.
 
 Network | Contract ID         | Chain ID   | Status
 ------- | ------------------- | ---------- | ------
-MainNet | [`aurora`][MainNet] | 1313161554 | 🚧
-TestNet | [`aurora`][TestNet] | 1313161555 | 🚧
-BetaNet | [`aurora`][BetaNet] | 1313161556 | 🚧
+Mainnet | [`aurora`][Mainnet] | 1313161554 | 🚧
+Testnet | [`aurora`][Testnet] | 1313161555 | 🚧
+Betanet | [`aurora`][Betanet] | 1313161556 | 🚧
 Local   | `aurora.test.near`  | 1313161556 | ✅
 
-[MainNet]: https://explorer.near.org/accounts/aurora
-[TestNet]: https://explorer.testnet.near.org/accounts/aurora
-[BetaNet]: https://explorer.betanet.near.org/accounts/aurora
+[Mainnet]: https://explorer.near.org/accounts/aurora
+[Testnet]: https://explorer.testnet.near.org/accounts/aurora
+[Betanet]: https://explorer.betanet.near.org/accounts/aurora
 
 ## Prerequisites
 
@@ -118,6 +118,11 @@ aurora deploy-code 0x600060005560648060106000396000f360e060020a6000350480638ada0
 
 ### Examining EVM contract state
 
+```console
+$ aurora encode-address test.near
+0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B
+```
+
 ```sh
 aurora get-nonce 0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B
 aurora get-balance 0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B
@@ -126,6 +131,11 @@ aurora get-storage-at 0xFc481F4037887e10708552c0D7563Ec6858640d6 0
 ```
 
 ### Calling an EVM contract read-only
+
+```console
+$ aurora encode-address test.near
+0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B
+```
 
 ```sh
 aurora view --sender 0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B 0xFc481F4037887e10708552c0D7563Ec6858640d6 0x8ada066e  # getCounter()

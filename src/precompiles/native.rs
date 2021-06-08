@@ -1,9 +1,7 @@
-use crate::prelude::PhantomData;
-use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 
 use crate::parameters::PromiseCreateArgs;
-use crate::prelude::{Cow, String, ToString, Vec, U256};
+use crate::prelude::{is_valid_account_id, Cow, PhantomData, String, ToString, Vec, U256};
 use crate::storage::{bytes_to_key, KeyPrefix};
 use crate::types::AccountId;
 use crate::AuroraState;
@@ -11,6 +9,8 @@ use crate::AuroraState;
 use super::{Precompile, PrecompileResult};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
+
+use crate::precompiles::PrecompileOutput;
 
 mod costs {
     use crate::types::Gas;
@@ -33,37 +33,15 @@ const MIN_ACCOUNT_ID_LEN: u64 = 2;
 /// The maximum length of a valid account ID.
 const MAX_ACCOUNT_ID_LEN: u64 = 64;
 
-/// Returns `true` if the given account ID is valid and `false` otherwise.
-///
-/// Taken from near-sdk-rs:
-/// (https://github.com/near/near-sdk-rs/blob/42f62384c3acd024829501ee86e480917da03896/near-sdk/src/environment/env.rs#L816-L843)
-pub fn is_valid_account_id(account_id: &[u8]) -> bool {
-    if (account_id.len() as u64) < MIN_ACCOUNT_ID_LEN
-        || (account_id.len() as u64) > MAX_ACCOUNT_ID_LEN
-    {
-        return false;
-    }
+pub struct ExitToNear; //TransferEthToNear
 
-    // NOTE: We don't want to use Regex here, because it requires extra time to compile it.
-    // The valid account ID regex is /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/
-    // Instead the implementation is based on the previous character checks.
-
-    // We can safely assume that last char was a separator.
-    let mut last_char_is_separator = true;
-
-    for c in account_id {
-        let current_char_is_separator = match *c {
-            b'a'..=b'z' | b'0'..=b'9' => false,
-            b'-' | b'_' | b'.' => true,
-            _ => return false,
-        };
-        if current_char_is_separator && last_char_is_separator {
-            return false;
-        }
-        last_char_is_separator = current_char_is_separator;
-    }
-    // The account can't end as separator.
-    !last_char_is_separator
+impl ExitToNear {
+    /// Exit to NEAR precompile address
+    ///
+    /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
+    /// This address is computed as: `&keccak("exitToNear")[12..]`
+    pub(super) const ADDRESS: [u8; 20] =
+        super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
@@ -81,7 +59,7 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
-    #[cfg(not(feature = "contract"))]
+    #[cfg(not(feature = "exit-precompiles"))]
     fn run(
         input: &[u8],
         target_gas: u64,
@@ -101,7 +79,7 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
         })
     }
 
-    #[cfg(feature = "contract")]
+    #[cfg(feature = "exit-precompiles")]
     fn run(
         input: &[u8],
         target_gas: u64,
@@ -204,23 +182,27 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
 
         state.add_promise(promise);
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            output: Vec::new(),
-            cost: 0,
-            logs: Vec::new(),
-        })
+        Ok(PrecompileOutput::default())
     }
 }
 
 pub struct ExitToEthereum<S>(PhantomData<S>);
+
+impl ExitToEthereum {
+    /// Exit to Ethereum precompile address
+    ///
+    /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
+    /// This address is computed as: `&keccak("exitToEthereum")[12..]`
+    pub(super) const ADDRESS: [u8; 20] =
+        super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
+}
 
 impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
-    #[cfg(not(feature = "contract"))]
+    #[cfg(not(feature = "exit-precompiles"))]
     fn run(
         input: &[u8],
         target_gas: u64,
@@ -240,7 +222,7 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
         })
     }
 
-    #[cfg(feature = "contract")]
+    #[cfg(feature = "exit-precompiles")]
     fn run(
         input: &[u8],
         target_gas: u64,
@@ -348,18 +330,13 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
 
         state.add_promise(promise);
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            output: Vec::new(),
-            cost: 0,
-            logs: Vec::new(),
-        })
+        Ok(PrecompileOutput::default())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::precompiles::{EXIT_TO_ETHEREUM_ID, EXIT_TO_NEAR_ID};
+    use super::{ExitToEthereum, ExitToNear};
     use crate::types::near_account_to_evm_address;
 
     use super::*;
@@ -367,12 +344,12 @@ mod tests {
     #[test]
     fn test_precompile_id() {
         assert_eq!(
-            EXIT_TO_ETHEREUM_ID,
-            near_account_to_evm_address("exitToEthereum".as_bytes()).to_low_u64_be()
+            ExitToEthereum::ADDRESS,
+            near_account_to_evm_address("exitToEthereum".as_bytes()).0
         );
         assert_eq!(
-            EXIT_TO_NEAR_ID,
-            near_account_to_evm_address("exitToNear".as_bytes()).to_low_u64_be()
+            ExitToNear::ADDRESS,
+            near_account_to_evm_address("exitToNear".as_bytes()).0
         );
     }
 }

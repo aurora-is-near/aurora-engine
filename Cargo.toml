@@ -42,9 +42,7 @@ blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", d
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm", rev="b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c", default-features = false }
-#evm = { version = "0.26.0", default-features = false }
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm", rev="b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c", default-features = false }
-#evm-core = { version = "0.26.1", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }
@@ -53,9 +51,10 @@ rlp = { version = "0.5.0", default-features = false }
 sha2 = { version = "0.9.3", default-features = false, optional = true }
 sha3 = { version = "0.9.1", default-features = false }
 wee_alloc = { version = "0.4.5", default-features = false }
-lunarity-lexer = { git = "https://github.com/ilblackdragon/lunarity", rev = "5201d9a76f7e491082b7f74af7e64049271e387f", default-features = false }
+logos = { version = "0.12", default-features = false, features = ["export_derive"] }
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
+byte-slice-cast = { version = "1.0", default-features = false }
 rjson = { version = "0.3.1", default-features = false }
 
 [dev-dependencies]
@@ -76,7 +75,11 @@ serde_json = "1"
 
 [features]
 default = ["sha2", "std"]
-std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "lunarity-lexer/std", "bn/std"]
+std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "logos/std", "bn/std"]
 testnet = []
-contract = []
+engine = []
+contract = ["engine"]
 evm_bully = []
+log = []
+exit-precompiles = ["contract"]
+integration-test = ["log"]

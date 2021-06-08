@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use crate::transaction::EthSignedTransaction;
-use crate::types::{near_account_to_evm_address, AccountId, Balance, RawAddress};
+use crate::types::{near_account_to_evm_address, AccountId, Balance, RawAddress, Wei};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
 use near_vm_logic::VMOutcome;
@@ -11,7 +11,7 @@ use near_vm_runner::VMError;
 use secp256k1::SecretKey;
 use sha3::Digest;
 
-const INITIAL_BALANCE: u64 = 1000;
+const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 
 pub struct CallResult {
@@ -180,7 +180,7 @@ impl test_utils::AuroraRunner {
             ],
         );
 
-        let input = create_eth_transaction(Some(token.into()), U256::from(0), input, None, &sender);
+        let input = create_eth_transaction(Some(token.into()), Wei::zero(), input, None, &sender);
 
         let result = self.evm_submit(input, origin); // create_eth_transaction()
         result.check_ok();
@@ -302,12 +302,12 @@ fn test_relayer_charge_fee() {
     let recipient = runner.create_account().address;
 
     let recipient_balance = runner.get_balance(recipient.into());
-    assert_eq!(recipient_balance, U256::from(INITIAL_BALANCE));
+    assert_eq!(recipient_balance, INITIAL_BALANCE);
 
     let relayer = create_ethereum_address();
     runner.register_relayer(alice.clone(), relayer);
     let relayer_balance = runner.get_balance(relayer);
-    assert_eq!(relayer_balance, U256::from(0));
+    assert_eq!(relayer_balance, Wei::new_u64(0));
 
     let balance = runner.balance_of(token, recipient, origin());
     assert_eq!(balance, U256::from(0));
@@ -324,9 +324,12 @@ fn test_relayer_charge_fee() {
     );
 
     let recipient_balance_end = runner.get_balance(recipient.into());
-    assert_eq!(recipient_balance_end, U256::from(INITIAL_BALANCE - fee));
+    assert_eq!(
+        recipient_balance_end,
+        Wei::new_u64(INITIAL_BALANCE.raw().as_u64() - fee)
+    );
     let relayer_balance = runner.get_balance(relayer);
-    assert_eq!(relayer_balance, U256::from(fee));
+    assert_eq!(relayer_balance, Wei::new_u64(fee));
 
     let balance = runner.balance_of(token, recipient, origin());
     assert_eq!(balance, U256::from(amount));

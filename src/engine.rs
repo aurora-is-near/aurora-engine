@@ -1,21 +1,23 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor::{StackExecutor, StackSubstateMetadata};
+use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
+use crate::connector::EthConnectorContract;
 use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
     FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
     ViewCallArgs,
 };
+
 use crate::precompiles;
 use crate::prelude::{Address, ToString, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
-use crate::types::{u256_to_arr, AccountId};
+use crate::types::{u256_to_arr, AccountId, Wei};
 
 macro_rules! unwrap_res_or_finish {
     ($e:expr, $output:expr) => {
@@ -118,6 +120,21 @@ impl ExitIntoResult for ExitReason {
     }
 }
 
+#[derive(Debug)]
+pub enum EngineStateError {
+    NotFound,
+    DeserializationFailed,
+}
+
+impl AsRef<[u8]> for EngineStateError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::NotFound => b"ERR_STATE_NOT_FOUND",
+            Self::DeserializationFailed => b"ERR_STATE_CORRUPTED",
+        }
+    }
+}
+
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
@@ -160,14 +177,14 @@ pub struct Engine {
 }
 
 // TODO: upgrade to Berlin HF
-const CONFIG: &Config = &Config::istanbul();
+pub(crate) const CONFIG: &Config = &Config::istanbul();
 
 /// Key for storing the state of the engine.
 const STATE_KEY: &[u8; 5] = b"STATE";
 
 impl Engine {
-    pub fn new(origin: Address) -> Self {
-        Self::new_with_state(Engine::get_state(), origin)
+    pub fn new(origin: Address) -> Result<Self, EngineStateError> {
+        Engine::get_state().map(|state| Self::new_with_state(state, origin))
     }
 
     pub fn new_with_state(state: EngineState, origin: Address) -> Self {
@@ -183,10 +200,11 @@ impl Engine {
     }
 
     /// Fails if state is not found.
-    pub fn get_state() -> EngineState {
+    pub fn get_state() -> Result<EngineState, EngineStateError> {
         match sdk::read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
-            None => Default::default(),
-            Some(bytes) => EngineState::try_from_slice(&bytes).expect("ERR_DESER"),
+            None => Err(EngineStateError::NotFound),
+            Some(bytes) => EngineState::try_from_slice(&bytes)
+                .map_err(|_| EngineStateError::DeserializationFailed),
         }
     }
 
@@ -203,8 +221,7 @@ impl Engine {
     }
 
     pub fn get_code_size(address: &Address) -> usize {
-        // TODO: Seems this can be optimized to only read the register length.
-        Engine::get_code(&address).len()
+        sdk::read_storage_len(&address_to_key(KeyPrefix::Code, address)).unwrap_or(0)
     }
 
     pub fn set_nonce(address: &Address, nonce: &U256) {
@@ -237,21 +254,25 @@ impl Engine {
             .unwrap_or_else(U256::zero)
     }
 
-    pub fn set_balance(address: &Address, balance: &U256) {
+    pub fn set_balance(address: &Address, balance: &Wei) {
         sdk::write_storage(
             &address_to_key(KeyPrefix::Balance, address),
-            &u256_to_arr(balance),
+            &balance.to_bytes(),
         );
     }
 
     pub fn remove_balance(address: &Address) {
+        let balance = Self::get_balance(address);
+        // Apply changes for eth-conenctor
+        EthConnectorContract::get_instance().internal_remove_eth(address, &balance.raw());
         sdk::remove_storage(&address_to_key(KeyPrefix::Balance, address))
     }
 
-    pub fn get_balance(address: &Address) -> U256 {
-        sdk::read_storage(&address_to_key(KeyPrefix::Balance, address))
+    pub fn get_balance(address: &Address) -> Wei {
+        let raw = sdk::read_storage(&address_to_key(KeyPrefix::Balance, address))
             .map(|value| U256::from_big_endian(&value))
-            .unwrap_or_else(U256::zero)
+            .unwrap_or_else(U256::zero);
+        Wei::new(raw)
     }
 
     pub fn remove_storage(address: &Address, key: &H256) {
@@ -272,7 +293,7 @@ impl Engine {
         let balance = Self::get_balance(address);
         let nonce = Self::get_nonce(address);
         let code_len = Self::get_code_size(address);
-        balance == U256::zero() && nonce == U256::zero() && code_len == 0
+        balance.is_zero() && nonce.is_zero() && code_len == 0
     }
 
     /// Removes all storage for the given address.
@@ -304,25 +325,28 @@ impl Engine {
 
     pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
         let origin = self.origin();
-        let value = U256::zero();
-        self.deploy_code(origin, value, input)
+        let value = Wei::zero();
+        self.deploy_code(origin, value, input, u64::MAX)
     }
 
     pub fn deploy_code(
         &mut self,
         origin: Address,
-        value: U256,
+        value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<SubmitResult> {
-        let mut executor = self.make_executor();
+        let mut executor = self.make_executor(gas_limit);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
-            executor.transact_create(origin, value, input, u64::MAX),
+            executor.transact_create(origin, value.raw(), input, gas_limit),
             address,
         );
-
         let is_succeed = status.is_succeed();
-        status.into_result()?;
+        if let Err(e) = status.into_result() {
+            Engine::increment_nonce(&origin);
+            return Err(e);
+        }
         let used_gas = executor.used_gas();
         let (values, logs, promises) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
@@ -339,19 +363,21 @@ impl Engine {
     pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let contract = Address(args.contract);
-        let value = U256::zero();
-        self.call(origin, contract, value, args.input)
+        let value = Wei::zero();
+        self.call(origin, contract, value, args.input, u64::MAX)
     }
 
     pub fn call(
         &mut self,
         origin: Address,
         contract: Address,
-        value: U256,
+        value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<SubmitResult> {
-        let mut executor = self.make_executor();
-        let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+        let mut executor = self.make_executor(gas_limit);
+        let (status, result) =
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
 
         let is_succeed = status.is_succeed();
         if let Err(e) = status.into_result() {
@@ -381,39 +407,30 @@ impl Engine {
         Self::set_nonce(address, &new_nonce);
     }
 
-    #[cfg(feature = "testnet")]
-    /// Credits the address with 10 coins from the faucet.
-    pub fn credit(&self, address: &Address) -> EngineResult<()> {
-        let balance = Self::get_balance(address);
-        // Saturating adds are intentional
-        let new_balance = balance.saturating_add(U256::from(10_000_000_000_000_000_000));
-
-        Self::set_balance(address, &new_balance);
-        Ok(())
-    }
-
     pub fn view_with_args(&self, args: ViewCallArgs) -> EngineResult<Vec<u8>> {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
-        self.view(origin, contract, value, args.input)
+        self.view(origin, contract, Wei::new(value), args.input, u64::MAX)
     }
 
     pub fn view(
         &self,
         origin: Address,
         contract: Address,
-        value: U256,
+        value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<Vec<u8>> {
-        let mut executor = self.make_executor();
-        let (status, result) = executor.transact_call(origin, contract, value, input, u64::MAX);
+        let mut executor = self.make_executor(gas_limit);
+        let (status, result) =
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
         status.into_result()?;
         Ok(result)
     }
 
-    fn make_executor(&self) -> StackExecutor<AuroraStackState> {
-        let metadata = StackSubstateMetadata::new(u64::MAX, &CONFIG);
+    fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState> {
+        let metadata = StackSubstateMetadata::new(gas_limit, &CONFIG);
         let state = AuroraStackState::new(metadata, self);
         StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
     }
@@ -451,9 +468,10 @@ impl Engine {
         &mut self,
         sender: Address,
         receiver: Address,
-        value: U256,
+        value: Wei,
+        gas_limit: u64,
     ) -> EngineResult<SubmitResult> {
-        self.call(sender, receiver, value, Vec::new())
+        self.call(sender, receiver, value, Vec::new(), gas_limit)
     }
 
     /// Mint tokens for recipient on a particular ERC20 token
@@ -466,7 +484,7 @@ impl Engine {
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
-    pub fn receive_erc20_tokens(&mut self, args: NEP141FtOnTransferArgs) {
+    pub fn receive_erc20_tokens(&mut self, args: NEP141FtOnTransferArgs, gas_limit: u64) {
         let str_amount = args.amount.to_string();
         let output_on_fail = str_amount.as_bytes();
 
@@ -516,7 +534,12 @@ impl Engine {
             );
 
             unwrap_res_or_finish!(
-                self.transfer(recipient.clone(), relayer_address.clone(), fee),
+                self.transfer(
+                    recipient.clone(),
+                    relayer_address.clone(),
+                    Wei::new_u64(fee.as_u64()),
+                    gas_limit
+                ),
                 output_on_fail
             );
         }
@@ -531,8 +554,9 @@ impl Engine {
             self.call(
                 current_address(),
                 erc20_token,
-                U256::from(0),
+                Wei::new_u64(0),
                 [selector, tail.as_slice()].concat(),
+                gas_limit,
             ),
             output_on_fail
         );
@@ -548,7 +572,7 @@ impl Engine {
                     .as_bytes(),
             );
             sdk::promise_create(
-                promise.target_account_id,
+                promise.target_account_id.as_bytes(),
                 promise.method.as_bytes(),
                 promise.args.as_slice(),
                 promise.attached_balance,
@@ -651,7 +675,7 @@ impl evm::backend::Backend for Engine {
     fn basic(&self, address: Address) -> Basic {
         Basic {
             nonce: Engine::get_nonce(&address),
-            balance: Engine::get_balance(&address),
+            balance: Engine::get_balance(&address).raw(),
         }
     }
 
@@ -690,7 +714,12 @@ impl ApplyBackend for Engine {
                     reset_storage,
                 } => {
                     Engine::set_nonce(&address, &basic.nonce);
-                    Engine::set_balance(&address, &basic.balance);
+
+                    // Apply changes for eth-connector
+                    EthConnectorContract::get_instance()
+                        .internal_set_eth_balance(&address, &basic.balance);
+                    Engine::set_balance(&address, &Wei::new(basic.balance));
+
                     if let Some(code) = code {
                         Engine::set_code(&address, &code)
                     }

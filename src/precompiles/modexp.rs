@@ -1,10 +1,12 @@
-use evm::executor::PrecompileOutput;
-use evm::{Context, ExitError, ExitSucceed};
-use num::BigUint;
-
-use crate::precompiles::{Berlin, Byzantium, HardFork, Precompile, PrecompileResult};
+use crate::precompiles::{
+    Berlin, Byzantium, HardFork, Precompile, PrecompileOutput, PrecompileResult,
+};
 use crate::prelude::{PhantomData, Vec, U256};
 use crate::AuroraState;
+use evm::{Context, ExitError};
+use num::BigUint;
+
+pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
 
 pub(super) struct ModExp<HF: HardFork, S>(PhantomData<HF>, PhantomData<S>);
 
@@ -122,7 +124,7 @@ impl<S: AuroraState> Precompile<S> for ModExp<Byzantium, S> {
         let exponent = BigUint::from_bytes_be(&exp_bytes);
         let modulus = BigUint::from_bytes_be(&mod_bytes);
 
-        let result = {
+        let output = {
             let computed_result = base.modpow(&exponent, &modulus).to_bytes_be();
             // The result must be the same length as the input modulus.
             // To ensure this we pad on the left with zeros.
@@ -137,12 +139,7 @@ impl<S: AuroraState> Precompile<S> for ModExp<Byzantium, S> {
             }
         };
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            output: result,
-            cost,
-            logs: Vec::new(),
-        })
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

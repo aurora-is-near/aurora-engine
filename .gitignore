@@ -19,3 +19,6 @@ artifacts/
 cache/
 node_modules/
 res/
+
+# Other
+etc/state-migration-test/target/

@@ -1,7 +1,6 @@
-use evm::executor::PrecompileOutput;
 use evm::{Context, ExitError, ExitSucceed};
 
-use crate::precompiles::{Precompile, PrecompileResult};
+use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use crate::prelude::{mem, Borrowed, PhantomData, TryInto, Vec};
 use crate::AuroraState;
 
@@ -17,6 +16,10 @@ mod consts {
 }
 
 pub(super) struct Blake2F<S>(PhantomData<S>);
+
+impl<S> Blake2F<S> {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 9);
+}
 
 impl<S: AuroraState> Precompile<S> for Blake2F<S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
@@ -85,13 +88,8 @@ impl<S: AuroraState> Precompile<S> for Blake2F<S> {
         }
         let finished = input[212] != 0;
 
-        let res = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            output: res,
-            cost,
-            logs: Vec::new(),
-        })
+        let output = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

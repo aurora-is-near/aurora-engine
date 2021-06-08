@@ -1,6 +1,6 @@
 CARGO = cargo
 NEAR  = near
-FEATURES = contract
+FEATURES = contract,log
 
 ifeq ($(evm-bully),yes)
   FEATURES := $(FEATURES),evm_bully
@@ -15,6 +15,7 @@ release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 
 target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
+	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm 
 
 etc/eth-contracts/res/EvmErc20.bin: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
 	cd etc/eth-contracts && yarn && yarn build
@@ -27,6 +28,11 @@ debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
 	$(CARGO) build --target wasm32-unknown-unknown --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 
+test-build:
+	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=contract,integration-test -Z avoid-dev-deps
+	ln -sf target/wasm32-unknown-unknown/release/aurora_engine.wasm release.wasm 
+	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm 
+
 .PHONY: all release debug
 
 deploy: release.wasm
@@ -38,10 +44,10 @@ check-format:
 	$(CARGO) fmt -- --check
 
 check-clippy:
-	$(CARGO) +nightly clippy --no-default-features --features=$(FEATURES) -- -D warnings
+	$(CARGO) clippy --no-default-features --features=$(FEATURES) -- -D warnings
 
 # test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
-test: release
+test: test-build
 	$(CARGO) test
 
 format:

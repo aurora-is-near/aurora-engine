@@ -1,9 +1,9 @@
-use evm::executor::PrecompileOutput;
-use evm::{Context, ExitError, ExitSucceed};
-
-use crate::precompiles::{Byzantium, HardFork, Istanbul, Precompile, PrecompileResult};
+use crate::precompiles::{
+    Byzantium, HardFork, Istanbul, Precompile, PrecompileOutput, PrecompileResult,
+};
 use crate::prelude::*;
 use crate::AuroraState;
+use evm::{Context, ExitError};
 
 /// bn128 costs.
 mod costs {
@@ -42,6 +42,15 @@ mod consts {
 
     /// Pair element length.
     pub(super) const PAIR_ELEMENT_LEN: usize = 192;
+}
+
+/// bn128 precompile addresses
+pub(super) mod addresses {
+    use crate::precompiles;
+
+    pub const ADD: [u8; 20] = precompiles::make_address(0, 6);
+    pub const MUL: [u8; 20] = precompiles::make_address(0, 7);
+    pub const PAIR: [u8; 20] = precompiles::make_address(0, 8);
 }
 
 /// Reads the `x` and `y` points from an input at a given position.
@@ -112,13 +121,8 @@ impl<S: AuroraState> Precompile<S> for BN128Add<Byzantium, S> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                exit_status: ExitSucceed::Returned,
-                output: res,
-                cost,
-                logs: Vec::new(),
-            })
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -144,13 +148,8 @@ impl<S: AuroraState> Precompile<S> for BN128Add<Istanbul, S> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                exit_status: ExitSucceed::Returned,
-                output: res,
-                cost,
-                logs: Vec::new(),
-            })
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -202,13 +201,8 @@ impl<S: AuroraState> Precompile<S> for BN128Mul<Byzantium, S> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                exit_status: ExitSucceed::Returned,
-                output: res,
-                cost,
-                logs: Vec::new(),
-            })
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -233,13 +227,8 @@ impl<S: AuroraState> Precompile<S> for BN128Mul<Istanbul, S> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                exit_status: ExitSucceed::Returned,
-                output: res,
-                cost,
-                logs: Vec::new(),
-            })
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -363,13 +352,8 @@ impl<S: AuroraState> Precompile<S> for BN128Pair<Byzantium, S> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                exit_status: ExitSucceed::Returned,
-                output: res,
-                cost,
-                logs: Vec::new(),
-            })
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
@@ -397,13 +381,8 @@ impl<S: AuroraState> Precompile<S> for BN128Pair<Istanbul, S> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let res = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput {
-                exit_status: ExitSucceed::Returned,
-                output: res,
-                cost,
-                logs: Vec::new(),
-            })
+            let output = Self::run_inner(input, context)?;
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }

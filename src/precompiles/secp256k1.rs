@@ -1,8 +1,8 @@
+use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
+use crate::prelude::*;
 use ethabi::Address;
-use evm::executor::PrecompileOutput;
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError};
 
-use crate::precompiles::{Precompile, PrecompileResult};
 use crate::prelude::*;
 use crate::AuroraState;
 
@@ -44,6 +44,10 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
 
 pub(super) struct ECRecover<S>(PhantomData<S>);
 
+impl<S> ECRecover<S> {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 1);
+}
+
 impl<S: AuroraState> Precompile<S> for ECRecover<S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::ECRECOVER_BASE)
@@ -77,12 +81,7 @@ impl<S: AuroraState> Precompile<S> for ECRecover<S> {
         let v_bit = match v[31] {
             27 | 28 if v[..31] == [0; 31] => v[31] - 27,
             _ => {
-                return Ok(PrecompileOutput {
-                    exit_status: ExitSucceed::Returned,
-                    output: vec![255u8; 32],
-                    cost,
-                    logs: Vec::new(),
-                });
+                return Ok(PrecompileOutput::without_logs(0, vec![255u8; 32]));
             }
         };
         signature[64] = v_bit; // v
@@ -99,12 +98,7 @@ impl<S: AuroraState> Precompile<S> for ECRecover<S> {
             }
         };
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            output: output.to_vec(),
-            cost,
-            logs: Vec::new(),
-        })
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

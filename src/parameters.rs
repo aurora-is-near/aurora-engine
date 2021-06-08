@@ -1,7 +1,17 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::prelude::{String, Vec};
-use crate::types::{AccountId, Balance, RawAddress, RawH256, RawU256};
+#[cfg(feature = "engine")]
+use crate::admin_controlled::PausedMask;
+#[cfg(feature = "engine")]
+use crate::json;
+use crate::prelude::{String, ToString, Vec};
+#[cfg(feature = "engine")]
+use crate::prover::Proof;
+#[cfg(feature = "engine")]
+use crate::sdk;
+use crate::types::{
+    AccountId, Balance, EthAddress, RawAddress, RawH256, RawU256, ERR_FAILED_PARSE,
+};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -142,6 +152,304 @@ pub struct PromiseCreateArgs {
     pub args: Vec<u8>,
     pub attached_balance: u128,
     pub attached_gas: u64,
+}
+/// Eth-connector deposit arguments
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct DepositCallArgs {
+    /// Proof data
+    pub proof: Proof,
+    /// Optional relayer address
+    pub relayer_eth_account: Option<EthAddress>,
+}
+
+/// Eth-connector isUsedProof arguments
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct IsUsedProofCallArgs {
+    /// Proof data
+    pub proof: Proof,
+}
+
+/// withdraw result for eth-connector
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize)]
+pub struct WithdrawResult {
+    pub amount: Balance,
+    pub recipient_id: RawAddress,
+    pub eth_custodian_address: RawAddress,
+}
+
+/// ft_on_transfer eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct FtOnTransfer {
+    pub amount: Balance,
+    pub msg: String,
+    pub receiver_id: AccountId,
+}
+
+/// ft_resolve_transfer eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize)]
+pub struct FtResolveTransfer {
+    pub receiver_id: AccountId,
+    pub amount: Balance,
+    pub current_account_id: AccountId,
+}
+
+/// Fungible token storage balance
+#[cfg(feature = "engine")]
+#[derive(Default)]
+pub struct StorageBalance {
+    pub total: Balance,
+    pub available: Balance,
+}
+
+#[cfg(feature = "engine")]
+impl StorageBalance {
+    pub fn to_json_bytes(&self) -> Vec<u8> {
+        use alloc::format;
+        format!(
+            "{{\"total\": \"{}\", \"available\": \"{}\",}}",
+            self.total.to_string(),
+            self.available.to_string()
+        )
+        .as_bytes()
+        .to_vec()
+    }
+}
+
+/// resolve_transfer eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct ResolveTransferCallArgs {
+    pub sender_id: AccountId,
+    pub amount: Balance,
+    pub receiver_id: AccountId,
+}
+
+/// Finish deposit NEAR eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct FinishDepositCallArgs {
+    pub new_owner_id: AccountId,
+    pub amount: Balance,
+    pub proof_key: String,
+    pub relayer_id: AccountId,
+    pub fee: Balance,
+    pub msg: Option<Vec<u8>>,
+}
+
+/// Deposit ETH args
+#[cfg(feature = "engine")]
+#[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
+pub struct DepositEthCallArgs {
+    pub proof: Proof,
+    pub relayer_eth_account: EthAddress,
+}
+
+/// Finish deposit NEAR eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct FinishDepositEthCallArgs {
+    pub new_owner_id: EthAddress,
+    pub amount: Balance,
+    pub fee: Balance,
+    pub relayer_eth_account: AccountId,
+    pub proof: Proof,
+}
+
+/// Eth-connector initial args
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct InitCallArgs {
+    pub prover_account: AccountId,
+    pub eth_custodian_address: AccountId,
+}
+
+/// Eth-connector Set contract data call args
+pub type SetContractDataCallArgs = InitCallArgs;
+
+/// transfer eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct TransferCallCallArgs {
+    pub receiver_id: AccountId,
+    pub amount: Balance,
+    pub memo: Option<String>,
+    pub msg: String,
+}
+
+#[cfg(feature = "engine")]
+impl From<json::JsonValue> for TransferCallCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            receiver_id: v
+                .string("receiver_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            memo: v.string("memo").ok(),
+            msg: v.string("msg").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
+}
+
+/// storage_balance_of eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct StorageBalanceOfCallArgs {
+    pub account_id: AccountId,
+}
+
+#[cfg(feature = "engine")]
+impl From<json::JsonValue> for StorageBalanceOfCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            account_id: v
+                .string("account_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
+}
+
+/// storage_deposit eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct StorageDepositCallArgs {
+    pub account_id: Option<AccountId>,
+    pub registration_only: Option<bool>,
+}
+
+#[cfg(feature = "engine")]
+impl From<json::JsonValue> for StorageDepositCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            account_id: v.string("account_id").ok(),
+            registration_only: v.bool("registration_only").ok(),
+        }
+    }
+}
+
+/// storage_withdraw eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct StorageWithdrawCallArgs {
+    pub amount: Option<u128>,
+}
+
+#[cfg(feature = "engine")]
+impl From<json::JsonValue> for StorageWithdrawCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            amount: v.u128("amount").ok(),
+        }
+    }
+}
+
+/// transfer args for json invocation
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct TransferCallArgs {
+    pub receiver_id: AccountId,
+    pub amount: Balance,
+    pub memo: Option<String>,
+}
+
+#[cfg(feature = "engine")]
+impl From<json::JsonValue> for TransferCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            receiver_id: v
+                .string("receiver_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            memo: v.string("memo").ok(),
+        }
+    }
+}
+
+/// withdraw NEAR eth-connector call args
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct WithdrawCallArgs {
+    pub recipient_address: EthAddress,
+    pub amount: Balance,
+}
+
+/// balance_of args for json invocation
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct BalanceOfCallArgs {
+    pub account_id: AccountId,
+}
+
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct BalanceOfEthCallArgs {
+    pub address: EthAddress,
+}
+
+#[cfg(feature = "engine")]
+impl From<json::JsonValue> for BalanceOfCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            account_id: v
+                .string("account_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
+}
+
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct RegisterRelayerCallArgs {
+    pub address: EthAddress,
+}
+
+#[cfg(feature = "engine")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct PauseEthConnectorCallArgs {
+    pub paused_mask: PausedMask,
+}
+
+#[cfg(feature = "engine")]
+pub trait ExpectUtf8<T> {
+    fn expect_utf8(self, message: &[u8]) -> T;
+}
+
+#[cfg(feature = "engine")]
+impl<T> ExpectUtf8<T> for Option<T> {
+    fn expect_utf8(self, message: &[u8]) -> T {
+        match self {
+            Some(t) => t,
+            None => sdk::panic_utf8(message),
+        }
+    }
+}
+
+#[cfg(feature = "engine")]
+impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
+    fn expect_utf8(self, message: &[u8]) -> T {
+        match self {
+            Ok(t) => t,
+            Err(_) => sdk::panic_utf8(message),
+        }
+    }
+}
+
+#[cfg(feature = "engine")]
+impl From<json::JsonValue> for ResolveTransferCallArgs {
+    fn from(v: json::JsonValue) -> Self {
+        Self {
+            sender_id: v
+                .string("sender_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            receiver_id: v
+                .string("receiver_id")
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            amount: v.u128("amount").expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        }
+    }
 }
 
 #[cfg(test)]

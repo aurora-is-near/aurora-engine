@@ -1,8 +1,7 @@
-use crate::prelude::{PhantomData, Vec};
-use evm::executor::PrecompileOutput;
-use evm::{Context, ExitError, ExitSucceed};
+use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
+use crate::prelude::{vec, PhantomData};
+use evm::{Context, ExitError};
 
-use crate::precompiles::{Precompile, PrecompileResult};
 use crate::AuroraState;
 
 mod costs {
@@ -23,6 +22,10 @@ mod consts {
 
 /// SHA256 precompile.
 pub struct SHA256<S>(PhantomData<S>);
+
+impl<S> SHA256<S> {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 2);
+}
 
 impl<S: AuroraState> Precompile<S> for SHA256<S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
@@ -50,13 +53,13 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
             return Err(ExitError::OutOfGas);
         }
 
-        let hash = sha2::Sha256::digest(input);
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            output: hash.to_vec(),
-            cost: 0,
-            logs: Vec::new(),
-        })
+        let cost = Self::required_gas(input)?;
+        if cost > target_gas {
+            Err(ExitError::OutOfGas)
+        } else {
+            let output = sha2::Sha256::digest(input).to_vec();
+            Ok(PrecompileOutput::without_logs(cost, output))
+        }
     }
 
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
@@ -76,18 +79,18 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            Ok(PrecompileOutput {
-                exit_status: ExitSucceed::Returned,
-                output: sdk::sha256(input).as_bytes().to_vec(),
-                cost,
-                logs: Vec::new(),
-            })
+            let output = sdk::sha256(input).as_bytes().to_vec();
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }
 
 /// RIPEMD160 precompile.
 pub struct RIPEMD160<S>(PhantomData<S>);
+
+impl<S> RIPEMD160<S> {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 3);
+}
 
 impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
@@ -117,14 +120,9 @@ impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
             let hash = ripemd160::Ripemd160::digest(input);
             // The result needs to be padded with leading zeros because it is only 20 bytes, but
             // the evm works with 32-byte words.
-            let mut result = [0u8; 32];
-            result[12..].copy_from_slice(&hash);
-            Ok(PrecompileOutput {
-                exit_status: ExitSucceed::Returned,
-                output: result.to_vec(),
-                cost,
-                logs: Vec::new(),
-            })
+            let mut output = vec![0u8; 32];
+            output[12..].copy_from_slice(&hash);
+            Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
 }

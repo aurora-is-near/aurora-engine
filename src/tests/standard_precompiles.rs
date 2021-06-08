@@ -2,9 +2,10 @@ use crate::test_utils::{
     self,
     standard_precompiles::{PrecompilesConstructor, PrecompilesContract},
 };
+use crate::types::Wei;
 use secp256k1::SecretKey;
 
-const INITIAL_BALANCE: u64 = 1000;
+const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 
 #[test]
@@ -14,7 +15,7 @@ fn standard_precompiles() {
     let source_account = SecretKey::random(&mut rng);
     runner.create_address(
         test_utils::address_from_secret_key(&source_account),
-        INITIAL_BALANCE.into(),
+        INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
 

@@ -1,9 +1,7 @@
-use crate::prelude::PhantomData;
-use evm::executor::PrecompileOutput;
-use evm::{Context, ExitError, ExitSucceed};
+use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
+use evm::{Context, ExitError};
 
-use crate::precompiles::{Precompile, PrecompileResult};
-use crate::prelude::Vec;
+use crate::prelude::{PhantomData, Vec};
 use crate::AuroraState;
 
 /// Identity precompile costs.
@@ -21,6 +19,10 @@ mod consts {
 }
 
 pub struct Identity<S>(PhantomData<S>);
+
+impl<S> Identity<S> {
+    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 4);
+}
 
 impl<S: AuroraState> Precompile<S> for Identity<S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
@@ -46,12 +48,7 @@ impl<S: AuroraState> Precompile<S> for Identity<S> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            Ok(PrecompileOutput {
-                exit_status: ExitSucceed::Returned,
-                output: input.to_vec(),
-                cost,
-                logs: Vec::new(),
-            })
+            Ok(PrecompileOutput::without_logs(cost, input.to_vec()))
         }
     }
 }

@@ -15,7 +15,7 @@ pub(crate) fn eth_erc20_benchmark(c: &mut Criterion) {
     let source_account = SecretKey::random(&mut rng);
     runner.create_address(
         address_from_secret_key(&source_account),
-        INITIAL_BALANCE.into(),
+        crate::types::Wei::new_u64(INITIAL_BALANCE),
         INITIAL_NONCE.into(),
     );
     let calling_account_id = "some-account.near".to_string();
