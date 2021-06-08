@@ -62,15 +62,6 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
     }
 }
 
-#[allow(dead_code)]
-pub fn exit_to_near_address() -> Address {
-    Address::from_slice(
-        hex::decode("e9217bc70b7ed1f598ddd3199e80b093fa71124f")
-            .unwrap()
-            .as_slice(),
-    )
-}
-
 /// A precompile operation result.
 type PrecompileResult = Result<PrecompileOutput, ExitError>;
 

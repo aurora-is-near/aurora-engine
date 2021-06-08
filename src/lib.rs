@@ -322,24 +322,17 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
         let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
-        #[allow(clippy::if_same_then_else)]
         if sdk::predecessor_account_id() == sdk::current_account_id() {
             let engine = Engine::new(predecessor_address()).sdk_unwrap();
             EthConnectorContract::get_instance().ft_on_transfer(&engine)
         } else {
             let input = sdk::read_input();
 
-            let args = if let Ok(args) = NEP141FtOnTransferArgs::try_from_slice(input.as_slice()) {
-                args
-            } else {
-                // At this point the amount is not known yet.
-                // It is responsibility of the NEP141 to provide correct arguments.
-                sdk::return_output(b"0");
-                return;
-            };
+            let args: NEP141FtOnTransferArgs = sdk::read_input_borsh().sdk_unwrap();
 
-            // TODO: Find correct gas_limit
+            // TODO: Find correct gas_limit (do we need this here?)
             let gas_limit = 0;
+
             engine.receive_erc20_tokens(args, gas_limit);
         }
     }

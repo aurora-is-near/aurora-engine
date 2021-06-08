@@ -3,7 +3,6 @@ use crate::prelude::*;
 use ethabi::Address;
 use evm::{Context, ExitError};
 
-use crate::prelude::*;
 use crate::AuroraState;
 
 mod costs {

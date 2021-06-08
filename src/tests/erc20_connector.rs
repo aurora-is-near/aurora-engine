@@ -307,7 +307,7 @@ fn test_relayer_charge_fee() {
     let relayer = create_ethereum_address();
     runner.register_relayer(alice.clone(), relayer);
     let relayer_balance = runner.get_balance(relayer);
-    assert_eq!(relayer_balance, Wei::new_u64(0));
+    assert_eq!(relayer_balance, Wei::zero());
 
     let balance = runner.balance_of(token, recipient, origin());
     assert_eq!(balance, U256::from(0));

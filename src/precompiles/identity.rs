@@ -1,7 +1,7 @@
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use evm::{Context, ExitError};
 
-use crate::prelude::{PhantomData, Vec};
+use crate::prelude::PhantomData;
 use crate::AuroraState;
 
 /// Identity precompile costs.

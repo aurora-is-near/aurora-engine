@@ -181,9 +181,7 @@ impl<T> Stack<T> {
 
     pub fn discard(&mut self) {
         let boundary = self.boundaries.pop().unwrap();
-        while self.stack.len() > boundary {
-            self.stack.pop().unwrap();
-        }
+        self.stack.truncate(boundary);
     }
 
     pub fn push(&mut self, value: T) {

@@ -58,8 +58,8 @@ impl Signer {
 
 pub(crate) const SUBMIT: &str = "submit";
 
-pub(crate) mod contract_call;
 pub(crate) mod erc20;
+pub(crate) mod exit_precompile;
 pub(crate) mod solidity;
 pub(crate) mod standard_precompiles;
 

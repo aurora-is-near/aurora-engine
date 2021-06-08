@@ -2,7 +2,7 @@ use crate::test_utils::{origin, AuroraRunner, Signer};
 
 use crate::prelude::U256;
 use crate::test_utils;
-use crate::test_utils::contract_call::{Tester, TesterConstructor};
+use crate::test_utils::exit_precompile::{Tester, TesterConstructor};
 use crate::test_utils::solidity;
 use crate::transaction::EthTransaction;
 use ethabi::Address;

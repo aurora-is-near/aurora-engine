@@ -1,7 +1,7 @@
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError};
 
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
-use crate::prelude::{mem, Borrowed, PhantomData, TryInto, Vec};
+use crate::prelude::{mem, Borrowed, PhantomData, TryInto};
 use crate::AuroraState;
 
 /// Blake2 costs.

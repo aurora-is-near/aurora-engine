@@ -10,6 +10,7 @@ use super::{Precompile, PrecompileResult};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
+use crate::engine::Engine;
 use crate::precompiles::PrecompileOutput;
 
 mod costs {
@@ -33,9 +34,9 @@ const MIN_ACCOUNT_ID_LEN: u64 = 2;
 /// The maximum length of a valid account ID.
 const MAX_ACCOUNT_ID_LEN: u64 = 64;
 
-pub struct ExitToNear; //TransferEthToNear
+pub struct ExitToNear<S>(PhantomData<S>); //TransferEthToNear
 
-impl ExitToNear {
+impl<S> ExitToNear<S> {
     /// Exit to NEAR precompile address
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
@@ -45,14 +46,12 @@ impl ExitToNear {
 }
 
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
-    AccountId::from_utf8(
+    Engine::AccountId::from_utf8(
         crate::sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
             .expect(ERR_TARGET_TOKEN_NOT_FOUND),
     )
     .unwrap()
 }
-
-pub struct ExitToNear<S>(PhantomData<S>); //TransferEthToNear
 
 impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
@@ -137,7 +136,7 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
                 // This precompile branch is expected to be called from the ERC20 burn function\
                 //
                 // Input slice format:
-                //      amount (U256 le bytes) - the amount that was burned
+                //      amount (U256 big-endian bytes) - the amount that was burned
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
 
                 if context.apparent_value != U256::from(0) {
@@ -188,7 +187,7 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
 
 pub struct ExitToEthereum<S>(PhantomData<S>);
 
-impl ExitToEthereum {
+impl<S> ExitToEthereum<S> {
     /// Exit to Ethereum precompile address
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
@@ -281,7 +280,7 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
                 // (or burn function with some flag provided that this is expected to be withdrawn)
                 //
                 // Input slice format:
-                //      amount (U256 le bytes) - the amount that was burned
+                //      amount (U256 big-endian bytes) - the amount that was burned
                 //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
 
                 if context.apparent_value != U256::from(0) {

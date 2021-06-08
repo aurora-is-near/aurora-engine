@@ -1,6 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
+use evm::executor::{StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
@@ -151,11 +151,6 @@ pub struct EngineState {
     pub upgrade_delay_blocks: u64,
     /// Mapping between relayer account id and relayer evm address
     pub relayers_evm_addresses: LookupMap<{ KeyPrefix::RelayerEvmAddressMap as KeyPrefixU8 }>,
-    /// Mapping between nep141 in NEAR to erc20 tokens in the EVM
-    pub nep141_erc20: BijectionMap<
-        { KeyPrefix::Nep141Erc20Map as KeyPrefixU8 },
-        { KeyPrefix::Erc20Nep141Map as KeyPrefixU8 },
-    >,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -166,7 +161,6 @@ impl From<NewCallArgs> for EngineState {
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
             relayers_evm_addresses: LookupMap::new(),
-            nep141_erc20: BijectionMap::new(),
         }
     }
 }
@@ -451,12 +445,13 @@ impl Engine {
 
     pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
         // Check that this nep141 token was not registered before, they can only be registered once.
-        assert!(self.state.nep141_erc20.lookup_left(nep141_token).is_none());
-        self.state.nep141_erc20.insert(nep141_token, erc20_token);
+        let map = Self::nep141_erc20_map();
+        assert!(map.lookup_left(nep141_token).is_none());
+        map.insert(nep141_token, erc20_token);
     }
 
     pub fn get_erc20_from_nep141(&self, nep141_token: &[u8]) -> Option<Vec<u8>> {
-        self.state.nep141_erc20.lookup_left(nep141_token)
+        Self::nep141_erc20_map().lookup_left(nep141_token)
     }
 
     /// Transfers an amount from a given sender to a receiver, provided that
@@ -554,7 +549,7 @@ impl Engine {
             self.call(
                 current_address(),
                 erc20_token,
-                Wei::new_u64(0),
+                Wei::zero(),
                 [selector, tail.as_slice()].concat(),
                 gas_limit,
             ),
@@ -565,8 +560,16 @@ impl Engine {
         sdk::return_output(b"0");
     }
 
+    fn nep141_erc20_map() -> BijectionMap<
+        { KeyPrefix::Nep141Erc20Map as KeyPrefixU8 },
+        { KeyPrefix::Erc20Nep141Map as KeyPrefixU8 },
+    > {
+        Default::default()
+    }
+
     fn schedule_promises(promises: impl IntoIterator<Item = PromiseCreateArgs>) {
         for promise in promises {
+            #[cfg(feature = "log")]
             sdk::log_utf8(
                 crate::prelude::format!("{}.{}", promise.target_account_id, promise.method)
                     .as_bytes(),
