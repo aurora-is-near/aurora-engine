@@ -32,7 +32,6 @@ contract Tester {
         try this.withdrawAndFail(toNear) {
             require(false);
         } catch {
-
         }
     }
 

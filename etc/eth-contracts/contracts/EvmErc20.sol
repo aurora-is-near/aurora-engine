@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./AdminControlled.sol";
 import "./IExit.sol";
 
+
 /**
  * @title SimpleToken
  * @dev Very simple ERC20 Token example, where all tokens are pre-assigned to the creator.

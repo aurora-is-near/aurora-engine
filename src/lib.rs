@@ -326,8 +326,6 @@ mod contract {
             let engine = Engine::new(predecessor_address()).sdk_unwrap();
             EthConnectorContract::get_instance().ft_on_transfer(&engine)
         } else {
-            let input = sdk::read_input();
-
             let args: NEP141FtOnTransferArgs = sdk::read_input_borsh().sdk_unwrap();
 
             // TODO: Find correct gas_limit (do we need this here?)
