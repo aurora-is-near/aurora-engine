@@ -530,8 +530,8 @@ impl Engine {
 
             unwrap_res_or_finish!(
                 self.transfer(
-                    recipient.clone(),
-                    relayer_address.clone(),
+                    recipient,
+                    relayer_address,
                     Wei::new_u64(fee.as_u64()),
                     gas_limit
                 ),
@@ -541,7 +541,7 @@ impl Engine {
 
         let selector = &sdk::keccak("mint(address,uint256)".as_bytes())[..4];
         let tail = ethabi::encode(&[
-            ethabi::Token::Address(recipient.into()),
+            ethabi::Token::Address(recipient),
             ethabi::Token::Uint(args.amount.into()),
         ]);
 

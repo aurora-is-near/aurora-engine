@@ -156,6 +156,7 @@ pub fn near_account_to_evm_address(addr: &[u8]) -> Address {
     Address::from_slice(&keccak(addr)[12..])
 }
 
+#[derive(Default)]
 pub struct Stack<T> {
     stack: Vec<T>,
     boundaries: Vec<usize>,
@@ -163,11 +164,9 @@ pub struct Stack<T> {
 
 impl<T> Stack<T> {
     pub fn new() -> Self {
-        let mut boundaries = Vec::new();
-        boundaries.push(0);
         Self {
             stack: Vec::new(),
-            boundaries,
+            boundaries: crate::prelude::vec![0],
         }
     }
 

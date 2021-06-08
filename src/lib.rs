@@ -349,7 +349,7 @@ mod contract {
             ethabi::Token::String("Empty".to_string()),
             ethabi::Token::String("EMPTY".to_string()),
             ethabi::Token::Uint(ethabi::Uint::from(0)),
-            ethabi::Token::Address(current_address().into()),
+            ethabi::Token::Address(current_address()),
         ]);
 
         Engine::deploy_code_with_input(
