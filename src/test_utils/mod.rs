@@ -21,7 +21,7 @@ use crate::types;
 use crate::types::AccountId;
 use crate::{storage, AuroraState};
 
-near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
+lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
 }
 
