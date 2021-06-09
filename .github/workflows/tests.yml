@@ -8,6 +8,14 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Install the toolchain
         uses: actions-rs/toolchain@v1
         with:
