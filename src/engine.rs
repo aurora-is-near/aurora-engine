@@ -5,6 +5,7 @@ use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::connector::EthConnectorContract;
+#[cfg(feature = "contract")]
 use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
@@ -18,6 +19,11 @@ use crate::sdk;
 use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId, Wei};
+
+#[cfg(not(feature = "contract"))]
+pub fn current_address() -> Address {
+    crate::types::near_account_to_evm_address("engine".as_bytes())
+}
 
 macro_rules! unwrap_res_or_finish {
     ($e:expr, $output:expr) => {

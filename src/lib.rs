@@ -40,7 +40,7 @@ pub mod sdk;
 
 #[cfg(test)]
 mod benches;
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 mod state;
 #[cfg(test)]
 mod test_utils;

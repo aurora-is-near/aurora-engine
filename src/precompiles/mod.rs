@@ -213,7 +213,7 @@ pub fn byzantium_precompiles(
 }
 
 /// Matches the address given to Istanbul precompiles.
-#[cfg(feature = "contract")]
+#[cfg(feature = "engine")]
 #[allow(dead_code)]
 pub fn istanbul_precompiles(
     address: Address,

@@ -305,9 +305,8 @@ dependencies = [
 
 [[package]]
 name = "evm"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f833b0e642bec8286b80f00ad6cc6a95e50210c77949b9cb484637e6a05ed596"
+version = "0.26.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm?rev=b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c#b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c"
 dependencies = [
  "ethereum",
  "evm-core",
@@ -321,9 +320,8 @@ dependencies = [
 
 [[package]]
 name = "evm-core"
-version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "908739da31125d17a69533c290a6c818b494176e59a2ce8accbf122f7d76835c"
+version = "0.26.1"
+source = "git+https://github.com/aurora-is-near/sputnikvm?rev=b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c#b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c"
 dependencies = [
  "funty",
  "primitive-types",
@@ -331,9 +329,8 @@ dependencies = [
 
 [[package]]
 name = "evm-gasometer"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4118f952ce320c11e1b7b8a575e477d70bc86a3b92ea23e427174d979cf1da26"
+version = "0.26.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm?rev=b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c#b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c"
 dependencies = [
  "evm-core",
  "evm-runtime",
@@ -342,9 +339,8 @@ dependencies = [
 
 [[package]]
 name = "evm-runtime"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "952296b416c3b334b26933ad1f9cfa9203e251691586fb317e411872886ca31b"
+version = "0.26.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm?rev=b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c#b2aea1ad111b803bfa50cd26ed8aec6b63c1c55c"
 dependencies = [
  "evm-core",
  "primitive-types",

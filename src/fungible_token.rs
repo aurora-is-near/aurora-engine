@@ -1,12 +1,12 @@
 #[cfg(feature = "engine")]
 use crate::parameters::*;
+#[cfg(feature = "log")]
+use crate::prelude::format;
 #[cfg(feature = "engine")]
 use crate::prelude::{self, Ordering, String, ToString, Vec, U256};
 use crate::types::*;
 #[cfg(feature = "engine")]
 use crate::{connector, engine, sdk, storage};
-#[cfg(feature = "log")]
-use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[cfg(feature = "engine")]
