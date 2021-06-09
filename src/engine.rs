@@ -23,9 +23,9 @@ macro_rules! unwrap_res_or_finish {
     ($e:expr, $output:expr) => {
         match $e {
             Ok(v) => v,
-            Err(e) => {
+            Err(_e) => {
                 #[cfg(feature = "log")]
-                sdk::log(crate::prelude::format!("{:?}", e).as_str());
+                sdk::log(crate::prelude::format!("{:?}", _e).as_str());
                 sdk::return_output($output);
                 return;
             }

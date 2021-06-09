@@ -312,8 +312,11 @@ impl EthConnectorContract {
         // Check promise results
         let data0: Vec<u8> = match sdk::promise_result(0) {
             PromiseResult::Successful(x) => x,
-            _ => sdk::panic_utf8(b"ERR_PROMISE_INDEX"),
+            PromiseResult::Failed => sdk::panic_utf8(b"ERR_???"),
+            // This shouldn't be reachable
+            PromiseResult::NotReady => sdk::panic_utf8(b"ERR_PROMISE_NOT_READY"),
         };
+
         #[cfg(feature = "log")]
         sdk::log("Check verification_success");
         let verification_success = bool::try_from_slice(&data0).unwrap();
