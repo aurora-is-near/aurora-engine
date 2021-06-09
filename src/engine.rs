@@ -145,7 +145,7 @@ pub struct Engine {
 }
 
 // TODO: upgrade to Berlin HF
-const CONFIG: &Config = &Config::istanbul();
+pub(crate) const CONFIG: &Config = &Config::istanbul();
 
 /// Key for storing the state of the engine.
 const STATE_KEY: &[u8; 5] = b"STATE";
@@ -313,7 +313,7 @@ impl Engine {
     pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let value = Wei::zero();
-        self.deploy_code(origin, value, input)
+        self.deploy_code(origin, value, input, u64::MAX)
     }
 
     pub fn deploy_code(
@@ -321,15 +321,19 @@ impl Engine {
         origin: Address,
         value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<SubmitResult> {
-        let mut executor = self.make_executor();
+        let mut executor = self.make_executor(gas_limit);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
-            executor.transact_create(origin, value.raw(), input, u64::MAX),
+            executor.transact_create(origin, value.raw(), input, gas_limit),
             address,
         );
         let is_succeed = status.is_succeed();
-        status.into_result()?;
+        if let Err(e) = status.into_result() {
+            Engine::increment_nonce(&origin);
+            return Err(e);
+        }
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
@@ -346,7 +350,7 @@ impl Engine {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = Wei::zero();
-        self.call(origin, contract, value, args.input)
+        self.call(origin, contract, value, args.input, u64::MAX)
     }
 
     pub fn call(
@@ -355,10 +359,11 @@ impl Engine {
         contract: Address,
         value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<SubmitResult> {
-        let mut executor = self.make_executor();
+        let mut executor = self.make_executor(gas_limit);
         let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, u64::MAX);
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
 
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
@@ -391,7 +396,7 @@ impl Engine {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
-        self.view(origin, contract, Wei::new(value), args.input)
+        self.view(origin, contract, Wei::new(value), args.input, u64::MAX)
     }
 
     pub fn view(
@@ -400,16 +405,17 @@ impl Engine {
         contract: Address,
         value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<Vec<u8>> {
-        let mut executor = self.make_executor();
+        let mut executor = self.make_executor(gas_limit);
         let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, u64::MAX);
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
         status.into_result()?;
         Ok(result)
     }
 
-    fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {
-        let metadata = StackSubstateMetadata::new(u64::MAX, &CONFIG);
+    fn make_executor(&self, gas_limit: u64) -> StackExecutor<MemoryStackState<Engine>> {
+        let metadata = StackSubstateMetadata::new(gas_limit, &CONFIG);
         let state = MemoryStackState::new(metadata, self);
         StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
     }

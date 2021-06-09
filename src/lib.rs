@@ -87,8 +87,9 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
+        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
+        NewCallArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs,
+        ViewCallArgs,
     };
     use crate::prelude::{Address, H256, U256};
     use crate::sdk;
@@ -97,6 +98,7 @@ mod contract {
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
+    const GAS_OVERFLOW: &str = "ERR_GAS_OVERFLOW";
 
     ///
     /// ADMINISTRATIVE METHODS
@@ -147,9 +149,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let state = Engine::get_state().sdk_unwrap();
-        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
-            .sdk_expect("ERR_NO_UPGRADE")
-            .sdk_unwrap();
+        let index = internal_get_upgrade_index();
         sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
 
@@ -169,9 +169,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
         let state = Engine::get_state().sdk_unwrap();
-        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
-            .sdk_expect("ERR_NO_UPGRADE")
-            .sdk_unwrap();
+        let index = internal_get_upgrade_index();
         if sdk::block_index() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }
@@ -240,16 +238,33 @@ mod contract {
 
         Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
 
+        // Check intrinsic gas is covered by transaction gas limit
+        match signed_transaction
+            .transaction
+            .intrinsic_gas(&crate::engine::CONFIG)
+        {
+            None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
+            Some(intrinsic_gas) => {
+                if signed_transaction.transaction.gas < intrinsic_gas.into() {
+                    sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
+                }
+            }
+        }
+
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
+        let gas_limit = signed_transaction
+            .transaction
+            .get_gas_limit()
+            .sdk_expect(GAS_OVERFLOW);
         let data = signed_transaction.transaction.data;
         let result = if let Some(receiver) = signed_transaction.transaction.to {
-            Engine::call(&mut engine, sender, receiver, value, data)
+            Engine::call(&mut engine, sender, receiver, value, data, gas_limit)
             // TODO: charge for storage
         } else {
             // Execute a contract deployment:
-            Engine::deploy_code(&mut engine, sender, value, data)
+            Engine::deploy_code(&mut engine, sender, value, data, gas_limit)
             // TODO: charge for storage
         };
         result
@@ -277,6 +292,7 @@ mod contract {
             meta_call_args.contract_address,
             meta_call_args.value,
             meta_call_args.input,
+            u64::MAX, // TODO: is there a gas limit with meta calls?
         );
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
@@ -356,7 +372,7 @@ mod contract {
             )
         }
         // return new chain ID
-        sdk::return_output(&Engine::get_state().chain_id)
+        sdk::return_output(&Engine::get_state().sdk_unwrap().chain_id)
     }
 
     #[cfg(feature = "evm_bully")]
@@ -402,6 +418,15 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn finish_deposit_near() {
         EthConnectorContract::get_instance().finish_deposit_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn is_used_proof() {
+        let args = IsUsedProofCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+
+        let is_used_proof = EthConnectorContract::get_instance().is_used_proof(args.proof);
+        let res = is_used_proof.try_to_vec().unwrap();
+        sdk::return_output(&res[..]);
     }
 
     #[no_mangle]
@@ -506,6 +531,14 @@ mod contract {
     ///
     /// Utility methods.
     ///
+
+    fn internal_get_upgrade_index() -> u64 {
+        match sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)) {
+            Ok(index) => index,
+            Err(sdk::ReadU64Error::InvalidU64) => sdk::panic_utf8(b"ERR_INVALID_UPGRADE"),
+            Err(sdk::ReadU64Error::MissingValue) => sdk::panic_utf8(b"ERR_NO_UPGRADE"),
+        }
+    }
 
     fn require_owner_only(state: &EngineState) {
         if state.owner_id.as_bytes() != sdk::predecessor_account_id() {

@@ -1,6 +1,6 @@
-use crate::precompiles::{Precompile, PrecompileResult};
+use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use crate::prelude::{mem, Borrowed, TryInto};
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError};
 
 /// Blake2 costs.
 mod costs {
@@ -80,8 +80,8 @@ impl Precompile for Blake2F {
         }
         let finished = input[212] != 0;
 
-        let res = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
-        Ok((ExitSucceed::Returned, res, cost))
+        let output = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -195,12 +195,12 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context()).unwrap().1
+        Blake2F::run(&input, 12, &new_context()).unwrap().output
     }
 
     fn test_blake2f_r_12() -> Vec<u8> {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, 12, &new_context()).unwrap().1
+        Blake2F::run(&input, 12, &new_context()).unwrap().output
     }
 
     fn test_blake2f_final_block_false() -> Vec<u8> {
@@ -218,7 +218,7 @@ mod tests {
             00",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context()).unwrap().1
+        Blake2F::run(&input, 12, &new_context()).unwrap().output
     }
 
     #[test]

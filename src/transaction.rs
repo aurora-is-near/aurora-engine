@@ -2,7 +2,7 @@ use crate::prelude::{Address, Vec, U256};
 use crate::types::Wei;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct EthTransaction {
     /// A monotonically increasing transaction counter for this sender
     pub nonce: U256,
@@ -35,6 +35,36 @@ impl EthTransaction {
             s.append(&0u8);
             s.append(&0u8);
         }
+    }
+
+    pub fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
+        let is_contract_creation = self.to.is_none();
+
+        let base_gas = if is_contract_creation {
+            config.gas_transaction_create
+        } else {
+            config.gas_transaction_call
+        };
+
+        let num_zero_bytes = self.data.iter().filter(|b| **b == 0).count();
+        let num_non_zero_bytes = self.data.len() - num_zero_bytes;
+
+        let gas_zero_bytes = config
+            .gas_transaction_zero_data
+            .checked_mul(num_zero_bytes as u64)?;
+        let gas_non_zero_bytes = config
+            .gas_transaction_non_zero_data
+            .checked_mul(num_non_zero_bytes as u64)?;
+
+        base_gas
+            .checked_add(gas_zero_bytes)
+            .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
+    }
+
+    /// Returns self.gas as a u64, or None if self.gas > u64::MAX
+    pub fn get_gas_limit(&self) -> Option<u64> {
+        use crate::prelude::TryInto;
+        self.gas.try_into().ok()
     }
 }
 

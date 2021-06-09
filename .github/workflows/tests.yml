@@ -28,6 +28,20 @@ jobs:
         with:
           command: test
           args: --locked --verbose
+  bully-build:
+    name: Bully build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Install the toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly-2021-03-25
+          override: true
+      - run: make evm-bully=yes
+      - run: ls -lH release.wasm
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
