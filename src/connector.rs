@@ -388,6 +388,7 @@ impl EthConnectorContract {
     }
 
     /// Burn NEAR tokens
+    #[allow(dead_code)]
     fn burn_near(&mut self, owner_id: AccountId, amount: Balance) {
         #[cfg(feature = "log")]
         sdk::log(&format!("Burn NEAR {} tokens for: {}", amount, owner_id));
@@ -593,7 +594,6 @@ impl EthConnectorContract {
         // Special case when predecessor_account_id is current_account_id
         if current_account_id == predecessor_account_id {
             let fee = message_data.fee.as_u128();
-            self.burn_near(current_account_id, args.amount);
             // Mint fee to relayer
             let relayer = engine.get_relayer(&message_data.relayer.as_bytes());
             if fee > 0 && relayer.is_some() {
