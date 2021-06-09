@@ -83,6 +83,7 @@ impl ERC20 {
                 ethabi::Token::Uint(amount),
             ])
             .unwrap();
+
         EthTransaction {
             nonce,
             gas_price: Default::default(),
