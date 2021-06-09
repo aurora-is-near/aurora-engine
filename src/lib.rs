@@ -327,11 +327,7 @@ mod contract {
             EthConnectorContract::get_instance().ft_on_transfer(&engine)
         } else {
             let args: NEP141FtOnTransferArgs = sdk::read_input_borsh().sdk_unwrap();
-
-            // TODO: Find correct gas_limit
-            let gas_limit = 100_000;
-
-            engine.receive_erc20_tokens(args, gas_limit);
+            engine.receive_erc20_tokens(args);
         }
     }
 

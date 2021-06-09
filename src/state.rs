@@ -108,7 +108,6 @@ impl<'backend, 'config> StackState<'config> for AuroraStackState<'backend, 'conf
     }
 
     fn enter(&mut self, gas_limit: u64, is_static: bool) {
-        // TODO: What should we do with respect to gas limit
         self.promises.enter();
 
         self.memory_stack_state.enter(gas_limit, is_static);

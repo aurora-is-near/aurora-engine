@@ -43,9 +43,9 @@ impl<const K: KeyPrefixU8> LookupMap<K> {
     /// Removes a serialized key from the map, returning the serialized value at the key if the key
     /// was previously in the map.
     #[allow(dead_code)]
-    pub fn remove_raw(&mut self, key_raw: &[u8]) {
+    pub fn remove_raw(&mut self, key_raw: &[u8]) -> Option<Vec<u8>> {
         let storage_key = self.raw_key_to_storage_key(key_raw);
-        sdk::remove_storage(&storage_key);
+        sdk::remove_storage_with_result(&storage_key)
     }
 }
 
@@ -77,16 +77,14 @@ impl<const LR: KeyPrefixU8, const RL: KeyPrefixU8> BijectionMap<LR, RL> {
 
     #[allow(dead_code)]
     pub fn remove_left(&self, value_left: &[u8]) {
-        Self::left_to_right().remove_raw(value_left);
-        if let Some(value_right) = sdk::storage_get_evicted() {
+        if let Some(value_right) = Self::left_to_right().remove_raw(value_left) {
             Self::right_to_left().remove_raw(value_right.as_slice());
         }
     }
 
     #[allow(dead_code)]
     pub fn remove_right(&self, value_right: &[u8]) {
-        Self::right_to_left().remove_raw(value_right);
-        if let Some(value_left) = sdk::storage_get_evicted() {
+        if let Some(value_left) = Self::right_to_left().remove_raw(value_right) {
             Self::left_to_right().remove_raw(value_left.as_slice());
         }
     }

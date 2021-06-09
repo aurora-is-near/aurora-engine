@@ -487,7 +487,7 @@ impl Engine {
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
-    pub fn receive_erc20_tokens(&mut self, args: NEP141FtOnTransferArgs, gas_limit: u64) {
+    pub fn receive_erc20_tokens(&mut self, args: NEP141FtOnTransferArgs) {
         let str_amount = args.amount.to_string();
         let output_on_fail = str_amount.as_bytes();
 
@@ -541,7 +541,7 @@ impl Engine {
                     recipient,
                     relayer_address,
                     Wei::new_u64(fee.as_u64()),
-                    gas_limit
+                    u64::MAX,
                 ),
                 output_on_fail
             );
@@ -559,7 +559,7 @@ impl Engine {
                 erc20_token,
                 Wei::zero(),
                 [selector, tail.as_slice()].concat(),
-                gas_limit,
+                u64::MAX,
             ),
             output_on_fail
         );

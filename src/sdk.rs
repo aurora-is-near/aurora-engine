@@ -7,7 +7,7 @@ const READ_STORAGE_REGISTER_ID: u64 = 0;
 const INPUT_REGISTER_ID: u64 = 0;
 
 /// Register used to record evicted values from the storage.
-const EVICTED_REGISTER: u64 = u64::MAX - 1;
+const EVICTED_REGISTER: u64 = 0;
 
 const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
 
@@ -262,7 +262,7 @@ pub fn write_storage(key: &[u8], value: &[u8]) {
 
 pub fn remove_storage(key: &[u8]) {
     unsafe {
-        exports::storage_remove(key.len() as u64, key.as_ptr() as u64, 0);
+        exports::storage_remove(key.len() as u64, key.as_ptr() as u64, EVICTED_REGISTER);
     }
 }
 
@@ -276,15 +276,19 @@ pub fn register_len(register_id: u64) -> Option<u64> {
     }
 }
 
-// TODO(MarX): Test this function
 /// Reads the most recent value that was evicted with `storage_write` or `storage_remove` command.
-pub fn storage_get_evicted() -> Option<Vec<u8>> {
+fn storage_get_evicted() -> Option<Vec<u8>> {
     let len = register_len(EVICTED_REGISTER)?;
     let bytes: Vec<u8> = vec![0u8; len as usize];
     unsafe {
         exports::read_register(EVICTED_REGISTER, bytes.as_ptr() as *const u64 as u64);
     };
     Some(bytes)
+}
+
+pub fn remove_storage_with_result(key: &[u8]) -> Option<Vec<u8>> {
+    remove_storage(key);
+    storage_get_evicted()
 }
 
 #[allow(dead_code)]
