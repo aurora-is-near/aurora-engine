@@ -61,7 +61,7 @@ impl Precompile for ModExp<Byzantium> {
         let mod_len = U256::from(&input[64..96]);
 
         let mul = Self::mult_complexity(core::cmp::max(mod_len, base_len))?;
-        let adj = core::cmp::max(Self::adj_exp_len(exp_len, base_len, &input), U256::from(1))
+        let adj = core::cmp::max(Self::adj_exp_len(exp_len, base_len, input), U256::from(1))
             / U256::from(20);
         let (gas_val, overflow) = mul.overflowing_mul(adj);
         if overflow {

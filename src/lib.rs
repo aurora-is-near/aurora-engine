@@ -241,7 +241,7 @@ mod contract {
         // Check intrinsic gas is covered by transaction gas limit
         match signed_transaction
             .transaction
-            .intrinsic_gas(&crate::engine::CONFIG)
+            .intrinsic_gas(crate::engine::CONFIG)
         {
             None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
             Some(intrinsic_gas) => {

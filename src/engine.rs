@@ -408,9 +408,9 @@ impl Engine {
     }
 
     fn make_executor(&self, gas_limit: u64) -> StackExecutor<MemoryStackState<Engine>> {
-        let metadata = StackSubstateMetadata::new(gas_limit, &CONFIG);
+        let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
         let state = MemoryStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
+        StackExecutor::new_with_precompile(state, CONFIG, precompiles::istanbul_precompiles)
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
