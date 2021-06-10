@@ -386,14 +386,6 @@ impl EthConnectorContract {
         self.ft.internal_deposit_eth(owner_id, amount);
     }
 
-    /// Burn NEAR tokens
-    #[allow(dead_code)]
-    fn burn_near(&mut self, owner_id: AccountId, amount: Balance) {
-        #[cfg(feature = "log")]
-        sdk::log(&format!("Burn NEAR {} tokens for: {}", amount, owner_id));
-        self.ft.internal_withdraw(&owner_id, amount);
-    }
-
     /// Burn ETH tokens
     fn burn_eth(&mut self, address: EthAddress, amount: Balance) {
         #[cfg(feature = "log")]
