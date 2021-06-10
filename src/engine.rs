@@ -244,11 +244,11 @@ impl Engine {
     }
 
     pub fn remove_storage(address: &Address, key: &H256, generation: u32) {
-        sdk::remove_storage(&storage_to_key(address, key, generation).as_ref());
+        sdk::remove_storage(storage_to_key(address, key, generation).as_ref());
     }
 
     pub fn set_storage(address: &Address, key: &H256, value: &H256, generation: u32) {
-        sdk::write_storage(&storage_to_key(address, key, generation).as_ref(), &value.0);
+        sdk::write_storage(storage_to_key(address, key, generation).as_ref(), &value.0);
     }
 
     pub fn get_storage(address: &Address, key: &H256, generation: u32) -> H256 {
