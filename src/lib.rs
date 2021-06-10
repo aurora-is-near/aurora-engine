@@ -31,6 +31,8 @@ mod fungible_token;
 mod json;
 #[cfg(feature = "engine")]
 mod log_entry;
+#[cfg(feature = "engine")]
+pub mod migration;
 mod precompiles;
 #[cfg(feature = "engine")]
 mod prover;
@@ -517,6 +519,11 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_accounts_counter() {
         EthConnectorContract::get_instance().get_accounts_counter()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn migrate() {
+        crate::migration::migrate()
     }
 
     #[cfg(feature = "integration-test")]
