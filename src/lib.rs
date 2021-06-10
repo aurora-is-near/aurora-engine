@@ -523,9 +523,12 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn migrate() {
-        crate::migration::migrate()
+        sdk::assert_private_call();
+        let args = Migration::from(parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()));
+        crate::migration::migrate(args);
+        sdk::return_output(&"done".as_bytes());
     }
-
+    
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
