@@ -283,7 +283,7 @@ impl Engine {
     }
 
     /// Removes all storage for the given address.
-    pub fn remove_all_storage(address: &Address, generation: u32) {
+    fn remove_all_storage(address: &Address, generation: u32) {
         // FIXME: there is presently no way to prefix delete trie state.
         // NOTE: There is not going to be a method on runtime for this.
         //     You may need to store all keys in a list if you want to do this in a contract.
@@ -296,18 +296,11 @@ impl Engine {
     }
 
     /// Removes an account.
-    pub fn remove_account(address: &Address, generation: u32) {
+    fn remove_account(address: &Address, generation: u32) {
         Self::remove_nonce(address);
         Self::remove_balance(address);
         Self::remove_code(address);
         Self::remove_all_storage(address, generation);
-    }
-
-    /// Removes an account if it is empty.
-    pub fn remove_account_if_empty(address: &Address, generation: u32) {
-        if Self::is_account_empty(address) {
-            Self::remove_account(address, generation);
-        }
     }
 
     pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
@@ -565,7 +558,7 @@ impl ApplyBackend for Engine {
                     basic,
                     code,
                     storage,
-                    reset_storage: _,
+                    reset_storage,
                 } => {
                     let generation = Self::get_generation(&address);
                     Engine::set_nonce(&address, &basic.nonce);
@@ -579,21 +572,31 @@ impl ApplyBackend for Engine {
                         Engine::set_code(&address, &code)
                     }
 
-                    // TODO: When does the storage needs to be wiped?
-                    // if reset_storage {
-                    // Engine::remove_all_storage(&address, generation)
-                    // }
+                    let next_generation = if reset_storage {
+                        Engine::remove_all_storage(&address, generation);
+                        generation + 1
+                    } else {
+                        generation
+                    };
 
                     for (index, value) in storage {
                         if value == H256::default() {
-                            Engine::remove_storage(&address, &index, generation)
+                            Engine::remove_storage(&address, &index, next_generation)
                         } else {
-                            Engine::set_storage(&address, &index, &value, generation)
+                            Engine::set_storage(&address, &index, &value, next_generation)
                         }
                     }
 
-                    if delete_empty {
-                        Engine::remove_account_if_empty(&address, generation)
+                    // We only need to remove the account if:
+                    // 1. we are supposed to delete an empty account
+                    // 2. the account is empty
+                    // 3. we didn't already clear out the storage (because if we did then there is
+                    //    nothing to do)
+                    if delete_empty
+                        && Engine::is_account_empty(&address)
+                        && generation == next_generation
+                    {
+                        Engine::remove_account(&address, generation);
                     }
                 }
                 Apply::Delete { address } => {
