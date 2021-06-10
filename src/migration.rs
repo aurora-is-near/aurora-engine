@@ -56,9 +56,5 @@ impl From<json::JsonValue> for Migration {
 
 /// Migrate key fields and/or data value
 /// Can be executed only contract itself.
-pub fn migrate() {
-    sdk::assert_private_call();
-    let _args =
-        Migration::from(parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()));
-    sdk::return_output(&"done".as_bytes());
+pub fn migrate(args: MigrationArgs) {
 }
