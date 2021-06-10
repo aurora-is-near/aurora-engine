@@ -312,7 +312,7 @@ impl EthConnectorContract {
         // Check promise results
         let data0: Vec<u8> = match sdk::promise_result(0) {
             PromiseResult::Successful(x) => x,
-            PromiseResult::Failed => sdk::panic_utf8(b"ERR_???"),
+            PromiseResult::Failed => sdk::panic_utf8(b"ERR_PROMISE_FAILED"),
             // This shouldn't be reachable
             PromiseResult::NotReady => sdk::panic_utf8(b"ERR_PROMISE_NOT_READY"),
         };
