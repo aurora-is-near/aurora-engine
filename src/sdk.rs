@@ -265,7 +265,9 @@ pub fn remove_storage(key: &[u8]) {
         exports::storage_remove(key.len() as u64, key.as_ptr() as u64, EVICTED_REGISTER);
     }
 }
-
+/// Returns the size of the blob stored in the given register.
+/// * If register is used, then returns the size, which can potentially be zero;
+/// * If register is not used, returns `u64::MAX`
 pub fn register_len(register_id: u64) -> Option<u64> {
     let len = unsafe { exports::register_len(register_id) };
 
