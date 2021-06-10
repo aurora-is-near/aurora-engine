@@ -1,0 +1,36 @@
+{
+  "name": "evm-erc20-token",
+  "version": "0.1.0",
+  "description": "ERC20 token implementation on EVM mapped from Native NEP-141",
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.1.0"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.1",
+    "chai": "^4.3.3",
+    "eslint": "^6.3.0",
+    "eslint-config-standard": "^14.1.0",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-node": "^11.0.0",
+    "eslint-plugin-promise": "^4.0.1",
+    "eslint-plugin-standard": "^4.0.0",
+    "eth-gas-reporter": "^0.2.11",
+    "ethers": "^5.0.31",
+    "hardhat": "^2.1.1",
+    "rainbow-bridge-lib": "^2.0.0",
+    "solc": "0.8.3",
+    "solidity-coverage": "^0.7.16",
+    "solium": "^1.2.5"
+  },
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "lint:js": "eslint .",
+    "lint:js:fix": "eslint . --fix",
+    "lint:sol": "solium -d .",
+    "lint:sol:fix": "solium -d . --fix",
+    "lint": "yarn lint:js && yarn lint:sol",
+    "lint:fix": "yarn lint:js:fix && yarn lint:sol:fix"
+  }
+}

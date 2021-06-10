@@ -17,6 +17,9 @@ target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock 
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm 
 
+etc/eth-contracts/artifacts/contracts/StateTest.sol/StateTest.json: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
+	cd etc/eth-contracts && yarn && yarn build
+
 debug: debug.wasm
 
 debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
@@ -25,7 +28,7 @@ debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
 	$(CARGO) build --target wasm32-unknown-unknown --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 
-test-build:
+test-build: etc/eth-contracts/artifacts/contracts/StateTest.sol/StateTest.json
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=contract,integration-test -Z avoid-dev-deps
 	ln -sf target/wasm32-unknown-unknown/release/aurora_engine.wasm release.wasm 
 	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm 
