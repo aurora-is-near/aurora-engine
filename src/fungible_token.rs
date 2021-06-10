@@ -16,11 +16,11 @@ const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
-    /// Total supply of the all token.
-    pub total_supply: Balance,
+    /// Total ETH supply of ETH on Near (nETH as NEP-141 token)
+    pub total_eth_supply_on_near: Balance,
 
-    /// Total supply of the all ETH token.
-    pub total_supply_eth: Balance,
+    /// Total ETH supply on Aurora (native ETH in Aurora EVM)
+    pub total_eth_supply_on_aurora: Balance,
 
     /// The storage size in bytes for one account.
     pub account_storage_usage: StorageUsage,
@@ -32,28 +32,28 @@ impl FungibleToken {
         Self::default()
     }
 
-    /// Balance of NEAR tokens
-    pub fn internal_unwrap_balance_of(&self, account_id: &str) -> Balance {
+    /// Balance of nETH (ETH on NEAR token)
+    pub fn internal_unwrap_balance_of_eth_on_near(&self, account_id: &str) -> Balance {
         match self.accounts_get(account_id) {
             Some(balance) => u128::try_from_slice(&balance[..]).unwrap(),
             None => sdk::panic_utf8(b"ERR_ACCOUNT_NOT_EXIST"),
         }
     }
 
-    /// Balance of ETH tokens
-    pub fn internal_unwrap_balance_of_eth(&self, address: EthAddress) -> Balance {
+    /// Balance of ETH (native ETH on Aurora)
+    pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
         engine::Engine::get_balance(&prelude::Address(address))
             .raw()
             .as_u128()
     }
 
-    /// Internal deposit NEAR - NEP-141
-    pub fn internal_deposit(&mut self, account_id: &str, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of(account_id);
+    /// Internal ETH deposit to NEAR - nETH (NEP-141)
+    pub fn internal_deposit_eth_to_near(&mut self, account_id: &str, amount: Balance) {
+        let balance = self.internal_unwrap_balance_of_eth_on_near(account_id);
         if let Some(new_balance) = balance.checked_add(amount) {
             self.accounts_insert(account_id, new_balance);
-            self.total_supply = self
-                .total_supply
+            self.total_eth_supply_on_near = self
+                .total_eth_supply_on_near
                 .checked_add(amount)
                 .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
         } else {
@@ -61,20 +61,16 @@ impl FungibleToken {
         }
     }
 
-    /// Internal deposit ETH (nETH)
-    pub fn internal_deposit_eth(&mut self, address: EthAddress, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of_eth(address);
+    /// Internal ETH deposit to Aurora - native ETH
+    pub fn internal_deposit_eth_to_aurora(&mut self, address: EthAddress, amount: Balance) {
+        let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_add(amount) {
             engine::Engine::set_balance(
                 &prelude::Address(address),
                 &Wei::new(U256::from(new_balance)),
             );
-            self.total_supply_eth = self
-                .total_supply_eth
-                .checked_add(amount)
-                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
-            self.total_supply = self
-                .total_supply
+            self.total_eth_supply_on_aurora = self
+                .total_eth_supply_on_aurora
                 .checked_add(amount)
                 .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
         } else {
@@ -84,17 +80,17 @@ impl FungibleToken {
 
     /// Needed by engine to update balances after a transaction (see ApplyBackend for Engine)
     pub(crate) fn internal_set_eth_balance(&mut self, address: EthAddress, new_balance: Balance) {
-        let current_balance = self.internal_unwrap_balance_of_eth(address);
+        let current_balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         match current_balance.cmp(&new_balance) {
             Ordering::Less => {
                 // current_balance is smaller, so we need to deposit
                 let diff = new_balance - current_balance;
-                self.internal_deposit_eth(address, diff);
+                self.internal_deposit_eth_to_aurora(address, diff);
             }
             Ordering::Greater => {
                 // current_balance is larger, so we need to withdraw
                 let diff = current_balance - new_balance;
-                self.internal_withdraw_eth(address, diff);
+                self.internal_withdraw_eth_from_aurora(address, diff);
             }
             // if the balances are equal then we do not need to do anything
             Ordering::Equal => (),
@@ -102,12 +98,12 @@ impl FungibleToken {
     }
 
     /// Withdraw NEAR tokens
-    pub fn internal_withdraw(&mut self, account_id: &str, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of(account_id);
+    pub fn internal_withdraw_eth_from_near(&mut self, account_id: &str, amount: Balance) {
+        let balance = self.internal_unwrap_balance_of_eth_on_near(account_id);
         if let Some(new_balance) = balance.checked_sub(amount) {
             self.accounts_insert(account_id, new_balance);
-            self.total_supply = self
-                .total_supply
+            self.total_eth_supply_on_near = self
+                .total_eth_supply_on_near
                 .checked_sub(amount)
                 .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
         } else {
@@ -116,19 +112,15 @@ impl FungibleToken {
     }
 
     /// Withdraw ETH tokens
-    pub fn internal_withdraw_eth(&mut self, address: EthAddress, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of_eth(address);
+    pub fn internal_withdraw_eth_from_aurora(&mut self, address: EthAddress, amount: Balance) {
+        let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_sub(amount) {
             engine::Engine::set_balance(
                 &prelude::Address(address),
                 &Wei::new(U256::from(new_balance)),
             );
-            self.total_supply_eth = self
-                .total_supply_eth
-                .checked_sub(amount)
-                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
-            self.total_supply = self
-                .total_supply
+            self.total_eth_supply_on_aurora = self
+                .total_eth_supply_on_aurora
                 .checked_sub(amount)
                 .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
         } else {
@@ -137,7 +129,7 @@ impl FungibleToken {
     }
 
     /// Transfer NEAR tokens
-    pub fn internal_transfer(
+    pub fn internal_transfer_eth_on_near(
         &mut self,
         sender_id: &str,
         receiver_id: &str,
@@ -149,8 +141,8 @@ impl FungibleToken {
             "Sender and receiver should be different"
         );
         assert!(amount > 0, "The amount should be a positive number");
-        self.internal_withdraw(sender_id, amount);
-        self.internal_deposit(receiver_id, amount);
+        self.internal_withdraw_eth_from_near(sender_id, amount);
+        self.internal_deposit_eth_to_near(receiver_id, amount);
         #[cfg(feature = "log")]
         sdk::log(&format!(
             "Transfer {} from {} to {}",
@@ -170,19 +162,15 @@ impl FungibleToken {
         sdk::assert_one_yocto();
         let predecessor_account_id = sdk::predecessor_account_id();
         let sender_id = str_from_slice(&predecessor_account_id);
-        self.internal_transfer(sender_id, receiver_id, amount, memo);
+        self.internal_transfer_eth_on_near(sender_id, receiver_id, amount, memo);
     }
 
-    pub fn ft_total_supply(&self) -> u128 {
-        self.total_supply
+    pub fn ft_total_eth_supply_on_near(&self) -> u128 {
+        self.total_eth_supply_on_near
     }
 
-    pub fn ft_total_supply_near(&self) -> u128 {
-        self.total_supply - self.total_supply_eth
-    }
-
-    pub fn ft_total_supply_eth(&self) -> u128 {
-        self.total_supply_eth
+    pub fn ft_total_eth_supply_on_aurora(&self) -> u128 {
+        self.total_eth_supply_on_aurora
     }
 
     pub fn ft_balance_of(&self, account_id: &str) -> u128 {
@@ -204,7 +192,7 @@ impl FungibleToken {
         let sender_id = str_from_slice(&predecessor_account_id);
         // Special case for Aurora transfer itself - we shouldn't transfer
         if sender_id != receiver_id {
-            self.internal_transfer(sender_id, receiver_id, amount, memo);
+            self.internal_transfer_eth_on_near(sender_id, receiver_id, amount, memo);
         }
         // Note: This seems to be breaking the invariant that sender_id != receiver_id. You need to
         //    make sure the ft implementation doesn't break after this change.
@@ -303,7 +291,8 @@ impl FungibleToken {
                     (amount - refund_amount, 0)
                 } else {
                     // Sender's account was deleted, so we need to burn tokens.
-                    self.total_supply -= refund_amount;
+                    //TODO check this:
+                    self.total_eth_supply_on_near -= refund_amount;
                     #[cfg(feature = "log")]
                     sdk::log("The account of the sender was deleted");
                     (amount, refund_amount)
@@ -335,7 +324,8 @@ impl FungibleToken {
             let balance = u128::try_from_slice(&balance[..]).unwrap();
             if balance == 0 || force {
                 self.accounts_remove(account_id);
-                self.total_supply -= balance;
+                //TODO check this:
+                self.total_eth_supply_on_near -= balance;
                 let amount = self.storage_balance_bounds().min + 1;
                 let promise0 = sdk::promise_batch_create(&account_id_key);
                 sdk::promise_batch_action_transfer(promise0, amount);

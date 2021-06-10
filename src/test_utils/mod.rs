@@ -165,8 +165,7 @@ impl AuroraRunner {
                 .get(&ft_key)
                 .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
                 .unwrap_or_default();
-            current_ft.total_supply += init_balance.raw().as_u128();
-            current_ft.total_supply_eth += init_balance.raw().as_u128();
+            current_ft.total_eth_supply_on_aurora += init_balance.raw().as_u128();
             current_ft
         };
 
