@@ -26,13 +26,22 @@ lazy_static_include::lazy_static_include_bytes! {
 }
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
-pub(crate) struct Signer {
-    pub nonce: u64,
-    pub secret_key: SecretKey,
-}
 
 pub fn origin() -> AccountId {
     "aurora".to_string()
+}
+
+pub(crate) const SUBMIT: &str = "submit";
+
+pub(crate) mod erc20;
+pub(crate) mod exit_precompile;
+pub(crate) mod self_destruct;
+pub(crate) mod solidity;
+pub(crate) mod standard_precompiles;
+
+pub(crate) struct Signer {
+    pub nonce: u64,
+    pub secret_key: SecretKey,
 }
 
 impl Signer {
@@ -55,13 +64,6 @@ impl Signer {
         nonce
     }
 }
-
-pub(crate) const SUBMIT: &str = "submit";
-
-pub(crate) mod erc20;
-pub(crate) mod exit_precompile;
-pub(crate) mod solidity;
-pub(crate) mod standard_precompiles;
 
 pub(crate) struct AuroraRunner {
     pub aurora_account_id: String,

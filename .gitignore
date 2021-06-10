@@ -22,3 +22,7 @@ res/
 
 # Other
 etc/state-migration-test/target/
+
+node_modules/
+artifacts/
+cache

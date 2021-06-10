@@ -1,3 +1,4 @@
+#![feature(array_methods)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
@@ -398,7 +399,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
         let args: GetStorageAtArgs = sdk::read_input_borsh().sdk_unwrap();
-        let value = Engine::get_storage(&Address(args.address), &H256(args.key));
+        let address = Address(args.address);
+        let generation = Engine::get_generation(&address);
+        let value = Engine::get_storage(&Address(args.address), &H256(args.key), generation);
         sdk::return_output(&value.0)
     }
 
