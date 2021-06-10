@@ -23,7 +23,7 @@
     "solium": "^1.2.5"
   },
   "scripts": {
-    "compile": "hardhat compile",
+    "build": "hardhat compile",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
     "lint:js": "eslint .",

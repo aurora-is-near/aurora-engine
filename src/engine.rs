@@ -565,7 +565,7 @@ impl ApplyBackend for Engine {
                     basic,
                     code,
                     storage,
-                    reset_storage,
+                    reset_storage: _,
                 } => {
                     let generation = Self::get_generation(&address);
                     Engine::set_nonce(&address, &basic.nonce);
@@ -579,9 +579,10 @@ impl ApplyBackend for Engine {
                         Engine::set_code(&address, &code)
                     }
 
-                    if reset_storage {
-                        Engine::remove_all_storage(&address, generation)
-                    }
+                    // TODO: When does the storage needs to be wiped?
+                    // if reset_storage {
+                    // Engine::remove_all_storage(&address, generation)
+                    // }
 
                     for (index, value) in storage {
                         if value == H256::default() {

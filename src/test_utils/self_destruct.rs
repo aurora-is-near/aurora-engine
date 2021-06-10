@@ -3,9 +3,12 @@ use crate::prelude::Address;
 use crate::test_utils::{solidity, AuroraRunner, Signer};
 use crate::transaction::EthTransaction;
 use borsh::BorshSerialize;
+use primitive_types::U256;
 use std::convert::TryInto;
 
 pub(crate) struct SelfDestructFactoryConstructor(pub solidity::ContractConstructor);
+
+const DEFAULT_GAS: u64 = 1_000_000_000;
 
 impl SelfDestructFactoryConstructor {
     pub fn load() -> Self {
@@ -26,7 +29,7 @@ impl SelfDestructFactoryConstructor {
         EthTransaction {
             nonce: nonce.into(),
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: U256::from(DEFAULT_GAS),
             to: None,
             value: Default::default(),
             data,
@@ -63,7 +66,7 @@ impl SelfDestructFactory {
         let tx = EthTransaction {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
             value: Default::default(),
             data,
@@ -101,7 +104,7 @@ impl SelfDestruct {
         let tx = EthTransaction {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
             value: Default::default(),
             data,
@@ -130,7 +133,7 @@ impl SelfDestruct {
         let tx = EthTransaction {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
             value: Default::default(),
             data,
@@ -151,7 +154,7 @@ impl SelfDestruct {
         let tx = EthTransaction {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
             value: Default::default(),
             data,
