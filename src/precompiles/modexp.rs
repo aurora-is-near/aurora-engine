@@ -214,7 +214,6 @@ mod tests {
         input: &'static str,
         expected: &'static str,
         name: &'static str,
-        gas: u64,
     }
 
     const BYZANTIUM_TESTS: [Test; 3] = [
@@ -228,7 +227,6 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
             expected: "0000000000000000000000000000000000000000000000000000000000000001",
             name: "eip198_example_1",
-            gas: 13_056,
         },
         Test {
             input: "\
@@ -239,7 +237,6 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
             expected: "0000000000000000000000000000000000000000000000000000000000000000",
             name: "eip198_example_2",
-            gas: 13_056,
         },
         Test {
             input: "\
@@ -253,19 +250,24 @@ mod tests {
             6b",
             expected: "60008f1614cc01dcfb6bfb09c625cf90b47d4468db81b5f8b7a39d42f332eab9b2da8f2d95311648a8f243f4bb13cfb3d8f7f2a3c014122ebb3ed41b02783adc",
             name: "nagydani_1_square",
-            gas: 204,
-        }
+        },
+    ];
+
+    const BYZANTIUM_GAS: [u64; 3] = [
+        13_056,
+        13_056,
+        204,
     ];
 
     #[test]
     fn test_byzantium_modexp() {
-        for test in BYZANTIUM_TESTS.iter() {
+        for (test, test_gas) in BYZANTIUM_TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
             let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
-            assert_eq!(gas, test.gas, "{} gas", test.name);
+            assert_eq!(gas, *test_gas, "{} gas", test.name);
 
-            let res = ModExp::<Byzantium>::run(&input, test.gas, &new_context()).unwrap().output;
+            let res = ModExp::<Byzantium>::run(&input, *test_gas, &new_context()).unwrap().output;
             let expected = hex::decode(&test.expected).unwrap();
             assert_eq!(res, expected, "{}", test.name);
         }
