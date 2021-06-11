@@ -16,10 +16,10 @@ const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
-    /// Total supply of ETH on Near (nETH as NEP-141 token)
+    /// Total ETH supply on Near (nETH as NEP-141 token)
     pub total_eth_supply_on_near: Balance,
 
-    /// Total ETH supply on Aurora (native ETH in Aurora EVM)
+    /// Total ETH supply on Aurora (ETH in Aurora EVM)
     pub total_eth_supply_on_aurora: Balance,
 
     /// The storage size in bytes for one account.
@@ -40,7 +40,7 @@ impl FungibleToken {
         }
     }
 
-    /// Balance of ETH (native ETH on Aurora)
+    /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
         engine::Engine::get_balance(&prelude::Address(address))
             .raw()
@@ -61,7 +61,7 @@ impl FungibleToken {
         }
     }
 
-    /// Internal ETH deposit to Aurora - native ETH
+    /// Internal ETH deposit to Aurora
     pub fn internal_deposit_eth_to_aurora(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_add(amount) {
@@ -291,7 +291,6 @@ impl FungibleToken {
                     (amount - refund_amount, 0)
                 } else {
                     // Sender's account was deleted, so we need to burn tokens.
-                    //TODO check this:
                     self.total_eth_supply_on_near -= refund_amount;
                     #[cfg(feature = "log")]
                     sdk::log("The account of the sender was deleted");
@@ -324,7 +323,6 @@ impl FungibleToken {
             let balance = u128::try_from_slice(&balance[..]).unwrap();
             if balance == 0 || force {
                 self.accounts_remove(account_id);
-                //TODO check this:
                 self.total_eth_supply_on_near -= balance;
                 let amount = self.storage_balance_bounds().min + 1;
                 let promise0 = sdk::promise_batch_create(&account_id_key);

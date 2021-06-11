@@ -416,7 +416,7 @@ impl EthConnectorContract {
         sdk::log(&format!("Total ETH supply on NEAR: {}", total_supply));
     }
 
-    /// Returns total ETH supply on Aurora (native ETH inside Aurora EVM)
+    /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
     pub fn ft_total_eth_supply_on_aurora(&self) {
         let total_supply = self.ft.ft_total_eth_supply_on_aurora();
         sdk::return_output(total_supply.to_string().as_bytes());
@@ -438,7 +438,7 @@ impl EthConnectorContract {
         ));
     }
 
-    /// Return balance of ETH (native ETH on Aurora)
+    /// Return balance of ETH (ETH in Aurora EVM)
     pub fn ft_balance_of_eth_on_aurora(&self) {
         let args =
             BalanceOfEthCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
