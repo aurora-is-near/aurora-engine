@@ -80,5 +80,33 @@ fn test_json_parse() {
         DEFAULT_GAS,
         0,
     );
-    println!("{:#?}", res.promise_results());
+    let res = res.promise_results();
+    let res = res[res.len() - 2].clone();
+    assert!(format!("{:?}", res.unwrap().status()).contains("done"));
+}
+
+#[test]
+fn test_migation_add() {
+    let json_data = r#"[
+        {
+            "action": "Add",
+            "data": [{
+                "new_field": "test1",
+                "prefix": "1",
+                "value": "val1"
+            }]
+        }
+    ]"#;
+    let (master_account, _contract) = init();
+    let res = master_account.call(
+        CONTRACT_ACC.to_string(),
+        "migrate",
+        &json_data.as_bytes(),
+        DEFAULT_GAS,
+        0,
+    );
+    let res = res.promise_results();
+    //println!("{:#?}", res);
+    let res = res[res.len() - 2].clone();
+    assert!(format!("{:?}", res.unwrap().status()).contains("done"));
 }

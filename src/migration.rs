@@ -4,7 +4,6 @@ use crate::sdk;
 use crate::types::{ExpectUtf8, ERR_FAILED_PARSE};
 
 /// Basic actions for Migration
-#[derive(Debug)]
 pub enum MigrationAction {
     /// Add field with Value
     Add,
@@ -21,7 +20,6 @@ pub enum MigrationAction {
 }
 
 /// Migration data/rules
-#[derive(Debug)]
 pub struct MigrationData {
     /// Field contains: 1. Current field (or new field), 2. Old field
     pub field: (String, Option<String>),
@@ -32,7 +30,6 @@ pub struct MigrationData {
 }
 
 /// Migration data and/or fields
-#[derive(Debug)]
 pub struct Migration {
     /// Migration action
     pub action: MigrationAction,
@@ -41,7 +38,6 @@ pub struct Migration {
 }
 
 /// Basic migdation data set
-#[derive(Debug)]
 pub struct MigrationArgs(Vec<Migration>);
 
 impl From<json::JsonValue> for MigrationData {
@@ -105,6 +101,27 @@ impl From<json::JsonValue> for MigrationArgs {
 
 /// Migrate key fields and/or data value
 /// Can be executed only contract itself.
-pub fn migrate(_args: MigrationArgs) {
+pub fn migrate(args: MigrationArgs) {
+    args.0.iter().for_each(|m| match m.action {
+        MigrationAction::Add => {
+            m.data.iter().for_each(|data| {
+                let prefix = data.prefix.clone();
+                let new_field = data.field.0.clone();
+                let key = format!("{}{}", prefix, new_field);
+                if sdk::storage_has_key(key.as_bytes()) {
+                    sdk::panic_utf8("AddAction: key already exists".as_bytes());
+                }
+                if data.value.is_none() {
+                    sdk::panic_utf8("AddAction: value doesn't set".as_bytes());
+                }
+                sdk::write_storage(key.as_bytes(), &data.value.clone().unwrap())
+            });
+        }
+        MigrationAction::RenameKey => {}
+        MigrationAction::UpdateKeyValue => {}
+        MigrationAction::UpdateValue => {}
+        MigrationAction::Remove => {}
+        MigrationAction::RemoveValue => {}
+    });
     let _ = sdk::storage_has_key("".as_bytes());
 }
