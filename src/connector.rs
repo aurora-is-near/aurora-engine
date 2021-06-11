@@ -66,8 +66,7 @@ impl EthConnectorContract {
     }
 
     fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorStorageId) -> T {
-        let data =
-            sdk::read_storage(&Self::get_contract_key(&suffix)).expect("Failed read storage");
+        let data = sdk::read_storage(&Self::get_contract_key(suffix)).expect("Failed read storage");
         T::try_from_slice(&data[..]).unwrap()
     }
 
@@ -387,13 +386,6 @@ impl EthConnectorContract {
         self.ft.internal_deposit_eth(owner_id, amount);
     }
 
-    /// Burn NEAR tokens
-    fn burn_near(&mut self, owner_id: AccountId, amount: Balance) {
-        #[cfg(feature = "log")]
-        sdk::log(&format!("Burn NEAR {} tokens for: {}", amount, owner_id));
-        self.ft.internal_withdraw(&owner_id, amount);
-    }
-
     /// Burn ETH tokens
     fn burn_eth(&mut self, address: EthAddress, amount: Balance) {
         #[cfg(feature = "log")]
@@ -431,7 +423,7 @@ impl EthConnectorContract {
     /// Return total supply of NEAR + ETH
     pub fn ft_total_supply(&self) {
         let total_supply = self.ft.ft_total_supply();
-        sdk::return_output(&total_supply.to_string().as_bytes());
+        sdk::return_output(total_supply.to_string().as_bytes());
         #[cfg(feature = "log")]
         sdk::log(&format!("Total supply: {}", total_supply));
     }
@@ -439,7 +431,7 @@ impl EthConnectorContract {
     /// Return total supply of NEAR
     pub fn ft_total_supply_near(&self) {
         let total_supply = self.ft.ft_total_supply_near();
-        sdk::return_output(&total_supply.to_string().as_bytes());
+        sdk::return_output(total_supply.to_string().as_bytes());
         #[cfg(feature = "log")]
         sdk::log(&format!("Total supply NEAR: {}", total_supply));
     }
@@ -447,7 +439,7 @@ impl EthConnectorContract {
     /// Return total supply of ETH
     pub fn ft_total_supply_eth(&self) {
         let total_supply = self.ft.ft_total_supply_eth();
-        sdk::return_output(&total_supply.to_string().as_bytes());
+        sdk::return_output(total_supply.to_string().as_bytes());
         #[cfg(feature = "log")]
         sdk::log(&format!("Total supply ETH: {}", total_supply));
     }
@@ -458,7 +450,7 @@ impl EthConnectorContract {
             parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
         let balance = self.ft.ft_balance_of(&args.account_id);
-        sdk::return_output(&balance.to_string().as_bytes());
+        sdk::return_output(balance.to_string().as_bytes());
         #[cfg(feature = "log")]
         sdk::log(&format!(
             "Balance of NEAR [{}]: {}",
@@ -477,7 +469,7 @@ impl EthConnectorContract {
             hex::encode(args.address),
             balance
         ));
-        sdk::return_output(&balance.to_string().as_bytes());
+        sdk::return_output(balance.to_string().as_bytes());
     }
 
     /// Transfer between NEAR accounts
@@ -513,7 +505,7 @@ impl EthConnectorContract {
         ));
         // `ft_resolve_transfer` can change `total_supply` so we should save the contract
         self.save_ft_contract();
-        sdk::return_output(&amount.to_string().as_bytes());
+        sdk::return_output(amount.to_string().as_bytes());
     }
 
     /// FT transfer call from sender account (invoker account) to receiver
@@ -593,9 +585,8 @@ impl EthConnectorContract {
         // Special case when predecessor_account_id is current_account_id
         if current_account_id == predecessor_account_id {
             let fee = message_data.fee.as_u128();
-            self.burn_near(current_account_id, args.amount);
             // Mint fee to relayer
-            let relayer = engine.get_relayer(&message_data.relayer.as_bytes());
+            let relayer = engine.get_relayer(message_data.relayer.as_bytes());
             if fee > 0 && relayer.is_some() {
                 self.mint_eth(message_data.recipient, args.amount - fee);
                 let evm_relayer_address: EthAddress = relayer.unwrap().0;
