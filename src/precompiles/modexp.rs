@@ -10,13 +10,13 @@ pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
 pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
-    fn adj_exp_len(exp_len: U256, base_len: U256, bytes: &[u8]) -> U256 {
+    fn adj_exp_len(exp_len: u64, base_len: u64, bytes: &[u8]) -> u64 {
         let mut exp_bytes = Vec::with_capacity(32);
-        for i in 0..exp_len.as_usize() {
+        for i in 0..exp_len {
             if U256::from(96) + base_len + U256::from(1) >= U256::from(bytes.len()) {
                 exp_bytes.push(0u8);
             } else {
-                let bytes_i = 96 + base_len.as_usize() + i;
+                let bytes_i = (96 + base_len + i) as usize;
                 if let Some(byte) = bytes.get(bytes_i) {
                     exp_bytes.push(*byte);
                 } else {
@@ -28,13 +28,13 @@ impl<HF: HardFork> ModExp<HF> {
 
         let exp = U256::from(exp_bytes.as_slice());
 
-        if exp_len <= U256::from(32) && exp == U256::zero() {
-            U256::zero()
-        } else if exp_len <= U256::from(32) {
-            U256::from(exp.bits())
+        if exp_len <= 32 && exp == U256::zero() {
+            0
+        } else if exp_len <= 32 {
+            exp.bits() as u64
         } else {
             // else > 32
-            U256::from(8) * (exp_len - U256::from(32)) + U256::from(exp.bits())
+            8 * (exp_len - 32) + exp.bits() as u64
         }
     }
 
@@ -94,17 +94,17 @@ impl<HF: HardFork> ModExp<HF> {
 }
 
 impl ModExp<Byzantium> {
-    fn mult_complexity(x: U256) -> Result<U256, ExitError> {
-        if x <= U256::from(64) {
+    fn mult_complexity(x: u64) -> Result<u64, ExitError> {
+        if x <= 64 {
             Ok(x * x)
-        } else if x <= U256::from(1_024) {
-            Ok(x * x / U256::from(4) + U256::from(96) * x - U256::from(3_072))
+        } else if x <= 1_024 {
+            Ok(x * x / 4 + 96 * x - 3_072)
         } else {
             let (sqroot, overflow) = x.overflowing_mul(x);
             if overflow {
                 Err(ExitError::OutOfGas)
             } else {
-                Ok(sqroot / U256::from(16) + U256::from(480) * x - U256::from(199_680))
+                Ok(sqroot / 16 + 480 * x - 199_680)
             }
         }
     }
@@ -112,28 +112,19 @@ impl ModExp<Byzantium> {
 
 impl Precompile for ModExp<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
-        let base_len = U256::from(&input[0..32]);
-        let exp_len = U256::from(&input[32..64]);
-        let mod_len = U256::from(&input[64..96]);
+        let base_len = U256::from(&input[0..32]).as_u64();
+        let exp_len = U256::from(&input[32..64]).as_u64();
+        let mod_len = U256::from(&input[64..96]).as_u64();
 
         let mul = Self::mult_complexity(core::cmp::max(mod_len, base_len))?;
-        let adj = Self::adj_exp_len(exp_len, base_len, &input) - U256::from(1);
-        let (mut gas, overflow) =  mul.overflowing_mul(core::cmp::max(adj, U256::from(1)));
+        let adj = Self::adj_exp_len(exp_len, base_len, &input) - 1;
+        let (mut gas, overflow) =  mul.overflowing_mul(core::cmp::max(adj, 1));
         if overflow {
             Err(ExitError::OutOfGas)
         } else {
-            gas /= U256::from(20);
-            Ok(gas.as_u64())
+            gas /= 20;
+            Ok(gas)
         }
-
-        // let mul = Self::mult_complexity(core::cmp::max(mod_len, base_len))?;
-        // let adj = core::cmp::max(Self::adj_exp_len(exp_len, base_len, &input));
-        // let (gas_val, overflow) = mul.overflowing_mul(adj);
-        // if overflow {
-        //     Err(ExitError::OutOfGas)
-        // } else {
-        //     Ok(gas_val.as_u64())
-        // }
     }
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
@@ -150,18 +141,18 @@ impl Precompile for ModExp<Byzantium> {
 }
 
 impl ModExp<Berlin> {
-    fn mult_complexity(mut x: U256) {
-        x += U256::from(7);
-        x /= U256::from(8);
+    fn mult_complexity(x: u64) -> u64 {
+        let mut x = (x + 7) / 8;
         x *= x;
+        x
     }
 }
 
 impl Precompile for ModExp<Berlin> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
-        let base_len = U256::from(&input[0..32]);
-        let exp_len = U256::from(&input[32..64]);
-        let mod_len = U256::from(&input[64..96]);
+        let base_len = U256::from(&input[0..32]).as_u64();
+        let exp_len = U256::from(&input[32..64]).as_u64();
+        let mod_len = U256::from(&input[64..96]).as_u64();
 
         let adj = Self::adj_exp_len(exp_len, base_len, &input);
 
@@ -177,20 +168,20 @@ impl Precompile for ModExp<Berlin> {
         let mut gas = core::cmp::max(mod_len, base_len);
         Self::mult_complexity(gas);
 
-        gas *= core::cmp::max(adj, U256::from(1));
+        gas *= core::cmp::max(adj, 1);
 
         // 2. Different divisor (`GQUADDIVISOR`) (3)
-        gas /= U256::from(3);
-        if gas.bits() > 64 {
+        gas /= 3;
+        if U256::from(gas).bits() > 64 {
             return Ok(u64::MAX);
         }
 
         // 3. Minimum price of 200 gas
-        if gas.as_u64() < 200 {
+        if gas < 200 {
             return Ok(200u64);
         }
 
-        Ok(gas.as_u64())
+        Ok(gas)
     }
 
     fn run(_input: &[u8], _target_gas: u64, _context: &Context) -> PrecompileResult {
@@ -216,7 +207,7 @@ mod tests {
         name: &'static str,
     }
 
-    const BYZANTIUM_TESTS: [Test; 3] = [
+    const TESTS: [Test; 3] = [
         Test {
             input: "\
             0000000000000000000000000000000000000000000000000000000000000001\
@@ -259,9 +250,15 @@ mod tests {
         204,
     ];
 
+    const BERLIN_GAS: [u64; 3] = [
+        1_360,
+        1_360,
+        200,
+    ];
+
     #[test]
     fn test_byzantium_modexp() {
-        for (test, test_gas) in BYZANTIUM_TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
+        for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
             let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
@@ -356,6 +353,15 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp() {
+        for (test, test_gas) in TESTS.iter().zip(BERLIN_GAS.iter()) {
+            let input = hex::decode(&test.input).unwrap();
 
+            let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+            assert_eq!(gas, *test_gas, "{} gas", test.name);
+
+            let res = ModExp::<Byzantium>::run(&input, *test_gas, &new_context()).unwrap().output;
+            let expected = hex::decode(&test.expected).unwrap();
+            assert_eq!(res, expected, "{}", test.name);
+        }
     }
 }
