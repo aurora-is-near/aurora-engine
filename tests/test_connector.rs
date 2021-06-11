@@ -316,13 +316,13 @@ fn test_eth_deposit_balance_total_supply() {
     assert_eq!(balance, DEPOSITED_EVM_FEE);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT * 2);
 
     let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
 
     let balance = total_supply_near(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, 0);
+    assert_eq!(balance, DEPOSITED_EVM_AMOUNT);
 }
 
 #[test]
@@ -457,7 +457,7 @@ fn test_ft_transfer_call_eth() {
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
 
     let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE - transfer_amount);
+    assert_eq!(balance, DEPOSITED_FEE);
 
     let balance = get_eth_balance(
         &master_account,
@@ -474,10 +474,10 @@ fn test_ft_transfer_call_eth() {
     assert_eq!(balance, fee);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_AMOUNT);
+    assert_eq!(balance, DEPOSITED_AMOUNT + transfer_amount);
 
     let balance = total_supply_near(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_AMOUNT - transfer_amount);
+    assert_eq!(balance, DEPOSITED_AMOUNT);
 
     let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, transfer_amount);
@@ -558,7 +558,7 @@ fn test_ft_transfer_call_without_relayer() {
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
 
     let balance = get_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE - transfer_amount);
+    assert_eq!(balance, DEPOSITED_FEE);
 
     let balance = get_eth_balance(
         &master_account,
@@ -575,10 +575,10 @@ fn test_ft_transfer_call_without_relayer() {
     assert_eq!(balance, 0);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_AMOUNT);
+    assert_eq!(balance, DEPOSITED_AMOUNT + transfer_amount);
 
     let balance = total_supply_near(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_AMOUNT - transfer_amount);
+    assert_eq!(balance, DEPOSITED_AMOUNT);
 
     let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, transfer_amount);
@@ -1042,13 +1042,13 @@ fn test_deposit_evm_with_zero_fee() {
     assert_eq!(balance, 0);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, deposited_amount);
+    assert_eq!(balance, deposited_amount * 2);
 
     let balance = total_supply_eth(&master_account, CONTRACT_ACC);
     assert_eq!(balance, deposited_amount);
 
     let balance = total_supply_near(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, 0);
+    assert_eq!(balance, deposited_amount);
 }
 
 #[test]
