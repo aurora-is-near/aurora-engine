@@ -545,6 +545,35 @@ mod contract {
         sdk::return_output(&data[..]);
     }
 
+    /// For tests only
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn read_storage() {
+        let key = sdk::read_input();
+        sdk::return_output(&sdk::read_storage(&key).unwrap_or_default())
+    }
+
+    /// For tests only
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn write_storage() {
+        use alloc::vec::Vec;
+        use bn::prelude::String;
+
+        let s = String::from_utf8(sdk::read_input()).unwrap();
+        let data: Vec<_> = s.split(':').collect();
+        assert_eq!(data.len(), 2);
+        sdk::write_storage(data[0].clone().as_bytes(), &data[1].clone().as_bytes());
+    }
+
+    /// For tests only
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn storage_has_key() {
+        let key = sdk::read_input();
+        sdk::return_output(&[sdk::storage_has_key(&key) as u8])
+    }
+
     ///
     /// Utility methods.
     ///

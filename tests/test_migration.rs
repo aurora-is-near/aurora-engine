@@ -97,6 +97,33 @@ fn test_migation_add() {
             }]
         }
     ]"#;
+
+    let (master_account, contract) = init();
+
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "migrate",
+        &json_data.as_bytes(),
+        DEFAULT_GAS,
+        0,
+    );
+    let res = res.promise_results();
+    let res = res[res.len() - 2].clone();
+    assert!(format!("{:?}", res.unwrap().status()).contains("done"));
+}
+
+#[test]
+fn test_migation_rename_key() {
+    let json_data = r#"[
+        {
+            "action": "RenameKey",
+            "data": [{
+                "old_field": "test1",
+                "new_field": "test2",
+                "prefix": "1"
+            }]
+        }
+    ]"#;
     let (master_account, _contract) = init();
     let res = master_account.call(
         CONTRACT_ACC.to_string(),
@@ -106,7 +133,7 @@ fn test_migation_add() {
         0,
     );
     let res = res.promise_results();
-    //println!("{:#?}", res);
+    println!("{:#?}", res);
     let res = res[res.len() - 2].clone();
     assert!(format!("{:?}", res.unwrap().status()).contains("done"));
 }

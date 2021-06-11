@@ -1,3 +1,32 @@
+//! # Migration storage
+//!
+//! ## Add
+//! Add new key with specific value
+//!
+//! Example:
+//! ```json
+//! [{
+//!     "action": "Add",
+//!     "data": [{
+//!          "new_field": "test1",
+//!          "prefix": "1",
+//!          "value": "val1"
+//!      }]
+//!  }]
+//! ```
+//!
+//! # RenameKey
+//! Rename existing key without changing value
+//! ```json
+//! [{
+//!     "action": "RenameKey",
+//!     "data": [{
+//!         "old_field": "test1",
+//!         "new_field": "test2",
+//!         "prefix": "1"
+//!     }]
+//! }]
+//! ```
 use crate::json;
 use crate::prelude::*;
 use crate::sdk;
@@ -85,7 +114,6 @@ impl From<json::JsonValue> for Migration {
     }
 }
 
-// TODO: will be changed
 impl From<json::JsonValue> for MigrationArgs {
     fn from(v: json::JsonValue) -> Self {
         let data: Vec<Migration> = v
@@ -117,11 +145,26 @@ pub fn migrate(args: MigrationArgs) {
                 sdk::write_storage(key.as_bytes(), &data.value.clone().unwrap())
             });
         }
-        MigrationAction::RenameKey => {}
+        MigrationAction::RenameKey => m.data.iter().for_each(|data| {
+            let prefix = data.prefix.clone();
+            let new_field = data.field.0.clone();
+            let old_field = data
+                .field
+                .1
+                .clone()
+                .expect_utf8(ERR_FAILED_PARSE.as_bytes());
+            let new_key = format!("{}{}", prefix, new_field);
+            let old_key = format!("{}{}", prefix, old_field);
+            if !sdk::storage_has_key(old_key.as_bytes()) {
+                sdk::panic_utf8("RenameKey: key doesn't exists".as_bytes());
+            }
+            let value =
+                sdk::read_storage(old_key.as_bytes()).expect_utf8(b"ERR_FAILED_READ_STORAGE");
+            sdk::write_storage(new_key.as_bytes(), &value)
+        }),
         MigrationAction::UpdateKeyValue => {}
         MigrationAction::UpdateValue => {}
         MigrationAction::Remove => {}
         MigrationAction::RemoveValue => {}
     });
-    let _ = sdk::storage_has_key("".as_bytes());
 }
