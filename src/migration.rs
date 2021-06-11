@@ -24,7 +24,7 @@ pub enum MigrationAction {
 /// Migration data/rules
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct MigrationData {
-    /// Field contains: 1. Current field (ot new field), 2. Old field
+    /// Field contains: 1. Current field (or new field), 2. Old field
     pub field: (String, Option<String>),
     /// Key prefix
     pub prefix: String,
@@ -45,6 +45,24 @@ pub struct Migration {
 /// Basic migdation data set
 pub struct MigrationArgs(Vec<Migration>);
 
+impl From<json::JsonValue> for MigrationData {
+    fn from(v: json::JsonValue) -> Self {
+        let new_field = v
+            .string("new_field")
+            .expect_utf8(&ERR_FAILED_PARSE.as_bytes());
+        let old_field = v.string("old_field").ok();
+        let prefix = v.string("prefix").expect_utf8(&ERR_FAILED_PARSE.as_bytes());
+        let value = v
+            .string("value")
+            .map_or(None, |v| Some(v.as_bytes().to_vec()));
+        Self {
+            field: (new_field, old_field),
+            prefix,
+            value,
+        }
+    }
+}
+
 impl From<String> for MigrationAction {
     fn from(v: String) -> Self {
         match v.as_str() {
@@ -63,10 +81,15 @@ impl From<json::JsonValue> for Migration {
     fn from(v: json::JsonValue) -> Self {
         Self {
             action: {
-                let s = v.string("action").expect_utf8(&ERR_FAILED_PARSE.as_bytes());
-                MigrationAction::from(s)
+                MigrationAction::from(v.string("action").expect_utf8(&ERR_FAILED_PARSE.as_bytes()))
             },
-            data: vec![],
+            data: {
+                v.array_objects()
+                    .expect_utf8(ERR_FAILED_PARSE.as_bytes())
+                    .iter()
+                    .map(|v| MigrationData::from(v.clone()))
+                    .collect()
+            },
         }
     }
 }
@@ -80,7 +103,7 @@ impl From<json::JsonValue> for MigrationArgs {
             .iter()
             .map(|val| Migration::from(val.clone()))
             .collect();
-        //sdk::log_utf8(format!("{:?}", x.len()).as_bytes());
+        sdk::log_utf8(format!("{:?}", data.len()).as_bytes());
         Self(data)
     }
 }

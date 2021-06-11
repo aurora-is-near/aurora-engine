@@ -1210,23 +1210,3 @@ fn assert_execution_status_failure(
         _ => panic!("{}", panic_msg),
     }
 }
-
-#[test]
-fn test_json_parse() {
-    let json_data = r#"[{"test":"test2"}, {"test3":"test4"}]"#;
-    /*let m1 = Migration {
-        action: MigrationAction::Add,
-        data: vec![],
-    };
-    MigrationArgs(vec![m1]);*/
-    //let _m = MigrationArgs::from(parse_json(&json_data.as_bytes()).unwrap());
-    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
-    let res = master_account.call(
-        CONTRACT_ACC.to_string(),
-        "migrate",
-        &json_data.as_bytes(),
-        DEFAULT_GAS,
-        0,
-    );
-    println!("{:#?}", res.promise_results());
-}
