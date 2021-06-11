@@ -371,12 +371,9 @@ mod tests {
     ];
 
     #[test]
-    fn test_byzantium_modexp() {
+    fn test_modexp() {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
-
-            let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
-            assert_eq!(gas, *test_gas, "{} gas", test.name);
 
             let res = ModExp::<Byzantium>::run(&input, *test_gas, &new_context()).unwrap().output;
             let expected = hex::decode(&test.expected).unwrap();
@@ -463,6 +460,16 @@ mod tests {
         //     .output;
         // let res = U256::from_big_endian(&modexp_res);
         // assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn test_byzantium_modexp_gas() {
+        for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
+            let input = hex::decode(&test.input).unwrap();
+
+            let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+            assert_eq!(gas, *test_gas, "{} gas", test.name);
+        }
     }
 
     #[test]
