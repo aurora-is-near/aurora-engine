@@ -16,7 +16,7 @@ const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
-    /// Total ETH supply of ETH on Near (nETH as NEP-141 token)
+    /// Total supply of ETH on Near (nETH as NEP-141 token)
     pub total_eth_supply_on_near: Balance,
 
     /// Total ETH supply on Aurora (native ETH in Aurora EVM)
