@@ -118,7 +118,7 @@ impl Precompile for ModExp<Byzantium> {
 
         let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len))?;
         let iter_count = Self::calc_iter_count(exp_len, base_len, &input) - 1;
-        let (mut gas, overflow) =  mul.overflowing_mul(core::cmp::max(iter_count, 1));
+        let (mut gas, overflow) = mul.overflowing_mul(core::cmp::max(iter_count, 1));
 
         if overflow {
             Err(ExitError::OutOfGas)
@@ -145,7 +145,6 @@ impl ModExp<Berlin> {
     fn mul_complexity(base_len: u64, mod_len: u64) -> u64 {
         let max_len = core::cmp::max(mod_len, base_len);
         let words = max_len.div_ceil(&8);
-        println!("words: {}", words);
         words.pow(2)
     }
 }
@@ -176,6 +175,9 @@ impl Precompile for ModExp<Berlin> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Byzantium tests: https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp.json
+    // Berlin tests:https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp_eip2565.json
 
     fn new_context() -> Context {
         Context {
@@ -327,43 +329,13 @@ mod tests {
     ];
 
     const BYZANTIUM_GAS: [u64; 17] = [
-        13_056,
-        13_056,
-        204,
-        204,
-        3_276,
-        665,
-        665,
-        10_649,
-        1_894,
-        1_894,
-        30_310,
-        5_580,
-        5_580,
-        89_292,
-        17_868,
-        17_868,
-        285_900,
+        13_056, 13_056, 204, 204, 3_276, 665, 665, 10_649, 1_894, 1_894, 30_310, 5_580, 5_580,
+        89_292, 17_868, 17_868, 285_900,
     ];
 
     const BERLIN_GAS: [u64; 17] = [
-        1_360,
-        1_360,
-        200,
-        200,
-        341,
-        200,
-        200,
-        1_365,
-        341,
-        341,
-        5_461,
-        1_365,
-        1_365,
-        21_845,
-        5_461,
-        5_461,
-        87_381,
+        1_360, 1_360, 200, 200, 341, 200, 200, 1_365, 341, 341, 5_461, 1_365, 1_365, 21_845, 5_461,
+        5_461, 87_381,
     ];
 
     #[test]
@@ -371,7 +343,9 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
-            let res = ModExp::<Byzantium>::run(&input, *test_gas, &new_context()).unwrap().output;
+            let res = ModExp::<Byzantium>::run(&input, *test_gas, &new_context())
+                .unwrap()
+                .output;
             let expected = hex::decode(&test.expected).unwrap();
             assert_eq!(res, expected, "{}", test.name);
         }
