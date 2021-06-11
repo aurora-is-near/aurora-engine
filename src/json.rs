@@ -4,6 +4,7 @@ use alloc::collections::BTreeMap;
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
 
+#[derive(Clone)]
 pub enum JsonValue {
     Null,
     Number(f64),
@@ -106,6 +107,14 @@ impl AsRef<[u8]> for JsonError {
             Self::InvalidBool => b"ERR_FAILED_PARSE_BOOL",
             Self::InvalidString => b"ERR_FAILED_PARSE_STRING",
             Self::InvalidArray => b"ERR_FAILED_PARSE_ARRAY",
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn array_objects(&self) -> Result<Vec<JsonValue>, ()> {
+        match self {
+            JsonValue::Array(arr) => Ok(arr.to_vec()),
+            _ => Err(()),
         }
     }
 }
