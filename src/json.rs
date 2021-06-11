@@ -53,9 +53,11 @@ impl JsonValue {
     #[allow(dead_code)]
     pub fn u128(&self, key: &str) -> Result<u128, JsonError> {
         match self {
-            JsonValue::Object(o) => match o.get(key).ok_or(())? {
-                JsonValue::String(n) => Ok(n.parse::<u128>().expect_utf8(b"ERR_FAILED_PARSE_U128")),
-                _ => Err(()),
+            JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
+                JsonValue::String(n) => {
+                    Ok(n.parse::<u128>().map_err(|_| JsonError::InvalidU128)?)
+                }
+                _ => Err(JsonError::InvalidU128),
             },
             _ => Err(JsonError::NotJsonType),
         }
