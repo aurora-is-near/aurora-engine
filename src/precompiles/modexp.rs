@@ -9,7 +9,7 @@ pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
 
 pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
-impl ModExp<Byzantium> {
+impl<HF: HardFork> ModExp<HF> {
     fn adj_exp_len(exp_len: U256, base_len: U256, bytes: &[u8]) -> U256 {
         let mut exp32_bytes = Vec::with_capacity(32);
         for i in 0..32 {
@@ -52,33 +52,8 @@ impl ModExp<Byzantium> {
             }
         }
     }
-}
 
-impl Precompile for ModExp<Byzantium> {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
-        let base_len = U256::from(&input[0..32]);
-        let exp_len = U256::from(&input[32..64]);
-        let mod_len = U256::from(&input[64..96]);
-
-        let mul = Self::mult_complexity(core::cmp::max(mod_len, base_len))?;
-        let adj = core::cmp::max(Self::adj_exp_len(exp_len, base_len, &input), U256::from(1))
-            / U256::from(20);
-        let (gas_val, overflow) = mul.overflowing_mul(adj);
-        if overflow {
-            Err(ExitError::OutOfGas)
-        } else {
-            Ok(gas_val.as_u64())
-        }
-    }
-
-    /// See: https://eips.ethereum.org/EIPS/eip-198
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
-        let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            return Err(ExitError::OutOfGas);
-        }
-
+    fn run_inner(input: &[u8], _context: &Context) -> Result<Vec<u8>, ExitError> {
         let base_len = U256::from(&input[0..32]);
         let exp_len = U256::from(&input[32..64]);
         let mod_len = U256::from(&input[64..96]);
@@ -132,13 +107,43 @@ impl Precompile for ModExp<Byzantium> {
             }
         };
 
-        Ok(PrecompileOutput::without_logs(cost, output))
+        Ok(output)
+    }
+}
+
+impl Precompile for ModExp<Byzantium> {
+    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+        let base_len = U256::from(&input[0..32]);
+        let exp_len = U256::from(&input[32..64]);
+        let mod_len = U256::from(&input[64..96]);
+
+        let mul = Self::mult_complexity(core::cmp::max(mod_len, base_len))?;
+        let adj = core::cmp::max(Self::adj_exp_len(exp_len, base_len, &input), U256::from(1))
+            / U256::from(20);
+        let (gas_val, overflow) = mul.overflowing_mul(adj);
+        if overflow {
+            Err(ExitError::OutOfGas)
+        } else {
+            Ok(gas_val.as_u64())
+        }
+    }
+
+    /// See: https://eips.ethereum.org/EIPS/eip-198
+    /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
+    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+        let cost = Self::required_gas(input)?;
+        if cost > target_gas {
+            Err(ExitError::OutOfGas)
+        } else {
+            let output = Self::run_inner(inpuit, context)?;
+            Ok(PrecompileOutput::without_logs(cost, output))
+        }
     }
 }
 
 impl Precompile for ModExp<Berlin> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
-        todo!()
+
     }
 
     fn run(_input: &[u8], _target_gas: u64, _context: &Context) -> PrecompileResult {
