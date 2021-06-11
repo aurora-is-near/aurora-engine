@@ -73,13 +73,13 @@ impl JsonValue {
     }
 
     #[allow(dead_code)]
-    pub fn array<T, F>(&self, key: &str, call: F) -> Result<Vec<T>, ()>
+    pub fn array<T, F>(&self, key: &str, mut call: F) -> Result<Vec<T>, ()>
     where
-        F: FnMut(&JsonValue) -> T,
+        F: FnMut(JsonValue) -> T,
     {
         match self {
             JsonValue::Object(o) => match o.get(key).ok_or(())? {
-                JsonValue::Array(arr) => Ok(arr.iter().map(call).collect()),
+                JsonValue::Array(arr) => Ok(arr.iter().map(|v| call(v.clone())).collect()),
                 _ => Err(()),
             },
             _ => Err(()),

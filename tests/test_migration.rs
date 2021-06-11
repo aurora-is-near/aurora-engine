@@ -64,7 +64,12 @@ fn test_json_parse() {
     let json_data = r#"[
         {
             "action": "Add",
-            "data": []
+            "data": [{
+                "new_field": "test1",
+                "old_field": "test2",
+                "prefix": "1",
+                "value": "val1"
+            }]
         }
     ]"#;
     let (master_account, _contract) = init();

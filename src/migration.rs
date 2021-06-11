@@ -2,10 +2,9 @@ use crate::json;
 use crate::prelude::*;
 use crate::sdk;
 use crate::types::{ExpectUtf8, ERR_FAILED_PARSE};
-use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Basic actions for Migration
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug)]
 pub enum MigrationAction {
     /// Add field with Value
     Add,
@@ -22,7 +21,7 @@ pub enum MigrationAction {
 }
 
 /// Migration data/rules
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug)]
 pub struct MigrationData {
     /// Field contains: 1. Current field (or new field), 2. Old field
     pub field: (String, Option<String>),
@@ -33,8 +32,7 @@ pub struct MigrationData {
 }
 
 /// Migration data and/or fields
-// TODO: will be changed
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug)]
 pub struct Migration {
     /// Migration action
     pub action: MigrationAction,
@@ -43,6 +41,7 @@ pub struct Migration {
 }
 
 /// Basic migdation data set
+#[derive(Debug)]
 pub struct MigrationArgs(Vec<Migration>);
 
 impl From<json::JsonValue> for MigrationData {
@@ -80,16 +79,12 @@ impl From<String> for MigrationAction {
 impl From<json::JsonValue> for Migration {
     fn from(v: json::JsonValue) -> Self {
         Self {
-            action: {
-                MigrationAction::from(v.string("action").expect_utf8(&ERR_FAILED_PARSE.as_bytes()))
-            },
-            data: {
-                v.array_objects()
-                    .expect_utf8(ERR_FAILED_PARSE.as_bytes())
-                    .iter()
-                    .map(|v| MigrationData::from(v.clone()))
-                    .collect()
-            },
+            action: MigrationAction::from(
+                v.string("action").expect_utf8(&ERR_FAILED_PARSE.as_bytes()),
+            ),
+            data: v
+                .array("data", MigrationData::from)
+                .expect_utf8(&ERR_FAILED_PARSE.as_bytes()),
         }
     }
 }
