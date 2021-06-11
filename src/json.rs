@@ -6,6 +6,7 @@ use alloc::collections::BTreeMap;
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
 
+#[derive(Clone)]
 pub enum JsonValue {
     Null,
     Number(f64),
@@ -81,6 +82,14 @@ impl JsonValue {
                 JsonValue::Array(arr) => Ok(arr.iter().map(call).collect()),
                 _ => Err(()),
             },
+            _ => Err(()),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn array_objects(&self) -> Result<Vec<JsonValue>, ()> {
+        match self {
+            JsonValue::Array(arr) => Ok(arr.to_vec()),
             _ => Err(()),
         }
     }
