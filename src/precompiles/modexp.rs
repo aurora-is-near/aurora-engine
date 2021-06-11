@@ -11,39 +11,38 @@ pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
     fn adj_exp_len(exp_len: U256, base_len: U256, bytes: &[u8]) -> U256 {
-        let mut exp32_bytes = Vec::with_capacity(32);
-        for i in 0..32 {
+        let mut exp_bytes = Vec::with_capacity(32);
+        for i in 0..exp_len.as_usize() {
             if U256::from(96) + base_len + U256::from(1) >= U256::from(bytes.len()) {
-                exp32_bytes.push(0u8);
+                exp_bytes.push(0u8);
             } else {
-                let base_len_i = base_len.as_usize();
-                let bytes_i = 96 + base_len_i + i;
+                let bytes_i = 96 + base_len.as_usize() + i;
                 if let Some(byte) = bytes.get(bytes_i) {
-                    exp32_bytes.push(*byte);
+                    exp_bytes.push(*byte);
                 } else {
                     // Pad out the data if the byte is empty.
-                    exp32_bytes.push(0u8);
+                    exp_bytes.push(0u8);
                 }
             }
         }
-        let exp32 = U256::from(exp32_bytes.as_slice());
 
-        if exp_len <= U256::from(32) && exp32 == U256::zero() {
+        let exp = U256::from(exp_bytes.as_slice());
+
+        if exp_len <= U256::from(32) && exp == U256::zero() {
             U256::zero()
         } else if exp_len <= U256::from(32) {
-            U256::from(exp32.bits())
+            U256::from(exp.bits())
         } else {
             // else > 32
-            U256::from(8) * (exp_len - U256::from(32)) + U256::from(exp32.bits())
+            U256::from(8) * (exp_len - U256::from(32)) + U256::from(exp.bits())
         }
     }
 
     fn run_inner(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        let base_len = U256::from(&input[0..32]);
-        let exp_len = U256::from(&input[32..64]);
-        let mod_len = U256::from(&input[64..96]);
+        let base_len = U256::from(&input[0..32]).as_usize();
+        let exp_len = U256::from(&input[32..64]).as_usize();
+        let mod_len = U256::from(&input[64..96]).as_usize();
 
-        let base_len = base_len.as_usize();
         let mut base_bytes = Vec::with_capacity(32);
         for i in 0..base_len {
             if 96 + i >= input.len() {
@@ -53,7 +52,6 @@ impl<HF: HardFork> ModExp<HF> {
             }
         }
 
-        let exp_len = exp_len.as_usize();
         let mut exp_bytes = Vec::with_capacity(32);
         for i in 0..exp_len {
             if 96 + base_len + i >= input.len() {
@@ -63,7 +61,6 @@ impl<HF: HardFork> ModExp<HF> {
             }
         }
 
-        let mod_len = mod_len.as_usize();
         let mut mod_bytes = Vec::with_capacity(32);
         for i in 0..mod_len {
             if 96 + base_len + exp_len + i >= input.len() {
@@ -120,14 +117,23 @@ impl Precompile for ModExp<Byzantium> {
         let mod_len = U256::from(&input[64..96]);
 
         let mul = Self::mult_complexity(core::cmp::max(mod_len, base_len))?;
-        let adj = core::cmp::max(Self::adj_exp_len(exp_len, base_len, &input), U256::from(1))
-            / U256::from(20);
-        let (gas_val, overflow) = mul.overflowing_mul(adj);
+        let adj = Self::adj_exp_len(exp_len, base_len, &input) - U256::from(1);
+        let (mut gas, overflow) =  mul.overflowing_mul(core::cmp::max(adj, U256::from(1)));
         if overflow {
             Err(ExitError::OutOfGas)
         } else {
-            Ok(gas_val.as_u64())
+            gas /= U256::from(20);
+            Ok(gas.as_u64())
         }
+
+        // let mul = Self::mult_complexity(core::cmp::max(mod_len, base_len))?;
+        // let adj = core::cmp::max(Self::adj_exp_len(exp_len, base_len, &input));
+        // let (gas_val, overflow) = mul.overflowing_mul(adj);
+        // if overflow {
+        //     Err(ExitError::OutOfGas)
+        // } else {
+        //     Ok(gas_val.as_u64())
+        // }
     }
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
@@ -157,8 +163,7 @@ impl Precompile for ModExp<Berlin> {
         let exp_len = U256::from(&input[32..64]);
         let mod_len = U256::from(&input[64..96]);
 
-        let adj = core::cmp::max(Self::adj_exp_len(exp_len, base_len, &input), U256::from(1))
-            / U256::from(20);
+        let adj = Self::adj_exp_len(exp_len, base_len, &input);
 
         // Three changes in EIP-2565
         //
@@ -207,12 +212,12 @@ mod tests {
 
     struct Test {
         input: &'static str,
-        expected: U256,
+        expected: &'static str,
         name: &'static str,
         gas: u64,
     }
 
-    const BYZANTIUM_TESTS: [Test; 1] = [
+    const BYZANTIUM_TESTS: [Test; 3] = [
         Test {
             input: "\
             0000000000000000000000000000000000000000000000000000000000000001\
@@ -221,27 +226,49 @@ mod tests {
             03\
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e\
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
-            expected: U256([1, 0, 0, 0]),
+            expected: "0000000000000000000000000000000000000000000000000000000000000001",
             name: "eip198_example_1",
             gas: 13_056,
         },
+        Test {
+            input: "\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000020\
+            0000000000000000000000000000000000000000000000000000000000000020\
+            fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e\
+            fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+            expected: "0000000000000000000000000000000000000000000000000000000000000000",
+            name: "eip198_example_2",
+            gas: 13_056,
+        },
+        Test {
+            input: "\
+            0000000000000000000000000000000000000000000000000000000000000040\
+            0000000000000000000000000000000000000000000000000000000000000001\
+            0000000000000000000000000000000000000000000000000000000000000040\
+            e09ad9675465c53a109fac66a445c91b292d2bb2c5268addb30cd82f80fcb003\
+            3ff97c80a5fc6f39193ae969c6ede6710a6b7ac27078a06d90ef1c72e5c85fb5\
+            02fc9e1f6beb81516545975218075ec2af118cd8798df6e08a147c60fd6095ac\
+            2bb02c2908cf4dd7c81f11c289e4bce98f3553768f392a80ce22bf5c4f4a248c\
+            6b",
+            expected: "60008f1614cc01dcfb6bfb09c625cf90b47d4468db81b5f8b7a39d42f332eab9b2da8f2d95311648a8f243f4bb13cfb3d8f7f2a3c014122ebb3ed41b02783adc",
+            name: "nagydani_1_square",
+            gas: 204,
+        }
     ];
 
     #[test]
     fn test_byzantium_modexp() {
         for test in BYZANTIUM_TESTS.iter() {
             let input = hex::decode(&test.input).unwrap();
-            let modexp_res = ModExp::<Byzantium>::run(&input, test.gas, &new_context()).unwrap().output;
-            let res = U256::from_big_endian(&modexp_res);
 
             let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
-            println!("{}", gas);
+            assert_eq!(gas, test.gas, "{} gas", test.name);
 
-            assert_eq!(res, test.expected, "{}", test.name);
+            let res = ModExp::<Byzantium>::run(&input, test.gas, &new_context()).unwrap().output;
+            let expected = hex::decode(&test.expected).unwrap();
+            assert_eq!(res, expected, "{}", test.name);
         }
-
-        // let u = U256::from(1);
-        // println!("{:x?}", u.0);
 
         // let test_input1 = hex::decode(
         //     "\
