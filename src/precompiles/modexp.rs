@@ -3,14 +3,14 @@ use crate::precompiles::{
 };
 use crate::prelude::{PhantomData, Vec, U256};
 use evm::{Context, ExitError};
-use num::BigUint;
+use num::{BigUint, Integer};
 
 pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
 
 pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
-    fn adj_exp_len(exp_len: u64, base_len: u64, bytes: &[u8]) -> u64 {
+    fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> u64 {
         let mut exp_bytes = Vec::with_capacity(32);
         for i in 0..exp_len {
             if U256::from(96) + base_len + U256::from(1) >= U256::from(bytes.len()) {
@@ -94,7 +94,7 @@ impl<HF: HardFork> ModExp<HF> {
 }
 
 impl ModExp<Byzantium> {
-    fn mult_complexity(x: u64) -> Result<u64, ExitError> {
+    fn mul_complexity(x: u64) -> Result<u64, ExitError> {
         if x <= 64 {
             Ok(x * x)
         } else if x <= 1_024 {
@@ -116,9 +116,10 @@ impl Precompile for ModExp<Byzantium> {
         let exp_len = U256::from(&input[32..64]).as_u64();
         let mod_len = U256::from(&input[64..96]).as_u64();
 
-        let mul = Self::mult_complexity(core::cmp::max(mod_len, base_len))?;
-        let adj = Self::adj_exp_len(exp_len, base_len, &input) - 1;
-        let (mut gas, overflow) =  mul.overflowing_mul(core::cmp::max(adj, 1));
+        let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len))?;
+        let iter_count = Self::calc_iter_count(exp_len, base_len, &input) - 1;
+        let (mut gas, overflow) =  mul.overflowing_mul(core::cmp::max(iter_count, 1));
+
         if overflow {
             Err(ExitError::OutOfGas)
         } else {
@@ -141,10 +142,11 @@ impl Precompile for ModExp<Byzantium> {
 }
 
 impl ModExp<Berlin> {
-    fn mult_complexity(x: u64) -> u64 {
-        let mut x = (x + 7) / 8;
-        x *= x;
-        x
+    fn mul_complexity(base_len: u64, mod_len: u64) -> u64 {
+        let max_len = core::cmp::max(mod_len, base_len);
+        let words = max_len.div_ceil(&8);
+        println!("words: {}", words);
+        words.pow(2)
     }
 }
 
@@ -154,38 +156,20 @@ impl Precompile for ModExp<Berlin> {
         let exp_len = U256::from(&input[32..64]).as_u64();
         let mod_len = U256::from(&input[64..96]).as_u64();
 
-        let adj = Self::adj_exp_len(exp_len, base_len, &input);
+        let mul = Self::mul_complexity(base_len, mod_len);
+        let iter_count = Self::calc_iter_count(exp_len, base_len, &input) - 1;
 
-        // Three changes in EIP-2565
-        //
-        // 1. Different mult complexity in EIP-2565
-        // (https://eips.ethereum.org/EIPS/eip-2565).
-        //
-        // def mult_complexity(x):
-        //    ceiling(x/8)^2
-        //
-        // where x is max(length_of_MODULUS, length_of_BASE)
-        let mut gas = core::cmp::max(mod_len, base_len);
-        Self::mult_complexity(gas);
-
-        gas *= core::cmp::max(adj, 1);
-
-        // 2. Different divisor (`GQUADDIVISOR`) (3)
-        gas /= 3;
-        if U256::from(gas).bits() > 64 {
-            return Ok(u64::MAX);
-        }
-
-        // 3. Minimum price of 200 gas
-        if gas < 200 {
-            return Ok(200u64);
-        }
-
-        Ok(gas)
+        Ok(core::cmp::max(200, mul * iter_count / 3))
     }
 
-    fn run(_input: &[u8], _target_gas: u64, _context: &Context) -> PrecompileResult {
-        todo!()
+    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+        let cost = Self::required_gas(input)?;
+        if cost > target_gas {
+            Err(ExitError::OutOfGas)
+        } else {
+            let output = Self::run_inner(input)?;
+            Ok(PrecompileOutput::without_logs(cost, output))
+        }
     }
 }
 
@@ -362,12 +346,24 @@ mod tests {
         285_900,
     ];
 
-    const BERLIN_GAS: [u64; 5] = [
+    const BERLIN_GAS: [u64; 17] = [
         1_360,
         1_360,
         200,
         200,
         341,
+        200,
+        200,
+        1_365,
+        341,
+        341,
+        5_461,
+        1_365,
+        1_365,
+        21_845,
+        5_461,
+        5_461,
+        87_381,
     ];
 
     #[test]
@@ -379,87 +375,6 @@ mod tests {
             let expected = hex::decode(&test.expected).unwrap();
             assert_eq!(res, expected, "{}", test.name);
         }
-
-        // let test_input1 = hex::decode(
-        //     "\
-        //     0000000000000000000000000000000000000000000000000000000000000001\
-        //     0000000000000000000000000000000000000000000000000000000000000020\
-        //     0000000000000000000000000000000000000000000000000000000000000020\
-        //     03\
-        //     fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e\
-        //     fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
-        // )
-        // .unwrap();
-        // let modexp_res = ModExp::<Byzantium>::run(&test_input1, 12_288, &new_context())
-        //     .unwrap()
-        //     .output;
-        // let res = U256::from_big_endian(&modexp_res);
-        //
-        // assert_eq!(res, U256::from(1));
-        //
-        // let test_input2 = hex::decode(
-        //     "0000000000000000000000000000000000000000000000000000000000000000\
-        //     0000000000000000000000000000000000000000000000000000000000000020\
-        //     0000000000000000000000000000000000000000000000000000000000000020\
-        //     fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e\
-        //     fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
-        // )
-        // .unwrap();
-        // let modexp_res = ModExp::<Byzantium>::run(&test_input2, 12_288, &new_context())
-        //     .unwrap()
-        //     .output;
-        // let res = U256::from_big_endian(&modexp_res);
-        //
-        // assert_eq!(res, U256::from(0));
-        //
-        // let test_input3 = hex::decode(
-        //     "0000000000000000000000000000000000000000000000000000000000000000\
-        //     0000000000000000000000000000000000000000000000000000000000000020\
-        //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
-        //     fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe\
-        //     fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd",
-        // )
-        // .unwrap();
-        // assert!(ModExp::<Byzantium>::run(&test_input3, 0, &new_context()).is_err());
-        //
-        // let test_input4 = hex::decode(
-        //     "0000000000000000000000000000000000000000000000000000000000000001\
-        //     0000000000000000000000000000000000000000000000000000000000000002\
-        //     0000000000000000000000000000000000000000000000000000000000000020\
-        //     03\
-        //     ffff\
-        //     8000000000000000000000000000000000000000000000000000000000000000\
-        //     07",
-        // )
-        // .unwrap();
-        // let expected = U256::from_big_endian(
-        //     &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
-        //         .unwrap(),
-        // );
-        // let modexp_res = ModExp::<Byzantium>::run(&test_input4, 12_288, &new_context())
-        //     .unwrap()
-        //     .output;
-        // let res = U256::from_big_endian(&modexp_res);
-        // assert_eq!(res, expected);
-        //
-        // let test_input5 = hex::decode(
-        //     "0000000000000000000000000000000000000000000000000000000000000001\
-        //     0000000000000000000000000000000000000000000000000000000000000002\
-        //     0000000000000000000000000000000000000000000000000000000000000020\
-        //     03\
-        //     ffff\
-        //     80",
-        // )
-        // .unwrap();
-        // let expected = U256::from_big_endian(
-        //     &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
-        //         .unwrap(),
-        // );
-        // let modexp_res = ModExp::<Byzantium>::run(&test_input5, 12_288, &new_context())
-        //     .unwrap()
-        //     .output;
-        // let res = U256::from_big_endian(&modexp_res);
-        // assert_eq!(res, expected);
     }
 
     #[test]
@@ -473,16 +388,12 @@ mod tests {
     }
 
     #[test]
-    fn test_berlin_modexp() {
+    fn test_berlin_modexp_gas() {
         for (test, test_gas) in TESTS.iter().zip(BERLIN_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
-            let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+            let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);
-
-            let res = ModExp::<Byzantium>::run(&input, *test_gas, &new_context()).unwrap().output;
-            let expected = hex::decode(&test.expected).unwrap();
-            assert_eq!(res, expected, "{}", test.name);
         }
     }
 }
