@@ -1,3 +1,4 @@
+#![feature(array_methods)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
@@ -86,16 +87,20 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
+        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
+        NewCallArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs,
+        ViewCallArgs,
     };
     use crate::prelude::{Address, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
-    use crate::types::{near_account_to_evm_address, u256_to_arr, ERR_FAILED_PARSE};
+    use crate::types::{
+        near_account_to_evm_address, u256_to_arr, SdkExpect, SdkUnwrap, ERR_FAILED_PARSE,
+    };
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
+    const GAS_OVERFLOW: &str = "ERR_GAS_OVERFLOW";
 
     ///
     /// ADMINISTRATIVE METHODS
@@ -146,9 +151,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let state = Engine::get_state().sdk_unwrap();
-        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
-            .sdk_expect("ERR_NO_UPGRADE")
-            .sdk_unwrap();
+        let index = internal_get_upgrade_index();
         sdk::return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
 
@@ -168,9 +171,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
         let state = Engine::get_state().sdk_unwrap();
-        let index = sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY))
-            .sdk_expect("ERR_NO_UPGRADE")
-            .sdk_unwrap();
+        let index = internal_get_upgrade_index();
         if sdk::block_index() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }
@@ -239,16 +240,33 @@ mod contract {
 
         Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
 
+        // Check intrinsic gas is covered by transaction gas limit
+        match signed_transaction
+            .transaction
+            .intrinsic_gas(crate::engine::CONFIG)
+        {
+            None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
+            Some(intrinsic_gas) => {
+                if signed_transaction.transaction.gas < intrinsic_gas.into() {
+                    sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
+                }
+            }
+        }
+
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let value = signed_transaction.transaction.value;
+        let gas_limit = signed_transaction
+            .transaction
+            .get_gas_limit()
+            .sdk_expect(GAS_OVERFLOW);
         let data = signed_transaction.transaction.data;
         let result = if let Some(receiver) = signed_transaction.transaction.to {
-            Engine::call(&mut engine, sender, receiver, value, data)
+            Engine::call(&mut engine, sender, receiver, value, data, gas_limit)
             // TODO: charge for storage
         } else {
             // Execute a contract deployment:
-            Engine::deploy_code(&mut engine, sender, value, data)
+            Engine::deploy_code(&mut engine, sender, value, data, gas_limit)
             // TODO: charge for storage
         };
         result
@@ -276,6 +294,7 @@ mod contract {
             meta_call_args.contract_address,
             meta_call_args.value,
             meta_call_args.input,
+            u64::MAX, // TODO: is there a gas limit with meta calls?
         );
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
@@ -329,7 +348,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
         let args: GetStorageAtArgs = sdk::read_input_borsh().sdk_unwrap();
-        let value = Engine::get_storage(&Address(args.address), &H256(args.key));
+        let address = Address(args.address);
+        let generation = Engine::get_generation(&address);
+        let value = Engine::get_storage(&Address(args.address), &H256(args.key), generation);
         sdk::return_output(&value.0)
     }
 
@@ -353,7 +374,7 @@ mod contract {
             )
         }
         // return new chain ID
-        sdk::return_output(&Engine::get_state().chain_id)
+        sdk::return_output(&Engine::get_state().sdk_unwrap().chain_id)
     }
 
     #[cfg(feature = "evm_bully")]
@@ -399,6 +420,15 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn finish_deposit_near() {
         EthConnectorContract::get_instance().finish_deposit_near();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn is_used_proof() {
+        let args = IsUsedProofCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+
+        let is_used_proof = EthConnectorContract::get_instance().is_used_proof(args.proof);
+        let res = is_used_proof.try_to_vec().unwrap();
+        sdk::return_output(&res[..]);
     }
 
     #[no_mangle]
@@ -504,6 +534,14 @@ mod contract {
     /// Utility methods.
     ///
 
+    fn internal_get_upgrade_index() -> u64 {
+        match sdk::read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)) {
+            Ok(index) => index,
+            Err(sdk::ReadU64Error::InvalidU64) => sdk::panic_utf8(b"ERR_INVALID_UPGRADE"),
+            Err(sdk::ReadU64Error::MissingValue) => sdk::panic_utf8(b"ERR_NO_UPGRADE"),
+        }
+    }
+
     fn require_owner_only(state: &EngineState) {
         if state.owner_id.as_bytes() != sdk::predecessor_account_id() {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED");
@@ -512,50 +550,6 @@ mod contract {
 
     fn predecessor_address() -> Address {
         near_account_to_evm_address(&sdk::predecessor_account_id())
-    }
-
-    trait SdkExpect<T> {
-        fn sdk_expect(self, msg: &str) -> T;
-    }
-
-    impl<T> SdkExpect<T> for Option<T> {
-        fn sdk_expect(self, msg: &str) -> T {
-            match self {
-                Some(t) => t,
-                None => sdk::panic_utf8(msg.as_ref()),
-            }
-        }
-    }
-
-    impl<T, E> SdkExpect<T> for Result<T, E> {
-        fn sdk_expect(self, msg: &str) -> T {
-            match self {
-                Ok(t) => t,
-                Err(_) => sdk::panic_utf8(msg.as_ref()),
-            }
-        }
-    }
-
-    trait SdkUnwrap<T> {
-        fn sdk_unwrap(self) -> T;
-    }
-
-    impl<T> SdkUnwrap<T> for Option<T> {
-        fn sdk_unwrap(self) -> T {
-            match self {
-                Some(t) => t,
-                None => sdk::panic_utf8("ERR_UNWRAP".as_bytes()),
-            }
-        }
-    }
-
-    impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for Result<T, E> {
-        fn sdk_unwrap(self) -> T {
-            match self {
-                Ok(t) => t,
-                Err(e) => sdk::panic_utf8(e.as_ref()),
-            }
-        }
     }
 
     trait SdkProcess<T> {

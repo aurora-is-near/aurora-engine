@@ -27,8 +27,35 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
 pub(crate) const SUBMIT: &str = "submit";
 
 pub(crate) mod erc20;
+pub(crate) mod self_destruct;
 pub(crate) mod solidity;
 pub(crate) mod standard_precompiles;
+
+pub(crate) struct Signer {
+    pub nonce: u64,
+    pub secret_key: SecretKey,
+}
+
+impl Signer {
+    pub fn new(secret_key: SecretKey) -> Self {
+        Self {
+            nonce: 0,
+            secret_key,
+        }
+    }
+
+    pub fn random() -> Self {
+        let mut rng = rand::thread_rng();
+        let sk = SecretKey::random(&mut rng);
+        Self::new(sk)
+    }
+
+    pub fn use_nonce(&mut self) -> u64 {
+        let nonce = self.nonce;
+        self.nonce += 1;
+        nonce
+    }
+}
 
 pub(crate) struct AuroraRunner {
     pub aurora_account_id: String,
@@ -101,7 +128,7 @@ impl AuroraRunner {
     ) -> (Option<VMOutcome>, Option<VMError>) {
         Self::update_context(&mut self.context, caller_account_id, input);
 
-        near_vm_runner::run(
+        let (maybe_outcome, maybe_error) = near_vm_runner::run(
             &self.code,
             method_name,
             &mut self.ext,
@@ -112,7 +139,12 @@ impl AuroraRunner {
             self.current_protocol_version,
             Some(&self.cache),
             &self.profile,
-        )
+        );
+
+        if let Some(outcome) = &maybe_outcome {
+            self.context.storage_usage = outcome.storage_usage;
+        }
+        (maybe_outcome, maybe_error)
     }
 
     pub fn create_address(&mut self, address: Address, init_balance: types::Wei, init_nonce: U256) {
@@ -299,7 +331,7 @@ pub(crate) fn create_eth_transaction(
     let tx = EthTransaction {
         nonce: Default::default(),
         gas_price: Default::default(),
-        gas: Default::default(),
+        gas: u64::MAX.into(),
         to,
         value,
         data,

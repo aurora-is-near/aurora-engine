@@ -14,3 +14,7 @@
 /*.wasm
 /target/
 etc/state-migration-test/target/
+
+node_modules/
+artifacts/
+cache

@@ -1,8 +1,5 @@
 use super::prelude::*;
-use crate::sdk;
 
-use crate::parameters::ExpectUtf8;
-use crate::types::ERR_FAILED_PARSE;
 use alloc::collections::BTreeMap;
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
@@ -16,73 +13,99 @@ pub enum JsonValue {
     Object(BTreeMap<String, JsonValue>),
 }
 
+pub enum JsonError {
+    NotJsonType,
+    MissingValue,
+    InvalidU8,
+    InvalidU64,
+    InvalidU128,
+    InvalidBool,
+    InvalidString,
+    InvalidArray,
+}
+
 pub struct JsonArray(Vec<JsonValue>);
 pub struct JsonObject(BTreeMap<String, JsonValue>);
 
 impl JsonValue {
     #[allow(dead_code)]
-    pub fn string(&self, key: &str) -> Result<String, ()> {
+    pub fn string(&self, key: &str) -> Result<String, JsonError> {
         match self {
-            JsonValue::Object(o) => match o.get(key).ok_or(())? {
+            JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
                 JsonValue::String(s) => Ok(s.into()),
-                _ => Err(()),
+                _ => Err(JsonError::InvalidString),
             },
-            _ => Err(()),
+            _ => Err(JsonError::NotJsonType),
         }
     }
 
     #[allow(dead_code)]
-    pub fn u64(&self, key: &str) -> Result<u64, ()> {
+    pub fn u64(&self, key: &str) -> Result<u64, JsonError> {
         match self {
-            JsonValue::Object(o) => match o.get(key).ok_or(())? {
+            JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
                 JsonValue::Number(n) => Ok(*n as u64),
-                _ => Err(()),
+                _ => Err(JsonError::InvalidU64),
             },
-            _ => Err(()),
+            _ => Err(JsonError::NotJsonType),
         }
     }
 
     #[allow(dead_code)]
-    pub fn u128(&self, key: &str) -> Result<u128, ()> {
+    pub fn u128(&self, key: &str) -> Result<u128, JsonError> {
         match self {
             JsonValue::Object(o) => match o.get(key).ok_or(())? {
                 JsonValue::String(n) => Ok(n.parse::<u128>().expect_utf8(b"ERR_FAILED_PARSE_U128")),
                 _ => Err(()),
             },
-            _ => Err(()),
+            _ => Err(JsonError::NotJsonType),
         }
     }
 
     #[allow(dead_code)]
-    pub fn bool(&self, key: &str) -> Result<bool, ()> {
+    pub fn bool(&self, key: &str) -> Result<bool, JsonError> {
         match self {
-            JsonValue::Object(o) => match o.get(key).ok_or(())? {
+            JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
                 JsonValue::Bool(n) => Ok(*n),
-                _ => Err(()),
+                _ => Err(JsonError::InvalidBool),
             },
-            _ => Err(()),
+            _ => Err(JsonError::NotJsonType),
         }
     }
 
     #[allow(dead_code)]
-    pub fn parse_u8(v: &JsonValue) -> u8 {
+    pub fn parse_u8(v: &JsonValue) -> Result<u8, JsonError> {
         match v {
-            JsonValue::Number(n) => *n as u8,
-            _ => sdk::panic_utf8(ERR_FAILED_PARSE.as_bytes()),
+            JsonValue::Number(n) => Ok(*n as u8),
+            _ => Err(JsonError::InvalidU8),
         }
     }
 
     #[allow(dead_code)]
-    pub fn array<T, F>(&self, key: &str, call: F) -> Result<Vec<T>, ()>
+    pub fn array<T, F>(&self, key: &str, call: F) -> Result<Vec<T>, JsonError>
     where
         F: FnMut(&JsonValue) -> T,
     {
         match self {
-            JsonValue::Object(o) => match o.get(key).ok_or(())? {
+            JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
                 JsonValue::Array(arr) => Ok(arr.iter().map(call).collect()),
-                _ => Err(()),
+                _ => Err(JsonError::InvalidArray),
             },
-            _ => Err(()),
+            _ => Err(JsonError::NotJsonType),
+        }
+    }
+}
+
+impl AsRef<[u8]> for JsonError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::NotJsonType => b"ERR_NOT_A_JSON_TYPE",
+            Self::MissingValue => b"ERR_JSON_MISSING_VALUE",
+            Self::InvalidU8 => b"ERR_FAILED_PARSE_U8",
+            Self::InvalidU64 => b"ERR_FAILED_PARSE_U64",
+            Self::InvalidU128 => b"ERR_FAILED_PARSE_U128",
+            Self::InvalidBool => b"ERR_FAILED_PARSE_BOOL",
+            Self::InvalidString => b"ERR_FAILED_PARSE_STRING",
+            Self::InvalidArray => b"ERR_FAILED_PARSE_ARRAY",
         }
     }
 }

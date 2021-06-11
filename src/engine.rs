@@ -145,7 +145,7 @@ pub struct Engine {
 }
 
 // TODO: upgrade to Berlin HF
-const CONFIG: &Config = &Config::istanbul();
+pub(crate) const CONFIG: &Config = &Config::istanbul();
 
 /// Key for storing the state of the engine.
 const STATE_KEY: &[u8; 5] = b"STATE";
@@ -243,16 +243,16 @@ impl Engine {
         Wei::new(raw)
     }
 
-    pub fn remove_storage(address: &Address, key: &H256) {
-        sdk::remove_storage(&storage_to_key(address, key));
+    pub fn remove_storage(address: &Address, key: &H256, generation: u32) {
+        sdk::remove_storage(storage_to_key(address, key, generation).as_ref());
     }
 
-    pub fn set_storage(address: &Address, key: &H256, value: &H256) {
-        sdk::write_storage(&storage_to_key(address, key), &value.0);
+    pub fn set_storage(address: &Address, key: &H256, value: &H256, generation: u32) {
+        sdk::write_storage(storage_to_key(address, key, generation).as_ref(), &value.0);
     }
 
-    pub fn get_storage(address: &Address, key: &H256) -> H256 {
-        sdk::read_storage(&storage_to_key(address, key))
+    pub fn get_storage(address: &Address, key: &H256, generation: u32) -> H256 {
+        sdk::read_storage(storage_to_key(address, key, generation).as_ref())
             .map(|value| H256::from_slice(&value))
             .unwrap_or_else(H256::default)
     }
@@ -264,8 +264,26 @@ impl Engine {
         balance.is_zero() && nonce.is_zero() && code_len == 0
     }
 
+    /// Increments storage generation for a given address.
+    pub fn set_generation(address: &Address, generation: u32) {
+        sdk::write_storage(
+            &address_to_key(KeyPrefix::Generation, address),
+            &generation.to_be_bytes(),
+        );
+    }
+
+    pub fn get_generation(address: &Address) -> u32 {
+        sdk::read_storage(&address_to_key(KeyPrefix::Generation, address))
+            .map(|value| {
+                let mut bytes = [0u8; 4];
+                bytes[0..4].copy_from_slice(&value[0..4]);
+                u32::from_be_bytes(bytes)
+            })
+            .unwrap_or(0)
+    }
+
     /// Removes all storage for the given address.
-    pub fn remove_all_storage(_address: &Address) {
+    fn remove_all_storage(address: &Address, generation: u32) {
         // FIXME: there is presently no way to prefix delete trie state.
         // NOTE: There is not going to be a method on runtime for this.
         //     You may need to store all keys in a list if you want to do this in a contract.
@@ -274,27 +292,21 @@ impl Engine {
         //     Either way you may have to store the nonce per storage address root. When the account
         //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
         //     can be deleted over time. That's how TurboGeth does storage.
+        Self::set_generation(address, generation + 1);
     }
 
     /// Removes an account.
-    pub fn remove_account(address: &Address) {
+    fn remove_account(address: &Address, generation: u32) {
         Self::remove_nonce(address);
         Self::remove_balance(address);
         Self::remove_code(address);
-        Self::remove_all_storage(address);
-    }
-
-    /// Removes an account if it is empty.
-    pub fn remove_account_if_empty(address: &Address) {
-        if Self::is_account_empty(address) {
-            Self::remove_account(address);
-        }
+        Self::remove_all_storage(address, generation);
     }
 
     pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let value = Wei::zero();
-        self.deploy_code(origin, value, input)
+        self.deploy_code(origin, value, input, u64::MAX)
     }
 
     pub fn deploy_code(
@@ -302,15 +314,19 @@ impl Engine {
         origin: Address,
         value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<SubmitResult> {
-        let mut executor = self.make_executor();
+        let mut executor = self.make_executor(gas_limit);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
-            executor.transact_create(origin, value.raw(), input, u64::MAX),
+            executor.transact_create(origin, value.raw(), input, gas_limit),
             address,
         );
         let is_succeed = status.is_succeed();
-        status.into_result()?;
+        if let Err(e) = status.into_result() {
+            Engine::increment_nonce(&origin);
+            return Err(e);
+        }
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
@@ -327,7 +343,7 @@ impl Engine {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = Wei::zero();
-        self.call(origin, contract, value, args.input)
+        self.call(origin, contract, value, args.input, u64::MAX)
     }
 
     pub fn call(
@@ -336,10 +352,11 @@ impl Engine {
         contract: Address,
         value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<SubmitResult> {
-        let mut executor = self.make_executor();
+        let mut executor = self.make_executor(gas_limit);
         let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, u64::MAX);
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
 
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
@@ -372,7 +389,7 @@ impl Engine {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
-        self.view(origin, contract, Wei::new(value), args.input)
+        self.view(origin, contract, Wei::new(value), args.input, u64::MAX)
     }
 
     pub fn view(
@@ -381,18 +398,19 @@ impl Engine {
         contract: Address,
         value: Wei,
         input: Vec<u8>,
+        gas_limit: u64,
     ) -> EngineResult<Vec<u8>> {
-        let mut executor = self.make_executor();
+        let mut executor = self.make_executor(gas_limit);
         let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, u64::MAX);
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
         status.into_result()?;
         Ok(result)
     }
 
-    fn make_executor(&self) -> StackExecutor<MemoryStackState<Engine>> {
-        let metadata = StackSubstateMetadata::new(u64::MAX, &CONFIG);
+    fn make_executor(&self, gas_limit: u64) -> StackExecutor<MemoryStackState<Engine>> {
+        let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
         let state = MemoryStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
+        StackExecutor::new_with_precompile(state, CONFIG, precompiles::istanbul_precompiles)
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
@@ -514,7 +532,8 @@ impl evm::backend::Backend for Engine {
 
     /// Get storage value of address at index.
     fn storage(&self, address: Address, index: H256) -> H256 {
-        Engine::get_storage(&address, &index)
+        let generation = Self::get_generation(&address);
+        Engine::get_storage(&address, &index, generation)
     }
 
     /// Get original storage value of address at index, if available.
@@ -541,6 +560,7 @@ impl ApplyBackend for Engine {
                     storage,
                     reset_storage,
                 } => {
+                    let generation = Self::get_generation(&address);
                     Engine::set_nonce(&address, &basic.nonce);
 
                     // Apply changes for eth-connector
@@ -552,23 +572,37 @@ impl ApplyBackend for Engine {
                         Engine::set_code(&address, &code)
                     }
 
-                    if reset_storage {
-                        Engine::remove_all_storage(&address)
-                    }
+                    let next_generation = if reset_storage {
+                        Engine::remove_all_storage(&address, generation);
+                        generation + 1
+                    } else {
+                        generation
+                    };
 
                     for (index, value) in storage {
                         if value == H256::default() {
-                            Engine::remove_storage(&address, &index)
+                            Engine::remove_storage(&address, &index, next_generation)
                         } else {
-                            Engine::set_storage(&address, &index, &value)
+                            Engine::set_storage(&address, &index, &value, next_generation)
                         }
                     }
 
-                    if delete_empty {
-                        Engine::remove_account_if_empty(&address)
+                    // We only need to remove the account if:
+                    // 1. we are supposed to delete an empty account
+                    // 2. the account is empty
+                    // 3. we didn't already clear out the storage (because if we did then there is
+                    //    nothing to do)
+                    if delete_empty
+                        && Engine::is_account_empty(&address)
+                        && generation == next_generation
+                    {
+                        Engine::remove_account(&address, generation);
                     }
                 }
-                Apply::Delete { address } => Engine::remove_account(&address),
+                Apply::Delete { address } => {
+                    let generation = Self::get_generation(&address);
+                    Engine::remove_account(&address, generation);
+                }
             }
         }
     }

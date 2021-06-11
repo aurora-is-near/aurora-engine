@@ -43,7 +43,7 @@ impl ERC20Constructor {
         EthTransaction {
             nonce,
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: u64::MAX.into(),
             to: None,
             value: Default::default(),
             data,
@@ -83,10 +83,11 @@ impl ERC20 {
                 ethabi::Token::Uint(amount),
             ])
             .unwrap();
+
         EthTransaction {
             nonce,
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: u64::MAX.into(),
             to: Some(self.0.address),
             value: Default::default(),
             data,
@@ -107,7 +108,7 @@ impl ERC20 {
         EthTransaction {
             nonce,
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: u64::MAX.into(),
             to: Some(self.0.address),
             value: Default::default(),
             data,
@@ -125,7 +126,7 @@ impl ERC20 {
         EthTransaction {
             nonce,
             gas_price: Default::default(),
-            gas: Default::default(),
+            gas: u64::MAX.into(),
             to: Some(self.0.address),
             value: Default::default(),
             data,
