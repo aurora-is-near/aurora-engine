@@ -1,6 +1,9 @@
 use super::prelude::*;
 
+#[cfg(feature = "engine")]
 use alloc::collections::BTreeMap;
+#[cfg(test)]
+use std::collections::BTreeMap;
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
 
@@ -13,6 +16,7 @@ pub enum JsonValue {
     Object(BTreeMap<String, JsonValue>),
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 pub enum JsonError {
     NotJsonType,
     MissingValue,
@@ -115,6 +119,20 @@ impl AsRef<[u8]> for JsonError {
     }
 }
 
+#[cfg(test)]
+impl std::fmt::Debug for JsonError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.write_fmt(format_args!("{}", std::str::from_utf8(self.as_ref()).unwrap()))
+    }
+}
+
+#[cfg(test)]
+impl std::fmt::Display for JsonError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:?}", *self))
+    }
+}
+
 impl Array<JsonValue, JsonObject, JsonValue> for JsonArray {
     fn new() -> Self {
         JsonArray(Vec::new())
@@ -195,4 +213,149 @@ pub fn parse_json(data: &[u8]) -> Option<JsonValue> {
     let data_array: Vec<char> = data.iter().map(|b| *b as char).collect::<Vec<_>>();
     let mut index = 0;
     rjson::parse::<JsonValue, JsonArray, JsonObject, JsonValue>(&*data_array, &mut index)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_json_type_string() {
+        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "abcd").as_bytes()).unwrap();
+        let string = json.string("foo").ok().unwrap();
+        assert_eq!(string, "abcd");
+
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, 123).as_bytes()).unwrap();
+        let err = json.string("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidString);
+
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, true).as_bytes()).unwrap();
+        let err = json.string("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidString);
+
+        let json = parse_json(format!(r#"{{"foo": ["{}"]}}"#, "abcd").as_bytes()).unwrap();
+        let err = json.string("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidString);
+
+        let json = JsonValue::Null;
+        let err = json.string("foo").unwrap_err();
+        assert_eq!(err, JsonError::NotJsonType);
+    }
+
+    #[test]
+    fn test_json_type_u64() {
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, 123).as_bytes()).unwrap();
+        let val = json.u64("foo").ok().unwrap();
+        assert_eq!(val, 123);
+
+        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "bar").as_bytes()).unwrap();
+        let err = json.u64("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU64);
+
+        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "123").as_bytes()).unwrap();
+        let err = json.u64("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU64);
+
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, true).as_bytes()).unwrap();
+        let err = json.u64("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU64);
+
+        let json = parse_json(format!(r#"{{"foo": [{}]}}"#, 123).as_bytes()).unwrap();
+        let err = json.u64("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU64);
+
+        let json = JsonValue::Null;
+        let err = json.u64("foo").unwrap_err();
+        assert_eq!(err, JsonError::NotJsonType);
+    }
+
+    #[test]
+    fn test_json_type_u128() {
+        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, 123).as_bytes()).unwrap();
+        let val = json.u128("foo").ok().unwrap();
+        assert_eq!(val, 123);
+
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, 123).as_bytes()).unwrap();
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::ExpectedStringGotNumber);
+
+        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "bar").as_bytes()).unwrap();
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU128);
+
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, true).as_bytes()).unwrap();
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU128);
+
+        let json = parse_json(format!(r#"{{"foo": ["{}"]}}"#, 123).as_bytes()).unwrap();
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU128);
+
+        let json = JsonValue::Null;
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::NotJsonType);
+    }
+
+    #[test]
+    fn test_json_type_bool() {
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, true).as_bytes()).unwrap();
+        let val = json.bool("foo").ok().unwrap();
+        assert_eq!(val, true);
+
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, false).as_bytes()).unwrap();
+        let val = json.bool("foo").ok().unwrap();
+        assert_eq!(val, false);
+
+        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, true).as_bytes()).unwrap();
+        let err = json.bool("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidBool);
+
+        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, false).as_bytes()).unwrap();
+        let err = json.bool("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidBool);
+
+        let json = parse_json(format!(r#"{{"foo": [{}]}}"#, true).as_bytes()).unwrap();
+        let err = json.bool("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidBool);
+
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, 123).as_bytes()).unwrap();
+        let err = json.bool("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidBool);
+
+        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "bar").as_bytes()).unwrap();
+        let err = json.bool("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidBool);
+
+        let json = JsonValue::Null;
+        let err = json.bool("foo").unwrap_err();
+        assert_eq!(err, JsonError::NotJsonType);
+    }
+
+    #[test]
+    fn test_json_type_u8() {
+        let json = JsonValue::from(123f64);
+        let val = JsonValue::parse_u8(&json).ok().unwrap();
+        assert_eq!(val, 123);
+
+        let json = JsonValue::from(256f64);
+        let val = JsonValue::parse_u8(&json).ok().unwrap();
+        assert_eq!(val, 255);
+
+        let json = JsonValue::from(260f64);
+        let val = JsonValue::parse_u8(&json).ok().unwrap();
+        assert_eq!(val, 255);
+
+        let json = JsonValue::from(12345678f64);
+        let val = JsonValue::parse_u8(&json).ok().unwrap();
+        assert_eq!(val, 255);
+
+        let json = JsonValue::from("abcd".to_string());
+        let err = JsonValue::parse_u8(&json).unwrap_err();
+        assert_eq!(err, JsonError::InvalidU8);
+    }
+
+    #[test]
+    fn test_json_type_array() {
+        //TODO
+    }
 }

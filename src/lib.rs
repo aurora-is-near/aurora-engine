@@ -27,7 +27,7 @@ mod deposit_event;
 pub mod engine;
 #[cfg(any(feature = "engine", test))]
 mod fungible_token;
-#[cfg(feature = "engine")]
+#[cfg(any(feature = "engine", test))]
 mod json;
 #[cfg(feature = "engine")]
 mod log_entry;
