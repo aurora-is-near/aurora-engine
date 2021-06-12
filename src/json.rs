@@ -22,6 +22,7 @@ pub enum JsonError {
     InvalidBool,
     InvalidString,
     InvalidArray,
+    ExpectedStringGotNumber,
 }
 
 pub struct JsonArray(Vec<JsonValue>);
@@ -54,7 +55,10 @@ impl JsonValue {
     pub fn u128(&self, key: &str) -> Result<u128, JsonError> {
         match self {
             JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
-                JsonValue::Number(n) => Ok(*n as u128),
+                JsonValue::String(n) => {
+                    Ok(n.parse::<u128>().map_err(|_| JsonError::InvalidU128)?)
+                }
+                JsonValue::Number(_) => Err(JsonError::ExpectedStringGotNumber),
                 _ => Err(JsonError::InvalidU128),
             },
             _ => Err(JsonError::NotJsonType),
@@ -106,6 +110,7 @@ impl AsRef<[u8]> for JsonError {
             Self::InvalidBool => b"ERR_FAILED_PARSE_BOOL",
             Self::InvalidString => b"ERR_FAILED_PARSE_STRING",
             Self::InvalidArray => b"ERR_FAILED_PARSE_ARRAY",
+            Self::ExpectedStringGotNumber => b"ERR_EXPECTED_STRING_GOT_NUMBER",
         }
     }
 }
