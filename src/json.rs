@@ -27,6 +27,8 @@ pub enum JsonError {
     InvalidString,
     InvalidArray,
     ExpectedStringGotNumber,
+    OutOfRangeU8,
+    OutOfRangeU64,
 }
 
 pub struct JsonArray(Vec<JsonValue>);
@@ -48,7 +50,14 @@ impl JsonValue {
     pub fn u64(&self, key: &str) -> Result<u64, JsonError> {
         match self {
             JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
-                JsonValue::Number(n) => Ok(*n as u64),
+                JsonValue::Number(n) => {
+                    // Upper bound is covered by the type limitation
+                    if *n < u64::MIN as f64 {
+                        Err(JsonError::OutOfRangeU64)
+                    } else {
+                        Ok(*n as u64)
+                    }
+                }
                 _ => Err(JsonError::InvalidU64),
             },
             _ => Err(JsonError::NotJsonType),
@@ -83,7 +92,13 @@ impl JsonValue {
     #[allow(dead_code)]
     pub fn parse_u8(v: &JsonValue) -> Result<u8, JsonError> {
         match v {
-            JsonValue::Number(n) => Ok(*n as u8),
+            JsonValue::Number(n) => {
+                if *n < u8::MIN as f64 || *n > u8::MAX as f64 {
+                    Err(JsonError::OutOfRangeU8)
+                } else {
+                    Ok(*n as u8)
+                }
+            }
             _ => Err(JsonError::InvalidU8),
         }
     }
@@ -115,6 +130,8 @@ impl AsRef<[u8]> for JsonError {
             Self::InvalidString => b"ERR_FAILED_PARSE_STRING",
             Self::InvalidArray => b"ERR_FAILED_PARSE_ARRAY",
             Self::ExpectedStringGotNumber => b"ERR_EXPECTED_STRING_GOT_NUMBER",
+            Self::OutOfRangeU8 => b"ERR_OUT_OF_RANGE_U8",
+            Self::OutOfRangeU64 => b"ERR_OUT_OF_RANGE_U64",
         }
     }
 }
@@ -248,6 +265,10 @@ mod tests {
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, 123);
 
+        let json = parse_json(format!(r#"{{"foo": {}}}"#, -1).as_bytes()).unwrap();
+        let err = json.u64("foo").unwrap_err();
+        assert_eq!(err, JsonError::OutOfRangeU64);
+
         let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "bar").as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidU64);
@@ -337,17 +358,13 @@ mod tests {
         let val = JsonValue::parse_u8(&json).ok().unwrap();
         assert_eq!(val, 123);
 
+        let json = JsonValue::from(-1f64);
+        let err = JsonValue::parse_u8(&json).unwrap_err();
+        assert_eq!(err, JsonError::OutOfRangeU8);
+
         let json = JsonValue::from(256f64);
-        let val = JsonValue::parse_u8(&json).ok().unwrap();
-        assert_eq!(val, 255);
-
-        let json = JsonValue::from(260f64);
-        let val = JsonValue::parse_u8(&json).ok().unwrap();
-        assert_eq!(val, 255);
-
-        let json = JsonValue::from(12345678f64);
-        let val = JsonValue::parse_u8(&json).ok().unwrap();
-        assert_eq!(val, 255);
+        let err = JsonValue::parse_u8(&json).unwrap_err();
+        assert_eq!(err, JsonError::OutOfRangeU8);
 
         let json = JsonValue::from("abcd".to_string());
         let err = JsonValue::parse_u8(&json).unwrap_err();
