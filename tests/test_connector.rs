@@ -1267,3 +1267,31 @@ fn test_ft_transfer_empty_value() {
         "Expected failure as empty string can't be parsed to u128",
     );
 }
+
+#[test]
+fn test_ft_transfer_wrong_u128_json_type() {
+    let (_, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_near(&contract, CONTRACT_ACC);
+
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "ft_transfer",
+        json!({
+            "receiver_id": DEPOSITED_RECIPIENT,
+            "amount": 200,
+            "memo": "transfer memo"
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    let promises = res.promise_results();
+    let promise = &promises[promises.len() - 3];
+    eprintln!("{:#?}", promise.as_ref().unwrap().outcome().clone().status);
+    assert_execution_status_failure(
+        promise.as_ref().unwrap().outcome().clone().status,
+        "ERR_EXPECTED_STRING_GOT_NUMBER",
+        "Expected failure as number type can't be parsed to u128",
+    );
+}
