@@ -2,10 +2,10 @@ use super::prelude::*;
 
 #[cfg(feature = "engine")]
 use alloc::collections::BTreeMap;
-#[cfg(test)]
-use std::collections::BTreeMap;
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
+#[cfg(test)]
+use std::collections::BTreeMap;
 
 pub enum JsonValue {
     Null,
@@ -139,7 +139,10 @@ impl AsRef<[u8]> for JsonError {
 #[cfg(test)]
 impl std::fmt::Debug for JsonError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        f.write_fmt(format_args!("{}", std::str::from_utf8(self.as_ref()).unwrap()))
+        f.write_fmt(format_args!(
+            "{}",
+            std::str::from_utf8(self.as_ref()).unwrap()
+        ))
     }
 }
 
