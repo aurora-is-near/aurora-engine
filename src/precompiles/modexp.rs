@@ -11,22 +11,9 @@ pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> u64 {
-        let mut exp_bytes = Vec::with_capacity(32);
-        for i in 0..exp_len {
-            if U256::from(96) + base_len + U256::from(1) >= U256::from(bytes.len()) {
-                exp_bytes.push(0u8);
-            } else {
-                let bytes_i = (96 + base_len + i) as usize;
-                if let Some(byte) = bytes.get(bytes_i) {
-                    exp_bytes.push(*byte);
-                } else {
-                    // Pad out the data if the byte is empty.
-                    exp_bytes.push(0u8);
-                }
-            }
-        }
-
-        let exp = U256::from(exp_bytes.as_slice());
+        let start = base_len as usize + 96;
+        let end = exp_len as usize + start;
+        let exp = U256::from(&bytes[start..end]);
 
         if exp_len <= 32 && exp == U256::zero() {
             0
@@ -43,23 +30,13 @@ impl<HF: HardFork> ModExp<HF> {
         let exp_len = U256::from(&input[32..64]).as_usize();
         let mod_len = U256::from(&input[64..96]).as_usize();
 
-        let mut base_bytes = Vec::with_capacity(32);
-        for i in 0..base_len {
-            if 96 + i >= input.len() {
-                base_bytes.push(0u8);
-            } else {
-                base_bytes.push(input[96 + i]);
-            }
-        }
+        let base_start = 96;
+        let base_end = base_len + base_start;
+        let base_bytes = &input[base_start..base_end];
 
-        let mut exp_bytes = Vec::with_capacity(32);
-        for i in 0..exp_len {
-            if 96 + base_len + i >= input.len() {
-                exp_bytes.push(0u8);
-            } else {
-                exp_bytes.push(input[96 + base_len + i]);
-            }
-        }
+        let exp_start = base_len as usize + 96;
+        let exp_end = exp_len as usize + exp_start;
+        let exp_bytes = &input[exp_start..exp_end];
 
         let mut mod_bytes = Vec::with_capacity(32);
         for i in 0..mod_len {
