@@ -122,7 +122,7 @@ impl ModExp<Berlin> {
     fn mul_complexity(base_len: u64, mod_len: u64) -> u64 {
         let max_len = core::cmp::max(mod_len, base_len);
         let words = max_len.div_ceil(&8);
-        words.pow(2)
+        words.saturating_mul(words)
     }
 }
 
