@@ -77,11 +77,11 @@ impl ModExp<Byzantium> {
         } else if x <= 1_024 {
             Ok(x * x / 4 + 96 * x - 3_072)
         } else {
-            let (sqroot, overflow) = x.overflowing_mul(x);
+            let (x_sq, overflow) = x.overflowing_mul(x);
             if overflow {
                 Err(ExitError::OutOfGas)
             } else {
-                Ok(sqroot / 16 + 480 * x - 199_680)
+                Ok(x_sq / 16 + 480 * x - 199_680)
             }
         }
     }
