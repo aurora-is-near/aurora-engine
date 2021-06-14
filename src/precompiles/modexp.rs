@@ -96,7 +96,7 @@ impl Precompile for ModExp<Byzantium> {
         let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len))?;
         let iter_count = Self::calc_iter_count(exp_len, base_len, &input);
         let maybe_gas = mul.checked_mul(core::cmp::max(iter_count, 1));
-        
+
         maybe_gas.map(|g| g / 20).ok_or(ExitError::OutOfGas)
     }
 
