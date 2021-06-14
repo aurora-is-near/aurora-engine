@@ -18,7 +18,7 @@ impl<HF: HardFork> ModExp<HF> {
         if exp_len <= 32 && exp == U256::zero() {
             0
         } else if exp_len <= 32 {
-            exp.bits() as u64
+            exp.bits() as u64 - 1
         } else {
             // else > 32
             8 * (exp_len - 32) + exp.bits() as u64
@@ -94,7 +94,7 @@ impl Precompile for ModExp<Byzantium> {
         let mod_len = U256::from(&input[64..96]).as_u64();
 
         let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len))?;
-        let iter_count = Self::calc_iter_count(exp_len, base_len, &input) - 1;
+        let iter_count = Self::calc_iter_count(exp_len, base_len, &input);
         let (mut gas, overflow) = mul.overflowing_mul(core::cmp::max(iter_count, 1));
 
         if overflow {
@@ -133,7 +133,7 @@ impl Precompile for ModExp<Berlin> {
         let mod_len = U256::from(&input[64..96]).as_u64();
 
         let mul = Self::mul_complexity(base_len, mod_len);
-        let iter_count = Self::calc_iter_count(exp_len, base_len, &input) - 1;
+        let iter_count = Self::calc_iter_count(exp_len, base_len, &input);
 
         Ok(core::cmp::max(200, mul * iter_count / 3))
     }
