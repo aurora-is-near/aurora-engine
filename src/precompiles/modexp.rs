@@ -10,18 +10,18 @@ pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
 pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
-    fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> u64 {
-        let start = base_len as usize + 96;
-        let end = cmp::min(32, exp_len as usize) + start;
+    fn calc_iter_count(exp_len: U256, base_len: U256, bytes: &[u8]) -> U256 {
+        let start = base_len.as_usize() + 96;
+        let end = core::cmp::min(32, exp_len.as_usize()) + start;
         let exp = U256::from(&bytes[start..end]);
 
-        if exp_len <= 32 && exp == U256::zero() {
-            0
-        } else if exp_len <= 32 {
-            exp.bits() as u64 - 1
+        if exp_len <= U256::from(32) && exp == U256::zero() {
+            U256::zero()
+        } else if exp_len <= U256::from(32) {
+            U256::from(exp.bits()) - U256::from(1)
         } else {
             // else > 32
-            8 * (exp_len - 32) + exp.bits() as u64 - 1
+            U256::from(8) * (exp_len - U256::from(32)) + U256::from(exp.bits()) - U256::from(1)
         }
     }
 
@@ -66,17 +66,17 @@ impl<HF: HardFork> ModExp<HF> {
 }
 
 impl ModExp<Byzantium> {
-    fn mul_complexity(x: u64) -> Result<u64, ExitError> {
-        if x <= 64 {
+    fn mul_complexity(x: U256) -> Result<U256, ExitError> {
+        if x <= U256::from(64) {
             Ok(x * x)
-        } else if x <= 1_024 {
-            Ok(x * x / 4 + 96 * x - 3_072)
+        } else if x <= U256::from(1_024) {
+            Ok(x * x / U256::from(4) + U256::from(96) * x - U256::from(3_072))
         } else {
             let (x_sq, overflow) = x.overflowing_mul(x);
             if overflow {
                 Err(ExitError::OutOfGas)
             } else {
-                Ok(x_sq / 16 + 480 * x - 199_680)
+                Ok(x_sq / U256::from(16) + U256::from(480) * x - U256::from(199_680))
             }
         }
     }
@@ -84,15 +84,17 @@ impl ModExp<Byzantium> {
 
 impl Precompile for ModExp<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
-        let base_len = U256::from(&input[0..32]).as_u64();
-        let exp_len = U256::from(&input[32..64]).as_u64();
-        let mod_len = U256::from(&input[64..96]).as_u64();
+        let base_len = U256::from(&input[0..32]);
+        let exp_len = U256::from(&input[32..64]);
+        let mod_len = U256::from(&input[64..96]);
 
         let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len))?;
         let iter_count = Self::calc_iter_count(exp_len, base_len, &input);
-        let maybe_gas = mul.checked_mul(core::cmp::max(iter_count, 1));
+        let maybe_gas = mul.checked_mul(core::cmp::max(iter_count, U256::from(1)));
 
-        maybe_gas.map(|g| g / 20).ok_or(ExitError::OutOfGas)
+        maybe_gas
+            .map(|g| g.as_u64() / 20)
+            .ok_or(ExitError::OutOfGas)
     }
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
@@ -118,12 +120,12 @@ impl ModExp<Berlin> {
 
 impl Precompile for ModExp<Berlin> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
-        let base_len = U256::from(&input[0..32]).as_u64();
-        let exp_len = U256::from(&input[32..64]).as_u64();
-        let mod_len = U256::from(&input[64..96]).as_u64();
+        let base_len = U256::from(&input[0..32]);
+        let exp_len = U256::from(&input[32..64]);
+        let mod_len = U256::from(&input[64..96]);
 
-        let mul = Self::mul_complexity(base_len, mod_len);
-        let iter_count = Self::calc_iter_count(exp_len, base_len, &input);
+        let mul = Self::mul_complexity(base_len.as_u64(), mod_len.as_u64());
+        let iter_count = Self::calc_iter_count(exp_len, base_len, &input).as_u64();
 
         Ok(core::cmp::max(200, mul * iter_count / 3))
     }
