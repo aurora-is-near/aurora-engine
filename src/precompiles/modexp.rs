@@ -10,44 +10,51 @@ pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
 pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
-    fn calc_iter_count(exp_len: U256, base_len: U256, bytes: &[u8]) -> U256 {
-        let start = base_len.as_usize() + 96;
-        let end = core::cmp::min(32, exp_len.as_usize()) + start;
-        let exp = U256::from(&bytes[start..end]);
+    // Note: the output of this function is bounded by 2^67
+    fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> U256 {
+        #[allow(clippy::redundant_closure)]
+        let exp = parse_bytes(
+            bytes,
+            (base_len as usize).saturating_add(96),
+            core::cmp::min(32, exp_len as usize),
+            // I don't understand why I need a closure here, but doesn't compile without one
+            |x| U256::from(x),
+        );
 
-        if exp_len <= U256::from(32) && exp == U256::zero() {
+        if exp_len <= 32 && exp.is_zero() {
             U256::zero()
-        } else if exp_len <= U256::from(32) {
+        } else if exp_len <= 32 {
             U256::from(exp.bits()) - U256::from(1)
         } else {
             // else > 32
-            U256::from(8) * (exp_len - U256::from(32)) + U256::from(exp.bits()) - U256::from(1)
+            U256::from(8) * U256::from(exp_len - 32) + U256::from(exp.bits()) - U256::from(1)
         }
     }
 
     fn run_inner(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        let base_len = U256::from(&input[0..32]).as_usize();
-        let exp_len = U256::from(&input[32..64]).as_usize();
-        let mod_len = U256::from(&input[64..96]).as_usize();
+        let (base_len, exp_len, mod_len) = parse_lengths(input);
+        let base_len = base_len as usize;
+        let exp_len = exp_len as usize;
+        let mod_len = mod_len as usize;
 
         let base_start = 96;
-        let base_end = base_len + base_start;
-        let base_bytes = &input[base_start..base_end];
+        let base_end = base_len.saturating_add(base_start);
 
-        let exp_start = base_len + 96;
-        let exp_end = exp_len + exp_start;
-        let exp_bytes = &input[exp_start..exp_end];
+        let exp_start = base_end;
+        let exp_end = exp_len.saturating_add(exp_start);
 
-        let mod_start = base_len + exp_len + 96;
-        let mod_end = mod_len + mod_start;
-        let mod_bytes = &input[mod_start..mod_end];
+        let mod_start = exp_end;
 
-        let base = BigUint::from_bytes_be(&base_bytes);
-        let exponent = BigUint::from_bytes_be(&exp_bytes);
-        let modulus = BigUint::from_bytes_be(&mod_bytes);
+        let base = parse_bytes(input, base_start, base_len, BigUint::from_bytes_be);
+        let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
+        let modulus = parse_bytes(input, mod_start, mod_len, BigUint::from_bytes_be);
 
         let output = {
-            let computed_result = base.modpow(&exponent, &modulus).to_bytes_be();
+            let computed_result = if modulus == BigUint::from(0u32) {
+                Vec::new()
+            } else {
+                base.modpow(&exponent, &modulus).to_bytes_be()
+            };
             // The result must be the same length as the input modulus.
             // To ensure this we pad on the left with zeros.
             if mod_len > computed_result.len() {
@@ -66,35 +73,31 @@ impl<HF: HardFork> ModExp<HF> {
 }
 
 impl ModExp<Byzantium> {
-    fn mul_complexity(x: U256) -> Result<U256, ExitError> {
-        if x <= U256::from(64) {
-            Ok(x * x)
-        } else if x <= U256::from(1_024) {
-            Ok(x * x / U256::from(4) + U256::from(96) * x - U256::from(3_072))
+    // ouput of this function is bounded by 2^128
+    fn mul_complexity(x: u64) -> U256 {
+        if x <= 64 {
+            U256::from(x * x)
+        } else if x <= 1_024 {
+            U256::from(x * x / 4 + 96 * x - 3_072)
         } else {
-            let (x_sq, overflow) = x.overflowing_mul(x);
-            if overflow {
-                Err(ExitError::OutOfGas)
-            } else {
-                Ok(x_sq / U256::from(16) + U256::from(480) * x - U256::from(199_680))
-            }
+            // up-cast to avoid overflow
+            let x = U256::from(x);
+            let x_sq = x * x; // x < 2^64 => x*x < 2^128 < 2^256 (no overflow)
+            x_sq / U256::from(16) + U256::from(480) * x - U256::from(199_680)
         }
     }
 }
 
 impl Precompile for ModExp<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
-        let base_len = U256::from(&input[0..32]);
-        let exp_len = U256::from(&input[32..64]);
-        let mod_len = U256::from(&input[64..96]);
+        let (base_len, exp_len, mod_len) = parse_lengths(input);
 
-        let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len))?;
+        let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
         let iter_count = Self::calc_iter_count(exp_len, base_len, &input);
-        let maybe_gas = mul.checked_mul(core::cmp::max(iter_count, U256::from(1)));
+        // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
+        let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
 
-        maybe_gas
-            .map(|g| g.as_u64() / 20)
-            .ok_or(ExitError::OutOfGas)
+        Ok(saturating_round(gas))
     }
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
@@ -111,23 +114,24 @@ impl Precompile for ModExp<Byzantium> {
 }
 
 impl ModExp<Berlin> {
-    fn mul_complexity(base_len: u64, mod_len: u64) -> u64 {
+    // output bounded by 2^122
+    fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
-        let words = max_len.div_ceil(&8);
-        words.saturating_mul(words)
+        let words = U256::from(max_len.div_ceil(&8));
+        words * words
     }
 }
 
 impl Precompile for ModExp<Berlin> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
-        let base_len = U256::from(&input[0..32]);
-        let exp_len = U256::from(&input[32..64]);
-        let mod_len = U256::from(&input[64..96]);
+        let (base_len, exp_len, mod_len) = parse_lengths(input);
 
-        let mul = Self::mul_complexity(base_len.as_u64(), mod_len.as_u64());
-        let iter_count = Self::calc_iter_count(exp_len, base_len, &input).as_u64();
+        let mul = Self::mul_complexity(base_len, mod_len);
+        let iter_count = Self::calc_iter_count(exp_len, base_len, &input);
+        // mul * iter_count bounded by 2^189 (so no overflow)
+        let gas = mul * iter_count / U256::from(3);
 
-        Ok(core::cmp::max(200, mul * iter_count / 3))
+        Ok(core::cmp::max(200, saturating_round(gas)))
     }
 
     fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
@@ -139,6 +143,40 @@ impl Precompile for ModExp<Berlin> {
             Ok(PrecompileOutput::without_logs(cost, output))
         }
     }
+}
+
+fn parse_bytes<T, F: FnOnce(&[u8]) -> T>(input: &[u8], start: usize, size: usize, f: F) -> T {
+    let len = input.len();
+    if start >= len {
+        return f(&[]);
+    }
+    let end = start + size;
+    if end > len {
+        f(&input[start..len])
+    } else {
+        f(&input[start..end])
+    }
+}
+
+fn saturating_round(x: U256) -> u64 {
+    if x.bits() > 64 {
+        u64::MAX
+    } else {
+        x.as_u64()
+    }
+}
+
+fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
+    let parse = |start: usize| -> u64 {
+        // I don't understand why I need a closure here, but doesn't compile without one
+        #[allow(clippy::redundant_closure)]
+        saturating_round(parse_bytes(input, start, 32, |x| U256::from(x)))
+    };
+    let base_len = parse(0);
+    let exp_len = parse(32);
+    let mod_len = parse(64);
+
+    (base_len, exp_len, mod_len)
 }
 
 #[cfg(test)]
@@ -338,5 +376,50 @@ mod tests {
             let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);
         }
+    }
+
+    #[test]
+    fn test_berlin_modexp_big_input() {
+        let base_len = U256::from(4);
+        let exp_len = U256::from(u64::MAX);
+        let mod_len = U256::from(4);
+        let base: u32 = 1;
+        let exp = U256::MAX;
+
+        let mut input: Vec<u8> = Vec::new();
+        input.extend_from_slice(&crate::types::u256_to_arr(&base_len));
+        input.extend_from_slice(&crate::types::u256_to_arr(&exp_len));
+        input.extend_from_slice(&crate::types::u256_to_arr(&mod_len));
+        input.extend_from_slice(&base.to_be_bytes());
+        input.extend_from_slice(&crate::types::u256_to_arr(&exp));
+
+        // completes without any overflow
+        ModExp::<Berlin>::required_gas(&input).unwrap();
+    }
+
+    #[test]
+    fn test_berlin_modexp_bigger_input() {
+        let base_len = U256::MAX;
+        let exp_len = U256::MAX;
+        let mod_len = U256::MAX;
+        let base: u32 = 1;
+        let exp = U256::MAX;
+
+        let mut input: Vec<u8> = Vec::new();
+        input.extend_from_slice(&crate::types::u256_to_arr(&base_len));
+        input.extend_from_slice(&crate::types::u256_to_arr(&exp_len));
+        input.extend_from_slice(&crate::types::u256_to_arr(&mod_len));
+        input.extend_from_slice(&base.to_be_bytes());
+        input.extend_from_slice(&crate::types::u256_to_arr(&exp));
+
+        // completes without any overflow
+        ModExp::<Berlin>::required_gas(&input).unwrap();
+    }
+
+    #[test]
+    fn test_berlin_modexp_empty_input() {
+        let res = ModExp::<Berlin>::run(&[], 100_000, &new_context()).unwrap();
+        let expected: Vec<u8> = Vec::new();
+        assert_eq!(res.output, expected)
     }
 }
