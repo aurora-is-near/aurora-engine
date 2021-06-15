@@ -12,7 +12,7 @@ pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 impl<HF: HardFork> ModExp<HF> {
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> u64 {
         let start = base_len as usize + 96;
-        let end = exp_len as usize + start;
+        let end = cmp::min(32, exp_len as usize) + start;
         let exp = U256::from(&bytes[start..end]);
 
         if exp_len <= 32 && exp == U256::zero() {
