@@ -211,8 +211,11 @@ fn encode_eip712(
         hex::encode(digest_encoded.clone())
     ));
 
+    // clippy doesn't like this `let` binding if the logging feature is disabled
+    // because the log line is not really there in that case
+    #[allow(clippy::let_and_return)]
     let digest = sdk::keccak(&digest_encoded);
-    crate::log!(&format!("digest: {}", hex::encode(digest)));
+    crate::log!(&format!("digest: {}", hex::encode(&digest)));
     digest
 }
 
