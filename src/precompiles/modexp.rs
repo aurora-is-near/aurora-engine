@@ -34,18 +34,13 @@ impl<HF: HardFork> ModExp<HF> {
         let base_end = base_len + base_start;
         let base_bytes = &input[base_start..base_end];
 
-        let exp_start = base_len as usize + 96;
-        let exp_end = exp_len as usize + exp_start;
+        let exp_start = base_len + 96;
+        let exp_end = exp_len + exp_start;
         let exp_bytes = &input[exp_start..exp_end];
 
-        let mut mod_bytes = Vec::with_capacity(32);
-        for i in 0..mod_len {
-            if 96 + base_len + exp_len + i >= input.len() {
-                mod_bytes.push(0u8);
-            } else {
-                mod_bytes.push(input[96 + base_len + exp_len + i]);
-            }
-        }
+        let mod_start = base_len + exp_len + 96;
+        let mod_end = mod_len + mod_start;
+        let mod_bytes = &input[mod_start..mod_end];
 
         let base = BigUint::from_bytes_be(&base_bytes);
         let exponent = BigUint::from_bytes_be(&exp_bytes);
