@@ -4,7 +4,9 @@ use crate::engine::Engine;
 use crate::log_entry::LogEntry;
 use crate::precompiles::ecrecover;
 use crate::types::{AccountId, EthAddress};
-use alloc::{format, vec::Vec};
+#[cfg(feature = "log")]
+use alloc::format;
+use alloc::vec::Vec;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::{Bytes, Event, EventParam, Hash, Log, RawLog, Token};
 
