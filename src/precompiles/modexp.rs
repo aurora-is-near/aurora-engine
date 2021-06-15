@@ -21,7 +21,7 @@ impl<HF: HardFork> ModExp<HF> {
             exp.bits() as u64 - 1
         } else {
             // else > 32
-            8 * (exp_len - 32) + exp.bits() as u64
+            8 * (exp_len - 32) + exp.bits() as u64 - 1
         }
     }
 
