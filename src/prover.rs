@@ -4,7 +4,9 @@ use crate::engine::Engine;
 use crate::log_entry::LogEntry;
 use crate::precompiles::ecrecover;
 use crate::types::{AccountId, EthAddress};
-use alloc::{format, vec::Vec};
+#[cfg(feature = "log")]
+use alloc::format;
+use alloc::vec::Vec;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::{Bytes, Event, EventParam, Hash, Log, RawLog, Token};
 
@@ -159,13 +161,13 @@ fn encode_eip712(
             Token::Address(H160::from(custodian_address)),
         ])),
     ]);
-    sdk::log(&format!(
+    crate::log!(&format!(
         "Domain_separator encoded: {}",
         hex::encode(domain_separator_encoded.clone())
     ));
 
     let domain_separator = sdk::keccak(&domain_separator_encoded);
-    sdk::log(&format!(
+    crate::log!(&format!(
         "Domain_separator hash: {}",
         hex::encode(domain_separator)
     ));
@@ -188,13 +190,13 @@ fn encode_eip712(
             Token::Address(H160::from(custodian_address)),
         ])),
     ]);
-    sdk::log(&format!(
+    crate::log!(&format!(
         "WithdrawFromEVM struct encoded: {}",
         hex::encode(withdraw_from_evm_struct_encoded.clone()),
     ));
 
     let withdraw_from_evm_struct_hash = sdk::keccak(&withdraw_from_evm_struct_encoded);
-    sdk::log(&format!(
+    crate::log!(&format!(
         "WithdrawFromEVM struct hash: {}",
         hex::encode(withdraw_from_evm_struct_hash)
     ));
@@ -204,13 +206,16 @@ fn encode_eip712(
         Token::FixedBytes(domain_separator.as_bytes().to_vec()),
         Token::FixedBytes(withdraw_from_evm_struct_hash.as_bytes().to_vec()),
     ]);
-    sdk::log(&format!(
+    crate::log!(&format!(
         "digest_encoded: {}",
         hex::encode(digest_encoded.clone())
     ));
 
+    // clippy doesn't like this `let` binding if the logging feature is disabled
+    // because the log line is not really there in that case
+    #[allow(clippy::let_and_return)]
     let digest = sdk::keccak(&digest_encoded);
-    sdk::log(&format!("digest: {}", hex::encode(digest)));
+    crate::log!(&format!("digest: {}", hex::encode(&digest)));
     digest
 }
 
@@ -229,9 +234,9 @@ pub fn verify_withdraw_eip712(
         WITHDRAW_FROM_EVM_TYPEHASH,
     );
     let withdraw_msg_signer = ecrecover(res, &eip712_signature[..]).unwrap();
-    sdk::log(&format!("sender: {}", hex::encode(sender)));
-    sdk::log(&format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
-    sdk::log(&format!(
+    crate::log!(&format!("sender: {}", hex::encode(sender)));
+    crate::log!(&format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
+    crate::log!(&format!(
         "ecrecover: {}",
         H160::from(sender) == withdraw_msg_signer
     ));
@@ -254,9 +259,9 @@ pub fn verify_transfer_eip712(
         TRANSFER_FROM_EVM_TO_NEAR_TYPEHASH,
     );
     let withdraw_msg_signer = ecrecover(res, &eip712_signature[..]).unwrap();
-    sdk::log(&format!("sender: {}", hex::encode(sender)));
-    sdk::log(&format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
-    sdk::log(&format!(
+    crate::log!(&format!("sender: {}", hex::encode(sender)));
+    crate::log!(&format!("ecrecover: {}", hex::encode(withdraw_msg_signer)));
+    crate::log!(&format!(
         "ecrecover: {}",
         H160::from(sender) == withdraw_msg_signer
     ));

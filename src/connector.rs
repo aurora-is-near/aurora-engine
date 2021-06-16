@@ -77,8 +77,7 @@ impl EthConnectorContract {
             !sdk::storage_has_key(&Self::get_contract_key(&EthConnectorStorageId::Contract)),
             "ERR_CONTRACT_INITIALIZED"
         );
-        #[cfg(feature = "log")]
-        sdk::log("[init contract]");
+        crate::log!("[init contract]");
 
         let contract_data = Self::set_contract_data(SetContractDataCallArgs {
             prover_account: args.prover_account,
@@ -180,8 +179,7 @@ impl EthConnectorContract {
     pub fn deposit(&self) {
         self.assert_not_paused(PAUSE_DEPOSIT);
 
-        #[cfg(feature = "log")]
-        sdk::log("[Deposit tokens]");
+        crate::log!("[Deposit tokens]");
 
         // Get incoming deposit arguments
         let raw_proof = sdk::read_input();
@@ -189,8 +187,7 @@ impl EthConnectorContract {
         // Fetch event data from Proof
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
 
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
             hex::encode(event.sender),
             event.recipient,
@@ -198,8 +195,7 @@ impl EthConnectorContract {
             event.fee.as_u128()
         ));
 
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Event's address {}, custodian address {}",
             hex::encode(&event.eth_custodian_address),
             hex::encode(&self.contract.eth_custodian_address),
@@ -212,8 +208,7 @@ impl EthConnectorContract {
         assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
 
         // Verify proof data with cross-contract call to prover account
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Deposit verify_log_entry for prover: {}",
             self.contract.prover_account,
         ));
@@ -292,8 +287,7 @@ impl EthConnectorContract {
         sdk::assert_private_call();
         let data: FinishDepositCallArgs =
             FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
-        #[cfg(feature = "log")]
-        sdk::log(&format!("Finish deposit NEAR amount: {}", data.amount));
+        crate::log!(&format!("Finish deposit NEAR amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
 
         // Check promise results
@@ -301,8 +295,7 @@ impl EthConnectorContract {
             PromiseResult::Successful(x) => x,
             _ => sdk::panic_utf8(b"ERR_PROMISE_INDEX"),
         };
-        #[cfg(feature = "log")]
-        sdk::log("Check verification_success");
+        crate::log!("Check verification_success");
         let verification_success = bool::try_from_slice(&data0).unwrap();
         assert!(verification_success, "ERR_VERIFY_PROOF");
 
@@ -345,8 +338,7 @@ impl EthConnectorContract {
 
     /// Record used proof as hash key
     fn record_proof(&mut self, key: &str) {
-        #[cfg(feature = "log")]
-        sdk::log(&format!("Record proof: {}", key));
+        crate::log!(&format!("Record proof: {}", key));
 
         assert!(!self.check_used_event(key), "ERR_PROOF_EXIST");
         self.save_used_event(key);
@@ -354,8 +346,7 @@ impl EthConnectorContract {
 
     ///  Mint nETH tokens
     fn mint_eth_on_near(&mut self, owner_id: AccountId, amount: Balance) {
-        #[cfg(feature = "log")]
-        sdk::log(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
+        crate::log!(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
 
         if self.ft.accounts_get(&owner_id).is_none() {
             self.ft.accounts_insert(&owner_id, 0);
@@ -365,8 +356,7 @@ impl EthConnectorContract {
 
     ///  Mint ETH tokens
     fn mint_eth_on_aurora(&mut self, owner_id: EthAddress, amount: Balance) {
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Mint {} ETH tokens for: {}",
             amount,
             hex::encode(owner_id)
@@ -376,8 +366,7 @@ impl EthConnectorContract {
 
     /// Burn ETH tokens
     fn burn_eth_on_aurora(&mut self, address: EthAddress, amount: Balance) {
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Burn {} ETH tokens for: {}",
             amount,
             hex::encode(address)
@@ -411,17 +400,15 @@ impl EthConnectorContract {
     /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
     pub fn ft_total_eth_supply_on_near(&self) {
         let total_supply = self.ft.ft_total_eth_supply_on_near();
+        crate::log!(&format!("Total ETH supply on NEAR: {}", total_supply));
         sdk::return_output(total_supply.to_string().as_bytes());
-        #[cfg(feature = "log")]
-        sdk::log(&format!("Total ETH supply on NEAR: {}", total_supply));
     }
 
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
     pub fn ft_total_eth_supply_on_aurora(&self) {
         let total_supply = self.ft.ft_total_eth_supply_on_aurora();
+        crate::log!(&format!("Total ETH supply on Aurora: {}", total_supply));
         sdk::return_output(total_supply.to_string().as_bytes());
-        #[cfg(feature = "log")]
-        sdk::log(&format!("Total ETH supply on Aurora: {}", total_supply));
     }
 
     /// Return balance of nETH (ETH on Near)
@@ -429,13 +416,14 @@ impl EthConnectorContract {
         let args = BalanceOfCallArgs::from(
             parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
+
         let balance = self.ft.ft_balance_of(&args.account_id);
-        sdk::return_output(balance.to_string().as_bytes());
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Balance of nETH [{}]: {}",
             args.account_id, balance
         ));
+
+        sdk::return_output(balance.to_string().as_bytes());
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
@@ -445,8 +433,7 @@ impl EthConnectorContract {
         let balance = self
             .ft
             .internal_unwrap_balance_of_eth_on_aurora(args.address);
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Balance of ETH [{}]: {}",
             hex::encode(args.address),
             balance
@@ -463,8 +450,7 @@ impl EthConnectorContract {
         self.ft
             .ft_transfer(&args.receiver_id, args.amount, &args.memo);
         self.save_ft_contract();
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Transfer amount {} to {} success with memo: {:?}",
             args.amount, args.receiver_id, args.memo
         ));
@@ -480,8 +466,7 @@ impl EthConnectorContract {
         let amount = self
             .ft
             .ft_resolve_transfer(&args.sender_id, &args.receiver_id, args.amount);
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Resolve transfer from {} to {} success",
             args.sender_id, args.receiver_id
         ));
@@ -494,8 +479,7 @@ impl EthConnectorContract {
     /// We starting early checking for message data to avoid `ft_on_transfer` call panics
     /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
     pub fn ft_transfer_call(&mut self, args: TransferCallCallArgs) {
-        #[cfg(feature = "log")]
-        sdk::log(&format!(
+        crate::log!(&format!(
             "Transfer call to {} amount {}",
             args.receiver_id, args.amount,
         ));
@@ -559,8 +543,7 @@ impl EthConnectorContract {
     /// ft_on_transfer callback function
     #[allow(clippy::unnecessary_unwrap)]
     pub fn ft_on_transfer(&mut self, engine: &Engine) {
-        #[cfg(feature = "log")]
-        sdk::log("Call ft_on_transfer");
+        crate::log!("Call ft_on_transfer");
         let args = FtOnTransfer::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();

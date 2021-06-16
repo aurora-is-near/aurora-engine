@@ -383,7 +383,7 @@ fn test_ft_transfer() {
         "ft_transfer",
         json!({
             "receiver_id": DEPOSITED_RECIPIENT,
-            "amount": transfer_amount,
+            "amount": transfer_amount.to_string(),
             "memo": "transfer memo"
         })
         .to_string()
@@ -446,7 +446,7 @@ fn test_ft_transfer_call_eth() {
         "ft_transfer_call",
         json!({
             "receiver_id": CONTRACT_ACC,
-            "amount": transfer_amount as u64,
+            "amount": transfer_amount.to_string(),
             "msg": message,
         })
         .to_string()
@@ -547,7 +547,7 @@ fn test_ft_transfer_call_without_relayer() {
         "ft_transfer_call",
         json!({
             "receiver_id": CONTRACT_ACC,
-            "amount": transfer_amount as u64,
+            "amount": transfer_amount.to_string(),
             "msg": message,
         })
         .to_string()
@@ -603,7 +603,7 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
         "ft_transfer_call",
         json!({
             "receiver_id": CONTRACT_ACC,
-            "amount": transfer_amount as u64,
+            "amount": transfer_amount.to_string(),
             "msg": message,
         })
         .to_string()
@@ -931,7 +931,7 @@ fn test_get_accounts_counter_and_transfer() {
         "ft_transfer",
         json!({
             "receiver_id": DEPOSITED_RECIPIENT,
-            "amount": transfer_amount,
+            "amount": transfer_amount.to_string(),
             "memo": "transfer memo"
         })
         .to_string()
@@ -1203,7 +1203,7 @@ fn assert_execution_status_failure(
     // "right: 'MISMATCHED_DATA': ERR_MSG [src/some_file.rs:LINE_NUMBER:COLUMN_NUMBER]"
     // So the ": ERR_MSG [" pattern should catch all invariants of error, even if one of the errors
     // message is a subset of another one (e.g. `ERR_MSG_FAILED` is a subset of `ERR_MSG_FAILED_FOO`)
-    let expected_err_msg_pattern = format!(": {} [", err_msg);
+    let expected_err_msg_pattern = format!(": {}", err_msg);
 
     match execution_status {
         ExecutionStatus::Failure(err) => {
@@ -1212,4 +1212,89 @@ fn assert_execution_status_failure(
         }
         _ => panic!("{}", panic_msg),
     }
+}
+
+#[test]
+fn test_ft_transfer_max_value() {
+    let (_, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_eth_to_near(&contract, CONTRACT_ACC);
+
+    let transfer_amount = u128::MAX;
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "ft_transfer",
+        json!({
+            "receiver_id": DEPOSITED_RECIPIENT,
+            "amount": transfer_amount.to_string(),
+            "memo": "transfer memo"
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    let promises = res.promise_results();
+    let promise = &promises[promises.len() - 3];
+    eprintln!("{:#?}", promise.as_ref().unwrap().outcome().clone().status);
+    assert_execution_status_failure(
+        promise.as_ref().unwrap().outcome().clone().status,
+        "ERR_NOT_ENOUGH_BALANCE",
+        "Expected failure as the amount is too large",
+    );
+}
+
+#[test]
+fn test_ft_transfer_empty_value() {
+    let (_, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_eth_to_near(&contract, CONTRACT_ACC);
+
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "ft_transfer",
+        json!({
+            "receiver_id": DEPOSITED_RECIPIENT,
+            "amount": "",
+            "memo": "transfer memo"
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    let promises = res.promise_results();
+    let promise = &promises[promises.len() - 3];
+    eprintln!("{:#?}", promise.as_ref().unwrap().outcome().clone().status);
+    assert_execution_status_failure(
+        promise.as_ref().unwrap().outcome().clone().status,
+        "ERR_FAILED_PARSE_U128",
+        "Expected failure as empty string can't be parsed to u128",
+    );
+}
+
+#[test]
+fn test_ft_transfer_wrong_u128_json_type() {
+    let (_, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_eth_to_near(&contract, CONTRACT_ACC);
+
+    let res = contract.call(
+        CONTRACT_ACC.to_string(),
+        "ft_transfer",
+        json!({
+            "receiver_id": DEPOSITED_RECIPIENT,
+            "amount": 200,
+            "memo": "transfer memo"
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    let promises = res.promise_results();
+    let promise = &promises[promises.len() - 3];
+    eprintln!("{:#?}", promise.as_ref().unwrap().outcome().clone().status);
+    assert_execution_status_failure(
+        promise.as_ref().unwrap().outcome().clone().status,
+        "ERR_EXPECTED_STRING_GOT_NUMBER",
+        "Expected failure as number type can't be parsed to u128",
+    );
 }
