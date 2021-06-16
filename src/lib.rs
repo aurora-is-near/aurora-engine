@@ -100,7 +100,9 @@ mod contract {
     use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
-    use crate::types::{near_account_to_evm_address, u256_to_arr, ERR_FAILED_PARSE};
+    use crate::types::{
+        near_account_to_evm_address, u256_to_arr, SdkExpect, SdkUnwrap, ERR_FAILED_PARSE,
+    };
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -247,7 +249,7 @@ mod contract {
         // Check intrinsic gas is covered by transaction gas limit
         match signed_transaction
             .transaction
-            .intrinsic_gas(&crate::engine::CONFIG)
+            .intrinsic_gas(crate::engine::CONFIG)
         {
             None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
             Some(intrinsic_gas) => {
@@ -628,49 +630,49 @@ mod contract {
         near_account_to_evm_address(&sdk::current_account_id())
     }
 
-    pub(crate) trait SdkExpect<T> {
-        fn sdk_expect(self, msg: &str) -> T;
-    }
+    // pub(crate) trait SdkExpect<T> {
+    //     fn sdk_expect(self, msg: &str) -> T;
+    // }
 
-    impl<T> SdkExpect<T> for Option<T> {
-        fn sdk_expect(self, msg: &str) -> T {
-            match self {
-                Some(t) => t,
-                None => sdk::panic_utf8(msg.as_ref()),
-            }
-        }
-    }
+    // impl<T> SdkExpect<T> for Option<T> {
+    //     fn sdk_expect(self, msg: &str) -> T {
+    //         match self {
+    //             Some(t) => t,
+    //             None => sdk::panic_utf8(msg.as_ref()),
+    //         }
+    //     }
+    // }
 
-    impl<T, E> SdkExpect<T> for Result<T, E> {
-        fn sdk_expect(self, msg: &str) -> T {
-            match self {
-                Ok(t) => t,
-                Err(_) => sdk::panic_utf8(msg.as_ref()),
-            }
-        }
-    }
+    // impl<T, E> SdkExpect<T> for Result<T, E> {
+    //     fn sdk_expect(self, msg: &str) -> T {
+    //         match self {
+    //             Ok(t) => t,
+    //             Err(_) => sdk::panic_utf8(msg.as_ref()),
+    //         }
+    //     }
+    // }
 
-    pub(crate) trait SdkUnwrap<T> {
-        fn sdk_unwrap(self) -> T;
-    }
+    // pub(crate) trait SdkUnwrap<T> {
+    //     fn sdk_unwrap(self) -> T;
+    // }
 
-    impl<T> SdkUnwrap<T> for Option<T> {
-        fn sdk_unwrap(self) -> T {
-            match self {
-                Some(t) => t,
-                None => sdk::panic_utf8("ERR_UNWRAP".as_bytes()),
-            }
-        }
-    }
+    // impl<T> SdkUnwrap<T> for Option<T> {
+    //     fn sdk_unwrap(self) -> T {
+    //         match self {
+    //             Some(t) => t,
+    //             None => sdk::panic_utf8("ERR_UNWRAP".as_bytes()),
+    //         }
+    //     }
+    // }
 
-    impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for Result<T, E> {
-        fn sdk_unwrap(self) -> T {
-            match self {
-                Ok(t) => t,
-                Err(e) => sdk::panic_utf8(e.as_ref()),
-            }
-        }
-    }
+    // impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for Result<T, E> {
+    //     fn sdk_unwrap(self) -> T {
+    //         match self {
+    //             Ok(t) => t,
+    //             Err(e) => sdk::panic_utf8(e.as_ref()),
+    //         }
+    //     }
+    // }
 
     pub(crate) trait SdkProcess<T> {
         fn sdk_process(self);
