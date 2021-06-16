@@ -87,7 +87,7 @@ mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use crate::connector::EthConnectorContract;
-    use crate::engine::{Engine, EngineResult, EngineState};
+    use crate::engine::{Engine, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
@@ -101,7 +101,8 @@ mod contract {
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{
-        near_account_to_evm_address, u256_to_arr, SdkExpect, SdkUnwrap, ERR_FAILED_PARSE,
+        near_account_to_evm_address, u256_to_arr, SdkExpect, SdkProcess, SdkUnwrap,
+        ERR_FAILED_PARSE,
     };
 
     const CODE_KEY: &[u8; 4] = b"CODE";
@@ -628,63 +629,6 @@ mod contract {
 
     pub fn current_address() -> Address {
         near_account_to_evm_address(&sdk::current_account_id())
-    }
-
-    // pub(crate) trait SdkExpect<T> {
-    //     fn sdk_expect(self, msg: &str) -> T;
-    // }
-
-    // impl<T> SdkExpect<T> for Option<T> {
-    //     fn sdk_expect(self, msg: &str) -> T {
-    //         match self {
-    //             Some(t) => t,
-    //             None => sdk::panic_utf8(msg.as_ref()),
-    //         }
-    //     }
-    // }
-
-    // impl<T, E> SdkExpect<T> for Result<T, E> {
-    //     fn sdk_expect(self, msg: &str) -> T {
-    //         match self {
-    //             Ok(t) => t,
-    //             Err(_) => sdk::panic_utf8(msg.as_ref()),
-    //         }
-    //     }
-    // }
-
-    // pub(crate) trait SdkUnwrap<T> {
-    //     fn sdk_unwrap(self) -> T;
-    // }
-
-    // impl<T> SdkUnwrap<T> for Option<T> {
-    //     fn sdk_unwrap(self) -> T {
-    //         match self {
-    //             Some(t) => t,
-    //             None => sdk::panic_utf8("ERR_UNWRAP".as_bytes()),
-    //         }
-    //     }
-    // }
-
-    // impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for Result<T, E> {
-    //     fn sdk_unwrap(self) -> T {
-    //         match self {
-    //             Ok(t) => t,
-    //             Err(e) => sdk::panic_utf8(e.as_ref()),
-    //         }
-    //     }
-    // }
-
-    pub(crate) trait SdkProcess<T> {
-        fn sdk_process(self);
-    }
-
-    impl<T: AsRef<[u8]>> SdkProcess<T> for EngineResult<T> {
-        fn sdk_process(self) {
-            match self {
-                Ok(r) => sdk::return_output(r.as_ref()),
-                Err(e) => sdk::panic_utf8(e.as_ref()),
-            }
-        }
     }
 }
 

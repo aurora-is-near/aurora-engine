@@ -65,16 +65,6 @@ impl JsonValue {
         }
     }
 
-    pub fn u128_from_str(&self, key: &str) -> Result<u128, JsonError> {
-        match self {
-            JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
-                JsonValue::String(s) => s.parse::<u128>().map_err(|_| JsonError::InvalidU128),
-                _ => Err(JsonError::InvalidU128),
-            },
-            _ => Err(JsonError::NotJsonType),
-        }
-    }
-
     #[allow(dead_code)]
     pub fn bool(&self, key: &str) -> Result<bool, JsonError> {
         match self {

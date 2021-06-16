@@ -153,7 +153,7 @@ impl TryFrom<json::JsonValue> for NEP141FtOnTransferArgs {
     fn try_from(value: json::JsonValue) -> Result<Self, Self::Error> {
         Ok(Self {
             sender_id: value.string("sender_id")?,
-            amount: value.u128_from_str("amount")?,
+            amount: value.u128("amount")?,
             msg: value.string("msg")?.into(),
         })
     }

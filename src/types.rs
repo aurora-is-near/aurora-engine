@@ -6,6 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
 
+use crate::engine::EngineResult;
 #[cfg(feature = "engine")]
 use crate::sdk;
 
@@ -266,6 +267,19 @@ impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for core::result::Result<T, E> {
     fn sdk_unwrap(self) -> T {
         match self {
             Ok(t) => t,
+            Err(e) => sdk::panic_utf8(e.as_ref()),
+        }
+    }
+}
+
+pub(crate) trait SdkProcess<T> {
+    fn sdk_process(self);
+}
+
+impl<T: AsRef<[u8]>> SdkProcess<T> for EngineResult<T> {
+    fn sdk_process(self) {
+        match self {
+            Ok(r) => sdk::return_output(r.as_ref()),
             Err(e) => sdk::panic_utf8(e.as_ref()),
         }
     }
