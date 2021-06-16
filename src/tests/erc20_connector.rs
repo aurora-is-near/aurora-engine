@@ -9,6 +9,7 @@ use ethabi::Token;
 use near_vm_logic::VMOutcome;
 use near_vm_runner::VMError;
 use secp256k1::SecretKey;
+use serde_json::json;
 use sha3::Digest;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
@@ -199,13 +200,13 @@ impl test_utils::AuroraRunner {
             "ft_on_transfer",
             nep141,
             relayer_id,
-            NEP141FtOnTransferArgs {
-                sender_id,
-                amount,
-                msg,
-            }
-            .try_to_vec()
-            .unwrap(),
+            json!({
+                "sender_id": sender_id,
+                "amount": amount,
+                "msg": msg
+            })
+            .to_string()
+            .into_bytes(),
         );
         res.check_ok();
         String::from_utf8(res.value()).unwrap()

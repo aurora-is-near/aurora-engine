@@ -23,6 +23,6 @@ res/
 # Other
 etc/state-migration-test/target/
 
-node_modules/
+node_modules/*
 artifacts/
 cache

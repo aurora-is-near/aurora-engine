@@ -13,6 +13,7 @@ pub use alloc::{
 #[cfg(not(feature = "std"))]
 pub use core::{
     cmp::Ordering,
+    convert::TryFrom,
     convert::TryInto,
     marker::PhantomData,
     mem,
@@ -26,6 +27,7 @@ pub use std::{
     boxed::Box,
     cmp::Ordering,
     collections::HashMap,
+    convert::TryFrom,
     convert::TryInto,
     error::Error,
     fmt, format,

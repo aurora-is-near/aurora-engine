@@ -73,6 +73,7 @@ rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
 lazy-static-include = "3.1.1"
+base64 = "0.13.0"
 
 [features]
 default = ["sha2", "std"]

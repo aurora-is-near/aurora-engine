@@ -580,7 +580,7 @@ impl Engine {
         sdk::return_output(b"0");
     }
 
-    fn nep141_erc20_map() -> BijectionMap<
+    pub fn nep141_erc20_map() -> BijectionMap<
         { KeyPrefix::Nep141Erc20Map as KeyPrefixU8 },
         { KeyPrefix::Erc20Nep141Map as KeyPrefixU8 },
     > {

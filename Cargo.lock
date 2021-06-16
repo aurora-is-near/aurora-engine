@@ -118,6 +118,7 @@ name = "aurora-engine"
 version = "1.0.0"
 dependencies = [
  "aurora-bn",
+ "base64 0.13.0",
  "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh",
  "bstr",

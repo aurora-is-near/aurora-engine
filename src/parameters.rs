@@ -4,7 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::admin_controlled::PausedMask;
 #[cfg(feature = "engine")]
 use crate::json;
-use crate::prelude::{String, ToString, Vec};
+use crate::prelude::{String, ToString, TryFrom, Vec};
 #[cfg(feature = "engine")]
 use crate::prover::Proof;
 #[cfg(feature = "engine")]
@@ -138,11 +138,24 @@ pub struct BeginBlockArgs {
 
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
-#[derive(BorshSerialize, BorshDeserialize)]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
     pub amount: Balance,
     pub msg: String,
+}
+
+#[cfg(feature = "engine")]
+impl TryFrom<json::JsonValue> for NEP141FtOnTransferArgs {
+    // TODO: Define type of error
+    type Error = ();
+
+    fn try_from(value: json::JsonValue) -> Result<Self, Self::Error> {
+        Ok(Self {
+            sender_id: value.string("sender_id")?,
+            amount: value.u128_from_str("amount")?,
+            msg: value.string("msg")?.into(),
+        })
+    }
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]

@@ -96,6 +96,7 @@ mod contract {
         SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
     };
 
+    use crate::json::parse_json;
     use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
@@ -323,11 +324,19 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
         let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
+
         if sdk::predecessor_account_id() == sdk::current_account_id() {
             let engine = Engine::new(predecessor_address()).sdk_unwrap();
             EthConnectorContract::get_instance().ft_on_transfer(&engine)
         } else {
-            let args: NEP141FtOnTransferArgs = sdk::read_input_borsh().sdk_unwrap();
+            // TODO: Use this approach for EthConnector as well
+
+            let args: NEP141FtOnTransferArgs = parse_json(sdk::read_input().as_slice())
+                .sdk_unwrap()
+                .try_into()
+                .map_err(|_| b"ERR_ARG_PARSE")
+                .sdk_unwrap();
+
             engine.receive_erc20_tokens(args);
         }
     }
@@ -519,8 +528,6 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
-        use crate::json::parse_json;
-
         // Check is payable
         sdk::assert_one_yocto();
 
@@ -564,6 +571,26 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_accounts_counter() {
         EthConnectorContract::get_instance().get_accounts_counter()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_erc20_from_nep141() {
+        sdk::return_output(
+            Engine::nep141_erc20_map()
+                .lookup_left(sdk::read_input().as_slice())
+                .sdk_expect("NEP141_NOT_FOUND")
+                .as_slice(),
+        );
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_nep141_from_erc20() {
+        sdk::return_output(
+            Engine::nep141_erc20_map()
+                .lookup_right(sdk::read_input().as_slice())
+                .sdk_expect("ERC20_NOT_FOUND")
+                .as_slice(),
+        );
     }
 
     #[cfg(feature = "integration-test")]
