@@ -1,10 +1,11 @@
 use evm::{Context, ExitError};
 
-use crate::parameters::PromiseCreateArgs;
-use crate::prelude::{is_valid_account_id, Cow, PhantomData, String, ToString, U256};
+use crate::parameters::{PromiseCreateArgs, WithdrawCallArgs};
+use crate::prelude::{is_valid_account_id, Cow, PhantomData, String, ToString, TryInto, U256};
 use crate::storage::{bytes_to_key, KeyPrefix};
 use crate::types::AccountId;
 use crate::AuroraState;
+use borsh::BorshSerialize;
 
 use super::{Precompile, PrecompileResult};
 
@@ -249,23 +250,19 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
                 //
                 // Input slice format:
                 //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
-
-                let eth_recipient: String = hex::encode(input);
-
-                if eth_recipient.len() == 20 {
-                    (
-                        String::from_utf8(crate::sdk::current_account_id()).unwrap(),
-                        // There is no way to inject json, given the encoding of both arguments
-                        // as decimal and hexadecimal respectively.
-                        crate::prelude::format!(
-                            r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                            context.apparent_value.as_u128(),
-                            eth_recipient
-                        ),
-                    )
-                } else {
-                    return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
-                }
+                (
+                    String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                    // There is no way to inject json, given the encoding of both arguments
+                    // as decimal and hexadecimal respectively.
+                    WithdrawCallArgs {
+                        recipient_address: input.try_into().map_err(|_| {
+                            ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS"))
+                        })?,
+                        amount: context.apparent_value.as_u128(),
+                    }
+                    .try_to_vec()
+                    .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
+                )
             }
             0x1 => {
                 // ERC-20 transfer
@@ -300,7 +297,9 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
                             r#"{{"amount": "{}", "recipient": "{}"}}"#,
                             amount,
                             eth_recipient
-                        ),
+                        )
+                        .as_bytes()
+                        .to_vec(),
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
@@ -316,7 +315,7 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
         let promise = PromiseCreateArgs {
             target_account_id: nep141_address,
             method: "withdraw".to_string(),
-            args: serialized_args.as_bytes().to_vec(),
+            args: serialized_args,
             attached_balance: 1,
             attached_gas: costs::WITHDRAWAL_GAS,
         };
