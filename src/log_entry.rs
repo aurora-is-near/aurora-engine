@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use crate::prelude::Vec;
 use primitive_types::{H160, H256};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]

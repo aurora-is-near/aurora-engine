@@ -2,14 +2,15 @@ use crate::precompiles::{
     Berlin, Byzantium, HardFork, Precompile, PrecompileOutput, PrecompileResult,
 };
 use crate::prelude::{PhantomData, Vec, U256};
+use crate::AuroraState;
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
 pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
 
-pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
+pub(super) struct ModExp<HF: HardFork, S>(PhantomData<HF>, PhantomData<S>);
 
-impl<HF: HardFork> ModExp<HF> {
+impl<HF: HardFork, S: AuroraState> ModExp<HF, S> {
     // Note: the output of this function is bounded by 2^67
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> U256 {
         #[allow(clippy::redundant_closure)]
@@ -72,7 +73,7 @@ impl<HF: HardFork> ModExp<HF> {
     }
 }
 
-impl ModExp<Byzantium> {
+impl<S: AuroraState> ModExp<Byzantium, S> {
     // ouput of this function is bounded by 2^128
     fn mul_complexity(x: u64) -> U256 {
         if x <= 64 {
@@ -88,7 +89,7 @@ impl ModExp<Byzantium> {
     }
 }
 
-impl Precompile for ModExp<Byzantium> {
+impl<S: AuroraState> Precompile<S> for ModExp<Byzantium, S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
@@ -102,7 +103,13 @@ impl Precompile for ModExp<Byzantium> {
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -113,7 +120,7 @@ impl Precompile for ModExp<Byzantium> {
     }
 }
 
-impl ModExp<Berlin> {
+impl<S: AuroraState> ModExp<Berlin, S> {
     // output bounded by 2^122
     fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
@@ -122,7 +129,7 @@ impl ModExp<Berlin> {
     }
 }
 
-impl Precompile for ModExp<Berlin> {
+impl<S: AuroraState> Precompile<S> for ModExp<Berlin, S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
@@ -134,7 +141,13 @@ impl Precompile for ModExp<Berlin> {
         Ok(core::cmp::max(200, saturating_round(gas)))
     }
 
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -181,18 +194,12 @@ fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::{new_context, new_state, MockState};
+
     use super::*;
 
     // Byzantium tests: https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp.json
     // Berlin tests:https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp_eip2565.json
-
-    fn new_context() -> Context {
-        Context {
-            address: Default::default(),
-            caller: Default::default(),
-            apparent_value: Default::default(),
-        }
-    }
 
     struct Test {
         input: &'static str,
@@ -349,10 +356,17 @@ mod tests {
     fn test_modexp() {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
+            let mut state = new_state();
 
-            let res = ModExp::<Byzantium>::run(&input, *test_gas, &new_context())
-                .unwrap()
-                .output;
+            let res = ModExp::<Byzantium, MockState>::run(
+                &input,
+                *test_gas,
+                &new_context(),
+                &mut state,
+                false,
+            )
+            .unwrap()
+            .output;
             let expected = hex::decode(&test.expected).unwrap();
             assert_eq!(res, expected, "{}", test.name);
         }
@@ -363,7 +377,7 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
-            let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+            let gas = ModExp::<Byzantium, MockState>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);
         }
     }
@@ -373,7 +387,7 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BERLIN_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
-            let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
+            let gas = ModExp::<Berlin, MockState>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);
         }
     }
@@ -394,7 +408,7 @@ mod tests {
         input.extend_from_slice(&crate::types::u256_to_arr(&exp));
 
         // completes without any overflow
-        ModExp::<Berlin>::required_gas(&input).unwrap();
+        ModExp::<Berlin, MockState>::required_gas(&input).unwrap();
     }
 
     #[test]
@@ -413,12 +427,14 @@ mod tests {
         input.extend_from_slice(&crate::types::u256_to_arr(&exp));
 
         // completes without any overflow
-        ModExp::<Berlin>::required_gas(&input).unwrap();
+        ModExp::<Berlin, MockState>::required_gas(&input).unwrap();
     }
 
     #[test]
     fn test_berlin_modexp_empty_input() {
-        let res = ModExp::<Berlin>::run(&[], 100_000, &new_context()).unwrap();
+        let mut state = new_state();
+        let res = ModExp::<Berlin, MockState>::run(&[], 100_000, &new_context(), &mut state, false)
+            .unwrap();
         let expected: Vec<u8> = Vec::new();
         assert_eq!(res.output, expected)
     }

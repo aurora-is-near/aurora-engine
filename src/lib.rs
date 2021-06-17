@@ -8,6 +8,8 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+use crate::parameters::PromiseCreateArgs;
+
 #[cfg(feature = "engine")]
 mod map;
 pub mod meta_parsing;
@@ -21,7 +23,6 @@ pub mod types;
 mod admin_controlled;
 #[cfg(feature = "engine")]
 mod connector;
-#[cfg(feature = "engine")]
 mod deposit_event;
 #[cfg(feature = "engine")]
 pub mod engine;
@@ -29,7 +30,6 @@ pub mod engine;
 mod fungible_token;
 #[cfg(feature = "engine")]
 mod json;
-#[cfg(feature = "engine")]
 mod log_entry;
 mod precompiles;
 #[cfg(feature = "engine")]
@@ -39,6 +39,8 @@ pub mod sdk;
 
 #[cfg(test)]
 mod benches;
+#[cfg(feature = "engine")]
+mod state;
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]
@@ -83,19 +85,22 @@ mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use crate::connector::EthConnectorContract;
-    use crate::engine::{Engine, EngineResult, EngineState};
+    use crate::engine::{Engine, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
-        NewCallArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs,
-        ViewCallArgs,
+        DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs,
+        IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs,
+        SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
     };
-    use crate::prelude::{Address, H256, U256};
+
+    use crate::json::parse_json;
+    use crate::prelude::{format, Address, ToString, TryInto, H160, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{
-        near_account_to_evm_address, u256_to_arr, SdkExpect, SdkUnwrap, ERR_FAILED_PARSE,
+        near_account_to_evm_address, u256_to_arr, SdkExpect, SdkProcess, SdkUnwrap,
+        ERR_FAILED_PARSE,
     };
 
     const CODE_KEY: &[u8; 4] = b"CODE";
@@ -312,6 +317,60 @@ mod contract {
         );
     }
 
+    /// Allow receiving NEP141 tokens to the EVM contract.
+    ///
+    /// This function returns the amount of tokens to return to the sender.
+    /// Either all tokens are transferred tokens are returned in case of an
+    /// error, or no token is returned if tx was successful.
+    #[no_mangle]
+    pub extern "C" fn ft_on_transfer() {
+        let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
+
+        let args: NEP141FtOnTransferArgs = parse_json(sdk::read_input().as_slice())
+            .sdk_unwrap()
+            .try_into()
+            .map_err(|err| format!("ERR_JSON_{:?}", err))
+            .sdk_unwrap();
+
+        if sdk::predecessor_account_id() == sdk::current_account_id() {
+            let engine = Engine::new(predecessor_address()).sdk_unwrap();
+            EthConnectorContract::get_instance().ft_on_transfer(&engine, &args);
+        } else {
+            engine.receive_erc20_tokens(&args);
+        }
+    }
+
+    /// Deploy ERC20 token mapped to a NEP141
+    #[no_mangle]
+    pub extern "C" fn deploy_erc20_token() {
+        // Id of the NEP141 token in Near
+        let args: DeployErc20TokenArgs =
+            DeployErc20TokenArgs::try_from_slice(&sdk::read_input()).sdk_expect("ERR_ARG_PARSE");
+
+        let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
+
+        let erc20_contract = include_bytes!("../etc/eth-contracts/res/EvmErc20.bin");
+        let deploy_args = ethabi::encode(&[
+            ethabi::Token::String("Empty".to_string()),
+            ethabi::Token::String("EMPTY".to_string()),
+            ethabi::Token::Uint(ethabi::Uint::from(0)),
+            ethabi::Token::Address(current_address()),
+        ]);
+
+        Engine::deploy_code_with_input(
+            &mut engine,
+            (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec(),
+        )
+        .map(|res| {
+            let address = H160(res.result.as_slice().try_into().unwrap());
+            engine.register_token(address.as_bytes(), args.nep141.as_bytes());
+            res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
+        })
+        .sdk_process();
+
+        // TODO: charge for storage
+    }
+
     ///
     /// NONMUTATIVE METHODS
     ///
@@ -409,7 +468,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn withdraw() {
-        EthConnectorContract::get_instance().withdraw_near()
+        EthConnectorContract::get_instance().withdraw_eth_from_near()
     }
 
     #[no_mangle]
@@ -418,8 +477,8 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn finish_deposit_near() {
-        EthConnectorContract::get_instance().finish_deposit_near();
+    pub extern "C" fn finish_deposit() {
+        EthConnectorContract::get_instance().finish_deposit();
     }
 
     #[no_mangle]
@@ -433,17 +492,17 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_total_supply() {
-        EthConnectorContract::get_instance().ft_total_supply();
+        EthConnectorContract::get_instance().ft_total_eth_supply_on_near();
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_total_supply_near() {
-        EthConnectorContract::get_instance().ft_total_supply_near();
+    pub extern "C" fn ft_total_eth_supply_on_near() {
+        EthConnectorContract::get_instance().ft_total_eth_supply_on_near();
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_total_supply_eth() {
-        EthConnectorContract::get_instance().ft_total_supply_eth();
+    pub extern "C" fn ft_total_eth_supply_on_aurora() {
+        EthConnectorContract::get_instance().ft_total_eth_supply_on_aurora();
     }
 
     #[no_mangle]
@@ -453,7 +512,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
-        EthConnectorContract::get_instance().ft_balance_of_eth();
+        EthConnectorContract::get_instance().ft_balance_of_eth_on_aurora();
     }
 
     #[no_mangle]
@@ -468,8 +527,6 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
-        use crate::json::parse_json;
-
         // Check is payable
         sdk::assert_one_yocto();
 
@@ -495,12 +552,6 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_on_transfer() {
-        let engine = Engine::new(predecessor_address()).sdk_unwrap();
-        EthConnectorContract::get_instance().ft_on_transfer(&engine)
-    }
-
-    #[no_mangle]
     pub extern "C" fn get_paused_flags() {
         let paused_flags = EthConnectorContract::get_instance().get_paused_flags();
         let data = paused_flags.try_to_vec().expect(ERR_FAILED_PARSE);
@@ -521,11 +572,30 @@ mod contract {
         EthConnectorContract::get_instance().get_accounts_counter()
     }
 
+    #[no_mangle]
+    pub extern "C" fn get_erc20_from_nep141() {
+        sdk::return_output(
+            Engine::nep141_erc20_map()
+                .lookup_left(sdk::read_input().as_slice())
+                .sdk_expect("NEP141_NOT_FOUND")
+                .as_slice(),
+        );
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_nep141_from_erc20() {
+        sdk::return_output(
+            Engine::nep141_erc20_map()
+                .lookup_right(sdk::read_input().as_slice())
+                .sdk_expect("ERC20_NOT_FOUND")
+                .as_slice(),
+        );
+    }
+
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
-        #[cfg(feature = "log")]
-        sdk::log("Call from verify_log_entry");
+        crate::log!("Call from verify_log_entry");
         let data = true.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
     }
@@ -552,16 +622,11 @@ mod contract {
         near_account_to_evm_address(&sdk::predecessor_account_id())
     }
 
-    trait SdkProcess<T> {
-        fn sdk_process(self);
+    pub fn current_address() -> Address {
+        near_account_to_evm_address(&sdk::current_account_id())
     }
+}
 
-    impl<T: AsRef<[u8]>> SdkProcess<T> for EngineResult<T> {
-        fn sdk_process(self) {
-            match self {
-                Ok(r) => sdk::return_output(r.as_ref()),
-                Err(e) => sdk::panic_utf8(e.as_ref()),
-            }
-        }
-    }
+pub trait AuroraState {
+    fn add_promise(&mut self, promise: PromiseCreateArgs);
 }

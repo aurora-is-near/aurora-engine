@@ -13,7 +13,7 @@ const DEFAULT_GAS: u64 = 1_000_000_000;
 impl SelfDestructFactoryConstructor {
     pub fn load() -> Self {
         Self(solidity::ContractConstructor::compile_from_extended_json(
-            "etc/eth-contracts/artifacts/contracts/StateTest.sol/SelfDestructFactory.json",
+            "etc/eth-contracts/artifacts/contracts/test/StateTest.sol/SelfDestructFactory.json",
         ))
     }
 
@@ -83,7 +83,7 @@ pub(crate) struct SelfDestructConstructor(pub solidity::ContractConstructor);
 impl SelfDestructConstructor {
     pub fn load() -> Self {
         Self(solidity::ContractConstructor::compile_from_extended_json(
-            "etc/eth-contracts/artifacts/contracts/StateTest.sol/SelfDestruct.json",
+            "etc/eth-contracts/artifacts/contracts/test/StateTest.sol/SelfDestruct.json",
         ))
     }
 }
