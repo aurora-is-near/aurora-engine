@@ -4,16 +4,12 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::admin_controlled::PausedMask;
 #[cfg(feature = "engine")]
 use crate::json;
-#[cfg(feature = "engine")]
-use crate::prelude::ToString;
-use crate::prelude::{String, Vec};
-#[cfg(feature = "engine")]
-use crate::prover::Proof;
+use crate::prelude::{is_valid_account_id, String, ToString, TryFrom, Vec};
 #[cfg(feature = "engine")]
 use crate::sdk;
-use crate::types::{AccountId, RawAddress, RawH256, RawU256};
+use crate::types::{AccountId, Balance, Proof, RawAddress, RawH256, RawU256};
 #[cfg(feature = "engine")]
-use crate::types::{Balance, EthAddress, SdkUnwrap};
+use crate::types::{EthAddress, SdkUnwrap};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -92,6 +88,11 @@ pub struct ViewCallArgs {
     pub input: Vec<u8>,
 }
 
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
+pub struct DeployErc20TokenArgs {
+    pub nep141: AccountId,
+}
+
 /// Borsh-encoded parameters for the `get_storage_at` function.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct GetStorageAtArgs {
@@ -133,6 +134,54 @@ pub struct BeginBlockArgs {
     pub gaslimit: RawU256,
 }
 
+/// Borsh-encoded parameters for the `ft_transfer_call` function
+/// for regular NEP-141 tokens.
+pub struct NEP141FtOnTransferArgs {
+    pub sender_id: AccountId,
+    pub amount: Balance,
+    pub msg: String,
+}
+
+#[cfg(feature = "engine")]
+impl TryFrom<json::JsonValue> for NEP141FtOnTransferArgs {
+    type Error = json::JsonError;
+
+    fn try_from(value: json::JsonValue) -> Result<Self, Self::Error> {
+        Ok(Self {
+            sender_id: value.string("sender_id")?,
+            amount: value.u128("amount")?,
+            msg: value.string("msg")?,
+        })
+    }
+}
+
+#[cfg(feature = "engine")]
+impl TryFrom<NEP141FtOnTransferArgs> for String {
+    type Error = json::ParseError;
+
+    fn try_from(value: NEP141FtOnTransferArgs) -> Result<Self, Self::Error> {
+        if !is_valid_account_id(value.sender_id.as_bytes()) {
+            return Err(json::ParseError::InvalidAccountId);
+        }
+
+        Ok(crate::prelude::format!(
+            r#"{{"sender_id": "{}", "amount": "{}", "msg": "{}"}}"#,
+            value.sender_id,
+            value.amount,
+            // Escape message to avoid json injection attacks
+            value.msg.replace("\\", "\\\\").replace("\"", "\\\"")
+        ))
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct PromiseCreateArgs {
+    pub target_account_id: AccountId,
+    pub method: String,
+    pub args: Vec<u8>,
+    pub attached_balance: u128,
+    pub attached_gas: u64,
+}
 /// Eth-connector deposit arguments
 #[cfg(feature = "engine")]
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -158,15 +207,6 @@ pub struct WithdrawResult {
     pub amount: Balance,
     pub recipient_id: RawAddress,
     pub eth_custodian_address: RawAddress,
-}
-
-/// ft_on_transfer eth-connector call args
-#[cfg(feature = "engine")]
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct FtOnTransfer {
-    pub amount: Balance,
-    pub msg: String,
-    pub receiver_id: AccountId,
 }
 
 /// ft_resolve_transfer eth-connector call args

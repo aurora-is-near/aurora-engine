@@ -2,14 +2,15 @@ use crate::precompiles::{
     Berlin, Byzantium, HardFork, Precompile, PrecompileOutput, PrecompileResult,
 };
 use crate::prelude::{PhantomData, Vec, U256};
+use crate::AuroraState;
 use evm::{Context, ExitError};
 use num::BigUint;
 
 pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
 
-pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
+pub(super) struct ModExp<HF: HardFork, S>(PhantomData<HF>, PhantomData<S>);
 
-impl ModExp<Byzantium> {
+impl<S> ModExp<Byzantium, S> {
     fn adj_exp_len(exp_len: U256, base_len: U256, bytes: &[u8]) -> U256 {
         let mut exp32_bytes = Vec::with_capacity(32);
         for i in 0..32 {
@@ -54,7 +55,7 @@ impl ModExp<Byzantium> {
     }
 }
 
-impl Precompile for ModExp<Byzantium> {
+impl<S: AuroraState> Precompile<S> for ModExp<Byzantium, S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         let base_len = U256::from(&input[0..32]);
         let exp_len = U256::from(&input[32..64]);
@@ -73,7 +74,13 @@ impl Precompile for ModExp<Byzantium> {
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             return Err(ExitError::OutOfGas);
@@ -136,27 +143,27 @@ impl Precompile for ModExp<Byzantium> {
     }
 }
 
-impl Precompile for ModExp<Berlin> {
+impl<S: AuroraState> Precompile<S> for ModExp<Berlin, S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         todo!()
     }
 
-    fn run(_input: &[u8], _target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(
+        _input: &[u8],
+        _target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         todo!()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::test_utils::{new_context, new_state};
 
-    fn new_context() -> Context {
-        Context {
-            address: Default::default(),
-            caller: Default::default(),
-            apparent_value: Default::default(),
-        }
-    }
+    use super::*;
 
     #[test]
     fn test_modexp() {
@@ -170,9 +177,15 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
         )
         .unwrap();
-        let modexp_res = ModExp::<Byzantium>::run(&test_input1, 12_288, &new_context())
-            .unwrap()
-            .output;
+        let modexp_res = ModExp::<Byzantium, _>::run(
+            &test_input1,
+            12_288,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         let res = U256::from_big_endian(&modexp_res);
 
         assert_eq!(res, U256::from(1));
@@ -185,9 +198,15 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
         )
         .unwrap();
-        let modexp_res = ModExp::<Byzantium>::run(&test_input2, 12_288, &new_context())
-            .unwrap()
-            .output;
+        let modexp_res = ModExp::<Byzantium, _>::run(
+            &test_input2,
+            12_288,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         let res = U256::from_big_endian(&modexp_res);
 
         assert_eq!(res, U256::from(0));
@@ -200,7 +219,14 @@ mod tests {
             fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd",
         )
         .unwrap();
-        assert!(ModExp::<Byzantium>::run(&test_input3, 0, &new_context()).is_err());
+        assert!(ModExp::<Byzantium, _>::run(
+            &test_input3,
+            0,
+            &new_context(),
+            &mut new_state(),
+            false
+        )
+        .is_err());
 
         let test_input4 = hex::decode(
             "0000000000000000000000000000000000000000000000000000000000000001\
@@ -216,9 +242,15 @@ mod tests {
             &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
                 .unwrap(),
         );
-        let modexp_res = ModExp::<Byzantium>::run(&test_input4, 12_288, &new_context())
-            .unwrap()
-            .output;
+        let modexp_res = ModExp::<Byzantium, _>::run(
+            &test_input4,
+            12_288,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         let res = U256::from_big_endian(&modexp_res);
         assert_eq!(res, expected);
 
@@ -235,9 +267,15 @@ mod tests {
             &hex::decode("3b01b01ac41f2d6e917c6d6a221ce793802469026d9ab7578fa2e79e4da6aaab")
                 .unwrap(),
         );
-        let modexp_res = ModExp::<Byzantium>::run(&test_input5, 12_288, &new_context())
-            .unwrap()
-            .output;
+        let modexp_res = ModExp::<Byzantium, _>::run(
+            &test_input5,
+            12_288,
+            &new_context(),
+            &mut new_state(),
+            false,
+        )
+        .unwrap()
+        .output;
         let res = U256::from_big_endian(&modexp_res);
         assert_eq!(res, expected);
     }

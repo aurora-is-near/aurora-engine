@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use evm::Context;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
@@ -7,26 +8,33 @@ use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome};
 use near_vm_runner::{MockCompiledContractCache, VMError};
-
 use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::fungible_token::FungibleToken;
-use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
+use crate::parameters::{InitCallArgs, NewCallArgs, PromiseCreateArgs, SubmitResult};
 use crate::prelude::Address;
-use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 use crate::transaction::{EthSignedTransaction, EthTransaction};
 use crate::types;
+use crate::types::AccountId;
+use crate::{storage, AuroraState};
 
-near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
+lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
+}
+
+// TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
+
+pub fn origin() -> AccountId {
+    "aurora".to_string()
 }
 
 pub(crate) const SUBMIT: &str = "submit";
 
 pub(crate) mod erc20;
+pub(crate) mod exit_precompile;
 pub(crate) mod self_destruct;
 pub(crate) mod solidity;
 pub(crate) mod standard_precompiles;
@@ -68,6 +76,7 @@ pub(crate) struct AuroraRunner {
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
     pub profile: ProfileData,
+    pub previous_logs: Vec<String>,
 }
 
 /// Same as `AuroraRunner`, but consumes `self` on execution (thus preventing building on
@@ -86,7 +95,12 @@ impl<'a> OneShotAuroraRunner<'a> {
         caller_account_id: String,
         input: Vec<u8>,
     ) -> (Option<VMOutcome>, Option<VMError>) {
-        AuroraRunner::update_context(&mut self.context, caller_account_id, input);
+        AuroraRunner::update_context(
+            &mut self.context,
+            caller_account_id.clone(),
+            caller_account_id,
+            input,
+        );
 
         near_vm_runner::run(
             &self.base.code,
@@ -112,11 +126,16 @@ impl AuroraRunner {
         }
     }
 
-    fn update_context(context: &mut VMContext, caller_account_id: String, input: Vec<u8>) {
+    pub fn update_context(
+        context: &mut VMContext,
+        caller_account_id: String,
+        signer_account_id: String,
+        input: Vec<u8>,
+    ) {
         context.block_index += 1;
         context.block_timestamp += 100;
         context.input = input;
-        context.signer_account_id = caller_account_id.clone();
+        context.signer_account_id = signer_account_id;
         context.predecessor_account_id = caller_account_id;
     }
 
@@ -126,7 +145,27 @@ impl AuroraRunner {
         caller_account_id: String,
         input: Vec<u8>,
     ) -> (Option<VMOutcome>, Option<VMError>) {
-        Self::update_context(&mut self.context, caller_account_id, input);
+        self.call_with_signer(
+            method_name,
+            caller_account_id.clone(),
+            caller_account_id,
+            input,
+        )
+    }
+
+    pub fn call_with_signer(
+        &mut self,
+        method_name: &str,
+        caller_account_id: String,
+        signer_account_id: String,
+        input: Vec<u8>,
+    ) -> (Option<VMOutcome>, Option<VMError>) {
+        Self::update_context(
+            &mut self.context,
+            caller_account_id,
+            signer_account_id,
+            input,
+        );
 
         let (maybe_outcome, maybe_error) = near_vm_runner::run(
             &self.code,
@@ -140,9 +179,9 @@ impl AuroraRunner {
             Some(&self.cache),
             &self.profile,
         );
-
         if let Some(outcome) = &maybe_outcome {
             self.context.storage_usage = outcome.storage_usage;
+            self.previous_logs = outcome.logs.clone();
         }
         (maybe_outcome, maybe_error)
     }
@@ -232,6 +271,7 @@ impl AuroraRunner {
         Self::update_context(
             &mut context,
             "GETTER".to_string(),
+            "GETTER".to_string(),
             address.as_bytes().to_vec(),
         );
         let (outcome, maybe_error) = near_vm_runner::run(
@@ -283,6 +323,7 @@ impl Default for AuroraRunner {
             fees_config: Default::default(),
             current_protocol_version: u32::MAX,
             profile: Default::default(),
+            previous_logs: Default::default(),
         }
     }
 }
@@ -386,4 +427,23 @@ pub(crate) fn validate_address_balance_and_nonce(
 ) {
     assert_eq!(runner.get_balance(address), expected_balance, "balance");
     assert_eq!(runner.get_nonce(address), expected_nonce, "nonce");
+}
+
+pub fn new_context() -> Context {
+    Context {
+        address: Default::default(),
+        caller: Default::default(),
+        apparent_value: Default::default(),
+    }
+}
+
+#[derive(Default)]
+pub struct MockState;
+
+impl AuroraState for MockState {
+    fn add_promise(&mut self, _promise: PromiseCreateArgs) {}
+}
+
+pub fn new_state() -> MockState {
+    Default::default()
 }

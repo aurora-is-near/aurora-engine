@@ -1,6 +1,8 @@
-use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
-use crate::prelude::{mem, Borrowed, TryInto};
 use evm::{Context, ExitError};
+
+use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
+use crate::prelude::{mem, Borrowed, PhantomData, TryInto};
+use crate::AuroraState;
 
 /// Blake2 costs.
 mod costs {
@@ -13,13 +15,13 @@ mod consts {
     pub(super) const INPUT_LENGTH: usize = 213;
 }
 
-pub(super) struct Blake2F;
+pub(super) struct Blake2F<S>(PhantomData<S>);
 
-impl Blake2F {
+impl<S> Blake2F<S> {
     pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 9);
 }
 
-impl Precompile for Blake2F {
+impl<S: AuroraState> Precompile<S> for Blake2F<S> {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         let (int_bytes, _) = input.split_at(mem::size_of::<u32>());
         Ok(u64::from(u32::from_be_bytes(
@@ -37,7 +39,13 @@ impl Precompile for Blake2F {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-152
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         if input.len() != consts::INPUT_LENGTH {
             return Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")));
         }
@@ -87,16 +95,10 @@ impl Precompile for Blake2F {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::prelude::Vec;
+    use crate::test_utils::{new_context, new_state};
 
-    fn new_context() -> Context {
-        Context {
-            address: Default::default(),
-            caller: Default::default(),
-            apparent_value: Default::default(),
-        }
-    }
+    use super::*;
 
     // [4 bytes for rounds]
     // [64 bytes for h]
@@ -118,12 +120,12 @@ mod tests {
 
     fn test_blake2f_out_of_gas() -> PrecompileResult {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, 11, &new_context())
+        Blake2F::run(&input, 11, &new_context(), &mut new_state(), false)
     }
 
     fn test_blake2f_empty() -> PrecompileResult {
         let input = [0u8; 0];
-        Blake2F::run(&input, 0, &new_context())
+        Blake2F::run(&input, 0, &new_context(), &mut new_state(), false)
     }
 
     fn test_blake2f_invalid_len_1() -> PrecompileResult {
@@ -141,7 +143,7 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context())
+        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
     }
 
     fn test_blake2f_invalid_len_2() -> PrecompileResult {
@@ -159,7 +161,7 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context())
+        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
     }
 
     fn test_blake2f_invalid_flag() -> PrecompileResult {
@@ -177,7 +179,7 @@ mod tests {
             02",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context())
+        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
     }
 
     fn test_blake2f_r_0() -> Vec<u8> {
@@ -195,12 +197,16 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context()).unwrap().output
+        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
+            .unwrap()
+            .output
     }
 
     fn test_blake2f_r_12() -> Vec<u8> {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, 12, &new_context()).unwrap().output
+        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
+            .unwrap()
+            .output
     }
 
     fn test_blake2f_final_block_false() -> Vec<u8> {
@@ -218,7 +224,9 @@ mod tests {
             00",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context()).unwrap().output
+        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
+            .unwrap()
+            .output
     }
 
     #[test]

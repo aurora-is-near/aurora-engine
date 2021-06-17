@@ -13,6 +13,7 @@ pub enum JsonValue {
     Object(BTreeMap<String, JsonValue>),
 }
 
+#[derive(Debug)]
 pub enum JsonError {
     NotJsonType,
     MissingValue,
@@ -23,6 +24,11 @@ pub enum JsonError {
     InvalidString,
     InvalidArray,
     ExpectedStringGotNumber,
+}
+
+#[derive(Debug)]
+pub enum ParseError {
+    InvalidAccountId,
 }
 
 pub struct JsonArray(Vec<JsonValue>);

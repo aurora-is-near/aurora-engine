@@ -3,6 +3,8 @@ use crate::prelude::*;
 use ethabi::Address;
 use evm::{Context, ExitError};
 
+use crate::AuroraState;
+
 mod costs {
     pub(super) const ECRECOVER_BASE: u64 = 3_000;
 }
@@ -16,7 +18,7 @@ mod consts {
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000001
 // Quite a few library methods rely on this and that should be changed. This
 // should only be for precompiles.
-pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
+pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     use sha3::Digest;
     assert_eq!(signature.len(), 65);
 
@@ -39,18 +41,24 @@ pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitErr
     Err(ExitError::Other(Borrowed("invalid ECDSA signature")))
 }
 
-pub(super) struct ECRecover;
+pub(super) struct ECRecover<S>(PhantomData<S>);
 
-impl ECRecover {
+impl<S> ECRecover<S> {
     pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 1);
 }
 
-impl Precompile for ECRecover {
+impl<S: AuroraState> Precompile<S> for ECRecover<S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::ECRECOVER_BASE)
     }
 
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        _context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             return Err(ExitError::OutOfGas);
@@ -95,15 +103,9 @@ impl Precompile for ECRecover {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::test_utils::{new_context, new_state};
 
-    fn new_context() -> Context {
-        Context {
-            address: Default::default(),
-            caller: Default::default(),
-            apparent_value: Default::default(),
-        }
-    }
+    use super::*;
 
     fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
         matches!(ecrecover(hash, signature), Ok(s) if s == signer)
@@ -130,7 +132,7 @@ mod tests {
             hex::decode("000000000000000000000000c08b5542d177ac6686946920409741463a15dddb")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context())
+        let res = ECRecover::run(&input, 3_000, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -138,7 +140,7 @@ mod tests {
         // out of gas
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b650acf9d3f5f0a2c799776a1254355d5f4061762a237396a99a0e0e3fc2bcd6729514a0dacb2e623ac4abd157cb18163ff942280db4d5caad66ddf941ba12e03").unwrap();
 
-        let res = ECRecover::run(&input, 2_999, &new_context());
+        let res = ECRecover::run(&input, 2_999, &new_context(), &mut new_state(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // bad inputs
@@ -147,7 +149,7 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context())
+        let res = ECRecover::run(&input, 3_000, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -157,7 +159,7 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context())
+        let res = ECRecover::run(&input, 3_000, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -167,7 +169,7 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context())
+        let res = ECRecover::run(&input, 3_000, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -177,7 +179,7 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context())
+        let res = ECRecover::run(&input, 3_000, &new_context(), &mut new_state(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
