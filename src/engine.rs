@@ -18,7 +18,7 @@ use crate::prelude::{Address, ToString, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
-use crate::types::{u256_to_arr, AccountId, Wei};
+use crate::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
 
 #[cfg(not(feature = "contract"))]
 pub fn current_address() -> Address {
@@ -559,7 +559,7 @@ impl Engine {
             );
         }
 
-        let selector = &sdk::keccak("mint(address,uint256)".as_bytes())[..4];
+        let selector = ERC20_MINT_SELECTOR;
         let tail = ethabi::encode(&[
             ethabi::Token::Address(recipient),
             ethabi::Token::Uint(args.amount.into()),
