@@ -150,7 +150,7 @@ impl TryFrom<json::JsonValue> for NEP141FtOnTransferArgs {
         Ok(Self {
             sender_id: value.string("sender_id")?,
             amount: value.u128("amount")?,
-            msg: value.string("msg")?.into(),
+            msg: value.string("msg")?,
         })
     }
 }
