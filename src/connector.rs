@@ -278,7 +278,7 @@ impl EthConnectorContract {
         sdk::promise_return(promise1);
     }
 
-    /// Finish deposit NEAR (private method)
+    /// Finish deposit (private method)
     /// NOTE: we should `record_proof` only after `mint` operation. The reason
     /// is that in this case we only calculate the amount to be credited but
     /// do not save it, however, if an error occurs during the calculation,
@@ -287,7 +287,7 @@ impl EthConnectorContract {
         sdk::assert_private_call();
         let data: FinishDepositCallArgs =
             FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
-        crate::log!(&format!("Finish deposit NEAR amount: {}", data.amount));
+        crate::log!(&format!("Finish deposit with the amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
 
         // Check promise results
