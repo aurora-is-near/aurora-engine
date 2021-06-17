@@ -25,7 +25,7 @@ etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json: $(shell
 
 debug: debug.wasm
 
-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
+debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm etc/eth-contracts/res/EvmErc20.bin
 	ln -sf $< $@
 
 target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
