@@ -202,7 +202,7 @@ impl test_utils::AuroraRunner {
             relayer_id,
             json!({
                 "sender_id": sender_id,
-                "amount": amount,
+                "amount": amount.to_string(),
                 "msg": msg
             })
             .to_string()

@@ -13,6 +13,7 @@ pub enum JsonValue {
     Object(BTreeMap<String, JsonValue>),
 }
 
+#[derive(Debug)]
 pub enum JsonError {
     NotJsonType,
     MissingValue,

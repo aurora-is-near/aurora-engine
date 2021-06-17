@@ -206,7 +206,7 @@ impl EthConnectorContract {
             "ERR_WRONG_EVENT_ADDRESS",
         );
 
-        assert!(event.amount >= event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
+        assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
 
         // Verify proof data with cross-contract call to prover account
         crate::log!(&format!(
@@ -506,7 +506,7 @@ impl EthConnectorContract {
         let message_data = self.parse_on_transfer_message(&args.msg);
         // Check is transfer amount > fee
         assert!(
-            args.amount >= message_data.fee.as_u128(),
+            args.amount > message_data.fee.as_u128(),
             "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"
         );
 

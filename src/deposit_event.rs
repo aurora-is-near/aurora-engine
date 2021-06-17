@@ -1,4 +1,6 @@
 use crate::prelude::{vec, String, ToString};
+#[cfg(not(feature = "contract"))]
+use crate::prelude::{TryInto, Vec};
 
 use crate::types::*;
 use ethabi::{EventParam, ParamType};
@@ -63,7 +65,6 @@ impl DepositedEvent {
     #[cfg(not(feature = "contract"))]
     #[allow(dead_code)]
     pub fn to_log_entry_data(&self) -> Vec<u8> {
-        use std::convert::TryInto;
         EthEvent::to_log_entry_data(
             DEPOSITED_EVENT,
             DepositedEvent::event_params(),
