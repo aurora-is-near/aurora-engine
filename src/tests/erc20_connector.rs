@@ -1,9 +1,9 @@
-use crate::parameters::{FunctionCallArgs, NEP141FtOnTransferArgs, SubmitResult};
+use crate::parameters::{FunctionCallArgs, SubmitResult};
 use crate::prelude::*;
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use crate::transaction::EthSignedTransaction;
-use crate::types::{near_account_to_evm_address, AccountId, Balance, RawAddress, Wei};
+use crate::types::{AccountId, Balance, RawAddress, Wei};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
 use near_vm_logic::VMOutcome;
@@ -157,6 +157,7 @@ impl test_utils::AuroraRunner {
         result
     }
 
+    #[allow(dead_code)]
     pub fn admin(&mut self, token: RawAddress, origin: AccountId) -> CallResult {
         let input = build_input("admin()", &[]);
         let result = self.evm_call(token, input, origin);
@@ -239,7 +240,7 @@ fn test_mint() {
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(0));
     let amount = 10;
-    let result = runner.mint(token, address, amount, origin());
+    let _result = runner.mint(token, address, amount, origin());
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(amount));
 }

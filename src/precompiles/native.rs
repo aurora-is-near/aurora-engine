@@ -1,16 +1,22 @@
 use evm::{Context, ExitError};
 
-use crate::parameters::PromiseCreateArgs;
-#[cfg(feature = "engine")]
-use crate::parameters::WithdrawCallArgs;
-use crate::prelude::{is_valid_account_id, Cow, PhantomData, String, ToString, TryInto, U256};
-use crate::storage::{bytes_to_key, KeyPrefix};
-use crate::types::AccountId;
+use crate::prelude::PhantomData;
+#[cfg(not(feature = "contract"))]
+use crate::prelude::Vec;
 use crate::AuroraState;
-use borsh::BorshSerialize;
+#[cfg(feature = "engine")]
+use {
+    crate::parameters::PromiseCreateArgs,
+    crate::parameters::WithdrawCallArgs,
+    crate::prelude::{is_valid_account_id, Cow, String, ToString, TryInto, U256},
+    crate::storage::{bytes_to_key, KeyPrefix},
+    crate::types::AccountId,
+    borsh::BorshSerialize,
+};
 
 use super::{Precompile, PrecompileResult};
 
+#[cfg(feature = "engine")]
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 use crate::precompiles::PrecompileOutput;
@@ -25,9 +31,11 @@ mod costs {
     pub(super) const EXIT_TO_ETHEREUM_GAS: Gas = 0;
 
     // TODO(#51): Determine the correct amount of gas
+    #[cfg(feature = "engine")]
     pub(super) const FT_TRANSFER_GAS: Gas = 100_000_000_000_000;
 
     // TODO(#51): Determine the correct amount of gas
+    #[cfg(feature = "engine")]
     pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
 }
 
@@ -60,12 +68,10 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
     fn run(
         input: &[u8],
         target_gas: u64,
-        context: &Context,
+        _context: &Context,
         _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
-        use crate::prelude::Vec;
-
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -204,12 +210,10 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
     fn run(
         input: &[u8],
         target_gas: u64,
-        context: &Context,
+        _context: &Context,
         _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
-        use crate::prelude::Vec;
-
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }

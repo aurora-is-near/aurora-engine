@@ -1,6 +1,6 @@
-use crate::prelude::{vec, String, ToString};
 #[cfg(not(feature = "contract"))]
-use crate::prelude::{TryInto, Vec};
+use crate::prelude::Vec;
+use crate::prelude::{vec, String, ToString};
 
 use crate::types::*;
 use ethabi::{EventParam, ParamType};
@@ -45,7 +45,8 @@ impl DepositedEvent {
         ]
     }
 
-    /// Parse raw log Etherium proof entry data.
+    /// Parses raw Ethereum logs proof's entry data
+    #[cfg(feature = "engine")]
     pub fn from_log_entry_data(data: &[u8]) -> Self {
         let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data);
         let sender = event.log.params[0].value.clone().into_address().unwrap().0;

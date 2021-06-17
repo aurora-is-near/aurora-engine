@@ -1,14 +1,16 @@
-#[cfg(feature = "engine")]
-use crate::parameters::*;
 #[cfg(feature = "log")]
 use crate::prelude::format;
-use crate::prelude::TryInto;
-#[cfg(feature = "engine")]
-use crate::prelude::{self, Ordering, String, ToString, Vec, U256};
 use crate::types::*;
-#[cfg(feature = "engine")]
-use crate::{connector, engine, sdk, storage};
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "engine")]
+use {
+    crate::connector,
+    crate::engine,
+    crate::parameters::*,
+    crate::prelude::{self, Ordering, String, ToString, TryInto, Vec, U256},
+    crate::sdk,
+    crate::storage,
+};
 
 #[cfg(feature = "engine")]
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;

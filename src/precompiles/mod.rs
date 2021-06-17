@@ -7,18 +7,21 @@ mod native;
 mod secp256k1;
 use evm::{Context, ExitError};
 
-use crate::precompiles::blake2::Blake2F;
-use crate::precompiles::bn128::{BN128Add, BN128Mul, BN128Pair};
-use crate::precompiles::hash::{RIPEMD160, SHA256};
-use crate::precompiles::identity::Identity;
-use crate::precompiles::modexp::ModExp;
-use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
-use crate::precompiles::secp256k1::ECRecover;
-use crate::prelude::{Address, Vec};
-#[cfg(feature = "engine")]
-use crate::state::AuroraStackState;
+use crate::prelude::Vec;
 use crate::AuroraState;
+#[cfg(feature = "engine")]
+use crate::{
+    precompiles::blake2::Blake2F,
+    precompiles::bn128::{BN128Add, BN128Mul, BN128Pair},
+    precompiles::hash::{RIPEMD160, SHA256},
+    precompiles::identity::Identity,
+    precompiles::modexp::ModExp,
+    precompiles::native::{ExitToEthereum, ExitToNear},
+    precompiles::secp256k1::ECRecover,
+    prelude::Address,
+    state::AuroraStackState,
+};
 use evm::backend::Log;
 use evm::ExitSucceed;
 
@@ -63,6 +66,7 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
 /// A precompile operation result.
 type PrecompileResult = Result<PrecompileOutput, ExitError>;
 
+#[cfg(feature = "engine")]
 type EvmPrecompileResult = Result<evm::executor::PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.

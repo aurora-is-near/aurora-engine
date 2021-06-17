@@ -1,12 +1,17 @@
-use borsh::BorshSerialize;
-
-use near_crypto::{InMemorySigner, KeyType, PublicKey, Signature, Signer};
-
 #[cfg(feature = "meta-call")]
-use aurora_engine::meta_parsing::{near_erc712_domain, parse_meta_call, prepare_meta_call_args};
-use aurora_engine::parameters::MetaCallArgs;
-use aurora_engine::prelude::{Address, U256};
-use aurora_engine::types::{keccak, u256_to_arr, InternalMetaCallArgs, Wei};
+use {
+    aurora_engine::meta_parsing::{near_erc712_domain, parse_meta_call, prepare_meta_call_args},
+    aurora_engine::parameters::MetaCallArgs,
+    aurora_engine::prelude::U256,
+    aurora_engine::types::{u256_to_arr, InternalMetaCallArgs, Wei},
+    borsh::BorshSerialize,
+    near_crypto::{InMemorySigner, KeyType, Signature, Signer},
+};
+
+use near_crypto::PublicKey;
+
+use aurora_engine::prelude::Address;
+use aurora_engine::types::keccak;
 
 #[cfg(feature = "meta-call")]
 pub fn encode_meta_call_function_args(
