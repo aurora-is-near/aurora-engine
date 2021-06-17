@@ -3,7 +3,6 @@ mod bn128;
 mod hash;
 mod identity;
 mod modexp;
-#[cfg(feature = "exit-precompiles")]
 mod native;
 mod secp256k1;
 use evm::{Context, ExitError};
@@ -13,7 +12,6 @@ use crate::precompiles::bn128::{BN128Add, BN128Mul, BN128Pair};
 use crate::precompiles::hash::{RIPEMD160, SHA256};
 use crate::precompiles::identity::Identity;
 use crate::precompiles::modexp::ModExp;
-#[cfg(feature = "exit-precompiles")]
 use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::precompiles::secp256k1::ECRecover;
@@ -145,11 +143,9 @@ pub fn homestead_precompiles(
         RIPEMD160::<AuroraStackState>::ADDRESS => Some(RIPEMD160::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
             ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
         ),
@@ -199,11 +195,9 @@ pub fn byzantium_precompiles(
         bn128::addresses::PAIR => Some(BN128Pair::<Byzantium, _>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
             ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
         ),
@@ -256,11 +250,9 @@ pub fn istanbul_precompiles(
         Blake2F::<AuroraStackState>::ADDRESS => Some(Blake2F::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
             ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
         ),
@@ -313,11 +305,9 @@ pub fn berlin_precompiles(
         Blake2F::<AuroraStackState>::ADDRESS => Some(Blake2F::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
             ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
         ),

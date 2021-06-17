@@ -1,6 +1,8 @@
 use evm::{Context, ExitError};
 
-use crate::parameters::{PromiseCreateArgs, WithdrawCallArgs};
+use crate::parameters::PromiseCreateArgs;
+#[cfg(feature = "engine")]
+use crate::parameters::WithdrawCallArgs;
 use crate::prelude::{is_valid_account_id, Cow, PhantomData, String, ToString, TryInto, U256};
 use crate::storage::{bytes_to_key, KeyPrefix};
 use crate::types::AccountId;
@@ -40,6 +42,7 @@ impl<S> ExitToNear<S> {
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
+#[cfg(feature = "contract")]
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
     AccountId::from_utf8(
         crate::sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
@@ -53,7 +56,7 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
-    #[cfg(not(feature = "exit-precompiles"))]
+    #[cfg(not(feature = "contract"))]
     fn run(
         input: &[u8],
         target_gas: u64,
@@ -61,19 +64,20 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
         _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
+        use crate::prelude::Vec;
+
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
         Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
             output: Vec::new(),
             cost: 0,
             logs: Vec::new(),
         })
     }
 
-    #[cfg(feature = "exit-precompiles")]
+    #[cfg(feature = "contract")]
     fn run(
         input: &[u8],
         target_gas: u64,
@@ -196,7 +200,7 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
-    #[cfg(not(feature = "exit-precompiles"))]
+    #[cfg(not(feature = "contract"))]
     fn run(
         input: &[u8],
         target_gas: u64,
@@ -204,19 +208,20 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
         _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
+        use crate::prelude::Vec;
+
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
         Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
             output: Vec::new(),
             cost: 0,
             logs: Vec::new(),
         })
     }
 
-    #[cfg(feature = "exit-precompiles")]
+    #[cfg(feature = "contract")]
     fn run(
         input: &[u8],
         target_gas: u64,
@@ -326,7 +331,7 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(feature = "contract", test))]
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
     use crate::types::near_account_to_evm_address;
