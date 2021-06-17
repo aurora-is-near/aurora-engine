@@ -18,6 +18,7 @@ mod consts {
 pub(super) struct Blake2F<S>(PhantomData<S>);
 
 impl<S> Blake2F<S> {
+    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 9);
 }
 

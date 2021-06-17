@@ -33,6 +33,7 @@ pub type StorageUsage = u64;
 /// Selector to call mint function in ERC 20 contract
 ///
 /// keccak("mint(address,uint256)".as_bytes())[..4];
+#[allow(dead_code)]
 pub(crate) const ERC20_MINT_SELECTOR: &[u8] = &[64, 193, 15, 25];
 
 pub type EventParams = Vec<EventParam>;
@@ -71,7 +72,7 @@ impl EthEvent {
     /// Build log_entry_data from ethereum event
     #[cfg(not(feature = "contract"))]
     #[allow(dead_code)]
-    pub fn to_log_entry_data(
+    pub fn params_to_log_entry_data(
         name: &str,
         params: EventParams,
         locker_address: EthAddress,
