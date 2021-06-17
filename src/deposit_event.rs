@@ -73,8 +73,8 @@ impl DepositedEvent {
             vec![self.sender.to_vec()],
             vec![
                 ethabi::Token::String(self.recipient.clone()),
-                ethabi::Token::Uint(self.amount.into()),
-                ethabi::Token::Uint(self.fee.clone()),
+                ethabi::Token::Uint(self.amount),
+                ethabi::Token::Uint(self.fee),
             ],
         )
     }
