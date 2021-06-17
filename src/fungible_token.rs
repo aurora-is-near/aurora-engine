@@ -39,7 +39,7 @@ impl FungibleToken {
     pub fn internal_unwrap_balance_of_eth_on_near(&self, account_id: &str) -> Balance {
         match self.accounts_get(account_id) {
             Some(balance) => u128::try_from_slice(&balance[..]).unwrap(),
-            None => sdk::panic_utf8(b"ERR_ACCOUNT_NOT_EXIST"),
+            None => 0,
         }
     }
 
