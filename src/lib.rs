@@ -595,8 +595,7 @@ mod contract {
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
-        #[cfg(feature = "log")]
-        sdk::log("Call from verify_log_entry");
+        crate::log!("Call from verify_log_entry");
         let data = true.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
     }

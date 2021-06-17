@@ -409,6 +409,14 @@ pub fn log(data: &str) {
     log_utf8(data.as_bytes())
 }
 
+#[macro_export]
+macro_rules! log {
+    ($e: expr) => {
+        #[cfg(feature = "log")]
+        $crate::sdk::log($e)
+    };
+}
+
 #[allow(unused)]
 pub fn prepaid_gas() -> u64 {
     unsafe { exports::prepaid_gas() }
