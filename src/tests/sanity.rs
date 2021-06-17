@@ -1,7 +1,7 @@
 use crate::prelude::Address;
 use crate::test_utils;
 use crate::transaction::EthTransaction;
-use crate::types::Wei;
+use crate::types::{Wei, ERC20_MINT_SELECTOR};
 use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
@@ -186,4 +186,16 @@ fn initialize_transfer() -> (test_utils::AuroraRunner, SecretKey, Address) {
     let dest_address = test_utils::address_from_secret_key(&SecretKey::random(&mut rng));
 
     (runner, source_account, dest_address)
+}
+
+use sha3::{Digest, Keccak256};
+
+#[test]
+fn check_selector() {
+    /// Selector to call mint function in ERC 20 contract
+    ///
+    /// keccak("mint(address,uint256)".as_bytes())[..4];
+    let mut hasher = sha3::Keccak256::default();
+    hasher.update(b"mint(address,uint256)");
+    assert_eq!(hasher.finalize()[..4].to_vec(), ERC20_MINT_SELECTOR);
 }

@@ -17,6 +17,9 @@ pub enum KeyPrefix {
     Storage = 0x4,
     RelayerEvmAddressMap = 0x5,
     EthConnector = 0x6,
+    Generation = 0x7,
+    Nep141Erc20Map = 0x8,
+    Erc20Nep141Map = 0x9,
 }
 
 /// Enum used to differentiate different storage keys used by eth-connector
@@ -43,6 +46,9 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x4 => Self::Storage,
             0x5 => Self::RelayerEvmAddressMap,
             0x6 => Self::EthConnector,
+            0x7 => Self::Generation,
+            0x8 => Self::Nep141Erc20Map,
+            0x9 => Self::Erc20Nep141Map,
             _ => unreachable!(),
         }
     }
@@ -62,8 +68,31 @@ pub fn address_to_key(prefix: KeyPrefix, address: &Address) -> [u8; 22] {
     result
 }
 
+pub enum StorageKeyKind {
+    Normal([u8; 54]),
+    Generation([u8; 58]),
+}
+
+impl AsRef<[u8]> for StorageKeyKind {
+    fn as_ref(&self) -> &[u8] {
+        use StorageKeyKind::*;
+        match self {
+            Normal(v) => v.as_slice(),
+            Generation(v) => v.as_slice(),
+        }
+    }
+}
+
+pub fn storage_to_key(address: &Address, key: &H256, generation: u32) -> StorageKeyKind {
+    if generation == 0 {
+        StorageKeyKind::Normal(normal_storage_key(address, key))
+    } else {
+        StorageKeyKind::Generation(generation_storage_key(address, key, generation))
+    }
+}
+
 #[allow(dead_code)]
-pub fn storage_to_key(address: &Address, key: &H256) -> [u8; 54] {
+fn normal_storage_key(address: &Address, key: &H256) -> [u8; 54] {
     let mut result = [0u8; 54];
     result[0] = VersionPrefix::V1 as u8;
     result[1] = KeyPrefix::Storage as u8;
@@ -73,12 +102,12 @@ pub fn storage_to_key(address: &Address, key: &H256) -> [u8; 54] {
 }
 
 #[allow(dead_code)]
-pub fn storage_to_key_nonced(address: &Address, storage_nonce: u32, key: &H256) -> [u8; 58] {
+fn generation_storage_key(address: &Address, key: &H256, generation: u32) -> [u8; 58] {
     let mut result = [0u8; 58];
     result[0] = VersionPrefix::V1 as u8;
     result[1] = KeyPrefix::Storage as u8;
     result[2..22].copy_from_slice(&address.0);
-    result[22..26].copy_from_slice(&storage_nonce.to_le_bytes());
+    result[22..26].copy_from_slice(&generation.to_le_bytes());
     result[26..58].copy_from_slice(&key.0);
     result
 }

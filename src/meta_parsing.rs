@@ -140,7 +140,7 @@ pub fn parse_type(field_type: &str) -> ParsingResult<ArgType> {
 pub fn near_erc712_domain(chain_id: U256) -> RawU256 {
     let mut bytes = Vec::with_capacity(70);
     bytes.extend_from_slice(
-        &keccak("EIP712Domain(string name,string version,uint256 chainId)".as_bytes()).as_bytes(),
+        keccak("EIP712Domain(string name,string version,uint256 chainId)".as_bytes()).as_bytes(),
     );
     let near: RawU256 = keccak(b"NEAR").into();
     bytes.extend_from_slice(&near);
@@ -165,7 +165,7 @@ pub fn encode_address(addr: Address) -> Vec<u8> {
 
 pub fn encode_string(s: &str) -> Vec<u8> {
     let mut bytes = vec![];
-    bytes.extend_from_slice(&keccak(s.as_bytes()).as_bytes());
+    bytes.extend_from_slice(keccak(s.as_bytes()).as_bytes());
     bytes
 }
 
@@ -360,12 +360,12 @@ fn eip_712_hash_argument(
 ) -> ParsingResult<Vec<u8>> {
     match ty {
         ArgType::String | ArgType::Bytes => {
-            eip_712_rlp_value(value, |b| Ok(keccak(&b).as_bytes().to_vec()))
+            eip_712_rlp_value(value, |b| Ok(keccak(b).as_bytes().to_vec()))
         }
         ArgType::Byte(_) => eip_712_rlp_value(value, |b| Ok(b.clone())),
         // TODO: ensure rlp int is encoded as sign extended uint256, otherwise this is wrong
         ArgType::Uint | ArgType::Int | ArgType::Bool => eip_712_rlp_value(value, |b| {
-            Ok(u256_to_arr(&U256::from_big_endian(&b)).to_vec())
+            Ok(u256_to_arr(&U256::from_big_endian(b)).to_vec())
         }),
         ArgType::Address => {
             eip_712_rlp_value(value, |b| Ok(encode_address(Address::from_slice(b))))
@@ -442,7 +442,7 @@ fn arg_to_abi_token(
         }
         ArgType::Byte(_) => value_to_abi_token(arg, |b| Ok(ABIToken::FixedBytes(b.clone()))),
         ArgType::Uint | ArgType::Int | ArgType::Bool => {
-            value_to_abi_token(arg, |b| Ok(ABIToken::Uint(U256::from_big_endian(&b))))
+            value_to_abi_token(arg, |b| Ok(ABIToken::Uint(U256::from_big_endian(b))))
         }
         ArgType::Address => {
             value_to_abi_token(arg, |b| Ok(ABIToken::Address(Address::from_slice(b))))
@@ -519,8 +519,8 @@ pub fn prepare_meta_call_args(
     // See "Rationale for typeHash" in https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct
     // method_def is used here for typeHash
     let types = "NearTx(string evmId,uint256 nonce,uint256 feeAmount,address feeAddress,address contractAddress,uint256 value,string contractMethod,Arguments arguments)".to_string() + &arguments;
-    bytes.extend_from_slice(&keccak(types.as_bytes()).as_bytes());
-    bytes.extend_from_slice(&keccak(account_id).as_bytes());
+    bytes.extend_from_slice(keccak(types.as_bytes()).as_bytes());
+    bytes.extend_from_slice(keccak(account_id).as_bytes());
     bytes.extend_from_slice(&u256_to_arr(&input.nonce));
     bytes.extend_from_slice(&input.fee_amount.to_bytes());
     bytes.extend_from_slice(&encode_address(input.fee_address));
@@ -529,10 +529,10 @@ pub fn prepare_meta_call_args(
 
     let methods = MethodAndTypes::parse(&method_def)?;
     let method_sig = method_signature(&methods);
-    bytes.extend_from_slice(&keccak(method_sig.as_bytes()).as_bytes());
+    bytes.extend_from_slice(keccak(method_sig.as_bytes()).as_bytes());
 
     let mut arg_bytes = Vec::new();
-    arg_bytes.extend_from_slice(&keccak(arguments.as_bytes()).as_bytes());
+    arg_bytes.extend_from_slice(keccak(arguments.as_bytes()).as_bytes());
     let args_decoded: Vec<RlpValue> = rlp_decode(&input.input)?;
     if methods.method.args.len() != args_decoded.len() {
         return Err(ParsingError::ArgsLengthMismatch);

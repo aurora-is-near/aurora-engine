@@ -118,6 +118,7 @@ name = "aurora-engine"
 version = "1.0.0"
 dependencies = [
  "aurora-bn",
+ "base64 0.13.0",
  "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh",
  "bstr",
@@ -128,6 +129,7 @@ dependencies = [
  "evm-core",
  "git2",
  "hex",
+ "lazy-static-include",
  "libsecp256k1",
  "logos",
  "near-crypto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -142,6 +144,8 @@ dependencies = [
  "ripemd160",
  "rjson",
  "rlp",
+ "serde",
+ "serde_json",
  "sha2 0.9.5",
  "sha3 0.9.1",
  "wee_alloc",
@@ -1260,9 +1264,9 @@ checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 
 [[package]]
 name = "evm"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f833b0e642bec8286b80f00ad6cc6a95e50210c77949b9cb484637e6a05ed596"
+checksum = "ff50bbacb1b2149e29cc31bdd73dc2fe6d3cc0d291c438ec1cb3cdb7b2f8aa1c"
 dependencies = [
  "environmental",
  "ethereum",
@@ -1279,9 +1283,9 @@ dependencies = [
 
 [[package]]
 name = "evm-core"
-version = "0.27.1"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "908739da31125d17a69533c290a6c818b494176e59a2ce8accbf122f7d76835c"
+checksum = "7828a238e25e8c5b5a23a2114e6f3863780ffd1dca6f7f74eecfd51271a8c573"
 dependencies = [
  "funty",
  "parity-scale-codec",
@@ -1291,9 +1295,9 @@ dependencies = [
 
 [[package]]
 name = "evm-gasometer"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4118f952ce320c11e1b7b8a575e477d70bc86a3b92ea23e427174d979cf1da26"
+checksum = "b61792ef56c7772b6d9425674852241dddcbb5fd507e6849c63ce39d1ad74e5e"
 dependencies = [
  "environmental",
  "evm-core",
@@ -1303,9 +1307,9 @@ dependencies = [
 
 [[package]]
 name = "evm-runtime"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "952296b416c3b334b26933ad1f9cfa9203e251691586fb317e411872886ca31b"
+checksum = "4b7b8ae833004b1d619997d8a31b61b291b0bb3a7ed0af709342331a9a217d53"
 dependencies = [
  "environmental",
  "evm-core",

@@ -28,7 +28,7 @@ fn erc20_mint() {
     );
 
     // Do mint transaction
-    let mint_amount: u64 = rand::random();
+    let mint_amount: u64 = 10;
     let mint_tx = contract.mint(dest_address, mint_amount.into(), (INITIAL_NONCE + 2).into());
     let outcome = runner.submit_transaction(&source_account, mint_tx);
     assert!(outcome.is_ok());

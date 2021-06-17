@@ -41,8 +41,8 @@ rpath = false
 blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
-evm = { version = "0.27.0", default-features = false }
-evm-core = { version = "0.27.1", default-features = false }
+evm = { version = "0.28.0", default-features = false }
+evm-core = { version = "0.28.0", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }
@@ -59,6 +59,8 @@ rjson = { version = "0.3.1", default-features = false }
 
 [dev-dependencies]
 bstr = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 hex = { version = "0.4.3", default-features = false }
 near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }
 near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }
@@ -70,6 +72,8 @@ libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
+lazy-static-include = "3.1.1"
+base64 = "0.13.0"
 
 [features]
 default = ["sha2", "std"]

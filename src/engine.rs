@@ -1,18 +1,52 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
+use evm::executor::{StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::connector::EthConnectorContract;
-use crate::map::LookupMap;
-use crate::parameters::{FunctionCallArgs, NewCallArgs, SubmitResult, ViewCallArgs};
+#[cfg(feature = "contract")]
+use crate::contract::current_address;
+use crate::map::{BijectionMap, LookupMap};
+use crate::parameters::{
+    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
+    ViewCallArgs,
+};
 
 use crate::precompiles;
-use crate::prelude::{Address, TryInto, Vec, H256, U256};
+use crate::prelude::{Address, ToString, TryInto, Vec, H256, U256};
 use crate::sdk;
+use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
-use crate::types::{u256_to_arr, AccountId, Wei};
+use crate::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
+
+#[cfg(not(feature = "contract"))]
+pub fn current_address() -> Address {
+    crate::types::near_account_to_evm_address("engine".as_bytes())
+}
+
+macro_rules! unwrap_res_or_finish {
+    ($e:expr, $output:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(_e) => {
+                #[cfg(feature = "log")]
+                sdk::log(crate::prelude::format!("{:?}", _e).as_str());
+                sdk::return_output($output);
+                return;
+            }
+        }
+    };
+}
+
+macro_rules! assert_or_finish {
+    ($e:expr, $output:expr) => {
+        if !$e {
+            sdk::return_output($output);
+            return;
+        }
+    };
+}
 
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -243,16 +277,16 @@ impl Engine {
         Wei::new(raw)
     }
 
-    pub fn remove_storage(address: &Address, key: &H256) {
-        sdk::remove_storage(&storage_to_key(address, key));
+    pub fn remove_storage(address: &Address, key: &H256, generation: u32) {
+        sdk::remove_storage(storage_to_key(address, key, generation).as_ref());
     }
 
-    pub fn set_storage(address: &Address, key: &H256, value: &H256) {
-        sdk::write_storage(&storage_to_key(address, key), &value.0);
+    pub fn set_storage(address: &Address, key: &H256, value: &H256, generation: u32) {
+        sdk::write_storage(storage_to_key(address, key, generation).as_ref(), &value.0);
     }
 
-    pub fn get_storage(address: &Address, key: &H256) -> H256 {
-        sdk::read_storage(&storage_to_key(address, key))
+    pub fn get_storage(address: &Address, key: &H256, generation: u32) -> H256 {
+        sdk::read_storage(storage_to_key(address, key, generation).as_ref())
             .map(|value| H256::from_slice(&value))
             .unwrap_or_else(H256::default)
     }
@@ -264,8 +298,26 @@ impl Engine {
         balance.is_zero() && nonce.is_zero() && code_len == 0
     }
 
+    /// Increments storage generation for a given address.
+    pub fn set_generation(address: &Address, generation: u32) {
+        sdk::write_storage(
+            &address_to_key(KeyPrefix::Generation, address),
+            &generation.to_be_bytes(),
+        );
+    }
+
+    pub fn get_generation(address: &Address) -> u32 {
+        sdk::read_storage(&address_to_key(KeyPrefix::Generation, address))
+            .map(|value| {
+                let mut bytes = [0u8; 4];
+                bytes[0..4].copy_from_slice(&value[0..4]);
+                u32::from_be_bytes(bytes)
+            })
+            .unwrap_or(0)
+    }
+
     /// Removes all storage for the given address.
-    pub fn remove_all_storage(_address: &Address) {
+    fn remove_all_storage(address: &Address, generation: u32) {
         // FIXME: there is presently no way to prefix delete trie state.
         // NOTE: There is not going to be a method on runtime for this.
         //     You may need to store all keys in a list if you want to do this in a contract.
@@ -274,21 +326,15 @@ impl Engine {
         //     Either way you may have to store the nonce per storage address root. When the account
         //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
         //     can be deleted over time. That's how TurboGeth does storage.
+        Self::set_generation(address, generation + 1);
     }
 
     /// Removes an account.
-    pub fn remove_account(address: &Address) {
+    fn remove_account(address: &Address, generation: u32) {
         Self::remove_nonce(address);
         Self::remove_balance(address);
         Self::remove_code(address);
-        Self::remove_all_storage(address);
-    }
-
-    /// Removes an account if it is empty.
-    pub fn remove_account_if_empty(address: &Address) {
-        if Self::is_account_empty(address) {
-            Self::remove_account(address);
-        }
+        Self::remove_all_storage(address, generation);
     }
 
     pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
@@ -316,8 +362,9 @@ impl Engine {
             return Err(e);
         }
         let used_gas = executor.used_gas();
-        let (values, logs) = executor.into_state().deconstruct();
+        let (values, logs, promises) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
+        Self::schedule_promises(promises);
 
         Ok(SubmitResult {
             status: is_succeed,
@@ -346,18 +393,19 @@ impl Engine {
         let (status, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit);
 
-        let used_gas = executor.used_gas();
-        let (values, logs) = executor.into_state().deconstruct();
         let is_succeed = status.is_succeed();
-
         if let Err(e) = status.into_result() {
             Engine::increment_nonce(&origin);
             return Err(e);
         }
+        let used_gas = executor.used_gas();
+
+        let (values, logs, promises) = executor.into_state().deconstruct();
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
+        Self::schedule_promises(promises);
 
         Ok(SubmitResult {
             status: is_succeed,
@@ -395,10 +443,10 @@ impl Engine {
         Ok(result)
     }
 
-    fn make_executor(&self, gas_limit: u64) -> StackExecutor<MemoryStackState<Engine>> {
-        let metadata = StackSubstateMetadata::new(gas_limit, &CONFIG);
-        let state = MemoryStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, &CONFIG, precompiles::istanbul_precompiles)
+    fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState> {
+        let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
+        let state = AuroraStackState::new(metadata, self);
+        StackExecutor::new_with_precompile(state, CONFIG, precompiles::istanbul_precompiles)
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
@@ -413,6 +461,151 @@ impl Engine {
             .relayers_evm_addresses
             .get_raw(account_id)
             .map(|result| Address(result.as_slice().try_into().unwrap()))
+    }
+
+    pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
+        // Check that this nep141 token was not registered before, they can only be registered once.
+        let map = Self::nep141_erc20_map();
+        assert!(map.lookup_left(nep141_token).is_none());
+        map.insert(nep141_token, erc20_token);
+    }
+
+    pub fn get_erc20_from_nep141(&self, nep141_token: &[u8]) -> Option<Vec<u8>> {
+        Self::nep141_erc20_map().lookup_left(nep141_token)
+    }
+
+    /// Transfers an amount from a given sender to a receiver, provided that
+    /// the have enough in their balance.
+    ///
+    /// If the sender can send, and the receiver can receive, then the transfer
+    /// will execute successfully.
+    pub fn transfer(
+        &mut self,
+        sender: Address,
+        receiver: Address,
+        value: Wei,
+        gas_limit: u64,
+    ) -> EngineResult<SubmitResult> {
+        self.call(sender, receiver, value, Vec::new(), gas_limit)
+    }
+
+    /// Mint tokens for recipient on a particular ERC20 token
+    /// This function should return the amount of tokens unused,
+    /// which will be always all (<amount>) if there is any problem
+    /// with the input, or 0 if tokens were minted successfully.
+    ///
+    /// The output will be serialized as a String
+    /// https://github.com/near/NEPs/discussions/146
+    ///
+    /// IMPORTANT: This function should not panic, otherwise it won't
+    /// be possible to return the tokens to the sender.
+    pub fn receive_erc20_tokens(&mut self, args: &NEP141FtOnTransferArgs) {
+        let str_amount = args.amount.to_string();
+        let output_on_fail = str_amount.as_bytes();
+
+        let token = sdk::predecessor_account_id();
+
+        // Parse message to determine recipient and fee
+        let (recipient, fee) = {
+            // Message format:
+            //      Recipient of the transaction - 40 characters (Address in hex)
+            //      Fee to be paid in ETH (Optional) - 64 characters (Encoded in big endian / hex)
+            let mut message = args.msg.as_bytes();
+            assert_or_finish!(message.len() >= 40, output_on_fail);
+
+            let recipient = Address(unwrap_res_or_finish!(
+                hex::decode(&message[..40]).unwrap().as_slice().try_into(),
+                output_on_fail
+            ));
+            message = &message[40..];
+
+            let fee = if message.is_empty() {
+                U256::from(0)
+            } else {
+                assert_or_finish!(message.len() == 64, output_on_fail);
+                U256::from_big_endian(
+                    unwrap_res_or_finish!(hex::decode(message), output_on_fail).as_slice(),
+                )
+            };
+
+            (recipient, fee)
+        };
+
+        let erc20_token = Address(unwrap_res_or_finish!(
+            unwrap_res_or_finish!(
+                self.get_erc20_from_nep141(token.as_slice()).ok_or(()),
+                output_on_fail
+            )
+            .as_slice()
+            .try_into(),
+            output_on_fail
+        ));
+
+        if fee != U256::from(0) {
+            let relayer_account_id = sdk::signer_account_id();
+            let relayer_address = unwrap_res_or_finish!(
+                self.get_relayer(relayer_account_id.as_slice()).ok_or(()),
+                output_on_fail
+            );
+
+            unwrap_res_or_finish!(
+                self.transfer(
+                    recipient,
+                    relayer_address,
+                    Wei::new_u64(fee.as_u64()),
+                    u64::MAX,
+                ),
+                output_on_fail
+            );
+        }
+
+        let selector = ERC20_MINT_SELECTOR;
+        let tail = ethabi::encode(&[
+            ethabi::Token::Address(recipient),
+            ethabi::Token::Uint(args.amount.into()),
+        ]);
+
+        unwrap_res_or_finish!(
+            self.call(
+                current_address(),
+                erc20_token,
+                Wei::zero(),
+                [selector, tail.as_slice()].concat(),
+                u64::MAX,
+            ),
+            output_on_fail
+        );
+
+        // Everything succeed so return "0"
+        sdk::return_output(b"0");
+    }
+
+    pub fn nep141_erc20_map() -> BijectionMap<
+        { KeyPrefix::Nep141Erc20Map as KeyPrefixU8 },
+        { KeyPrefix::Erc20Nep141Map as KeyPrefixU8 },
+    > {
+        Default::default()
+    }
+
+    fn schedule_promises(promises: impl IntoIterator<Item = PromiseCreateArgs>) {
+        for promise in promises {
+            #[cfg(feature = "log")]
+            sdk::log_utf8(
+                crate::prelude::format!(
+                    "Call contract: {}.{}",
+                    promise.target_account_id,
+                    promise.method
+                )
+                .as_bytes(),
+            );
+            sdk::promise_create(
+                promise.target_account_id.as_bytes(),
+                promise.method.as_bytes(),
+                promise.args.as_slice(),
+                promise.attached_balance,
+                promise.attached_gas,
+            );
+        }
     }
 }
 
@@ -520,7 +713,8 @@ impl evm::backend::Backend for Engine {
 
     /// Get storage value of address at index.
     fn storage(&self, address: Address, index: H256) -> H256 {
-        Engine::get_storage(&address, &index)
+        let generation = Self::get_generation(&address);
+        Engine::get_storage(&address, &index, generation)
     }
 
     /// Get original storage value of address at index, if available.
@@ -547,6 +741,7 @@ impl ApplyBackend for Engine {
                     storage,
                     reset_storage,
                 } => {
+                    let generation = Self::get_generation(&address);
                     Engine::set_nonce(&address, &basic.nonce);
 
                     // Apply changes for eth-connector
@@ -558,23 +753,37 @@ impl ApplyBackend for Engine {
                         Engine::set_code(&address, &code)
                     }
 
-                    if reset_storage {
-                        Engine::remove_all_storage(&address)
-                    }
+                    let next_generation = if reset_storage {
+                        Engine::remove_all_storage(&address, generation);
+                        generation + 1
+                    } else {
+                        generation
+                    };
 
                     for (index, value) in storage {
                         if value == H256::default() {
-                            Engine::remove_storage(&address, &index)
+                            Engine::remove_storage(&address, &index, next_generation)
                         } else {
-                            Engine::set_storage(&address, &index, &value)
+                            Engine::set_storage(&address, &index, &value, next_generation)
                         }
                     }
 
-                    if delete_empty {
-                        Engine::remove_account_if_empty(&address)
+                    // We only need to remove the account if:
+                    // 1. we are supposed to delete an empty account
+                    // 2. the account is empty
+                    // 3. we didn't already clear out the storage (because if we did then there is
+                    //    nothing to do)
+                    if delete_empty
+                        && Engine::is_account_empty(&address)
+                        && generation == next_generation
+                    {
+                        Engine::remove_account(&address, generation);
                     }
                 }
-                Apply::Delete { address } => Engine::remove_account(&address),
+                Apply::Delete { address } => {
+                    let generation = Self::get_generation(&address);
+                    Engine::remove_account(&address, generation);
+                }
             }
         }
     }
