@@ -1,14 +1,25 @@
-use crate::prelude::{self, Address, String, Vec, H256, U256};
-#[cfg(feature = "engine")]
-use alloc::str;
+use crate::prelude::{self, Address, String, ToString, Vec, H256, U256};
+#[cfg(not(feature = "contract"))]
+use crate::prelude::{format, vec};
+
+use crate::prelude::str;
 use borsh::{BorshDeserialize, BorshSerialize};
+use ethabi::{Event, EventParam, Hash, Log, RawLog};
+
+#[cfg(not(feature = "contract"))]
+use ethabi::{ParamType, Token};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
 
+#[cfg(feature = "engine")]
 use crate::engine::EngineResult;
+use crate::log_entry::LogEntry;
 #[cfg(feature = "engine")]
 use crate::sdk;
+
+#[cfg(not(feature = "contract"))]
+use ethabi::param_type::Writer;
 
 pub type AccountId = String;
 pub type Balance = u128;
@@ -18,6 +29,99 @@ pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 pub type EthAddress = [u8; 20];
 pub type Gas = u64;
 pub type StorageUsage = u64;
+
+pub type EventParams = Vec<EventParam>;
+
+/// Ethereum event
+pub struct EthEvent {
+    pub eth_custodian_address: EthAddress,
+    pub log: Log,
+}
+
+#[allow(dead_code)]
+impl EthEvent {
+    /// Get Ethereum event from `log_entry_data`
+    pub fn fetch_log_entry_data(name: &str, params: EventParams, data: &[u8]) -> Self {
+        let event = Event {
+            name: name.to_string(),
+            inputs: params,
+            anonymous: false,
+        };
+        let log_entry: LogEntry = rlp::decode(data).expect("INVALID_RLP");
+        let eth_custodian_address = log_entry.address.0;
+        let topics = log_entry.topics.iter().map(|h| Hash::from(h.0)).collect();
+
+        let raw_log = RawLog {
+            topics,
+            data: log_entry.data,
+        };
+        let log = event.parse_log(raw_log).expect("Failed to parse event log");
+
+        Self {
+            eth_custodian_address,
+            log,
+        }
+    }
+
+    /// Build log_entry_data from ethereum event
+    #[cfg(not(feature = "contract"))]
+    #[allow(dead_code)]
+    pub fn to_log_entry_data(
+        name: &str,
+        params: EventParams,
+        locker_address: EthAddress,
+        indexes: Vec<Vec<u8>>,
+        values: Vec<Token>,
+    ) -> Vec<u8> {
+        let event = Event {
+            name: name.to_string(),
+            inputs: params.into_iter().collect(),
+            anonymous: false,
+        };
+        let params: Vec<ParamType> = event.inputs.iter().map(|p| p.kind.clone()).collect();
+        let topics = indexes
+            .into_iter()
+            .map(|value| {
+                let mut result: [u8; 32] = Default::default();
+                result[12..].copy_from_slice(value.as_slice());
+                H256::from(result)
+            })
+            .collect();
+        let log_entry = LogEntry {
+            address: locker_address.into(),
+            topics: vec![vec![long_signature(&event.name, &params).0.into()], topics].concat(),
+            data: ethabi::encode(&values),
+        };
+        rlp::encode(&log_entry).to_vec()
+    }
+}
+
+#[cfg(not(feature = "contract"))]
+fn long_signature(name: &str, params: &[ParamType]) -> Hash {
+    let types = params
+        .iter()
+        .map(Writer::write)
+        .collect::<Vec<String>>()
+        .join(",");
+
+    let data: Vec<u8> = From::from(format!("{}({})", name, types).as_str());
+
+    let mut sponge = sha3::Keccak256::default();
+    sponge.update(&data);
+    let mut result: [u8; 32] = Default::default();
+    result.copy_from_slice(sponge.finalize().as_slice());
+    H256::from(result)
+}
+
+#[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
+pub struct Proof {
+    pub log_index: u64,
+    pub log_entry_data: Vec<u8>,
+    pub receipt_index: u64,
+    pub receipt_data: Vec<u8>,
+    pub header_data: Vec<u8>,
+    pub proof: Vec<Vec<u8>>,
+}
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
@@ -272,10 +376,12 @@ impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for core::result::Result<T, E> {
     }
 }
 
+#[cfg(feature = "engine")]
 pub(crate) trait SdkProcess<T> {
     fn sdk_process(self);
 }
 
+#[cfg(feature = "engine")]
 impl<T: AsRef<[u8]>> SdkProcess<T> for EngineResult<T> {
     fn sdk_process(self) {
         match self {

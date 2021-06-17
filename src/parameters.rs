@@ -4,13 +4,10 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::admin_controlled::PausedMask;
 #[cfg(feature = "engine")]
 use crate::json;
-use crate::json::JsonError;
-use crate::prelude::{String, ToString, TryFrom, Vec};
-#[cfg(feature = "engine")]
-use crate::prover::Proof;
+use crate::prelude::{is_valid_account_id, String, ToString, TryFrom, Vec};
 #[cfg(feature = "engine")]
 use crate::sdk;
-use crate::types::{AccountId, Balance, RawAddress, RawH256, RawU256};
+use crate::types::{AccountId, Balance, Proof, RawAddress, RawH256, RawU256};
 #[cfg(feature = "engine")]
 use crate::types::{EthAddress, SdkUnwrap};
 use evm::backend::Log;
@@ -147,8 +144,7 @@ pub struct NEP141FtOnTransferArgs {
 
 #[cfg(feature = "engine")]
 impl TryFrom<json::JsonValue> for NEP141FtOnTransferArgs {
-    // TODO: Define type of error
-    type Error = JsonError;
+    type Error = json::JsonError;
 
     fn try_from(value: json::JsonValue) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -156,6 +152,25 @@ impl TryFrom<json::JsonValue> for NEP141FtOnTransferArgs {
             amount: value.u128("amount")?,
             msg: value.string("msg")?.into(),
         })
+    }
+}
+
+#[cfg(feature = "engine")]
+impl TryFrom<NEP141FtOnTransferArgs> for String {
+    type Error = json::ParseError;
+
+    fn try_from(value: NEP141FtOnTransferArgs) -> Result<Self, Self::Error> {
+        if !is_valid_account_id(value.sender_id.as_bytes()) {
+            return Err(json::ParseError::InvalidAccountId);
+        }
+
+        Ok(crate::prelude::format!(
+            r#"{{"sender_id": "{}", "amount": "{}", "msg": "{}"}}"#,
+            value.sender_id,
+            value.amount,
+            // Escape message to avoid json injection attacks
+            value.msg.replace("\\", "\\\\").replace("\"", "\\\"")
+        ))
     }
 }
 
@@ -192,15 +207,6 @@ pub struct WithdrawResult {
     pub amount: Balance,
     pub recipient_id: RawAddress,
     pub eth_custodian_address: RawAddress,
-}
-
-/// ft_on_transfer eth-connector call args
-#[cfg(feature = "engine")]
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct FtOnTransfer {
-    pub amount: Balance,
-    pub msg: String,
-    pub receiver_id: AccountId,
 }
 
 /// ft_resolve_transfer eth-connector call args

@@ -25,6 +25,11 @@ pub enum JsonError {
     ExpectedStringGotNumber,
 }
 
+#[derive(Debug)]
+pub enum ParseError {
+    InvalidAccountId,
+}
+
 pub struct JsonArray(Vec<JsonValue>);
 pub struct JsonObject(BTreeMap<String, JsonValue>);
 

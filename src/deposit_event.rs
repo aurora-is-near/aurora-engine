@@ -1,9 +1,6 @@
-use crate::prover::*;
+use crate::prelude::{vec, String, ToString};
+
 use crate::types::*;
-use alloc::{
-    string::{String, ToString},
-    vec,
-};
 use ethabi::{EventParam, ParamType};
 use primitive_types::U256;
 
@@ -61,5 +58,22 @@ impl DepositedEvent {
             amount,
             fee,
         }
+    }
+
+    #[cfg(not(feature = "contract"))]
+    #[allow(dead_code)]
+    pub fn to_log_entry_data(&self) -> Vec<u8> {
+        use std::convert::TryInto;
+        EthEvent::to_log_entry_data(
+            DEPOSITED_EVENT,
+            DepositedEvent::event_params(),
+            self.eth_custodian_address,
+            vec![self.sender.to_vec()],
+            vec![
+                ethabi::Token::String(self.recipient.clone()),
+                ethabi::Token::Uint(self.amount.into()),
+                ethabi::Token::Uint(self.fee.clone()),
+            ],
+        )
     }
 }

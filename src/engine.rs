@@ -499,7 +499,7 @@ impl Engine {
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
-    pub fn receive_erc20_tokens(&mut self, args: NEP141FtOnTransferArgs) {
+    pub fn receive_erc20_tokens(&mut self, args: &NEP141FtOnTransferArgs) {
         let str_amount = args.amount.to_string();
         let output_on_fail = str_amount.as_bytes();
 

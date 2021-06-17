@@ -1,14 +1,14 @@
 use crate::fungible_token::*;
 use crate::parameters::*;
 use crate::sdk;
-use crate::types::*;
+use crate::types::{AccountId, Balance, EthAddress, Gas, PromiseResult, Proof, ERR_FAILED_PARSE};
 
 use crate::admin_controlled::{AdminControlled, PausedMask};
 use crate::deposit_event::*;
 use crate::engine::Engine;
 use crate::json::parse_json;
 use crate::prelude::*;
-use crate::prover::{validate_eth_address, Proof};
+use crate::prover::validate_eth_address;
 use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
 #[cfg(feature = "log")]
 use alloc::format;
@@ -151,7 +151,7 @@ impl EthConnectorContract {
         fee.copy_from_slice(&msg[..32]);
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
-        // Checkk account
+        // Check account
         let account_id = data[0];
         assert!(
             is_valid_account_id(account_id.as_bytes()),
@@ -209,7 +209,8 @@ impl EthConnectorContract {
             event.eth_custodian_address, self.contract.eth_custodian_address,
             "ERR_WRONG_EVENT_ADDRESS",
         );
-        assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
+
+        assert!(event.amount >= event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
 
         // Verify proof data with cross-contract call to prover account
         #[cfg(feature = "log")]
@@ -268,6 +269,7 @@ impl EthConnectorContract {
                 }
                 .try_to_vec()
                 .unwrap();
+
                 let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
                 // Send to self - current account id
                 let data = FinishDepositCallArgs {
@@ -524,7 +526,7 @@ impl EthConnectorContract {
         let message_data = self.parse_on_transfer_message(&args.msg);
         // Check is transfer amount > fee
         assert!(
-            args.amount > message_data.fee.as_u128(),
+            args.amount >= message_data.fee.as_u128(),
             "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"
         );
 
@@ -576,30 +578,22 @@ impl EthConnectorContract {
 
     /// ft_on_transfer callback function
     #[allow(clippy::unnecessary_unwrap)]
-    pub fn ft_on_transfer(&mut self, engine: &Engine) {
+    pub fn ft_on_transfer(&mut self, engine: &Engine, args: &NEP141FtOnTransferArgs) {
         #[cfg(feature = "log")]
         sdk::log("Call ft_on_transfer");
-        let args = FtOnTransfer::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
-        let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
         // Parse message with specific rules
         let message_data = self.parse_on_transfer_message(&args.msg);
 
         // Special case when predecessor_account_id is current_account_id
-        if current_account_id == predecessor_account_id {
-            let fee = message_data.fee.as_u128();
-            // Mint fee to relayer
-            let relayer = engine.get_relayer(message_data.relayer.as_bytes());
-            if fee > 0 && relayer.is_some() {
-                self.mint_eth(message_data.recipient, args.amount - fee);
-                let evm_relayer_address: EthAddress = relayer.unwrap().0;
-                self.mint_eth(evm_relayer_address, fee);
-            } else {
-                self.mint_eth(message_data.recipient, args.amount);
-            }
+        let fee = message_data.fee.as_u128();
+        // Mint fee to relayer
+        let relayer = engine.get_relayer(message_data.relayer.as_bytes());
+        if fee > 0 && relayer.is_some() {
+            self.mint_eth(message_data.recipient, args.amount - fee);
+            let evm_relayer_address: EthAddress = relayer.unwrap().0;
+            self.mint_eth(evm_relayer_address, fee);
         } else {
-            // Implement new scheme for ERC20
-            todo!();
+            self.mint_eth(message_data.recipient, args.amount);
         }
         self.save_ft_contract();
         sdk::return_output(0.to_string().as_bytes());

@@ -23,7 +23,6 @@ pub mod types;
 mod admin_controlled;
 #[cfg(feature = "engine")]
 mod connector;
-#[cfg(feature = "engine")]
 mod deposit_event;
 #[cfg(feature = "engine")]
 pub mod engine;
@@ -31,7 +30,6 @@ pub mod engine;
 mod fungible_token;
 #[cfg(feature = "engine")]
 mod json;
-#[cfg(feature = "engine")]
 mod log_entry;
 mod precompiles;
 #[cfg(feature = "engine")]
@@ -328,19 +326,17 @@ mod contract {
     pub extern "C" fn ft_on_transfer() {
         let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
 
+        let args: NEP141FtOnTransferArgs = parse_json(sdk::read_input().as_slice())
+            .sdk_unwrap()
+            .try_into()
+            .map_err(|_| b"ERR_ARG_PARSE")
+            .sdk_unwrap();
+
         if sdk::predecessor_account_id() == sdk::current_account_id() {
             let engine = Engine::new(predecessor_address()).sdk_unwrap();
-            EthConnectorContract::get_instance().ft_on_transfer(&engine)
+            EthConnectorContract::get_instance().ft_on_transfer(&engine, &args);
         } else {
-            // TODO: Use this approach for EthConnector as well
-
-            let args: NEP141FtOnTransferArgs = parse_json(sdk::read_input().as_slice())
-                .sdk_unwrap()
-                .try_into()
-                .map_err(|_| b"ERR_ARG_PARSE")
-                .sdk_unwrap();
-
-            engine.receive_erc20_tokens(args);
+            engine.receive_erc20_tokens(&args);
         }
     }
 
