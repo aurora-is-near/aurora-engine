@@ -228,29 +228,18 @@ impl EthConnectorContract {
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
 
         // Finalize deposit
-        let promise1 = match self.parse_event_message(&event.recipient) {
+        let data = match self.parse_event_message(&event.recipient) {
             // Deposit to NEAR accounts
-            TokenMessageData::Near(account_id) => {
-                let data = FinishDepositCallArgs {
-                    new_owner_id: account_id,
-                    amount: event.amount.as_u128(),
-                    proof_key: proof.get_key(),
-                    relayer_id: predecessor_account_id,
-                    fee: event.fee.as_u128(),
-                    msg: None,
-                }
-                .try_to_vec()
-                .unwrap();
-
-                sdk::promise_then(
-                    promise0,
-                    &sdk::current_account_id(),
-                    b"finish_deposit_near",
-                    &data[..],
-                    NO_DEPOSIT,
-                    GAS_FOR_FINISH_DEPOSIT,
-                )
+            TokenMessageData::Near(account_id) => FinishDepositCallArgs {
+                new_owner_id: account_id,
+                amount: event.amount.as_u128(),
+                proof_key: proof.get_key(),
+                relayer_id: predecessor_account_id,
+                fee: event.fee.as_u128(),
+                msg: None,
             }
+            .try_to_vec()
+            .unwrap(),
             // Deposit to Eth accounts
             // fee is being minted in the `ft_on_transfer` callback method
             TokenMessageData::Eth { address, message } => {
@@ -267,7 +256,7 @@ impl EthConnectorContract {
 
                 let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
                 // Send to self - current account id
-                let data = FinishDepositCallArgs {
+                FinishDepositCallArgs {
                     new_owner_id: current_account_id,
                     amount: event.amount.as_u128(),
                     proof_key: proof.get_key(),
@@ -276,32 +265,31 @@ impl EthConnectorContract {
                     msg: Some(transfer_data),
                 }
                 .try_to_vec()
-                .unwrap();
-
-                sdk::promise_then(
-                    promise0,
-                    &sdk::current_account_id(),
-                    b"finish_deposit_near",
-                    &data[..],
-                    NO_DEPOSIT,
-                    GAS_FOR_FINISH_DEPOSIT,
-                )
+                .unwrap()
             }
         };
 
+        let promise1 = sdk::promise_then(
+            promise0,
+            &sdk::current_account_id(),
+            b"finish_deposit",
+            &data[..],
+            NO_DEPOSIT,
+            GAS_FOR_FINISH_DEPOSIT,
+        );
         sdk::promise_return(promise1);
     }
 
-    /// Finish deposit NEAR (private method)
+    /// Finish deposit (private method)
     /// NOTE: we should `record_proof` only after `mint` operation. The reason
     /// is that in this case we only calculate the amount to be credited but
     /// do not save it, however, if an error occurs during the calculation,
     /// this will happen before `record_proof`. After that contract will save.
-    pub fn finish_deposit_near(&mut self) {
+    pub fn finish_deposit(&mut self) {
         sdk::assert_private_call();
         let data: FinishDepositCallArgs =
             FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
-        crate::log!(&format!("Finish deposit NEAR amount: {}", data.amount));
+        crate::log!(&format!("Finish deposit with the amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
 
         // Check promise results
@@ -318,7 +306,7 @@ impl EthConnectorContract {
         // Mint tokens to recipient minus fee
         if let Some(msg) = data.msg {
             // Mint - calculate new balances
-            self.mint_near(data.new_owner_id, data.amount);
+            self.mint_eth_on_near(data.new_owner_id, data.amount);
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key);
             // Save new contract data
@@ -327,8 +315,8 @@ impl EthConnectorContract {
             self.ft_transfer_call(transfer_call_args);
         } else {
             // Mint - calculate new balances
-            self.mint_near(data.new_owner_id.clone(), data.amount - data.fee);
-            self.mint_near(data.relayer_id, data.fee);
+            self.mint_eth_on_near(data.new_owner_id.clone(), data.amount - data.fee);
+            self.mint_eth_on_near(data.relayer_id, data.fee);
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key);
             // Save new contract data
@@ -348,7 +336,7 @@ impl EthConnectorContract {
 
     /// Internal ETH withdraw ETH logic
     pub(crate) fn internal_remove_eth(&mut self, address: &Address, amount: &U256) {
-        self.burn_eth(address.0, amount.as_u128());
+        self.burn_eth_on_aurora(address.0, amount.as_u128());
         self.save_ft_contract();
     }
 
@@ -360,39 +348,39 @@ impl EthConnectorContract {
         self.save_used_event(key);
     }
 
-    ///  Mint NEAR tokens
-    fn mint_near(&mut self, owner_id: AccountId, amount: Balance) {
-        crate::log!(&format!("Mint NEAR {} tokens for: {}", amount, owner_id));
+    ///  Mint nETH tokens
+    fn mint_eth_on_near(&mut self, owner_id: AccountId, amount: Balance) {
+        crate::log!(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
 
         if self.ft.accounts_get(&owner_id).is_none() {
             self.ft.accounts_insert(&owner_id, 0);
         }
-        self.ft.internal_deposit(&owner_id, amount);
+        self.ft.internal_deposit_eth_to_near(&owner_id, amount);
     }
 
     ///  Mint ETH tokens
-    fn mint_eth(&mut self, owner_id: EthAddress, amount: Balance) {
+    fn mint_eth_on_aurora(&mut self, owner_id: EthAddress, amount: Balance) {
         crate::log!(&format!(
-            "Mint ETH {} tokens for: {}",
+            "Mint {} ETH tokens for: {}",
             amount,
             hex::encode(owner_id)
         ));
-        self.ft.internal_deposit_eth(owner_id, amount);
+        self.ft.internal_deposit_eth_to_aurora(owner_id, amount);
     }
 
     /// Burn ETH tokens
-    fn burn_eth(&mut self, address: EthAddress, amount: Balance) {
+    fn burn_eth_on_aurora(&mut self, address: EthAddress, amount: Balance) {
         crate::log!(&format!(
-            "Burn ETH {} tokens for: {}",
+            "Burn {} ETH tokens for: {}",
             amount,
             hex::encode(address)
         ));
-        self.ft.internal_withdraw_eth(address, amount);
+        self.ft.internal_withdraw_eth_from_aurora(address, amount);
     }
 
-    /// Withdraw from NEAR accounts
+    /// Withdraw nETH from NEAR accounts
     /// NOTE: it should be without any log data
-    pub fn withdraw_near(&mut self) {
+    pub fn withdraw_eth_from_near(&mut self) {
         self.assert_not_paused(PAUSE_WITHDRAW);
 
         sdk::assert_one_yocto();
@@ -407,51 +395,48 @@ impl EthConnectorContract {
         // Burn tokens to recipient
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         self.ft
-            .internal_withdraw(&predecessor_account_id, args.amount);
+            .internal_withdraw_eth_from_near(&predecessor_account_id, args.amount);
         // Save new contract data
         self.save_ft_contract();
         sdk::return_output(&res[..]);
     }
 
-    /// Return total supply of NEAR + ETH
-    pub fn ft_total_supply(&self) {
-        let total_supply = self.ft.ft_total_supply();
+    /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
+    pub fn ft_total_eth_supply_on_near(&self) {
+        let total_supply = self.ft.ft_total_eth_supply_on_near();
+        crate::log!(&format!("Total ETH supply on NEAR: {}", total_supply));
         sdk::return_output(total_supply.to_string().as_bytes());
-        crate::log!(&format!("Total supply: {}", total_supply));
     }
 
-    /// Return total supply of NEAR
-    pub fn ft_total_supply_near(&self) {
-        let total_supply = self.ft.ft_total_supply_near();
+    /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
+    pub fn ft_total_eth_supply_on_aurora(&self) {
+        let total_supply = self.ft.ft_total_eth_supply_on_aurora();
+        crate::log!(&format!("Total ETH supply on Aurora: {}", total_supply));
         sdk::return_output(total_supply.to_string().as_bytes());
-        crate::log!(&format!("Total supply NEAR: {}", total_supply));
     }
 
-    /// Return total supply of ETH
-    pub fn ft_total_supply_eth(&self) {
-        let total_supply = self.ft.ft_total_supply_eth();
-        sdk::return_output(total_supply.to_string().as_bytes());
-        crate::log!(&format!("Total supply ETH: {}", total_supply));
-    }
-
-    /// Return balance of NEAR
+    /// Return balance of nETH (ETH on Near)
     pub fn ft_balance_of(&self) {
         let args = BalanceOfCallArgs::from(
             parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
+
         let balance = self.ft.ft_balance_of(&args.account_id);
-        sdk::return_output(balance.to_string().as_bytes());
         crate::log!(&format!(
-            "Balance of NEAR [{}]: {}",
+            "Balance of nETH [{}]: {}",
             args.account_id, balance
         ));
+
+        sdk::return_output(balance.to_string().as_bytes());
     }
 
-    /// Return balance of ETH
-    pub fn ft_balance_of_eth(&self) {
+    /// Return balance of ETH (ETH in Aurora EVM)
+    pub fn ft_balance_of_eth_on_aurora(&self) {
         let args =
             BalanceOfEthCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
-        let balance = self.ft.internal_unwrap_balance_of_eth(args.address);
+        let balance = self
+            .ft
+            .internal_unwrap_balance_of_eth_on_aurora(args.address);
         crate::log!(&format!(
             "Balance of ETH [{}]: {}",
             hex::encode(args.address),
@@ -515,10 +500,13 @@ impl EthConnectorContract {
         // Note: It can't overflow because the total supply doesn't change during transfer.
         let amount_for_check = self
             .ft
-            .internal_unwrap_balance_of_eth(message_data.recipient);
+            .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
         assert!(amount_for_check.checked_add(args.amount).is_some());
-        assert!(self.ft.total_supply_eth.checked_add(args.amount).is_some());
-        assert!(self.ft.total_supply.checked_add(args.amount).is_some());
+        assert!(self
+            .ft
+            .total_eth_supply_on_aurora
+            .checked_add(args.amount)
+            .is_some());
 
         self.ft
             .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
@@ -568,11 +556,11 @@ impl EthConnectorContract {
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         if fee > 0 && relayer.is_some() {
-            self.mint_eth(message_data.recipient, args.amount - fee);
+            self.mint_eth_on_aurora(message_data.recipient, args.amount - fee);
             let evm_relayer_address: EthAddress = relayer.unwrap().0;
-            self.mint_eth(evm_relayer_address, fee);
+            self.mint_eth_on_aurora(evm_relayer_address, fee);
         } else {
-            self.mint_eth(message_data.recipient, args.amount);
+            self.mint_eth_on_aurora(message_data.recipient, args.amount);
         }
         self.save_ft_contract();
         sdk::return_output(0.to_string().as_bytes());

@@ -468,7 +468,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn withdraw() {
-        EthConnectorContract::get_instance().withdraw_near()
+        EthConnectorContract::get_instance().withdraw_eth_from_near()
     }
 
     #[no_mangle]
@@ -477,8 +477,8 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn finish_deposit_near() {
-        EthConnectorContract::get_instance().finish_deposit_near();
+    pub extern "C" fn finish_deposit() {
+        EthConnectorContract::get_instance().finish_deposit();
     }
 
     #[no_mangle]
@@ -492,17 +492,17 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_total_supply() {
-        EthConnectorContract::get_instance().ft_total_supply();
+        EthConnectorContract::get_instance().ft_total_eth_supply_on_near();
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_total_supply_near() {
-        EthConnectorContract::get_instance().ft_total_supply_near();
+    pub extern "C" fn ft_total_eth_supply_on_near() {
+        EthConnectorContract::get_instance().ft_total_eth_supply_on_near();
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_total_supply_eth() {
-        EthConnectorContract::get_instance().ft_total_supply_eth();
+    pub extern "C" fn ft_total_eth_supply_on_aurora() {
+        EthConnectorContract::get_instance().ft_total_eth_supply_on_aurora();
     }
 
     #[no_mangle]
@@ -512,7 +512,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
-        EthConnectorContract::get_instance().ft_balance_of_eth();
+        EthConnectorContract::get_instance().ft_balance_of_eth_on_aurora();
     }
 
     #[no_mangle]

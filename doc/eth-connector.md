@@ -22,12 +22,12 @@ $ near call <NEAR_ACC> new_eth_connector '{"prover_account": "<PROVER_NEAR_ACCOU
 
 ## ETH connector specific methods
 * new_eth_connector (call once)
-* deposit (mutable)  
+* deposit (mutable)
 * withdraw (mutable, payable)
-* finish_deposit_near (private, mutable)
+* finish_deposit (private, mutable)
 * ft_total_supply (view)
-* ft_total_supply_near (view)
-* ft_total_supply_eth (view)
+* ft_total_eth_supply_on_near (view)
+* ft_total_eth_supply_on_aurora (view)
 * ft_balance_of (view)
 * ft_balance_of_eth (view)
 * ft_transfer (mutable, payable)
