@@ -52,6 +52,9 @@ rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
 ### Building the EVM binary
 
 ```sh
+make --always-make mainnet # produces Mainnet build
+make --always-make testnet # produces Testnet build
+make --always-make betanet # produces Betanet build
 make release  # produces release.wasm (300+ KiB)
 make debug    # produces debug.wasm (1+ MiB), which includes symbols
 ```
