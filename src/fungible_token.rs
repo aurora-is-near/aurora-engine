@@ -1,12 +1,13 @@
 #[cfg(feature = "engine")]
 use crate::parameters::*;
+#[cfg(feature = "log")]
+use crate::prelude::format;
+use crate::prelude::TryInto;
 #[cfg(feature = "engine")]
 use crate::prelude::{self, Ordering, String, ToString, Vec, U256};
 use crate::types::*;
 #[cfg(feature = "engine")]
 use crate::{connector, engine, sdk, storage};
-#[cfg(feature = "log")]
-use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[cfg(feature = "engine")]
@@ -205,16 +206,14 @@ impl FungibleToken {
         if sender_id != receiver_id {
             self.internal_transfer(sender_id, receiver_id, amount, memo);
         }
-        // Note: This seems to be breaking the invariant that sender_id != receiver_id. You need to
-        //    make sure the ft implementation doesn't break after this change.
-
-        let data1 = FtOnTransfer {
+        let data1: String = NEP141FtOnTransferArgs {
             amount,
             msg,
-            receiver_id: receiver_id.to_string(),
+            sender_id: receiver_id.to_string(),
         }
-        .try_to_vec()
+        .try_into()
         .unwrap();
+
         let account_id = String::from_utf8(sdk::current_account_id()).unwrap();
         let data2 = FtResolveTransfer {
             receiver_id: receiver_id.to_string(),
@@ -227,7 +226,7 @@ impl FungibleToken {
         let promise0 = sdk::promise_create(
             receiver_id.as_bytes(),
             b"ft_on_transfer",
-            &data1[..],
+            data1.as_bytes(),
             connector::NO_DEPOSIT,
             GAS_FOR_FT_ON_TRANSFER,
         );

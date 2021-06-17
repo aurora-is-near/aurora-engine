@@ -1,15 +1,18 @@
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError};
+
+use crate::parameters::{PromiseCreateArgs, WithdrawCallArgs};
+use crate::prelude::{is_valid_account_id, Cow, PhantomData, String, ToString, TryInto, U256};
+use crate::storage::{bytes_to_key, KeyPrefix};
+use crate::types::AccountId;
+use crate::AuroraState;
+use borsh::BorshSerialize;
 
 use super::{Precompile, PrecompileResult};
-use crate::precompiles::PrecompileOutput;
-use crate::prelude::Vec;
-#[cfg(feature = "exit-precompiles")]
-use crate::{
-    prelude::{is_valid_account_id, Cow, String, U256},
-    types::AccountId,
-};
 
-#[cfg(feature = "exit-precompiles")]
+const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
+
+use crate::precompiles::PrecompileOutput;
+
 mod costs {
     use crate::types::Gas;
 
@@ -26,17 +29,9 @@ mod costs {
     pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
 }
 
-/// Get the current nep141 token associated with the current erc20 token.
-/// This will fail is none is associated.
-#[cfg(feature = "exit-precompiles")]
-fn get_nep141_from_erc20(_erc20_token: &[u8]) -> Vec<u8> {
-    // TODO(#51): Already implemented
-    Vec::new()
-}
+pub struct ExitToNear<S>(PhantomData<S>); //TransferEthToNear
 
-pub struct ExitToNear; //TransferEthToNear
-
-impl ExitToNear {
+impl<S> ExitToNear<S> {
     /// Exit to NEAR precompile address
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
@@ -45,97 +40,149 @@ impl ExitToNear {
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
-impl Precompile for ExitToNear {
+fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
+    AccountId::from_utf8(
+        crate::sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
+            .expect(ERR_TARGET_TOKEN_NOT_FOUND),
+    )
+    .unwrap()
+}
+
+impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
     #[cfg(not(feature = "exit-precompiles"))]
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
-        Ok((ExitSucceed::Returned, Vec::new(), 0))
+        Ok(PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output: Vec::new(),
+            cost: 0,
+            logs: Vec::new(),
+        })
     }
 
     #[cfg(feature = "exit-precompiles")]
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
-        let (nep141_address, args) = if context.apparent_value != U256::from(0) {
-            // ETH transfer
-            //
-            // Input slice format:
-            //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
+        // TODO(MarX): After calling directly function withdraw in Tester.sol
+        //   This function is called with is_static = true
+        //   Figure out if this needs to be fixed in EVM, or the way
+        //   that is being used to determine if a function is called in static
+        //   mode is incorrect.
+        // if is_static {
+        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        // }
 
-            if is_valid_account_id(input) {
-                (
-                    crate::sdk::current_account_id(),
-                    crate::prelude::format!(
-                        r#"{{"receiver_id": "{}", "amount": "{}"}}"#,
-                        String::from_utf8(input.to_vec()).unwrap(),
-                        context.apparent_value.as_u128()
-                    ),
-                )
-            } else {
-                return Err(ExitError::Other(Cow::from(
-                    "ERR_INVALID_RECEIVER_ACCOUNT_ID",
-                )));
+        // First byte of the input is a flag, selecting the behavior to be triggered:
+        //      0x0 -> Eth transfer
+        //      0x1 -> Erc20 transfer
+        let mut input = input;
+        let flag = input[0];
+        input = &input[1..];
+
+        let (nep141_address, args) = match flag {
+            0x0 => {
+                // ETH transfer
+                //
+                // Input slice format:
+                //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
+
+                if is_valid_account_id(input) {
+                    (
+                        String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                        // There is no way to inject json, given the encoding of both arguments
+                        // as decimal and valid account id respectively.
+                        crate::prelude::format!(
+                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                            String::from_utf8(input.to_vec()).unwrap(),
+                            context.apparent_value.as_u128()
+                        ),
+                    )
+                } else {
+                    return Err(ExitError::Other(Cow::from(
+                        "ERR_INVALID_RECEIVER_ACCOUNT_ID",
+                    )));
+                }
             }
-        } else {
-            // ERC20 transfer
-            //
-            // This precompile branch is expected to be called from the ERC20 burn function\
-            //
-            // Input slice format:
-            //      amount (U256 le bytes) - the amount that was burned
-            //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
+            0x1 => {
+                // ERC20 transfer
+                //
+                // This precompile branch is expected to be called from the ERC20 burn function\
+                //
+                // Input slice format:
+                //      amount (U256 big-endian bytes) - the amount that was burned
+                //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
 
-            let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
+                if context.apparent_value != U256::from(0) {
+                    return Err(ExitError::Other(Cow::from(
+                        "ERR_ETH_ATTACHED_FOR_ERC20_EXIT",
+                    )));
+                }
 
-            let mut input_mut = input;
-            let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
-            input_mut = &input_mut[32..];
+                let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
-            // TODO: You have to charge caller's account balance for this transfer.
+                let amount = U256::from_big_endian(&input[..32]).as_u128();
+                input = &input[32..];
 
-            if is_valid_account_id(input_mut) {
-                let receiver_account_id: AccountId = String::from_utf8(input_mut.to_vec()).unwrap();
-                (
-                    nep141_address,
-                    crate::prelude::format!(
-                        r#"{{"receiver_id": "{}", "amount": "{}"}}"#,
-                        receiver_account_id,
-                        amount
-                    ),
-                )
-            } else {
-                return Err(ExitError::Other(Cow::from(
-                    "ERR_INVALID_RECEIVER_ACCOUNT_ID",
-                )));
+                if is_valid_account_id(input) {
+                    let receiver_account_id: AccountId = String::from_utf8(input.to_vec()).unwrap();
+                    (
+                        nep141_address,
+                        // There is no way to inject json, given the encoding of both arguments
+                        // as decimal and valid account id respectively.
+                        crate::prelude::format!(
+                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                            receiver_account_id,
+                            amount
+                        ),
+                    )
+                } else {
+                    return Err(ExitError::Other(Cow::from(
+                        "ERR_INVALID_RECEIVER_ACCOUNT_ID",
+                    )));
+                }
             }
+            _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
         };
 
-        let promise0 = crate::sdk::promise_create(
-            &nep141_address,
-            b"ft_transfer",
-            args.as_bytes(),
-            1,
-            costs::FT_TRANSFER_GAS,
-        );
+        let promise = PromiseCreateArgs {
+            target_account_id: nep141_address,
+            method: "ft_transfer".to_string(),
+            args: args.as_bytes().to_vec(),
+            attached_balance: 1,
+            attached_gas: costs::FT_TRANSFER_GAS,
+        };
 
-        crate::sdk::promise_return(promise0);
+        state.add_promise(promise);
 
         Ok(PrecompileOutput::default())
     }
 }
 
-pub struct ExitToEthereum;
+pub struct ExitToEthereum<S>(PhantomData<S>);
 
-impl ExitToEthereum {
+impl<S> ExitToEthereum<S> {
     /// Exit to Ethereum precompile address
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
@@ -144,91 +191,136 @@ impl ExitToEthereum {
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
 }
 
-impl Precompile for ExitToEthereum {
+impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
     #[cfg(not(feature = "exit-precompiles"))]
-    fn run(input: &[u8], target_gas: u64, _context: &Context) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        _state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
-        Ok((ExitSucceed::Returned, Vec::new(), 0))
+        Ok(PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output: Vec::new(),
+            cost: 0,
+            logs: Vec::new(),
+        })
     }
 
     #[cfg(feature = "exit-precompiles")]
-    fn run(input: &[u8], target_gas: u64, context: &Context) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: u64,
+        context: &Context,
+        state: &mut S,
+        _is_static: bool,
+    ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
-        let (nep141_address, serialized_args) = if context.apparent_value != U256::from(0) {
-            // ETH transfer
-            //
-            // Input slice format:
-            //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
+        // TODO(MarX): After calling directly function withdraw in Tester.sol
+        //   This function is called with is_static = true
+        //   Figure out if this needs to be fixed in EVM, or the way
+        //   that is being used to determine if a function is called in static
+        //   mode is incorrect.
+        // if is_static {
+        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        // }
 
-            let eth_recipient: String = hex::encode(input);
+        // First byte of the input is a flag, selecting the behavior to be triggered:
+        //      0x0 -> Eth transfer
+        //      0x1 -> Erc20 transfer
+        let mut input = input;
+        let flag = input[0];
+        input = &input[1..];
 
-            if eth_recipient.len() == 20 {
+        let (nep141_address, serialized_args) = match flag {
+            0x0 => {
+                // ETH transfer
+                //
+                // Input slice format:
+                //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
                 (
-                    crate::sdk::current_account_id(),
-                    crate::prelude::format!(
-                        r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                        context.apparent_value.as_u128(),
-                        eth_recipient
-                    ),
+                    String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                    // There is no way to inject json, given the encoding of both arguments
+                    // as decimal and hexadecimal respectively.
+                    WithdrawCallArgs {
+                        recipient_address: input.try_into().map_err(|_| {
+                            ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS"))
+                        })?,
+                        amount: context.apparent_value.as_u128(),
+                    }
+                    .try_to_vec()
+                    .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
                 )
-            } else {
-                return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
             }
-        } else {
-            // ERC-20 transfer
-            //
-            // This precompile branch is expected to be called from the ERC20 withdraw function
-            // (or burn function with some flag provided that this is expected to be withdrawn)
-            //
-            // Input slice format:
-            //      amount (U256 le bytes) - the amount that was burned
-            //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
+            0x1 => {
+                // ERC-20 transfer
+                //
+                // This precompile branch is expected to be called from the ERC20 withdraw function
+                // (or burn function with some flag provided that this is expected to be withdrawn)
+                //
+                // Input slice format:
+                //      amount (U256 big-endian bytes) - the amount that was burned
+                //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
 
-            let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
+                if context.apparent_value != U256::from(0) {
+                    return Err(ExitError::Other(Cow::from(
+                        "ERR_ETH_ATTACHED_FOR_ERC20_EXIT",
+                    )));
+                }
 
-            let mut input_mut = input;
+                let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
-            let amount = U256::from_big_endian(&input_mut[..32]).as_u128();
-            input_mut = &input_mut[32..];
+                let amount = U256::from_big_endian(&input[..32]).as_u128();
+                input = &input[32..];
 
-            // TODO: Charge the caller's account balance?
+                if input.len() == 20 {
+                    // Parse ethereum address in hex
+                    let eth_recipient: String = hex::encode(input.to_vec());
 
-            if input_mut.len() == 20 {
-                // Parse ethereum address in hex
-                let eth_recipient: String = hex::encode(input_mut.to_vec());
-
-                (
-                    nep141_address,
-                    crate::prelude::format!(
-                        r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                        amount,
-                        eth_recipient
-                    ),
-                )
-            } else {
-                return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
+                    (
+                        nep141_address,
+                        // There is no way to inject json, given the encoding of both arguments
+                        // as decimal and hexadecimal respectively.
+                        crate::prelude::format!(
+                            r#"{{"amount": "{}", "recipient": "{}"}}"#,
+                            amount,
+                            eth_recipient
+                        )
+                        .as_bytes()
+                        .to_vec(),
+                    )
+                } else {
+                    return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
+                }
+            }
+            _ => {
+                return Err(ExitError::Other(Cow::from(
+                    "ERR_INVALID_RECEIVER_ACCOUNT_ID",
+                )));
             }
         };
 
-        let promise0 = crate::sdk::promise_create(
-            &nep141_address,
-            b"withdraw",
-            serialized_args.as_bytes(),
-            1,
-            costs::WITHDRAWAL_GAS,
-        );
+        let promise = PromiseCreateArgs {
+            target_account_id: nep141_address,
+            method: "withdraw".to_string(),
+            args: serialized_args,
+            attached_balance: 1,
+            attached_gas: costs::WITHDRAWAL_GAS,
+        };
 
-        crate::sdk::promise_return(promise0);
+        state.add_promise(promise);
 
         Ok(PrecompileOutput::default())
     }
@@ -238,6 +330,8 @@ impl Precompile for ExitToEthereum {
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
     use crate::types::near_account_to_evm_address;
+
+    use super::*;
 
     #[test]
     fn test_precompile_id() {
