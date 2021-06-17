@@ -12,6 +12,7 @@ use crate::parameters::PromiseCreateArgs;
 
 #[cfg(feature = "engine")]
 mod map;
+#[cfg(feature = "meta-call")]
 pub mod meta_parsing;
 pub mod parameters;
 pub mod prelude;
@@ -279,6 +280,7 @@ mod contract {
             .sdk_process();
     }
 
+    #[cfg(feature = "meta-call")]
     #[no_mangle]
     pub extern "C" fn meta_call() {
         let input = sdk::read_input();
