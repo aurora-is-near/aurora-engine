@@ -72,7 +72,7 @@ impl EthEvent {
     /// Build log_entry_data from ethereum event
     #[cfg(not(feature = "contract"))]
     #[allow(dead_code)]
-    pub fn to_log_entry_data(
+    pub fn params_to_log_entry_data(
         name: &str,
         params: EventParams,
         locker_address: EthAddress,

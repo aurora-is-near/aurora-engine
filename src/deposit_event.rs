@@ -66,7 +66,7 @@ impl DepositedEvent {
     #[cfg(not(feature = "contract"))]
     #[allow(dead_code)]
     pub fn to_log_entry_data(&self) -> Vec<u8> {
-        EthEvent::to_log_entry_data(
+        EthEvent::params_to_log_entry_data(
             DEPOSITED_EVENT,
             DepositedEvent::event_params(),
             self.eth_custodian_address,
