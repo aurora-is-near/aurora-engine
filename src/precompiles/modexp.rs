@@ -6,6 +6,7 @@ use crate::AuroraState;
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
+#[cfg_attr(not(feature = "engine"), allow(dead_code))]
 pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
 
 pub(super) struct ModExp<HF: HardFork, S>(PhantomData<HF>, PhantomData<S>);

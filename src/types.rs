@@ -33,6 +33,7 @@ pub type StorageUsage = u64;
 /// Selector to call mint function in ERC 20 contract
 ///
 /// keccak("mint(address,uint256)".as_bytes())[..4];
+#[allow(dead_code)]
 pub(crate) const ERC20_MINT_SELECTOR: &[u8] = &[64, 193, 15, 25];
 
 pub type EventParams = Vec<EventParam>;

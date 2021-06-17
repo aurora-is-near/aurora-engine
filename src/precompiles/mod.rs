@@ -323,6 +323,7 @@ pub fn berlin_precompiles(
 /// const fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
+#[cfg_attr(not(feature = "engine"), allow(dead_code))]
 const fn make_address(x: u32, y: u128) -> [u8; 20] {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
