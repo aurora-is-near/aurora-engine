@@ -83,20 +83,16 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
         target_gas: u64,
         context: &Context,
         state: &mut S,
-        _is_static: bool,
+        is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
-        // TODO(MarX): After calling directly function withdraw in Tester.sol
-        //   This function is called with is_static = true
-        //   Figure out if this needs to be fixed in EVM, or the way
-        //   that is being used to determine if a function is called in static
-        //   mode is incorrect.
-        // if is_static {
-        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        // }
+        // It's not allowed to call exit precompiles in static mode
+        if is_static {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
@@ -227,20 +223,16 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
         target_gas: u64,
         context: &Context,
         state: &mut S,
-        _is_static: bool,
+        is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
-        // TODO(MarX): After calling directly function withdraw in Tester.sol
-        //   This function is called with is_static = true
-        //   Figure out if this needs to be fixed in EVM, or the way
-        //   that is being used to determine if a function is called in static
-        //   mode is incorrect.
-        // if is_static {
-        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        // }
+        // It's not allowed to call exit precompiles in static mode
+        if is_static {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
