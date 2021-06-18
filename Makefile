@@ -34,10 +34,10 @@ etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json: $(shell
 
 debug: debug.wasm
 
-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm etc/eth-contracts/res/EvmErc20.bin
+debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 	ln -sf $< $@
 
-target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
+target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
 	$(CARGO) build --target wasm32-unknown-unknown --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 
 test-build: etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json etc/eth-contracts/res/EvmErc20.bin
