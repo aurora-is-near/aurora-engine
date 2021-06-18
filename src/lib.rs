@@ -20,6 +20,7 @@ pub mod transaction;
 pub mod types;
 
 mod admin_controlled;
+#[cfg_attr(not(feature = "contract"), allow(dead_code))]
 mod connector;
 mod deposit_event;
 pub mod engine;

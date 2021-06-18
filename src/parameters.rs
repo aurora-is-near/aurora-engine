@@ -220,8 +220,7 @@ pub struct StorageBalance {
 
 impl StorageBalance {
     pub fn to_json_bytes(&self) -> Vec<u8> {
-        use crate::prelude::format;
-        format!(
+        crate::prelude::format!(
             "{{\"total\": \"{}\", \"available\": \"{}\",}}",
             self.total.to_string(),
             self.available.to_string()

@@ -4,6 +4,7 @@ use crate::prelude::PhantomData;
 #[cfg(not(feature = "contract"))]
 use crate::prelude::Vec;
 use crate::AuroraState;
+#[cfg(feature = "contract")]
 use {
     crate::parameters::PromiseCreateArgs,
     crate::parameters::WithdrawCallArgs,

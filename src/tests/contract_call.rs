@@ -2,14 +2,6 @@ use crate::test_utils::{origin, AuroraRunner, Signer};
 
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor};
-use {
-    crate::prelude::U256,
-    crate::test_utils::solidity,
-    crate::transaction::EthTransaction,
-    ethabi::Address,
-    near_crypto::SecretKey,
-    std::path::{Path, PathBuf},
-};
 
 fn setup_test() -> (AuroraRunner, Signer, [u8; 20], Tester) {
     let mut runner = AuroraRunner::new();

@@ -3,6 +3,7 @@ mod bn128;
 mod hash;
 mod identity;
 mod modexp;
+#[cfg_attr(not(feature = "contract"), allow(dead_code))]
 mod native;
 mod secp256k1;
 use evm::{Context, ExitError};

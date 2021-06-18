@@ -173,11 +173,13 @@ pub fn read_input() -> Vec<u8> {
     }
 }
 
+#[cfg_attr(not(feature = "contract"), allow(dead_code))]
 pub(crate) fn read_input_borsh<T: BorshDeserialize>() -> Result<T, ArgParseErr> {
     let bytes = read_input();
     T::try_from_slice(&bytes).map_err(|_| ArgParseErr)
 }
 
+#[cfg_attr(not(feature = "contract"), allow(dead_code))]
 pub(crate) fn read_input_arr20() -> Result<[u8; 20], IncorrectInputLength> {
     unsafe {
         exports::input(INPUT_REGISTER_ID);
