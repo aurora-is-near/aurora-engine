@@ -1,18 +1,12 @@
-use aurora_engine::parameters::NewCallArgs;
-use aurora_engine::prelude::U256;
-use aurora_engine::types;
+use crate::parameters::NewCallArgs;
+use crate::prelude::U256;
+use crate::test_utils::AuroraRunner;
+use crate::types;
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-
-// TODO: it would be nice to include this under src/tests but right now this is not possible.
-// The issue is a linker error (arising from multiple dependencies on near-vm-logic I think).
-
-near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "release.wasm"
-}
 
 #[test]
 fn test_state_migration() {
@@ -33,15 +27,15 @@ fn test_state_migration() {
 }
 
 fn deploy_evm() -> AuroraAccount {
-    let aurora_config = AuroraConfig::default();
+    let aurora_runner = AuroraRunner::default();
     let main_account = near_sdk_sim::init_simulator(None);
     let contract_account = main_account.deploy(
-        &aurora_config.code,
-        aurora_config.account_id.clone(),
+        &aurora_runner.code.code,
+        aurora_runner.aurora_account_id.clone(),
         5 * near_sdk_sim::STORAGE_AMOUNT,
     );
     let new_args = NewCallArgs {
-        chain_id: types::u256_to_arr(&U256::from(aurora_config.chain_id)),
+        chain_id: types::u256_to_arr(&U256::from(aurora_runner.chain_id)),
         owner_id: main_account.account_id.clone(),
         bridge_prover_id: "prover.near".to_string(),
         upgrade_delay_blocks: 1,
@@ -75,22 +69,6 @@ impl AuroraAccount {
             near_sdk_sim::DEFAULT_GAS,
             0,
         )
-    }
-}
-
-struct AuroraConfig {
-    code: Vec<u8>,
-    chain_id: u64,
-    account_id: String,
-}
-
-impl Default for AuroraConfig {
-    fn default() -> Self {
-        Self {
-            code: EVM_WASM_BYTES.to_vec(),
-            chain_id: 1313161556, // NEAR betanet
-            account_id: "aurora".to_string(),
-        }
     }
 }
 

@@ -4,3 +4,4 @@ mod erc20_connector;
 mod sanity;
 mod self_destruct_state;
 mod standard_precompiles;
+mod state_migration;
