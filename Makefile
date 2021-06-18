@@ -60,7 +60,7 @@ check-clippy:
 
 # test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
 test: test-build
-	$(CARGO) test
+	$(CARGO) test --features meta-call
 
 format:
 	$(CARGO) fmt
