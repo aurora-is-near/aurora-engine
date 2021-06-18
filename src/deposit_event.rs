@@ -46,7 +46,6 @@ impl DepositedEvent {
     }
 
     /// Parses raw Ethereum logs proof's entry data
-    #[cfg(feature = "engine")]
     pub fn from_log_entry_data(data: &[u8]) -> Self {
         let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data);
         let sender = event.log.params[0].value.clone().into_address().unwrap().0;

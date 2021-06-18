@@ -10,7 +10,6 @@ extern crate core;
 
 use crate::parameters::PromiseCreateArgs;
 
-#[cfg(feature = "engine")]
 mod map;
 #[cfg(feature = "meta-call")]
 pub mod meta_parsing;
@@ -20,27 +19,19 @@ pub mod storage;
 pub mod transaction;
 pub mod types;
 
-#[cfg(feature = "engine")]
 mod admin_controlled;
-#[cfg(feature = "engine")]
 mod connector;
 mod deposit_event;
-#[cfg(feature = "engine")]
 pub mod engine;
-#[cfg(any(feature = "engine", test))]
 mod fungible_token;
-#[cfg(feature = "engine")]
 mod json;
 mod log_entry;
 mod precompiles;
-#[cfg(feature = "engine")]
 mod prover;
-#[cfg(feature = "engine")]
 pub mod sdk;
 
 #[cfg(test)]
 mod benches;
-#[cfg(feature = "engine")]
 mod state;
 #[cfg(test)]
 mod test_utils;

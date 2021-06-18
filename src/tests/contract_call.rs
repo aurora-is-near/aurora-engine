@@ -2,7 +2,6 @@ use crate::test_utils::{origin, AuroraRunner, Signer};
 
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor};
-#[cfg(feature = "engine")]
 use {
     crate::prelude::U256,
     crate::test_utils::solidity,
