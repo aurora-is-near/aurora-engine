@@ -545,7 +545,6 @@ impl EthConnectorContract {
     }
 
     /// ft_on_transfer callback function
-    #[allow(clippy::unnecessary_unwrap)]
     pub fn ft_on_transfer(&mut self, engine: &Engine, args: &NEP141FtOnTransferArgs) {
         crate::log!("Call ft_on_transfer");
         // Parse message with specific rules
@@ -555,12 +554,12 @@ impl EthConnectorContract {
         let fee = message_data.fee.as_u128();
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
-        if fee > 0 && relayer.is_some() {
-            self.mint_eth_on_aurora(message_data.recipient, args.amount - fee);
-            let evm_relayer_address: EthAddress = relayer.unwrap().0;
-            self.mint_eth_on_aurora(evm_relayer_address, fee);
-        } else {
-            self.mint_eth_on_aurora(message_data.recipient, args.amount);
+        match (fee, relayer) {
+            (fee, Some(crate::prelude::H160(evm_relayer_address))) if fee > 0 => {
+                self.mint_eth_on_aurora(message_data.recipient, args.amount - fee);
+                self.mint_eth_on_aurora(evm_relayer_address, fee);
+            }
+            _ => self.mint_eth_on_aurora(message_data.recipient, args.amount),
         }
         self.save_ft_contract();
         sdk::return_output(0.to_string().as_bytes());

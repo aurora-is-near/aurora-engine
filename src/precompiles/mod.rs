@@ -3,24 +3,25 @@ mod bn128;
 mod hash;
 mod identity;
 mod modexp;
-#[cfg(feature = "exit-precompiles")]
 mod native;
 mod secp256k1;
 use evm::{Context, ExitError};
 
-use crate::precompiles::blake2::Blake2F;
-use crate::precompiles::bn128::{BN128Add, BN128Mul, BN128Pair};
-use crate::precompiles::hash::{RIPEMD160, SHA256};
-use crate::precompiles::identity::Identity;
-use crate::precompiles::modexp::ModExp;
-#[cfg(feature = "exit-precompiles")]
-use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
-use crate::precompiles::secp256k1::ECRecover;
-use crate::prelude::{Address, Vec};
-#[cfg(feature = "engine")]
-use crate::state::AuroraStackState;
+use crate::prelude::Vec;
 use crate::AuroraState;
+#[cfg(feature = "engine")]
+use crate::{
+    precompiles::blake2::Blake2F,
+    precompiles::bn128::{BN128Add, BN128Mul, BN128Pair},
+    precompiles::hash::{RIPEMD160, SHA256},
+    precompiles::identity::Identity,
+    precompiles::modexp::ModExp,
+    precompiles::native::{ExitToEthereum, ExitToNear},
+    precompiles::secp256k1::ECRecover,
+    prelude::Address,
+    state::AuroraStackState,
+};
 use evm::backend::Log;
 use evm::ExitSucceed;
 
@@ -65,6 +66,7 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
 /// A precompile operation result.
 type PrecompileResult = Result<PrecompileOutput, ExitError>;
 
+#[cfg(feature = "engine")]
 type EvmPrecompileResult = Result<evm::executor::PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
@@ -145,11 +147,9 @@ pub fn homestead_precompiles(
         RIPEMD160::<AuroraStackState>::ADDRESS => Some(RIPEMD160::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
             ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
         ),
@@ -199,11 +199,9 @@ pub fn byzantium_precompiles(
         bn128::addresses::PAIR => Some(BN128Pair::<Byzantium, _>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
             ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
         ),
@@ -256,11 +254,9 @@ pub fn istanbul_precompiles(
         Blake2F::<AuroraStackState>::ADDRESS => Some(Blake2F::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
             ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
         ),
@@ -313,11 +309,9 @@ pub fn berlin_precompiles(
         Blake2F::<AuroraStackState>::ADDRESS => Some(Blake2F::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
             input, target_gas, context, state, is_static,
         )),
-        #[cfg(feature = "exit-precompiles")]
         ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
             ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
         ),
@@ -329,6 +323,7 @@ pub fn berlin_precompiles(
 /// const fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
+#[cfg_attr(not(feature = "engine"), allow(dead_code))]
 const fn make_address(x: u32, y: u128) -> [u8; 20] {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();

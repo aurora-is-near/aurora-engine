@@ -1,13 +1,16 @@
 use crate::test_utils::{origin, AuroraRunner, Signer};
 
-use crate::prelude::U256;
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor};
-use crate::test_utils::solidity;
-use crate::transaction::EthTransaction;
-use ethabi::Address;
-use near_crypto::SecretKey;
-use std::path::{Path, PathBuf};
+#[cfg(feature = "engine")]
+use {
+    crate::prelude::U256,
+    crate::test_utils::solidity,
+    crate::transaction::EthTransaction,
+    ethabi::Address,
+    near_crypto::SecretKey,
+    std::path::{Path, PathBuf},
+};
 
 fn setup_test() -> (AuroraRunner, Signer, [u8; 20], Tester) {
     let mut runner = AuroraRunner::new();
@@ -37,7 +40,7 @@ fn setup_test() -> (AuroraRunner, Signer, [u8; 20], Tester) {
 
 #[test]
 fn hello_world_solidity() {
-    let (mut runner, mut signer, token, tester) = setup_test();
+    let (mut runner, mut signer, _token, tester) = setup_test();
 
     let name = "AuroraG".to_string();
     let expected = format!("Hello {}!", name);
@@ -48,7 +51,7 @@ fn hello_world_solidity() {
 
 #[test]
 fn withdraw() {
-    let (mut runner, mut signer, token, tester) = setup_test();
+    let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
         (true, "Call contract: tt.testnet.ft_transfer"),
@@ -64,7 +67,7 @@ fn withdraw() {
 
 #[test]
 fn withdraw_and_fail() {
-    let (mut runner, mut signer, token, tester) = setup_test();
+    let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
         (true, "Call contract: tt.testnet.ft_transfer"),
@@ -83,7 +86,7 @@ fn withdraw_and_fail() {
 
 #[test]
 fn try_withdraw_and_avoid_fail() {
-    let (mut runner, mut signer, token, tester) = setup_test();
+    let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
         (true, "Call contract: tt.testnet.ft_transfer"),
@@ -102,7 +105,7 @@ fn try_withdraw_and_avoid_fail() {
 
 #[test]
 fn try_withdraw_and_avoid_fail_and_succeed() {
-    let (mut runner, mut signer, token, tester) = setup_test();
+    let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
         (true, "Call contract: tt.testnet.ft_transfer"),

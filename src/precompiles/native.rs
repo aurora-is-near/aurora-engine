@@ -1,14 +1,22 @@
 use evm::{Context, ExitError};
 
-use crate::parameters::{PromiseCreateArgs, WithdrawCallArgs};
-use crate::prelude::{is_valid_account_id, Cow, PhantomData, String, ToString, TryInto, U256};
-use crate::storage::{bytes_to_key, KeyPrefix};
-use crate::types::AccountId;
+use crate::prelude::PhantomData;
+#[cfg(not(feature = "contract"))]
+use crate::prelude::Vec;
 use crate::AuroraState;
-use borsh::BorshSerialize;
+#[cfg(feature = "engine")]
+use {
+    crate::parameters::PromiseCreateArgs,
+    crate::parameters::WithdrawCallArgs,
+    crate::prelude::{is_valid_account_id, Cow, String, ToString, TryInto, U256},
+    crate::storage::{bytes_to_key, KeyPrefix},
+    crate::types::AccountId,
+    borsh::BorshSerialize,
+};
 
 use super::{Precompile, PrecompileResult};
 
+#[cfg_attr(not(feature = "engine"), allow(dead_code))]
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 use crate::precompiles::PrecompileOutput;
@@ -23,9 +31,11 @@ mod costs {
     pub(super) const EXIT_TO_ETHEREUM_GAS: Gas = 0;
 
     // TODO(#51): Determine the correct amount of gas
+    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const FT_TRANSFER_GAS: Gas = 100_000_000_000_000;
 
     // TODO(#51): Determine the correct amount of gas
+    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
 }
 
@@ -36,10 +46,12 @@ impl<S> ExitToNear<S> {
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
+    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const ADDRESS: [u8; 20] =
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
+#[cfg(feature = "contract")]
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
     AccountId::from_utf8(
         crate::sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
@@ -53,11 +65,11 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
-    #[cfg(not(feature = "exit-precompiles"))]
+    #[cfg(not(feature = "contract"))]
     fn run(
         input: &[u8],
         target_gas: u64,
-        context: &Context,
+        _context: &Context,
         _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
@@ -66,33 +78,28 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
         }
 
         Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
             output: Vec::new(),
             cost: 0,
             logs: Vec::new(),
         })
     }
 
-    #[cfg(feature = "exit-precompiles")]
+    #[cfg(feature = "contract")]
     fn run(
         input: &[u8],
         target_gas: u64,
         context: &Context,
         state: &mut S,
-        _is_static: bool,
+        is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
-        // TODO(MarX): After calling directly function withdraw in Tester.sol
-        //   This function is called with is_static = true
-        //   Figure out if this needs to be fixed in EVM, or the way
-        //   that is being used to determine if a function is called in static
-        //   mode is incorrect.
-        // if is_static {
-        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        // }
+        // It's not allowed to call exit precompiles in static mode
+        if is_static {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
@@ -187,6 +194,7 @@ impl<S> ExitToEthereum<S> {
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
+    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const ADDRESS: [u8; 20] =
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
 }
@@ -196,11 +204,11 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
-    #[cfg(not(feature = "exit-precompiles"))]
+    #[cfg(not(feature = "contract"))]
     fn run(
         input: &[u8],
         target_gas: u64,
-        context: &Context,
+        _context: &Context,
         _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
@@ -209,33 +217,28 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
         }
 
         Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
             output: Vec::new(),
             cost: 0,
             logs: Vec::new(),
         })
     }
 
-    #[cfg(feature = "exit-precompiles")]
+    #[cfg(feature = "contract")]
     fn run(
         input: &[u8],
         target_gas: u64,
         context: &Context,
         state: &mut S,
-        _is_static: bool,
+        is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
 
-        // TODO(MarX): After calling directly function withdraw in Tester.sol
-        //   This function is called with is_static = true
-        //   Figure out if this needs to be fixed in EVM, or the way
-        //   that is being used to determine if a function is called in static
-        //   mode is incorrect.
-        // if is_static {
-        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        // }
+        // It's not allowed to call exit precompiles in static mode
+        if is_static {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
@@ -326,7 +329,7 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(feature = "contract", test))]
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
     use crate::types::near_account_to_evm_address;

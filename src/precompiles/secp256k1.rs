@@ -44,6 +44,7 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
 pub(super) struct ECRecover<S>(PhantomData<S>);
 
 impl<S> ECRecover<S> {
+    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 1);
 }
 

@@ -188,13 +188,13 @@ fn initialize_transfer() -> (test_utils::AuroraRunner, SecretKey, Address) {
     (runner, source_account, dest_address)
 }
 
-use sha3::{Digest, Keccak256};
+use sha3::Digest;
 
 #[test]
 fn check_selector() {
-    /// Selector to call mint function in ERC 20 contract
-    ///
-    /// keccak("mint(address,uint256)".as_bytes())[..4];
+    // Selector to call mint function in ERC 20 contract
+    //
+    // keccak("mint(address,uint256)".as_bytes())[..4];
     let mut hasher = sha3::Keccak256::default();
     hasher.update(b"mint(address,uint256)");
     assert_eq!(hasher.finalize()[..4].to_vec(), ERC20_MINT_SELECTOR);

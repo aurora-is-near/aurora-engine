@@ -1,9 +1,9 @@
-use crate::parameters::{FunctionCallArgs, SubmitResult};
+use crate::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{solidity, AuroraRunner, Signer};
 use crate::transaction::EthTransaction;
-use borsh::BorshSerialize;
-use std::convert::TryInto;
+#[cfg(feature = "engine")]
+use {crate::parameters::FunctionCallArgs, borsh::BorshSerialize, std::convert::TryInto};
 
 pub(crate) struct TesterConstructor(pub solidity::ContractConstructor);
 
