@@ -144,6 +144,10 @@ impl FungibleToken {
             "Sender and receiver should be different"
         );
         assert!(amount > 0, "The amount should be a positive number");
+        if !self.accounts_contains_key(receiver_id) {
+            // TODO: how does this interact with the storage deposit concept?
+            self.internal_register_account(receiver_id)
+        }
         self.internal_withdraw_eth_from_near(sender_id, amount);
         self.internal_deposit_eth_to_near(receiver_id, amount);
         crate::log!(&format!(
