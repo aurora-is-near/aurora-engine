@@ -4,6 +4,7 @@ pub use alloc::{
     borrow::{Cow, Cow::*},
     boxed::Box,
     collections::BTreeMap as HashMap,
+    collections::BTreeMap,
     fmt, format, str,
     string::String,
     string::ToString,

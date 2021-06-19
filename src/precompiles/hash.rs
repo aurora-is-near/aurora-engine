@@ -24,7 +24,6 @@ mod consts {
 pub struct SHA256<S>(PhantomData<S>);
 
 impl<S> SHA256<S> {
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 2);
 }
 
@@ -90,7 +89,6 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
 pub struct RIPEMD160<S>(PhantomData<S>);
 
 impl<S> RIPEMD160<S> {
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 3);
 }
 

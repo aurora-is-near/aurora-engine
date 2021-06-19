@@ -4,7 +4,7 @@ use crate::prelude::PhantomData;
 #[cfg(not(feature = "contract"))]
 use crate::prelude::Vec;
 use crate::AuroraState;
-#[cfg(feature = "engine")]
+#[cfg(feature = "contract")]
 use {
     crate::parameters::PromiseCreateArgs,
     crate::parameters::WithdrawCallArgs,
@@ -16,7 +16,6 @@ use {
 
 use super::{Precompile, PrecompileResult};
 
-#[cfg_attr(not(feature = "engine"), allow(dead_code))]
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 use crate::precompiles::PrecompileOutput;
@@ -31,11 +30,9 @@ mod costs {
     pub(super) const EXIT_TO_ETHEREUM_GAS: Gas = 0;
 
     // TODO(#51): Determine the correct amount of gas
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const FT_TRANSFER_GAS: Gas = 100_000_000_000_000;
 
     // TODO(#51): Determine the correct amount of gas
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
 }
 
@@ -46,7 +43,6 @@ impl<S> ExitToNear<S> {
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const ADDRESS: [u8; 20] =
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
@@ -194,7 +190,6 @@ impl<S> ExitToEthereum<S> {
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const ADDRESS: [u8; 20] =
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
 }

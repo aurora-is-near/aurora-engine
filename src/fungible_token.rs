@@ -2,7 +2,6 @@
 use crate::prelude::format;
 use crate::types::*;
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "engine")]
 use {
     crate::connector,
     crate::engine,
@@ -12,9 +11,7 @@ use {
     crate::storage,
 };
 
-#[cfg(feature = "engine")]
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
-#[cfg(feature = "engine")]
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
@@ -29,7 +26,6 @@ pub struct FungibleToken {
     pub account_storage_usage: StorageUsage,
 }
 
-#[cfg(feature = "engine")]
 impl FungibleToken {
     pub fn new() -> Self {
         Self::default()
@@ -382,7 +378,6 @@ impl FungibleToken {
         } else {
             let min_balance = self.storage_balance_bounds().min;
             if amount < min_balance {
-                #[cfg(feature = "log")]
                 sdk::panic_utf8(b"ERR_ATTACHED_DEPOSIT_NOT_ENOUGH");
             }
 
