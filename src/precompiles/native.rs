@@ -324,21 +324,19 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
     }
 }
 
-#[cfg(all(feature = "contract", test))]
+#[cfg(test)]
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
     use crate::types::near_account_to_evm_address;
 
-    use super::*;
-
     #[test]
     fn test_precompile_id() {
         assert_eq!(
-            ExitToEthereum::ADDRESS,
+            ExitToEthereum::<()>::ADDRESS,
             near_account_to_evm_address("exitToEthereum".as_bytes()).0
         );
         assert_eq!(
-            ExitToNear::ADDRESS,
+            ExitToNear::<()>::ADDRESS,
             near_account_to_evm_address("exitToNear".as_bytes()).0
         );
     }

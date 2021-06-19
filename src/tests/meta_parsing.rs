@@ -1,20 +1,13 @@
-#[cfg(feature = "meta-call")]
 use {
-    aurora_engine::meta_parsing::{near_erc712_domain, parse_meta_call, prepare_meta_call_args},
-    aurora_engine::parameters::MetaCallArgs,
-    aurora_engine::prelude::U256,
-    aurora_engine::types::{u256_to_arr, InternalMetaCallArgs, Wei},
+    crate::meta_parsing::{near_erc712_domain, parse_meta_call, prepare_meta_call_args},
+    crate::parameters::MetaCallArgs,
+    crate::prelude::{Address, U256},
+    crate::types::{keccak, u256_to_arr, InternalMetaCallArgs, Wei},
     borsh::BorshSerialize,
-    near_crypto::{InMemorySigner, KeyType, Signature, Signer},
+    near_crypto::{InMemorySigner, KeyType, PublicKey, Signature, Signer},
 };
 
-use near_crypto::PublicKey;
-
-use aurora_engine::prelude::Address;
-use aurora_engine::types::keccak;
-
-#[cfg(feature = "meta-call")]
-pub fn encode_meta_call_function_args(
+fn encode_meta_call_function_args(
     signer: &dyn Signer,
     chain_id: u64,
     nonce: U256,
@@ -67,7 +60,7 @@ pub fn encode_meta_call_function_args(
     }
 }
 
-pub fn public_key_to_address(public_key: PublicKey) -> Address {
+fn public_key_to_address(public_key: PublicKey) -> Address {
     match public_key {
         PublicKey::ED25519(_) => panic!("Wrong PublicKey"),
         PublicKey::SECP256K1(pubkey) => {
@@ -80,7 +73,7 @@ pub fn public_key_to_address(public_key: PublicKey) -> Address {
     }
 }
 
-#[cfg(all(feature = "meta-call", test))]
+#[test]
 fn test_meta_parsing() {
     let chain_id = 1313161555;
     let signer = InMemorySigner::from_seed("doesnt", KeyType::SECP256K1, "a");
