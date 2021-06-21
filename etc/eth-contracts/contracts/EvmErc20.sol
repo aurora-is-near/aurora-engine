@@ -28,7 +28,7 @@ contract EvmErc20 is ERC20, AdminControlled, IExit {
     }
 
     function withdrawToNear(bytes memory recipient, uint256 amount) external override {
-        _burn(msg.sender, amount);
+        _burn(_msgSender(), amount);
 
         bytes32 amount_b = bytes32(amount);
         bytes memory input = abi.encodePacked("\x01", amount_b, recipient);
@@ -40,7 +40,7 @@ contract EvmErc20 is ERC20, AdminControlled, IExit {
     }
 
     function withdrawToEthereum(address recipient, uint256 amount) external override {
-        _burn(msg.sender, amount);
+        _burn(_msgSender(), amount);
 
         bytes32 amount_b = bytes32(amount);
         bytes20 recipient_b = bytes20(recipient);
