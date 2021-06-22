@@ -247,8 +247,7 @@ impl FungibleToken {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(value) => {
                 if let Some(unused_amount) = parse_json(value.as_slice())
-                    .map(|x| (&x).try_into().ok())
-                    .flatten()
+                    .and_then(|x| (&x).try_into().ok())
                 {
                     if amount > unused_amount {
                         unused_amount
