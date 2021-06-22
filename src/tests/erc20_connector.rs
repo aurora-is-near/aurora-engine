@@ -272,7 +272,7 @@ fn test_ft_on_transfer() {
 
     let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, hex::encode(recipient));
     // Transaction should succeed so return amount is 0
-    assert_eq!(res, "0");
+    assert_eq!(res, "\"0\"");
 
     let balance = runner.balance_of(token, recipient, origin());
     assert_eq!(balance, U256::from(amount));
@@ -290,7 +290,7 @@ fn test_ft_on_transfer_fail() {
     let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, hex::encode(recipient));
 
     // Transaction should fail so it must return everything
-    assert_eq!(res, amount.to_string());
+    assert_eq!(res, format!("\"{}\"", amount.to_string()));
 }
 
 #[test]
