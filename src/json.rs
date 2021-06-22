@@ -60,13 +60,7 @@ impl JsonValue {
     #[allow(dead_code)]
     pub fn u128(&self, key: &str) -> Result<u128, JsonError> {
         match self {
-            JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
-                JsonValue::String(n) => {
-                    Ok(n.parse::<u128>().map_err(|_| JsonError::InvalidU128)?)
-                }
-                JsonValue::Number(_) => Err(JsonError::ExpectedStringGotNumber),
-                _ => Err(JsonError::InvalidU128),
-            },
+            JsonValue::Object(o) => o.get(key).ok_or(JsonError::MissingValue)?.try_into(),
             _ => Err(JsonError::NotJsonType),
         }
     }
@@ -174,6 +168,18 @@ impl From<JsonArray> for JsonValue {
 impl From<JsonObject> for JsonValue {
     fn from(v: JsonObject) -> Self {
         JsonValue::Object(v.0)
+    }
+}
+
+impl TryFrom<&JsonValue> for u128 {
+    type Error = JsonError;
+
+    fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
+        match value {
+            JsonValue::String(n) => Ok(n.parse::<u128>().map_err(|_| JsonError::InvalidU128)?),
+            JsonValue::Number(_) => Err(JsonError::ExpectedStringGotNumber),
+            _ => Err(JsonError::InvalidU128),
+        }
     }
 }
 

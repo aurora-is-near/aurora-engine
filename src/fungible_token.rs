@@ -1,3 +1,4 @@
+use crate::json::parse_json;
 #[cfg(feature = "log")]
 use crate::prelude::format;
 use crate::types::*;
@@ -245,12 +246,10 @@ impl FungibleToken {
         let unused_amount = match sdk::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(value) => {
-                if let Ok(unused_amount) = String::from_utf8(value) {
-                    let unused_amount = if let Ok(v) = unused_amount.parse::<u128>() {
-                        v
-                    } else {
-                        amount
-                    };
+                if let Some(unused_amount) = parse_json(value.as_slice())
+                    .map(|x| (&x).try_into().ok())
+                    .flatten()
+                {
                     if amount > unused_amount {
                         unused_amount
                     } else {

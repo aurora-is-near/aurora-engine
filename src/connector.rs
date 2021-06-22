@@ -562,7 +562,7 @@ impl EthConnectorContract {
             _ => self.mint_eth_on_aurora(message_data.recipient, args.amount),
         }
         self.save_ft_contract();
-        sdk::return_output(0.to_string().as_bytes());
+        sdk::return_output("\"0\"".as_bytes());
     }
 
     /// Get accounts counter for statistics.
