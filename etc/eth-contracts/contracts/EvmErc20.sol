@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: CC0-1.0
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./AdminControlled.sol";
 import "./IExit.sol";
@@ -13,7 +12,7 @@ import "./IExit.sol";
  * Note they can later distribute these tokens as they wish using `transfer` and other
  * `ERC20` functions.
  */
-contract EvmErc20 is Context, ERC20, AdminControlled, IExit {
+contract EvmErc20 is ERC20, AdminControlled, IExit {
     uint8 private _decimals;
 
     constructor (string memory name, string memory symbol, uint8 decimal, address admin)  ERC20(name, symbol) AdminControlled(admin, 0) {
@@ -29,7 +28,7 @@ contract EvmErc20 is Context, ERC20, AdminControlled, IExit {
     }
 
     function withdrawToNear(bytes memory recipient, uint256 amount) external override {
-        _burn(msg.sender, amount);
+        _burn(_msgSender(), amount);
 
         bytes32 amount_b = bytes32(amount);
         bytes memory input = abi.encodePacked("\x01", amount_b, recipient);
@@ -41,7 +40,7 @@ contract EvmErc20 is Context, ERC20, AdminControlled, IExit {
     }
 
     function withdrawToEthereum(address recipient, uint256 amount) external override {
-        _burn(msg.sender, amount);
+        _burn(_msgSender(), amount);
 
         bytes32 amount_b = bytes32(amount);
         bytes20 recipient_b = bytes20(recipient);

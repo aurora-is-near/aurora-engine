@@ -14,7 +14,7 @@ use crate::parameters::{
 };
 
 use crate::precompiles;
-use crate::prelude::{Address, ToString, TryInto, Vec, H256, U256};
+use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
@@ -500,7 +500,7 @@ impl Engine {
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
     pub fn receive_erc20_tokens(&mut self, args: &NEP141FtOnTransferArgs) {
-        let str_amount = args.amount.to_string();
+        let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
 
         let token = sdk::predecessor_account_id();
@@ -576,8 +576,9 @@ impl Engine {
             output_on_fail
         );
 
+        // TODO(marX)
         // Everything succeed so return "0"
-        sdk::return_output(b"0");
+        sdk::return_output(b"\"0\"");
     }
 
     pub fn nep141_erc20_map() -> BijectionMap<

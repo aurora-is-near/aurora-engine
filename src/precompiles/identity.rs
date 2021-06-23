@@ -21,7 +21,6 @@ mod consts {
 pub struct Identity<S>(PhantomData<S>);
 
 impl<S> Identity<S> {
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 4);
 }
 

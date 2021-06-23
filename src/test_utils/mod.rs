@@ -103,7 +103,8 @@ impl<'a> OneShotAuroraRunner<'a> {
         );
 
         near_vm_runner::run(
-            &self.base.code,
+            self.base.code.hash.as_ref().to_vec(),
+            &self.base.code.code.as_slice(),
             method_name,
             &mut self.ext,
             self.context.clone(),
@@ -168,7 +169,8 @@ impl AuroraRunner {
         );
 
         let (maybe_outcome, maybe_error) = near_vm_runner::run(
-            &self.code,
+            self.code.hash.as_ref().to_vec(),
+            &self.code.code.as_slice(),
             method_name,
             &mut self.ext,
             self.context.clone(),
@@ -275,7 +277,8 @@ impl AuroraRunner {
             address.as_bytes().to_vec(),
         );
         let (outcome, maybe_error) = near_vm_runner::run(
-            &self.code,
+            self.code.hash.as_ref().to_vec(),
+            &self.code.code.as_slice(),
             method_name,
             &mut self.ext.clone(),
             context,

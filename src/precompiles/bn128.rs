@@ -48,11 +48,8 @@ mod consts {
 pub(super) mod addresses {
     use crate::precompiles;
 
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub const ADD: [u8; 20] = precompiles::make_address(0, 6);
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub const MUL: [u8; 20] = precompiles::make_address(0, 7);
-    #[cfg_attr(not(feature = "engine"), allow(dead_code))]
     pub const PAIR: [u8; 20] = precompiles::make_address(0, 8);
 }
 

@@ -12,10 +12,8 @@ use ethabi::{ParamType, Token};
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
 
-#[cfg(feature = "engine")]
 use crate::engine::EngineResult;
 use crate::log_entry::LogEntry;
-#[cfg(feature = "engine")]
 use crate::sdk;
 
 #[cfg(not(feature = "contract"))]
@@ -24,7 +22,7 @@ use ethabi::param_type::Writer;
 pub type AccountId = String;
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
-pub type RawU256 = [u8; 32]; // Little-endian large integer type.
+pub type RawU256 = [u8; 32]; // Big-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 pub type EthAddress = [u8; 20];
 pub type Gas = u64;
@@ -207,7 +205,6 @@ pub struct StorageBalanceBounds {
 }
 
 /// promise results structure
-#[cfg(feature = "engine")]
 pub enum PromiseResult {
     NotReady,
     Successful(Vec<u8>),
@@ -215,7 +212,6 @@ pub enum PromiseResult {
 }
 
 /// ft_resolve_transfer result of eth-connector
-#[cfg(feature = "engine")]
 pub struct FtResolveTransferResult {
     pub amount: Balance,
     pub refund_amount: Balance,
@@ -302,7 +298,6 @@ impl<T> Stack<T> {
         self.stack
     }
 }
-#[cfg(feature = "engine")]
 pub fn str_from_slice(inp: &[u8]) -> &str {
     str::from_utf8(inp).unwrap()
 }
@@ -332,12 +327,10 @@ impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
     }
 }
 
-#[cfg(feature = "engine")]
 pub trait SdkExpect<T> {
     fn sdk_expect(self, msg: &str) -> T;
 }
 
-#[cfg(feature = "engine")]
 impl<T> SdkExpect<T> for Option<T> {
     fn sdk_expect(self, msg: &str) -> T {
         match self {
@@ -347,7 +340,6 @@ impl<T> SdkExpect<T> for Option<T> {
     }
 }
 
-#[cfg(feature = "engine")]
 impl<T, E> SdkExpect<T> for core::result::Result<T, E> {
     fn sdk_expect(self, msg: &str) -> T {
         match self {
@@ -357,12 +349,10 @@ impl<T, E> SdkExpect<T> for core::result::Result<T, E> {
     }
 }
 
-#[cfg(feature = "engine")]
 pub trait SdkUnwrap<T> {
     fn sdk_unwrap(self) -> T;
 }
 
-#[cfg(feature = "engine")]
 impl<T> SdkUnwrap<T> for Option<T> {
     fn sdk_unwrap(self) -> T {
         match self {
@@ -372,7 +362,6 @@ impl<T> SdkUnwrap<T> for Option<T> {
     }
 }
 
-#[cfg(feature = "engine")]
 impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for core::result::Result<T, E> {
     fn sdk_unwrap(self) -> T {
         match self {
@@ -382,12 +371,10 @@ impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for core::result::Result<T, E> {
     }
 }
 
-#[cfg(feature = "engine")]
 pub(crate) trait SdkProcess<T> {
     fn sdk_process(self);
 }
 
-#[cfg(feature = "engine")]
 impl<T: AsRef<[u8]>> SdkProcess<T> for EngineResult<T> {
     fn sdk_process(self) {
         match self {

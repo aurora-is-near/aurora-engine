@@ -3,6 +3,7 @@ mod bn128;
 mod hash;
 mod identity;
 mod modexp;
+#[cfg_attr(not(feature = "contract"), allow(dead_code))]
 mod native;
 mod secp256k1;
 use evm::{Context, ExitError};
@@ -10,7 +11,6 @@ use evm::{Context, ExitError};
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
 use crate::prelude::Vec;
 use crate::AuroraState;
-#[cfg(feature = "engine")]
 use crate::{
     precompiles::blake2::Blake2F,
     precompiles::bn128::{BN128Add, BN128Mul, BN128Pair},
@@ -66,7 +66,6 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
 /// A precompile operation result.
 type PrecompileResult = Result<PrecompileOutput, ExitError>;
 
-#[cfg(feature = "engine")]
 type EvmPrecompileResult = Result<evm::executor::PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
@@ -211,7 +210,6 @@ pub fn byzantium_precompiles(
 }
 
 /// Matches the address given to Istanbul precompiles.
-#[cfg(feature = "engine")]
 #[allow(dead_code)]
 pub fn istanbul_precompiles(
     address: Address,
@@ -323,7 +321,6 @@ pub fn berlin_precompiles(
 /// const fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
-#[cfg_attr(not(feature = "engine"), allow(dead_code))]
 const fn make_address(x: u32, y: u128) -> [u8; 20] {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
