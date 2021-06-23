@@ -5,6 +5,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use {
     crate::connector,
     crate::engine,
+    crate::json::parse_json,
     crate::parameters::*,
     crate::prelude::{self, Ordering, String, ToString, TryInto, Vec, U256},
     crate::sdk,
@@ -241,12 +242,9 @@ impl FungibleToken {
         let unused_amount = match sdk::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(value) => {
-                if let Ok(unused_amount) = String::from_utf8(value) {
-                    let unused_amount = if let Ok(v) = unused_amount.parse::<u128>() {
-                        v
-                    } else {
-                        amount
-                    };
+                if let Some(unused_amount) =
+                    parse_json(value.as_slice()).and_then(|x| (&x).try_into().ok())
+                {
                     if amount > unused_amount {
                         unused_amount
                     } else {
