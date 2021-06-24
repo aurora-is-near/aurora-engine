@@ -94,7 +94,7 @@ impl<S: AuroraState> Precompile<S> for ModExp<Byzantium, S> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
         let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
-        let iter_count = Self::calc_iter_count(exp_len, base_len, &input);
+        let iter_count = Self::calc_iter_count(exp_len, base_len, input);
         // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
         let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
 
@@ -134,7 +134,7 @@ impl<S: AuroraState> Precompile<S> for ModExp<Berlin, S> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
         let mul = Self::mul_complexity(base_len, mod_len);
-        let iter_count = Self::calc_iter_count(exp_len, base_len, &input);
+        let iter_count = Self::calc_iter_count(exp_len, base_len, input);
         // mul * iter_count bounded by 2^189 (so no overflow)
         let gas = mul * iter_count / U256::from(3);
 
