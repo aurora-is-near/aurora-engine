@@ -1,6 +1,6 @@
 use crate::prelude::U256;
 use crate::test_utils::solidity;
-use crate::transaction::EthTransaction;
+use crate::transaction::LegacyEthTransaction;
 use std::path::{Path, PathBuf};
 
 pub(crate) struct PrecompilesConstructor(pub solidity::ContractConstructor);
@@ -23,7 +23,7 @@ impl PrecompilesConstructor {
         ))
     }
 
-    pub fn deploy(&self, nonce: U256) -> EthTransaction {
+    pub fn deploy(&self, nonce: U256) -> LegacyEthTransaction {
         let data = self
             .0
             .abi
@@ -31,7 +31,7 @@ impl PrecompilesConstructor {
             .unwrap()
             .encode_input(self.0.code.clone(), &[])
             .unwrap();
-        EthTransaction {
+        LegacyEthTransaction {
             nonce,
             gas_price: Default::default(),
             gas: u64::MAX.into(),
@@ -51,7 +51,7 @@ impl PrecompilesConstructor {
 }
 
 impl PrecompilesContract {
-    pub fn call_method(&self, method_name: &str, nonce: U256) -> EthTransaction {
+    pub fn call_method(&self, method_name: &str, nonce: U256) -> LegacyEthTransaction {
         let data = self
             .0
             .abi
@@ -59,7 +59,7 @@ impl PrecompilesContract {
             .unwrap()
             .encode_input(&[])
             .unwrap();
-        EthTransaction {
+        LegacyEthTransaction {
             nonce,
             gas_price: Default::default(),
             gas: u64::MAX.into(),

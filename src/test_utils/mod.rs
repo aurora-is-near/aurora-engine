@@ -16,7 +16,7 @@ use crate::fungible_token::FungibleToken;
 use crate::parameters::{InitCallArgs, NewCallArgs, PromiseCreateArgs, SubmitResult};
 use crate::prelude::Address;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
-use crate::transaction::{EthSignedTransaction, EthTransaction};
+use crate::transaction::{LegacyEthSignedTransaction, LegacyEthTransaction};
 use crate::types;
 use crate::types::AccountId;
 use crate::{storage, AuroraState};
@@ -218,7 +218,7 @@ impl AuroraRunner {
     pub fn submit_transaction(
         &mut self,
         account: &SecretKey,
-        transaction: EthTransaction,
+        transaction: LegacyEthTransaction,
     ) -> Result<SubmitResult, VMError> {
         let calling_account_id = "some-account.near".to_string();
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
@@ -236,7 +236,7 @@ impl AuroraRunner {
         }
     }
 
-    pub fn deploy_contract<F: FnOnce(&T) -> EthTransaction, T: Into<ContractConstructor>>(
+    pub fn deploy_contract<F: FnOnce(&T) -> LegacyEthTransaction, T: Into<ContractConstructor>>(
         &mut self,
         account: &SecretKey,
         constructor_tx: F,
@@ -369,9 +369,9 @@ pub(crate) fn create_eth_transaction(
     data: Vec<u8>,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
-) -> EthSignedTransaction {
+) -> LegacyEthSignedTransaction {
     // nonce, gas_price and gas are not used by EVM contract currently
-    let tx = EthTransaction {
+    let tx = LegacyEthTransaction {
         nonce: Default::default(),
         gas_price: Default::default(),
         gas: u64::MAX.into(),
@@ -383,10 +383,10 @@ pub(crate) fn create_eth_transaction(
 }
 
 pub(crate) fn sign_transaction(
-    tx: EthTransaction,
+    tx: LegacyEthTransaction,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
-) -> EthSignedTransaction {
+) -> LegacyEthSignedTransaction {
     let mut rlp_stream = RlpStream::new();
     tx.rlp_append_unsigned(&mut rlp_stream, chain_id);
     let message_hash = types::keccak(rlp_stream.as_raw());
@@ -399,7 +399,7 @@ pub(crate) fn sign_transaction(
     };
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());
-    EthSignedTransaction {
+    LegacyEthSignedTransaction {
         transaction: tx,
         v,
         r,
