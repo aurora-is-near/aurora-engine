@@ -1,5 +1,7 @@
-use crate::admin_controlled::PausedMask;
-use crate::connector::{PAUSE_DEPOSIT, PAUSE_WITHDRAW, UNPAUSE_ALL};
+use crate::admin_controlled::{PausedMask, ERR_PAUSED};
+use crate::connector::{
+    ERR_NOT_ENOUGH_BALANCE_FOR_FEE, PAUSE_DEPOSIT, PAUSE_WITHDRAW, UNPAUSE_ALL,
+};
 use crate::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawCallArgs, WithdrawResult,
 };
@@ -24,8 +26,6 @@ const RECIPIENT_ETH_ADDRESS: &'static str = "891b2749238b27ff58e951088e55b04de71
 const EVM_CUSTODIAN_ADDRESS: &'static str = "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E";
 const DEPOSITED_EVM_AMOUNT: u128 = 10200;
 const DEPOSITED_EVM_FEE: u128 = 200;
-const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &'static str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
-const ERR_PAUSED: &'static str = "ERR_PAUSED";
 
 #[derive(BorshDeserialize, Debug)]
 pub struct IsUsedProofResult {
