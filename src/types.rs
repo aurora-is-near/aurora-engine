@@ -118,6 +118,7 @@ fn long_signature(name: &str, params: &[ParamType]) -> Hash {
 }
 
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
+#[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
 pub struct Proof {
     pub log_index: u64,
     pub log_entry_data: Vec<u8>,

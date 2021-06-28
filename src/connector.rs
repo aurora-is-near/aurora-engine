@@ -19,9 +19,9 @@ const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
 // Note: Is 40Tgas always enough?
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
 
-const UNPAUSE_ALL: PausedMask = 0;
-const PAUSE_DEPOSIT: PausedMask = 1 << 0;
-const PAUSE_WITHDRAW: PausedMask = 1 << 1;
+pub(crate) const UNPAUSE_ALL: PausedMask = 0;
+pub(crate) const PAUSE_DEPOSIT: PausedMask = 1 << 0;
+pub(crate) const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnectorContract {
