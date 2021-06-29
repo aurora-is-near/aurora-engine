@@ -215,12 +215,13 @@ mod contract {
     /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
     pub extern "C" fn submit() {
-        use crate::transaction::EthSignedTransaction;
-        use rlp::{Decodable, Rlp};
+        use crate::prelude::TryFrom;
+        use crate::transaction::EthTransaction;
 
         let input = sdk::read_input();
-        let signed_transaction =
-            EthSignedTransaction::decode(&Rlp::new(&input)).sdk_expect("ERR_INVALID_TX");
+
+        let EthTransaction::Legacy(signed_transaction) =
+            EthTransaction::try_from(input.as_slice()).sdk_unwrap();
 
         let state = Engine::get_state().sdk_unwrap();
 

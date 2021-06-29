@@ -1,9 +1,53 @@
-use crate::prelude::{Address, Vec, U256};
+use crate::prelude::{Address, TryFrom, Vec, U256};
 use crate::types::Wei;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
+/// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
+#[derive(Eq, PartialEq)]
+pub enum EthTransaction {
+    Legacy(LegacyEthSignedTransaction),
+}
+
+impl TryFrom<&[u8]> for EthTransaction {
+    type Error = ParseTransactionError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        if bytes[0] <= 0x7f {
+            return Err(ParseTransactionError::UnknownTransactionType);
+        } else if bytes[0] == 0xff {
+            return Err(ParseTransactionError::ReservedSentinel);
+        }
+
+        let legacy = LegacyEthSignedTransaction::decode(&Rlp::new(bytes))?;
+        Ok(Self::Legacy(legacy))
+    }
+}
+
+pub enum ParseTransactionError {
+    UnknownTransactionType,
+    // Per the EIP-2718 spec 0xff is a reserved value
+    ReservedSentinel,
+    RlpDecodeError(DecoderError),
+}
+
+impl From<DecoderError> for ParseTransactionError {
+    fn from(e: DecoderError) -> Self {
+        Self::RlpDecodeError(e)
+    }
+}
+
+impl AsRef<[u8]> for ParseTransactionError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::UnknownTransactionType => b"ERR_UNKNOWN_TX_TYPE",
+            Self::ReservedSentinel => b"ERR_RESERVED_LEADING_TX_BYTE",
+            Self::RlpDecodeError(_) => b"ERR_TX_RLP_DECODE",
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct EthTransaction {
+pub struct LegacyEthTransaction {
     /// A monotonically increasing transaction counter for this sender
     pub nonce: U256,
     /// The fee the sender pays per unit of gas
@@ -18,7 +62,7 @@ pub struct EthTransaction {
     pub data: Vec<u8>,
 }
 
-impl EthTransaction {
+impl LegacyEthTransaction {
     pub fn rlp_append_unsigned(&self, s: &mut RlpStream, chain_id: Option<u64>) {
         s.begin_list(if chain_id.is_none() { 6 } else { 9 });
         s.append(&self.nonce);
@@ -69,9 +113,9 @@ impl EthTransaction {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct EthSignedTransaction {
+pub struct LegacyEthSignedTransaction {
     /// The unsigned transaction data
-    pub transaction: EthTransaction,
+    pub transaction: LegacyEthTransaction,
     /// The ECDSA recovery ID
     pub v: u64,
     /// The first ECDSA signature output
@@ -80,7 +124,7 @@ pub struct EthSignedTransaction {
     pub s: U256,
 }
 
-impl EthSignedTransaction {
+impl LegacyEthSignedTransaction {
     /// Returns sender of given signed transaction by doing ecrecover on the signature.
     #[allow(dead_code)]
     pub fn sender(&self) -> Option<Address> {
@@ -108,7 +152,7 @@ impl EthSignedTransaction {
     }
 }
 
-impl Encodable for EthSignedTransaction {
+impl Encodable for LegacyEthSignedTransaction {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(9);
         s.append(&self.transaction.nonce);
@@ -126,7 +170,7 @@ impl Encodable for EthSignedTransaction {
     }
 }
 
-impl Decodable for EthSignedTransaction {
+impl Decodable for LegacyEthSignedTransaction {
     fn decode(rlp: &Rlp<'_>) -> Result<Self, DecoderError> {
         if rlp.item_count() != Ok(9) {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
@@ -157,7 +201,7 @@ impl Decodable for EthSignedTransaction {
         let r = rlp.val_at(7)?;
         let s = rlp.val_at(8)?;
         Ok(Self {
-            transaction: EthTransaction {
+            transaction: LegacyEthTransaction {
                 nonce,
                 gas_price,
                 gas,
@@ -188,7 +232,7 @@ mod tests {
     #[test]
     fn test_eth_signed_no_chain_sender() {
         let encoded_tx = hex::decode("f901f680883362396163613030836691b78080b901a06080604052600080546001600160a01b0319163317905534801561002257600080fd5b5061016e806100326000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c8063445df0ac146100465780638da5cb5b14610060578063fdacd57614610084575b600080fd5b61004e6100a3565b60408051918252519081900360200190f35b6100686100a9565b604080516001600160a01b039092168252519081900360200190f35b6100a16004803603602081101561009a57600080fd5b50356100b8565b005b60015481565b6000546001600160a01b031681565b6000546001600160a01b031633146101015760405162461bcd60e51b81526004018080602001828103825260338152602001806101076033913960400191505060405180910390fd5b60015556fe546869732066756e6374696f6e206973207265737472696374656420746f2074686520636f6e74726163742773206f776e6572a265627a7a72315820b7e3396b30da5009ea603d5c2bdfd68577b979d5817fbe4fbd7d983f5c04ff3464736f6c634300050f00321ca0f0133510c01bc64a64f84b411082ff74bbc4a3aa5c720d2b5f61ad76716ee232a03412d91486eb012423492af258a4cd3b03ce67dde7fdc93bbea142bce6a59c9f").unwrap();
-        let tx = EthSignedTransaction::decode(&Rlp::new(&encoded_tx)).unwrap();
+        let tx = LegacyEthSignedTransaction::decode(&Rlp::new(&encoded_tx)).unwrap();
         assert_eq!(tx.v, 28);
         assert_eq!(tx.chain_id(), None);
         assert_eq!(
@@ -200,12 +244,12 @@ mod tests {
     #[test]
     fn test_decode_eth_signed_transaction() {
         let encoded_tx = hex::decode("f86a8086d55698372431831e848094f0109fc8df283027b6285cc889f5aa624eac1f55843b9aca008025a009ebb6ca057a0535d6186462bc0b465b561c94a295bdb0621fc19208ab149a9ca0440ffd775ce91a833ab410777204d5341a6f9fa91216a6f3ee2c051fea6a0428").unwrap();
-        let tx = EthSignedTransaction::decode(&Rlp::new(&encoded_tx)).unwrap();
+        let tx = LegacyEthSignedTransaction::decode(&Rlp::new(&encoded_tx)).unwrap();
         assert_eq!(tx.v, 37);
         assert_eq!(tx.chain_id(), Some(1));
         assert_eq!(
             tx.transaction,
-            EthTransaction {
+            LegacyEthTransaction {
                 nonce: U256::zero(),
                 gas_price: U256::from(234567897654321u128),
                 gas: U256::from(2000000u128),
@@ -225,10 +269,10 @@ mod tests {
     #[test]
     fn test_none_decode_eth_signed_transaction() {
         let encoded_tx = hex::decode("f8c58001831e84808080b874600060005560648060106000396000f360e060020a6000350480638ada066e146028578063d09de08a1460365780632baeceb714604d57005b5060005460005260206000f3005b5060016000540160005560005460005260206000f3005b5060016000540360005560005460005260206000f300849c8a82cba07bea58c20d614248f6f1607704ee209eee14190f6187d6c7dc935b6599199cd5a02fe682dec51911f02d6a2812f301419d3f181acd3ef5b3609ac28b1dc42b0531").unwrap();
-        let tx_1 = EthSignedTransaction::decode(&Rlp::new(&encoded_tx)).unwrap();
+        let tx_1 = LegacyEthSignedTransaction::decode(&Rlp::new(&encoded_tx)).unwrap();
 
         let encoded_tx = hex::decode("f8d98001831e848094000000000000000000000000000000000000000080b874600060005560648060106000396000f360e060020a6000350480638ada066e146028578063d09de08a1460365780632baeceb714604d57005b5060005460005260206000f3005b5060016000540160005560005460005260206000f3005b5060016000540360005560005460005260206000f300849c8a82cba0668cfa20c8521b28fa8e42f26df0f2c090dda2fb5cbbb60dd616e8d00f93d9d8a00a1e5de8454ce9072cefd8268c0bf8eba2c1206a5e5a43914c1d62962c121d94").unwrap();
-        let tx_2 = EthSignedTransaction::decode(&Rlp::new(&encoded_tx)).unwrap();
+        let tx_2 = LegacyEthSignedTransaction::decode(&Rlp::new(&encoded_tx)).unwrap();
         assert_eq!(tx_1.transaction.to, tx_2.transaction.to);
     }
 

@@ -1,6 +1,6 @@
 use crate::prelude::{Address, U256};
 use crate::test_utils::solidity;
-use crate::transaction::EthTransaction;
+use crate::transaction::LegacyEthTransaction;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
 
@@ -26,7 +26,7 @@ impl ERC20Constructor {
         ))
     }
 
-    pub fn deploy(&self, name: &str, symbol: &str, nonce: U256) -> EthTransaction {
+    pub fn deploy(&self, name: &str, symbol: &str, nonce: U256) -> LegacyEthTransaction {
         let data = self
             .0
             .abi
@@ -40,7 +40,7 @@ impl ERC20Constructor {
                 ],
             )
             .unwrap();
-        EthTransaction {
+        LegacyEthTransaction {
             nonce,
             gas_price: Default::default(),
             gas: u64::MAX.into(),
@@ -72,7 +72,7 @@ impl ERC20Constructor {
 }
 
 impl ERC20 {
-    pub fn mint(&self, recipient: Address, amount: U256, nonce: U256) -> EthTransaction {
+    pub fn mint(&self, recipient: Address, amount: U256, nonce: U256) -> LegacyEthTransaction {
         let data = self
             .0
             .abi
@@ -84,7 +84,7 @@ impl ERC20 {
             ])
             .unwrap();
 
-        EthTransaction {
+        LegacyEthTransaction {
             nonce,
             gas_price: Default::default(),
             gas: u64::MAX.into(),
@@ -94,7 +94,7 @@ impl ERC20 {
         }
     }
 
-    pub fn transfer(&self, recipient: Address, amount: U256, nonce: U256) -> EthTransaction {
+    pub fn transfer(&self, recipient: Address, amount: U256, nonce: U256) -> LegacyEthTransaction {
         let data = self
             .0
             .abi
@@ -105,7 +105,7 @@ impl ERC20 {
                 ethabi::Token::Uint(amount),
             ])
             .unwrap();
-        EthTransaction {
+        LegacyEthTransaction {
             nonce,
             gas_price: Default::default(),
             gas: u64::MAX.into(),
@@ -115,7 +115,7 @@ impl ERC20 {
         }
     }
 
-    pub fn balance_of(&self, address: Address, nonce: U256) -> EthTransaction {
+    pub fn balance_of(&self, address: Address, nonce: U256) -> LegacyEthTransaction {
         let data = self
             .0
             .abi
@@ -123,7 +123,7 @@ impl ERC20 {
             .unwrap()
             .encode_input(&[ethabi::Token::Address(address)])
             .unwrap();
-        EthTransaction {
+        LegacyEthTransaction {
             nonce,
             gas_price: Default::default(),
             gas: u64::MAX.into(),
