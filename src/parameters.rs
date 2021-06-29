@@ -197,7 +197,7 @@ pub struct IsUsedProofCallArgs {
 
 /// withdraw result for eth-connector
 #[derive(BorshSerialize)]
-#[cfg_attr(test, derive(BorshDeserialize))]
+#[cfg_attr(not(target_arch = "wasm32"), derive(BorshDeserialize))]
 pub struct WithdrawResult {
     pub amount: Balance,
     pub recipient_id: RawAddress,
