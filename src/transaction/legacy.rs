@@ -37,28 +37,9 @@ impl LegacyEthTransaction {
         }
     }
 
+    #[inline]
     pub fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
-        let is_contract_creation = self.to.is_none();
-
-        let base_gas = if is_contract_creation {
-            config.gas_transaction_create
-        } else {
-            config.gas_transaction_call
-        };
-
-        let num_zero_bytes = self.data.iter().filter(|b| **b == 0).count();
-        let num_non_zero_bytes = self.data.len() - num_zero_bytes;
-
-        let gas_zero_bytes = config
-            .gas_transaction_zero_data
-            .checked_mul(num_zero_bytes as u64)?;
-        let gas_non_zero_bytes = config
-            .gas_transaction_non_zero_data
-            .checked_mul(num_non_zero_bytes as u64)?;
-
-        base_gas
-            .checked_add(gas_zero_bytes)
-            .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
+        super::intrinsic_gas(self.to.is_none(), &self.data, &[], config)
     }
 
     /// Returns self.gas as a u64, or None if self.gas > u64::MAX
@@ -95,7 +76,7 @@ impl LegacyEthSignedTransaction {
         self.transaction
             .rlp_append_unsigned(&mut rlp_stream, chain_id);
         let message_hash = crate::types::keccak(rlp_stream.as_raw());
-        crate::precompiles::ecrecover(message_hash, &vrs_to_arr(rec_id, self.r, self.s)).ok()
+        crate::precompiles::ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s)).ok()
     }
 
     /// Returns chain id encoded in `v` parameter of the signature if that was done, otherwise None.
@@ -154,14 +135,6 @@ impl Decodable for LegacyEthSignedTransaction {
             s,
         })
     }
-}
-
-fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
-    let mut result = [0u8; 65]; // (r, s, v), typed (uint256, uint256, uint8)
-    r.to_big_endian(&mut result[0..32]);
-    s.to_big_endian(&mut result[32..64]);
-    result[64] = v;
-    result
 }
 
 #[cfg(test)]

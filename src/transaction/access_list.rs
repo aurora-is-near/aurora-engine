@@ -26,7 +26,7 @@ impl Decodable for AccessTuple {
 /// See https://eips.ethereum.org/EIPS/eip-2930
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct AccessListEthTransaction {
-    pub chain_id: U256,
+    pub chain_id: u64,
     pub nonce: U256,
     pub gas_price: U256,
     pub gas_limit: U256,
@@ -45,6 +45,11 @@ impl AccessListEthTransaction {
     /// RLP encoding for a signed message (used to encode the transaction for sending to tx pool)
     pub fn rlp_append_signed(&self, s: &mut RlpStream) {
         self.rlp_append(s, 11);
+    }
+
+    #[inline]
+    pub fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
+        super::intrinsic_gas(self.to.is_none(), &self.data, &self.access_list, config)
     }
 
     fn rlp_append(&self, s: &mut RlpStream, list_len: usize) {
@@ -78,6 +83,19 @@ pub struct AccessListEthSignedTransaction {
     pub parity: u8,
     pub r: U256,
     pub s: U256,
+}
+
+impl AccessListEthSignedTransaction {
+    pub fn sender(&self) -> Option<Address> {
+        let mut rlp_stream = RlpStream::new();
+        self.transaction_data.rlp_append_unsigned(&mut rlp_stream);
+        let message_hash = crate::types::keccak(rlp_stream.as_raw());
+        crate::precompiles::ecrecover(
+            message_hash,
+            &super::vrs_to_arr(self.parity, self.r, self.s),
+        )
+        .ok()
+    }
 }
 
 impl Encodable for AccessListEthSignedTransaction {

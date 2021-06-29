@@ -1,4 +1,4 @@
-use crate::prelude::{Address, TryFrom};
+use crate::prelude::{Address, TryFrom, Vec, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 
 pub(crate) mod access_list;
@@ -11,6 +11,57 @@ pub use legacy::{LegacyEthSignedTransaction, LegacyEthTransaction};
 pub enum EthTransaction {
     Legacy(LegacyEthSignedTransaction),
     AccessList(access_list::AccessListEthSignedTransaction),
+}
+
+impl EthTransaction {
+    pub fn chain_id(&self) -> Option<u64> {
+        match self {
+            Self::Legacy(tx) => tx.chain_id(),
+            Self::AccessList(tx) => Some(tx.transaction_data.chain_id),
+        }
+    }
+
+    pub fn sender(&self) -> Option<Address> {
+        match self {
+            Self::Legacy(tx) => tx.sender(),
+            Self::AccessList(tx) => tx.sender(),
+        }
+    }
+
+    pub fn nonce(&self) -> &U256 {
+        match self {
+            Self::Legacy(tx) => &tx.transaction.nonce,
+            Self::AccessList(tx) => &tx.transaction_data.nonce,
+        }
+    }
+
+    pub fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
+        match self {
+            Self::Legacy(tx) => tx.transaction.intrinsic_gas(config),
+            Self::AccessList(tx) => tx.transaction_data.intrinsic_gas(config),
+        }
+    }
+
+    pub fn gas_limit(&self) -> &U256 {
+        match self {
+            Self::Legacy(tx) => &tx.transaction.gas,
+            Self::AccessList(tx) => &tx.transaction_data.gas_limit,
+        }
+    }
+
+    pub fn destructure(self) -> (crate::types::Wei, Option<u64>, Vec<u8>, Option<Address>) {
+        use crate::prelude::TryInto;
+        match self {
+            Self::Legacy(tx) => {
+                let tx = tx.transaction;
+                (tx.value, tx.gas.try_into().ok(), tx.data, tx.to)
+            }
+            Self::AccessList(tx) => {
+                let tx = tx.transaction_data;
+                (tx.value, tx.gas_limit.try_into().ok(), tx.data, tx.to)
+            }
+        }
+    }
 }
 
 impl TryFrom<&[u8]> for EthTransaction {
@@ -71,4 +122,41 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
             Ok(Some(v))
         }
     }
+}
+
+// TODO: need to include access_list gas cost (see https://eips.ethereum.org/EIPS/eip-2930)
+// Should go in the config, which requires upstream change.
+fn intrinsic_gas(
+    is_contract_creation: bool,
+    data: &[u8],
+    _access_list: &[access_list::AccessTuple],
+    config: &evm::Config,
+) -> Option<u64> {
+    let base_gas = if is_contract_creation {
+        config.gas_transaction_create
+    } else {
+        config.gas_transaction_call
+    };
+
+    let num_zero_bytes = data.iter().filter(|b| **b == 0).count();
+    let num_non_zero_bytes = data.len() - num_zero_bytes;
+
+    let gas_zero_bytes = config
+        .gas_transaction_zero_data
+        .checked_mul(num_zero_bytes as u64)?;
+    let gas_non_zero_bytes = config
+        .gas_transaction_non_zero_data
+        .checked_mul(num_non_zero_bytes as u64)?;
+
+    base_gas
+        .checked_add(gas_zero_bytes)
+        .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
+}
+
+fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
+    let mut result = [0u8; 65]; // (r, s, v), typed (uint256, uint256, uint8)
+    r.to_big_endian(&mut result[0..32]);
+    s.to_big_endian(&mut result[32..64]);
+    result[64] = v;
+    result
 }

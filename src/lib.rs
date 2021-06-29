@@ -219,11 +219,7 @@ mod contract {
 
         let input = sdk::read_input();
 
-        let signed_transaction = match EthTransaction::try_from(input.as_slice()).sdk_unwrap() {
-            EthTransaction::Legacy(tx) => tx,
-            // TODO
-            EthTransaction::AccessList(_) => sdk::panic_utf8(b"ERR_NOT_SUPPORTED"),
-        };
+        let signed_transaction = EthTransaction::try_from(input.as_slice()).sdk_unwrap();
 
         let state = Engine::get_state().sdk_unwrap();
 
@@ -239,16 +235,13 @@ mod contract {
             .sender()
             .sdk_expect("ERR_INVALID_ECDSA_SIGNATURE");
 
-        Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
+        Engine::check_nonce(&sender, signed_transaction.nonce()).sdk_unwrap();
 
         // Check intrinsic gas is covered by transaction gas limit
-        match signed_transaction
-            .transaction
-            .intrinsic_gas(crate::engine::CONFIG)
-        {
+        match signed_transaction.intrinsic_gas(crate::engine::CONFIG) {
             None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
             Some(intrinsic_gas) => {
-                if signed_transaction.transaction.gas < intrinsic_gas.into() {
+                if signed_transaction.gas_limit() < &intrinsic_gas.into() {
                     sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
                 }
             }
@@ -256,13 +249,10 @@ mod contract {
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
-        let value = signed_transaction.transaction.value;
-        let gas_limit = signed_transaction
-            .transaction
-            .get_gas_limit()
-            .sdk_expect(GAS_OVERFLOW);
-        let data = signed_transaction.transaction.data;
-        let result = if let Some(receiver) = signed_transaction.transaction.to {
+        let (value, gas_limit, data, maybe_receiver) = signed_transaction.destructure();
+        let gas_limit = gas_limit.sdk_expect(GAS_OVERFLOW);
+        // TODO: need to pass in AccessList as well; requires upstream change
+        let result = if let Some(receiver) = maybe_receiver {
             Engine::call(&mut engine, sender, receiver, value, data, gas_limit)
             // TODO: charge for storage
         } else {
