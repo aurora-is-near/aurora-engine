@@ -1,50 +1,6 @@
-use crate::prelude::{Address, TryFrom, Vec, U256};
+use crate::prelude::{Address, Vec, U256};
 use crate::types::Wei;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
-
-/// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
-#[derive(Eq, PartialEq)]
-pub enum EthTransaction {
-    Legacy(LegacyEthSignedTransaction),
-}
-
-impl TryFrom<&[u8]> for EthTransaction {
-    type Error = ParseTransactionError;
-
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes[0] <= 0x7f {
-            return Err(ParseTransactionError::UnknownTransactionType);
-        } else if bytes[0] == 0xff {
-            return Err(ParseTransactionError::ReservedSentinel);
-        }
-
-        let legacy = LegacyEthSignedTransaction::decode(&Rlp::new(bytes))?;
-        Ok(Self::Legacy(legacy))
-    }
-}
-
-pub enum ParseTransactionError {
-    UnknownTransactionType,
-    // Per the EIP-2718 spec 0xff is a reserved value
-    ReservedSentinel,
-    RlpDecodeError(DecoderError),
-}
-
-impl From<DecoderError> for ParseTransactionError {
-    fn from(e: DecoderError) -> Self {
-        Self::RlpDecodeError(e)
-    }
-}
-
-impl AsRef<[u8]> for ParseTransactionError {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::UnknownTransactionType => b"ERR_UNKNOWN_TX_TYPE",
-            Self::ReservedSentinel => b"ERR_RESERVED_LEADING_TX_BYTE",
-            Self::RlpDecodeError(_) => b"ERR_TX_RLP_DECODE",
-        }
-    }
-}
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LegacyEthTransaction {
@@ -178,23 +134,7 @@ impl Decodable for LegacyEthSignedTransaction {
         let nonce = rlp.val_at(0)?;
         let gas_price = rlp.val_at(1)?;
         let gas = rlp.val_at(2)?;
-        let to = {
-            let value = rlp.at(3)?;
-            if value.is_empty() {
-                if value.is_data() {
-                    None
-                } else {
-                    return Err(rlp::DecoderError::RlpExpectedToBeData);
-                }
-            } else {
-                let v: Address = value.as_val()?;
-                if v == Address::zero() {
-                    None
-                } else {
-                    Some(v)
-                }
-            }
-        };
+        let to = super::rlp_extract_to(rlp, 3)?;
         let value = Wei::new(rlp.val_at(4)?);
         let data = rlp.val_at(5)?;
         let v = rlp.val_at(6)?;

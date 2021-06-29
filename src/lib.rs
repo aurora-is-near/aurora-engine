@@ -219,8 +219,11 @@ mod contract {
 
         let input = sdk::read_input();
 
-        let EthTransaction::Legacy(signed_transaction) =
-            EthTransaction::try_from(input.as_slice()).sdk_unwrap();
+        let signed_transaction = match EthTransaction::try_from(input.as_slice()).sdk_unwrap() {
+            EthTransaction::Legacy(tx) => tx,
+            // TODO
+            EthTransaction::AccessList(_) => sdk::panic_utf8(b"ERR_NOT_SUPPORTED"),
+        };
 
         let state = Engine::get_state().sdk_unwrap();
 
