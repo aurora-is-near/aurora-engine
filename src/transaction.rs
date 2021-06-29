@@ -36,6 +36,16 @@ impl From<DecoderError> for ParseTransactionError {
     }
 }
 
+impl AsRef<[u8]> for ParseTransactionError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::UnknownTransactionType => b"ERR_UNKNOWN_TX_TYPE",
+            Self::ReservedSentinel => b"ERR_RESERVED_LEADING_TX_BYTE",
+            Self::RlpDecodeError(_) => b"ERR_TX_RLP_DECODE",
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LegacyEthTransaction {
     /// A monotonically increasing transaction counter for this sender

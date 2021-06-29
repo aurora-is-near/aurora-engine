@@ -221,7 +221,7 @@ mod contract {
         let input = sdk::read_input();
 
         let EthTransaction::Legacy(signed_transaction) =
-            EthTransaction::try_from(input.as_slice()).sdk_expect("ERR_INVALID_TX");
+            EthTransaction::try_from(input.as_slice()).sdk_unwrap();
 
         let state = Engine::get_state().sdk_unwrap();
 
