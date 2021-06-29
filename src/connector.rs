@@ -14,14 +14,15 @@ use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
 use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
+pub(crate) const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
 // Note: Is 40Tgas always enough?
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
 
-const UNPAUSE_ALL: PausedMask = 0;
-const PAUSE_DEPOSIT: PausedMask = 1 << 0;
-const PAUSE_WITHDRAW: PausedMask = 1 << 1;
+pub(crate) const UNPAUSE_ALL: PausedMask = 0;
+pub(crate) const PAUSE_DEPOSIT: PausedMask = 1 << 0;
+pub(crate) const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnectorContract {
@@ -206,7 +207,11 @@ impl EthConnectorContract {
             "ERR_WRONG_EVENT_ADDRESS",
         );
 
-        assert!(event.amount > event.fee, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
+        assert!(
+            event.amount > event.fee,
+            "{}",
+            ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
+        );
 
         // Verify proof data with cross-contract call to prover account
         crate::log!(&format!(
@@ -492,7 +497,8 @@ impl EthConnectorContract {
         // Check is transfer amount > fee
         assert!(
             args.amount > message_data.fee.as_u128(),
-            "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"
+            "{}",
+            ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
         );
 
         // Additional check overflow before process `ft_on_transfer`

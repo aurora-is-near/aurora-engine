@@ -2,6 +2,8 @@ use crate::sdk;
 
 pub type PausedMask = u8;
 
+pub(crate) const ERR_PAUSED: &str = "ERR_PAUSED";
+
 pub trait AdminControlled {
     /// Returns true if the current account is owner
     fn is_owner(&self) -> bool {
@@ -23,6 +25,6 @@ pub trait AdminControlled {
 
     /// Asserts the passed paused flag is not set. Panics with "ERR_PAUSED" if the flag is set.
     fn assert_not_paused(&self, flag: PausedMask) {
-        assert!(!self.is_paused(flag), "ERR_PAUSED");
+        assert!(!self.is_paused(flag), "{}", ERR_PAUSED);
     }
 }
