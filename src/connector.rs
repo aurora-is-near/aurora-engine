@@ -8,7 +8,6 @@ use crate::deposit_event::*;
 use crate::engine::Engine;
 use crate::json::parse_json;
 use crate::prelude::*;
-use crate::prover::validate_eth_address;
 use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
 #[cfg(feature = "log")]
 use alloc::format;
@@ -110,7 +109,7 @@ impl EthConnectorContract {
         // Get initial contract arguments
         let contract_data = EthConnector {
             prover_account: args.prover_account,
-            eth_custodian_address: validate_eth_address(args.eth_custodian_address),
+            eth_custodian_address: crate::types::validate_eth_address(args.eth_custodian_address),
         };
         // Save eth-connector specific data
         sdk::save_contract(

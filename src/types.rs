@@ -117,6 +117,15 @@ fn long_signature(name: &str, params: &[ParamType]) -> Hash {
     H256::from(result)
 }
 
+/// Validate Etherium address from string and return EthAddress
+pub fn validate_eth_address(address: String) -> EthAddress {
+    let data = hex::decode(address).expect("ETH_ADDRESS_FAILED");
+    assert_eq!(data.len(), 20, "ETH_WRONG_ADDRESS_LENGTH");
+    let mut result = [0u8; 20];
+    result.copy_from_slice(&data);
+    result
+}
+
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
 #[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
 pub struct Proof {
@@ -126,6 +135,19 @@ pub struct Proof {
     pub receipt_data: Vec<u8>,
     pub header_data: Vec<u8>,
     pub proof: Vec<Vec<u8>>,
+}
+
+impl Proof {
+    pub fn get_key(&self) -> String {
+        let mut data = self.log_index.try_to_vec().unwrap();
+        data.extend(self.receipt_index.try_to_vec().unwrap());
+        data.extend(self.header_data.clone());
+        sdk::sha256(&data[..])
+            .0
+            .iter()
+            .map(|n| n.to_string())
+            .collect()
+    }
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
