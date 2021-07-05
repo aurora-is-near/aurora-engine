@@ -117,13 +117,31 @@ fn long_signature(name: &str, params: &[ParamType]) -> Hash {
     H256::from(result)
 }
 
+#[derive(Debug)]
+pub enum ValidationError {
+    Decode,
+    WrongEthAddress,
+}
+
+impl AsRef<[u8]> for ValidationError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Decode => b"FAILED_DECODE",
+            Self::WrongEthAddress => b"WRONG_ETH_ADDRESS",
+        }
+    }
+}
+
 /// Validate Etherium address from string and return EthAddress
-pub fn validate_eth_address(address: String) -> EthAddress {
-    let data = hex::decode(address).expect("ETH_ADDRESS_FAILED");
+pub fn validate_eth_address(address: String) -> Result<EthAddress, ValidationError> {
+    let data = hex::decode(address).map_err(|_| ValidationError::Decode)?;
+    if data.len() != 20 {
+        return Err(ValidationError::WrongEthAddress);
+    }
     assert_eq!(data.len(), 20, "ETH_WRONG_ADDRESS_LENGTH");
     let mut result = [0u8; 20];
     result.copy_from_slice(&data);
-    result
+    Ok(result)
 }
 
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
@@ -248,7 +266,7 @@ pub enum ErrorKind {
     InvalidEcRecoverSignature,
 }
 
-pub type Result<T> = core::result::Result<T, ErrorKind>;
+//pub type Result<T> = core::result::Result<T, ErrorKind>;
 
 #[allow(dead_code)]
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {

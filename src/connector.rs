@@ -1,7 +1,9 @@
 use crate::fungible_token::*;
 use crate::parameters::*;
 use crate::sdk;
-use crate::types::{AccountId, Balance, EthAddress, Gas, PromiseResult, Proof, ERR_FAILED_PARSE};
+use crate::types::{
+    AccountId, Balance, EthAddress, Gas, PromiseResult, Proof, SdkUnwrap, ERR_FAILED_PARSE,
+};
 
 use crate::admin_controlled::{AdminControlled, PausedMask};
 use crate::deposit_event::*;
@@ -109,7 +111,8 @@ impl EthConnectorContract {
         // Get initial contract arguments
         let contract_data = EthConnector {
             prover_account: args.prover_account,
-            eth_custodian_address: crate::types::validate_eth_address(args.eth_custodian_address),
+            eth_custodian_address: crate::types::validate_eth_address(args.eth_custodian_address)
+                .sdk_unwrap(),
         };
         // Save eth-connector specific data
         sdk::save_contract(
