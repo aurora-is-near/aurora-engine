@@ -28,7 +28,6 @@ mod fungible_token;
 mod json;
 mod log_entry;
 mod precompiles;
-mod prover;
 pub mod sdk;
 
 #[cfg(test)]
