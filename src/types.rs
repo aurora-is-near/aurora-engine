@@ -126,7 +126,7 @@ pub enum ValidationError {
 impl AsRef<[u8]> for ValidationError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::EthAddressFailedDecode => b"FAILED_DECODE",
+            Self::EthAddressFailedDecode => b"FAILED_DECODE_ETH_ADDRESS",
             Self::WrongEthAddress => b"WRONG_ETH_ADDRESS",
         }
     }
