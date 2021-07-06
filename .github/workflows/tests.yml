@@ -27,7 +27,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --locked --verbose
+          args: --locked --verbose --features meta-call
   bully-build:
     name: Bully build
     runs-on: ubuntu-latest

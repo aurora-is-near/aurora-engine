@@ -1,6 +1,6 @@
 CARGO = cargo
 NEAR  = near
-FEATURES = contract,log
+FEATURES = mainnet
 
 ifeq ($(evm-bully),yes)
   FEATURES := $(FEATURES),evm_bully
@@ -8,16 +8,28 @@ endif
 
 all: release
 
+mainnet: FEATURES=mainnet
+mainnet: release
+
+testnet: FEATURES=testnet
+testnet: release
+
+betanet: FEATURES=betanet
+betanet: release
+
 release: release.wasm
 
 release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	ln -sf $< $@
 
-target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
+target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
-	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm 
+	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm
 
-etc/eth-contracts/artifacts/contracts/StateTest.sol/StateTest.json: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
+etc/eth-contracts/res/EvmErc20.bin: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
+	cd etc/eth-contracts && yarn && yarn build
+
+etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
 	cd etc/eth-contracts && yarn && yarn build
 
 debug: debug.wasm
@@ -25,15 +37,15 @@ debug: debug.wasm
 debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 	ln -sf $< $@
 
-target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs)
+target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
 	$(CARGO) build --target wasm32-unknown-unknown --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 
-test-build: etc/eth-contracts/artifacts/contracts/StateTest.sol/StateTest.json
-	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=contract,integration-test -Z avoid-dev-deps
-	ln -sf target/wasm32-unknown-unknown/release/aurora_engine.wasm release.wasm 
-	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm 
+test-build: etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json etc/eth-contracts/res/EvmErc20.bin
+	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=mainnet,integration-test,meta-call -Z avoid-dev-deps
+	ln -sf target/wasm32-unknown-unknown/release/aurora_engine.wasm release.wasm
+	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm
 
-.PHONY: all release debug
+.PHONY: all release debug eth-contracts mainnet testnet betanet
 
 deploy: release.wasm
 	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),aurora.test.near) --wasm-file=$<
@@ -48,7 +60,7 @@ check-clippy:
 
 # test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
 test: test-build
-	$(CARGO) test
+	$(CARGO) test --features meta-call
 
 format:
 	$(CARGO) fmt

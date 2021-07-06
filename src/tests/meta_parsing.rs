@@ -1,13 +1,13 @@
-use borsh::BorshSerialize;
+use {
+    crate::meta_parsing::{near_erc712_domain, parse_meta_call, prepare_meta_call_args},
+    crate::parameters::MetaCallArgs,
+    crate::prelude::{Address, U256},
+    crate::types::{keccak, u256_to_arr, InternalMetaCallArgs, Wei},
+    borsh::BorshSerialize,
+    near_crypto::{InMemorySigner, KeyType, PublicKey, Signature, Signer},
+};
 
-use near_crypto::{InMemorySigner, KeyType, PublicKey, Signature, Signer};
-
-use aurora_engine::meta_parsing::{near_erc712_domain, parse_meta_call, prepare_meta_call_args};
-use aurora_engine::parameters::MetaCallArgs;
-use aurora_engine::prelude::{Address, U256};
-use aurora_engine::types::{keccak, u256_to_arr, InternalMetaCallArgs, Wei};
-
-pub fn encode_meta_call_function_args(
+fn encode_meta_call_function_args(
     signer: &dyn Signer,
     chain_id: u64,
     nonce: U256,
@@ -60,7 +60,7 @@ pub fn encode_meta_call_function_args(
     }
 }
 
-pub fn public_key_to_address(public_key: PublicKey) -> Address {
+fn public_key_to_address(public_key: PublicKey) -> Address {
     match public_key {
         PublicKey::ED25519(_) => panic!("Wrong PublicKey"),
         PublicKey::SECP256K1(pubkey) => {

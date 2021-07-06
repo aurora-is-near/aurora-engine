@@ -5,6 +5,10 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 const READ_STORAGE_REGISTER_ID: u64 = 0;
 const INPUT_REGISTER_ID: u64 = 0;
+
+/// Register used to record evicted values from the storage.
+const EVICTED_REGISTER: u64 = 0;
+
 const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
 
 mod exports {
@@ -169,11 +173,13 @@ pub fn read_input() -> Vec<u8> {
     }
 }
 
+#[cfg_attr(not(feature = "contract"), allow(dead_code))]
 pub(crate) fn read_input_borsh<T: BorshDeserialize>() -> Result<T, ArgParseErr> {
     let bytes = read_input();
     T::try_from_slice(&bytes).map_err(|_| ArgParseErr)
 }
 
+#[cfg_attr(not(feature = "contract"), allow(dead_code))]
 pub(crate) fn read_input_arr20() -> Result<[u8; 20], IncorrectInputLength> {
     unsafe {
         exports::input(INPUT_REGISTER_ID);
@@ -258,10 +264,38 @@ pub fn write_storage(key: &[u8], value: &[u8]) {
 
 pub fn remove_storage(key: &[u8]) {
     unsafe {
-        exports::storage_remove(key.len() as u64, key.as_ptr() as u64, 0);
+        exports::storage_remove(key.len() as u64, key.as_ptr() as u64, EVICTED_REGISTER);
+    }
+}
+/// Returns the size of the blob stored in the given register.
+/// * If register is used, then returns the size, which can potentially be zero;
+/// * If register is not used, returns `u64::MAX`
+pub fn register_len(register_id: u64) -> Option<u64> {
+    let len = unsafe { exports::register_len(register_id) };
+
+    if len == u64::MAX {
+        None
+    } else {
+        Some(len)
     }
 }
 
+/// Reads the most recent value that was evicted with `storage_write` or `storage_remove` command.
+fn storage_get_evicted() -> Option<Vec<u8>> {
+    let len = register_len(EVICTED_REGISTER)?;
+    let bytes: Vec<u8> = vec![0u8; len as usize];
+    unsafe {
+        exports::read_register(EVICTED_REGISTER, bytes.as_ptr() as *const u64 as u64);
+    };
+    Some(bytes)
+}
+
+pub fn remove_storage_with_result(key: &[u8]) -> Option<Vec<u8>> {
+    remove_storage(key);
+    storage_get_evicted()
+}
+
+#[allow(dead_code)]
 pub fn block_timestamp() -> u64 {
     unsafe { exports::block_timestamp() }
 }
@@ -292,6 +326,26 @@ pub fn log_utf8(bytes: &[u8]) {
 pub fn predecessor_account_id() -> Vec<u8> {
     unsafe {
         exports::predecessor_account_id(1);
+        let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
+        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
+        bytes
+    }
+}
+
+#[allow(dead_code)]
+pub fn signer_account_id() -> Vec<u8> {
+    unsafe {
+        exports::signer_account_id(1);
+        let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
+        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
+        bytes
+    }
+}
+
+#[allow(dead_code)]
+pub fn signer_account_pk() -> Vec<u8> {
+    unsafe {
+        exports::signer_account_pk(1);
         let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
         exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
         bytes
@@ -355,6 +409,14 @@ pub fn save_contract<T: BorshSerialize>(key: &[u8], data: &T) {
 #[allow(dead_code)]
 pub fn log(data: &str) {
     log_utf8(data.as_bytes())
+}
+
+#[macro_export]
+macro_rules! log {
+    ($e: expr) => {
+        #[cfg(feature = "log")]
+        $crate::sdk::log($e)
+    };
 }
 
 #[allow(unused)]

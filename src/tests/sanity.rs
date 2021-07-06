@@ -1,7 +1,7 @@
 use crate::prelude::Address;
 use crate::test_utils;
-use crate::transaction::EthTransaction;
-use crate::types::Wei;
+use crate::transaction::LegacyEthTransaction;
+use crate::types::{Wei, ERC20_MINT_SELECTOR};
 use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
@@ -98,7 +98,7 @@ fn test_eth_transfer_insufficient_balance() {
 fn test_eth_transfer_incorrect_nonce() {
     let (mut runner, source_account, dest_address) = initialize_transfer();
     let source_address = test_utils::address_from_secret_key(&source_account);
-    let transaction = EthTransaction {
+    let transaction = LegacyEthTransaction {
         nonce: (INITIAL_NONCE + 1).into(),
         gas_price: Default::default(),
         gas: Default::default(),
@@ -139,7 +139,7 @@ fn test_eth_transfer_incorrect_nonce() {
 fn test_eth_transfer_not_enough_gas() {
     let (mut runner, source_account, dest_address) = initialize_transfer();
     let source_address = test_utils::address_from_secret_key(&source_account);
-    let transaction = EthTransaction {
+    let transaction = LegacyEthTransaction {
         nonce: INITIAL_NONCE.into(),
         gas_price: Default::default(),
         gas: 10_000.into(), // this is not enough gas
@@ -186,4 +186,16 @@ fn initialize_transfer() -> (test_utils::AuroraRunner, SecretKey, Address) {
     let dest_address = test_utils::address_from_secret_key(&SecretKey::random(&mut rng));
 
     (runner, source_account, dest_address)
+}
+
+use sha3::Digest;
+
+#[test]
+fn check_selector() {
+    // Selector to call mint function in ERC 20 contract
+    //
+    // keccak("mint(address,uint256)".as_bytes())[..4];
+    let mut hasher = sha3::Keccak256::default();
+    hasher.update(b"mint(address,uint256)");
+    assert_eq!(hasher.finalize()[..4].to_vec(), ERC20_MINT_SELECTOR);
 }

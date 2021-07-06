@@ -1,9 +1,8 @@
-use crate::prover::*;
+#[cfg(not(feature = "contract"))]
+use crate::prelude::Vec;
+use crate::prelude::{vec, String, ToString};
+
 use crate::types::*;
-use alloc::{
-    string::{String, ToString},
-    vec,
-};
 use ethabi::{EventParam, ParamType};
 use primitive_types::U256;
 
@@ -46,7 +45,7 @@ impl DepositedEvent {
         ]
     }
 
-    /// Parse raw log Etherium proof entry data.
+    /// Parses raw Ethereum logs proof's entry data
     pub fn from_log_entry_data(data: &[u8]) -> Self {
         let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data);
         let sender = event.log.params[0].value.clone().into_address().unwrap().0;
@@ -61,5 +60,21 @@ impl DepositedEvent {
             amount,
             fee,
         }
+    }
+
+    #[cfg(not(feature = "contract"))]
+    #[allow(dead_code)]
+    pub fn to_log_entry_data(&self) -> Vec<u8> {
+        EthEvent::params_to_log_entry_data(
+            DEPOSITED_EVENT,
+            DepositedEvent::event_params(),
+            self.eth_custodian_address,
+            vec![self.sender.to_vec()],
+            vec![
+                ethabi::Token::String(self.recipient.clone()),
+                ethabi::Token::Uint(self.amount),
+                ethabi::Token::Uint(self.fee),
+            ],
+        )
     }
 }

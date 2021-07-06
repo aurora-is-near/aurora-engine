@@ -18,6 +18,8 @@ pub enum KeyPrefix {
     RelayerEvmAddressMap = 0x5,
     EthConnector = 0x6,
     Generation = 0x7,
+    Nep141Erc20Map = 0x8,
+    Erc20Nep141Map = 0x9,
 }
 
 /// Enum used to differentiate different storage keys used by eth-connector
@@ -45,6 +47,8 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x5 => Self::RelayerEvmAddressMap,
             0x6 => Self::EthConnector,
             0x7 => Self::Generation,
+            0x8 => Self::Nep141Erc20Map,
+            0x9 => Self::Erc20Nep141Map,
             _ => unreachable!(),
         }
     }

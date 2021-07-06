@@ -1,7 +1,7 @@
 use crate::parameters::FunctionCallArgs;
 use crate::prelude::Address;
 use crate::test_utils::{solidity, AuroraRunner, Signer};
-use crate::transaction::EthTransaction;
+use crate::transaction::LegacyEthTransaction;
 use borsh::BorshSerialize;
 use primitive_types::U256;
 use std::convert::TryInto;
@@ -13,11 +13,11 @@ const DEFAULT_GAS: u64 = 1_000_000_000;
 impl SelfDestructFactoryConstructor {
     pub fn load() -> Self {
         Self(solidity::ContractConstructor::compile_from_extended_json(
-            "etc/eth-contracts/artifacts/contracts/StateTest.sol/SelfDestructFactory.json",
+            "etc/eth-contracts/artifacts/contracts/test/StateTest.sol/SelfDestructFactory.json",
         ))
     }
 
-    pub fn deploy(&self, nonce: u64) -> EthTransaction {
+    pub fn deploy(&self, nonce: u64) -> LegacyEthTransaction {
         let data = self
             .0
             .abi
@@ -26,7 +26,7 @@ impl SelfDestructFactoryConstructor {
             .encode_input(self.0.code.clone(), &[])
             .unwrap();
 
-        EthTransaction {
+        LegacyEthTransaction {
             nonce: nonce.into(),
             gas_price: Default::default(),
             gas: U256::from(DEFAULT_GAS),
@@ -63,7 +63,7 @@ impl SelfDestructFactory {
             .encode_input(&[])
             .unwrap();
 
-        let tx = EthTransaction {
+        let tx = LegacyEthTransaction {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
             gas: U256::from(DEFAULT_GAS),
@@ -83,7 +83,7 @@ pub(crate) struct SelfDestructConstructor(pub solidity::ContractConstructor);
 impl SelfDestructConstructor {
     pub fn load() -> Self {
         Self(solidity::ContractConstructor::compile_from_extended_json(
-            "etc/eth-contracts/artifacts/contracts/StateTest.sol/SelfDestruct.json",
+            "etc/eth-contracts/artifacts/contracts/test/StateTest.sol/SelfDestruct.json",
         ))
     }
 }
@@ -101,7 +101,7 @@ impl SelfDestruct {
             .encode_input(&[])
             .unwrap();
 
-        let tx = EthTransaction {
+        let tx = LegacyEthTransaction {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
             gas: U256::from(DEFAULT_GAS),
@@ -130,7 +130,7 @@ impl SelfDestruct {
             .encode_input(&[])
             .unwrap();
 
-        let tx = EthTransaction {
+        let tx = LegacyEthTransaction {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
             gas: U256::from(DEFAULT_GAS),
@@ -151,7 +151,7 @@ impl SelfDestruct {
             .encode_input(&[])
             .unwrap();
 
-        let tx = EthTransaction {
+        let tx = LegacyEthTransaction {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
             gas: U256::from(DEFAULT_GAS),

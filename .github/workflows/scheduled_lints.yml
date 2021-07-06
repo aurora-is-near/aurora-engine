@@ -17,8 +17,9 @@ jobs:
           toolchain: nightly
           override: true
           components: clippy
+      - run: make etc/eth-contracts/res/EvmErc20.bin
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --no-default-features --features=contract -- -D warnings
+          args: --no-default-features --features=mainnet -- -D warnings
