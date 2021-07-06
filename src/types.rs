@@ -119,14 +119,14 @@ fn long_signature(name: &str, params: &[ParamType]) -> Hash {
 
 #[derive(Debug)]
 pub enum ValidationError {
-    Decode,
+    EthAddressFailedDecode,
     WrongEthAddress,
 }
 
 impl AsRef<[u8]> for ValidationError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::Decode => b"FAILED_DECODE",
+            Self::EthAddressFailedDecode => b"FAILED_DECODE",
             Self::WrongEthAddress => b"WRONG_ETH_ADDRESS",
         }
     }
@@ -134,7 +134,7 @@ impl AsRef<[u8]> for ValidationError {
 
 /// Validate Etherium address from string and return EthAddress
 pub fn validate_eth_address(address: String) -> Result<EthAddress, ValidationError> {
-    let data = hex::decode(address).map_err(|_| ValidationError::Decode)?;
+    let data = hex::decode(address).map_err(|_| ValidationError::EthAddressFailedDecode)?;
     if data.len() != 20 {
         return Err(ValidationError::WrongEthAddress);
     }
@@ -265,8 +265,6 @@ pub enum ErrorKind {
     InvalidMetaTransactionFunctionArg,
     InvalidEcRecoverSignature,
 }
-
-//pub type Result<T> = core::result::Result<T, ErrorKind>;
 
 #[allow(dead_code)]
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {
