@@ -87,7 +87,7 @@ mod contract {
     };
 
     use crate::json::parse_json;
-    use crate::prelude::{format, Address, ToString, TryInto, H160, H256, U256};
+    use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{
@@ -323,7 +323,7 @@ mod contract {
         let args: NEP141FtOnTransferArgs = parse_json(sdk::read_input().as_slice())
             .sdk_unwrap()
             .try_into()
-            .map_err(|err| format!("ERR_JSON_{:?}", err))
+            .map_err(|err| err)
             .sdk_unwrap();
 
         if sdk::predecessor_account_id() == sdk::current_account_id() {
