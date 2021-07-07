@@ -17,7 +17,6 @@ pub enum JsonValue {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug)]
 pub enum JsonError {
     NotJsonType,
     MissingValue,
@@ -30,6 +29,7 @@ pub enum JsonError {
     ExpectedStringGotNumber,
     OutOfRangeU8,
     OutOfRangeU64,
+    OutOfRangeU128,
 }
 
 #[derive(Debug)]
@@ -132,6 +132,7 @@ impl AsRef<[u8]> for JsonError {
             Self::ExpectedStringGotNumber => b"ERR_EXPECTED_STRING_GOT_NUMBER",
             Self::OutOfRangeU8 => b"ERR_OUT_OF_RANGE_U8",
             Self::OutOfRangeU64 => b"ERR_OUT_OF_RANGE_U64",
+            Self::OutOfRangeU128 => b"ERR_OUT_OF_RANGE_U128",
         }
     }
 }
@@ -214,7 +215,15 @@ impl TryFrom<&JsonValue> for u128 {
 
     fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
         match value {
-            JsonValue::String(n) => Ok(n.parse::<u128>().map_err(|_| JsonError::InvalidU128)?),
+            JsonValue::String(n) => {
+                if let Ok(x) = n.parse::<u128>() {
+                    Ok(x)
+                } else if n.parse::<i128>().is_ok() {
+                    Err(JsonError::OutOfRangeU128)
+                } else {
+                    Err(JsonError::InvalidU128)
+                }
+            }
             JsonValue::Number(_) => Err(JsonError::ExpectedStringGotNumber),
             _ => Err(JsonError::InvalidU128),
         }
@@ -253,19 +262,27 @@ mod tests {
 
     #[test]
     fn test_json_type_string() {
-        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "abcd").as_bytes()).unwrap();
-        let string = json.string("foo").ok().unwrap();
-        assert_eq!(string, "abcd");
+        let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
+        let string_data = json.string("foo").ok().unwrap();
+        assert_eq!(string_data, "abcd");
 
-        let json = parse_json(format!(r#"{{"foo": {}}}"#, 123).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
         let err = json.string("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidString);
 
-        let json = parse_json(format!(r#"{{"foo": {}}}"#, true).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": true}"#.as_bytes()).unwrap();
         let err = json.string("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidString);
 
-        let json = parse_json(format!(r#"{{"foo": ["{}"]}}"#, "abcd").as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": ["abcd"]}"#.as_bytes()).unwrap();
+        let err = json.string("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidString);
+
+        let json = parse_json(r#"{"foo": {}}"#.as_bytes()).unwrap();
+        let err = json.string("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidString);
+
+        let json = parse_json(r#"{"foo": null}"#.as_bytes()).unwrap();
         let err = json.string("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidString);
 
@@ -276,27 +293,35 @@ mod tests {
 
     #[test]
     fn test_json_type_u64() {
-        let json = parse_json(format!(r#"{{"foo": {}}}"#, 123).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, 123);
 
-        let json = parse_json(format!(r#"{{"foo": {}}}"#, -1).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": -123}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
         assert_eq!(err, JsonError::OutOfRangeU64);
 
-        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "bar").as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidU64);
 
-        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "123").as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": "123"}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidU64);
 
-        let json = parse_json(format!(r#"{{"foo": {}}}"#, true).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": true}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidU64);
 
-        let json = parse_json(format!(r#"{{"foo": [{}]}}"#, 123).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": [123]}"#.as_bytes()).unwrap();
+        let err = json.u64("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU64);
+
+        let json = parse_json(r#"{"foo": {}}"#.as_bytes()).unwrap();
+        let err = json.u64("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU64);
+
+        let json = parse_json(r#"{"foo": null}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidU64);
 
@@ -307,23 +332,36 @@ mod tests {
 
     #[test]
     fn test_json_type_u128() {
-        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, 123).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": "123"}"#.as_bytes()).unwrap();
         let val = json.u128("foo").ok().unwrap();
         assert_eq!(val, 123);
 
-        let json = parse_json(format!(r#"{{"foo": {}}}"#, 123).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": "-123"}"#.as_bytes()).unwrap();
+        ////let val = json.u128("foo").ok().unwrap();
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::OutOfRangeU128);
+
+        let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
         let err = json.u128("foo").unwrap_err();
         assert_eq!(err, JsonError::ExpectedStringGotNumber);
 
-        let json = parse_json(format!(r#"{{"foo": "{}"}}"#, "bar").as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
         let err = json.u128("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidU128);
 
-        let json = parse_json(format!(r#"{{"foo": {}}}"#, true).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": true}"#.as_bytes()).unwrap();
         let err = json.u128("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidU128);
 
-        let json = parse_json(format!(r#"{{"foo": ["{}"]}}"#, 123).as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": ["123"]}"#.as_bytes()).unwrap();
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU128);
+
+        let json = parse_json(r#"{"foo": {}}"#.as_bytes()).unwrap();
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU128);
+
+        let json = parse_json(r#"{"foo": null}"#.as_bytes()).unwrap();
         let err = json.u128("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidU128);
 
