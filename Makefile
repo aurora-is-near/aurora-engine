@@ -50,7 +50,7 @@ test-build: etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.j
 deploy: release.wasm
 	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),aurora.test.near) --wasm-file=$<
 
-check: test check-format check-clippy
+check: test test-sol check-format check-clippy
 
 check-format:
 	$(CARGO) fmt -- --check
@@ -61,6 +61,9 @@ check-clippy:
 # test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
 test: test-build
 	$(CARGO) test --features meta-call
+
+test-sol:
+	cd etc/eth-contracts && yarn && yarn test
 
 format:
 	$(CARGO) fmt
