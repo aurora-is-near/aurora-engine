@@ -3,14 +3,15 @@ const { expect } = require('chai');
 
 describe('EthCustodian contract', () => {
     let user1;
+    let deployerAccount;
     let adminAccount;
 
     let evmErc20Factory;
     let evmErc20Contract;
 
-    const metadata_name = "EMPTY_TOKEN";
-    const metadata_symbol = "EMPTY_SYMBOL";
-    const metadata_decimals = 0;
+    const metadataName = 'EMPTY_TOKEN';
+    const metadataSymbol = 'EMPTY_SYMBOL';
+    const metadataDecimals = 0;
 
     beforeEach(async () => {
         [deployerAccount, user1] = await ethers.getSigners();
@@ -22,73 +23,73 @@ describe('EthCustodian contract', () => {
         evmErc20Contract = await evmErc20Factory
             .connect(adminAccount)
             .deploy(
-                metadata_name,
-                metadata_symbol,
-                metadata_decimals,
+                metadataName,
+                metadataSymbol,
+                metadataDecimals,
                 adminAccount.address,
             );
     });
 
     describe('AdminControlled', () => {
         it('Only admin is allowed to update the metadata', async () => {
-            const new_metadata_name = "NEW_CUSTOM_TOKEN";
-            const new_metadata_symbol = "NEW_CSTM";
-            const new_metadata_decimals = 18;
+            const newMetadataName = 'NEW_CUSTOM_TOKEN';
+            const newMetadataSymbol = 'NEW_CSTM';
+            const newMetadataDecimals = 18;
 
             await expect(
                 evmErc20Contract
-                   .connect(user1)
-                   .setMetadata(
-                       new_metadata_name,
-                       new_metadata_symbol,
-                       new_metadata_decimals,
-                   )
+                    .connect(user1)
+                    .setMetadata(
+                        newMetadataName,
+                        newMetadataSymbol,
+                        newMetadataDecimals,
+                    ),
             )
                 .to
                 .be
                 .reverted;
 
-            expect(await evmErc20Contract.name()).to.equal(metadata_name);
-            expect(await evmErc20Contract.symbol()).to.equal(metadata_symbol);
-            expect(await evmErc20Contract.decimals()).to.equal(metadata_decimals);
+            expect(await evmErc20Contract.name()).to.equal(metadataName);
+            expect(await evmErc20Contract.symbol()).to.equal(metadataSymbol);
+            expect(await evmErc20Contract.decimals()).to.equal(metadataDecimals);
 
             await evmErc20Contract
                 .connect(adminAccount)
                 .setMetadata(
-                    new_metadata_name,
-                    new_metadata_symbol,
-                    new_metadata_decimals,
+                    newMetadataName,
+                    newMetadataSymbol,
+                    newMetadataDecimals,
                 );
 
-            expect(await evmErc20Contract.name()).to.equal(new_metadata_name);
-            expect(await evmErc20Contract.symbol()).to.equal(new_metadata_symbol);
-            expect(await evmErc20Contract.decimals()).to.equal(new_metadata_decimals);
+            expect(await evmErc20Contract.name()).to.equal(newMetadataName);
+            expect(await evmErc20Contract.symbol()).to.equal(newMetadataSymbol);
+            expect(await evmErc20Contract.decimals()).to.equal(newMetadataDecimals);
         });
     });
 
     describe('Metadata', () => {
         it('Should match the deployed metadata', async () => {
-            expect(await evmErc20Contract.name()).to.equal(metadata_name);
-            expect(await evmErc20Contract.symbol()).to.equal(metadata_symbol);
-            expect(await evmErc20Contract.decimals()).to.equal(metadata_decimals);
+            expect(await evmErc20Contract.name()).to.equal(metadataName);
+            expect(await evmErc20Contract.symbol()).to.equal(metadataSymbol);
+            expect(await evmErc20Contract.decimals()).to.equal(metadataDecimals);
         });
 
-        it('Should update the metadata', async() => {
-            const new_metadata_name = "NEW_CUSTOM_TOKEN";
-            const new_metadata_symbol = "NEW_CSTM";
-            const new_metadata_decimals = 18;
+        it('Should update the metadata', async () => {
+            const newMetadataName = 'NEW_CUSTOM_TOKEN';
+            const newMetadataSymbol = 'NEW_CSTM';
+            const newMetadataDecimals = 18;
 
             await evmErc20Contract
                 .connect(adminAccount)
                 .setMetadata(
-                    new_metadata_name,
-                    new_metadata_symbol,
-                    new_metadata_decimals,
+                    newMetadataName,
+                    newMetadataSymbol,
+                    newMetadataDecimals,
                 );
 
-            expect(await evmErc20Contract.name()).to.equal(new_metadata_name);
-            expect(await evmErc20Contract.symbol()).to.equal(new_metadata_symbol);
-            expect(await evmErc20Contract.decimals()).to.equal(new_metadata_decimals);
+            expect(await evmErc20Contract.name()).to.equal(newMetadataName);
+            expect(await evmErc20Contract.symbol()).to.equal(newMetadataSymbol);
+            expect(await evmErc20Contract.decimals()).to.equal(newMetadataDecimals);
         });
     });
 });
