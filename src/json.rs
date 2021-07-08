@@ -440,9 +440,9 @@ mod tests {
 
     #[test]
     fn test_json_type_array() {
-        let json = parse_json(r#"{"foo": [1, 3, 2]}"#.as_bytes()).unwrap();
+        let json = parse_json(r#"{"foo": [1, 3, 2, 100]}"#.as_bytes()).unwrap();
         let val = json.array("foo", JsonValue::parse_u8).ok().unwrap();
-        assert_eq!(val, vec![1, 3, 2]);
+        assert_eq!(val, vec![1, 3, 2, 100]);
 
         let json = parse_json(r#"{"foo": []}"#.as_bytes()).unwrap();
         let val = json.array("foo", JsonValue::parse_u8).ok().unwrap();
