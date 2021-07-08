@@ -117,7 +117,35 @@ fn long_signature(name: &str, params: &[ParamType]) -> Hash {
     H256::from(result)
 }
 
+#[derive(Debug)]
+pub enum ValidationError {
+    EthAddressFailedDecode,
+    WrongEthAddress,
+}
+
+impl AsRef<[u8]> for ValidationError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::EthAddressFailedDecode => b"FAILED_DECODE_ETH_ADDRESS",
+            Self::WrongEthAddress => b"WRONG_ETH_ADDRESS",
+        }
+    }
+}
+
+/// Validate Etherium address from string and return EthAddress
+pub fn validate_eth_address(address: String) -> Result<EthAddress, ValidationError> {
+    let data = hex::decode(address).map_err(|_| ValidationError::EthAddressFailedDecode)?;
+    if data.len() != 20 {
+        return Err(ValidationError::WrongEthAddress);
+    }
+    assert_eq!(data.len(), 20, "ETH_WRONG_ADDRESS_LENGTH");
+    let mut result = [0u8; 20];
+    result.copy_from_slice(&data);
+    Ok(result)
+}
+
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
+#[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
 pub struct Proof {
     pub log_index: u64,
     pub log_entry_data: Vec<u8>,
@@ -125,6 +153,19 @@ pub struct Proof {
     pub receipt_data: Vec<u8>,
     pub header_data: Vec<u8>,
     pub proof: Vec<Vec<u8>>,
+}
+
+impl Proof {
+    pub fn get_key(&self) -> String {
+        let mut data = self.log_index.try_to_vec().unwrap();
+        data.extend(self.receipt_index.try_to_vec().unwrap());
+        data.extend(self.header_data.clone());
+        sdk::sha256(&data[..])
+            .0
+            .iter()
+            .map(|n| n.to_string())
+            .collect()
+    }
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
@@ -224,8 +265,6 @@ pub enum ErrorKind {
     InvalidMetaTransactionFunctionArg,
     InvalidEcRecoverSignature,
 }
-
-pub type Result<T> = core::result::Result<T, ErrorKind>;
 
 #[allow(dead_code)]
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {

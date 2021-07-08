@@ -2,7 +2,7 @@ use crate::parameters::{FunctionCallArgs, SubmitResult};
 use crate::prelude::*;
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
-use crate::transaction::EthSignedTransaction;
+use crate::transaction::LegacyEthSignedTransaction;
 use crate::types::{AccountId, Balance, RawAddress, Wei};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
@@ -105,7 +105,11 @@ impl test_utils::AuroraRunner {
         )
     }
 
-    pub fn evm_submit(&mut self, input: EthSignedTransaction, origin: AccountId) -> CallResult {
+    pub fn evm_submit(
+        &mut self,
+        input: LegacyEthSignedTransaction,
+        origin: AccountId,
+    ) -> CallResult {
         self.make_call("submit", origin, rlp::encode(&input).to_vec())
     }
 

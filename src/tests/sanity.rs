@@ -1,6 +1,6 @@
 use crate::prelude::Address;
 use crate::test_utils;
-use crate::transaction::EthTransaction;
+use crate::transaction::LegacyEthTransaction;
 use crate::types::{Wei, ERC20_MINT_SELECTOR};
 use secp256k1::SecretKey;
 
@@ -98,7 +98,7 @@ fn test_eth_transfer_insufficient_balance() {
 fn test_eth_transfer_incorrect_nonce() {
     let (mut runner, source_account, dest_address) = initialize_transfer();
     let source_address = test_utils::address_from_secret_key(&source_account);
-    let transaction = EthTransaction {
+    let transaction = LegacyEthTransaction {
         nonce: (INITIAL_NONCE + 1).into(),
         gas_price: Default::default(),
         gas: Default::default(),
@@ -139,7 +139,7 @@ fn test_eth_transfer_incorrect_nonce() {
 fn test_eth_transfer_not_enough_gas() {
     let (mut runner, source_account, dest_address) = initialize_transfer();
     let source_address = test_utils::address_from_secret_key(&source_account);
-    let transaction = EthTransaction {
+    let transaction = LegacyEthTransaction {
         nonce: INITIAL_NONCE.into(),
         gas_price: Default::default(),
         gas: 10_000.into(), // this is not enough gas
