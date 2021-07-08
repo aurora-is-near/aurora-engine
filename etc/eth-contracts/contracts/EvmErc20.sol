@@ -13,14 +13,35 @@ import "./IExit.sol";
  * `ERC20` functions.
  */
 contract EvmErc20 is ERC20, AdminControlled, IExit {
+    string private _name;
+    string private _symbol;
     uint8 private _decimals;
 
-    constructor (string memory name, string memory symbol, uint8 decimal, address admin)  ERC20(name, symbol) AdminControlled(admin, 0) {
-        _decimals = decimal;
+    constructor (string memory metadata_name, string memory metadata_symbol, uint8 metadata_decimals, address admin)
+        ERC20(metadata_name, metadata_symbol)
+        AdminControlled(admin, 0)
+    {
+        _name = metadata_name;
+        _symbol = metadata_symbol;
+        _decimals = metadata_decimals;
+    }
+
+    function name() public view override returns (string memory) {
+        return _name;
+    }
+
+    function symbol() public view override returns (string memory) {
+        return _symbol;
     }
 
     function decimals() public view override returns (uint8) {
         return _decimals;
+    }
+
+    function setMetadata(string memory metadata_name, string memory metadata_symbol, uint8 metadata_decimals) public onlyAdmin {
+        _name = metadata_name;
+        _symbol = metadata_symbol;
+        _decimals = metadata_decimals;
     }
 
     function mint(address account, uint256 amount) public onlyAdmin {
