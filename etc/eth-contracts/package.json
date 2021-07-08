@@ -7,6 +7,7 @@
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.1",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
     "chai": "^4.3.3",
     "eslint": "^6.3.0",
     "eslint-config-standard": "^14.1.0",
@@ -15,6 +16,7 @@
     "eslint-plugin-promise": "^4.0.1",
     "eslint-plugin-standard": "^4.0.0",
     "eth-gas-reporter": "^0.2.11",
+    "ethereum-waffle": "^3.4.0",
     "ethers": "^5.0.31",
     "hardhat": "^2.1.1",
     "rainbow-bridge-lib": "^2.0.0",
@@ -25,7 +27,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "build": "yarn compile && node main.js ./artifacts/contracts/EvmErc20.sol/EvmErc20.json",
-    "test": "hardhat test",
+    "test": "yarn hardhat test",
     "coverage": "hardhat coverage",
     "lint:js": "eslint .",
     "lint:js:fix": "eslint . --fix",
