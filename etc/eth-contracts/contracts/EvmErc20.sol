@@ -38,7 +38,7 @@ contract EvmErc20 is ERC20, AdminControlled, IExit {
         return _decimals;
     }
 
-    function setMetadata(string memory metadata_name, string memory metadata_symbol, uint8 metadata_decimals) public onlyAdmin {
+    function setMetadata(string memory metadata_name, string memory metadata_symbol, uint8 metadata_decimals) external onlyAdmin {
         _name = metadata_name;
         _symbol = metadata_symbol;
         _decimals = metadata_decimals;
