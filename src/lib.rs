@@ -323,7 +323,6 @@ mod contract {
         let args: NEP141FtOnTransferArgs = parse_json(sdk::read_input().as_slice())
             .sdk_unwrap()
             .try_into()
-            .map_err(|err| err)
             .sdk_unwrap();
 
         if sdk::predecessor_account_id() == sdk::current_account_id() {

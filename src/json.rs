@@ -16,7 +16,7 @@ pub enum JsonValue {
     Object(BTreeMap<String, JsonValue>),
 }
 
-#[cfg_attr(test, derive(PartialEq))]
+#[derive(Ord, PartialOrd, Eq, PartialEq)]
 pub enum JsonError {
     NotJsonType,
     MissingValue,
@@ -27,12 +27,17 @@ pub enum JsonError {
     InvalidString,
     InvalidArray,
     ExpectedStringGotNumber,
+    OutOfRange(JsonOutOfRangeError),
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
+pub enum JsonOutOfRangeError {
     OutOfRangeU8,
     OutOfRangeU64,
     OutOfRangeU128,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ParseError {
     InvalidAccountId,
 }
@@ -59,7 +64,7 @@ impl JsonValue {
                 JsonValue::Number(n) => {
                     // Upper bound is covered by the type limitation
                     if *n < u64::MIN as f64 {
-                        Err(JsonError::OutOfRangeU64)
+                        Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64))
                     } else {
                         Ok(*n as u64)
                     }
@@ -94,7 +99,7 @@ impl JsonValue {
         match v {
             JsonValue::Number(n) => {
                 if *n < u8::MIN as f64 || *n > u8::MAX as f64 {
-                    Err(JsonError::OutOfRangeU8)
+                    Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64))
                 } else {
                     Ok(*n as u8)
                 }
@@ -136,6 +141,14 @@ impl AsRef<[u8]> for JsonError {
             Self::InvalidString => b"ERR_FAILED_PARSE_STRING",
             Self::InvalidArray => b"ERR_FAILED_PARSE_ARRAY",
             Self::ExpectedStringGotNumber => b"ERR_EXPECTED_STRING_GOT_NUMBER",
+            Self::OutOfRange(err) => err.as_ref(),
+        }
+    }
+}
+
+impl AsRef<[u8]> for JsonOutOfRangeError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
             Self::OutOfRangeU8 => b"ERR_OUT_OF_RANGE_U8",
             Self::OutOfRangeU64 => b"ERR_OUT_OF_RANGE_U64",
             Self::OutOfRangeU128 => b"ERR_OUT_OF_RANGE_U128",
@@ -225,7 +238,7 @@ impl TryFrom<&JsonValue> for u128 {
                 if let Ok(x) = n.parse::<u128>() {
                     Ok(x)
                 } else if n.parse::<i128>().is_ok() {
-                    Err(JsonError::OutOfRangeU128)
+                    Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU128))
                 } else {
                     Err(JsonError::InvalidU128)
                 }
@@ -305,7 +318,10 @@ mod tests {
 
         let json = parse_json(r#"{"foo": -123}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::OutOfRangeU64);
+        assert_eq!(
+            err,
+            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64)
+        );
 
         let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
@@ -345,7 +361,10 @@ mod tests {
         let json = parse_json(r#"{"foo": "-123"}"#.as_bytes()).unwrap();
         ////let val = json.u128("foo").ok().unwrap();
         let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::OutOfRangeU128);
+        assert_eq!(
+            err,
+            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU128)
+        );
 
         let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
         let err = json.u128("foo").unwrap_err();
@@ -427,11 +446,17 @@ mod tests {
 
         let json = JsonValue::from(-1f64);
         let err = JsonValue::parse_u8(&json).unwrap_err();
-        assert_eq!(err, JsonError::OutOfRangeU8);
+        assert_eq!(
+            err,
+            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8)
+        );
 
         let json = JsonValue::from(256f64);
         let err = JsonValue::parse_u8(&json).unwrap_err();
-        assert_eq!(err, JsonError::OutOfRangeU8);
+        assert_eq!(
+            err,
+            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8)
+        );
 
         let json = JsonValue::from("abcd".to_string());
         let err = JsonValue::parse_u8(&json).unwrap_err();
