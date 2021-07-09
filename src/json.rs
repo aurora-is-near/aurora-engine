@@ -1,7 +1,5 @@
 use super::prelude::*;
 
-#[cfg(feature = "engine")]
-use alloc::collections::BTreeMap;
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
 #[cfg(test)]
@@ -99,7 +97,7 @@ impl JsonValue {
         match v {
             JsonValue::Number(n) => {
                 if *n < u8::MIN as f64 || *n > u8::MAX as f64 {
-                    Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64))
+                    Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8))
                 } else {
                     Ok(*n as u8)
                 }
@@ -323,6 +321,10 @@ mod tests {
             JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64)
         );
 
+        // let json = parse_json(r#"{"foo": 12.3}"#.as_bytes()).unwrap();
+        // let err = json.u64("foo").unwrap_err();
+        // assert_eq!(err, JsonError::InvalidU64);
+
         let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidU64);
@@ -359,7 +361,6 @@ mod tests {
         assert_eq!(val, 123);
 
         let json = parse_json(r#"{"foo": "-123"}"#.as_bytes()).unwrap();
-        ////let val = json.u128("foo").ok().unwrap();
         let err = json.u128("foo").unwrap_err();
         assert_eq!(
             err,
@@ -369,6 +370,14 @@ mod tests {
         let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
         let err = json.u128("foo").unwrap_err();
         assert_eq!(err, JsonError::ExpectedStringGotNumber);
+
+        let json = parse_json(r#"{"foo": 12.3}"#.as_bytes()).unwrap();
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::ExpectedStringGotNumber);
+
+        let json = parse_json(r#"{"foo": "12.3"}"#.as_bytes()).unwrap();
+        let err = json.u128("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidU128);
 
         let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
         let err = json.u128("foo").unwrap_err();
@@ -418,6 +427,10 @@ mod tests {
         assert_eq!(err, JsonError::InvalidBool);
 
         let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
+        let err = json.bool("foo").unwrap_err();
+        assert_eq!(err, JsonError::InvalidBool);
+
+        let json = parse_json(r#"{"foo": 12.3}"#.as_bytes()).unwrap();
         let err = json.bool("foo").unwrap_err();
         assert_eq!(err, JsonError::InvalidBool);
 
