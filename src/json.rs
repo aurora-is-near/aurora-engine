@@ -61,7 +61,7 @@ impl JsonValue {
             JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
                 JsonValue::Number(n) => {
                     // Upper bound is covered by the type limitation
-                    if *n < u64::MIN as f64 {
+                    if (*n as i128) < u64::MIN as i128 {
                         Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64))
                     } else {
                         Ok(*n as u64)
@@ -96,7 +96,7 @@ impl JsonValue {
     pub fn parse_u8(v: &JsonValue) -> Result<u8, JsonError> {
         match v {
             JsonValue::Number(n) => {
-                if *n < u8::MIN as f64 || *n > u8::MAX as f64 {
+                if (*n as i128) < u8::MIN as i128 || (*n as i128) > u8::MAX as i128 {
                     Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8))
                 } else {
                     Ok(*n as u8)
