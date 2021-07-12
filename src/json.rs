@@ -297,7 +297,7 @@ mod tests {
         let json = parse_json(r#"{"foo": 12.99}"#.as_bytes()).unwrap();
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, 12);
-        
+
         let json = parse_json(format!(r#"{{"foo": {} }}"#, u64::MAX).as_bytes()).unwrap();
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, u64::MAX);
