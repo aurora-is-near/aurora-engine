@@ -105,26 +105,6 @@ impl JsonValue {
             _ => Err(JsonError::InvalidU8),
         }
     }
-
-    #[allow(dead_code)]
-    pub fn array<T, F>(&self, key: &str, mut call: F) -> Result<Vec<T>, JsonError>
-    where
-        F: FnMut(&JsonValue) -> Result<T, JsonError>,
-    {
-        match self {
-            JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
-                JsonValue::Array(arr) => {
-                    let mut res = vec![];
-                    for v in arr.iter() {
-                        res.push(call(v)?);
-                    }
-                    Ok(res)
-                }
-                _ => Err(JsonError::InvalidArray),
-            },
-            _ => Err(JsonError::NotJsonType),
-        }
-    }
 }
 
 impl AsRef<[u8]> for JsonError {
@@ -474,41 +454,5 @@ mod tests {
         let json = JsonValue::from("abcd".to_string());
         let err = JsonValue::parse_u8(&json).unwrap_err();
         assert_eq!(err, JsonError::InvalidU8);
-    }
-
-    #[test]
-    fn test_json_type_array() {
-        let json = parse_json(r#"{"foo": [1, 3, 2, 100]}"#.as_bytes()).unwrap();
-        let val = json.array("foo", JsonValue::parse_u8).ok().unwrap();
-        assert_eq!(val, vec![1, 3, 2, 100]);
-
-        let json = parse_json(r#"{"foo": []}"#.as_bytes()).unwrap();
-        let val = json.array("foo", JsonValue::parse_u8).ok().unwrap();
-        let res_data: Vec<u8> = vec![];
-        assert_eq!(val, res_data);
-
-        let json = parse_json(r#"{"foo": ["abcd"]}"#.as_bytes()).unwrap();
-        let err = json.array("foo", JsonValue::parse_u8).unwrap_err();
-        assert_eq!(err, JsonError::InvalidU8);
-
-        let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
-        let err = json.array("foo", JsonValue::parse_u8).unwrap_err();
-        assert_eq!(err, JsonError::InvalidArray);
-
-        let json = parse_json(r#"{"foo": true}"#.as_bytes()).unwrap();
-        let err = json.array("foo", JsonValue::parse_u8).unwrap_err();
-        assert_eq!(err, JsonError::InvalidArray);
-
-        let json = parse_json(r#"{"foo": {}}"#.as_bytes()).unwrap();
-        let err = json.array("foo", JsonValue::parse_u8).unwrap_err();
-        assert_eq!(err, JsonError::InvalidArray);
-
-        let json = parse_json(r#"{"foo": null}"#.as_bytes()).unwrap();
-        let err = json.array("foo", JsonValue::parse_u8).unwrap_err();
-        assert_eq!(err, JsonError::InvalidArray);
-
-        let json = JsonValue::Null;
-        let err = json.array("foo", JsonValue::parse_u8).unwrap_err();
-        assert_eq!(err, JsonError::NotJsonType);
     }
 }
