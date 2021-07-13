@@ -294,11 +294,17 @@ mod tests {
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, 123);
 
+        let json = parse_json(format!(r#"{{"foo": {} }}"#, u64::MAX).as_bytes()).unwrap();
+        let val = json.u64("foo").ok().unwrap();
+        assert_eq!(val, u64::MAX);
+
         let json = parse_json(r#"{"foo": 12.99}"#.as_bytes()).unwrap();
+        // TODO [#176]: should fail since it is not a `u64`
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, 12);
 
-        let json = parse_json(format!(r#"{{"foo": {} }}"#, u64::MAX).as_bytes()).unwrap();
+        let json = parse_json(format!(r#"{{"foo": {} }}"#, u128::MAX).as_bytes()).unwrap();
+        // TODO [#176]: should fail since it is not a `u64`
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, u64::MAX);
 
@@ -308,10 +314,6 @@ mod tests {
             err,
             JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64)
         );
-
-        // let json = parse_json(r#"{"foo": 12.3}"#.as_bytes()).unwrap();
-        // let err = json.u64("foo").unwrap_err();
-        // assert_eq!(err, JsonError::InvalidU64);
 
         let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
