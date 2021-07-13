@@ -97,7 +97,7 @@ impl JsonValue {
     pub fn parse_u8(v: &JsonValue) -> Result<u8, JsonError> {
         match v {
             JsonValue::Number(n) => {
-                if (*n as i128) < u8::MIN as i128 || (*n as i128) > u8::MAX as i128 {
+                if n.is_sign_negative() || n > &(u8::MAX as f64) {
                     Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8))
                 } else {
                     Ok(*n as u8)
