@@ -81,9 +81,9 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs,
-        IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs,
-        SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
+        DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetErc20FromNep141CallArgs,
+        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
     };
 
     use crate::json::parse_json;
@@ -357,7 +357,7 @@ mod contract {
         )
         .map(|res| {
             let address = H160(res.result.as_slice().try_into().unwrap());
-            engine.register_token(address.as_bytes(), args.nep141.as_bytes());
+            engine.register_token(address.as_bytes(), &args.nep141);
             res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
         })
         .sdk_process();
@@ -568,9 +568,12 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_erc20_from_nep141() {
+        let args: GetErc20FromNep141CallArgs =
+            GetErc20FromNep141CallArgs::try_from_slice(&sdk::read_input())
+                .sdk_expect("ERR_ARG_PARSE");
+
         sdk::return_output(
-            Engine::nep141_erc20_map()
-                .lookup_left(sdk::read_input().as_slice())
+            Engine::get_erc20_from_nep141(&args.nep141)
                 .sdk_expect("NEP141_NOT_FOUND")
                 .as_slice(),
         );
