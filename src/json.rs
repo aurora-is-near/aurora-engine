@@ -60,9 +60,10 @@ impl JsonValue {
         match self {
             JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
                 JsonValue::Number(n) => {
-                    // Upper bound is covered by the type limitation
-                    if (*n as i128) < u64::MIN as i128 {
+                    if n.is_sign_negative() || n.is_infinite() || n > &(u64::MAX as f64) {
                         Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64))
+                    } else if n.is_nan() {
+                        Err(JsonError::InvalidU64)
                     } else {
                         Ok(*n as u64)
                     }
@@ -304,9 +305,11 @@ mod tests {
         assert_eq!(val, 12);
 
         let json = parse_json(format!(r#"{{"foo": {} }}"#, u128::MAX).as_bytes()).unwrap();
-        // TODO [#176]: should fail since it is not a `u64`
-        let val = json.u64("foo").ok().unwrap();
-        assert_eq!(val, u64::MAX);
+        let err = json.u64("foo").unwrap_err();
+        assert_eq!(
+            err,
+            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64)
+        );
 
         let json = parse_json(r#"{"foo": -123}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
