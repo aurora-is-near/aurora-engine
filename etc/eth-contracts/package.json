@@ -8,6 +8,7 @@
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.1",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "hardhat-storage-layout": "^0.1.6",
     "chai": "^4.3.3",
     "eslint": "^6.3.0",
     "eslint-config-standard": "^14.1.0",
