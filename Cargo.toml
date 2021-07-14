@@ -55,7 +55,7 @@ logos = { version = "0.12", default-features = false, features = ["export_derive
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 byte-slice-cast = { version = "1.0", default-features = false }
-rjson = { version = "0.3.1", default-features = false }
+rjson = { git = "https://github.com/aurora-is-near/rjson", branch="master", default-features = false, features = ["integer"] }
 
 [dev-dependencies]
 bstr = "0.2"

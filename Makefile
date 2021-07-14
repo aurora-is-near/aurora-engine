@@ -71,6 +71,10 @@ format:
 clean:
 	@rm -Rf *.wasm target *~
 
+build-release-only:
+	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
+	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm
+
 .PHONY: deploy check check-format check-clippy test format clean
 
 .SECONDARY:

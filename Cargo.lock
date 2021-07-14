@@ -2986,9 +2986,8 @@ dependencies = [
 
 [[package]]
 name = "rjson"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5510dbde48c4c37bf69123b1f636b6dd5f8dffe1f4e358af03c46a4947dca219"
+version = "0.3.2"
+source = "git+https://github.com/aurora-is-near/rjson?branch=master#cc3da9495e7e520900d66d2b517539f74fff93cf"
 
 [[package]]
 name = "rlp"

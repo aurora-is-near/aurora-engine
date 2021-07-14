@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 pub enum JsonValue {
     Null,
     Number(f64),
+    I64(i64),
+    U64(u64),
     Bool(bool),
     String(String),
     Array(Vec<JsonValue>),
@@ -184,6 +186,18 @@ impl From<f64> for JsonValue {
     }
 }
 
+impl From<i64> for JsonValue {
+    fn from(v: i64) -> Self {
+        JsonValue::I64(v)
+    }
+}
+
+impl From<u64> for JsonValue {
+    fn from(v: u64) -> Self {
+        JsonValue::U64(v)
+    }
+}
+
 impl From<bool> for JsonValue {
     fn from(v: bool) -> Self {
         JsonValue::Bool(v)
@@ -234,6 +248,8 @@ impl core::fmt::Debug for JsonValue {
             JsonValue::Null => f.write_str("null"),
             JsonValue::String(ref v) => f.write_fmt(format_args!("\"{}\"", v)),
             JsonValue::Number(ref v) => f.write_fmt(format_args!("{}", v)),
+            JsonValue::I64(ref v) => f.write_fmt(format_args!("{}", v)),
+            JsonValue::U64(ref v) => f.write_fmt(format_args!("{}", v)),
             JsonValue::Bool(ref v) => f.write_fmt(format_args!("{}", v)),
             JsonValue::Array(ref v) => f.write_fmt(format_args!("{:?}", v)),
             JsonValue::Object(ref v) => f.write_fmt(format_args!("{:#?}", v)),
