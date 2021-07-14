@@ -12,6 +12,7 @@ use crate::parameters::{
     FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
     ViewCallArgs,
 };
+use crate::types::str_from_slice;
 
 use crate::precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
@@ -463,15 +464,19 @@ impl Engine {
             .map(|result| Address(result.as_slice().try_into().unwrap()))
     }
 
-    pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
+    pub fn register_token(&mut self, erc20_token: &[u8], nep141_account_id: &str) {
+        // Convert nep141 AccountID to lower case
+        let nep141_account_id = nep141_account_id.to_lowercase();
+        let nep141_key = nep141_account_id.as_bytes();
+
         // Check that this nep141 token was not registered before, they can only be registered once.
         let map = Self::nep141_erc20_map();
-        assert!(map.lookup_left(nep141_token).is_none());
-        map.insert(nep141_token, erc20_token);
+        assert!(map.lookup_left(nep141_key).is_none());
+        map.insert(nep141_key, erc20_token);
     }
 
-    pub fn get_erc20_from_nep141(&self, nep141_token: &[u8]) -> Option<Vec<u8>> {
-        Self::nep141_erc20_map().lookup_left(nep141_token)
+    pub fn get_erc20_from_nep141(nep141_account_id: &str) -> Option<Vec<u8>> {
+        Self::nep141_erc20_map().lookup_left(nep141_account_id.to_lowercase().as_bytes())
     }
 
     /// Transfers an amount from a given sender to a receiver, provided that
@@ -503,8 +508,6 @@ impl Engine {
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
 
-        let token = sdk::predecessor_account_id();
-
         // Parse message to determine recipient and fee
         let (recipient, fee) = {
             // Message format:
@@ -531,9 +534,10 @@ impl Engine {
             (recipient, fee)
         };
 
+        let token = sdk::predecessor_account_id();
         let erc20_token = Address(unwrap_res_or_finish!(
             unwrap_res_or_finish!(
-                self.get_erc20_from_nep141(token.as_slice()).ok_or(()),
+                Self::get_erc20_from_nep141(str_from_slice(&token)).ok_or(()),
                 output_on_fail
             )
             .as_slice()
