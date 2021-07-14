@@ -249,15 +249,27 @@ mod contract {
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
-        let (value, gas_limit, data, maybe_receiver) = signed_transaction.destructure();
+        let (value, gas_limit, data, maybe_receiver, access_list) =
+            signed_transaction.destructure();
         let gas_limit = gas_limit.sdk_expect(GAS_OVERFLOW);
-        // TODO: need to pass in AccessList as well; requires upstream change
+        let access_list = access_list
+            .into_iter()
+            .map(|a| (a.address, a.storage_keys))
+            .collect();
         let result = if let Some(receiver) = maybe_receiver {
-            Engine::call(&mut engine, sender, receiver, value, data, gas_limit)
+            Engine::call(
+                &mut engine,
+                sender,
+                receiver,
+                value,
+                data,
+                gas_limit,
+                access_list,
+            )
             // TODO: charge for storage
         } else {
             // Execute a contract deployment:
-            Engine::deploy_code(&mut engine, sender, value, data, gas_limit)
+            Engine::deploy_code(&mut engine, sender, value, data, gas_limit, access_list)
             // TODO: charge for storage
         };
         result
@@ -287,6 +299,7 @@ mod contract {
             meta_call_args.value,
             meta_call_args.input,
             u64::MAX, // TODO: is there a gas limit with meta calls?
+            crate::prelude::Vec::new(),
         );
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))

@@ -7,8 +7,8 @@ pub const TYPE_BYTE: u8 = 0x01;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct AccessTuple {
-    address: Address,
-    storage_keys: Vec<H256>,
+    pub address: Address,
+    pub storage_keys: Vec<H256>,
 }
 
 impl Decodable for AccessTuple {

@@ -4,6 +4,7 @@ use rlp::{Decodable, DecoderError, Rlp};
 pub(crate) mod access_list;
 pub(crate) mod legacy;
 
+use access_list::AccessTuple;
 pub use legacy::{LegacyEthSignedTransaction, LegacyEthTransaction};
 
 /// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
@@ -49,16 +50,30 @@ impl EthTransaction {
         }
     }
 
-    pub fn destructure(self) -> (crate::types::Wei, Option<u64>, Vec<u8>, Option<Address>) {
+    pub fn destructure(
+        self,
+    ) -> (
+        crate::types::Wei,
+        Option<u64>,
+        Vec<u8>,
+        Option<Address>,
+        Vec<AccessTuple>,
+    ) {
         use crate::prelude::TryInto;
         match self {
             Self::Legacy(tx) => {
                 let tx = tx.transaction;
-                (tx.value, tx.gas.try_into().ok(), tx.data, tx.to)
+                (tx.value, tx.gas.try_into().ok(), tx.data, tx.to, Vec::new())
             }
             Self::AccessList(tx) => {
                 let tx = tx.transaction_data;
-                (tx.value, tx.gas_limit.try_into().ok(), tx.data, tx.to)
+                (
+                    tx.value,
+                    tx.gas_limit.try_into().ok(),
+                    tx.data,
+                    tx.to,
+                    tx.access_list,
+                )
             }
         }
     }
