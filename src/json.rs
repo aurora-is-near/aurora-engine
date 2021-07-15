@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 pub enum JsonValue {
     Null,
-    Number(f64),
+    F64(f64),
     I64(i64),
     U64(u64),
     Bool(bool),
@@ -61,15 +61,7 @@ impl JsonValue {
     pub fn u64(&self, key: &str) -> Result<u64, JsonError> {
         match self {
             JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
-                JsonValue::Number(n) => {
-                    if n.is_sign_negative() || n.is_infinite() || n > &(u64::MAX as f64) {
-                        Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64))
-                    } else if n.is_nan() {
-                        Err(JsonError::InvalidU64)
-                    } else {
-                        Ok(*n as u64)
-                    }
-                }
+                JsonValue::U64(n) => Ok(*n as u64),
                 _ => Err(JsonError::InvalidU64),
             },
             _ => Err(JsonError::NotJsonType),
@@ -98,8 +90,8 @@ impl JsonValue {
     #[allow(dead_code)]
     pub fn parse_u8(v: &JsonValue) -> Result<u8, JsonError> {
         match v {
-            JsonValue::Number(n) => {
-                if n.is_sign_negative() || n > &(u8::MAX as f64) {
+            JsonValue::U64(n) => {
+                if *n > u8::MAX as u64 {
                     Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8))
                 } else {
                     Ok(*n as u8)
@@ -182,7 +174,7 @@ impl Value<JsonArray, JsonObject, JsonValue> for JsonValue {}
 
 impl From<f64> for JsonValue {
     fn from(v: f64) -> Self {
-        JsonValue::Number(v)
+        JsonValue::F64(v)
     }
 }
 
@@ -236,7 +228,7 @@ impl TryFrom<&JsonValue> for u128 {
                     Err(JsonError::InvalidU128)
                 }
             }
-            JsonValue::Number(_) => Err(JsonError::ExpectedStringGotNumber),
+            JsonValue::F64(_) => Err(JsonError::ExpectedStringGotNumber),
             _ => Err(JsonError::InvalidU128),
         }
     }
@@ -247,7 +239,7 @@ impl core::fmt::Debug for JsonValue {
         match *self {
             JsonValue::Null => f.write_str("null"),
             JsonValue::String(ref v) => f.write_fmt(format_args!("\"{}\"", v)),
-            JsonValue::Number(ref v) => f.write_fmt(format_args!("{}", v)),
+            JsonValue::F64(ref v) => f.write_fmt(format_args!("{}", v)),
             JsonValue::I64(ref v) => f.write_fmt(format_args!("{}", v)),
             JsonValue::U64(ref v) => f.write_fmt(format_args!("{}", v)),
             JsonValue::Bool(ref v) => f.write_fmt(format_args!("{}", v)),
@@ -306,33 +298,28 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn test_json_type_u64_with_u128_value() {
+        let _ = parse_json(format!(r#"{{"foo": {} }}"#, u128::MAX).as_bytes());
+    }
+
+    #[test]
     fn test_json_type_u64() {
         let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, 123);
 
-        let json = parse_json(format!(r#"{{"foo": {} }}"#, u64::MAX).as_bytes()).unwrap();
-        let val = json.u64("foo").ok().unwrap();
-        assert_eq!(val, u64::MAX);
+        // let json = parse_json(format!(r#"{{"foo": {} }}"#, u64::MAX).as_bytes()).unwrap();
+        // let val = json.u64("foo").ok().unwrap();
+        // assert_eq!(val, u64::MAX);
 
         let json = parse_json(r#"{"foo": 12.99}"#.as_bytes()).unwrap();
-        // TODO [#176]: should fail since it is not a `u64`
-        let val = json.u64("foo").ok().unwrap();
-        assert_eq!(val, 12);
-
-        let json = parse_json(format!(r#"{{"foo": {} }}"#, u128::MAX).as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
-        assert_eq!(
-            err,
-            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64)
-        );
+        assert_eq!(err, JsonError::InvalidU64);
 
         let json = parse_json(r#"{"foo": -123}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
-        assert_eq!(
-            err,
-            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU64)
-        );
+        assert_eq!(err, JsonError::InvalidU64);
 
         let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
