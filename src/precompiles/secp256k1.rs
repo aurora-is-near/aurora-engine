@@ -4,6 +4,7 @@ use ethabi::Address;
 use evm::{Context, ExitError};
 
 use crate::AuroraState;
+use crate::state::AuroraStackState;
 
 mod costs {
     pub(super) const ECRECOVER_BASE: u64 = 3_000;
@@ -41,13 +42,13 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     Err(ExitError::Other(Borrowed("invalid ECDSA signature")))
 }
 
-pub(super) struct ECRecover<S>(PhantomData<S>);
+pub(super) struct ECRecover;
 
-impl<S> ECRecover<S> {
-    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 1);
+impl ECRecover {
+    pub(super) const ADDRESS: Address = super::make_address(0, 1);
 }
 
-impl<S: AuroraState> Precompile<S> for ECRecover<S> {
+impl Precompile for ECRecover {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::ECRECOVER_BASE)
     }
@@ -56,7 +57,7 @@ impl<S: AuroraState> Precompile<S> for ECRecover<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
+        _state: &mut AuroraStackState,
         _is_static: bool,
     ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;

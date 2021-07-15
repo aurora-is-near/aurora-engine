@@ -1,14 +1,16 @@
 use crate::precompiles::{
     Berlin, Byzantium, HardFork, Precompile, PrecompileOutput, PrecompileResult,
 };
-use crate::prelude::{PhantomData, Vec, U256};
+use crate::prelude::{Address, PhantomData, Vec, U256};
 use crate::AuroraState;
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
-pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 5);
-
 pub(super) struct ModExp<HF: HardFork, S>(PhantomData<HF>, PhantomData<S>);
+
+impl<HF: HardFork, S> ModExp<HF, S> {
+    pub(super) const ADDRESS: Address = super::make_address(0, 5);
+}
 
 impl<HF: HardFork, S: AuroraState> ModExp<HF, S> {
     // Note: the output of this function is bounded by 2^67

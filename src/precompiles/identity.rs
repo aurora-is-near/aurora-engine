@@ -1,7 +1,7 @@
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use evm::{Context, ExitError};
 
-use crate::prelude::PhantomData;
+use crate::prelude::{Address, PhantomData};
 use crate::AuroraState;
 
 /// Identity precompile costs.
@@ -21,7 +21,7 @@ mod consts {
 pub struct Identity<S>(PhantomData<S>);
 
 impl<S> Identity<S> {
-    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 4);
+    pub(super) const ADDRESS: Address = super::make_address(0, 4);
 }
 
 impl<S: AuroraState> Precompile<S> for Identity<S> {

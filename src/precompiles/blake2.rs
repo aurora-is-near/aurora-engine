@@ -1,7 +1,7 @@
 use evm::{Context, ExitError};
 
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
-use crate::prelude::{mem, Borrowed, PhantomData, TryInto};
+use crate::prelude::{mem, Address, Borrowed, PhantomData, TryInto};
 use crate::AuroraState;
 
 /// Blake2 costs.
@@ -18,7 +18,7 @@ mod consts {
 pub(super) struct Blake2F<S>(PhantomData<S>);
 
 impl<S> Blake2F<S> {
-    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 9);
+    pub(super) const ADDRESS: Address = super::make_address(0, 9);
 }
 
 impl<S: AuroraState> Precompile<S> for Blake2F<S> {
