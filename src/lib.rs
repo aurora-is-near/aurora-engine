@@ -342,12 +342,13 @@ mod contract {
 
         let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
 
+        let erc20_admin_account_id = ["erc20.".as_bytes(), &sdk::current_account_id()].concat();
         let erc20_contract = include_bytes!("../etc/eth-contracts/res/EvmErc20.bin");
         let deploy_args = ethabi::encode(&[
             ethabi::Token::String("Empty".to_string()),
             ethabi::Token::String("EMPTY".to_string()),
             ethabi::Token::Uint(ethabi::Uint::from(0)),
-            ethabi::Token::Address(current_address()),
+            ethabi::Token::Address(near_account_to_evm_address(erc20_admin_account_id.as_slice())),
         ]);
 
         Engine::deploy_code_with_input(
