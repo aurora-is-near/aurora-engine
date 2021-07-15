@@ -1,8 +1,8 @@
 use evm::{Context, ExitError};
 
-use crate::prelude::PhantomData;
 #[cfg(not(feature = "contract"))]
 use crate::prelude::Vec;
+use crate::prelude::{Address, PhantomData};
 use crate::AuroraState;
 #[cfg(feature = "contract")]
 use {
@@ -43,7 +43,7 @@ impl<S> ExitToNear<S> {
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
-    pub(super) const ADDRESS: [u8; 20] =
+    pub(super) const ADDRESS: Address =
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
@@ -190,7 +190,7 @@ impl<S> ExitToEthereum<S> {
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
-    pub(super) const ADDRESS: [u8; 20] =
+    pub(super) const ADDRESS: Address =
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
 }
 

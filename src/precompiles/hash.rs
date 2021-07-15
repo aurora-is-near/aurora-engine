@@ -1,8 +1,8 @@
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
-use crate::prelude::{vec, PhantomData};
+use crate::prelude::{vec, Address};
 use evm::{Context, ExitError};
 
-use crate::AuroraState;
+use crate::state::AuroraStackState;
 
 mod costs {
     pub(super) const SHA256_BASE: u64 = 60;
@@ -21,13 +21,13 @@ mod consts {
 }
 
 /// SHA256 precompile.
-pub struct SHA256<S>(PhantomData<S>);
+pub struct SHA256;
 
-impl<S> SHA256<S> {
-    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 2);
+impl SHA256 {
+    pub(super) const ADDRESS: Address = super::make_address(0, 2);
 }
 
-impl<S: AuroraState> Precompile<S> for SHA256<S> {
+impl Precompile for SHA256 {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             (input.len() as u64 + consts::SHA256_WORD_LEN - 1) / consts::SHA256_WORD_LEN
@@ -44,7 +44,7 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
+        _state: &mut AuroraStackState,
         _is_static: bool,
     ) -> PrecompileResult {
         use sha2::Digest;
@@ -70,7 +70,7 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
+        _state: &mut AuroraStackState,
         _is_static: bool,
     ) -> PrecompileResult {
         use crate::sdk;
@@ -86,13 +86,13 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
 }
 
 /// RIPEMD160 precompile.
-pub struct RIPEMD160<S>(PhantomData<S>);
+pub struct RIPEMD160;
 
-impl<S> RIPEMD160<S> {
-    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 3);
+impl RIPEMD160 {
+    pub(super) const ADDRESS: Address = super::make_address(0, 3);
 }
 
-impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
+impl Precompile for RIPEMD160 {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             (input.len() as u64 + consts::RIPEMD_WORD_LEN - 1) / consts::RIPEMD_WORD_LEN
@@ -108,7 +108,7 @@ impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
+        _state: &mut AuroraStackState,
         _is_static: bool,
     ) -> PrecompileResult {
         use ripemd160::Digest;
