@@ -357,7 +357,12 @@ mod contract {
         )
         .map(|res| {
             let address = H160(res.result.as_slice().try_into().unwrap());
-            engine.register_token(address.as_bytes(), &args.nep141);
+            crate::log!(
+                crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str()
+            );
+            engine
+                .register_token(address.as_bytes(), &args.nep141.as_bytes())
+                .sdk_unwrap();
             res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
         })
         .sdk_process();
@@ -573,8 +578,8 @@ mod contract {
                 .sdk_expect("ERR_ARG_PARSE");
 
         sdk::return_output(
-            Engine::get_erc20_from_nep141(&args.nep141)
-                .sdk_expect("NEP141_NOT_FOUND")
+            Engine::get_erc20_from_nep141(&args.nep141.as_bytes())
+                .sdk_unwrap()
                 .as_slice(),
         );
     }
