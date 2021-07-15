@@ -6,10 +6,10 @@ mod modexp;
 #[cfg_attr(not(feature = "contract"), allow(dead_code))]
 mod native;
 mod secp256k1;
-use evm::{Context, ExitError};
+use evm::{executor, Context, ExitError};
 
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
-use crate::prelude::Vec;
+use crate::prelude::{vec, Vec};
 use crate::AuroraState;
 use crate::{
     precompiles::blake2::Blake2F,
@@ -24,6 +24,7 @@ use crate::{
 };
 use evm::backend::Log;
 use evm::ExitSucceed;
+use primitive_types::H160;
 
 #[derive(Debug)]
 pub struct PrecompileOutput {
@@ -106,216 +107,336 @@ impl HardFork for Istanbul {}
 
 impl HardFork for Berlin {}
 
-/// No precompiles, returns `None`.
-#[cfg(feature = "contract")]
-#[allow(dead_code)]
-pub fn no_precompiles(
-    _address: Address,
-    _input: &[u8],
-    _target_gas: Option<u64>,
-    _context: &Context,
-    _state: &mut AuroraStackState,
-    _is_static: bool,
-) -> Option<EvmPrecompileResult> {
-    None // no precompiles supported
+pub(crate) struct PrecompileAddresses<HF> {
+    addresses: Vec<Address>,
+    hark_fork: crate::prelude::PhantomData<HF>,
 }
 
 /// Matches the address given to Homestead precompiles.
-#[cfg(feature = "contract")]
-#[allow(dead_code)]
-pub fn homestead_precompiles(
-    address: Address,
-    input: &[u8],
-    target_gas: Option<u64>,
-    context: &Context,
-    state: &mut AuroraStackState,
-    is_static: bool,
-) -> Option<EvmPrecompileResult> {
-    let target_gas = match target_gas {
-        Some(t) => t,
-        None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
-    };
+impl<'backend, 'config> executor::Precompiles<AuroraStackState<'backend, 'config>>
+    for PrecompileAddresses<Homestead>
+{
+    fn run(
+        &self,
+        address: H160,
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        state: &mut AuroraStackState,
+        is_static: bool,
+    ) -> Option<EvmPrecompileResult> {
+        let target_gas = match target_gas {
+            Some(t) => t,
+            None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
+        };
 
-    let output = match address.0 {
-        ECRecover::<AuroraStackState>::ADDRESS => Some(ECRecover::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        SHA256::<AuroraStackState>::ADDRESS => Some(SHA256::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        RIPEMD160::<AuroraStackState>::ADDRESS => Some(RIPEMD160::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
-            ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
-        ),
-        _ => None,
-    };
-    output.map(|res| res.map(Into::into))
+        let output = match address.0 {
+            ECRecover::<AuroraStackState>::ADDRESS => {
+                Some(ECRecover::run(input, target_gas, context, state, is_static))
+            }
+            SHA256::<AuroraStackState>::ADDRESS => {
+                Some(SHA256::run(input, target_gas, context, state, is_static))
+            }
+            RIPEMD160::<AuroraStackState>::ADDRESS => {
+                Some(RIPEMD160::run(input, target_gas, context, state, is_static))
+            }
+            ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::run(
+                input, target_gas, context, state, is_static,
+            )),
+            ExitToEthereum::<AuroraStackState>::ADDRESS => {
+                Some(ExitToEthereum::<AuroraStackState>::run(
+                    input, target_gas, context, state, is_static,
+                ))
+            }
+            _ => None,
+        };
+        output.map(|res| res.map(Into::into))
+    }
+
+    fn addresses(&self) -> &[H160] {
+        &self.addresses
+    }
+}
+
+impl PrecompileAddresses<Homestead> {
+    #[allow(dead_code)]
+    pub fn homestead() -> Self {
+        Self {
+            addresses: vec![
+                ECRecover::<AuroraStackState>::ADDRESS,
+                SHA256::<AuroraStackState>::ADDRESS,
+                RIPEMD160::<AuroraStackState>::ADDRESS,
+                ExitToNear::<AuroraStackState>::ADDRESS,
+                ExitToEthereum::<AuroraStackState>::ADDRESS,
+            ]
+            .into_iter()
+            .map(Address)
+            .collect(),
+            hark_fork: Default::default(),
+        }
+    }
 }
 
 /// Matches the address given to Byzantium precompiles.
-#[cfg(feature = "contract")]
-#[allow(dead_code)]
-pub fn byzantium_precompiles(
-    address: Address,
-    input: &[u8],
-    target_gas: Option<u64>,
-    context: &Context,
-    state: &mut AuroraStackState,
-    is_static: bool,
-) -> Option<EvmPrecompileResult> {
-    let target_gas = match target_gas {
-        Some(t) => t,
-        None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
-    };
+impl<'backend, 'config> executor::Precompiles<AuroraStackState<'backend, 'config>>
+    for PrecompileAddresses<Byzantium>
+{
+    fn run(
+        &self,
+        address: H160,
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        state: &mut AuroraStackState,
+        is_static: bool,
+    ) -> Option<EvmPrecompileResult> {
+        let target_gas = match target_gas {
+            Some(t) => t,
+            None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
+        };
 
-    let output = match address.0 {
-        ECRecover::<AuroraStackState>::ADDRESS => Some(ECRecover::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        SHA256::<AuroraStackState>::ADDRESS => Some(SHA256::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        RIPEMD160::<AuroraStackState>::ADDRESS => Some(RIPEMD160::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        Identity::<AuroraStackState>::ADDRESS => Some(Identity::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        modexp::ADDRESS => Some(ModExp::<Byzantium, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        bn128::addresses::ADD => Some(BN128Add::<Byzantium, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        bn128::addresses::MUL => Some(BN128Mul::<Byzantium, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        bn128::addresses::PAIR => Some(BN128Pair::<Byzantium, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
-            ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
-        ),
-        _ => None,
-    };
-    output.map(|res| res.map(Into::into))
+        let output = match address.0 {
+            ECRecover::<AuroraStackState>::ADDRESS => Some(ECRecover::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            SHA256::<AuroraStackState>::ADDRESS => Some(SHA256::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            RIPEMD160::<AuroraStackState>::ADDRESS => Some(RIPEMD160::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            Identity::<AuroraStackState>::ADDRESS => Some(Identity::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            modexp::ADDRESS => Some(ModExp::<Byzantium, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            bn128::addresses::ADD => Some(BN128Add::<Byzantium, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            bn128::addresses::MUL => Some(BN128Mul::<Byzantium, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            bn128::addresses::PAIR => Some(BN128Pair::<Byzantium, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            ExitToEthereum::<AuroraStackState>::ADDRESS => {
+                Some(ExitToEthereum::<AuroraStackState>::run(
+                    input, target_gas, context, state, is_static,
+                ))
+            }
+            _ => None,
+        };
+        output.map(|res| res.map(Into::into))
+    }
+
+    fn addresses(&self) -> &[H160] {
+        &self.addresses
+    }
+}
+
+impl PrecompileAddresses<Byzantium> {
+    #[allow(dead_code)]
+    pub fn byzantium() -> Self {
+        Self {
+            addresses: vec![
+                ECRecover::<AuroraStackState>::ADDRESS,
+                SHA256::<AuroraStackState>::ADDRESS,
+                RIPEMD160::<AuroraStackState>::ADDRESS,
+                Identity::<AuroraStackState>::ADDRESS,
+                modexp::ADDRESS,
+                bn128::addresses::ADD,
+                bn128::addresses::MUL,
+                bn128::addresses::PAIR,
+                ExitToNear::<AuroraStackState>::ADDRESS,
+                ExitToEthereum::<AuroraStackState>::ADDRESS,
+            ]
+            .into_iter()
+            .map(Address)
+            .collect(),
+            hark_fork: Default::default(),
+        }
+    }
 }
 
 /// Matches the address given to Istanbul precompiles.
-#[allow(dead_code)]
-pub fn istanbul_precompiles(
-    address: Address,
-    input: &[u8],
-    target_gas: Option<u64>,
-    context: &Context,
-    state: &mut AuroraStackState,
-    is_static: bool,
-) -> Option<EvmPrecompileResult> {
-    let target_gas = match target_gas {
-        Some(t) => t,
-        None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
-    };
+impl<'backend, 'config> executor::Precompiles<AuroraStackState<'backend, 'config>>
+    for PrecompileAddresses<Istanbul>
+{
+    fn run(
+        &self,
+        address: H160,
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        state: &mut AuroraStackState,
+        is_static: bool,
+    ) -> Option<EvmPrecompileResult> {
+        let target_gas = match target_gas {
+            Some(t) => t,
+            None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
+        };
 
-    let output = match address.0 {
-        ECRecover::<AuroraStackState>::ADDRESS => Some(ECRecover::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        SHA256::<AuroraStackState>::ADDRESS => Some(SHA256::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        RIPEMD160::<AuroraStackState>::ADDRESS => Some(RIPEMD160::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        Identity::<AuroraStackState>::ADDRESS => Some(Identity::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        modexp::ADDRESS => Some(ModExp::<Byzantium, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        bn128::addresses::ADD => Some(BN128Add::<Istanbul, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        bn128::addresses::MUL => Some(BN128Mul::<Istanbul, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        bn128::addresses::PAIR => Some(BN128Pair::<Istanbul, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        Blake2F::<AuroraStackState>::ADDRESS => Some(Blake2F::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
-            ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
-        ),
-        _ => None,
-    };
-    output.map(|res| res.map(Into::into))
+        let output = match address.0 {
+            ECRecover::<AuroraStackState>::ADDRESS => Some(ECRecover::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            SHA256::<AuroraStackState>::ADDRESS => Some(SHA256::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            RIPEMD160::<AuroraStackState>::ADDRESS => Some(RIPEMD160::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            Identity::<AuroraStackState>::ADDRESS => Some(Identity::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            modexp::ADDRESS => Some(ModExp::<Byzantium, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            bn128::addresses::ADD => Some(BN128Add::<Istanbul, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            bn128::addresses::MUL => Some(BN128Mul::<Istanbul, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            bn128::addresses::PAIR => Some(BN128Pair::<Istanbul, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            Blake2F::<AuroraStackState>::ADDRESS => Some(Blake2F::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            ExitToEthereum::<AuroraStackState>::ADDRESS => {
+                Some(ExitToEthereum::<AuroraStackState>::run(
+                    input, target_gas, context, state, is_static,
+                ))
+            }
+            _ => None,
+        };
+        output.map(|res| res.map(Into::into))
+    }
+
+    fn addresses(&self) -> &[H160] {
+        &self.addresses
+    }
+}
+
+impl PrecompileAddresses<Istanbul> {
+    pub fn istanbul() -> Self {
+        Self {
+            addresses: vec![
+                ECRecover::<AuroraStackState>::ADDRESS,
+                SHA256::<AuroraStackState>::ADDRESS,
+                RIPEMD160::<AuroraStackState>::ADDRESS,
+                Identity::<AuroraStackState>::ADDRESS,
+                modexp::ADDRESS,
+                bn128::addresses::ADD,
+                bn128::addresses::MUL,
+                bn128::addresses::PAIR,
+                Blake2F::<AuroraStackState>::ADDRESS,
+                ExitToNear::<AuroraStackState>::ADDRESS,
+                ExitToEthereum::<AuroraStackState>::ADDRESS,
+            ]
+            .into_iter()
+            .map(Address)
+            .collect(),
+            hark_fork: Default::default(),
+        }
+    }
 }
 
 /// Matches the address given to Berlin precompiles.
-#[cfg(feature = "contract")]
-#[allow(dead_code)]
-pub fn berlin_precompiles(
-    address: Address,
-    input: &[u8],
-    target_gas: Option<u64>,
-    context: &Context,
-    state: &mut AuroraStackState,
-    is_static: bool,
-) -> Option<EvmPrecompileResult> {
-    let target_gas = match target_gas {
-        Some(t) => t,
-        None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
-    };
+impl<'backend, 'config> executor::Precompiles<AuroraStackState<'backend, 'config>>
+    for PrecompileAddresses<Berlin>
+{
+    fn run(
+        &self,
+        address: H160,
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        state: &mut AuroraStackState,
+        is_static: bool,
+    ) -> Option<EvmPrecompileResult> {
+        let target_gas = match target_gas {
+            Some(t) => t,
+            None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
+        };
 
-    let output = match address.0 {
-        ECRecover::<AuroraStackState>::ADDRESS => Some(ECRecover::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        SHA256::<AuroraStackState>::ADDRESS => Some(SHA256::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        RIPEMD160::<AuroraStackState>::ADDRESS => Some(RIPEMD160::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        Identity::<AuroraStackState>::ADDRESS => Some(Identity::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        modexp::ADDRESS => Some(ModExp::<Berlin, _>::run(
-            input, target_gas, context, state, is_static,
-        )), // TODO gas changes
-        bn128::addresses::ADD => Some(BN128Add::<Istanbul, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        bn128::addresses::MUL => Some(BN128Mul::<Istanbul, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        bn128::addresses::PAIR => Some(BN128Pair::<Istanbul, _>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        Blake2F::<AuroraStackState>::ADDRESS => Some(Blake2F::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
-            input, target_gas, context, state, is_static,
-        )),
-        ExitToEthereum::<AuroraStackState>::ADDRESS => Some(
-            ExitToEthereum::<AuroraStackState>::run(input, target_gas, context, state, is_static),
-        ),
-        _ => None,
-    };
-    output.map(|res| res.map(Into::into))
+        let output = match address.0 {
+            ECRecover::<AuroraStackState>::ADDRESS => Some(ECRecover::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            SHA256::<AuroraStackState>::ADDRESS => Some(SHA256::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            RIPEMD160::<AuroraStackState>::ADDRESS => Some(RIPEMD160::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            Identity::<AuroraStackState>::ADDRESS => Some(Identity::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            modexp::ADDRESS => Some(ModExp::<Berlin, _>::run(
+                input, target_gas, context, state, is_static,
+            )), // TODO gas changes
+            bn128::addresses::ADD => Some(BN128Add::<Istanbul, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            bn128::addresses::MUL => Some(BN128Mul::<Istanbul, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            bn128::addresses::PAIR => Some(BN128Pair::<Istanbul, _>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            Blake2F::<AuroraStackState>::ADDRESS => Some(Blake2F::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            ExitToNear::<AuroraStackState>::ADDRESS => Some(ExitToNear::<AuroraStackState>::run(
+                input, target_gas, context, state, is_static,
+            )),
+            ExitToEthereum::<AuroraStackState>::ADDRESS => {
+                Some(ExitToEthereum::<AuroraStackState>::run(
+                    input, target_gas, context, state, is_static,
+                ))
+            }
+            _ => None,
+        };
+        output.map(|res| res.map(Into::into))
+    }
+
+    fn addresses(&self) -> &[H160] {
+        &self.addresses
+    }
+}
+
+impl PrecompileAddresses<Berlin> {
+    #[allow(dead_code)]
+    pub fn berlin() -> Self {
+        Self {
+            addresses: vec![
+                ECRecover::<AuroraStackState>::ADDRESS,
+                SHA256::<AuroraStackState>::ADDRESS,
+                RIPEMD160::<AuroraStackState>::ADDRESS,
+                Identity::<AuroraStackState>::ADDRESS,
+                modexp::ADDRESS,
+                bn128::addresses::ADD,
+                bn128::addresses::MUL,
+                bn128::addresses::PAIR,
+                Blake2F::<AuroraStackState>::ADDRESS,
+                ExitToNear::<AuroraStackState>::ADDRESS,
+                ExitToEthereum::<AuroraStackState>::ADDRESS,
+            ]
+            .into_iter()
+            .map(Address)
+            .collect(),
+            hark_fork: Default::default(),
+        }
+    }
 }
 
 /// const fn for making an address by concatenating the bytes from two given numbers,

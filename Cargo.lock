@@ -1150,8 +1150,7 @@ checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 [[package]]
 name = "evm"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff50bbacb1b2149e29cc31bdd73dc2fe6d3cc0d291c438ec1cb3cdb7b2f8aa1c"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
 dependencies = [
  "environmental",
  "ethereum",
@@ -1169,8 +1168,7 @@ dependencies = [
 [[package]]
 name = "evm-core"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7828a238e25e8c5b5a23a2114e6f3863780ffd1dca6f7f74eecfd51271a8c573"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
 dependencies = [
  "funty",
  "parity-scale-codec",
@@ -1181,8 +1179,7 @@ dependencies = [
 [[package]]
 name = "evm-gasometer"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b61792ef56c7772b6d9425674852241dddcbb5fd507e6849c63ce39d1ad74e5e"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
 dependencies = [
  "environmental",
  "evm-core",
@@ -1193,8 +1190,7 @@ dependencies = [
 [[package]]
 name = "evm-runtime"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b7b8ae833004b1d619997d8a31b61b291b0bb3a7ed0af709342331a9a217d53"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
 dependencies = [
  "environmental",
  "evm-core",
