@@ -223,11 +223,11 @@ impl<'backend, 'config> executor::Precompiles<AuroraStackState<'backend, 'config
             None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
         };
 
-        let output = self.get_fun(&address).map(|p| {
-            let mut res = (p)(input, target_gas, context, is_static);
-            if let Ok(o) = &mut res {
-                if let Some(p) = o.promise.take() {
-                    state.add_promise(p)
+        let output = self.get_fun(&address).map(|fun| {
+            let mut res = (fun)(input, target_gas, context, is_static);
+            if let Ok(output) = &mut res {
+                if let Some(promise) = output.promise.take() {
+                    state.add_promise(promise)
                 }
             }
             res
