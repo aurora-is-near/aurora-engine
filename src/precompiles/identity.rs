@@ -1,7 +1,7 @@
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use evm::{Context, ExitError};
 
-use crate::prelude::PhantomData;
+use crate::prelude::{Address, PhantomData};
 use crate::AuroraState;
 
 /// Identity precompile costs.
@@ -18,13 +18,13 @@ mod consts {
     pub(super) const IDENTITY_WORD_LEN: u64 = 32;
 }
 
-pub struct Identity<S>(PhantomData<S>);
+pub struct Identity;
 
-impl<S> Identity<S> {
-    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 4);
+impl Identity {
+    pub(super) const ADDRESS: Address = super::make_address(0, 4);
 }
 
-impl<S: AuroraState> Precompile<S> for Identity<S> {
+impl Precompile for Identity {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             (input.len() as u64 + consts::IDENTITY_WORD_LEN - 1) / consts::IDENTITY_WORD_LEN
@@ -41,7 +41,6 @@ impl<S: AuroraState> Precompile<S> for Identity<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
         let cost = Self::required_gas(input)?;
@@ -66,19 +65,19 @@ mod tests {
         let input = [0u8, 1, 2, 3];
 
         let expected = input[0..2].to_vec();
-        let res = Identity::run(&input[0..2], 18, &new_context(), &mut new_state(), false)
+        let res = Identity::run(&input[0..2], 18, &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
 
         let expected = input.to_vec();
-        let res = Identity::run(&input, 18, &new_context(), &mut new_state(), false)
+        let res = Identity::run(&input, 18, &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
 
         // gas fail
-        let res = Identity::run(&input[0..2], 17, &new_context(), &mut new_state(), false);
+        let res = Identity::run(&input[0..2], 17, &new_context(), false);
 
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
@@ -87,7 +86,7 @@ mod tests {
             0u8, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
             24, 25, 26, 27, 28, 29, 30, 31, 32,
         ];
-        let res = Identity::run(&input, 21, &new_context(), &mut new_state(), false)
+        let res = Identity::run(&input, 21, &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, input.to_vec());

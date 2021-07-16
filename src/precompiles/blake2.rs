@@ -1,7 +1,7 @@
 use evm::{Context, ExitError};
 
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
-use crate::prelude::{mem, Borrowed, PhantomData, TryInto};
+use crate::prelude::{mem, Address, Borrowed, PhantomData, TryInto};
 use crate::AuroraState;
 
 /// Blake2 costs.
@@ -15,13 +15,13 @@ mod consts {
     pub(super) const INPUT_LENGTH: usize = 213;
 }
 
-pub(super) struct Blake2F<S>(PhantomData<S>);
+pub(super) struct Blake2F;
 
-impl<S> Blake2F<S> {
-    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 9);
+impl Blake2F {
+    pub(super) const ADDRESS: Address = super::make_address(0, 9);
 }
 
-impl<S: AuroraState> Precompile<S> for Blake2F<S> {
+impl Precompile for Blake2F {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         let (int_bytes, _) = input.split_at(mem::size_of::<u32>());
         Ok(u64::from(u32::from_be_bytes(
@@ -43,7 +43,6 @@ impl<S: AuroraState> Precompile<S> for Blake2F<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
         if input.len() != consts::INPUT_LENGTH {
@@ -120,12 +119,12 @@ mod tests {
 
     fn test_blake2f_out_of_gas() -> PrecompileResult {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, 11, &new_context(), &mut new_state(), false)
+        Blake2F::run(&input, 11, &new_context(), false)
     }
 
     fn test_blake2f_empty() -> PrecompileResult {
         let input = [0u8; 0];
-        Blake2F::run(&input, 0, &new_context(), &mut new_state(), false)
+        Blake2F::run(&input, 0, &new_context(), false)
     }
 
     fn test_blake2f_invalid_len_1() -> PrecompileResult {
@@ -143,7 +142,7 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
+        Blake2F::run(&input, 12, &new_context(), false)
     }
 
     fn test_blake2f_invalid_len_2() -> PrecompileResult {
@@ -161,7 +160,7 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
+        Blake2F::run(&input, 12, &new_context(), false)
     }
 
     fn test_blake2f_invalid_flag() -> PrecompileResult {
@@ -179,7 +178,7 @@ mod tests {
             02",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
+        Blake2F::run(&input, 12, &new_context(), false)
     }
 
     fn test_blake2f_r_0() -> Vec<u8> {
@@ -197,14 +196,14 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
+        Blake2F::run(&input, 12, &new_context(), false)
             .unwrap()
             .output
     }
 
     fn test_blake2f_r_12() -> Vec<u8> {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
+        Blake2F::run(&input, 12, &new_context(), false)
             .unwrap()
             .output
     }
@@ -224,7 +223,7 @@ mod tests {
             00",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), &mut new_state(), false)
+        Blake2F::run(&input, 12, &new_context(), false)
             .unwrap()
             .output
     }

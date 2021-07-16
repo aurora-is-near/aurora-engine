@@ -448,10 +448,10 @@ impl Engine {
     fn make_executor(
         &self,
         gas_limit: u64,
-    ) -> StackExecutor<AuroraStackState, PrecompileAddresses<precompiles::Istanbul>> {
+    ) -> StackExecutor<AuroraStackState, PrecompileAddresses<precompiles::Homestead>> {
         let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
         let state = AuroraStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, CONFIG, PrecompileAddresses::istanbul())
+        StackExecutor::new_with_precompile(state, CONFIG, PrecompileAddresses::new_homestead())
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
