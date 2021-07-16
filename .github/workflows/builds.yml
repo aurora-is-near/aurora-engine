@@ -7,7 +7,7 @@ name: Builds
 jobs:
   release:
     name: Release
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
@@ -35,7 +35,7 @@ jobs:
         uses: EndBug/latest-tag@latest
   debug:
     name: Debug
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2

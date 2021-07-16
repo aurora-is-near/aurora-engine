@@ -4,7 +4,7 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
@@ -30,7 +30,7 @@ jobs:
           args: --locked --verbose --features meta-call
   bully-build:
     name: Bully build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
