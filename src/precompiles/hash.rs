@@ -2,8 +2,6 @@ use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use crate::prelude::{vec, Address};
 use evm::{Context, ExitError};
 
-use crate::state::AuroraStackState;
-
 mod costs {
     pub(super) const SHA256_BASE: u64 = 60;
 
@@ -44,7 +42,6 @@ impl Precompile for SHA256 {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut AuroraStackState,
         _is_static: bool,
     ) -> PrecompileResult {
         use sha2::Digest;
@@ -127,7 +124,7 @@ impl Precompile for RIPEMD160 {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{new_context, new_state};
+    use crate::test_utils::new_context;
 
     use super::*;
 

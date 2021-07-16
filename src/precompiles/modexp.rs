@@ -2,8 +2,6 @@ use crate::precompiles::{
     Berlin, Byzantium, HardFork, Precompile, PrecompileOutput, PrecompileResult,
 };
 use crate::prelude::{Address, PhantomData, Vec, U256};
-use crate::state::AuroraStackState;
-use crate::AuroraState;
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
@@ -195,7 +193,7 @@ fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{new_context, new_state, MockState};
+    use crate::test_utils::new_context;
 
     use super::*;
 
@@ -357,7 +355,6 @@ mod tests {
     fn test_modexp() {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
-            let mut state = new_state();
 
             let res = ModExp::<Byzantium>::run(&input, *test_gas, &new_context(), false)
                 .unwrap()
@@ -427,7 +424,6 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_empty_input() {
-        let mut state = new_state();
         let res = ModExp::<Berlin>::run(&[], 100_000, &new_context(), false).unwrap();
         let expected: Vec<u8> = Vec::new();
         assert_eq!(res.output, expected)

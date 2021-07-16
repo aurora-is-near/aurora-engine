@@ -13,7 +13,7 @@ use crate::parameters::{
     ViewCallArgs,
 };
 
-use crate::precompiles::{self, PrecompileAddresses};
+use crate::precompiles::Precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::state::AuroraStackState;
@@ -445,13 +445,10 @@ impl Engine {
         Ok(result)
     }
 
-    fn make_executor(
-        &self,
-        gas_limit: u64,
-    ) -> StackExecutor<AuroraStackState, PrecompileAddresses<precompiles::Homestead>> {
+    fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState, Precompiles> {
         let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
         let state = AuroraStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, CONFIG, PrecompileAddresses::new_homestead())
+        StackExecutor::new_with_precompile(state, CONFIG, Precompiles::new_istanbul())
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {

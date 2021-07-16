@@ -1,8 +1,7 @@
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use evm::{Context, ExitError};
 
-use crate::prelude::{Address, PhantomData};
-use crate::AuroraState;
+use crate::prelude::Address;
 
 /// Identity precompile costs.
 mod costs {
@@ -56,7 +55,7 @@ impl Precompile for Identity {
 mod tests {
     use evm::ExitError;
 
-    use crate::test_utils::{new_context, new_state};
+    use crate::test_utils::new_context;
 
     use super::*;
 

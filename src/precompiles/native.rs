@@ -1,11 +1,10 @@
-use evm::{Context, ExitError};
-
+use crate::parameters::PromiseCreateArgs;
 use crate::prelude::Address;
 #[cfg(not(feature = "contract"))]
 use crate::prelude::Vec;
+use evm::{Context, ExitError};
 #[cfg(feature = "contract")]
 use {
-    crate::parameters::PromiseCreateArgs,
     crate::parameters::WithdrawCallArgs,
     crate::prelude::{is_valid_account_id, Cow, String, ToString, TryInto, U256},
     crate::storage::{bytes_to_key, KeyPrefix},
@@ -20,7 +19,7 @@ const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 use crate::precompiles::PrecompileOutput;
 use crate::state::AuroraStackState;
 
-pub trait ReturnPromise {
+trait ReturnPromise {
     fn promise(&self, state: &mut AuroraStackState) -> PromiseCreateArgs;
 }
 
@@ -70,7 +69,6 @@ impl Precompile for ExitToNear {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
@@ -81,6 +79,7 @@ impl Precompile for ExitToNear {
             output: Vec::new(),
             cost: 0,
             logs: Vec::new(),
+            promise: None,
         })
     }
 
@@ -182,9 +181,7 @@ impl Precompile for ExitToNear {
     }
 }
 
-pub struct ExitToEthereum {
-    promise: PromiseCreateArgs,
-}
+pub struct ExitToEthereum;
 
 impl ExitToEthereum {
     /// Exit to Ethereum precompile address
@@ -205,7 +202,6 @@ impl Precompile for ExitToEthereum {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
@@ -216,6 +212,7 @@ impl Precompile for ExitToEthereum {
             output: Vec::new(),
             cost: 0,
             logs: Vec::new(),
+            promise: None,
         })
     }
 
@@ -328,12 +325,12 @@ mod tests {
     #[test]
     fn test_precompile_id() {
         assert_eq!(
-            ExitToEthereum::<()>::ADDRESS,
-            near_account_to_evm_address("exitToEthereum".as_bytes()).0
+            ExitToEthereum::ADDRESS,
+            near_account_to_evm_address("exitToEthereum".as_bytes())
         );
         assert_eq!(
-            ExitToNear::<()>::ADDRESS,
-            near_account_to_evm_address("exitToNear".as_bytes()).0
+            ExitToNear::ADDRESS,
+            near_account_to_evm_address("exitToNear".as_bytes())
         );
     }
 }
