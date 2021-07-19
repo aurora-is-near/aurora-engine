@@ -1,4 +1,4 @@
-use crate::prelude::{vec, Vec, H256};
+use crate::prelude::{vec, Address, Vec, H256};
 use crate::types::PromiseResult;
 use crate::types::STORAGE_PRICE_PER_BYTE;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -45,6 +45,15 @@ mod exports {
         fn random_seed(register_id: u64);
         pub(crate) fn sha256(value_len: u64, value_ptr: u64, register_id: u64);
         pub(crate) fn keccak256(value_len: u64, value_ptr: u64, register_id: u64);
+        pub(crate) fn ecrecover(
+            hash_len: u64,
+            hash_ptr: u64,
+            sig_len: u64,
+            sig_ptr: u64,
+            v: u64,
+            malleability_flag: u64,
+            register_id: u64,
+        ) -> u64;
         // #####################
         // # Miscellaneous API #
         // #####################
@@ -372,6 +381,36 @@ pub fn keccak(input: &[u8]) -> H256 {
     }
 }
 
+/// Recover address from message hash and signature.
+pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> {
+    unsafe {
+        let hash_ptr = hash.as_ptr() as u64;
+        let sig_ptr = signature.as_ptr() as u64;
+        let recover_register_id = 1;
+        let keccak_register_id = 2;
+        let result = exports::ecrecover(
+            32,
+            hash_ptr,
+            64,
+            sig_ptr,
+            signature[64] as u64,
+            0,
+            recover_register_id,
+        );
+        if result == (true as u64) {
+            // The result from the ecrecover call is in a register; we can use this
+            // register directly for the input to keccak256. This is why the length is
+            // set to `u64::MAX`.
+            exports::keccak256(u64::MAX, recover_register_id, keccak_register_id);
+            let keccak_hash_bytes = [0u8; 32];
+            exports::read_register(keccak_register_id, keccak_hash_bytes.as_ptr() as u64);
+            Ok(Address::from_slice(&keccak_hash_bytes[12..]))
+        } else {
+            Err(ECRecoverErr)
+        }
+    }
+}
+
 /// Returns account id of the current account.
 pub fn current_account_id() -> Vec<u8> {
     unsafe {
@@ -576,5 +615,17 @@ impl AsRef<[u8]> for ReadU64Error {
             Self::InvalidU64 => b"ERR_NOT_U64",
             Self::MissingValue => b"ERR_U64_NOT_FOUND",
         }
+    }
+}
+
+pub struct ECRecoverErr;
+impl ECRecoverErr {
+    pub fn as_str(&self) -> &'static str {
+        "ERR_ECRECOVER"
+    }
+}
+impl AsRef<[u8]> for ECRecoverErr {
+    fn as_ref(&self) -> &[u8] {
+        self.as_str().as_bytes()
     }
 }

@@ -18,9 +18,20 @@ mod consts {
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000001
 // Quite a few library methods rely on this and that should be changed. This
 // should only be for precompiles.
-pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
-    use sha3::Digest;
+pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     assert_eq!(signature.len(), 65);
+
+    #[cfg(feature = "contract")]
+    return crate::sdk::ecrecover(hash, signature)
+        .map_err(|e| ExitError::Other(Borrowed(e.as_str())));
+
+    #[cfg(not(feature = "contract"))]
+    internal_impl(hash, signature)
+}
+
+#[cfg(not(feature = "contract"))]
+fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
+    use sha3::Digest;
 
     let hash = secp256k1::Message::parse_slice(hash.as_bytes()).unwrap();
     let v = signature[64];
@@ -38,7 +49,9 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
         }
     }
 
-    Err(ExitError::Other(Borrowed("invalid ECDSA signature")))
+    Err(ExitError::Other(Borrowed(
+        crate::sdk::ECRecoverErr.as_str(),
+    )))
 }
 
 pub(super) struct ECRecover<S>(PhantomData<S>);
