@@ -45,6 +45,7 @@ mod exports {
         fn random_seed(register_id: u64);
         pub(crate) fn sha256(value_len: u64, value_ptr: u64, register_id: u64);
         pub(crate) fn keccak256(value_len: u64, value_ptr: u64, register_id: u64);
+        pub(crate) fn ripemd160(value_len: u64, value_ptr: u64, register_id: u64);
         pub(crate) fn ecrecover(
             hash_len: u64,
             hash_ptr: u64,
@@ -377,6 +378,17 @@ pub fn keccak(input: &[u8]) -> H256 {
         exports::keccak256(input.len() as u64, input.as_ptr() as u64, 1);
         let bytes = H256::zero();
         exports::read_register(1, bytes.0.as_ptr() as *const u64 as u64);
+        bytes
+    }
+}
+
+/// Calls environment ripemd160 on given input.
+pub fn ripemd160(input: &[u8]) -> [u8; 20] {
+    unsafe {
+        const REGISTER_ID: u64 = 1;
+        exports::ripemd160(input.len() as u64, input.as_ptr() as u64, REGISTER_ID);
+        let bytes = [0u8; 20];
+        exports::read_register(REGISTER_ID, bytes.as_ptr() as u64);
         bytes
     }
 }
