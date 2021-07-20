@@ -6,23 +6,28 @@ ifeq ($(evm-bully),yes)
   FEATURES := $(FEATURES),evm_bully
 endif
 
-all: release
+# TODO: This isn't updating the `FEATURES` for some reason. Disabled to prevent accidental compilation of the same binary for release.
+#all: mainnet testnet betanet
 
 mainnet: FEATURES=mainnet
-mainnet: release
+mainnet: mainnet-release.wasm
 
 testnet: FEATURES=testnet
-testnet: release
+testnet: testnet-release.wasm
 
 betanet: FEATURES=betanet
-betanet: release
+betanet: betanet-release.wasm
 
-release: release.wasm
-
-release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
+mainnet-release.wasm: compile-release
 	ln -sf $< $@
 
-target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
+testnet-release.wasm: compile-release
+	ln -sf $< $@
+
+betanet-release.wasm: compile-release
+	ln -sf $< $@
+
+compile-release: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm
 
@@ -32,12 +37,28 @@ etc/eth-contracts/res/EvmErc20.bin: $(shell find etc/eth-contracts/contracts -na
 etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
 	cd etc/eth-contracts && yarn && yarn build
 
-debug: debug.wasm
+# TODO: This isn't updating the `FEATURES` for some reason. Disabled to prevent accidental compilation of the same binary for debug.
+all-debug: mainnet-debug testnet-debug betanet-debug
 
-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
+mainnet-debug: FEATURES=mainnet
+mainnet-debug: mainnet-debug.wasm
+
+testnet-debug: FEATURES=testnet
+testnet-debug: testnet-debug.wasm
+
+betanet-debug: FEATURES=betanet
+betanet-debug: betanet-debug.wasm
+
+mainnet-debug.wasm: compile-debug
 	ln -sf $< $@
 
-target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
+testnet-debug.wasm: compile-debug
+	ln -sf $< $@
+
+betanet-debug.wasm: compile-debug
+	ln -sf $< $@
+
+compile-debug: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
 	$(CARGO) build --target wasm32-unknown-unknown --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 
 test-build: etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json etc/eth-contracts/res/EvmErc20.bin
@@ -47,7 +68,7 @@ test-build: etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.j
 
 .PHONY: all release debug eth-contracts mainnet testnet betanet
 
-deploy: release.wasm
+deploy: mainnet-release.wasm
 	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),aurora.test.near) --wasm-file=$<
 
 check: test test-sol check-format check-clippy
@@ -69,9 +90,10 @@ format:
 	$(CARGO) fmt
 
 clean:
-	@rm -Rf *.wasm target *~
+	@rm -Rf *.wasm
+	cargo clean
 
-.PHONY: deploy check check-format check-clippy test format clean
+.PHONY: deploy check check-format check-clippy test format clean mainnet testnet betanet compile-release mainnet-debug testnet-debug betanet-debug compile-debug
 
 .SECONDARY:
 .SUFFIXES:
