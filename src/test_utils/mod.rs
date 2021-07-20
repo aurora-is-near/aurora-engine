@@ -13,13 +13,13 @@ use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::fungible_token::FungibleToken;
-use crate::parameters::{InitCallArgs, NewCallArgs, PromiseCreateArgs, SubmitResult};
+use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
 use crate::prelude::Address;
+use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 use crate::transaction::{LegacyEthSignedTransaction, LegacyEthTransaction};
 use crate::types;
 use crate::types::AccountId;
-use crate::{storage, AuroraState};
 
 lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "release.wasm"
@@ -435,15 +435,4 @@ pub fn new_context() -> Context {
         caller: Default::default(),
         apparent_value: Default::default(),
     }
-}
-
-#[derive(Default)]
-pub struct MockState;
-
-impl AuroraState for MockState {
-    fn add_promise(&mut self, _promise: PromiseCreateArgs) {}
-}
-
-pub fn new_state() -> MockState {
-    Default::default()
 }

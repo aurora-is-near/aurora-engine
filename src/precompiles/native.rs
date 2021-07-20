@@ -1,12 +1,10 @@
-use evm::{Context, ExitError};
-
-use crate::prelude::PhantomData;
+use crate::parameters::PromiseCreateArgs;
+use crate::prelude::Address;
 #[cfg(not(feature = "contract"))]
 use crate::prelude::Vec;
-use crate::AuroraState;
+use evm::{Context, ExitError};
 #[cfg(feature = "contract")]
 use {
-    crate::parameters::PromiseCreateArgs,
     crate::parameters::WithdrawCallArgs,
     crate::prelude::{is_valid_account_id, Cow, String, ToString, TryInto, U256},
     crate::storage::{bytes_to_key, KeyPrefix},
@@ -19,6 +17,11 @@ use super::{Precompile, PrecompileResult};
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 use crate::precompiles::PrecompileOutput;
+use crate::state::AuroraStackState;
+
+trait ReturnPromise {
+    fn promise(&self, state: &mut AuroraStackState) -> PromiseCreateArgs;
+}
 
 mod costs {
     use crate::types::Gas;
@@ -36,14 +39,14 @@ mod costs {
     pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
 }
 
-pub struct ExitToNear<S>(PhantomData<S>); //TransferEthToNear
+pub struct ExitToNear; //TransferEthToNear
 
-impl<S> ExitToNear<S> {
+impl ExitToNear {
     /// Exit to NEAR precompile address
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
-    pub(super) const ADDRESS: [u8; 20] =
+    pub(super) const ADDRESS: Address =
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
@@ -56,7 +59,7 @@ fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
     .unwrap()
 }
 
-impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
+impl Precompile for ExitToNear {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
@@ -66,7 +69,6 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
@@ -77,17 +79,12 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
             output: Vec::new(),
             cost: 0,
             logs: Vec::new(),
+            promise: None,
         })
     }
 
     #[cfg(feature = "contract")]
-    fn run(
-        input: &[u8],
-        target_gas: u64,
-        context: &Context,
-        state: &mut S,
-        is_static: bool,
-    ) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, is_static: bool) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -177,24 +174,25 @@ impl<S: AuroraState> Precompile<S> for ExitToNear<S> {
             attached_gas: costs::FT_TRANSFER_GAS,
         };
 
-        state.add_promise(promise);
-
-        Ok(PrecompileOutput::default())
+        Ok(PrecompileOutput {
+            promise: Some(promise),
+            ..Default::default()
+        })
     }
 }
 
-pub struct ExitToEthereum<S>(PhantomData<S>);
+pub struct ExitToEthereum;
 
-impl<S> ExitToEthereum<S> {
+impl ExitToEthereum {
     /// Exit to Ethereum precompile address
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
-    pub(super) const ADDRESS: [u8; 20] =
+    pub(super) const ADDRESS: Address =
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
 }
 
-impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
+impl Precompile for ExitToEthereum {
     fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
@@ -204,7 +202,6 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
@@ -215,17 +212,12 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
             output: Vec::new(),
             cost: 0,
             logs: Vec::new(),
+            promise: None,
         })
     }
 
     #[cfg(feature = "contract")]
-    fn run(
-        input: &[u8],
-        target_gas: u64,
-        context: &Context,
-        state: &mut S,
-        is_static: bool,
-    ) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: u64, context: &Context, is_static: bool) -> PrecompileResult {
         if Self::required_gas(input)? > target_gas {
             return Err(ExitError::OutOfGas);
         }
@@ -318,9 +310,10 @@ impl<S: AuroraState> Precompile<S> for ExitToEthereum<S> {
             attached_gas: costs::WITHDRAWAL_GAS,
         };
 
-        state.add_promise(promise);
-
-        Ok(PrecompileOutput::default())
+        Ok(PrecompileOutput {
+            promise: Some(promise),
+            ..Default::default()
+        })
     }
 }
 
@@ -332,12 +325,12 @@ mod tests {
     #[test]
     fn test_precompile_id() {
         assert_eq!(
-            ExitToEthereum::<()>::ADDRESS,
-            near_account_to_evm_address("exitToEthereum".as_bytes()).0
+            ExitToEthereum::ADDRESS,
+            near_account_to_evm_address("exitToEthereum".as_bytes())
         );
         assert_eq!(
-            ExitToNear::<()>::ADDRESS,
-            near_account_to_evm_address("exitToNear".as_bytes()).0
+            ExitToNear::ADDRESS,
+            near_account_to_evm_address("exitToNear".as_bytes())
         );
     }
 }
