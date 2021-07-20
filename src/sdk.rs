@@ -5,6 +5,12 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 const READ_STORAGE_REGISTER_ID: u64 = 0;
 const INPUT_REGISTER_ID: u64 = 0;
+#[cfg(feature = "testnet")]
+const ECRECOVER_MESSAGE_SIZE: u64 = 32;
+#[cfg(feature = "testnet")]
+const ECRECOVER_SIGNATURE_LENGTH: u64 = 64;
+#[cfg(feature = "testnet")]
+const ECRECOVER_MALLEABILITY_FLAG: u64 = 1;
 
 /// Register used to record evicted values from the storage.
 const EVICTED_REGISTER: u64 = 0;
@@ -400,24 +406,24 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<crate::prelude::Address
     unsafe {
         let hash_ptr = hash.as_ptr() as u64;
         let sig_ptr = signature.as_ptr() as u64;
-        let recover_register_id = 1;
-        let keccak_register_id = 2;
+        const RECOVER_REGISTER_ID: u64 = 1;
+        const KECCACK_REGISTER_ID: u64 = 2;
         let result = exports::ecrecover(
-            32,
+            ECRECOVER_MESSAGE_SIZE,
             hash_ptr,
-            64,
+            ECRECOVER_SIGNATURE_LENGTH,
             sig_ptr,
             signature[64] as u64,
-            0,
-            recover_register_id,
+            ECRECOVER_MALLEABILITY_FLAG,
+            RECOVER_REGISTER_ID,
         );
         if result == (true as u64) {
             // The result from the ecrecover call is in a register; we can use this
             // register directly for the input to keccak256. This is why the length is
             // set to `u64::MAX`.
-            exports::keccak256(u64::MAX, recover_register_id, keccak_register_id);
+            exports::keccak256(u64::MAX, RECOVER_REGISTER_ID, KECCACK_REGISTER_ID);
             let keccak_hash_bytes = [0u8; 32];
-            exports::read_register(keccak_register_id, keccak_hash_bytes.as_ptr() as u64);
+            exports::read_register(KECCACK_REGISTER_ID, keccak_hash_bytes.as_ptr() as u64);
             Ok(crate::prelude::Address::from_slice(
                 &keccak_hash_bytes[12..],
             ))
