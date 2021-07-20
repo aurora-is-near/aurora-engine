@@ -21,15 +21,15 @@ mod consts {
 pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     assert_eq!(signature.len(), 65);
 
-    #[cfg(feature = "contract")]
+    #[cfg(feature = "testnet")]
     return crate::sdk::ecrecover(hash, signature)
         .map_err(|e| ExitError::Other(Borrowed(e.as_str())));
 
-    #[cfg(not(feature = "contract"))]
+    #[cfg(not(feature = "testnet"))]
     internal_impl(hash, signature)
 }
 
-#[cfg(not(feature = "contract"))]
+#[cfg(not(feature = "testnet"))]
 fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     use sha3::Digest;
 

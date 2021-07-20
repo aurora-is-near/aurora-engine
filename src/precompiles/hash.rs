@@ -91,7 +91,7 @@ pub struct RIPEMD160<S>(PhantomData<S>);
 impl<S> RIPEMD160<S> {
     pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 3);
 
-    #[cfg(not(feature = "contract"))]
+    #[cfg(not(feature = "testnet"))]
     fn internal_impl(input: &[u8]) -> [u8; 20] {
         use ripemd160::Digest;
         let hash = ripemd160::Ripemd160::digest(input);
@@ -124,9 +124,9 @@ impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            #[cfg(not(feature = "contract"))]
+            #[cfg(not(feature = "testnet"))]
             let hash = Self::internal_impl(input);
-            #[cfg(feature = "contract")]
+            #[cfg(feature = "testnet")]
             let hash = crate::sdk::ripemd160(input);
             // The result needs to be padded with leading zeros because it is only 20 bytes, but
             // the evm works with 32-byte words.

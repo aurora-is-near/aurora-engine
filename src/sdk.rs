@@ -1,4 +1,4 @@
-use crate::prelude::{vec, Address, Vec, H256};
+use crate::prelude::{vec, Vec, H256};
 use crate::types::PromiseResult;
 use crate::types::STORAGE_PRICE_PER_BYTE;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -383,6 +383,7 @@ pub fn keccak(input: &[u8]) -> H256 {
 }
 
 /// Calls environment ripemd160 on given input.
+#[cfg(feature = "testnet")]
 pub fn ripemd160(input: &[u8]) -> [u8; 20] {
     unsafe {
         const REGISTER_ID: u64 = 1;
@@ -394,7 +395,8 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
 }
 
 /// Recover address from message hash and signature.
-pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> {
+#[cfg(feature = "testnet")]
+pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<crate::prelude::Address, ECRecoverErr> {
     unsafe {
         let hash_ptr = hash.as_ptr() as u64;
         let sig_ptr = signature.as_ptr() as u64;
@@ -416,7 +418,9 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
             exports::keccak256(u64::MAX, recover_register_id, keccak_register_id);
             let keccak_hash_bytes = [0u8; 32];
             exports::read_register(keccak_register_id, keccak_hash_bytes.as_ptr() as u64);
-            Ok(Address::from_slice(&keccak_hash_bytes[12..]))
+            Ok(crate::prelude::Address::from_slice(
+                &keccak_hash_bytes[12..],
+            ))
         } else {
             Err(ECRecoverErr)
         }
