@@ -9,41 +9,21 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Install the toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2021-03-25
-          override: true
-          components: rustfmt
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all -- --check
   clippy:
     name: Clippy
     runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Install the toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2021-03-25
-          override: true
-          components: clippy
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: make etc/eth-contracts/res/EvmErc20.bin
       - name: Run Contract cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --no-default-features --features=contract -- -D warnings
+        run: cargo clippy --no-default-features --features=contract -- -D warnings
       - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
+        run: cargo clippy
 
   contracts:
     name: eth-contracts

@@ -11,12 +11,7 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Install the toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2021-03-25
-          override: true
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: make release
       - run: ls -lH mainnet-release.wasm
       - name: Upload the mainnet-release.wasm artifact
@@ -39,12 +34,7 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Install the toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2021-03-25
-          override: true
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: make debug
       - run: ls -lH mainnet-debug.wasm
       - name: Upload the mainnet-debug.wasm artifact
