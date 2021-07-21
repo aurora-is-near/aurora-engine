@@ -20,18 +20,17 @@ testnet: testnet-release.wasm
 betanet: FEATURES=betanet
 betanet: betanet-release.wasm
 
-mainnet-release.wasm: compile-release
-	ln -sf $< $@
+mainnet-release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
+	cp $< $@
 
-testnet-release.wasm: compile-release
-	ln -sf $< $@
+testnet-release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
+	cp $< $@
 
-betanet-release.wasm: compile-release
-	ln -sf $< $@
+betanet-release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
+	cp $< $@
 
-compile-release: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
+target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
-	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm
 
 etc/eth-contracts/res/EvmErc20.bin: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
 	cd etc/eth-contracts && yarn && yarn build
@@ -53,32 +52,38 @@ testnet-debug: testnet-debug.wasm
 betanet-debug: FEATURES=betanet
 betanet-debug: betanet-debug.wasm
 
-mainnet-debug.wasm: compile-debug
-	ln -sf $< $@
+mainnet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
+	cp $< $@
 
-testnet-debug.wasm: compile-debug
-	ln -sf $< $@
+testnet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
+	cp $< $@
 
-betanet-debug.wasm: compile-debug
-	ln -sf $< $@
+betanet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
+	cp $< $@
 
-compile-debug: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
+target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
 	$(CARGO) build --target wasm32-unknown-unknown --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 
 # test depends on release since `tests/test_upgrade.rs` includes `mainnet-release.wasm`
 test: test-mainnet
 
-test-mainnet: FEATURES=mainnet,integration-test,meta-call
-test-mainnet: mainnet-debug.wasm
-	$(CARGO) test --features mainnet,meta-call
+mainnet-test-build: FEATURES=mainnet,integration-test,meta-call
+mainnet-test-build: mainnet-release.wasm
 
-test-testnet: FEATURES=testnet,integration-test,meta-call
-test-testnet: testnet-debug.wasm
-	$(CARGO) test --features testnet,meta-call
+betanet-test-build: FEATURES=betanet,integration-test,meta-call
+betanet-test-build: betanet-release.wasm
 
-test-betanet: FEATURES=betanet,integration-test,meta-call
-test-betanet: betanet-debug.wasm
-	$(CARGO) test --features betanet,meta-call
+testnet-test-build: FEATURES=testnet,integration-test,meta-call
+testnet-test-build: testnet-release.wasm
+
+test-mainnet: mainnet-test-build
+	$(CARGO) test --features mainnet-test
+
+test-testnet: betanet-test-build
+	$(CARGO) test --features testnet-test
+
+test-betanet: testnet-test-build
+	$(CARGO) test --features betanet-test
 
 deploy: mainnet-release.wasm
 	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),aurora.test.near) --wasm-file=$<
@@ -101,7 +106,7 @@ clean:
 	@rm -Rf *.wasm
 	cargo clean
 
-.PHONY: release mainnet testnet betanet compile-release test-build deploy check check-format check-clippy test test-sol format clean debug mainnet-debug testnet-debug betanet-debug compile-debug
+.PHONY: release mainnet testnet betanet compile-release test-build deploy check check-format check-clippy test test-sol format clean debug mainnet-debug testnet-debug betanet-debug compile-debug mainnet-test-build testnet-test-build betanet-test-build target/wasm32-unknown-unknown/release/aurora_engine.wasm target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 
 .SECONDARY:
 .SUFFIXES:
