@@ -21,17 +21,26 @@ use crate::transaction::{LegacyEthSignedTransaction, LegacyEthTransaction};
 use crate::types;
 use crate::types::AccountId;
 
-#[cfg(all(feature = "mainnet", not(any(feature = "testnet", feature = "betanet"))))]
+#[cfg(all(
+    feature = "mainnet",
+    not(any(feature = "testnet", feature = "betanet"))
+))]
 lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "mainnet-debug.wasm"
 }
 
-#[cfg(all(feature = "testnet", not(any(feature = "mainnet", feature = "betanet"))))]
+#[cfg(all(
+    feature = "testnet",
+    not(any(feature = "mainnet", feature = "betanet"))
+))]
 lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "testnet-debug.wasm"
 }
 
-#[cfg(all(feature = "betanet", not(any(feature = "mainnet", feature = "testnet"))))]
+#[cfg(all(
+    feature = "betanet",
+    not(any(feature = "mainnet", feature = "testnet"))
+))]
 lazy_static_include::lazy_static_include_bytes! {
     EVM_WASM_BYTES => "betanet-debug.wasm"
 }
