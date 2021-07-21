@@ -34,8 +34,8 @@ jobs:
       - name: Prepare target directory
         run: |
           rm -rf target && mkdir target
-          ln -s ~/build-cache/aurora-engine/debug/ target/debug
-          ln -s ~/build-cache/aurora-engine/release/ target/release
+          ln -s ~/build-cache/aurora-engine-bully/debug/ target/debug
+          ln -s ~/build-cache/aurora-engine-bully/release/ target/release
       - name: Install the toolchain
         uses: actions-rs/toolchain@v1
         with:
