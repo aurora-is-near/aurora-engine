@@ -8,14 +8,11 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Cache Cargo artifacts
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Prepare target directory
+        run: |
+          rm -rf target && mkdir target
+          ln -s ~/build-cache/aurora-engine/debug/ target/debug
+          ln -s ~/build-cache/aurora-engine/release/ target/release
       - name: Install the toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -34,6 +31,11 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
+      - name: Prepare target directory
+        run: |
+          rm -rf target && mkdir target
+          ln -s ~/build-cache/aurora-engine-bully/debug/ target/debug
+          ln -s ~/build-cache/aurora-engine-bully/release/ target/release
       - name: Install the toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -45,3 +47,4 @@ jobs:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  RUSTC_WRAPPER: sccache
