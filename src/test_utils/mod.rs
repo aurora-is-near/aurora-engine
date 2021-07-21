@@ -21,8 +21,19 @@ use crate::transaction::{LegacyEthSignedTransaction, LegacyEthTransaction};
 use crate::types;
 use crate::types::AccountId;
 
+#[cfg(all(feature = "mainnet", not(any(feature = "testnet", feature = "betanet"))))]
 lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "release.wasm"
+    EVM_WASM_BYTES => "mainnet-debug.wasm"
+}
+
+#[cfg(all(feature = "testnet", not(any(feature = "mainnet", feature = "betanet"))))]
+lazy_static_include::lazy_static_include_bytes! {
+    EVM_WASM_BYTES => "testnet-debug.wasm"
+}
+
+#[cfg(all(feature = "betanet", not(any(feature = "mainnet", feature = "testnet"))))]
+lazy_static_include::lazy_static_include_bytes! {
+    EVM_WASM_BYTES => "betanet-debug.wasm"
 }
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.

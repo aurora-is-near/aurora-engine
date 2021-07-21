@@ -9,6 +9,8 @@ endif
 # TODO: This isn't updating the `FEATURES` for some reason. Disabled to prevent accidental compilation of the same binary for release.
 #all: mainnet testnet betanet
 
+release: mainnet
+
 mainnet: FEATURES=mainnet
 mainnet: mainnet-release.wasm
 
@@ -38,7 +40,9 @@ etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json: $(shell
 	cd etc/eth-contracts && yarn && yarn build
 
 # TODO: This isn't updating the `FEATURES` for some reason. Disabled to prevent accidental compilation of the same binary for debug.
-all-debug: mainnet-debug testnet-debug betanet-debug
+#all-debug: mainnet-debug testnet-debug betanet-debug
+
+debug: mainnet-debug
 
 mainnet-debug: FEATURES=mainnet
 mainnet-debug: mainnet-debug.wasm
@@ -61,12 +65,20 @@ betanet-debug.wasm: compile-debug
 compile-debug: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
 	$(CARGO) build --target wasm32-unknown-unknown --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
 
-test-build: etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json etc/eth-contracts/res/EvmErc20.bin
-	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=mainnet,integration-test,meta-call -Z avoid-dev-deps
-	ln -sf target/wasm32-unknown-unknown/release/aurora_engine.wasm release.wasm
-	ls -l target/wasm32-unknown-unknown/release/aurora_engine.wasm
+# test depends on release since `tests/test_upgrade.rs` includes `mainnet-release.wasm`
+test: test-mainnet
 
-.PHONY: all release debug eth-contracts mainnet testnet betanet
+test-mainnet: FEATURES=mainnet,integration-test,meta-call
+test-mainnet: mainnet-debug.wasm
+	$(CARGO) test --features mainnet,meta-call
+
+test-testnet: FEATURES=testnet,integration-test,meta-call
+test-testnet: testnet-debug.wasm
+	$(CARGO) test --features testnet,meta-call
+
+test-betanet: FEATURES=betanet,integration-test,meta-call
+test-betanet: betanet-debug.wasm
+	$(CARGO) test --features betanet,meta-call
 
 deploy: mainnet-release.wasm
 	$(NEAR) deploy --account-id=$(or $(NEAR_EVM_ACCOUNT),aurora.test.near) --wasm-file=$<
@@ -79,10 +91,6 @@ check-format:
 check-clippy:
 	$(CARGO) clippy --no-default-features --features=$(FEATURES) -- -D warnings
 
-# test depends on release since `tests/test_upgrade.rs` includes `release.wasm`
-test: test-build
-	$(CARGO) test --features meta-call
-
 test-sol:
 	cd etc/eth-contracts && yarn && yarn test
 
@@ -93,7 +101,7 @@ clean:
 	@rm -Rf *.wasm
 	cargo clean
 
-.PHONY: deploy check check-format check-clippy test format clean mainnet testnet betanet compile-release mainnet-debug testnet-debug betanet-debug compile-debug
+.PHONY: release mainnet testnet betanet compile-release test-build deploy check check-format check-clippy test test-sol format clean debug mainnet-debug testnet-debug betanet-debug compile-debug
 
 .SECONDARY:
 .SUFFIXES:

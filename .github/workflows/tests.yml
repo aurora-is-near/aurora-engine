@@ -41,7 +41,7 @@ jobs:
           toolchain: nightly-2021-03-25
           override: true
       - run: make evm-bully=yes
-      - run: ls -lH release.wasm
+      - run: ls -lH mainnet-release.wasm
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
