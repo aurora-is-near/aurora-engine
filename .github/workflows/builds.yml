@@ -18,17 +18,17 @@ jobs:
           toolchain: nightly-2021-03-25
           override: true
       - run: make release
-      - run: ls -lH release.wasm
-      - name: Upload the release.wasm artifact
+      - run: ls -lH mainnet-release.wasm
+      - name: Upload the mainnet-release.wasm artifact
         uses: actions/upload-artifact@v2
         with:
-          name: release.wasm
-          path: release.wasm
+          name: mainnet-release.wasm
+          path: mainnet-release.wasm
       - name: Update the latest release
         uses: svenstaro/upload-release-action@v2
         with:
           tag: latest
-          file: release.wasm
+          file: mainnet-release.wasm
           overwrite: true
           repo_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Update the latest tag
@@ -46,17 +46,17 @@ jobs:
           toolchain: nightly-2021-03-25
           override: true
       - run: make debug
-      - run: ls -lH debug.wasm
-      - name: Upload the debug.wasm artifact
+      - run: ls -lH mainnet-debug.wasm
+      - name: Upload the mainnet-debug.wasm artifact
         uses: actions/upload-artifact@v2
         with:
-          name: debug.wasm
-          path: debug.wasm
+          name: mainnet-debug.wasm
+          path: mainnet-debug.wasm
       - name: Update the latest release
         uses: svenstaro/upload-release-action@v2
         with:
           tag: latest
-          file: debug.wasm
+          file: mainnet-debug.wasm
           overwrite: true
           repo_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Update the latest tag

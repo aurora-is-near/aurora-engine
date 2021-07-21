@@ -11,8 +11,6 @@ use crate::engine::Engine;
 use crate::json::parse_json;
 use crate::prelude::*;
 use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
-#[cfg(feature = "log")]
-use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub(crate) const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";

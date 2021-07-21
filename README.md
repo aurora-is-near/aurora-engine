@@ -52,11 +52,15 @@ rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
 ### Building the EVM binary
 
 ```sh
+make release  # produces mainnet-release.wasm (300+ KiB)
 make -B mainnet  # produces Mainnet build
 make -B testnet  # produces Testnet build
 make -B betanet  # produces Betanet build
-make release  # produces release.wasm (300+ KiB)
-make debug    # produces debug.wasm (1+ MiB), which includes symbols
+
+make debug    # produces mainnet-debug.wasm (1+ MiB), which includes symbols
+make -B mainnet-debug # produces Mainnet debug build
+make -B testnet-debug # produces Testnet debug build
+make -B betanet-debug #produces Betanet debug build
 ```
 
 ### Running unit & integration tests
@@ -70,7 +74,7 @@ make check
 ### Downloading the latest EVM release
 
 ```sh
-wget https://github.com/aurora-is-near/aurora-engine/releases/download/latest/release.wasm
+wget https://github.com/aurora-is-near/aurora-engine/releases/download/latest/mainnet-release.wasm
 ```
 
 ### Installing the Aurora CLI tool
@@ -85,7 +89,7 @@ npm install -g aurora-is-near/aurora-cli
 export NEAR_ENV=local
 near delete aurora.test.near test.near  # if needed
 near create-account aurora.test.near --master-account=test.near --initial-balance 1000000
-aurora install --chain 1313161556 --owner test.near release.wasm
+aurora install --chain 1313161556 --owner test.near mainnet-release.wasm
 ```
 
 ### Deploying the EVM without the CLI
@@ -94,7 +98,7 @@ aurora install --chain 1313161556 --owner test.near release.wasm
 export NEAR_ENV=local
 near delete aurora.test.near test.near  # if needed
 near create-account aurora.test.near --master-account=test.near --initial-balance 1000000
-near deploy --account-id=aurora.test.near --wasm-file=release.wasm
+near deploy --account-id=aurora.test.near --wasm-file=mainnet-release.wasm
 aurora initialize --chain 1313161556 --owner test.near
 ```
 
