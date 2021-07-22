@@ -16,7 +16,7 @@ autobenches = false
 crate-type = ["cdylib", "rlib"]
 
 [profile.release]
-opt-level = "z"
+opt-level = 3
 debug = false
 debug-assertions = false
 overflow-checks = true
