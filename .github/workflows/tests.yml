@@ -15,8 +15,14 @@ jobs:
           ln -s ~/build-cache/aurora-engine/debug/ target/debug
           ln -s ~/build-cache/aurora-engine/release/ target/release
       - run: make mainnet-test-build
-      - name: Run cargo test
+      - run: make testnet-test-build
+      - run: make betanet-test-build
+      - name: Run mainnet cargo test
         run: cargo test --locked --verbose --features mainnet-test
+      - name: Run testnet cargo test
+        run: cargo test --locked --verbose --features testnet-test
+      - name: Run betanet cargo test
+        run: cargo test --locked --verbose --features betanet-test
   bully-build:
     name: Bully build
     runs-on: self-hosted

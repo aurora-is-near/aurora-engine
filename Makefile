@@ -79,10 +79,10 @@ testnet-test-build: testnet-release.wasm
 test-mainnet: mainnet-test-build
 	$(CARGO) test --features mainnet-test
 
-test-testnet: betanet-test-build
+test-testnet: testnet-test-build
 	$(CARGO) test --features testnet-test
 
-test-betanet: testnet-test-build
+test-betanet: betanet-test-build
 	$(CARGO) test --features betanet-test
 
 deploy: mainnet-release.wasm
