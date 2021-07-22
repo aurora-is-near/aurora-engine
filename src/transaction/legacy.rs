@@ -68,8 +68,8 @@ impl LegacyEthSignedTransaction {
         let mut rlp_stream = RlpStream::new();
         // See details of CHAIN_ID computation here - https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md#specification
         let (chain_id, rec_id) = match self.v {
-            // ecrecover suppose to handle 0..=28 range for ids.
-            0..=28 => (None, self.v as u8),
+            0..=26 => return None,
+            27..=28 => (None, (self.v - 27) as u8),
             29..=34 => return None,
             _ => (Some((self.v - 35) / 2), ((self.v - 35) % 2) as u8),
         };

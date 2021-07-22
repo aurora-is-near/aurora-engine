@@ -86,6 +86,15 @@ pub struct RIPEMD160;
 
 impl RIPEMD160 {
     pub(super) const ADDRESS: Address = super::make_address(0, 3);
+
+    #[cfg(not(feature = "testnet"))]
+    fn internal_impl(input: &[u8]) -> [u8; 20] {
+        use ripemd160::Digest;
+        let hash = ripemd160::Ripemd160::digest(input);
+        let mut output = [0u8; 20];
+        output.copy_from_slice(&hash);
+        output
+    }
 }
 
 impl Precompile for RIPEMD160 {
@@ -106,13 +115,14 @@ impl Precompile for RIPEMD160 {
         _context: &Context,
         _is_static: bool,
     ) -> PrecompileResult {
-        use ripemd160::Digest;
-
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let hash = ripemd160::Ripemd160::digest(input);
+            #[cfg(not(feature = "testnet"))]
+            let hash = Self::internal_impl(input);
+            #[cfg(feature = "testnet")]
+            let hash = crate::sdk::ripemd160(input);
             // The result needs to be padded with leading zeros because it is only 20 bytes, but
             // the evm works with 32-byte words.
             let mut output = vec![0u8; 32];
