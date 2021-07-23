@@ -26,6 +26,7 @@ jobs:
   bully-build:
     name: Bully build
     runs-on: self-hosted
+    needs: test
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
