@@ -3,7 +3,10 @@ on: [push, pull_request]
 name: Tests
 jobs:
   test:
-    name: Test suite
+    strategy:
+      matrix:
+        net: [main, test, beta]
+    name: Test suite (${{ matrix.net }}net)
     runs-on: self-hosted
     steps:
       - name: Clone the repository
@@ -14,15 +17,9 @@ jobs:
           rm -rf target && mkdir target
           ln -s ~/build-cache/aurora-engine/debug/ target/debug
           ln -s ~/build-cache/aurora-engine/release/ target/release
-      - run: make mainnet-test-build
-      - run: make testnet-test-build
-      - run: make betanet-test-build
-      - name: Run mainnet cargo test
-        run: cargo test --locked --verbose --features mainnet-test
-      - name: Run testnet cargo test
-        run: cargo test --locked --verbose --features testnet-test
-      - name: Run betanet cargo test
-        run: cargo test --locked --verbose --features betanet-test
+      - run: make ${{ matrix.net }}net-test-build
+      - name: Run ${{ matrix.net }}net cargo test
+        run: cargo test --locked --verbose --features ${{ matrix.net }}net-test
   bully-build:
     name: Bully build
     runs-on: self-hosted
