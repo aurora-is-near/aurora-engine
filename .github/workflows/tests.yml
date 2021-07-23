@@ -13,13 +13,15 @@ jobs:
         uses: actions/checkout@v2
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Prepare target directory
-        run: |
-          rm -rf target && mkdir target
-          ln -s ~/build-cache/aurora-engine/debug/ target/debug
-          ln -s ~/build-cache/aurora-engine/release/ target/release
+        run: rm -rf target && cp -r ~/build-cache/aurora-engine target
       - run: make ${{ matrix.net }}net-test-build
       - name: Run ${{ matrix.net }}net cargo test
         run: cargo test --locked --verbose --features ${{ matrix.net }}net-test
+      - name: Cache and clear target directory
+        run: |
+          mv -n target/debug/* ~/build-cache/aurora-engine/debug
+          mv -n target/release/* ~/build-cache/aurora-engine/release
+          rm -rf target
   bully-build:
     name: Bully build
     runs-on: self-hosted
@@ -29,12 +31,14 @@ jobs:
         uses: actions/checkout@v2
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Prepare target directory
-        run: |
-          rm -rf target && mkdir target
-          ln -s ~/build-cache/aurora-engine-bully/debug/ target/debug
-          ln -s ~/build-cache/aurora-engine-bully/release/ target/release
+        run: rm -rf target && cp -r ~/build-cache/aurora-engine target
       - run: make mainnet-debug evm-bully=yes
       - run: ls -lH mainnet-debug.wasm
+      - name: Cache and clear target directory
+        run: |
+          mv -n target/debug/* ~/build-cache/aurora-engine/debug
+          mv -n target/release/* ~/build-cache/aurora-engine/release
+          rm -rf target
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
