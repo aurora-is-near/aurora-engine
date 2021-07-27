@@ -32,12 +32,12 @@ jobs:
       - name: Prepare target directory
         run: |
           rm -rf target
-          cache-util -restore -path target -key aurora-engine-target@$bully@${{ hashFiles('**/Cargo.lock') }}
+          cache-util -restore -path target -key aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}
       - run: make mainnet-debug evm-bully=yes
       - run: ls -lH mainnet-debug.wasm
       - name: Cache target directory
         run: |
-          cache-util -save -move -path target -key aurora-engine-target@$bully@${{ hashFiles('**/Cargo.lock') }}
+          cache-util -save -move -path target -key aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
