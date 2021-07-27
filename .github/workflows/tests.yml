@@ -12,11 +12,16 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v2
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      - name: Clean target directory
-        run: rm -rf target
+      - name: Prepare target directory
+        run: |
+          rm -rf target
+          cache-util -restore -path target -key aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}
       - run: make ${{ matrix.net }}net-test-build
       - name: Run ${{ matrix.net }}net cargo test
         run: cargo test --locked --verbose --features ${{ matrix.net }}net-test
+      - name: Cache target directory
+        run: |
+          cache-util -save -move -path target -key aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}
   bully-build:
     name: Bully build
     runs-on: self-hosted
@@ -24,10 +29,15 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v2
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      - name: Clean target directory
-        run: rm -rf target
+      - name: Prepare target directory
+        run: |
+          rm -rf target
+          cache-util -restore -path target -key aurora-engine-target@$bully@${{ hashFiles('**/Cargo.lock') }}
       - run: make mainnet-debug evm-bully=yes
       - run: ls -lH mainnet-debug.wasm
+      - name: Cache target directory
+        run: |
+          cache-util -save -move -path target -key aurora-engine-target@$bully@${{ hashFiles('**/Cargo.lock') }}
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
