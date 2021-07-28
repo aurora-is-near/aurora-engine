@@ -28,6 +28,7 @@ pub struct EthConnectorContract {
     contract: EthConnector,
     ft: FungibleToken,
     paused_mask: PausedMask,
+    metadata: FungibleTokenMetadata,
 }
 
 /// eth-connector specific data
@@ -58,6 +59,7 @@ impl EthConnectorContract {
             contract: Self::get_contract_data(&EthConnectorStorageId::Contract),
             ft: Self::get_contract_data(&EthConnectorStorageId::FungibleToken),
             paused_mask: Self::get_contract_data(&EthConnectorStorageId::PausedMask),
+            metadata: Self::get_contract_data(&EthConnectorStorageId::FungibleTokenMetadata),
         }
     }
 
@@ -82,6 +84,7 @@ impl EthConnectorContract {
         let contract_data = Self::set_contract_data(SetContractDataCallArgs {
             prover_account: args.prover_account,
             eth_custodian_address: args.eth_custodian_address,
+            metadata: args.metadata.clone(),
         });
 
         let current_account_id = sdk::current_account_id();
@@ -89,6 +92,8 @@ impl EthConnectorContract {
         let mut ft = FungibleToken::new();
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
+
+        let metadata = args.metadata;
 
         let paused_mask = UNPAUSE_ALL;
         sdk::save_contract(
@@ -100,6 +105,7 @@ impl EthConnectorContract {
             contract: contract_data,
             ft,
             paused_mask,
+            metadata,
         }
         .save_ft_contract();
     }
@@ -583,6 +589,10 @@ impl EthConnectorContract {
             &Self::get_contract_key(&EthConnectorStorageId::FungibleToken),
             &self.ft,
         );
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
+            &self.metadata,
+        );
     }
 
     /// Generate key for used events from Prood
@@ -615,6 +625,11 @@ impl EthConnectorContract {
     /// Set Eth connector paused flags
     pub fn set_paused_flags(&mut self, args: PauseEthConnectorCallArgs) {
         self.set_paused(args.paused_mask);
+    }
+
+    /// Return metdata
+    pub fn get_metadata(&self) {
+        sdk::return_output(&self.metadata.try_to_vec().unwrap()[..]);
     }
 }
 

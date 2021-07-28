@@ -27,6 +27,17 @@ pub struct FungibleToken {
     pub account_storage_usage: StorageUsage,
 }
 
+#[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
+pub struct FungibleTokenMetadata {
+    pub spec: String,
+    pub name: String,
+    pub symbol: String,
+    pub icon: Option<String>,
+    pub reference: Option<String>,
+    pub reference_hash: Option<[u8; 32]>,
+    pub decimals: u8,
+}
+
 impl FungibleToken {
     pub fn new() -> Self {
         Self::default()

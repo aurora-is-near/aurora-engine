@@ -591,6 +591,11 @@ mod contract {
         );
     }
 
+    #[no_mangle]
+    pub extern "C" fn get_metadata() {
+        EthConnectorContract::get_instance().get_metadata();
+    }
+
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {

@@ -1,5 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
+use crate::fungible_token::FungibleTokenMetadata;
 use crate::prelude::{String, Vec};
 use crate::types::{AccountId, Balance, RawAddress, RawH256, RawU256};
 use crate::{
@@ -272,6 +273,7 @@ pub struct FinishDepositEthCallArgs {
 pub struct InitCallArgs {
     pub prover_account: AccountId,
     pub eth_custodian_address: AccountId,
+    pub metadata: FungibleTokenMetadata,
 }
 
 /// Eth-connector Set contract data call args
