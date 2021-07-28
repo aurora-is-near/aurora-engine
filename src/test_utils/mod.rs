@@ -233,6 +233,16 @@ impl AuroraRunner {
         trie.insert(ft_key, ft_value.try_to_vec().unwrap());
     }
 
+    pub fn submit_with_signer<F: FnOnce(U256) -> LegacyEthTransaction>(
+        &mut self,
+        signer: &mut Signer,
+        make_tx: F,
+    ) -> Result<SubmitResult, VMError> {
+        let nonce = signer.use_nonce();
+        let tx = make_tx(nonce.into());
+        self.submit_transaction(&signer.secret_key, tx)
+    }
+
     pub fn submit_transaction(
         &mut self,
         account: &SecretKey,
