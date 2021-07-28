@@ -12,7 +12,7 @@ use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
-use crate::fungible_token::FungibleToken;
+use crate::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
 use crate::prelude::Address;
 use crate::storage;
@@ -368,6 +368,7 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     let args = InitCallArgs {
         prover_account: "prover.near".to_string(),
         eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+        metadata: FungibleTokenMetadata::default(),
     };
     let (_, maybe_error) = runner.call(
         "new_eth_connector",
