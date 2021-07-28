@@ -592,7 +592,7 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn get_metadata() {
+    pub extern "C" fn ft_metadata() {
         EthConnectorContract::get_instance().get_metadata();
     }
 

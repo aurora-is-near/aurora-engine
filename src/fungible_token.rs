@@ -27,7 +27,7 @@ pub struct FungibleToken {
     pub account_storage_usage: StorageUsage,
 }
 
-#[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
+#[derive(BorshDeserialize, BorshSerialize, Clone)]
 pub struct FungibleTokenMetadata {
     pub spec: String,
     pub name: String,

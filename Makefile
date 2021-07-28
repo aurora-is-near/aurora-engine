@@ -106,11 +106,6 @@ clean:
 	@rm -Rf *.wasm
 	cargo clean
 
-test-pure: FEATURES=mainnet,integration-test,meta-call
-test-pure: Cargo.toml Cargo.lock $(shell find src -name "*.rs") 
-	RUSTFLAGS='-C link-arg=-s' $(CARGO) build --target wasm32-unknown-unknown --release --no-default-features --features=$(FEATURES) -Z avoid-dev-deps
-	$(CARGO) test --features mainnet-test
-
 .PHONY: release mainnet testnet betanet compile-release test-build deploy check check-format check-clippy test test-sol format clean debug mainnet-debug testnet-debug betanet-debug compile-debug mainnet-test-build testnet-test-build betanet-test-build target/wasm32-unknown-unknown/release/aurora_engine.wasm target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 
 .SECONDARY:
