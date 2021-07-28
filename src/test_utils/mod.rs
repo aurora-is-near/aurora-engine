@@ -75,7 +75,6 @@ pub(crate) struct AuroraRunner {
     pub wasm_config: VMConfig,
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
-    pub profile: ProfileData,
     pub previous_logs: Vec<String>,
 }
 
@@ -177,6 +176,8 @@ impl AuroraRunner {
         )
     }
 
+    // Might be useful for optimizing performance in the future
+    #[allow(dead_code)]
     pub fn profiled_call(
         &mut self,
         method_name: &str,
@@ -312,18 +313,31 @@ impl AuroraRunner {
     pub fn view_call(&self, args: ViewCallArgs) -> Result<Vec<u8>, VMError> {
         let input = args.try_to_vec().unwrap();
         let (outcome, maybe_error) = self.one_shot().call("view", "VIEWER".to_string(), input);
-        if let Some(error) = maybe_error {
-            Err(error)
-        } else {
-            let status = TransactionStatus::try_from_slice(
-                &outcome.unwrap().return_data.as_value().unwrap(),
-            )
-            .unwrap();
-            match status {
-                TransactionStatus::Succeed(bytes) => Ok(bytes),
-                err => panic!("View call execution error: {:?}", err),
-            }
+        let status =
+            TransactionStatus::try_from_slice(&Self::bytes_from_outcome(outcome, maybe_error)?)
+                .unwrap();
+        match status {
+            TransactionStatus::Succeed(bytes) => Ok(bytes),
+            err => panic!("View call execution error: {:?}", err),
         }
+    }
+
+    pub fn profiled_view_call(
+        &self,
+        args: ViewCallArgs,
+    ) -> (Result<Vec<u8>, VMError>, ProfileData) {
+        let input = args.try_to_vec().unwrap();
+        let (outcome, maybe_error, profile) =
+            self.one_shot()
+                .profiled_call("view", "VIEWER".to_string(), input);
+        let result = Self::bytes_from_outcome(outcome, maybe_error).unwrap();
+        let status = TransactionStatus::try_from_slice(&result).unwrap();
+        let result = match status {
+            TransactionStatus::Succeed(bytes) => Ok(bytes),
+            err => panic!("View call execution error: {:?}", err),
+        };
+
+        (result, profile)
     }
 
     pub fn get_balance(&self, address: Address) -> types::Wei {
@@ -345,6 +359,18 @@ impl AuroraRunner {
         assert!(maybe_error.is_none());
         let bytes = outcome.unwrap().return_data.as_value().unwrap();
         U256::from_big_endian(&bytes)
+    }
+
+    fn bytes_from_outcome(
+        maybe_outcome: Option<VMOutcome>,
+        maybe_error: Option<VMError>,
+    ) -> Result<Vec<u8>, VMError> {
+        if let Some(error) = maybe_error {
+            Err(error)
+        } else {
+            let bytes = maybe_outcome.unwrap().return_data.as_value().unwrap();
+            Ok(bytes)
+        }
     }
 }
 
@@ -386,7 +412,6 @@ impl Default for AuroraRunner {
             wasm_config: Default::default(),
             fees_config: Default::default(),
             current_protocol_version: u32::MAX,
-            profile: Default::default(),
             previous_logs: Default::default(),
         }
     }

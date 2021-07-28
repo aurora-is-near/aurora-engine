@@ -85,6 +85,27 @@ fn erc20_mint_out_of_gas() {
 }
 
 #[test]
+fn profile_erc20_get_balance() {
+    let (mut runner, mut source_account, _, contract) = initialize_erc20();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+
+    let outcome = runner.submit_with_signer(&mut source_account, |nonce| {
+        contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
+    });
+    assert!(outcome.is_ok());
+
+    let balance_tx = contract.balance_of(source_address, U256::zero());
+    let (result, profile) =
+        runner.profiled_view_call(test_utils::as_view_call(balance_tx, source_address));
+    assert!(result.is_ok());
+
+    // call costs less than 6 Tgas
+    assert!(profile.all_gas() / 1_000_000_000_000 < 6);
+    // at least 70% of the cost is spent on wasm computation (as opposed to host functions)
+    assert!((100 * profile.wasm_gas()) / profile.all_gas() > 70);
+}
+
+#[test]
 fn erc20_transfer_success() {
     let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
