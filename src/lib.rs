@@ -89,7 +89,7 @@ mod contract {
     use crate::json::parse_json;
     use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
     use crate::sdk;
-    use crate::storage::{bytes_to_key, KeyPrefix};
+    use crate::storage::{bytes_to_key, EthConnectorStorageId, KeyPrefix};
     use crate::types::{
         near_account_to_evm_address, u256_to_arr, SdkExpect, SdkProcess, SdkUnwrap,
         ERR_FAILED_PARSE,
@@ -180,8 +180,23 @@ mod contract {
     /// code.
     #[no_mangle]
     pub extern "C" fn state_migration() {
-        // This function is purposely left empty because we do not have any state migration
-        // to do.
+        // Only owner can call migration
+        sdk::assert_private_call();
+
+        let metadata_key = bytes_to_key(
+            KeyPrefix::EthConnector,
+            &[EthConnectorStorageId::FungibleTokenMetadata as u8],
+        );
+
+        //=========================================================
+        // Migrate Metadata
+        if !sdk::storage_has_key(&metadata_key[..]) {
+            use crate::fungible_token::FungibleTokenMetadata;
+
+            let metadata =
+                FungibleTokenMetadata::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+            sdk::save_contract(&metadata_key, &metadata);
+        }
     }
 
     ///
