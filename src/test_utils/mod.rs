@@ -390,6 +390,17 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     runner
 }
 
+pub(crate) fn transfer(to: Address, amount: types::Wei, nonce: U256) -> LegacyEthTransaction {
+    LegacyEthTransaction {
+        nonce,
+        gas_price: Default::default(),
+        gas: u64::MAX.into(),
+        to: Some(to),
+        value: amount,
+        data: Vec::new(),
+    }
+}
+
 pub(crate) fn create_eth_transaction(
     to: Option<Address>,
     value: types::Wei,

@@ -1,6 +1,5 @@
 use crate::prelude::Address;
 use crate::test_utils;
-use crate::transaction::LegacyEthTransaction;
 use crate::types::{Wei, ERC20_MINT_SELECTOR};
 use secp256k1::SecretKey;
 
@@ -13,17 +12,8 @@ const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 #[test]
 fn test_eth_transfer_success() {
     // set up Aurora runner and accounts
-    let (mut runner, source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account);
-    let transaction = test_utils::create_eth_transaction(
-        Some(dest_address),
-        TRANSFER_AMOUNT.into(),
-        vec![],
-        Some(runner.chain_id),
-        &source_account,
-    );
-    let input = rlp::encode(&transaction).to_vec();
-    let calling_account_id = "some-account.near".to_string();
+    let (mut runner, mut source_account, dest_address) = initialize_transfer();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
 
     // validate pre-state
     test_utils::validate_address_balance_and_nonce(
@@ -35,8 +25,11 @@ fn test_eth_transfer_success() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // perform transfer
-    let (_, maybe_err) = runner.call(test_utils::SUBMIT, calling_account_id, input);
-    assert!(maybe_err.is_none());
+    runner
+        .submit_with_signer(&mut source_account, |nonce| {
+            test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce)
+        })
+        .unwrap();
 
     // validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -56,17 +49,8 @@ fn test_eth_transfer_success() {
 /// Tests the case where the transfer amount is larger than the address balance
 #[test]
 fn test_eth_transfer_insufficient_balance() {
-    let (mut runner, source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account);
-    let transaction = test_utils::create_eth_transaction(
-        Some(dest_address),
-        INITIAL_BALANCE + INITIAL_BALANCE, // trying to transfer more than we have
-        vec![],
-        Some(runner.chain_id),
-        &source_account,
-    );
-    let input = rlp::encode(&transaction).to_vec();
-    let calling_account_id = "some-account.near".to_string();
+    let (mut runner, mut source_account, dest_address) = initialize_transfer();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
 
     // validate pre-state
     test_utils::validate_address_balance_and_nonce(
@@ -78,8 +62,13 @@ fn test_eth_transfer_insufficient_balance() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
-    let (_, maybe_err) = runner.call(test_utils::SUBMIT, calling_account_id, input);
-    let error_message = format!("{:?}", maybe_err);
+    let err = runner
+        .submit_with_signer(&mut source_account, |nonce| {
+            // try to transfer more than we have
+            test_utils::transfer(dest_address, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
+        })
+        .unwrap_err();
+    let error_message = format!("{:?}", err);
     assert!(error_message.contains("ERR_OUT_OF_FUND"));
 
     // validate post-state
@@ -96,20 +85,8 @@ fn test_eth_transfer_insufficient_balance() {
 /// Tests the case where the nonce on the transaction does not match the address
 #[test]
 fn test_eth_transfer_incorrect_nonce() {
-    let (mut runner, source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account);
-    let transaction = LegacyEthTransaction {
-        nonce: (INITIAL_NONCE + 1).into(),
-        gas_price: Default::default(),
-        gas: Default::default(),
-        to: Some(dest_address),
-        value: TRANSFER_AMOUNT.into(),
-        data: vec![],
-    };
-    let transaction =
-        test_utils::sign_transaction(transaction, Some(runner.chain_id), &source_account);
-    let input = rlp::encode(&transaction).to_vec();
-    let calling_account_id = "some-account.near".to_string();
+    let (mut runner, mut source_account, dest_address) = initialize_transfer();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
 
     // validate pre-state
     test_utils::validate_address_balance_and_nonce(
@@ -121,8 +98,13 @@ fn test_eth_transfer_incorrect_nonce() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
-    let (_, maybe_err) = runner.call(test_utils::SUBMIT, calling_account_id, input);
-    let error_message = format!("{:?}", maybe_err);
+    let err = runner
+        .submit_with_signer(&mut source_account, |nonce| {
+            // creating transaction with incorrect nonce
+            test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce + 1)
+        })
+        .unwrap_err();
+    let error_message = format!("{:?}", err);
     assert!(error_message.contains("ERR_INCORRECT_NONCE"));
 
     // validate post-state (which is the same as pre-state in this case)
@@ -137,20 +119,13 @@ fn test_eth_transfer_incorrect_nonce() {
 
 #[test]
 fn test_eth_transfer_not_enough_gas() {
-    let (mut runner, source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account);
-    let transaction = LegacyEthTransaction {
-        nonce: INITIAL_NONCE.into(),
-        gas_price: Default::default(),
-        gas: 10_000.into(), // this is not enough gas
-        to: Some(dest_address),
-        value: TRANSFER_AMOUNT.into(),
-        data: vec![],
+    let (mut runner, mut source_account, dest_address) = initialize_transfer();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let transaction = |nonce| {
+        let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
+        tx.gas = 10_000.into(); // this is not enough gas
+        tx
     };
-    let transaction =
-        test_utils::sign_transaction(transaction, Some(runner.chain_id), &source_account);
-    let input = rlp::encode(&transaction).to_vec();
-    let calling_account_id = "some-account.near".to_string();
 
     // validate pre-state
     test_utils::validate_address_balance_and_nonce(
@@ -162,8 +137,10 @@ fn test_eth_transfer_not_enough_gas() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
-    let (_, maybe_err) = runner.call(test_utils::SUBMIT, calling_account_id, input);
-    let error_message = format!("{:?}", maybe_err);
+    let err = runner
+        .submit_with_signer(&mut source_account, transaction)
+        .unwrap_err();
+    let error_message = format!("{:?}", err);
     assert!(error_message.contains("ERR_INTRINSIC_GAS"));
 
     // validate post-state (which is the same as pre-state in this case)
@@ -176,7 +153,7 @@ fn test_eth_transfer_not_enough_gas() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 }
 
-fn initialize_transfer() -> (test_utils::AuroraRunner, SecretKey, Address) {
+fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
     // set up Aurora runner and accounts
     let mut runner = test_utils::deploy_evm();
     let mut rng = rand::thread_rng();
@@ -184,8 +161,10 @@ fn initialize_transfer() -> (test_utils::AuroraRunner, SecretKey, Address) {
     let source_address = test_utils::address_from_secret_key(&source_account);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
     let dest_address = test_utils::address_from_secret_key(&SecretKey::random(&mut rng));
+    let mut signer = test_utils::Signer::new(source_account);
+    signer.nonce = INITIAL_NONCE;
 
-    (runner, source_account, dest_address)
+    (runner, signer, dest_address)
 }
 
 use sha3::Digest;
