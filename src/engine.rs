@@ -14,7 +14,7 @@ use crate::parameters::{
 };
 
 use crate::precompiles::Precompiles;
-use crate::prelude::{Address, TryInto, Vec, H256, U256};
+use crate::prelude::{is_valid_account_id, Address, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
@@ -125,6 +125,50 @@ impl ExitIntoResult for ExitReason {
             Error(e) => Err(e.into()),
             Fatal(e) => Err(e.into()),
         }
+    }
+}
+
+pub const ERR_INVALID_NEP141_ACCOUNT_ID: &str = "ERR_INVALID_NEP141_ACCOUNT_ID";
+
+#[derive(Debug)]
+pub enum GetErc20FromNep141Error {
+    InvalidNep141AccountId,
+    Nep141NotFound,
+}
+
+impl GetErc20FromNep141Error {
+    pub fn to_str(&self) -> &str {
+        match self {
+            Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
+            Self::Nep141NotFound => "ERR_NEP141_NOT_FOUND",
+        }
+    }
+}
+
+impl AsRef<[u8]> for GetErc20FromNep141Error {
+    fn as_ref(&self) -> &[u8] {
+        self.to_str().as_bytes()
+    }
+}
+
+#[derive(Debug)]
+pub enum RegisterTokenError {
+    InvalidNep141AccountId,
+    TokenAlreadyRegistered,
+}
+
+impl RegisterTokenError {
+    pub fn to_str(&self) -> &str {
+        match self {
+            Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
+            Self::TokenAlreadyRegistered => "ERR_NEP141_TOKEN_ALREADY_REGISTERED",
+        }
+    }
+}
+
+impl AsRef<[u8]> for RegisterTokenError {
+    fn as_ref(&self) -> &[u8] {
+        self.to_str().as_bytes()
     }
 }
 
@@ -465,15 +509,33 @@ impl Engine {
             .map(|result| Address(result.as_slice().try_into().unwrap()))
     }
 
-    pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
-        // Check that this nep141 token was not registered before, they can only be registered once.
-        let map = Self::nep141_erc20_map();
-        assert!(map.lookup_left(nep141_token).is_none());
-        map.insert(nep141_token, erc20_token);
+    pub fn register_token(
+        &mut self,
+        erc20_token: &[u8],
+        nep141_token: &[u8],
+    ) -> Result<(), RegisterTokenError> {
+        match Self::get_erc20_from_nep141(nep141_token) {
+            Err(GetErc20FromNep141Error::Nep141NotFound) => (),
+            Err(GetErc20FromNep141Error::InvalidNep141AccountId) => {
+                return Err(RegisterTokenError::InvalidNep141AccountId)
+            }
+            Ok(_) => return Err(RegisterTokenError::TokenAlreadyRegistered),
+        }
+
+        Self::nep141_erc20_map().insert(nep141_token, erc20_token);
+        Ok(())
     }
 
-    pub fn get_erc20_from_nep141(&self, nep141_token: &[u8]) -> Option<Vec<u8>> {
-        Self::nep141_erc20_map().lookup_left(nep141_token)
+    pub fn get_erc20_from_nep141(
+        nep141_account_id: &[u8],
+    ) -> Result<Vec<u8>, GetErc20FromNep141Error> {
+        if !is_valid_account_id(nep141_account_id) {
+            return Err(GetErc20FromNep141Error::InvalidNep141AccountId);
+        }
+
+        Self::nep141_erc20_map()
+            .lookup_left(nep141_account_id)
+            .ok_or(GetErc20FromNep141Error::Nep141NotFound)
     }
 
     /// Transfers an amount from a given sender to a receiver, provided that
@@ -505,8 +567,6 @@ impl Engine {
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
 
-        let token = sdk::predecessor_account_id();
-
         // Parse message to determine recipient and fee
         let (recipient, fee) = {
             // Message format:
@@ -533,13 +593,11 @@ impl Engine {
             (recipient, fee)
         };
 
+        let token = sdk::predecessor_account_id();
         let erc20_token = Address(unwrap_res_or_finish!(
-            unwrap_res_or_finish!(
-                self.get_erc20_from_nep141(token.as_slice()).ok_or(()),
-                output_on_fail
-            )
-            .as_slice()
-            .try_into(),
+            unwrap_res_or_finish!(Self::get_erc20_from_nep141(&token), output_on_fail)
+                .as_slice()
+                .try_into(),
             output_on_fail
         ));
 
