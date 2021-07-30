@@ -27,6 +27,7 @@ codegen-units = 1
 rpath = false
 
 [profile.dev]
+# Due to a strange bug, setting this to 3 will cause test failures
 opt-level = "z"
 debug = false
 debug-assertions = true
@@ -36,6 +37,12 @@ panic = "abort"
 incremental = false
 codegen-units = 1
 rpath = false
+
+[profile.bench]
+# lto must be enabled in the bench profile as well for
+# it to actually happen when running tests with --release
+lto = true
+opt-level = 3
 
 [dependencies]
 blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
