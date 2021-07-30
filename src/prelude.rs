@@ -49,7 +49,8 @@ pub use primitive_types::{H160, H256, U256};
 pub type Address = H160;
 
 #[allow(non_snake_case, dead_code)]
-pub fn Address(input: [u8; 20]) -> Address {
+// Gets around the fact that you can't contract pub fields with types.
+pub const fn Address(input: [u8; 20]) -> Address {
     H160(input)
 }
 

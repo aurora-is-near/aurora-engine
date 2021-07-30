@@ -3,45 +3,36 @@ on: [push, pull_request]
 name: Tests
 jobs:
   test:
-    name: Test suite
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        net: [main, test, beta]
+    name: Test suite (${{ matrix.net }}net)
+    runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Cache Cargo artifacts
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install the toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2021-03-25
-          override: true
-      - run: make test-build
-      - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --locked --verbose --features meta-call
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Cache lookup for target dir
+        run: cache-util -restore -path target -key aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}
+      - run: make ${{ matrix.net }}net-test-build
+      - name: Run ${{ matrix.net }}net cargo test
+        run: cargo test --locked --verbose --features ${{ matrix.net }}net-test
+      - name: Caching target dir
+        run: cache-util -save -move -path target -key aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}
   bully-build:
     name: Bully build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Install the toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2021-03-25
-          override: true
-      - run: make evm-bully=yes
-      - run: ls -lH release.wasm
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Cache lookup for target dir
+        run: cache-util -restore -path target -key aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}
+      - run: make mainnet-debug evm-bully=yes
+      - run: ls -lH mainnet-debug.wasm
+      - name: Cache target dir
+        run: cache-util -save -move -path target -key aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  RUSTC_WRAPPER: sccache

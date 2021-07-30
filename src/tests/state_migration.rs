@@ -31,12 +31,12 @@ fn deploy_evm() -> AuroraAccount {
     let main_account = near_sdk_sim::init_simulator(None);
     let contract_account = main_account.deploy(
         &aurora_runner.code.code,
-        aurora_runner.aurora_account_id.clone(),
+        aurora_runner.aurora_account_id.parse().unwrap(),
         5 * near_sdk_sim::STORAGE_AMOUNT,
     );
     let new_args = NewCallArgs {
         chain_id: types::u256_to_arr(&U256::from(aurora_runner.chain_id)),
-        owner_id: main_account.account_id.clone(),
+        owner_id: main_account.account_id.clone().into(),
         bridge_prover_id: "prover.near".to_string(),
         upgrade_delay_blocks: 1,
     };

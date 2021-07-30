@@ -175,7 +175,7 @@ impl TryFrom<NEP141FtOnTransferArgs> for String {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct PromiseCreateArgs {
     pub target_account_id: AccountId,
     pub method: String,
