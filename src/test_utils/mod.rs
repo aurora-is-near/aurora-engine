@@ -13,16 +13,39 @@ use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::fungible_token::FungibleToken;
-use crate::parameters::{InitCallArgs, NewCallArgs, PromiseCreateArgs, SubmitResult};
+use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
 use crate::prelude::Address;
+use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
-use crate::transaction::{LegacyEthSignedTransaction, LegacyEthTransaction};
+use crate::transaction::{
+    access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
+    LegacyEthSignedTransaction, LegacyEthTransaction,
+};
 use crate::types;
 use crate::types::AccountId;
-use crate::{storage, AuroraState};
 
+#[cfg(all(
+    feature = "mainnet-test",
+    not(any(feature = "testnet", feature = "betanet"))
+))]
 lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "release.wasm"
+    EVM_WASM_BYTES => "mainnet-release.wasm"
+}
+
+#[cfg(all(
+    feature = "testnet-test",
+    not(any(feature = "mainnet", feature = "betanet"))
+))]
+lazy_static_include::lazy_static_include_bytes! {
+    EVM_WASM_BYTES => "testnet-release.wasm"
+}
+
+#[cfg(all(
+    feature = "betanet-test",
+    not(any(feature = "mainnet", feature = "testnet"))
+))]
+lazy_static_include::lazy_static_include_bytes! {
+    EVM_WASM_BYTES => "betanet-release.wasm"
 }
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
@@ -103,8 +126,7 @@ impl<'a> OneShotAuroraRunner<'a> {
         );
 
         near_vm_runner::run(
-            self.base.code.hash.as_ref().to_vec(),
-            &self.base.code.code.as_slice(),
+            &self.base.code,
             method_name,
             &mut self.ext,
             self.context.clone(),
@@ -169,8 +191,7 @@ impl AuroraRunner {
         );
 
         let (maybe_outcome, maybe_error) = near_vm_runner::run(
-            self.code.hash.as_ref().to_vec(),
-            &self.code.code.as_slice(),
+            &self.code,
             method_name,
             &mut self.ext,
             self.context.clone(),
@@ -213,6 +234,16 @@ impl AuroraRunner {
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         trie.insert(ft_key, ft_value.try_to_vec().unwrap());
+    }
+
+    pub fn submit_with_signer<F: FnOnce(U256) -> LegacyEthTransaction>(
+        &mut self,
+        signer: &mut Signer,
+        make_tx: F,
+    ) -> Result<SubmitResult, VMError> {
+        let nonce = signer.use_nonce();
+        let tx = make_tx(nonce.into());
+        self.submit_transaction(&signer.secret_key, tx)
     }
 
     pub fn submit_transaction(
@@ -277,8 +308,7 @@ impl AuroraRunner {
             address.as_bytes().to_vec(),
         );
         let (outcome, maybe_error) = near_vm_runner::run(
-            self.code.hash.as_ref().to_vec(),
-            &self.code.code.as_slice(),
+            &self.code,
             method_name,
             &mut self.ext.clone(),
             context,
@@ -363,6 +393,17 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     runner
 }
 
+pub(crate) fn transfer(to: Address, amount: types::Wei, nonce: U256) -> LegacyEthTransaction {
+    LegacyEthTransaction {
+        nonce,
+        gas_price: Default::default(),
+        gas: u64::MAX.into(),
+        to: Some(to),
+        value: amount,
+        data: Vec::new(),
+    }
+}
+
 pub(crate) fn create_eth_transaction(
     to: Option<Address>,
     value: types::Wei,
@@ -407,6 +448,28 @@ pub(crate) fn sign_transaction(
     }
 }
 
+pub(crate) fn sign_access_list_transaction(
+    tx: AccessListEthTransaction,
+    secret_key: &SecretKey,
+) -> AccessListEthSignedTransaction {
+    let mut rlp_stream = RlpStream::new();
+    rlp_stream.append(&access_list::TYPE_BYTE);
+    tx.rlp_append_unsigned(&mut rlp_stream);
+    let message_hash = types::keccak(rlp_stream.as_raw());
+    let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
+
+    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let r = U256::from_big_endian(&signature.r.b32());
+    let s = U256::from_big_endian(&signature.s.b32());
+
+    AccessListEthSignedTransaction {
+        transaction_data: tx,
+        parity: recovery_id.serialize(),
+        r,
+        s,
+    }
+}
+
 pub(crate) fn address_from_secret_key(sk: &SecretKey) -> Address {
     let pk = PublicKey::from_secret_key(sk);
     let hash = types::keccak(&pk.serialize()[1..]);
@@ -440,13 +503,12 @@ pub fn new_context() -> Context {
     }
 }
 
-#[derive(Default)]
-pub struct MockState;
+pub(crate) fn address_from_hex(address: &str) -> Address {
+    let bytes = if address.starts_with("0x") {
+        hex::decode(&address[2..]).unwrap()
+    } else {
+        hex::decode(address).unwrap()
+    };
 
-impl AuroraState for MockState {
-    fn add_promise(&mut self, _promise: PromiseCreateArgs) {}
-}
-
-pub fn new_state() -> MockState {
-    Default::default()
+    Address::from_slice(&bytes)
 }

@@ -81,13 +81,13 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetStorageAtArgs, InitCallArgs,
-        IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs,
-        SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
+        DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetErc20FromNep141CallArgs,
+        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
     };
 
     use crate::json::parse_json;
-    use crate::prelude::{format, Address, ToString, TryInto, H160, H256, U256};
+    use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
     use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
     use crate::types::{
@@ -219,8 +219,7 @@ mod contract {
 
         let input = sdk::read_input();
 
-        let EthTransaction::Legacy(signed_transaction) =
-            EthTransaction::try_from(input.as_slice()).sdk_unwrap();
+        let signed_transaction = EthTransaction::try_from(input.as_slice()).sdk_unwrap();
 
         let state = Engine::get_state().sdk_unwrap();
 
@@ -236,16 +235,13 @@ mod contract {
             .sender()
             .sdk_expect("ERR_INVALID_ECDSA_SIGNATURE");
 
-        Engine::check_nonce(&sender, &signed_transaction.transaction.nonce).sdk_unwrap();
+        Engine::check_nonce(&sender, signed_transaction.nonce()).sdk_unwrap();
 
         // Check intrinsic gas is covered by transaction gas limit
-        match signed_transaction
-            .transaction
-            .intrinsic_gas(crate::engine::CONFIG)
-        {
+        match signed_transaction.intrinsic_gas(crate::engine::CONFIG) {
             None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
             Some(intrinsic_gas) => {
-                if signed_transaction.transaction.gas < intrinsic_gas.into() {
+                if signed_transaction.gas_limit() < &intrinsic_gas.into() {
                     sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
                 }
             }
@@ -253,18 +249,27 @@ mod contract {
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
-        let value = signed_transaction.transaction.value;
-        let gas_limit = signed_transaction
-            .transaction
-            .get_gas_limit()
-            .sdk_expect(GAS_OVERFLOW);
-        let data = signed_transaction.transaction.data;
-        let result = if let Some(receiver) = signed_transaction.transaction.to {
-            Engine::call(&mut engine, sender, receiver, value, data, gas_limit)
+        let (value, gas_limit, data, maybe_receiver, access_list) =
+            signed_transaction.destructure();
+        let gas_limit = gas_limit.sdk_expect(GAS_OVERFLOW);
+        let access_list = access_list
+            .into_iter()
+            .map(|a| (a.address, a.storage_keys))
+            .collect();
+        let result = if let Some(receiver) = maybe_receiver {
+            Engine::call(
+                &mut engine,
+                sender,
+                receiver,
+                value,
+                data,
+                gas_limit,
+                access_list,
+            )
             // TODO: charge for storage
         } else {
             // Execute a contract deployment:
-            Engine::deploy_code(&mut engine, sender, value, data, gas_limit)
+            Engine::deploy_code(&mut engine, sender, value, data, gas_limit, access_list)
             // TODO: charge for storage
         };
         result
@@ -294,6 +299,7 @@ mod contract {
             meta_call_args.value,
             meta_call_args.input,
             u64::MAX, // TODO: is there a gas limit with meta calls?
+            crate::prelude::Vec::new(),
         );
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
@@ -323,7 +329,6 @@ mod contract {
         let args: NEP141FtOnTransferArgs = parse_json(sdk::read_input().as_slice())
             .sdk_unwrap()
             .try_into()
-            .map_err(|err| format!("ERR_JSON_{:?}", err))
             .sdk_unwrap();
 
         if sdk::predecessor_account_id() == sdk::current_account_id() {
@@ -357,7 +362,12 @@ mod contract {
         )
         .map(|res| {
             let address = H160(res.result.as_slice().try_into().unwrap());
-            engine.register_token(address.as_bytes(), args.nep141.as_bytes());
+            crate::log!(
+                crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str()
+            );
+            engine
+                .register_token(address.as_bytes(), &args.nep141.as_bytes())
+                .sdk_unwrap();
             res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
         })
         .sdk_process();
@@ -568,10 +578,13 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_erc20_from_nep141() {
+        let args: GetErc20FromNep141CallArgs =
+            GetErc20FromNep141CallArgs::try_from_slice(&sdk::read_input())
+                .sdk_expect("ERR_ARG_PARSE");
+
         sdk::return_output(
-            Engine::nep141_erc20_map()
-                .lookup_left(sdk::read_input().as_slice())
-                .sdk_expect("NEP141_NOT_FOUND")
+            Engine::get_erc20_from_nep141(&args.nep141.as_bytes())
+                .sdk_unwrap()
                 .as_slice(),
         );
     }

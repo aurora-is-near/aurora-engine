@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "1.0.0"
+version = "1.5.0"
 authors = ["NEAR <hello@near.org>"]
 edition = "2018"
 description = ""
@@ -16,7 +16,7 @@ autobenches = false
 crate-type = ["cdylib", "rlib"]
 
 [profile.release]
-opt-level = "z"
+opt-level = 3
 debug = false
 debug-assertions = false
 overflow-checks = true
@@ -27,6 +27,7 @@ codegen-units = 1
 rpath = false
 
 [profile.dev]
+# Due to a strange bug, setting this to 3 will cause test failures
 opt-level = "z"
 debug = false
 debug-assertions = true
@@ -37,12 +38,18 @@ incremental = false
 codegen-units = 1
 rpath = false
 
+[profile.bench]
+# lto must be enabled in the bench profile as well for
+# it to actually happen when running tests with --release
+lto = true
+opt-level = 3
+
 [dependencies]
 blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
-evm = { version = "0.28.0", default-features = false }
-evm-core = { version = "0.28.0", default-features = false }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "09d4fe09dcb5fcabed8c1076699c8a2e70f14c23", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "09d4fe09dcb5fcabed8c1076699c8a2e70f14c23", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }
@@ -62,12 +69,12 @@ bstr = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hex = { version = "0.4.3", default-features = false }
-near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }
-near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077c6acfde68c06845f2a1eb2b5ed7983401" }
-near-crypto = "0.1.0"
-near-vm-runner = "4.0.0-pre.1"
-near-vm-logic = "4.0.0-pre.1"
-near-primitives-core = "0.4.0"
+near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "1b9843fe5b652928582e33879fc92ba87a639450" }
+near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "1b9843fe5b652928582e33879fc92ba87a639450" }
+near-crypto = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+near-vm-runner = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+near-vm-logic = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+near-primitives-core = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
 libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
@@ -86,3 +93,6 @@ integration-test = ["log"]
 mainnet = ["contract", "log"]
 testnet = ["contract", "log"]
 betanet = ["contract", "log", "meta-call"]
+mainnet-test = ["meta-call"]
+testnet-test = ["meta-call"]
+betanet-test = ["meta-call"]

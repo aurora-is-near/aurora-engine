@@ -87,10 +87,14 @@ pub struct ViewCallArgs {
     pub input: Vec<u8>,
 }
 
+/// Borsh-encoded parameters for `deploy_erc20_token` function.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
 pub struct DeployErc20TokenArgs {
     pub nep141: AccountId,
 }
+
+/// Borsh-encoded parameters for `get_erc20_from_nep141` function.
+pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgs;
 
 /// Borsh-encoded parameters for the `get_storage_at` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -171,7 +175,7 @@ impl TryFrom<NEP141FtOnTransferArgs> for String {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct PromiseCreateArgs {
     pub target_account_id: AccountId,
     pub method: String,
