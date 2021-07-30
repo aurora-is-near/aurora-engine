@@ -51,7 +51,9 @@ mod exports {
         fn random_seed(register_id: u64);
         pub(crate) fn sha256(value_len: u64, value_ptr: u64, register_id: u64);
         pub(crate) fn keccak256(value_len: u64, value_ptr: u64, register_id: u64);
+        #[cfg(feature = "testnet")]
         pub(crate) fn ripemd160(value_len: u64, value_ptr: u64, register_id: u64);
+        #[cfg(feature = "testnet")]
         pub(crate) fn ecrecover(
             hash_len: u64,
             hash_ptr: u64,
