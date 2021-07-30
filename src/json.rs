@@ -60,7 +60,7 @@ impl JsonValue {
     pub fn u64(&self, key: &str) -> Result<u64, JsonError> {
         match self {
             JsonValue::Object(o) => match o.get(key).ok_or(JsonError::MissingValue)? {
-                JsonValue::U64(n) => Ok(*n as u64),
+                JsonValue::U64(n) => Ok(*n),
                 _ => Err(JsonError::InvalidU64),
             },
             _ => Err(JsonError::NotJsonType),
@@ -449,18 +449,15 @@ mod tests {
 
     #[test]
     fn test_json_type_u8() {
-        let json = JsonValue::from(123f64);
+        let json = JsonValue::from(123_u64);
         let val = JsonValue::parse_u8(&json).ok().unwrap();
         assert_eq!(val, 123);
 
-        let json = JsonValue::from(-1f64);
+        let json = JsonValue::from(-1_i64);
         let err = JsonValue::parse_u8(&json).unwrap_err();
-        assert_eq!(
-            err,
-            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8)
-        );
+        assert_eq!(err, JsonError::InvalidU8);
 
-        let json = JsonValue::from(256f64);
+        let json = JsonValue::from(256_u64);
         let err = JsonValue::parse_u8(&json).unwrap_err();
         assert_eq!(
             err,

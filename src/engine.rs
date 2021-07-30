@@ -13,7 +13,7 @@ use crate::parameters::{
     ViewCallArgs,
 };
 
-use crate::precompiles;
+use crate::precompiles::Precompiles;
 use crate::prelude::{Address, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::state::AuroraStackState;
@@ -340,7 +340,7 @@ impl Engine {
     pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let value = Wei::zero();
-        self.deploy_code(origin, value, input, u64::MAX)
+        self.deploy_code(origin, value, input, u64::MAX, Vec::new())
     }
 
     pub fn deploy_code(
@@ -349,11 +349,12 @@ impl Engine {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
+        access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor(gas_limit);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (status, result) = (
-            executor.transact_create(origin, value.raw(), input, gas_limit),
+            executor.transact_create(origin, value.raw(), input, gas_limit, access_list),
             address,
         );
         let is_succeed = status.is_succeed();
@@ -378,7 +379,7 @@ impl Engine {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = Wei::zero();
-        self.call(origin, contract, value, args.input, u64::MAX)
+        self.call(origin, contract, value, args.input, u64::MAX, Vec::new())
     }
 
     pub fn call(
@@ -388,10 +389,11 @@ impl Engine {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
+        access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor(gas_limit);
         let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
 
         let is_succeed = status.is_succeed();
         if let Err(e) = status.into_result() {
@@ -438,15 +440,15 @@ impl Engine {
     ) -> EngineResult<Vec<u8>> {
         let mut executor = self.make_executor(gas_limit);
         let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
         status.into_result()?;
         Ok(result)
     }
 
-    fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState> {
+    fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState, Precompiles> {
         let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
         let state = AuroraStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, CONFIG, precompiles::istanbul_precompiles)
+        StackExecutor::new_with_precompile(state, CONFIG, Precompiles::new_istanbul())
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
@@ -486,7 +488,7 @@ impl Engine {
         value: Wei,
         gas_limit: u64,
     ) -> EngineResult<SubmitResult> {
-        self.call(sender, receiver, value, Vec::new(), gas_limit)
+        self.call(sender, receiver, value, Vec::new(), gas_limit, Vec::new())
     }
 
     /// Mint tokens for recipient on a particular ERC20 token
@@ -572,6 +574,7 @@ impl Engine {
                 Wei::zero(),
                 [selector, tail.as_slice()].concat(),
                 u64::MAX,
+                Vec::new(), // TODO: are there values we should put here?
             ),
             output_on_fail
         );
