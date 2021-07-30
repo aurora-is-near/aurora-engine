@@ -233,6 +233,16 @@ impl AuroraRunner {
         trie.insert(ft_key, ft_value.try_to_vec().unwrap());
     }
 
+    pub fn submit_with_signer<F: FnOnce(U256) -> LegacyEthTransaction>(
+        &mut self,
+        signer: &mut Signer,
+        make_tx: F,
+    ) -> Result<SubmitResult, VMError> {
+        let nonce = signer.use_nonce();
+        let tx = make_tx(nonce.into());
+        self.submit_transaction(&signer.secret_key, tx)
+    }
+
     pub fn submit_transaction(
         &mut self,
         account: &SecretKey,
@@ -378,6 +388,17 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     assert!(maybe_error.is_none());
 
     runner
+}
+
+pub(crate) fn transfer(to: Address, amount: types::Wei, nonce: U256) -> LegacyEthTransaction {
+    LegacyEthTransaction {
+        nonce,
+        gas_price: Default::default(),
+        gas: u64::MAX.into(),
+        to: Some(to),
+        value: amount,
+        data: Vec::new(),
+    }
 }
 
 pub(crate) fn create_eth_transaction(
