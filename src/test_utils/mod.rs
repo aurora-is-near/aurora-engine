@@ -17,7 +17,10 @@ use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
 use crate::prelude::Address;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
-use crate::transaction::{LegacyEthSignedTransaction, LegacyEthTransaction};
+use crate::transaction::{
+    access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
+    LegacyEthSignedTransaction, LegacyEthTransaction,
+};
 use crate::types;
 use crate::types::AccountId;
 
@@ -445,6 +448,28 @@ pub(crate) fn sign_transaction(
     }
 }
 
+pub(crate) fn sign_access_list_transaction(
+    tx: AccessListEthTransaction,
+    secret_key: &SecretKey,
+) -> AccessListEthSignedTransaction {
+    let mut rlp_stream = RlpStream::new();
+    rlp_stream.append(&access_list::TYPE_BYTE);
+    tx.rlp_append_unsigned(&mut rlp_stream);
+    let message_hash = types::keccak(rlp_stream.as_raw());
+    let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
+
+    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let r = U256::from_big_endian(&signature.r.b32());
+    let s = U256::from_big_endian(&signature.s.b32());
+
+    AccessListEthSignedTransaction {
+        transaction_data: tx,
+        parity: recovery_id.serialize(),
+        r,
+        s,
+    }
+}
+
 pub(crate) fn address_from_secret_key(sk: &SecretKey) -> Address {
     let pk = PublicKey::from_secret_key(sk);
     let hash = types::keccak(&pk.serialize()[1..]);
@@ -476,4 +501,14 @@ pub fn new_context() -> Context {
         caller: Default::default(),
         apparent_value: Default::default(),
     }
+}
+
+pub(crate) fn address_from_hex(address: &str) -> Address {
+    let bytes = if address.starts_with("0x") {
+        hex::decode(&address[2..]).unwrap()
+    } else {
+        hex::decode(address).unwrap()
+    };
+
+    Address::from_slice(&bytes)
 }
