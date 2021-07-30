@@ -324,16 +324,11 @@ impl AuroraRunner {
 
 impl Default for AuroraRunner {
     fn default() -> Self {
-        #[cfg(feature = "mainnet-test")]
-        let contract_code = &EVM_WASM_BYTES;
-        #[cfg(not(feature = "mainnet-test"))]
-        let contract_code = [];
-
         let aurora_account_id = "aurora".to_string();
         Self {
             aurora_account_id: aurora_account_id.clone(),
             chain_id: 1313161556, // NEAR betanet
-            code: ContractCode::new(contract_code.to_vec(), None),
+            code: ContractCode::new(EVM_WASM_BYTES.to_vec(), None),
             cache: Default::default(),
             ext: Default::default(),
             context: VMContext {
