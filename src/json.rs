@@ -33,7 +33,6 @@ pub enum JsonError {
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum JsonOutOfRangeError {
     OutOfRangeU8,
-    OutOfRangeU64,
     OutOfRangeU128,
 }
 
@@ -123,7 +122,6 @@ impl AsRef<[u8]> for JsonOutOfRangeError {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::OutOfRangeU8 => b"ERR_OUT_OF_RANGE_U8",
-            Self::OutOfRangeU64 => b"ERR_OUT_OF_RANGE_U64",
             Self::OutOfRangeU128 => b"ERR_OUT_OF_RANGE_U128",
         }
     }
@@ -229,6 +227,8 @@ impl TryFrom<&JsonValue> for u128 {
                 }
             }
             JsonValue::F64(_) => Err(JsonError::ExpectedStringGotNumber),
+            JsonValue::I64(_) => Err(JsonError::ExpectedStringGotNumber),
+            JsonValue::U64(_) => Err(JsonError::ExpectedStringGotNumber),
             _ => Err(JsonError::InvalidU128),
         }
     }
