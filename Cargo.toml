@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "1.0.0"
+version = "1.5.0"
 authors = ["NEAR <hello@near.org>"]
 edition = "2018"
 description = ""
