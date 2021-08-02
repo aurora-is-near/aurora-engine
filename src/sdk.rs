@@ -315,7 +315,9 @@ pub fn remove_storage_with_result(key: &[u8]) -> Option<Vec<u8>> {
 
 #[allow(dead_code)]
 pub fn block_timestamp() -> u64 {
-    unsafe { exports::block_timestamp() }
+    // NEAR timestamp is in nanoseconds
+    let timestamp_ns = unsafe { exports::block_timestamp() };
+    timestamp_ns / 1000 // convert to milliseconds for Ethereum compatibility
 }
 
 pub fn block_index() -> u64 {
