@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
@@ -23,6 +24,9 @@ use crate::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
 const BLOCK_HASH_PREFIX: u8 = 0;
+const BLOCK_HASH_PREFIX_SIZE: usize = 1;
+const BLOCK_HEIGHT_SIZE: usize = 8;
+const CHAIN_ID_SIZE: usize = 32;
 
 #[cfg(not(feature = "contract"))]
 pub fn current_address() -> Address {
@@ -261,7 +265,12 @@ impl Engine {
     /// ))
     /// ```
     pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u8]) -> H256 {
-        let mut data = Vec::with_capacity(1 + 8 + 32 + account_id.len());
+        debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, mem::size_of_val(&BLOCK_HASH_PREFIX));
+        debug_assert_eq!(BLOCK_HEIGHT_SIZE, mem::size_of_val(&block_height));
+        debug_assert_eq!(CHAIN_ID_SIZE, mem::size_of_val(&chain_id));
+        let mut data = Vec::with_capacity(
+            BLOCK_HASH_PREFIX_SIZE + BLOCK_HEIGHT_SIZE + CHAIN_ID_SIZE + account_id.len(),
+        );
         data.push(BLOCK_HASH_PREFIX);
         data.extend_from_slice(&block_height.to_be_bytes());
         data.extend_from_slice(&chain_id);
