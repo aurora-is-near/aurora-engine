@@ -42,36 +42,6 @@ mod tests;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-#[cfg(target_arch = "wasm32")]
-#[panic_handler]
-#[cfg_attr(not(feature = "log"), allow(unused_variables))]
-#[no_mangle]
-pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
-    #[cfg(feature = "log")]
-    {
-        use alloc::{format, string::ToString};
-        if let Some(msg) = info.message() {
-            let msg = if let Some(log) = info.location() {
-                format!("{} [{}]", msg, log)
-            } else {
-                msg.to_string()
-            };
-            sdk::panic_utf8(msg.as_bytes());
-        } else if let Some(log) = info.location() {
-            sdk::panic_utf8(log.to_string().as_bytes());
-        }
-    }
-
-    ::core::arch::wasm32::unreachable();
-}
-
-#[cfg(target_arch = "wasm32")]
-#[alloc_error_handler]
-#[no_mangle]
-pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
-    ::core::arch::wasm32::unreachable();
-}
-
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
