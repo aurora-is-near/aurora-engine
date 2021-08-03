@@ -260,11 +260,11 @@ impl Engine {
     ///     engine_account_id,
     /// ))
     /// ```
-    pub fn compute_block_hash(&self, block_height: u64, account_id: &[u8]) -> H256 {
+    pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u8]) -> H256 {
         let mut data = Vec::with_capacity(1 + 8 + 32 + account_id.len());
         data.push(BLOCK_HASH_PREFIX);
         data.extend_from_slice(&block_height.to_be_bytes());
-        data.extend_from_slice(&self.state.chain_id);
+        data.extend_from_slice(&chain_id);
         data.extend_from_slice(account_id);
 
         #[cfg(not(feature = "contract"))]
@@ -743,11 +743,11 @@ impl evm::backend::Backend for Engine {
             #[cfg(feature = "contract")]
             {
                 let account_id = sdk::current_account_id();
-                self.compute_block_hash(number.low_u64(), &account_id)
+                Self::compute_block_hash(self.state.chain_id, number.low_u64(), &account_id)
             }
 
             #[cfg(not(feature = "contract"))]
-            self.compute_block_hash(number.low_u64(), b"aurora")
+            Self::compute_block_hash(self.state.chain_id, number.low_u64(), b"aurora")
         } else {
             H256::zero()
         }
