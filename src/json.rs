@@ -298,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "overflow")]
     fn test_json_type_u64_with_u128_value() {
         let _ = parse_json(format!(r#"{{"foo": {} }}"#, u128::MAX).as_bytes());
     }
@@ -309,9 +309,9 @@ mod tests {
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, 123);
 
-        // let json = parse_json(format!(r#"{{"foo": {} }}"#, u64::MAX).as_bytes()).unwrap();
-        // let val = json.u64("foo").ok().unwrap();
-        // assert_eq!(val, u64::MAX);
+        let json = parse_json(format!(r#"{{"foo": {} }}"#, u64::MAX).as_bytes()).unwrap();
+        let val = json.u64("foo").ok().unwrap();
+        assert_eq!(val, u64::MAX);
 
         let json = parse_json(r#"{"foo": 12.99}"#.as_bytes()).unwrap();
         let err = json.u64("foo").unwrap_err();
