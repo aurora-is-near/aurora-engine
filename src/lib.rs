@@ -251,6 +251,12 @@ mod contract {
         let gas_price = *signed_transaction.gas_price();
         let prepaid_amount =
             Engine::charge_gas_limit(&sender, *signed_transaction.gas_limit(), gas_price)
+                .map_err(|e| {
+                    // In the error case we still need to increment the nonce since the transaction
+                    // was valid except for a property of the current state (the balance)
+                    Engine::increment_nonce(&sender);
+                    e
+                })
                 .sdk_unwrap();
 
         // Figure out what kind of a transaction this is, and execute it:
