@@ -12,5 +12,7 @@ jobs:
         uses: actions/checkout@v2
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: make etc/eth-contracts/res/EvmErc20.bin
+      - name: Update toolchain
+        run: rustup update nightly
       - name: Run cargo clippy
-        run: cargo clippy --no-default-features --features=mainnet -- -D warnings
+        run: cargo +nightly clippy --no-default-features --features=mainnet -- -D warnings
