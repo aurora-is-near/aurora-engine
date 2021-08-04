@@ -50,6 +50,13 @@ impl EthTransaction {
         }
     }
 
+    pub fn gas_price(&self) -> &U256 {
+        match self {
+            Self::Legacy(tx) => &tx.transaction.gas_price,
+            Self::AccessList(tx) => &tx.transaction_data.gas_price,
+        }
+    }
+
     pub fn destructure(
         self,
     ) -> (

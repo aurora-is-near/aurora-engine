@@ -247,6 +247,12 @@ mod contract {
             }
         }
 
+        // Pay for gas
+        let gas_price = *signed_transaction.gas_price();
+        let prepaid_amount =
+            Engine::charge_gas_limit(&sender, *signed_transaction.gas_limit(), gas_price)
+                .sdk_unwrap();
+
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
         let (value, gas_limit, data, maybe_receiver, access_list) =
@@ -272,6 +278,16 @@ mod contract {
             Engine::deploy_code(&mut engine, sender, value, data, gas_limit, access_list)
             // TODO: charge for storage
         };
+
+        // Give refund
+        let relayer = predecessor_address();
+        // TODO: need to handle charging gas in the error case too
+        if let Ok(x) = &result {
+            Engine::refund_unused_gas(&sender, &relayer, prepaid_amount, x.gas_used, gas_price)
+                .sdk_unwrap();
+        }
+
+        // return result to user
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();

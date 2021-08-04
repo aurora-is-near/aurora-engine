@@ -136,6 +136,37 @@ impl ExitIntoResult for ExitReason {
     }
 }
 
+pub struct BalanceOverflow;
+impl AsRef<[u8]> for BalanceOverflow {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_BALANCE_OVERFLOW"
+    }
+}
+
+/// Errors resulting from trying to pay for gas
+pub enum GasPaymentError {
+    /// Overflow adding ETH to an account balance (should never happen)
+    BalanceOverflow(BalanceOverflow),
+    /// Overflow in gas * gas_price calculation
+    EthAmountOverflow,
+    /// Not enough balance for account to cover the gas cost
+    OutOfFund,
+}
+impl AsRef<[u8]> for GasPaymentError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::BalanceOverflow(overflow) => overflow.as_ref(),
+            Self::EthAmountOverflow => b"ERR_GAS_ETH_AMOUNT_OVERFLOW",
+            Self::OutOfFund => b"ERR_OUT_OF_FUND",
+        }
+    }
+}
+impl From<BalanceOverflow> for GasPaymentError {
+    fn from(overflow: BalanceOverflow) -> Self {
+        Self::BalanceOverflow(overflow)
+    }
+}
+
 pub const ERR_INVALID_NEP141_ACCOUNT_ID: &str = "ERR_INVALID_NEP141_ACCOUNT_ID";
 
 #[derive(Debug)]
@@ -288,6 +319,58 @@ impl Engine {
         sdk::sha256(&data)
     }
 
+    pub fn charge_gas_limit(
+        sender: &Address,
+        gas_limit: U256,
+        gas_price: U256,
+    ) -> Result<Wei, GasPaymentError> {
+        // Early exit as performance optimization
+        if gas_price.is_zero() {
+            return Ok(Wei::zero());
+        }
+
+        let eth_amount = Wei::new(
+            gas_limit
+                .checked_mul(gas_price)
+                .ok_or(GasPaymentError::EthAmountOverflow)?,
+        );
+        let account_balance = Self::get_balance(sender);
+        let remaining_balance = account_balance
+            .checked_sub(eth_amount)
+            .ok_or(GasPaymentError::OutOfFund)?;
+
+        Self::set_balance(sender, &remaining_balance);
+
+        Ok(eth_amount)
+    }
+
+    pub fn refund_unused_gas(
+        sender: &Address,
+        relayer: &Address,
+        prepaid_eth: Wei,
+        used_gas: u64,
+        gas_price: U256,
+    ) -> Result<(), GasPaymentError> {
+        // Early exit as performance optimization
+        if gas_price.is_zero() {
+            return Ok(());
+        }
+
+        let used_amount = Wei::new(
+            gas_price
+                .checked_mul(used_gas.into())
+                .ok_or(GasPaymentError::EthAmountOverflow)?,
+        );
+        // We cannot have used more than the gas_limit
+        debug_assert!(used_amount <= prepaid_eth);
+        let refund_amount = prepaid_eth - used_amount;
+
+        Self::add_balance(sender, refund_amount)?;
+        Self::add_balance(relayer, used_amount)?;
+
+        Ok(())
+    }
+
     /// Fails if state is not found.
     pub fn get_state() -> Result<EngineState, EngineStateError> {
         match sdk::read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
@@ -341,6 +424,13 @@ impl Engine {
         sdk::read_storage(&address_to_key(KeyPrefix::Nonce, address))
             .map(|value| U256::from_big_endian(&value))
             .unwrap_or_else(U256::zero)
+    }
+
+    pub fn add_balance(address: &Address, amount: Wei) -> Result<(), BalanceOverflow> {
+        let current_balance = Self::get_balance(address);
+        let new_balance = current_balance.checked_add(amount).ok_or(BalanceOverflow)?;
+        Self::set_balance(address, &new_balance);
+        Ok(())
     }
 
     pub fn set_balance(address: &Address, balance: &Wei) {

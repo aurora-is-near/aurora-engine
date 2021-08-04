@@ -169,7 +169,7 @@ impl Proof {
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default)]
 pub struct Wei(U256);
 impl Wei {
     const ETH_TO_WEI: U256 = U256([1_000_000_000_000_000_000, 0, 0, 0]);
@@ -205,6 +205,14 @@ impl Wei {
 
     pub fn raw(self) -> U256 {
         self.0
+    }
+
+    pub fn checked_sub(self, other: Self) -> Option<Self> {
+        self.0.checked_sub(other.0).map(Self)
+    }
+
+    pub fn checked_add(self, other: Self) -> Option<Self> {
+        self.0.checked_add(other.0).map(Self)
     }
 }
 impl prelude::Sub for Wei {
