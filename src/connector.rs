@@ -629,7 +629,33 @@ impl EthConnectorContract {
 
     /// Return metdata
     pub fn get_metadata(&self) {
-        sdk::return_output(&self.metadata.try_to_vec().unwrap()[..]);
+        let icon = if let Some(ref icon) = self.metadata.icon {
+            format!(r#""{}""#, icon)
+        } else {
+            "null".to_string()
+        };
+        let reference = if let Some(ref reference) = self.metadata.reference {
+            format!(r#""{}""#, reference)
+        } else {
+            "null".to_string()
+        };
+        let reference_hash = if let Some(ref reference_hash) = self.metadata.reference_hash {
+            format!("{:?}", reference_hash)
+        } else {
+            "null".to_string()
+        };
+        let json_data = format!(
+            r#"{{"spec": "{}", "name": "{}", "symbol": "{}", "icon": {}, "reference": {}, "reference_hash": {}, "decimals": {:?}}}"#,
+            self.metadata.spec,
+            self.metadata.name,
+            self.metadata.symbol,
+            icon,
+            reference,
+            reference_hash,
+            self.metadata.decimals,
+        );
+        // Return JSON
+        sdk::return_output(&json_data.as_bytes());
     }
 }
 
