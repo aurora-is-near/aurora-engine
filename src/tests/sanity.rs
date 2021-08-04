@@ -2,6 +2,7 @@ use crate::prelude::Address;
 use crate::test_utils;
 use crate::types::{Wei, ERC20_MINT_SELECTOR};
 use secp256k1::SecretKey;
+use std::path::{Path, PathBuf};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
@@ -177,4 +178,47 @@ fn check_selector() {
     let mut hasher = sha3::Keccak256::default();
     hasher.update(b"mint(address,uint256)");
     assert_eq!(hasher.finalize()[..4].to_vec(), ERC20_MINT_SELECTOR);
+}
+
+#[test]
+fn test_block_hash() {
+    let runner = test_utils::AuroraRunner::default();
+    let chain_id = {
+        let number = crate::prelude::U256::from(runner.chain_id);
+        crate::types::u256_to_arr(&number)
+    };
+    let account_id = runner.aurora_account_id;
+    let block_hash = crate::engine::Engine::compute_block_hash(chain_id, 10, account_id.as_bytes());
+
+    assert_eq!(
+        hex::encode(block_hash.0).as_str(),
+        "4c8a60b32b74f184438a5e450951570bc1bda37caa7b6a3f178b80395845fb80"
+    );
+}
+
+#[test]
+fn test_block_hash_contract() {
+    let (mut runner, mut source_account, _) = initialize_transfer();
+    let test_constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+        ["src", "tests", "res"].iter().collect::<PathBuf>(),
+        Path::new("target").join("solidity_build"),
+        "blockhash.sol",
+        "BlockHash",
+    );
+    let nonce = source_account.use_nonce();
+    let test_contract = runner.deploy_contract(
+        &source_account.secret_key,
+        |c| c.deploy_without_args(nonce.into()),
+        test_constructor,
+    );
+
+    let result = runner
+        .submit_with_signer(&mut source_account, |nonce| {
+            test_contract.call_method_without_args("test", nonce)
+        })
+        .unwrap();
+
+    if !result.status {
+        panic!("{}", String::from_utf8_lossy(&result.result));
+    }
 }

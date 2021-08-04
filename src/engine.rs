@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
@@ -19,6 +20,13 @@ use crate::sdk;
 use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
+
+/// Used as the first byte in the concatenation of data used to compute the blockhash.
+/// Could be useful in the future as a version byte, or to distinguish different types of blocks.
+const BLOCK_HASH_PREFIX: u8 = 0;
+const BLOCK_HASH_PREFIX_SIZE: usize = 1;
+const BLOCK_HEIGHT_SIZE: usize = 8;
+const CHAIN_ID_SIZE: usize = 32;
 
 #[cfg(not(feature = "contract"))]
 pub fn current_address() -> Address {
@@ -191,7 +199,7 @@ impl AsRef<[u8]> for EngineStateError {
 /// Should not contain anything large or enumerable.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
 pub struct EngineState {
-    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],
     /// Account which can upgrade this contract.
     /// Use empty to disable updatability.
@@ -243,6 +251,41 @@ impl Engine {
             &bytes_to_key(KeyPrefix::Config, STATE_KEY),
             &state.try_to_vec().expect("ERR_SER"),
         );
+    }
+
+    /// There is one Aurora block per NEAR block height (note: when heights in NEAR are skipped
+    /// they are interpreted as empty blocks on Aurora). The blockhash is derived from the height
+    /// according to
+    /// ```text
+    /// block_hash = sha256(concat(
+    ///     BLOCK_HASH_PREFIX,
+    ///     block_height as u64,
+    ///     chain_id,
+    ///     engine_account_id,
+    /// ))
+    /// ```
+    pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u8]) -> H256 {
+        debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, mem::size_of_val(&BLOCK_HASH_PREFIX));
+        debug_assert_eq!(BLOCK_HEIGHT_SIZE, mem::size_of_val(&block_height));
+        debug_assert_eq!(CHAIN_ID_SIZE, mem::size_of_val(&chain_id));
+        let mut data = Vec::with_capacity(
+            BLOCK_HASH_PREFIX_SIZE + BLOCK_HEIGHT_SIZE + CHAIN_ID_SIZE + account_id.len(),
+        );
+        data.push(BLOCK_HASH_PREFIX);
+        data.extend_from_slice(&block_height.to_be_bytes());
+        data.extend_from_slice(&chain_id);
+        data.extend_from_slice(account_id);
+
+        #[cfg(not(feature = "contract"))]
+        {
+            use sha2::Digest;
+
+            let output = sha2::Sha256::digest(&data);
+            H256(output.into())
+        }
+
+        #[cfg(feature = "contract")]
+        sdk::sha256(&data)
     }
 
     /// Fails if state is not found.
@@ -705,7 +748,15 @@ impl evm::backend::Backend for Engine {
     fn block_hash(&self, number: U256) -> H256 {
         let idx = U256::from(sdk::block_index());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
-            H256::from([255u8; 32])
+            // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
+            #[cfg(feature = "contract")]
+            {
+                let account_id = sdk::current_account_id();
+                Self::compute_block_hash(self.state.chain_id, number.low_u64(), &account_id)
+            }
+
+            #[cfg(not(feature = "contract"))]
+            Self::compute_block_hash(self.state.chain_id, number.low_u64(), b"aurora")
         } else {
             H256::zero()
         }
