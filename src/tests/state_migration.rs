@@ -1,12 +1,13 @@
 use crate::parameters::NewCallArgs;
 use crate::prelude::U256;
-use crate::test_utils::AuroraRunner;
+use crate::test_utils::{self, AuroraRunner};
 use crate::types;
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use crate::types::Wei;
 
 #[test]
 fn test_state_migration() {
@@ -24,6 +25,47 @@ fn test_state_migration() {
     result.assert_success();
     let some_numbers: [u32; 7] = result.unwrap_borsh();
     assert_eq!(some_numbers, [3, 1, 4, 1, 5, 9, 2]);
+}
+
+// This test has nothing to do with migration. I'm just putting it here for convenience
+// because it does require near-sdk-sim and the state migration test already had the
+// `deploy_evm()` function to set everything up.
+#[test]
+fn test_state_revert() {
+    let aurora = deploy_evm();
+    let mut signer = test_utils::Signer::random();
+    let address = test_utils::address_from_secret_key(&signer.secret_key);
+
+    // create account
+    let args = crate::parameters::WithdrawCallArgs {
+        recipient_address: address.0,
+        amount: 1_000_000
+    };
+    aurora.call("mint_account", &args.try_to_vec().unwrap()).assert_success();
+
+    // confirm nonce is zero
+    let x = aurora.call("get_nonce", &address.0);
+    let observed_nonce = match &x.outcome().status {
+        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
+        _ => panic!("?"),
+    };
+    assert_eq!(observed_nonce, U256::zero());
+
+    // try operation that fails (transfer more eth than we have)
+    let nonce = signer.use_nonce();
+    let tx = test_utils::transfer(crate::prelude::Address([0; 20]), Wei::new_u64(2_000_000), nonce.into());
+    let signed_tx = test_utils::sign_transaction(tx, Some(AuroraRunner::default().chain_id), &signer.secret_key);
+    let x = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
+    println!("{:?}", x);
+
+    // check nonce again; it should have incremented because the transaction was valid
+    // (even though its execution failed)
+    let x = aurora.call("get_nonce", &address.0);
+    let observed_nonce = match &x.outcome().status {
+        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
+        _ => panic!("?"),
+    };
+    assert_eq!(observed_nonce, U256::one());
 }
 
 fn deploy_evm() -> AuroraAccount {
