@@ -193,8 +193,15 @@ mod contract {
         if !sdk::storage_has_key(&metadata_key[..]) {
             use crate::fungible_token::FungibleTokenMetadata;
 
-            let metadata =
-                FungibleTokenMetadata::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+            let metadata = FungibleTokenMetadata {
+                spec: "".to_string(),
+                symbol: "".to_string(),
+                name: "".to_string(),
+                icon: None,
+                reference: None,
+                reference_hash: None,
+                decimals: 18,
+            };
             sdk::save_contract(&metadata_key, &metadata);
         }
     }
