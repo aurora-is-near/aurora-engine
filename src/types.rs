@@ -12,7 +12,6 @@ use ethabi::{ParamType, Token};
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
 
-use crate::engine::EngineResult;
 use crate::log_entry::LogEntry;
 use crate::sdk;
 
@@ -422,7 +421,7 @@ pub(crate) trait SdkProcess<T> {
     fn sdk_process(self);
 }
 
-impl<T: AsRef<[u8]>> SdkProcess<T> for EngineResult<T> {
+impl<T: AsRef<[u8]>, E: AsRef<[u8]>> SdkProcess<T> for Result<T, E> {
     fn sdk_process(self) {
         match self {
             Ok(r) => sdk::return_output(r.as_ref()),

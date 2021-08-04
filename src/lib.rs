@@ -281,11 +281,12 @@ mod contract {
 
         // Give refund
         let relayer = predecessor_address();
-        // TODO: need to handle charging gas in the error case too
-        if let Ok(x) = &result {
-            Engine::refund_unused_gas(&sender, &relayer, prepaid_amount, x.gas_used, gas_price)
-                .sdk_unwrap();
-        }
+        let gas_used = match &result {
+            Ok(submit_result) => submit_result.gas_used,
+            Err(engine_err) => engine_err.gas_used,
+        };
+        Engine::refund_unused_gas(&sender, &relayer, prepaid_amount, gas_used, gas_price)
+            .sdk_unwrap();
 
         // return result to user
         result

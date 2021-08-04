@@ -56,9 +56,27 @@ macro_rules! assert_or_finish {
     };
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct EngineError {
+    pub kind: EngineErrorKind,
+    pub gas_used: u64,
+}
+
+impl AsRef<str> for EngineError {
+    fn as_ref(&self) -> &str {
+        self.kind.to_str()
+    }
+}
+
+impl AsRef<[u8]> for EngineError {
+    fn as_ref(&self) -> &[u8] {
+        self.kind.to_str().as_bytes()
+    }
+}
+
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum EngineError {
+pub enum EngineErrorKind {
     /// Normal EVM errors.
     EvmError(ExitError),
     /// Fatal EVM errors.
@@ -67,9 +85,16 @@ pub enum EngineError {
     IncorrectNonce,
 }
 
-impl EngineError {
+impl EngineErrorKind {
+    pub fn with_gas_used(self, gas_used: u64) -> EngineError {
+        EngineError {
+            kind: self,
+            gas_used,
+        }
+    }
+
     pub fn to_str(&self) -> &str {
-        use EngineError::*;
+        use EngineErrorKind::*;
         match self {
             EvmError(ExitError::StackUnderflow) => "ERR_STACK_UNDERFLOW",
             EvmError(ExitError::StackOverflow) => "ERR_STACK_OVERFLOW",
@@ -93,27 +118,27 @@ impl EngineError {
     }
 }
 
-impl AsRef<str> for EngineError {
+impl AsRef<str> for EngineErrorKind {
     fn as_ref(&self) -> &str {
         self.to_str()
     }
 }
 
-impl AsRef<[u8]> for EngineError {
+impl AsRef<[u8]> for EngineErrorKind {
     fn as_ref(&self) -> &[u8] {
         self.to_str().as_bytes()
     }
 }
 
-impl From<ExitError> for EngineError {
+impl From<ExitError> for EngineErrorKind {
     fn from(e: ExitError) -> Self {
-        EngineError::EvmError(e)
+        EngineErrorKind::EvmError(e)
     }
 }
 
-impl From<ExitFatal> for EngineError {
+impl From<ExitFatal> for EngineErrorKind {
     fn from(e: ExitFatal) -> Self {
-        EngineError::EvmFatal(e)
+        EngineErrorKind::EvmFatal(e)
     }
 }
 
@@ -122,11 +147,11 @@ pub type EngineResult<T> = Result<T, EngineError>;
 
 trait ExitIntoResult {
     /// Checks if the EVM exit is ok or an error.
-    fn into_result(self) -> EngineResult<()>;
+    fn into_result(self) -> Result<(), EngineErrorKind>;
 }
 
 impl ExitIntoResult for ExitReason {
-    fn into_result(self) -> EngineResult<()> {
+    fn into_result(self) -> Result<(), EngineErrorKind> {
         use ExitReason::*;
         match self {
             Succeed(_) | Revert(_) => Ok(()),
@@ -410,11 +435,11 @@ impl Engine {
     /// Checks the nonce to ensure that the address matches the transaction
     /// nonce.
     #[inline]
-    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> EngineResult<()> {
+    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> Result<(), EngineErrorKind> {
         let account_nonce = Self::get_nonce(address);
 
         if transaction_nonce != &account_nonce {
-            return Err(EngineError::IncorrectNonce);
+            return Err(EngineErrorKind::IncorrectNonce);
         }
 
         Ok(())
@@ -535,11 +560,11 @@ impl Engine {
             address,
         );
         let is_succeed = status.is_succeed();
+        let used_gas = executor.used_gas();
         if let Err(e) = status.into_result() {
             Engine::increment_nonce(&origin);
-            return Err(e);
+            return Err(e.with_gas_used(used_gas));
         }
-        let used_gas = executor.used_gas();
         let (values, logs, promises) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
         Self::schedule_promises(promises);
@@ -573,11 +598,11 @@ impl Engine {
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
 
         let is_succeed = status.is_succeed();
+        let used_gas = executor.used_gas();
         if let Err(e) = status.into_result() {
             Engine::increment_nonce(&origin);
-            return Err(e);
+            return Err(e.with_gas_used(used_gas));
         }
-        let used_gas = executor.used_gas();
 
         let (values, logs, promises) = executor.into_state().deconstruct();
 
@@ -600,7 +625,7 @@ impl Engine {
         Self::set_nonce(address, &new_nonce);
     }
 
-    pub fn view_with_args(&self, args: ViewCallArgs) -> EngineResult<Vec<u8>> {
+    pub fn view_with_args(&self, args: ViewCallArgs) -> Result<Vec<u8>, EngineErrorKind> {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
@@ -614,7 +639,7 @@ impl Engine {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
-    ) -> EngineResult<Vec<u8>> {
+    ) -> Result<Vec<u8>, EngineErrorKind> {
         let mut executor = self.make_executor(gas_limit);
         let (status, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
