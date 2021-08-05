@@ -607,6 +607,27 @@ mod contract {
         sdk::return_output(&data[..]);
     }
 
+    /// Function used to create accounts for tests
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn mint_account() {
+        use evm::backend::ApplyBackend;
+
+        let args: ([u8; 20], u64, u64) = sdk::read_input_borsh().sdk_expect("ERR_ARGS");
+        let address = Address(args.0);
+        let nonce = U256::from(args.1);
+        let balance = U256::from(args.2);
+        let mut engine = Engine::new(address).sdk_unwrap();
+        let state_change = evm::backend::Apply::Modify {
+            address,
+            basic: evm::backend::Basic { balance, nonce },
+            code: None,
+            storage: core::iter::empty(),
+            reset_storage: false,
+        };
+        engine.apply(core::iter::once(state_change), core::iter::empty(), false);
+    }
+
     ///
     /// Utility methods.
     ///
