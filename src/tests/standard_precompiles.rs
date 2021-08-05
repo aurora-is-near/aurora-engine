@@ -32,7 +32,7 @@ fn standard_precompiles() {
         .unwrap();
 
     // status == false indicates failure
-    if !outcome.status {
+    if outcome.status.is_fail() {
         panic!("{}", String::from_utf8_lossy(&outcome.result))
     }
 }

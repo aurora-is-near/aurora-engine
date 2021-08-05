@@ -61,11 +61,36 @@ impl From<Log> for ResultLog {
     }
 }
 
+#[derive(Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub enum EvmStatus {
+    Succeed,
+    Revert,
+    OutOfGas,
+    OutOfFund,
+    OutOfOffset,
+}
+
+impl EvmStatus {
+    pub fn is_ok(&self) -> bool {
+        *self == EvmStatus::Succeed
+    }
+
+    pub fn is_revert(&self) -> bool {
+        *self == EvmStatus::Revert
+    }
+
+    pub fn is_fail(&self) -> bool {
+        *self == EvmStatus::OutOfGas
+            || *self == EvmStatus::OutOfFund
+            || *self == EvmStatus::OutOfOffset
+    }
+}
+
 /// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
 /// and `deploy_with_input` methods.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct SubmitResult {
-    pub status: bool,
+    pub status: EvmStatus,
     pub gas_used: u64,
     pub result: Vec<u8>,
     pub logs: Vec<ResultLog>,

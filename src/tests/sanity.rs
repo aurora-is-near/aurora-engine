@@ -1,3 +1,4 @@
+use crate::parameters::EvmStatus;
 use crate::prelude::Address;
 use crate::test_utils;
 use crate::types::{Wei, ERC20_MINT_SELECTOR};
@@ -63,14 +64,13 @@ fn test_eth_transfer_insufficient_balance() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
-    let err = runner
+    let result = runner
         .submit_with_signer(&mut source_account, |nonce| {
             // try to transfer more than we have
             test_utils::transfer(dest_address, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
         })
-        .unwrap_err();
-    let error_message = format!("{:?}", err);
-    assert!(error_message.contains("ERR_OUT_OF_FUND"));
+        .unwrap();
+    assert_eq!(result.status, EvmStatus::OutOfFund);
 
     // validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -218,7 +218,7 @@ fn test_block_hash_contract() {
         })
         .unwrap();
 
-    if !result.status {
+    if result.status.is_fail() {
         panic!("{}", String::from_utf8_lossy(&result.result));
     }
 }

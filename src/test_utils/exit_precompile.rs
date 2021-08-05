@@ -78,7 +78,7 @@ impl Tester {
 
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
 
-        if result.status {
+        if result.status.is_ok() {
             Ok(ethabi::decode(output_type, result.result.as_slice()).unwrap())
         } else {
             Err(result)

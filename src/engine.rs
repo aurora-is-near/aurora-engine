@@ -10,8 +10,8 @@ use crate::connector::EthConnectorContract;
 use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
-    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
-    ViewCallArgs,
+    EvmStatus, FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs,
+    SubmitResult, ViewCallArgs,
 };
 
 use crate::precompiles::Precompiles;
@@ -122,17 +122,18 @@ pub type EngineResult<T> = Result<T, EngineError>;
 
 trait ExitIntoResult {
     /// Checks if the EVM exit is ok or an error.
-    fn into_result(self) -> EngineResult<()>;
+    fn into_result(self) -> EngineResult<EvmStatus>;
 }
 
 impl ExitIntoResult for ExitReason {
-    fn into_result(self) -> EngineResult<()> {
+    fn into_result(self) -> EngineResult<EvmStatus> {
         use ExitReason::*;
         match self {
-            Succeed(_) | Revert(_) => Ok(()),
-            Error(ExitError::OutOfOffset)
-            | Error(ExitError::OutOfFund)
-            | Error(ExitError::OutOfGas) => Ok(()),
+            Succeed(_) => Ok(EvmStatus::Succeed),
+            Revert(_) => Ok(EvmStatus::Revert),
+            Error(ExitError::OutOfOffset) => Ok(EvmStatus::OutOfOffset),
+            Error(ExitError::OutOfFund) => Ok(EvmStatus::OutOfFund),
+            Error(ExitError::OutOfGas) => Ok(EvmStatus::OutOfGas),
             Error(e) => Err(e.into()),
             Fatal(e) => Err(e.into()),
         }
@@ -443,22 +444,26 @@ impl Engine {
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor(gas_limit);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
-        let (status, result) = (
+        let (exit_reason, result) = (
             executor.transact_create(origin, value.raw(), input, gas_limit, access_list),
             address,
         );
-        let is_succeed = status.is_succeed();
-        if let Err(e) = status.into_result() {
-            Engine::increment_nonce(&origin);
-            return Err(e);
-        }
+
+        let status = match exit_reason.into_result() {
+            Ok(status) => status,
+            Err(e) => {
+                Engine::increment_nonce(&origin);
+                return Err(e);
+            }
+        };
+
         let used_gas = executor.used_gas();
         let (values, logs, promises) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
         Self::schedule_promises(promises);
 
         Ok(SubmitResult {
-            status: is_succeed,
+            status,
             gas_used: used_gas,
             result: result.0.to_vec(),
             logs: logs.into_iter().map(Into::into).collect(),
@@ -482,14 +487,17 @@ impl Engine {
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor(gas_limit);
-        let (status, result) =
+        let (exit_reason, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
 
-        let is_succeed = status.is_succeed();
-        if let Err(e) = status.into_result() {
-            Engine::increment_nonce(&origin);
-            return Err(e);
-        }
+        let status = match exit_reason.into_result() {
+            Ok(status) => status,
+            Err(e) => {
+                Engine::increment_nonce(&origin);
+                return Err(e);
+            }
+        };
+
         let used_gas = executor.used_gas();
 
         let (values, logs, promises) = executor.into_state().deconstruct();
@@ -500,7 +508,7 @@ impl Engine {
         Self::schedule_promises(promises);
 
         Ok(SubmitResult {
-            status: is_succeed,
+            status,
             gas_used: used_gas,
             result,
             logs: logs.into_iter().map(Into::into).collect(),
