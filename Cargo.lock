@@ -125,6 +125,7 @@ dependencies = [
  "byte-slice-cast",
  "criterion",
  "ethabi",
+ "ethjson",
  "evm",
  "evm-core",
  "git2",
@@ -148,6 +149,7 @@ dependencies = [
  "serde_json",
  "sha2 0.9.5",
  "sha3 0.9.1",
+ "triehash-ethereum",
  "wee_alloc",
 ]
 
@@ -1170,6 +1172,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ethjson"
+version = "0.1.0"
+source = "git+https://github.com/rust-blockchain/evm-tests.git#481bf8164f06bd91fd454abf102d66db452a40c8"
+dependencies = [
+ "ethereum-types",
+ "rustc-hex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "event-listener"
 version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1696,6 +1709,17 @@ name = "keccak"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
+
+[[package]]
+name = "keccak-hasher"
+version = "0.1.1"
+source = "git+https://github.com/rust-blockchain/evm-tests.git#481bf8164f06bd91fd454abf102d66db452a40c8"
+dependencies = [
+ "ethereum-types",
+ "hash-db",
+ "plain_hasher",
+ "tiny-keccak",
+]
 
 [[package]]
 name = "lazy-static-include"
@@ -2772,6 +2796,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3831453b3449ceb48b6d9c7ad7c96d5ea673e9b470a1dc578c2ce6521230884c"
 
 [[package]]
+name = "plain_hasher"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e19e6491bdde87c2c43d70f4c194bc8a758f2eb732df00f61e43f7362e3b4cc"
+dependencies = [
+ "crunchy",
+]
+
+[[package]]
 name = "plotters"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3617,6 +3650,16 @@ checksum = "a1631b201eb031b563d2e85ca18ec8092508e262a3196ce9bd10a67ec87b9f5c"
 dependencies = [
  "hash-db",
  "rlp",
+]
+
+[[package]]
+name = "triehash-ethereum"
+version = "0.2.0"
+source = "git+https://github.com/rust-blockchain/evm-tests.git#481bf8164f06bd91fd454abf102d66db452a40c8"
+dependencies = [
+ "ethereum-types",
+ "keccak-hasher",
+ "triehash",
 ]
 
 [[package]]

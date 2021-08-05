@@ -81,6 +81,8 @@ criterion = "0.3.4"
 git2 = "0.13"
 lazy-static-include = "3.1.1"
 base64 = "0.13.0"
+ethjson = { git = "https://github.com/rust-blockchain/evm-tests.git" }
+triehash-ethereum = { git = "https://github.com/rust-blockchain/evm-tests.git" } 
 
 [features]
 default = ["sha2", "std"]
