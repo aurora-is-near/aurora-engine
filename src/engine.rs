@@ -354,25 +354,25 @@ impl Engine {
             return Ok(Wei::zero());
         }
 
-        let eth_amount = Wei::new(
+        let payment_for_gas = Wei::new(
             gas_limit
                 .checked_mul(gas_price)
                 .ok_or(GasPaymentError::EthAmountOverflow)?,
         );
         let account_balance = Self::get_balance(sender);
         let remaining_balance = account_balance
-            .checked_sub(eth_amount)
+            .checked_sub(payment_for_gas)
             .ok_or(GasPaymentError::OutOfFund)?;
 
         Self::set_balance(sender, &remaining_balance);
 
-        Ok(eth_amount)
+        Ok(payment_for_gas)
     }
 
     pub fn refund_unused_gas(
         sender: &Address,
         relayer: &Address,
-        prepaid_eth: Wei,
+        prepaid_amount: Wei,
         used_gas: u64,
         gas_price: U256,
     ) -> Result<(), GasPaymentError> {
@@ -387,8 +387,8 @@ impl Engine {
                 .ok_or(GasPaymentError::EthAmountOverflow)?,
         );
         // We cannot have used more than the gas_limit
-        debug_assert!(used_amount <= prepaid_eth);
-        let refund_amount = prepaid_eth - used_amount;
+        debug_assert!(used_amount <= prepaid_amount);
+        let refund_amount = prepaid_amount - used_amount;
 
         Self::add_balance(sender, refund_amount)?;
         Self::add_balance(relayer, used_amount)?;
