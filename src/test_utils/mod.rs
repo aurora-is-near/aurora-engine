@@ -13,7 +13,7 @@ use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::fungible_token::FungibleToken;
-use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
+use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
 use crate::prelude::Address;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
@@ -281,7 +281,7 @@ impl AuroraRunner {
         assert!(maybe_err.is_none());
         let submit_result =
             SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();
-        let address = Address::from_slice(&submit_result);
+        let address = Address::from_slice(&unwrap_success(submit_result));
         let contract_constructor: ContractConstructor = contract_constructor.into();
         DeployedContract {
             abi: contract_constructor.abi,
@@ -511,4 +511,26 @@ pub(crate) fn address_from_hex(address: &str) -> Address {
     };
 
     Address::from_slice(&bytes)
+}
+
+pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {
+    match result.status {
+        TransactionStatus::Succeed(ret) => ret,
+        other => panic!("Unexpected status: {:?}", other),
+    }
+}
+
+pub fn unwrap_revert(result: SubmitResult) -> Vec<u8> {
+    match result.status {
+        TransactionStatus::Revert(ret) => ret,
+        other => panic!("Unexpected status: {:?}", other),
+    }
+}
+
+pub fn panic_on_fail(status: TransactionStatus) {
+    match status {
+        TransactionStatus::Succeed(_) => (),
+        TransactionStatus::Revert(message) => panic!("{}", String::from_utf8_lossy(&message)),
+        other => panic!("{}", String::from_utf8_lossy(other.as_ref())),
+    }
 }

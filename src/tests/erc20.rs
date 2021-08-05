@@ -139,8 +139,7 @@ fn erc20_transfer_insufficient_balance() {
             contract.transfer(dest_address, (2 * INITIAL_BALANCE).into(), nonce)
         })
         .unwrap();
-    assert!(outcome.status.is_revert()); // status == false means execution error
-    let message = parse_erc20_error_message(&outcome.result);
+    let message = parse_erc20_error_message(&test_utils::unwrap_revert(outcome));
     assert_eq!(&message, "&ERC20: transfer amount exceeds balance");
 
     // Validate post-state
@@ -201,9 +200,11 @@ fn get_address_erc20_balance(
     address: Address,
     contract: &ERC20,
 ) -> U256 {
-    let outcome = runner.submit_with_signer(signer, |nonce| contract.balance_of(address, nonce));
-    assert!(outcome.is_ok());
-    U256::from_big_endian(&outcome.unwrap().result)
+    let outcome = runner
+        .submit_with_signer(signer, |nonce| contract.balance_of(address, nonce))
+        .unwrap();
+    let output = test_utils::unwrap_success(outcome);
+    U256::from_big_endian(&output)
 }
 
 fn parse_erc20_error_message(result: &[u8]) -> String {

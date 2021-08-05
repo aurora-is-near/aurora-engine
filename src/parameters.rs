@@ -89,6 +89,19 @@ impl TransactionStatus {
     }
 }
 
+impl AsRef<[u8]> for TransactionStatus {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Succeed(_) => b"SUCCESS",
+            Self::Revert(_) => b"ERR_REVERT",
+            Self::OutOfFund => b"ERR_OUT_OF_FUND",
+            Self::OutOfGas => b"ERR_OUT_OF_GAS",
+            Self::OutOfOffset => b"ERR_OUT_OF_OFFSET",
+            Self::CallTooDeep => b"ERR_CALL_TOO_DEEP",
+        }
+    }
+}
+
 /// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
 /// and `deploy_with_input` methods.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]

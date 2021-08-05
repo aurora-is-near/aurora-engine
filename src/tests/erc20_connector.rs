@@ -139,7 +139,8 @@ impl test_utils::AuroraRunner {
         let input = build_input("balanceOf(address)", &[Token::Address(target.into())]);
         let result = self.evm_call(token, input, origin);
         result.check_ok();
-        U256::from_big_endian(result.submit_result().result.as_slice())
+        let output = test_utils::unwrap_success(result.submit_result());
+        U256::from_big_endian(output.as_slice())
     }
 
     pub fn mint(

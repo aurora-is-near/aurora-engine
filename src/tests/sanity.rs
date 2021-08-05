@@ -1,5 +1,5 @@
-use crate::parameters::TransactionStatus;
-use crate::prelude::Address;
+use crate::parameters::{SubmitResult, TransactionStatus};
+use crate::prelude::{Address, U256};
 use crate::test_utils;
 use crate::types::{Wei, ERC20_MINT_SELECTOR};
 use borsh::BorshSerialize;
@@ -219,9 +219,7 @@ fn test_block_hash_contract() {
         })
         .unwrap();
 
-    if result.status.is_fail() {
-        panic!("{}", String::from_utf8_lossy(&result.result));
-    }
+    test_utils::panic_on_fail(result.status);
 }
 
 // Same as `test_eth_transfer_insufficient_balance` above, except runs through
@@ -267,7 +265,7 @@ fn test_eth_transfer_insufficient_balance_sim() {
     );
     let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
     let result: SubmitResult = call_result.unwrap_borsh();
-    assert_eq!(result.status, EvmStatus::OutOfFund);
+    assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
     assert_eq!(
