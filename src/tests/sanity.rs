@@ -1,5 +1,5 @@
-use crate::parameters::{EvmStatus, SubmitResult};
-use crate::prelude::{Address, U256};
+use crate::parameters::TransactionStatus;
+use crate::prelude::Address;
 use crate::test_utils;
 use crate::types::{Wei, ERC20_MINT_SELECTOR};
 use borsh::BorshSerialize;
@@ -71,7 +71,7 @@ fn test_eth_transfer_insufficient_balance() {
             test_utils::transfer(dest_address, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
         })
         .unwrap();
-    assert_eq!(result.status, EvmStatus::OutOfFund);
+    assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
     test_utils::validate_address_balance_and_nonce(

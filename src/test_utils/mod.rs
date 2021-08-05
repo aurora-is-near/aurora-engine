@@ -281,7 +281,7 @@ impl AuroraRunner {
         assert!(maybe_err.is_none());
         let submit_result =
             SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();
-        let address = Address::from_slice(&submit_result.result);
+        let address = Address::from_slice(&submit_result);
         let contract_constructor: ContractConstructor = contract_constructor.into();
         DeployedContract {
             abi: contract_constructor.abi,

@@ -61,28 +61,31 @@ impl From<Log> for ResultLog {
     }
 }
 
+/// The status of a transaction.
 #[derive(Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-pub enum EvmStatus {
-    Succeed,
-    Revert,
+pub enum TransactionStatus {
+    Succeed(Vec<u8>),
+    Revert(Vec<u8>),
     OutOfGas,
     OutOfFund,
     OutOfOffset,
+    CallTooDeep,
 }
 
-impl EvmStatus {
+impl TransactionStatus {
     pub fn is_ok(&self) -> bool {
-        *self == EvmStatus::Succeed
+        matches!(*self, TransactionStatus::Succeed(_))
     }
 
     pub fn is_revert(&self) -> bool {
-        *self == EvmStatus::Revert
+        matches!(*self, TransactionStatus::Revert(_))
     }
 
     pub fn is_fail(&self) -> bool {
-        *self == EvmStatus::OutOfGas
-            || *self == EvmStatus::OutOfFund
-            || *self == EvmStatus::OutOfOffset
+        *self == TransactionStatus::OutOfGas
+            || *self == TransactionStatus::OutOfFund
+            || *self == TransactionStatus::OutOfOffset
+            || *self == TransactionStatus::CallTooDeep
     }
 }
 
@@ -90,9 +93,8 @@ impl EvmStatus {
 /// and `deploy_with_input` methods.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct SubmitResult {
-    pub status: EvmStatus,
+    pub status: TransactionStatus,
     pub gas_used: u64,
-    pub result: Vec<u8>,
     pub logs: Vec<ResultLog>,
 }
 

@@ -10,8 +10,8 @@ use crate::connector::EthConnectorContract;
 use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
-    EvmStatus, FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs,
-    SubmitResult, ViewCallArgs,
+    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
+    TransactionStatus, ViewCallArgs,
 };
 
 use crate::precompiles::Precompiles;
@@ -122,18 +122,18 @@ pub type EngineResult<T> = Result<T, EngineError>;
 
 trait ExitIntoResult {
     /// Checks if the EVM exit is ok or an error.
-    fn into_result(self) -> EngineResult<EvmStatus>;
+    fn into_result(self, data: Vec<u8>) -> EngineResult<TransactionStatus>;
 }
 
 impl ExitIntoResult for ExitReason {
-    fn into_result(self) -> EngineResult<EvmStatus> {
+    fn into_result(self, data: Vec<u8>) -> EngineResult<TransactionStatus> {
         use ExitReason::*;
         match self {
-            Succeed(_) => Ok(EvmStatus::Succeed),
-            Revert(_) => Ok(EvmStatus::Revert),
-            Error(ExitError::OutOfOffset) => Ok(EvmStatus::OutOfOffset),
-            Error(ExitError::OutOfFund) => Ok(EvmStatus::OutOfFund),
-            Error(ExitError::OutOfGas) => Ok(EvmStatus::OutOfGas),
+            Succeed(_) => Ok(TransactionStatus::Succeed(data)),
+            Revert(_) => Ok(TransactionStatus::Revert(data)),
+            Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
+            Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
+            Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
             Error(e) => Err(e.into()),
             Fatal(e) => Err(e.into()),
         }
@@ -449,7 +449,7 @@ impl Engine {
             address,
         );
 
-        let status = match exit_reason.into_result() {
+        let status = match exit_reason.into_result(result.0.to_vec()) {
             Ok(status) => status,
             Err(e) => {
                 Engine::increment_nonce(&origin);
@@ -465,7 +465,6 @@ impl Engine {
         Ok(SubmitResult {
             status,
             gas_used: used_gas,
-            result: result.0.to_vec(),
             logs: logs.into_iter().map(Into::into).collect(),
         })
     }
@@ -490,7 +489,7 @@ impl Engine {
         let (exit_reason, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
 
-        let status = match exit_reason.into_result() {
+        let status = match exit_reason.into_result(result) {
             Ok(status) => status,
             Err(e) => {
                 Engine::increment_nonce(&origin);
@@ -510,7 +509,6 @@ impl Engine {
         Ok(SubmitResult {
             status,
             gas_used: used_gas,
-            result,
             logs: logs.into_iter().map(Into::into).collect(),
         })
     }
@@ -521,7 +519,7 @@ impl Engine {
         Self::set_nonce(address, &new_nonce);
     }
 
-    pub fn view_with_args(&self, args: ViewCallArgs) -> EngineResult<Vec<u8>> {
+    pub fn view_with_args(&self, args: ViewCallArgs) -> EngineResult<TransactionStatus> {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
@@ -535,12 +533,11 @@ impl Engine {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
-    ) -> EngineResult<Vec<u8>> {
+    ) -> EngineResult<TransactionStatus> {
         let mut executor = self.make_executor(gas_limit);
         let (status, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
-        status.into_result()?;
-        Ok(result)
+        status.into_result(result)
     }
 
     fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState, Precompiles> {

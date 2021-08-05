@@ -77,13 +77,14 @@ mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use crate::connector::EthConnectorContract;
-    use crate::engine::{Engine, EngineState};
+    use crate::engine::{Engine, EngineError, EngineState};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
         DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetErc20FromNep141CallArgs,
         GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransactionStatus,
+        TransferCallCallArgs, ViewCallArgs,
     };
 
     use crate::json::parse_json;
@@ -356,21 +357,23 @@ mod contract {
             ethabi::Token::Address(current_address()),
         ]);
 
-        Engine::deploy_code_with_input(
+        let result = Engine::deploy_code_with_input(
             &mut engine,
             (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec(),
         )
-        .map(|res| {
-            let address = H160(res.result.as_slice().try_into().unwrap());
+        .sdk_unwrap();
+
+        if let TransactionStatus::Succeed(v) = result.status {
+            let address = H160(v.as_slice().try_into().unwrap());
             crate::log!(
                 crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str()
             );
             engine
                 .register_token(address.as_bytes(), &args.nep141.as_bytes())
                 .sdk_unwrap();
-            res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
-        })
-        .sdk_process();
+        } else {
+            crate::log!("Failed to deploy ERC-20 in Aurora");
+        }
 
         // TODO: charge for storage
     }
@@ -383,8 +386,10 @@ mod contract {
     pub extern "C" fn view() {
         let args: ViewCallArgs = sdk::read_input_borsh().sdk_unwrap();
         let engine = Engine::new(Address::from_slice(&args.sender)).sdk_unwrap();
-        let result = Engine::view_with_args(&engine, args);
-        result.sdk_process()
+        let result = Engine::view_with_args(&engine, args).sdk_unwrap();
+        if let TransactionStatus::Succeed(v) = result {
+            sdk::return_output(v.as_ref())
+        }
     }
 
     #[no_mangle]

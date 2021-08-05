@@ -1,4 +1,4 @@
-use crate::parameters::EvmStatus;
+use crate::parameters::TransactionStatus;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{
     self,
@@ -63,7 +63,7 @@ fn erc20_mint_out_of_gas() {
     mint_tx.gas = U256::from(67_000);
     let outcome = runner.submit_transaction(&source_account.secret_key, mint_tx);
     let error = outcome.unwrap();
-    assert_eq!(error.status, EvmStatus::OutOfGas);
+    assert_eq!(error.status, TransactionStatus::OutOfGas);
 
     // Validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -184,7 +184,7 @@ fn deploy_erc_20_out_of_gas() {
     deploy_transaction.gas = U256::from(3_200_000);
     let outcome = runner.submit_transaction(&source_account, deploy_transaction);
     let error = outcome.unwrap();
-    assert_eq!(error.status, EvmStatus::OutOfGas);
+    assert_eq!(error.status, TransactionStatus::OutOfGas);
 
     // Validate post-state
     test_utils::validate_address_balance_and_nonce(
