@@ -130,6 +130,9 @@ impl ExitIntoResult for ExitReason {
         use ExitReason::*;
         match self {
             Succeed(_) | Revert(_) => Ok(()),
+            Error(ExitError::OutOfOffset)
+            | Error(ExitError::OutOfFund)
+            | Error(ExitError::OutOfGas) => Ok(()),
             Error(e) => Err(e.into()),
             Fatal(e) => Err(e.into()),
         }
