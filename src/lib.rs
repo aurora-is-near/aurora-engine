@@ -241,16 +241,16 @@ mod contract {
         match signed_transaction.intrinsic_gas(crate::engine::CONFIG) {
             None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
             Some(intrinsic_gas) => {
-                if signed_transaction.gas_limit() < &intrinsic_gas.into() {
+                if signed_transaction.gas_limit() < intrinsic_gas.into() {
                     sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
                 }
             }
         }
 
         // Pay for gas
-        let gas_price = *signed_transaction.gas_price();
+        let gas_price = signed_transaction.gas_price();
         let prepaid_amount =
-            Engine::charge_gas_limit(&sender, *signed_transaction.gas_limit(), gas_price)
+            Engine::charge_gas_limit(&sender, signed_transaction.gas_limit(), gas_price)
                 .map_err(|e| {
                     // In the error case we still need to increment the nonce since the transaction
                     // was valid except for a property of the current state (the balance)
