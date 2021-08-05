@@ -1,9 +1,7 @@
-use primitive_types::{U256, H256, H160};
-use serde::Deserialize;
-use evm::backend::{MemoryBackend, MemoryAccount, MemoryVicinity};
+use evm::backend::MemoryAccount;
+use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use std::collections::BTreeMap;
-use std::rc::Rc;
 
 pub fn u256_to_h256(u: U256) -> H256 {
     let mut h = H256::default();
@@ -16,19 +14,27 @@ pub fn unwrap_to_account(s: &ethjson::spec::Account) -> MemoryAccount {
         balance: s.balance.clone().unwrap().into(),
         nonce: s.nonce.clone().unwrap().into(),
         code: s.code.clone().unwrap().into(),
-        storage: s.storage.as_ref().unwrap().iter().map(|(k, v)| {
-            (u256_to_h256(k.clone().into()), u256_to_h256(v.clone().into()))
-        }).collect(),
+        storage: s
+            .storage
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| {
+                (
+                    u256_to_h256(k.clone().into()),
+                    u256_to_h256(v.clone().into()),
+                )
+            })
+            .collect(),
     }
 }
 
 pub fn unwrap_to_state(a: &ethjson::spec::State) -> BTreeMap<H160, MemoryAccount> {
     match &a.0 {
-        ethjson::spec::HashOrMap::Map(m) => {
-            m.iter().map(|(k, v)| {
-                (k.clone().into(), unwrap_to_account(v))
-            }).collect()
-        },
+        ethjson::spec::HashOrMap::Map(m) => m
+            .iter()
+            .map(|(k, v)| (k.clone().into(), unwrap_to_account(v)))
+            .collect(),
         ethjson::spec::HashOrMap::Hash(_) => panic!("Hash can not be converted."),
     }
 }
@@ -53,8 +59,12 @@ impl rlp::Encodable for TrieAccount {
         let use_short_version = self.code_version == U256::zero();
 
         match use_short_version {
-            true => { stream.begin_list(4); }
-            false => { stream.begin_list(5); }
+            true => {
+                stream.begin_list(4);
+            }
+            false => {
+                stream.begin_list(5);
+            }
         }
 
         stream.append(&self.nonce);
@@ -94,43 +104,47 @@ pub fn assert_valid_state(a: &ethjson::spec::State, b: &BTreeMap<H160, MemoryAcc
     match &a.0 {
         ethjson::spec::HashOrMap::Map(m) => {
             assert_eq!(
-                &m.iter().map(|(k, v)| {
-                    (k.clone().into(), unwrap_to_account(v))
-                }).collect::<BTreeMap<_, _>>(),
+                &m.iter()
+                    .map(|(k, v)| { (k.clone().into(), unwrap_to_account(v)) })
+                    .collect::<BTreeMap<_, _>>(),
                 b
             );
-        },
+        }
         ethjson::spec::HashOrMap::Hash(h) => assert_valid_hash(&h.clone().into(), b),
     }
 }
 
 pub fn assert_valid_hash(h: &H256, b: &BTreeMap<H160, MemoryAccount>) {
-    let tree = b.iter().map(|(address, account)| {
-        let storage_root = triehash_ethereum::sec_trie_root(
-            account.storage
-                .iter()
-                .map(|(k, v)| {
-                    (k, rlp::encode(&U256::from_big_endian(&v[..])))
-                })
-        );
-        let code_hash = H256::from_slice(Keccak256::digest(&account.code).as_slice());
+    let tree = b
+        .iter()
+        .map(|(address, account)| {
+            let storage_root = triehash_ethereum::sec_trie_root(
+                account
+                    .storage
+                    .iter()
+                    .map(|(k, v)| (k, rlp::encode(&U256::from_big_endian(&v[..])))),
+            );
+            let code_hash = H256::from_slice(Keccak256::digest(&account.code).as_slice());
 
-        let account = TrieAccount {
-            nonce: account.nonce,
-            balance: account.balance,
-            storage_root,
-            code_hash,
-            code_version: U256::zero(),
-        };
+            let account = TrieAccount {
+                nonce: account.nonce,
+                balance: account.balance,
+                storage_root,
+                code_hash,
+                code_version: U256::zero(),
+            };
 
-        (address, rlp::encode(&account))
-    }).collect::<Vec<_>>();
+            (address, rlp::encode(&account))
+        })
+        .collect::<Vec<_>>();
 
     let root = triehash_ethereum::sec_trie_root(tree);
     let expect = h.clone().into();
 
     if root != expect {
-        panic!("Hash not equal; calculated: {:?}, expect: {:?}\nState: {:?}",
-               root, expect, b);
+        panic!(
+            "Hash not equal; calculated: {:?}, expect: {:?}\nState: {:?}",
+            root, expect, b
+        );
     }
 }
