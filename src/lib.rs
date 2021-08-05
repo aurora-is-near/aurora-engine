@@ -607,21 +607,6 @@ mod contract {
         sdk::return_output(&data[..]);
     }
 
-    #[cfg(feature = "integration-test")]
-    #[no_mangle]
-    pub extern "C" fn mint_account() {
-        use crate::parameters::WithdrawCallArgs;
-        // This function has nothing to do with withdraw, it just so happens that
-        // `WithdrawCallArgs` contains all the information I need, and I am being lazy since
-        // this is meant to be a minimal reproduction of a bug.
-        let args: WithdrawCallArgs = sdk::read_input_borsh().sdk_expect("yo");
-        let amount = crate::types::Wei::new(args.amount.into());
-        let address = Address(args.recipient_address);
-        Engine::set_balance(&address, &amount);
-        Engine::set_nonce(&address, &U256::zero());
-        Engine::set_code(&address, &[]);
-    }
-
     ///
     /// Utility methods.
     ///
