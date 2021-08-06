@@ -194,9 +194,9 @@ mod contract {
             use crate::fungible_token::FungibleTokenMetadata;
 
             let metadata = FungibleTokenMetadata {
-                spec: "".to_string(),
-                symbol: "".to_string(),
-                name: "".to_string(),
+                spec: "ft-1.0.0".to_string(),
+                symbol: "ETH".to_string(),
+                name: "Ether".to_string(),
                 icon: None,
                 reference: None,
                 reference_hash: None,
