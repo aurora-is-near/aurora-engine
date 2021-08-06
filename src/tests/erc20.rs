@@ -4,11 +4,11 @@ use crate::test_utils::{
     erc20::{ERC20Constructor, ERC20},
     Signer,
 };
-use crate::types::Wei;
+use crate::types::{self, Wei};
 use bstr::ByteSlice;
 use secp256k1::SecretKey;
 
-const INITIAL_BALANCE: u64 = 1000;
+const INITIAL_BALANCE: u64 = 1_000_000;
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: u64 = 67;
 
@@ -59,7 +59,10 @@ fn erc20_mint_out_of_gas() {
     assert!(error_message.contains("ERR_INTRINSIC_GAS"));
 
     // not enough gas to complete transaction
-    mint_tx.gas = U256::from(67_000);
+    const GAS_LIMIT: u64 = 67_000;
+    const GAS_PRICE: u64 = 10;
+    mint_tx.gas = U256::from(GAS_LIMIT);
+    mint_tx.gas_price = U256::from(GAS_PRICE); // also set non-zero gas price to check gas still charged.
     let outcome = runner.submit_transaction(&source_account.secret_key, mint_tx);
     let error = outcome.unwrap_err();
     let error_message = format!("{:?}", error);
@@ -69,8 +72,14 @@ fn erc20_mint_out_of_gas() {
     test_utils::validate_address_balance_and_nonce(
         &runner,
         test_utils::address_from_secret_key(&source_account.secret_key),
-        Wei::new_u64(INITIAL_BALANCE),
+        Wei::new_u64(INITIAL_BALANCE - GAS_LIMIT * GAS_PRICE),
         (INITIAL_NONCE + 3).into(),
+    );
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes()),
+        Wei::new_u64(GAS_LIMIT * GAS_PRICE),
+        U256::zero(),
     );
 }
 

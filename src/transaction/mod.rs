@@ -43,10 +43,17 @@ impl EthTransaction {
         }
     }
 
-    pub fn gas_limit(&self) -> &U256 {
+    pub fn gas_limit(&self) -> U256 {
         match self {
-            Self::Legacy(tx) => &tx.transaction.gas,
-            Self::AccessList(tx) => &tx.transaction_data.gas_limit,
+            Self::Legacy(tx) => tx.transaction.gas,
+            Self::AccessList(tx) => tx.transaction_data.gas_limit,
+        }
+    }
+
+    pub fn gas_price(&self) -> U256 {
+        match self {
+            Self::Legacy(tx) => tx.transaction.gas_price,
+            Self::AccessList(tx) => tx.transaction_data.gas_price,
         }
     }
 
