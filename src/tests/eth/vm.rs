@@ -4,8 +4,10 @@ use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::Config;
 use primitive_types::{H160, U256};
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
+use std::io::BufReader;
+use std::path::PathBuf;
 
 #[derive(Deserialize, Debug)]
 pub struct Test(ethjson::vm::Vm);
@@ -58,7 +60,7 @@ impl Test {
     }
 }
 
-fn executor(eth_test: Test) {
+fn vm_test(eth_test: Test) {
     let original_state = eth_test.unwrap_to_pre_state();
     let vicinity = eth_test.unwrap_to_vicinity();
     let config = Config::frontier();
@@ -78,7 +80,7 @@ fn executor(eth_test: Test) {
     backend.apply(values, logs, false);
 
     if eth_test.0.output.is_none() {
-        print!("{:?} ", reason);
+        print!("{:?}", reason);
 
         assert!(!reason.is_succeed());
         assert!(eth_test.0.post_state.is_none() && eth_test.0.gas_left.is_none());
@@ -97,31 +99,35 @@ fn executor(eth_test: Test) {
         println!("succeed");
     }
 }
-/*
-pub fn run_test(dir: &str) {
-    let _ = env_logger::try_init();
 
+pub fn run(dir: &str) {
+    use std:: fs;
+    use std:: fs::File;
+    
     let mut dest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    dest.push("src/tests/eth/ethtests");
     dest.push(dir);
 
     for entry in fs::read_dir(dest).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
+        println!("{:?}", path);
 
         let file = File::open(path).expect("Open file failed");
 
         let reader = BufReader::new(file);
-        let coll = serde_json::from_reader::<_, HashMap<String, vmtests::Test>>(reader)
+        let coll = serde_json::from_reader::<_, HashMap<String, Test>>(reader)
             .expect("Parse test cases failed");
 
-        for (name, test) in coll {
-            vmtests::test(&name, test);
+        for (_, test) in coll {
+            vm_test(test);
         }
     }
 }
-*/
+
 
 #[test]
 fn test_eth_vm_1() {
+    run("VMTests/vmArithmeticTest");
     assert!(true);
 }
