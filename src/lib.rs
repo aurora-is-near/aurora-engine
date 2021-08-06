@@ -242,11 +242,23 @@ mod contract {
         match signed_transaction.intrinsic_gas(crate::engine::CONFIG) {
             None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
             Some(intrinsic_gas) => {
-                if signed_transaction.gas_limit() < &intrinsic_gas.into() {
+                if signed_transaction.gas_limit() < intrinsic_gas.into() {
                     sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
                 }
             }
         }
+
+        // Pay for gas
+        let gas_price = signed_transaction.gas_price();
+        let prepaid_amount =
+            Engine::charge_gas_limit(&sender, signed_transaction.gas_limit(), gas_price)
+                .map_err(|e| {
+                    // In the error case we still need to increment the nonce since the transaction
+                    // was valid except for a property of the current state (the balance)
+                    Engine::increment_nonce(&sender);
+                    e
+                })
+                .sdk_unwrap();
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
@@ -273,6 +285,17 @@ mod contract {
             Engine::deploy_code(&mut engine, sender, value, data, gas_limit, access_list)
             // TODO: charge for storage
         };
+
+        // Give refund
+        let relayer = predecessor_address();
+        let gas_used = match &result {
+            Ok(submit_result) => submit_result.gas_used,
+            Err(engine_err) => engine_err.gas_used,
+        };
+        Engine::refund_unused_gas(&sender, &relayer, prepaid_amount, gas_used, gas_price)
+            .sdk_unwrap();
+
+        // return result to user
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();

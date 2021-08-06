@@ -1,14 +1,15 @@
 use crate::parameters::{SubmitResult, TransactionStatus};
 use crate::prelude::{Address, U256};
 use crate::test_utils;
-use crate::types::{Wei, ERC20_MINT_SELECTOR};
+use crate::types::{self, Wei, ERC20_MINT_SELECTOR};
 use borsh::BorshSerialize;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
-const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
+const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
+const GAS_PRICE: u64 = 10;
 
 /// Tests we can transfer Eth from one account to another and that the balances are correctly
 /// updated.
@@ -153,6 +154,101 @@ fn test_eth_transfer_not_enough_gas() {
         INITIAL_NONCE.into(),
     );
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+}
+
+#[test]
+fn test_transfer_charging_gas_success() {
+    let (mut runner, mut source_account, dest_address) = initialize_transfer();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let transaction = |nonce| {
+        let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
+        tx.gas = 30_000.into();
+        tx.gas_price = GAS_PRICE.into();
+        tx
+    };
+
+    // validate pre-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        INITIAL_BALANCE,
+        INITIAL_NONCE.into(),
+    );
+    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+
+    // do transfer
+    let result = runner
+        .submit_with_signer(&mut source_account, transaction)
+        .unwrap();
+    let spent_amount = Wei::new_u64(GAS_PRICE * result.gas_used);
+    let expected_source_balance = INITIAL_BALANCE - TRANSFER_AMOUNT - spent_amount;
+    let expected_dest_balance = TRANSFER_AMOUNT;
+    let expected_relayer_balance = spent_amount;
+    let relayer_address =
+        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+
+    // validate post-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        expected_source_balance,
+        (INITIAL_NONCE + 1).into(),
+    );
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        dest_address,
+        expected_dest_balance,
+        0.into(),
+    );
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        relayer_address,
+        expected_relayer_balance,
+        0.into(),
+    );
+}
+
+#[test]
+fn test_eth_transfer_charging_gas_not_enough_balance() {
+    let (mut runner, mut source_account, dest_address) = initialize_transfer();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let transaction = |nonce| {
+        let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
+        // With this gas limit and price the account does not
+        // have enough balance to cover the gas cost
+        tx.gas = 3_000_000.into();
+        tx.gas_price = GAS_PRICE.into();
+        tx
+    };
+
+    // validate pre-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        INITIAL_BALANCE,
+        INITIAL_NONCE.into(),
+    );
+    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+
+    // attempt transfer
+    let err = runner
+        .submit_with_signer(&mut source_account, transaction)
+        .unwrap_err();
+    let error_message = format!("{:?}", err);
+    assert!(error_message.contains("ERR_OUT_OF_FUND"));
+
+    // validate post-state
+    let relayer =
+        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        INITIAL_BALANCE,
+        // nonce is still incremented since the transaction was otherwise valid
+        (INITIAL_NONCE + 1).into(),
+    );
+    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    test_utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
 }
 
 fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
