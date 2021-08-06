@@ -5,9 +5,9 @@ use evm::Config;
 use primitive_types::{H160, U256};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 #[derive(Deserialize, Debug)]
 pub struct Test(ethjson::vm::Vm);
@@ -60,7 +60,8 @@ impl Test {
     }
 }
 
-fn vm_test(eth_test: Test) {
+fn vm_test(name: &str, eth_test: Test) {
+    print!("Running test {} ... ", name);
     let original_state = eth_test.unwrap_to_pre_state();
     let vicinity = eth_test.unwrap_to_vicinity();
     let config = Config::frontier();
@@ -101,9 +102,9 @@ fn vm_test(eth_test: Test) {
 }
 
 pub fn run(dir: &str) {
-    use std:: fs;
-    use std:: fs::File;
-    
+    use std::fs;
+    use std::fs::File;
+
     let mut dest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     dest.push("src/tests/eth/ethtests");
     dest.push(dir);
@@ -111,7 +112,6 @@ pub fn run(dir: &str) {
     for entry in fs::read_dir(dest).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
-        println!("{:?}", path);
 
         let file = File::open(path).expect("Open file failed");
 
@@ -119,15 +119,69 @@ pub fn run(dir: &str) {
         let coll = serde_json::from_reader::<_, HashMap<String, Test>>(reader)
             .expect("Parse test cases failed");
 
-        for (_, test) in coll {
-            vm_test(test);
+        for (name, test) in coll {
+            vm_test(&name, test);
         }
     }
 }
 
+#[test]
+fn vm_arithmetic() {
+    run("VMTests/vmArithmeticTest");
+}
 
 #[test]
-fn test_eth_vm_1() {
-    run("VMTests/vmArithmeticTest");
-    assert!(true);
+fn vm_bitwise_logic() {
+    run("VMTests/vmBitwiseLogicOperation");
+}
+
+#[test]
+fn vm_block_info() {
+    run("VMTests/vmBlockInfoTest");
+}
+
+#[test]
+fn vm_environmental_info() {
+    run("VMTests/vmEnvironmentalInfo");
+}
+
+#[test]
+fn vm_io_and_flow() {
+    run("VMTests/vmIOandFlowOperations");
+}
+
+#[test]
+fn vm_log() {
+    run("VMTests/vmLogTest");
+}
+
+#[test]
+#[ignore]
+fn vm_performance() {
+    run("VMTests/vmPerformance");
+}
+
+#[test]
+fn vm_push_dup_swap() {
+    run("VMTests/vmPushDupSwapTest");
+}
+
+#[test]
+fn vm_random() {
+    run("VMTests/vmRandomTest");
+}
+
+#[test]
+fn vm_sha3() {
+    run("VMTests/vmSha3Test");
+}
+
+#[test]
+fn vm_system() {
+    run("VMTests/vmSystemOperations");
+}
+
+#[test]
+fn vm_other() {
+    run("VMTests/vmTests");
 }
