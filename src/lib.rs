@@ -83,7 +83,8 @@ mod contract {
     use crate::parameters::{
         DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetErc20FromNep141CallArgs,
         GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransactionStatus,
+        TransferCallCallArgs, ViewCallArgs,
     };
 
     use crate::json::parse_json;
@@ -379,21 +380,24 @@ mod contract {
             ethabi::Token::Address(current_address()),
         ]);
 
-        Engine::deploy_code_with_input(
+        let address = match Engine::deploy_code_with_input(
             &mut engine,
             (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec(),
-        )
-        .map(|res| {
-            let address = H160(res.result.as_slice().try_into().unwrap());
-            crate::log!(
-                crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str()
-            );
-            engine
-                .register_token(address.as_bytes(), &args.nep141.as_bytes())
-                .sdk_unwrap();
-            res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
-        })
-        .sdk_process();
+        ) {
+            Ok(result) => match result.status {
+                TransactionStatus::Succeed(ret) => H160(ret.as_slice().try_into().unwrap()),
+                other => sdk::panic_utf8(other.as_ref()),
+            },
+            Err(e) => sdk::panic_utf8(e.as_ref()),
+        };
+
+        crate::log!(
+            crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str()
+        );
+        engine
+            .register_token(address.as_bytes(), &args.nep141.as_bytes())
+            .sdk_unwrap();
+        sdk::return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
 
         // TODO: charge for storage
     }
@@ -628,6 +632,27 @@ mod contract {
         crate::log!("Call from verify_log_entry");
         let data = true.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
+    }
+
+    /// Function used to create accounts for tests
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn mint_account() {
+        use evm::backend::ApplyBackend;
+
+        let args: ([u8; 20], u64, u64) = sdk::read_input_borsh().sdk_expect("ERR_ARGS");
+        let address = Address(args.0);
+        let nonce = U256::from(args.1);
+        let balance = U256::from(args.2);
+        let mut engine = Engine::new(address).sdk_unwrap();
+        let state_change = evm::backend::Apply::Modify {
+            address,
+            basic: evm::backend::Basic { balance, nonce },
+            code: None,
+            storage: core::iter::empty(),
+            reset_storage: false,
+        };
+        engine.apply(core::iter::once(state_change), core::iter::empty(), false);
     }
 
     ///

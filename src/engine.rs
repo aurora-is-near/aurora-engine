@@ -11,7 +11,7 @@ use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
     FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
-    ViewCallArgs,
+    TransactionStatus, ViewCallArgs,
 };
 
 use crate::precompiles::Precompiles;
@@ -147,14 +147,18 @@ pub type EngineResult<T> = Result<T, EngineError>;
 
 trait ExitIntoResult {
     /// Checks if the EVM exit is ok or an error.
-    fn into_result(self) -> Result<(), EngineErrorKind>;
+    fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind>;
 }
 
 impl ExitIntoResult for ExitReason {
-    fn into_result(self) -> Result<(), EngineErrorKind> {
+    fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
         use ExitReason::*;
         match self {
-            Succeed(_) | Revert(_) => Ok(()),
+            Succeed(_) => Ok(TransactionStatus::Succeed(data)),
+            Revert(_) => Ok(TransactionStatus::Revert(data)),
+            Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
+            Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
+            Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
             Error(e) => Err(e.into()),
             Fatal(e) => Err(e.into()),
         }
@@ -555,24 +559,27 @@ impl Engine {
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor(gas_limit);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
-        let (status, result) = (
+        let (exit_reason, result) = (
             executor.transact_create(origin, value.raw(), input, gas_limit, access_list),
             address,
         );
-        let is_succeed = status.is_succeed();
+
         let used_gas = executor.used_gas();
-        if let Err(e) = status.into_result() {
-            Engine::increment_nonce(&origin);
-            return Err(e.with_gas_used(used_gas));
-        }
+        let status = match exit_reason.into_result(result.0.to_vec()) {
+            Ok(status) => status,
+            Err(e) => {
+                Engine::increment_nonce(&origin);
+                return Err(e.with_gas_used(used_gas));
+            }
+        };
+
         let (values, logs, promises) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
         Self::schedule_promises(promises);
 
         Ok(SubmitResult {
-            status: is_succeed,
+            status,
             gas_used: used_gas,
-            result: result.0.to_vec(),
             logs: logs.into_iter().map(Into::into).collect(),
         })
     }
@@ -594,15 +601,17 @@ impl Engine {
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor(gas_limit);
-        let (status, result) =
+        let (exit_reason, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
 
-        let is_succeed = status.is_succeed();
         let used_gas = executor.used_gas();
-        if let Err(e) = status.into_result() {
-            Engine::increment_nonce(&origin);
-            return Err(e.with_gas_used(used_gas));
-        }
+        let status = match exit_reason.into_result(result) {
+            Ok(status) => status,
+            Err(e) => {
+                Engine::increment_nonce(&origin);
+                return Err(e.with_gas_used(used_gas));
+            }
+        };
 
         let (values, logs, promises) = executor.into_state().deconstruct();
 
@@ -612,9 +621,8 @@ impl Engine {
         Self::schedule_promises(promises);
 
         Ok(SubmitResult {
-            status: is_succeed,
+            status,
             gas_used: used_gas,
-            result,
             logs: logs.into_iter().map(Into::into).collect(),
         })
     }
@@ -625,7 +633,7 @@ impl Engine {
         Self::set_nonce(address, &new_nonce);
     }
 
-    pub fn view_with_args(&self, args: ViewCallArgs) -> Result<Vec<u8>, EngineErrorKind> {
+    pub fn view_with_args(&self, args: ViewCallArgs) -> Result<TransactionStatus, EngineErrorKind> {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
@@ -639,12 +647,11 @@ impl Engine {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
-    ) -> Result<Vec<u8>, EngineErrorKind> {
+    ) -> Result<TransactionStatus, EngineErrorKind> {
         let mut executor = self.make_executor(gas_limit);
         let (status, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
-        status.into_result()?;
-        Ok(result)
+        status.into_result(result)
     }
 
     fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState, Precompiles> {

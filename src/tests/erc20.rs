@@ -1,3 +1,4 @@
+use crate::parameters::TransactionStatus;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{
     self,
@@ -64,9 +65,8 @@ fn erc20_mint_out_of_gas() {
     mint_tx.gas = U256::from(GAS_LIMIT);
     mint_tx.gas_price = U256::from(GAS_PRICE); // also set non-zero gas price to check gas still charged.
     let outcome = runner.submit_transaction(&source_account.secret_key, mint_tx);
-    let error = outcome.unwrap_err();
-    let error_message = format!("{:?}", error);
-    assert!(error_message.contains("ERR_OUT_OF_GAS"));
+    let error = outcome.unwrap();
+    assert_eq!(error.status, TransactionStatus::OutOfGas);
 
     // Validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -109,7 +109,7 @@ fn erc20_transfer_success() {
             contract.transfer(dest_address, TRANSFER_AMOUNT.into(), nonce)
         })
         .unwrap();
-    assert!(outcome.status);
+    assert!(outcome.status.is_ok());
 
     // Validate post-state
     assert_eq!(
@@ -148,8 +148,7 @@ fn erc20_transfer_insufficient_balance() {
             contract.transfer(dest_address, (2 * INITIAL_BALANCE).into(), nonce)
         })
         .unwrap();
-    assert!(!outcome.status); // status == false means execution error
-    let message = parse_erc20_error_message(&outcome.result);
+    let message = parse_erc20_error_message(&test_utils::unwrap_revert(outcome));
     assert_eq!(&message, "&ERC20: transfer amount exceeds balance");
 
     // Validate post-state
@@ -192,9 +191,8 @@ fn deploy_erc_20_out_of_gas() {
     // not enough gas to complete transaction
     deploy_transaction.gas = U256::from(3_200_000);
     let outcome = runner.submit_transaction(&source_account, deploy_transaction);
-    let error = outcome.unwrap_err();
-    let error_message = format!("{:?}", error);
-    assert!(error_message.contains("ERR_OUT_OF_GAS"));
+    let error = outcome.unwrap();
+    assert_eq!(error.status, TransactionStatus::OutOfGas);
 
     // Validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -211,9 +209,11 @@ fn get_address_erc20_balance(
     address: Address,
     contract: &ERC20,
 ) -> U256 {
-    let outcome = runner.submit_with_signer(signer, |nonce| contract.balance_of(address, nonce));
-    assert!(outcome.is_ok());
-    U256::from_big_endian(&outcome.unwrap().result)
+    let outcome = runner
+        .submit_with_signer(signer, |nonce| contract.balance_of(address, nonce))
+        .unwrap();
+    let output = test_utils::unwrap_success(outcome);
+    U256::from_big_endian(&output)
 }
 
 fn parse_erc20_error_message(result: &[u8]) -> String {

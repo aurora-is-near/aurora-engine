@@ -1,8 +1,6 @@
-use crate::prelude::{self, Address, String, ToString, Vec, H256, U256};
+use crate::prelude::{self, str, Address, String, ToString, Vec, H256, U256};
 #[cfg(not(feature = "contract"))]
 use crate::prelude::{format, vec};
-
-use crate::prelude::str;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::{Event, EventParam, Hash, Log, RawLog};
 

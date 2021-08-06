@@ -1,6 +1,8 @@
-use crate::prelude::Address;
+use crate::parameters::{SubmitResult, TransactionStatus};
+use crate::prelude::{Address, U256};
 use crate::test_utils;
 use crate::types::{self, Wei, ERC20_MINT_SELECTOR};
+use borsh::BorshSerialize;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
@@ -64,14 +66,13 @@ fn test_eth_transfer_insufficient_balance() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
-    let err = runner
+    let result = runner
         .submit_with_signer(&mut source_account, |nonce| {
             // try to transfer more than we have
             test_utils::transfer(dest_address, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
         })
-        .unwrap_err();
-    let error_message = format!("{:?}", err);
-    assert!(error_message.contains("ERR_OUT_OF_FUND"));
+        .unwrap();
+    assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -314,7 +315,76 @@ fn test_block_hash_contract() {
         })
         .unwrap();
 
-    if !result.status {
-        panic!("{}", String::from_utf8_lossy(&result.result));
+    test_utils::panic_on_fail(result.status);
+}
+
+// Same as `test_eth_transfer_insufficient_balance` above, except runs through
+// `near-sdk-sim` instead of `near-vm-runner`. This is important because `near-sdk-sim`
+// has more production logic, in particular, state revert on contract panic.
+// TODO: should be able to generalize the `call` backend of `AuroraRunner` so that this
+//       test does not need to be written twice.
+#[test]
+fn test_eth_transfer_insufficient_balance_sim() {
+    use crate::tests::state_migration;
+
+    // initalize engine contract
+    let aurora = state_migration::deploy_evm();
+    let mut signer = test_utils::Signer::random();
+    let address = test_utils::address_from_secret_key(&signer.secret_key);
+
+    let args = (address.0, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
+    aurora
+        .call("mint_account", &args.try_to_vec().unwrap())
+        .assert_success();
+
+    // validate pre-state
+    assert_eq!(
+        query_address(&address, "get_nonce", &aurora),
+        U256::from(INITIAL_NONCE),
+    );
+    assert_eq!(
+        query_address(&address, "get_balance", &aurora),
+        INITIAL_BALANCE.raw(),
+    );
+
+    // Run transaction which will fail (transfer more than current balance)
+    let nonce = signer.use_nonce();
+    let tx = test_utils::transfer(
+        Address([1; 20]),
+        INITIAL_BALANCE + INITIAL_BALANCE,
+        nonce.into(),
+    );
+    let signed_tx = test_utils::sign_transaction(
+        tx,
+        Some(test_utils::AuroraRunner::default().chain_id),
+        &signer.secret_key,
+    );
+    let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
+    let result: SubmitResult = call_result.unwrap_borsh();
+    assert_eq!(result.status, TransactionStatus::OutOfFund);
+
+    // validate post-state
+    assert_eq!(
+        query_address(&address, "get_nonce", &aurora),
+        U256::from(INITIAL_NONCE + 1),
+    );
+    assert_eq!(
+        query_address(&address, "get_balance", &aurora),
+        INITIAL_BALANCE.raw(),
+    );
+
+    // helper function
+    fn query_address(
+        address: &Address,
+        method: &str,
+        aurora: &state_migration::AuroraAccount,
+    ) -> U256 {
+        let x = aurora.call(method, &address.0);
+        match &x.outcome().status {
+            near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => {
+                U256::from_big_endian(&b)
+            }
+            other => panic!("Unexpected outcome: {:?}", other),
+        }
     }
 }
