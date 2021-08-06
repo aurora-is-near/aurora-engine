@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Cache lookup for target dir
         run: cache-util -restore -path target -key aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}
