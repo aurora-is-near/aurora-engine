@@ -94,7 +94,7 @@ impl AsRef<[u8]> for TransactionStatus {
         match self {
             Self::Succeed(_) => b"SUCCESS",
             Self::Revert(_) => b"ERR_REVERT",
-            Self::OutOfFund => b"ERR_OUT_OF_FUND",
+            Self::OutOfFund => b"ERR_OUT_OF_FUNDS",
             Self::OutOfGas => b"ERR_OUT_OF_GAS",
             Self::OutOfOffset => b"ERR_OUT_OF_OFFSET",
             Self::CallTooDeep => b"ERR_CALL_TOO_DEEP",
