@@ -395,7 +395,7 @@ mod contract {
             crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str()
         );
         engine
-            .register_token(address.as_bytes(), &args.nep141.as_bytes())
+            .register_token(address.as_bytes(), args.nep141.as_bytes())
             .sdk_unwrap();
         sdk::return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
 
@@ -610,7 +610,7 @@ mod contract {
                 .sdk_expect("ERR_ARG_PARSE");
 
         sdk::return_output(
-            Engine::get_erc20_from_nep141(&args.nep141.as_bytes())
+            Engine::get_erc20_from_nep141(args.nep141.as_bytes())
                 .sdk_unwrap()
                 .as_slice(),
         );

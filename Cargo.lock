@@ -239,7 +239,8 @@ dependencies = [
 [[package]]
 name = "blake2"
 version = "0.9.1"
-source = "git+https://github.com/near/near-blake2.git#736ff607cc8160af87ffa697c14ebef85050138f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10a5720225ef5daecf08657f23791354e1685a8c91a4c60c7f3d3b2892f978f4"
 dependencies = [
  "crypto-mac 0.8.0",
  "digest 0.9.0",
@@ -249,8 +250,7 @@ dependencies = [
 [[package]]
 name = "blake2"
 version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10a5720225ef5daecf08657f23791354e1685a8c91a4c60c7f3d3b2892f978f4"
+source = "git+https://github.com/near/near-blake2.git#736ff607cc8160af87ffa697c14ebef85050138f"
 dependencies = [
  "crypto-mac 0.8.0",
  "digest 0.9.0",
@@ -2205,7 +2205,7 @@ dependencies = [
 [[package]]
 name = "near-sdk"
 version = "3.1.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
 dependencies = [
  "base64 0.13.0",
  "borsh",
@@ -2221,7 +2221,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-core"
 version = "3.1.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -2232,7 +2232,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-macros"
 version = "3.1.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
 dependencies = [
  "near-sdk-core",
  "proc-macro2",
@@ -2243,7 +2243,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-sim"
 version = "3.2.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
 dependencies = [
  "chrono",
  "funty",
