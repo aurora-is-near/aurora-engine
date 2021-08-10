@@ -77,13 +77,13 @@ mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use crate::connector::EthConnectorContract;
-    use crate::engine::{Engine, EngineState};
+    use crate::engine::{Engine, EngineState, GasPaymentError};
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
         DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetErc20FromNep141CallArgs,
         GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransactionStatus,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult, TransactionStatus,
         TransferCallCallArgs, ViewCallArgs,
     };
 
@@ -251,14 +251,25 @@ mod contract {
         // Pay for gas
         let gas_price = signed_transaction.gas_price();
         let prepaid_amount =
-            Engine::charge_gas_limit(&sender, signed_transaction.gas_limit(), gas_price)
-                .map_err(|e| {
-                    // In the error case we still need to increment the nonce since the transaction
-                    // was valid except for a property of the current state (the balance)
+            match Engine::charge_gas_limit(&sender, signed_transaction.gas_limit(), gas_price) {
+                Ok(amount) => amount,
+                // If the account does not have enough funds to cover the gas cost then we still
+                // must increment the nonce to prevent the transaction from being replayed in the
+                // future when the state may have changed such that it could pass.
+                Err(GasPaymentError::OutOfFund) => {
                     Engine::increment_nonce(&sender);
-                    e
-                })
-                .sdk_unwrap();
+                    let result = SubmitResult {
+                        status: TransactionStatus::OutOfFund,
+                        gas_used: 0,
+                        logs: crate::prelude::Vec::new(),
+                    };
+                    sdk::return_output(&result.try_to_vec().unwrap());
+                    return;
+                }
+                // If an overflow happens then the transaction is statically invalid
+                // (i.e. validity does not depend on state), so we do not need to increment the nonce.
+                Err(err) => sdk::panic_utf8(err.as_ref()),
+            };
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
