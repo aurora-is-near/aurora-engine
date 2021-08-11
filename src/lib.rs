@@ -645,6 +645,43 @@ mod contract {
         sdk::return_output(json_data.to_string().as_bytes())
     }
 
+    /// Due to the design change to stop minting and burning bridged ETH tokens
+    /// (see https://github.com/aurora-is-near/aurora-engine/pull/133 ),
+    /// there is currently an incorrect number of tokens in the Aurora NEP-141 token
+    /// account. This issue only impacts testnet because at the time the design was changed
+    /// the eth-connector had not been deployed to mainnet. The purpose of this function is
+    /// to mint the correct number of tokens in order to make up for the ones that were burned
+    /// before the design change in #133.
+    #[cfg(feature = "testnet")]
+    #[no_mangle]
+    pub extern "C" fn balance_evm_and_nep_141() {
+        use crate::precompiles::native::{ExitToEthereum, ExitToNear};
+        use crate::prelude::String;
+
+        let mut connector = EthConnectorContract::get_instance();
+        let aurora_account = unsafe { String::from_utf8_unchecked(sdk::current_account_id()) };
+        let aurora_nep_141_balance = connector.ft.ft_balance_of(&aurora_account);
+        let total_evm_balance = connector.ft.ft_total_eth_supply_on_aurora();
+        let exit_to_near_balance = Engine::get_balance(&ExitToNear::ADDRESS).raw().low_u128();
+        let exit_to_eth_balance = Engine::get_balance(&ExitToEthereum::ADDRESS)
+            .raw()
+            .low_u128();
+
+        // ETH sent to the exit precompiles is no longer accessible (and would have already been
+        // transferred from the Aurora account in the NEP-141 contract).
+        let available_evm_balance = total_evm_balance - exit_to_eth_balance - exit_to_near_balance;
+
+        // After #133 it should be true that `aurora_nep_141_balance == available_evm_balance`.
+        // If it is not then we mint tokens to make this the case.
+        if aurora_nep_141_balance < available_evm_balance {
+            let missing_balance = available_evm_balance - aurora_nep_141_balance;
+            connector
+                .ft
+                .internal_deposit_eth_to_near(&aurora_account, missing_balance);
+            connector.save_ft_contract();
+        }
+    }
+
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
