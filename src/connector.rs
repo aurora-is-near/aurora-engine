@@ -28,7 +28,7 @@ pub struct EthConnectorContract {
     contract: EthConnector,
     ft: FungibleToken,
     paused_mask: PausedMask,
-    metadata: FungibleTokenMetadata,
+    metadata: Option<FungibleTokenMetadata>,
 }
 
 /// eth-connector specific data
@@ -59,7 +59,7 @@ impl EthConnectorContract {
             contract: Self::get_contract_data(&EthConnectorStorageId::Contract),
             ft: Self::get_contract_data(&EthConnectorStorageId::FungibleToken),
             paused_mask: Self::get_contract_data(&EthConnectorStorageId::PausedMask),
-            metadata: Self::get_contract_data(&EthConnectorStorageId::FungibleTokenMetadata),
+            metadata: Self::get_contract_metadata(),
         }
     }
 
@@ -70,6 +70,14 @@ impl EthConnectorContract {
     fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorStorageId) -> T {
         let data = sdk::read_storage(&Self::get_contract_key(suffix)).expect("Failed read storage");
         T::try_from_slice(&data[..]).unwrap()
+    }
+
+    fn get_contract_metadata() -> Option<FungibleTokenMetadata> {
+        let data = sdk::read_storage(&Self::get_contract_key(
+            &EthConnectorStorageId::FungibleTokenMetadata,
+        ))
+        .expect("Failed read storage");
+        FungibleTokenMetadata::try_from_slice(&data[..]).ok()
     }
 
     /// Init eth-connector contract specific data
@@ -93,7 +101,7 @@ impl EthConnectorContract {
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
 
-        let metadata = args.metadata;
+        let metadata = Some(args.metadata);
 
         let paused_mask = UNPAUSE_ALL;
         sdk::save_contract(
@@ -629,31 +637,38 @@ impl EthConnectorContract {
 
     /// Return metdata
     pub fn get_metadata(&self) {
-        let icon = if let Some(ref icon) = self.metadata.icon {
-            format!(r#""{}""#, icon)
+        let json_data = if let Some(ref metadata) = self.metadata {
+            let icon = if let Some(ref icon) = metadata.icon {
+                format!(r#""{}""#, icon)
+            } else {
+                "null".to_string()
+            };
+            let reference = if let Some(ref reference) = metadata.reference {
+                format!(r#""{}""#, reference)
+            } else {
+                "null".to_string()
+            };
+            let reference_hash = if let Some(ref reference_hash) = metadata.reference_hash {
+                format!("{:?}", reference_hash)
+            } else {
+                "null".to_string()
+            };
+            format!(
+                r#"{{"spec": "{}", "name": "{}", "symbol": "{}", "icon": {}, "reference": {}, "reference_hash": {}, "decimals": {:?}}}"#,
+                metadata.spec,
+                metadata.name,
+                metadata.symbol,
+                icon,
+                reference,
+                reference_hash,
+                metadata.decimals,
+            )
         } else {
-            "null".to_string()
+            format!(
+                r#"{{"spec": "{}", "name": "{}", "symbol": "{}", "icon": {}, "reference": {}, "reference_hash": {}, "decimals": {:?}}}"#,
+                "ft-1.0.0", "ETH", "Ether", "", "", "", 18,
+            )
         };
-        let reference = if let Some(ref reference) = self.metadata.reference {
-            format!(r#""{}""#, reference)
-        } else {
-            "null".to_string()
-        };
-        let reference_hash = if let Some(ref reference_hash) = self.metadata.reference_hash {
-            format!("{:?}", reference_hash)
-        } else {
-            "null".to_string()
-        };
-        let json_data = format!(
-            r#"{{"spec": "{}", "name": "{}", "symbol": "{}", "icon": {}, "reference": {}, "reference_hash": {}, "decimals": {:?}}}"#,
-            self.metadata.spec,
-            self.metadata.name,
-            self.metadata.symbol,
-            icon,
-            reference,
-            reference_hash,
-            self.metadata.decimals,
-        );
         // Return JSON
         sdk::return_output(&json_data.as_bytes());
     }
