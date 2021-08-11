@@ -82,7 +82,7 @@ impl EthConnectorContract {
         let contract_data = Self::set_contract_data(SetContractDataCallArgs {
             prover_account: args.prover_account,
             eth_custodian_address: args.eth_custodian_address,
-            metadata: args.metadata.clone(),
+            metadata: args.metadata,
         });
 
         let current_account_id = sdk::current_account_id();
@@ -90,11 +90,6 @@ impl EthConnectorContract {
         let mut ft = FungibleToken::new();
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
-
-        sdk::save_contract(
-            &Self::get_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
-            &args.metadata,
-        );
 
         let paused_mask = UNPAUSE_ALL;
         sdk::save_contract(
@@ -122,6 +117,11 @@ impl EthConnectorContract {
         sdk::save_contract(
             &Self::get_contract_key(&EthConnectorStorageId::Contract),
             &contract_data,
+        );
+
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
+            &args.metadata,
         );
 
         contract_data
