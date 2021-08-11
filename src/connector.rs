@@ -82,6 +82,7 @@ impl EthConnectorContract {
         let contract_data = Self::set_contract_data(SetContractDataCallArgs {
             prover_account: args.prover_account,
             eth_custodian_address: args.eth_custodian_address,
+            metadata: args.metadata,
         });
 
         let current_account_id = sdk::current_account_id();
@@ -116,6 +117,11 @@ impl EthConnectorContract {
         sdk::save_contract(
             &Self::get_contract_key(&EthConnectorStorageId::Contract),
             &contract_data,
+        );
+
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
+            &args.metadata,
         );
 
         contract_data
@@ -615,6 +621,14 @@ impl EthConnectorContract {
     /// Set Eth connector paused flags
     pub fn set_paused_flags(&mut self, args: PauseEthConnectorCallArgs) {
         self.set_paused(args.paused_mask);
+    }
+
+    /// Return metdata
+    pub fn get_metadata() -> Option<FungibleTokenMetadata> {
+        sdk::read_storage(&Self::get_contract_key(
+            &EthConnectorStorageId::FungibleTokenMetadata,
+        ))
+        .and_then(|data| FungibleTokenMetadata::try_from_slice(&data).ok())
     }
 }
 

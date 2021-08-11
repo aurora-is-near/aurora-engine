@@ -78,6 +78,7 @@ mod contract {
 
     use crate::connector::EthConnectorContract;
     use crate::engine::{Engine, EngineState, GasPaymentError};
+    use crate::fungible_token::FungibleTokenMetadata;
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
@@ -181,8 +182,7 @@ mod contract {
     /// code.
     #[no_mangle]
     pub extern "C" fn state_migration() {
-        // This function is purposely left empty because we do not have any state migration
-        // to do.
+        // TODO: currently we don't have migrations
     }
 
     ///
@@ -635,6 +635,14 @@ mod contract {
                 .sdk_expect("ERC20_NOT_FOUND")
                 .as_slice(),
         );
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ft_metadata() {
+        let metadata: FungibleTokenMetadata =
+            EthConnectorContract::get_metadata().unwrap_or_default();
+        let json_data = crate::json::JsonValue::from(metadata);
+        sdk::return_output(json_data.to_string().as_bytes())
     }
 
     /// Due to the design change to stop minting and burning bridged ETH tokens
