@@ -1177,8 +1177,8 @@ checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 
 [[package]]
 name = "evm"
-version = "0.28.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
+version = "0.30.1"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=bcffb19a38027e98a34711a198502f9c85db877c#bcffb19a38027e98a34711a198502f9c85db877c"
 dependencies = [
  "environmental",
  "ethereum",
@@ -1195,8 +1195,8 @@ dependencies = [
 
 [[package]]
 name = "evm-core"
-version = "0.28.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
+version = "0.30.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=bcffb19a38027e98a34711a198502f9c85db877c#bcffb19a38027e98a34711a198502f9c85db877c"
 dependencies = [
  "funty",
  "parity-scale-codec",
@@ -1206,8 +1206,8 @@ dependencies = [
 
 [[package]]
 name = "evm-gasometer"
-version = "0.28.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
+version = "0.30.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=bcffb19a38027e98a34711a198502f9c85db877c#bcffb19a38027e98a34711a198502f9c85db877c"
 dependencies = [
  "environmental",
  "evm-core",
@@ -1217,8 +1217,8 @@ dependencies = [
 
 [[package]]
 name = "evm-runtime"
-version = "0.28.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
+version = "0.30.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=bcffb19a38027e98a34711a198502f9c85db877c#bcffb19a38027e98a34711a198502f9c85db877c"
 dependencies = [
  "environmental",
  "evm-core",
@@ -2321,8 +2321,8 @@ dependencies = [
  "near-vm-errors 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
  "ripemd160",
  "serde",
- "sha2 0.8.2",
- "sha3 0.8.2",
+ "sha2 0.9.5",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -2341,8 +2341,8 @@ dependencies = [
  "near-vm-errors 3.0.0 (git+https://github.com/near/nearcore.git?rev=8a37d39629885a41dde58b60642bcf1e99407d90)",
  "ripemd160",
  "serde",
- "sha2 0.8.2",
- "sha3 0.8.2",
+ "sha2 0.9.5",
+ "sha3 0.9.1",
 ]
 
 [[package]]

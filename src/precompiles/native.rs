@@ -1,12 +1,12 @@
 use crate::parameters::PromiseCreateArgs;
-use crate::prelude::Address;
 #[cfg(not(feature = "contract"))]
 use crate::prelude::Vec;
+use crate::prelude::{Address, H256};
 use evm::{Context, ExitError};
 #[cfg(feature = "contract")]
 use {
     crate::parameters::WithdrawCallArgs,
-    crate::prelude::{is_valid_account_id, Cow, String, ToString, TryInto, U256},
+    crate::prelude::{is_valid_account_id, vec, Cow, String, ToString, TryInto, Vec, U256},
     crate::storage::{bytes_to_key, KeyPrefix},
     crate::types::AccountId,
     borsh::BorshSerialize,
@@ -16,12 +16,20 @@ use super::{Precompile, PrecompileResult};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
-use crate::precompiles::PrecompileOutput;
-use crate::state::AuroraStackState;
+/// keccack256("ExitToNearPromise")
+pub(crate) const EXIT_TO_NEAR_LOG: H256 = H256([
+    0x93, 0x32, 0xb8, 0x78, 0xa0, 0xa0, 0xf8, 0x5f, 0xf8, 0xf2, 0xdb, 0x7a, 0x84, 0xa9, 0xa3, 0x22,
+    0xcd, 0x04, 0x49, 0xc5, 0xff, 0xda, 0x81, 0x40, 0x59, 0xcb, 0xf3, 0x28, 0x2f, 0x06, 0x49, 0x3a,
+]);
 
-trait ReturnPromise {
-    fn promise(&self, state: &mut AuroraStackState) -> PromiseCreateArgs;
-}
+/// keccak256("ExitToEthereumPromise")
+pub(crate) const EXIT_TO_ETHEREUM_LOG: H256 = H256([
+    0xd5, 0x86, 0xb1, 0x7a, 0x18, 0xaf, 0x55, 0x07, 0x2e, 0x18, 0x97, 0x6b, 0x92, 0x77, 0x27, 0xd3,
+    0x01, 0x36, 0x7e, 0x43, 0xe3, 0x53, 0x8d, 0xd5, 0xbc, 0x56, 0xcb, 0x13, 0x34, 0xef, 0xfd, 0xc0,
+]);
+
+use crate::precompiles::PrecompileOutput;
+use evm::backend::Log;
 
 mod costs {
     use crate::types::Gas;
@@ -166,16 +174,23 @@ impl Precompile for ExitToNear {
             _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
         };
 
-        let promise = PromiseCreateArgs {
+        let promise: Vec<u8> = PromiseCreateArgs {
             target_account_id: nep141_address,
             method: "ft_transfer".to_string(),
             args: args.as_bytes().to_vec(),
             attached_balance: 1,
             attached_gas: costs::FT_TRANSFER_GAS,
+        }
+        .try_to_vec()
+        .unwrap();
+        let log = Log {
+            address: context.address,
+            topics: vec![EXIT_TO_NEAR_LOG.clone()],
+            data: promise,
         };
 
         Ok(PrecompileOutput {
-            promise: Some(promise),
+            logs: vec![log],
             ..Default::default()
         })
     }
@@ -308,10 +323,17 @@ impl Precompile for ExitToEthereum {
             args: serialized_args,
             attached_balance: 1,
             attached_gas: costs::WITHDRAWAL_GAS,
+        }
+        .try_to_vec()
+        .unwrap();
+        let log = Log {
+            address: context.address,
+            topics: vec![EXIT_TO_ETHEREUM_LOG.clone()],
+            data: promise,
         };
 
         Ok(PrecompileOutput {
-            promise: Some(promise),
+            logs: vec![log],
             ..Default::default()
         })
     }

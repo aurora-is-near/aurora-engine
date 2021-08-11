@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor::{StackExecutor, StackSubstateMetadata};
+use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
@@ -14,10 +14,10 @@ use crate::parameters::{
     TransactionStatus, ViewCallArgs,
 };
 
+use crate::precompiles::native::{EXIT_TO_ETHEREUM_LOG, EXIT_TO_NEAR_LOG};
 use crate::precompiles::Precompiles;
 use crate::prelude::{is_valid_account_id, Address, TryInto, Vec, H256, U256};
 use crate::sdk;
-use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
 
@@ -573,9 +573,16 @@ impl Engine {
             }
         };
 
-        let (values, logs, promises) = executor.into_state().deconstruct();
+        let (values, logs) = executor.into_state().deconstruct();
+        for log in logs {
+            for topic in log.topics.iter() {
+                if *topic == EXIT_TO_NEAR_LOG || *topic == EXIT_TO_ETHEREUM_LOG {
+                    let promise = PromiseCreateArgs::try_from_slice(&log.data);
+                    Self::schedule_promises(promise);
+                }
+            }
+        }
         self.apply(values, Vec::<Log>::new(), true);
-        Self::schedule_promises(promises);
 
         Ok(SubmitResult {
             status,
@@ -613,12 +620,19 @@ impl Engine {
             }
         };
 
-        let (values, logs, promises) = executor.into_state().deconstruct();
+        let (values, logs) = executor.into_state().deconstruct();
+        for log in logs {
+            for topic in log.topics.iter() {
+                if *topic == EXIT_TO_NEAR_LOG || *topic == EXIT_TO_ETHEREUM_LOG {
+                    let promise = PromiseCreateArgs::try_from_slice(&log.data);
+                    Self::schedule_promises(promise);
+                }
+            }
+        }
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
-        Self::schedule_promises(promises);
 
         Ok(SubmitResult {
             status,
@@ -654,9 +668,9 @@ impl Engine {
         status.into_result(result)
     }
 
-    fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState, Precompiles> {
+    fn make_executor(&self, gas_limit: u64) -> StackExecutor<MemoryStackState<Engine>> {
         let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
-        let state = AuroraStackState::new(metadata, self);
+        let state = MemoryStackState::new(metadata, self);
         StackExecutor::new_with_precompile(state, CONFIG, Precompiles::new_istanbul())
     }
 

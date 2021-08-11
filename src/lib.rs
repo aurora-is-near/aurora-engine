@@ -2,6 +2,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
+#![feature(map_into_keys_values)]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -32,7 +33,6 @@ pub mod sdk;
 
 #[cfg(test)]
 mod benches;
-mod state;
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]

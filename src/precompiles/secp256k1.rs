@@ -1,6 +1,5 @@
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
 use crate::prelude::*;
-use ethabi::Address;
 use evm::{Context, ExitError};
 
 mod costs {
