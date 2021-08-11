@@ -5,6 +5,7 @@ use rjson::{Array, Null, Object, Value};
 #[cfg(test)]
 use std::collections::BTreeMap;
 
+#[derive(PartialEq)]
 pub enum JsonValue {
     Null,
     F64(f64),

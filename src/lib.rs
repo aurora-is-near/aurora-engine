@@ -78,6 +78,7 @@ mod contract {
 
     use crate::connector::EthConnectorContract;
     use crate::engine::{Engine, EngineState, GasPaymentError};
+    use crate::fungible_token::FungibleTokenMetadata;
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
@@ -638,7 +639,10 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_metadata() {
-        EthConnectorContract::get_instance().get_metadata();
+        let metadata: FungibleTokenMetadata =
+            EthConnectorContract::get_metadata().unwrap_or_default();
+        let json_data = crate::json::JsonValue::from(metadata);
+        sdk::return_output(json_data.to_string().as_bytes())
     }
 
     #[cfg(feature = "integration-test")]

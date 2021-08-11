@@ -28,7 +28,6 @@ pub struct EthConnectorContract {
     contract: EthConnector,
     ft: FungibleToken,
     paused_mask: PausedMask,
-    metadata: Option<FungibleTokenMetadata>,
 }
 
 /// eth-connector specific data
@@ -59,7 +58,6 @@ impl EthConnectorContract {
             contract: Self::get_contract_data(&EthConnectorStorageId::Contract),
             ft: Self::get_contract_data(&EthConnectorStorageId::FungibleToken),
             paused_mask: Self::get_contract_data(&EthConnectorStorageId::PausedMask),
-            metadata: Self::get_contract_metadata(),
         }
     }
 
@@ -70,14 +68,6 @@ impl EthConnectorContract {
     fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorStorageId) -> T {
         let data = sdk::read_storage(&Self::get_contract_key(suffix)).expect("Failed read storage");
         T::try_from_slice(&data[..]).unwrap()
-    }
-
-    fn get_contract_metadata() -> Option<FungibleTokenMetadata> {
-        let data = sdk::read_storage(&Self::get_contract_key(
-            &EthConnectorStorageId::FungibleTokenMetadata,
-        ))
-        .expect("Failed read storage");
-        FungibleTokenMetadata::try_from_slice(&data[..]).ok()
     }
 
     /// Init eth-connector contract specific data
@@ -101,7 +91,10 @@ impl EthConnectorContract {
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
 
-        let metadata = Some(args.metadata);
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
+            &args.metadata,
+        );
 
         let paused_mask = UNPAUSE_ALL;
         sdk::save_contract(
@@ -113,7 +106,6 @@ impl EthConnectorContract {
             contract: contract_data,
             ft,
             paused_mask,
-            metadata,
         }
         .save_ft_contract();
     }
@@ -597,10 +589,6 @@ impl EthConnectorContract {
             &Self::get_contract_key(&EthConnectorStorageId::FungibleToken),
             &self.ft,
         );
-        sdk::save_contract(
-            &Self::get_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
-            &self.metadata,
-        );
     }
 
     /// Generate key for used events from Prood
@@ -636,41 +624,11 @@ impl EthConnectorContract {
     }
 
     /// Return metdata
-    pub fn get_metadata(&self) {
-        let json_data = if let Some(ref metadata) = self.metadata {
-            let icon = if let Some(ref icon) = metadata.icon {
-                format!(r#""{}""#, icon)
-            } else {
-                "null".to_string()
-            };
-            let reference = if let Some(ref reference) = metadata.reference {
-                format!(r#""{}""#, reference)
-            } else {
-                "null".to_string()
-            };
-            let reference_hash = if let Some(ref reference_hash) = metadata.reference_hash {
-                format!("{:?}", reference_hash)
-            } else {
-                "null".to_string()
-            };
-            format!(
-                r#"{{"spec": "{}", "name": "{}", "symbol": "{}", "icon": {}, "reference": {}, "reference_hash": {}, "decimals": {:?}}}"#,
-                metadata.spec,
-                metadata.name,
-                metadata.symbol,
-                icon,
-                reference,
-                reference_hash,
-                metadata.decimals,
-            )
-        } else {
-            format!(
-                r#"{{"spec": "{}", "name": "{}", "symbol": "{}", "icon": {}, "reference": {}, "reference_hash": {}, "decimals": {:?}}}"#,
-                "ft-1.0.0", "ETH", "Ether", "", "", "", 18,
-            )
-        };
-        // Return JSON
-        sdk::return_output(json_data.as_bytes());
+    pub fn get_metadata() -> Option<FungibleTokenMetadata> {
+        sdk::read_storage(&Self::get_contract_key(
+            &EthConnectorStorageId::FungibleTokenMetadata,
+        ))
+        .and_then(|data| FungibleTokenMetadata::try_from_slice(&data).ok())
     }
 }
 

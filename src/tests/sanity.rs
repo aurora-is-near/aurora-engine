@@ -1,3 +1,4 @@
+use crate::fungible_token::FungibleTokenMetadata;
 use crate::parameters::{SubmitResult, TransactionStatus};
 use crate::prelude::{Address, U256};
 use crate::test_utils;
@@ -316,6 +317,25 @@ fn test_block_hash_contract() {
         .unwrap();
 
     test_utils::panic_on_fail(result.status);
+}
+
+#[test]
+fn test_ft_metadata() {
+    let mut runner = test_utils::deploy_evm();
+
+    let (maybe_outcome, maybe_error) = runner.call(
+        "ft_metadata",
+        runner.context.signer_account_id.clone(),
+        Vec::new(),
+    );
+    assert!(maybe_error.is_none());
+    let outcome = maybe_outcome.unwrap();
+    let json_value = crate::json::parse_json(&outcome.return_data.as_value().unwrap()).unwrap();
+
+    assert_eq!(
+        json_value,
+        crate::json::JsonValue::from(FungibleTokenMetadata::default())
+    );
 }
 
 // Same as `test_eth_transfer_insufficient_balance` above, except runs through

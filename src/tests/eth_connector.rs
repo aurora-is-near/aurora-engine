@@ -28,20 +28,6 @@ const EVM_CUSTODIAN_ADDRESS: &'static str = "096DE9C2B8A5B8c22cEe3289B101f6960d6
 const DEPOSITED_EVM_AMOUNT: u128 = 10200;
 const DEPOSITED_EVM_FEE: u128 = 200;
 
-impl Default for FungibleTokenMetadata {
-    fn default() -> Self {
-        Self {
-            spec: "".to_string(),
-            name: "".to_string(),
-            symbol: "".to_string(),
-            icon: None,
-            reference: None,
-            reference_hash: None,
-            decimals: 0,
-        }
-    }
-}
-
 #[derive(BorshDeserialize, Debug)]
 pub struct IsUsedProofResult {
     pub is_used_proof: bool,
