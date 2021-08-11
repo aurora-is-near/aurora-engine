@@ -670,7 +670,7 @@ impl EthConnectorContract {
             )
         };
         // Return JSON
-        sdk::return_output(&json_data.as_bytes());
+        sdk::return_output(json_data.as_bytes());
     }
 }
 

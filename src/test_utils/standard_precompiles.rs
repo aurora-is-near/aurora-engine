@@ -24,21 +24,7 @@ impl PrecompilesConstructor {
     }
 
     pub fn deploy(&self, nonce: U256) -> LegacyEthTransaction {
-        let data = self
-            .0
-            .abi
-            .constructor()
-            .unwrap()
-            .encode_input(self.0.code.clone(), &[])
-            .unwrap();
-        LegacyEthTransaction {
-            nonce,
-            gas_price: Default::default(),
-            gas: u64::MAX.into(),
-            to: None,
-            value: Default::default(),
-            data,
-        }
+        self.0.deploy_without_args(nonce)
     }
 
     fn solidity_artifacts_path() -> PathBuf {
@@ -52,21 +38,7 @@ impl PrecompilesConstructor {
 
 impl PrecompilesContract {
     pub fn call_method(&self, method_name: &str, nonce: U256) -> LegacyEthTransaction {
-        let data = self
-            .0
-            .abi
-            .function(method_name)
-            .unwrap()
-            .encode_input(&[])
-            .unwrap();
-        LegacyEthTransaction {
-            nonce,
-            gas_price: Default::default(),
-            gas: u64::MAX.into(),
-            to: Some(self.0.address),
-            value: Default::default(),
-            data,
-        }
+        self.0.call_method_without_args(method_name, nonce)
     }
 
     pub fn all_method_names() -> &'static [&'static str] {

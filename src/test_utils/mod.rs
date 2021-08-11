@@ -13,11 +13,14 @@ use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
+use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
 use crate::prelude::Address;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
-use crate::transaction::{LegacyEthSignedTransaction, LegacyEthTransaction};
+use crate::transaction::{
+    access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
+    LegacyEthSignedTransaction, LegacyEthTransaction,
+};
 use crate::types;
 use crate::types::AccountId;
 
@@ -233,6 +236,16 @@ impl AuroraRunner {
         trie.insert(ft_key, ft_value.try_to_vec().unwrap());
     }
 
+    pub fn submit_with_signer<F: FnOnce(U256) -> LegacyEthTransaction>(
+        &mut self,
+        signer: &mut Signer,
+        make_tx: F,
+    ) -> Result<SubmitResult, VMError> {
+        let nonce = signer.use_nonce();
+        let tx = make_tx(nonce.into());
+        self.submit_transaction(&signer.secret_key, tx)
+    }
+
     pub fn submit_transaction(
         &mut self,
         account: &SecretKey,
@@ -268,7 +281,7 @@ impl AuroraRunner {
         assert!(maybe_err.is_none());
         let submit_result =
             SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();
-        let address = Address::from_slice(&submit_result.result);
+        let address = Address::from_slice(&unwrap_success(submit_result));
         let contract_constructor: ContractConstructor = contract_constructor.into();
         DeployedContract {
             abi: contract_constructor.abi,
@@ -381,6 +394,17 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     runner
 }
 
+pub(crate) fn transfer(to: Address, amount: types::Wei, nonce: U256) -> LegacyEthTransaction {
+    LegacyEthTransaction {
+        nonce,
+        gas_price: Default::default(),
+        gas: u64::MAX.into(),
+        to: Some(to),
+        value: amount,
+        data: Vec::new(),
+    }
+}
+
 pub(crate) fn create_eth_transaction(
     to: Option<Address>,
     value: types::Wei,
@@ -425,6 +449,28 @@ pub(crate) fn sign_transaction(
     }
 }
 
+pub(crate) fn sign_access_list_transaction(
+    tx: AccessListEthTransaction,
+    secret_key: &SecretKey,
+) -> AccessListEthSignedTransaction {
+    let mut rlp_stream = RlpStream::new();
+    rlp_stream.append(&access_list::TYPE_BYTE);
+    tx.rlp_append_unsigned(&mut rlp_stream);
+    let message_hash = types::keccak(rlp_stream.as_raw());
+    let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
+
+    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let r = U256::from_big_endian(&signature.r.b32());
+    let s = U256::from_big_endian(&signature.s.b32());
+
+    AccessListEthSignedTransaction {
+        transaction_data: tx,
+        parity: recovery_id.serialize(),
+        r,
+        s,
+    }
+}
+
 pub(crate) fn address_from_secret_key(sk: &SecretKey) -> Address {
     let pk = PublicKey::from_secret_key(sk);
     let hash = types::keccak(&pk.serialize()[1..]);
@@ -455,5 +501,37 @@ pub fn new_context() -> Context {
         address: Default::default(),
         caller: Default::default(),
         apparent_value: Default::default(),
+    }
+}
+
+pub(crate) fn address_from_hex(address: &str) -> Address {
+    let bytes = if address.starts_with("0x") {
+        hex::decode(&address[2..]).unwrap()
+    } else {
+        hex::decode(address).unwrap()
+    };
+
+    Address::from_slice(&bytes)
+}
+
+pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {
+    match result.status {
+        TransactionStatus::Succeed(ret) => ret,
+        other => panic!("Unexpected status: {:?}", other),
+    }
+}
+
+pub fn unwrap_revert(result: SubmitResult) -> Vec<u8> {
+    match result.status {
+        TransactionStatus::Revert(ret) => ret,
+        other => panic!("Unexpected status: {:?}", other),
+    }
+}
+
+pub fn panic_on_fail(status: TransactionStatus) {
+    match status {
+        TransactionStatus::Succeed(_) => (),
+        TransactionStatus::Revert(message) => panic!("{}", String::from_utf8_lossy(&message)),
+        other => panic!("{}", String::from_utf8_lossy(other.as_ref())),
     }
 }

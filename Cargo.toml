@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "1.0.0"
+version = "1.5.0"
 authors = ["NEAR <hello@near.org>"]
 edition = "2018"
 description = ""
@@ -27,6 +27,7 @@ codegen-units = 1
 rpath = false
 
 [profile.dev]
+# Due to a strange bug, setting this to 3 will cause test failures
 opt-level = "z"
 debug = false
 debug-assertions = true
@@ -36,6 +37,12 @@ panic = "abort"
 incremental = false
 codegen-units = 1
 rpath = false
+
+[profile.bench]
+# lto must be enabled in the bench profile as well for
+# it to actually happen when running tests with --release
+lto = true
+opt-level = 3
 
 [dependencies]
 blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
@@ -55,19 +62,19 @@ logos = { version = "0.12", default-features = false, features = ["export_derive
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 byte-slice-cast = { version = "1.0", default-features = false }
-rjson = { version = "0.3.1", default-features = false }
+rjson = { git = "https://github.com/aurora-is-near/rjson", rev = "cc3da949", default-features = false, features = ["integer"] }
 
 [dev-dependencies]
 bstr = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hex = { version = "0.4.3", default-features = false }
-near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs", rev = "1b9843fe5b652928582e33879fc92ba87a639450" }
-near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs", rev = "1b9843fe5b652928582e33879fc92ba87a639450" }
-near-crypto = { git = "https://github.com/near/nearcore.git", rev = "8a37d39629885a41dde58b60642bcf1e99407d90"}
-near-vm-runner = { git = "https://github.com/near/nearcore.git", rev = "8a37d39629885a41dde58b60642bcf1e99407d90"}
-near-vm-logic = { git = "https://github.com/near/nearcore.git", rev = "8a37d39629885a41dde58b60642bcf1e99407d90"}
-near-primitives-core = { git = "https://github.com/near/nearcore.git", rev = "8a37d39629885a41dde58b60642bcf1e99407d90"}
+near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "1b9843fe5b652928582e33879fc92ba87a639450" }
+near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "1b9843fe5b652928582e33879fc92ba87a639450" }
+near-crypto = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+near-vm-runner = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+near-vm-logic = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+near-primitives-core = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
 libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
