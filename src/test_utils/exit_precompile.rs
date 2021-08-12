@@ -1,6 +1,6 @@
 use crate::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
-use crate::test_utils::{solidity, AuroraRunner, Signer};
+use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use crate::transaction::LegacyEthTransaction;
 
 pub(crate) struct TesterConstructor(pub solidity::ContractConstructor);
@@ -78,8 +78,9 @@ impl Tester {
 
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
 
-        if result.status {
-            Ok(ethabi::decode(output_type, result.result.as_slice()).unwrap())
+        if result.status.is_ok() {
+            let result = test_utils::unwrap_success(result);
+            Ok(ethabi::decode(output_type, result.as_slice()).unwrap())
         } else {
             Err(result)
         }

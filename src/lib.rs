@@ -77,13 +77,15 @@ mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use crate::connector::EthConnectorContract;
-    use crate::engine::{Engine, EngineState};
+    use crate::engine::{Engine, EngineState, GasPaymentError};
+    use crate::fungible_token::FungibleTokenMetadata;
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
         DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetErc20FromNep141CallArgs,
         GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, TransferCallCallArgs, ViewCallArgs,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult, TransactionStatus,
+        TransferCallCallArgs, ViewCallArgs,
     };
 
     use crate::json::parse_json;
@@ -180,8 +182,7 @@ mod contract {
     /// code.
     #[no_mangle]
     pub extern "C" fn state_migration() {
-        // This function is purposely left empty because we do not have any state migration
-        // to do.
+        // TODO: currently we don't have migrations
     }
 
     ///
@@ -241,11 +242,34 @@ mod contract {
         match signed_transaction.intrinsic_gas(crate::engine::CONFIG) {
             None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
             Some(intrinsic_gas) => {
-                if signed_transaction.gas_limit() < &intrinsic_gas.into() {
+                if signed_transaction.gas_limit() < intrinsic_gas.into() {
                     sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
                 }
             }
         }
+
+        // Pay for gas
+        let gas_price = signed_transaction.gas_price();
+        let prepaid_amount =
+            match Engine::charge_gas_limit(&sender, signed_transaction.gas_limit(), gas_price) {
+                Ok(amount) => amount,
+                // If the account does not have enough funds to cover the gas cost then we still
+                // must increment the nonce to prevent the transaction from being replayed in the
+                // future when the state may have changed such that it could pass.
+                Err(GasPaymentError::OutOfFund) => {
+                    Engine::increment_nonce(&sender);
+                    let result = SubmitResult {
+                        status: TransactionStatus::OutOfFund,
+                        gas_used: 0,
+                        logs: crate::prelude::Vec::new(),
+                    };
+                    sdk::return_output(&result.try_to_vec().unwrap());
+                    return;
+                }
+                // If an overflow happens then the transaction is statically invalid
+                // (i.e. validity does not depend on state), so we do not need to increment the nonce.
+                Err(err) => sdk::panic_utf8(err.as_ref()),
+            };
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
@@ -272,6 +296,17 @@ mod contract {
             Engine::deploy_code(&mut engine, sender, value, data, gas_limit, access_list)
             // TODO: charge for storage
         };
+
+        // Give refund
+        let relayer = predecessor_address();
+        let gas_used = match &result {
+            Ok(submit_result) => submit_result.gas_used,
+            Err(engine_err) => engine_err.gas_used,
+        };
+        Engine::refund_unused_gas(&sender, &relayer, prepaid_amount, gas_used, gas_price)
+            .sdk_unwrap();
+
+        // return result to user
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();
@@ -356,21 +391,24 @@ mod contract {
             ethabi::Token::Address(current_address()),
         ]);
 
-        Engine::deploy_code_with_input(
+        let address = match Engine::deploy_code_with_input(
             &mut engine,
             (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec(),
-        )
-        .map(|res| {
-            let address = H160(res.result.as_slice().try_into().unwrap());
-            crate::log!(
-                crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str()
-            );
-            engine
-                .register_token(address.as_bytes(), &args.nep141.as_bytes())
-                .sdk_unwrap();
-            res.result.try_to_vec().sdk_expect("ERR_SERIALIZE")
-        })
-        .sdk_process();
+        ) {
+            Ok(result) => match result.status {
+                TransactionStatus::Succeed(ret) => H160(ret.as_slice().try_into().unwrap()),
+                other => sdk::panic_utf8(other.as_ref()),
+            },
+            Err(e) => sdk::panic_utf8(e.as_ref()),
+        };
+
+        crate::log!(
+            crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str()
+        );
+        engine
+            .register_token(address.as_bytes(), args.nep141.as_bytes())
+            .sdk_unwrap();
+        sdk::return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
 
         // TODO: charge for storage
     }
@@ -583,7 +621,7 @@ mod contract {
                 .sdk_expect("ERR_ARG_PARSE");
 
         sdk::return_output(
-            Engine::get_erc20_from_nep141(&args.nep141.as_bytes())
+            Engine::get_erc20_from_nep141(args.nep141.as_bytes())
                 .sdk_unwrap()
                 .as_slice(),
         );
@@ -599,12 +637,78 @@ mod contract {
         );
     }
 
+    #[no_mangle]
+    pub extern "C" fn ft_metadata() {
+        let metadata: FungibleTokenMetadata =
+            EthConnectorContract::get_metadata().unwrap_or_default();
+        let json_data = crate::json::JsonValue::from(metadata);
+        sdk::return_output(json_data.to_string().as_bytes())
+    }
+
+    /// Due to the design change to stop minting and burning bridged ETH tokens
+    /// (see https://github.com/aurora-is-near/aurora-engine/pull/133 ),
+    /// there is currently an incorrect number of tokens in the Aurora NEP-141 token
+    /// account. This issue only impacts testnet because at the time the design was changed
+    /// the eth-connector had not been deployed to mainnet. The purpose of this function is
+    /// to mint the correct number of tokens in order to make up for the ones that were burned
+    /// before the design change in #133.
+    #[cfg(feature = "testnet")]
+    #[no_mangle]
+    pub extern "C" fn balance_evm_and_nep_141() {
+        use crate::precompiles::native::{ExitToEthereum, ExitToNear};
+        use crate::prelude::String;
+
+        let mut connector = EthConnectorContract::get_instance();
+        let aurora_account = unsafe { String::from_utf8_unchecked(sdk::current_account_id()) };
+        let aurora_nep_141_balance = connector.ft.ft_balance_of(&aurora_account);
+        let total_evm_balance = connector.ft.ft_total_eth_supply_on_aurora();
+        let exit_to_near_balance = Engine::get_balance(&ExitToNear::ADDRESS).raw().low_u128();
+        let exit_to_eth_balance = Engine::get_balance(&ExitToEthereum::ADDRESS)
+            .raw()
+            .low_u128();
+
+        // ETH sent to the exit precompiles is no longer accessible (and would have already been
+        // transferred from the Aurora account in the NEP-141 contract).
+        let available_evm_balance = total_evm_balance - exit_to_eth_balance - exit_to_near_balance;
+
+        // After #133 it should be true that `aurora_nep_141_balance == available_evm_balance`.
+        // If it is not then we mint tokens to make this the case.
+        if aurora_nep_141_balance < available_evm_balance {
+            let missing_balance = available_evm_balance - aurora_nep_141_balance;
+            connector
+                .ft
+                .internal_deposit_eth_to_near(&aurora_account, missing_balance);
+            connector.save_ft_contract();
+        }
+    }
+
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
         crate::log!("Call from verify_log_entry");
         let data = true.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
+    }
+
+    /// Function used to create accounts for tests
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn mint_account() {
+        use evm::backend::ApplyBackend;
+
+        let args: ([u8; 20], u64, u64) = sdk::read_input_borsh().sdk_expect("ERR_ARGS");
+        let address = Address(args.0);
+        let nonce = U256::from(args.1);
+        let balance = U256::from(args.2);
+        let mut engine = Engine::new(address).sdk_unwrap();
+        let state_change = evm::backend::Apply::Modify {
+            address,
+            basic: evm::backend::Basic { balance, nonce },
+            code: None,
+            storage: core::iter::empty(),
+            reset_storage: false,
+        };
+        engine.apply(core::iter::once(state_change), core::iter::empty(), false);
     }
 
     ///

@@ -34,6 +34,7 @@ name = "aurora-engine"
 version = "1.5.0"
 dependencies = [
  "aurora-bn",
+ "base64",
  "blake2",
  "borsh",
  "byte-slice-cast",
@@ -66,6 +67,12 @@ name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
+
+[[package]]
+name = "base64"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "beef"
@@ -707,9 +714,8 @@ dependencies = [
 
 [[package]]
 name = "rjson"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5510dbde48c4c37bf69123b1f636b6dd5f8dffe1f4e358af03c46a4947dca219"
+version = "0.3.2"
+source = "git+https://github.com/aurora-is-near/rjson?rev=cc3da949#cc3da9495e7e520900d66d2b517539f74fff93cf"
 
 [[package]]
 name = "rlp"

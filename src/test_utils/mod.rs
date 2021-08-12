@@ -12,8 +12,8 @@ use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
-use crate::fungible_token::FungibleToken;
-use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult};
+use crate::fungible_token::{FungibleToken, FungibleTokenMetadata};
+use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
 use crate::prelude::Address;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
@@ -281,7 +281,7 @@ impl AuroraRunner {
         assert!(maybe_err.is_none());
         let submit_result =
             SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();
-        let address = Address::from_slice(&submit_result.result);
+        let address = Address::from_slice(&unwrap_success(submit_result));
         let contract_constructor: ContractConstructor = contract_constructor.into();
         DeployedContract {
             abi: contract_constructor.abi,
@@ -381,6 +381,7 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     let args = InitCallArgs {
         prover_account: "prover.near".to_string(),
         eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+        metadata: FungibleTokenMetadata::default(),
     };
     let (_, maybe_error) = runner.call(
         "new_eth_connector",
@@ -511,4 +512,26 @@ pub(crate) fn address_from_hex(address: &str) -> Address {
     };
 
     Address::from_slice(&bytes)
+}
+
+pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {
+    match result.status {
+        TransactionStatus::Succeed(ret) => ret,
+        other => panic!("Unexpected status: {:?}", other),
+    }
+}
+
+pub fn unwrap_revert(result: SubmitResult) -> Vec<u8> {
+    match result.status {
+        TransactionStatus::Revert(ret) => ret,
+        other => panic!("Unexpected status: {:?}", other),
+    }
+}
+
+pub fn panic_on_fail(status: TransactionStatus) {
+    match status {
+        TransactionStatus::Succeed(_) => (),
+        TransactionStatus::Revert(message) => panic!("{}", String::from_utf8_lossy(&message)),
+        other => panic!("{}", String::from_utf8_lossy(other.as_ref())),
+    }
 }

@@ -241,7 +241,8 @@ dependencies = [
 [[package]]
 name = "blake2"
 version = "0.9.1"
-source = "git+https://github.com/near/near-blake2.git#736ff607cc8160af87ffa697c14ebef85050138f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10a5720225ef5daecf08657f23791354e1685a8c91a4c60c7f3d3b2892f978f4"
 dependencies = [
  "crypto-mac 0.8.0",
  "digest 0.9.0",
@@ -251,8 +252,7 @@ dependencies = [
 [[package]]
 name = "blake2"
 version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10a5720225ef5daecf08657f23791354e1685a8c91a4c60c7f3d3b2892f978f4"
+source = "git+https://github.com/near/near-blake2.git#736ff607cc8160af87ffa697c14ebef85050138f"
 dependencies = [
  "crypto-mac 0.8.0",
  "digest 0.9.0",
@@ -1474,9 +1474,9 @@ checksum = "0e4075386626662786ddb0ec9081e7c7eeb1ba31951f447ca780ef9f5d568189"
 
 [[package]]
 name = "git2"
-version = "0.13.19"
+version = "0.13.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17929de7239dea9f68aa14f94b2ab4974e7b24c1314275ffcc12a7758172fa18"
+checksum = "d9831e983241f8c5591ed53f17d874833e2fa82cac2625f3888c50cbfe136cba"
 dependencies = [
  "bitflags",
  "libc",
@@ -1758,9 +1758,9 @@ checksum = "18794a8ad5b29321f790b55d93dfba91e125cb1a9edbd4f8e3150acc771c1a5e"
 
 [[package]]
 name = "libgit2-sys"
-version = "0.12.20+1.1.0"
+version = "0.12.21+1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e2f09917e00b9ad194ae72072bb5ada2cca16d8171a43e91ddba2afbb02664b"
+checksum = "86271bacd72b2b9e854c3dcfb82efd538f15f870e4c11af66900effb462f6825"
 dependencies = [
  "cc",
  "libc",
@@ -2229,7 +2229,7 @@ dependencies = [
 [[package]]
 name = "near-sdk"
 version = "3.1.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
 dependencies = [
  "base64 0.13.0",
  "borsh",
@@ -2245,7 +2245,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-core"
 version = "3.1.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -2256,7 +2256,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-macros"
 version = "3.1.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
 dependencies = [
  "near-sdk-core",
  "proc-macro2",
@@ -2267,7 +2267,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-sim"
 version = "3.2.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=1b9843fe5b652928582e33879fc92ba87a639450#1b9843fe5b652928582e33879fc92ba87a639450"
 dependencies = [
  "chrono",
  "funty",
@@ -3163,9 +3163,8 @@ dependencies = [
 
 [[package]]
 name = "rjson"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5510dbde48c4c37bf69123b1f636b6dd5f8dffe1f4e358af03c46a4947dca219"
+version = "0.3.2"
+source = "git+https://github.com/aurora-is-near/rjson?rev=cc3da949#cc3da9495e7e520900d66d2b517539f74fff93cf"
 
 [[package]]
 name = "rlp"

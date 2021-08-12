@@ -1,6 +1,6 @@
 use crate::parameters::FunctionCallArgs;
 use crate::prelude::Address;
-use crate::test_utils::{solidity, AuroraRunner, Signer};
+use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use crate::transaction::LegacyEthTransaction;
 use borsh::BorshSerialize;
 use primitive_types::U256;
@@ -73,8 +73,9 @@ impl SelfDestructFactory {
         };
 
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
+        let result = test_utils::unwrap_success(result);
 
-        Address::from_slice(&result.result[12..])
+        Address::from_slice(&result[12..])
     }
 }
 
@@ -111,11 +112,10 @@ impl SelfDestruct {
         };
 
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
+        let result = test_utils::unwrap_success(result);
 
-        if result.result.len() == 32 {
-            Some(u128::from_be_bytes(
-                result.result[16..32].try_into().unwrap(),
-            ))
+        if result.len() == 32 {
+            Some(u128::from_be_bytes(result[16..32].try_into().unwrap()))
         } else {
             None
         }
