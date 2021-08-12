@@ -10,11 +10,11 @@ use crate::connector::EthConnectorContract;
 use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
-    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
-    TransactionStatus, ViewCallArgs,
+    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, ResultLog,
+    SubmitResult, TransactionStatus, ViewCallArgs,
 };
 
-use crate::precompiles::native::{EXIT_TO_ETHEREUM_LOG, EXIT_TO_NEAR_LOG};
+use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::precompiles::Precompiles;
 use crate::prelude::{is_valid_account_id, Address, TryInto, Vec, H256, U256};
 use crate::sdk;
@@ -574,20 +574,14 @@ impl Engine {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        for log in logs {
-            for topic in log.topics.iter() {
-                if *topic == EXIT_TO_NEAR_LOG || *topic == EXIT_TO_ETHEREUM_LOG {
-                    let promise = PromiseCreateArgs::try_from_slice(&log.data);
-                    Self::schedule_promises(promise);
-                }
-            }
-        }
+        let logs = Self::filter_promises_from_logs(logs);
+
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult {
             status,
             gas_used: used_gas,
-            logs: logs.into_iter().map(Into::into).collect(),
+            logs,
         })
     }
 
@@ -621,14 +615,7 @@ impl Engine {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        for log in logs {
-            for topic in log.topics.iter() {
-                if *topic == EXIT_TO_NEAR_LOG || *topic == EXIT_TO_ETHEREUM_LOG {
-                    let promise = PromiseCreateArgs::try_from_slice(&log.data);
-                    Self::schedule_promises(promise);
-                }
-            }
-        }
+        let logs = Self::filter_promises_from_logs(logs);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
@@ -637,7 +624,7 @@ impl Engine {
         Ok(SubmitResult {
             status,
             gas_used: used_gas,
-            logs: logs.into_iter().map(Into::into).collect(),
+            logs,
         })
     }
 
@@ -671,7 +658,7 @@ impl Engine {
     fn make_executor(&self, gas_limit: u64) -> StackExecutor<MemoryStackState<Engine>> {
         let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
         let state = MemoryStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, CONFIG, Precompiles::new_istanbul())
+        StackExecutor::new_with_precompile(state, CONFIG, Precompiles::new_istanbul().0)
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
@@ -828,25 +815,39 @@ impl Engine {
         Default::default()
     }
 
-    fn schedule_promises(promises: impl IntoIterator<Item = PromiseCreateArgs>) {
-        for promise in promises {
-            #[cfg(feature = "log")]
-            sdk::log_utf8(
-                crate::prelude::format!(
-                    "Call contract: {}.{}",
-                    promise.target_account_id,
-                    promise.method
-                )
-                .as_bytes(),
-            );
-            sdk::promise_create(
-                promise.target_account_id.as_bytes(),
-                promise.method.as_bytes(),
-                promise.args.as_slice(),
-                promise.attached_balance,
-                promise.attached_gas,
-            );
-        }
+    fn filter_promises_from_logs<T: IntoIterator<Item = Log>>(logs: T) -> Vec<ResultLog> {
+        logs.into_iter()
+            .filter_map(|log| {
+                if log.address == ExitToNear::ADDRESS || log.address == ExitToEthereum::ADDRESS {
+                    if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
+                        Self::schedule_promise(promise);
+                    }
+                    // do not pass on these "internal logs" to caller
+                    None
+                } else {
+                    Some(log.into())
+                }
+            })
+            .collect()
+    }
+
+    fn schedule_promise(promise: PromiseCreateArgs) {
+        #[cfg(feature = "log")]
+        sdk::log_utf8(
+            crate::prelude::format!(
+                "Call contract: {}.{}",
+                promise.target_account_id,
+                promise.method
+            )
+            .as_bytes(),
+        );
+        sdk::promise_create(
+            promise.target_account_id.as_bytes(),
+            promise.method.as_bytes(),
+            promise.args.as_slice(),
+            promise.attached_balance,
+            promise.attached_gas,
+        );
     }
 }
 

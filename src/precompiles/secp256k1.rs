@@ -1,4 +1,4 @@
-use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
+use crate::precompiles::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use crate::prelude::*;
 use evm::{Context, ExitError};
 
@@ -62,15 +62,12 @@ impl Precompile for ECRecover {
         Ok(costs::ECRECOVER_BASE)
     }
 
-    fn run(
-        input: &[u8],
-        target_gas: u64,
-        _context: &Context,
-        _is_static: bool,
-    ) -> PrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            return Err(ExitError::OutOfGas);
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
 
         let mut input = input.to_vec();
@@ -89,7 +86,7 @@ impl Precompile for ECRecover {
         let v_bit = match v[31] {
             27 | 28 if v[..31] == [0; 31] => v[31] - 27,
             _ => {
-                return Ok(PrecompileOutput::without_logs(0, vec![255u8; 32]));
+                return Ok(PrecompileOutput::without_logs(0, vec![255u8; 32]).into());
             }
         };
         signature[64] = v_bit; // v
@@ -106,7 +103,7 @@ impl Precompile for ECRecover {
             }
         };
 
-        Ok(PrecompileOutput::without_logs(cost, output))
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -140,7 +137,7 @@ mod tests {
             hex::decode("000000000000000000000000c08b5542d177ac6686946920409741463a15dddb")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context(), false)
+        let res = ECRecover::run(&input, Some(3_000), &new_context())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -148,7 +145,7 @@ mod tests {
         // out of gas
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b650acf9d3f5f0a2c799776a1254355d5f4061762a237396a99a0e0e3fc2bcd6729514a0dacb2e623ac4abd157cb18163ff942280db4d5caad66ddf941ba12e03").unwrap();
 
-        let res = ECRecover::run(&input, 2_999, &new_context(), false);
+        let res = ECRecover::run(&input, Some(2_999), &new_context());
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // bad inputs
@@ -157,7 +154,7 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context(), false)
+        let res = ECRecover::run(&input, Some(3_000), &new_context())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -167,7 +164,7 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context(), false)
+        let res = ECRecover::run(&input, Some(3_000), &new_context())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -177,7 +174,7 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context(), false)
+        let res = ECRecover::run(&input, Some(3_000), &new_context())
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -187,7 +184,7 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, 3_000, &new_context(), false)
+        let res = ECRecover::run(&input, Some(3_000), &new_context())
             .unwrap()
             .output;
         assert_eq!(res, expected);

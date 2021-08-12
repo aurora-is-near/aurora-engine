@@ -61,9 +61,6 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
     }
 }
 
-/// A precompile operation result.
-type PrecompileResult = Result<PrecompileOutput, ExitError>;
-
 type EvmPrecompileResult = Result<evm::executor::PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
@@ -72,7 +69,7 @@ pub trait Precompile {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError>;
 
     /// Runs the precompile function.
-    fn run(input: &[u8], target_gas: u64, context: &Context, is_static: bool) -> PrecompileResult;
+    fn run(input: &[u8], target_gas: Option<u64>, context: &Context) -> EvmPrecompileResult;
 }
 
 /// Hard fork marker.
@@ -98,9 +95,9 @@ impl HardFork for Istanbul {}
 
 impl HardFork for Berlin {}
 
-type PrecompileFn = fn(&[u8], u64, &Context, bool) -> PrecompileResult;
+type PrecompileFn = fn(&[u8], Option<u64>, &Context) -> EvmPrecompileResult;
 
-pub struct Precompiles(BTreeMap<Address, PrecompileFn>);
+pub struct Precompiles(pub BTreeMap<Address, PrecompileFn>);
 
 impl Precompiles {
     #[allow(dead_code)]
@@ -199,10 +196,6 @@ impl Precompiles {
     #[allow(dead_code)]
     fn new_berlin() -> Self {
         Self::new_istanbul()
-    }
-
-    fn get_fun(&self, address: &Address) -> Option<PrecompileFn> {
-        self.0.get(address).copied()
     }
 }
 
