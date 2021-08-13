@@ -83,7 +83,8 @@ git2 = "0.13"
 lazy-static-include = "3.1.1"
 base64 = "0.13.0"
 ethjson = { git = "https://github.com/rust-blockchain/evm-tests.git" }
-triehash-ethereum = { git = "https://github.com/rust-blockchain/evm-tests.git" } 
+triehash-ethereum = { git = "https://github.com/rust-blockchain/evm-tests.git" }
+parity-crypto = { version = "0.9", features = ["publickey"] }
 
 [features]
 default = ["sha2", "std"]
