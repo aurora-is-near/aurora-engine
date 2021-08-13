@@ -104,7 +104,7 @@ impl Precompile for ModExp<Byzantium> {
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
-    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context, _is_static: bool) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -138,7 +138,7 @@ impl Precompile for ModExp<Berlin> {
         Ok(core::cmp::max(200, saturating_round(gas)))
     }
 
-    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context, _is_static: bool) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {

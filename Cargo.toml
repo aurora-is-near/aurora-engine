@@ -48,8 +48,8 @@ opt-level = 3
 blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "bcffb19a38027e98a34711a198502f9c85db877c", default-features = false }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "bcffb19a38027e98a34711a198502f9c85db877c", default-features = false }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "01e000cbf081dada77ac6b325a6521341044d970", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "01e000cbf081dada77ac6b325a6521341044d970", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }

@@ -104,7 +104,7 @@ impl Precompile for Bn128Add<Byzantium> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, _is_static: bool) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -127,7 +127,7 @@ impl Precompile for Bn128Add<Istanbul> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, _is_static: bool) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -179,7 +179,7 @@ impl Precompile for Bn128Mul<Byzantium> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, _is_static: bool) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -201,7 +201,7 @@ impl Precompile for Bn128Mul<Istanbul> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, _is_static: bool) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -326,7 +326,7 @@ impl Precompile for Bn128Pair<Byzantium> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, _is_static: bool) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -351,7 +351,7 @@ impl Precompile for Bn128Pair<Istanbul> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, _is_static: bool) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {

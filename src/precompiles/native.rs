@@ -70,18 +70,17 @@ impl Precompile for ExitToNear {
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, is_static: bool) -> EvmPrecompileResult {
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);
             }
         }
 
-        // TODO: How to fix this?
         // It's not allowed to call exit precompiles in static mode
-        // if is_static {
-        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        // }
+        if is_static {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
@@ -206,18 +205,17 @@ impl Precompile for ExitToEthereum {
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context) -> EvmPrecompileResult {
+    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, is_static: bool) -> EvmPrecompileResult {
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);
             }
         }
 
-        // TODO: how to fix this?
         // It's not allowed to call exit precompiles in static mode
-        // if is_static {
-        //     return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        // }
+        if is_static {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
