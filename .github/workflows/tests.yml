@@ -1,5 +1,13 @@
 ---
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - "*"
+
 name: Tests
 jobs:
   test:
@@ -15,8 +23,8 @@ jobs:
         run: |
           cache-util restore cargo_git cargo_registry sccache yarn_cache
           cache-util restore aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}:target
-      - run: rm -rf target/solidity_build/
       - run: make test-${{ matrix.net }}net
+#      - run: rm -rf target/solidity_build/
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
@@ -31,9 +39,9 @@ jobs:
         run: |
           cache-util restore cargo_git cargo_registry sccache yarn_cache
           cache-util restore aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
-      - run: rm -rf target/solidity_build/
       - run: make mainnet-debug evm-bully=yes
       - run: ls -lH mainnet-debug.wasm
+#      - run: rm -rf target/solidity_build/
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
