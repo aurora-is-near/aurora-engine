@@ -9,7 +9,6 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Run cargo fmt
         run: cargo fmt --all -- --check
   clippy:
@@ -18,7 +17,6 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: make etc/eth-contracts/res/EvmErc20.bin
       - name: Run Contract cargo clippy
         run: cargo clippy --no-default-features --features=contract -- -D warnings
