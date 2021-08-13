@@ -290,7 +290,7 @@ fn test_block_hash() {
 
     assert_eq!(
         hex::encode(block_hash.0).as_str(),
-        "4c8a60b32b74f184438a5e450951570bc1bda37caa7b6a3f178b80395845fb80"
+        "c4a46f076b64877cbd8c5dbfd7bfbbea21a5653b79e3b6d06b6dfb5c88f1c384",
     );
 }
 
