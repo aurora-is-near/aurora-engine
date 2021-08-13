@@ -77,7 +77,7 @@ pub struct RIPEMD160;
 impl RIPEMD160 {
     pub(super) const ADDRESS: Address = super::make_address(0, 3);
 
-    #[cfg(not(feature = "testnet"))]
+    #[cfg(not(feature = "contract"))]
     fn internal_impl(input: &[u8]) -> [u8; 20] {
         use ripemd160::Digest;
         let hash = ripemd160::Ripemd160::digest(input);
@@ -107,9 +107,9 @@ impl Precompile for RIPEMD160 {
             }
         }
 
-        #[cfg(not(feature = "testnet"))]
+        #[cfg(not(feature = "contract"))]
         let hash = Self::internal_impl(input);
-        #[cfg(feature = "testnet")]
+        #[cfg(feature = "contract")]
         let hash = crate::sdk::ripemd160(input);
         // The result needs to be padded with leading zeros because it is only 20 bytes, but
         // the evm works with 32-byte words.

@@ -10,7 +10,6 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: make etc/eth-contracts/res/EvmErc20.bin
       - name: Update toolchain
         run: rustup update nightly

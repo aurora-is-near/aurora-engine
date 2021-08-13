@@ -1,3 +1,4 @@
+use crate::fungible_token::FungibleTokenMetadata;
 use crate::parameters::{SubmitResult, TransactionStatus};
 use crate::prelude::{Address, U256};
 use crate::test_utils;
@@ -316,6 +317,88 @@ fn test_block_hash_contract() {
         .unwrap();
 
     test_utils::panic_on_fail(result.status);
+}
+
+#[test]
+fn test_ft_metadata() {
+    let mut runner = test_utils::deploy_evm();
+
+    let (maybe_outcome, maybe_error) = runner.call(
+        "ft_metadata",
+        runner.context.signer_account_id.clone(),
+        Vec::new(),
+    );
+    assert!(maybe_error.is_none());
+    let outcome = maybe_outcome.unwrap();
+    let json_value = crate::json::parse_json(&outcome.return_data.as_value().unwrap()).unwrap();
+
+    assert_eq!(
+        json_value,
+        crate::json::JsonValue::from(FungibleTokenMetadata::default())
+    );
+}
+
+#[cfg(feature = "testnet-test")]
+#[test]
+fn test_balance_evm_and_nep_141() {
+    use crate::precompiles::native::{ExitToEthereum, ExitToNear};
+
+    let (mut runner, _, _) = initialize_transfer();
+    let caller = runner.aurora_account_id.clone();
+
+    // Include some ETH at the exit precompiles addresses for testing purposes
+    runner.create_address(ExitToNear::ADDRESS, TRANSFER_AMOUNT, U256::zero());
+    runner.create_address(
+        ExitToEthereum::ADDRESS,
+        TRANSFER_AMOUNT + TRANSFER_AMOUNT,
+        U256::zero(),
+    );
+
+    let aurora_balance = |runner: &mut test_utils::AuroraRunner| -> u128 {
+        let (maybe_result, maybe_err) = runner.call(
+            "ft_balance_of",
+            caller.clone(),
+            format!(r#"{{"account_id": "{}"}}"#, runner.aurora_account_id).into_bytes(),
+        );
+        assert!(maybe_err.is_none());
+        let result = maybe_result.unwrap();
+        String::from_utf8(result.return_data.as_value().unwrap())
+            .unwrap()
+            .parse()
+            .unwrap()
+    };
+
+    let evm_balance = |runner: &mut test_utils::AuroraRunner| -> u128 {
+        let exit_to_near_balance = runner.get_balance(ExitToNear::ADDRESS).raw().low_u128();
+        let exit_to_eth_balance = runner.get_balance(ExitToEthereum::ADDRESS).raw().low_u128();
+        let total_evm_balance: u128 = {
+            let (maybe_result, maybe_err) =
+                runner.call("ft_total_eth_supply_on_aurora", caller.clone(), Vec::new());
+            assert!(maybe_err.is_none());
+            let result = maybe_result.unwrap();
+            String::from_utf8(result.return_data.as_value().unwrap())
+                .unwrap()
+                .parse()
+                .unwrap()
+        };
+        total_evm_balance - exit_to_near_balance - exit_to_eth_balance
+    };
+
+    // There is not enough in the Aurora NEP-141 account, relative to how much is in the EVM;
+    assert_eq!(evm_balance(&mut runner), INITIAL_BALANCE.raw().low_u128());
+    assert_eq!(aurora_balance(&mut runner), 0);
+
+    // Call method to restore balance
+    let (_, maybe_err) = runner.call("balance_evm_and_nep_141", caller.clone(), Vec::new());
+    assert!(maybe_err.is_none());
+
+    // Balance is restored
+    assert_eq!(aurora_balance(&mut runner), evm_balance(&mut runner));
+
+    // Calling multiple times is a no-op
+    let (_, maybe_err) = runner.call("balance_evm_and_nep_141", caller.clone(), Vec::new());
+    assert!(maybe_err.is_none());
+    assert_eq!(aurora_balance(&mut runner), evm_balance(&mut runner));
 }
 
 // Same as `test_eth_transfer_insufficient_balance` above, except runs through

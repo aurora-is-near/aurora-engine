@@ -2,6 +2,7 @@ use crate::admin_controlled::{PausedMask, ERR_PAUSED};
 use crate::connector::{
     ERR_NOT_ENOUGH_BALANCE_FOR_FEE, PAUSE_DEPOSIT, PAUSE_WITHDRAW, UNPAUSE_ALL,
 };
+use crate::fungible_token::FungibleTokenMetadata;
 use crate::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawCallArgs, WithdrawResult,
 };
@@ -71,6 +72,7 @@ fn init_contract(
             &InitCallArgs {
                 prover_account: PROVER_ACCOUNT.into(),
                 eth_custodian_address: custodian_address.into(),
+                metadata: FungibleTokenMetadata::default(),
             }
             .try_to_vec()
             .unwrap(),
