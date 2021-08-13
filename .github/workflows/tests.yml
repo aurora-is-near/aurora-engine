@@ -16,9 +16,7 @@ jobs:
           cache-util restore cargo_git cargo_registry sccache yarn_cache
           cache-util restore aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}:target
       - run: rm -rf target/solidity_build/
-      - run: make ${{ matrix.net }}net-test-build
-      - name: Run ${{ matrix.net }}net cargo test
-        run: cargo test --locked --verbose --features ${{ matrix.net }}net-test
+      - run: make test-${{ matrix.net }}net
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
