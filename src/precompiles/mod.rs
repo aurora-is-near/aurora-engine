@@ -69,7 +69,12 @@ pub trait Precompile {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError>;
 
     /// Runs the precompile function.
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, is_static: bool) -> EvmPrecompileResult;
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        is_static: bool,
+    ) -> EvmPrecompileResult;
 }
 
 /// Hard fork marker.

@@ -38,7 +38,12 @@ impl Precompile for Blake2F {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-152
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
-    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context, _is_static: bool) -> EvmPrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        _context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         if input.len() != consts::INPUT_LENGTH {
             return Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")));
         }

@@ -70,7 +70,12 @@ impl Precompile for ExitToNear {
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, is_static: bool) -> EvmPrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        is_static: bool,
+    ) -> EvmPrecompileResult {
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);
@@ -205,7 +210,12 @@ impl Precompile for ExitToEthereum {
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: Option<u64>, context: &Context, is_static: bool) -> EvmPrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        is_static: bool,
+    ) -> EvmPrecompileResult {
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);

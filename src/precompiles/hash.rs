@@ -56,7 +56,12 @@ impl Precompile for SHA256 {
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context, _is_static: bool) -> EvmPrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        _context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         use crate::sdk;
 
         let cost = Self::required_gas(input)?;
@@ -99,7 +104,12 @@ impl Precompile for RIPEMD160 {
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000003
-    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context, _is_static: bool) -> EvmPrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        _context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
