@@ -6,7 +6,6 @@ use primitive_types::{H160, U256};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::io::BufReader;
-use std::path::PathBuf;
 use std::rc::Rc;
 
 #[derive(Deserialize, Debug)]
@@ -104,6 +103,7 @@ fn vm_test(name: &str, eth_test: Test) {
 pub fn run(dir: &str) {
     use std::fs;
     use std::fs::File;
+    use std::path::PathBuf;
 
     let mut dest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     dest.push("src/tests/eth/ethtests");
