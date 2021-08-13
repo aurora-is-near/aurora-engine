@@ -68,13 +68,22 @@ target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(
 test: test-mainnet
 
 mainnet-test-build: FEATURES=mainnet,integration-test,meta-call
-mainnet-test-build: mainnet-release.wasm
+mainnet-test-build: mainnet-test.wasm
 
 betanet-test-build: FEATURES=betanet,integration-test,meta-call
-betanet-test-build: betanet-release.wasm
+betanet-test-build: betanet-test.wasm
 
 testnet-test-build: FEATURES=testnet,integration-test,meta-call
-testnet-test-build: testnet-release.wasm
+testnet-test-build: testnet-test.wasm
+
+mainnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
+	cp $< $@
+
+testnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
+	cp $< $@
+
+betanet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
+	cp $< $@
 
 test-mainnet: mainnet-test-build
 	$(CARGO) test --features mainnet-test
