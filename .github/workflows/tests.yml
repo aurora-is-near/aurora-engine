@@ -7,7 +7,7 @@ jobs:
       matrix:
         net: [main, test, beta]
     name: Test suite (${{ matrix.net }}net)
-    runs-on: self-hosted
+    runs-on: [self-hosted, dockerized]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
@@ -21,7 +21,7 @@ jobs:
         run: cache-util -save -move -path target -key aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}
   bully-build:
     name: Bully build
-    runs-on: self-hosted
+    runs-on: [self-hosted, dockerized]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
