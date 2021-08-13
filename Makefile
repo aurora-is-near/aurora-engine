@@ -113,6 +113,7 @@ format:
 
 clean:
 	@rm -Rf *.wasm
+	@rm -Rf etc/eth-contracts/res
 	cargo clean
 
 .PHONY: release mainnet testnet betanet compile-release test-build deploy check check-format check-clippy test test-sol format clean debug mainnet-debug testnet-debug betanet-debug compile-debug mainnet-test-build testnet-test-build betanet-test-build target/wasm32-unknown-unknown/release/aurora_engine.wasm target/wasm32-unknown-unknown/debug/aurora_engine.wasm
