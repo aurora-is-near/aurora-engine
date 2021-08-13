@@ -140,6 +140,7 @@ pub fn run(dir: &str) {
     use std::path::PathBuf;
 
     let mut dest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    dest.push("src/tests/eth/ethtests");
     dest.push(dir);
 
     for entry in fs::read_dir(dest).unwrap() {
@@ -151,7 +152,6 @@ pub fn run(dir: &str) {
         }
 
         let path = entry.path();
-
         let file = File::open(path).expect("Open file failed");
 
         let reader = BufReader::new(file);
@@ -166,173 +166,173 @@ pub fn run(dir: &str) {
 
 #[test]
 fn st_args_zero_one_balance() {
-    run("ethtests/GeneralStateTests/stArgsZeroOneBalance")
+    run("GeneralStateTests/stArgsZeroOneBalance")
 }
 #[test]
 fn st_attack() {
-    run("ethtests/GeneralStateTests/stAttackTest")
+    run("GeneralStateTests/stAttackTest")
 }
 
 #[test]
 fn st_bad_opcode() {
-    run("ethtests/GeneralStateTests/stBadOpcode")
+    run("GeneralStateTests/stBadOpcode")
 }
 #[test]
 fn st_bugs() {
-    run("ethtests/GeneralStateTests/stBugs")
+    run("GeneralStateTests/stBugs")
 }
 #[test]
 fn st_call_code() {
-    run("ethtests/GeneralStateTests/stCallCodes")
+    run("GeneralStateTests/stCallCodes")
 }
 #[test]
 fn st_call_create_call_code() {
-    run("ethtests/GeneralStateTests/stCallCreateCallCodeTest")
+    run("GeneralStateTests/stCallCreateCallCodeTest")
 }
 #[test]
 fn st_call_delegate_codes_call_code_homestead() {
-    run("ethtests/GeneralStateTests/stCallDelegateCodesCallCodeHomestead")
+    run("GeneralStateTests/stCallDelegateCodesCallCodeHomestead")
 }
 #[test]
 fn st_call_delegate_codes_homestead() {
-    run("ethtests/GeneralStateTests/stCallDelegateCodesHomestead")
+    run("GeneralStateTests/stCallDelegateCodesHomestead")
 }
 #[test]
 fn st_chain_id() {
-    run("ethtests/GeneralStateTests/stChainId")
+    run("GeneralStateTests/stChainId")
 }
 #[test]
 fn st_changed_eip150() {
-    run("ethtests/GeneralStateTests/stChangedEIP150")
+    run("GeneralStateTests/stChangedEIP150")
 }
 #[test]
 fn st_code_copy() {
-    run("ethtests/GeneralStateTests/stCodeCopyTest")
+    run("GeneralStateTests/stCodeCopyTest")
 }
 #[test]
 fn st_code_size_limit() {
-    run("ethtests/GeneralStateTests/stCodeSizeLimit")
+    run("GeneralStateTests/stCodeSizeLimit")
 }
 #[test]
 #[ignore]
 fn st_create2() {
-    run("ethtests/GeneralStateTests/stCreate2")
+    run("GeneralStateTests/stCreate2")
 }
 #[test]
 fn st_create() {
-    run("ethtests/GeneralStateTests/stCreateTest")
+    run("GeneralStateTests/stCreateTest")
 }
 #[test]
 fn st_delegate_call_homestead() {
-    run("ethtests/GeneralStateTests/stDelegatecallTestHomestead")
+    run("GeneralStateTests/stDelegatecallTestHomestead")
 }
 #[test]
 fn st_eip150_single_code_gas_prices() {
-    run("ethtests/GeneralStateTests/stEIP150singleCodeGasPrices")
+    run("GeneralStateTests/stEIP150singleCodeGasPrices")
 }
 #[test]
 fn st_eip150_specific() {
-    run("ethtests/GeneralStateTests/stEIP150Specific")
+    run("GeneralStateTests/stEIP150Specific")
 }
 #[test]
 fn st_eip158_specific() {
-    run("ethtests/GeneralStateTests/stEIP158Specific")
+    run("GeneralStateTests/stEIP158Specific")
 }
 #[test]
 fn st_example() {
-    run("ethtests/GeneralStateTests/stExample")
+    run("GeneralStateTests/stExample")
 }
 #[test]
 fn st_ext_code_hash() {
-    run("ethtests/GeneralStateTests/stExtCodeHash")
+    run("GeneralStateTests/stExtCodeHash")
 }
 #[test]
 fn st_homestead_specific() {
-    run("ethtests/GeneralStateTests/stHomesteadSpecific")
+    run("GeneralStateTests/stHomesteadSpecific")
 }
 #[test]
 fn st_init_code() {
-    run("ethtests/GeneralStateTests/stInitCodeTest")
+    run("GeneralStateTests/stInitCodeTest")
 }
 #[test]
 fn st_log() {
-    run("ethtests/GeneralStateTests/stLogTests")
+    run("GeneralStateTests/stLogTests")
 }
 #[test]
 fn st_mem_expanding_eip_150_calls() {
-    run("ethtests/GeneralStateTests/stMemExpandingEIP150Calls")
+    run("GeneralStateTests/stMemExpandingEIP150Calls")
 }
 #[test]
 fn st_memory_stress() {
-    run("ethtests/GeneralStateTests/stMemoryStressTest")
+    run("GeneralStateTests/stMemoryStressTest")
 }
 #[test]
 fn st_memory() {
-    run("ethtests/GeneralStateTests/stMemoryTest")
+    run("GeneralStateTests/stMemoryTest")
 }
 #[test]
 fn st_non_zero_calls() {
-    run("ethtests/GeneralStateTests/stNonZeroCallsTest")
+    run("GeneralStateTests/stNonZeroCallsTest")
 }
 #[test]
 fn st_precompiled_contracts() {
-    run("ethtests/GeneralStateTests/stPreCompiledContracts")
+    run("GeneralStateTests/stPreCompiledContracts")
 }
 #[test]
 #[ignore]
 fn st_precompiled_contracts2() {
-    run("ethtests/GeneralStateTests/stPreCompiledContracts2")
+    run("GeneralStateTests/stPreCompiledContracts2")
 }
 #[test]
 #[ignore]
 fn st_quadratic_complexity() {
-    run("ethtests/GeneralStateTests/stQuadraticComplexityTest")
+    run("GeneralStateTests/stQuadraticComplexityTest")
 }
 #[test]
 fn st_random() {
-    run("ethtests/GeneralStateTests/stRandom")
+    run("GeneralStateTests/stRandom")
 }
 #[test]
 fn st_random2() {
-    run("ethtests/GeneralStateTests/stRandom2")
+    run("GeneralStateTests/stRandom2")
 }
 #[test]
 fn st_recursive_create() {
-    run("ethtests/GeneralStateTests/stRecursiveCreate")
+    run("GeneralStateTests/stRecursiveCreate")
 }
 #[test]
 fn st_refund() {
-    run("ethtests/GeneralStateTests/stRefundTest")
+    run("GeneralStateTests/stRefundTest")
 }
 #[test]
 fn st_return_data() {
-    run("ethtests/GeneralStateTests/stReturnDataTest")
+    run("GeneralStateTests/stReturnDataTest")
 }
 #[test]
 #[ignore]
 fn st_revert() {
-    run("ethtests/GeneralStateTests/stRevertTest")
+    run("GeneralStateTests/stRevertTest")
 }
 #[test]
 fn st_self_balance() {
-    run("ethtests/GeneralStateTests/stSelfBalance")
+    run("GeneralStateTests/stSelfBalance")
 }
 #[test]
 fn st_shift() {
-    run("ethtests/GeneralStateTests/stShift")
+    run("GeneralStateTests/stShift")
 }
 #[test]
 fn st_sload() {
-    run("ethtests/GeneralStateTests/stSLoadTest")
+    run("GeneralStateTests/stSLoadTest")
 }
 #[test]
 fn st_solidity() {
-    run("ethtests/GeneralStateTests/stSolidityTest")
+    run("GeneralStateTests/stSolidityTest")
 }
 #[test]
 #[ignore]
 fn st_special() {
-    run("ethtests/GeneralStateTests/stSpecialTest")
+    run("GeneralStateTests/stSpecialTest")
 }
 // Some of the collison test in sstore conflicts with evm's internal
 // handlings. Those situations will never happen on a production chain (an empty
@@ -340,46 +340,46 @@ fn st_special() {
 #[test]
 #[ignore]
 fn st_sstore() {
-    run("ethtests/GeneralStateTests/stSStoreTest")
+    run("GeneralStateTests/stSStoreTest")
 }
 #[test]
 fn st_stack() {
-    run("ethtests/GeneralStateTests/stStackTests")
+    run("GeneralStateTests/stStackTests")
 }
 #[test]
 #[ignore]
 fn st_static_call() {
-    run("ethtests/GeneralStateTests/stStaticCall")
+    run("GeneralStateTests/stStaticCall")
 }
 #[test]
 fn st_system_operations() {
-    run("ethtests/GeneralStateTests/stSystemOperationsTest")
+    run("GeneralStateTests/stSystemOperationsTest")
 }
 #[test]
 fn st_transaction() {
-    run("ethtests/GeneralStateTests/stTransactionTest")
+    run("GeneralStateTests/stTransactionTest")
 }
 #[test]
 fn st_transition() {
-    run("ethtests/GeneralStateTests/stTransitionTest")
+    run("GeneralStateTests/stTransitionTest")
 }
 #[test]
 fn st_wallet() {
-    run("ethtests/GeneralStateTests/stWalletTest")
+    run("GeneralStateTests/stWalletTest")
 }
 #[test]
 fn st_zero_calls_revert() {
-    run("ethtests/GeneralStateTests/stZeroCallsRevert");
+    run("GeneralStateTests/stZeroCallsRevert");
 }
 #[test]
 fn st_zero_calls() {
-    run("ethtests/GeneralStateTests/stZeroCallsTest")
+    run("GeneralStateTests/stZeroCallsTest")
 }
 #[test]
 fn st_zero_knowledge() {
-    run("ethtests/GeneralStateTests/stZeroKnowledge")
+    run("GeneralStateTests/stZeroKnowledge")
 }
 #[test]
 fn st_zero_knowledge2() {
-    run("ethtests/GeneralStateTests/stZeroKnowledge2")
+    run("GeneralStateTests/stZeroKnowledge2")
 }
