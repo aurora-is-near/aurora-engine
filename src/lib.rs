@@ -189,14 +189,7 @@ mod contract {
     /// MUTATIVE METHODS
     ///
 
-    #[cfg(feature = "integration-test")]
-    #[no_mangle]
-    pub extern "C" fn deploy_code() {
-        sdk::panic_utf8(b"ERR_DEPLOYED_TEST_VERSION");
-    }
-
     /// Deploy code into the EVM.
-    #[cfg(not(feature = "integration-test"))]
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let input = sdk::read_input();
