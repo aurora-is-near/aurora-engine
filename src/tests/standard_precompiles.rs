@@ -31,8 +31,5 @@ fn standard_precompiles() {
         .submit_transaction(&source_account, test_all_tx)
         .unwrap();
 
-    // status == false indicates failure
-    if !outcome.status {
-        panic!("{}", String::from_utf8_lossy(&outcome.result))
-    }
+    test_utils::panic_on_fail(outcome.status);
 }

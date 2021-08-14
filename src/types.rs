@@ -1,8 +1,6 @@
-use crate::prelude::{self, Address, String, ToString, Vec, H256, U256};
+use crate::prelude::{self, str, Address, String, ToString, Vec, H256, U256};
 #[cfg(not(feature = "contract"))]
 use crate::prelude::{format, vec};
-
-use crate::prelude::str;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::{Event, EventParam, Hash, Log, RawLog};
 
@@ -12,7 +10,6 @@ use ethabi::{ParamType, Token};
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
 
-use crate::engine::EngineResult;
 use crate::log_entry::LogEntry;
 use crate::sdk;
 
@@ -169,7 +166,7 @@ impl Proof {
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default)]
 pub struct Wei(U256);
 impl Wei {
     const ETH_TO_WEI: U256 = U256([1_000_000_000_000_000_000, 0, 0, 0]);
@@ -205,6 +202,14 @@ impl Wei {
 
     pub fn raw(self) -> U256 {
         self.0
+    }
+
+    pub fn checked_sub(self, other: Self) -> Option<Self> {
+        self.0.checked_sub(other.0).map(Self)
+    }
+
+    pub fn checked_add(self, other: Self) -> Option<Self> {
+        self.0.checked_add(other.0).map(Self)
     }
 }
 impl prelude::Sub for Wei {
@@ -414,7 +419,7 @@ pub(crate) trait SdkProcess<T> {
     fn sdk_process(self);
 }
 
-impl<T: AsRef<[u8]>> SdkProcess<T> for EngineResult<T> {
+impl<T: AsRef<[u8]>, E: AsRef<[u8]>> SdkProcess<T> for Result<T, E> {
     fn sdk_process(self) {
         match self {
             Ok(r) => sdk::return_output(r.as_ref()),

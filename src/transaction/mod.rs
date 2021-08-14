@@ -43,10 +43,17 @@ impl EthTransaction {
         }
     }
 
-    pub fn gas_limit(&self) -> &U256 {
+    pub fn gas_limit(&self) -> U256 {
         match self {
-            Self::Legacy(tx) => &tx.transaction.gas,
-            Self::AccessList(tx) => &tx.transaction_data.gas_limit,
+            Self::Legacy(tx) => tx.transaction.gas,
+            Self::AccessList(tx) => tx.transaction_data.gas_limit,
+        }
+    }
+
+    pub fn gas_price(&self) -> U256 {
+        match self {
+            Self::Legacy(tx) => tx.transaction.gas_price,
+            Self::AccessList(tx) => tx.transaction_data.gas_price,
         }
     }
 
@@ -139,12 +146,10 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
     }
 }
 
-// TODO: need to include access_list gas cost (see https://eips.ethereum.org/EIPS/eip-2930)
-// Should go in the config, which requires upstream change.
 fn intrinsic_gas(
     is_contract_creation: bool,
     data: &[u8],
-    _access_list: &[access_list::AccessTuple],
+    access_list: &[access_list::AccessTuple],
     config: &evm::Config,
 ) -> Option<u64> {
     let base_gas = if is_contract_creation {
@@ -163,9 +168,21 @@ fn intrinsic_gas(
         .gas_transaction_non_zero_data
         .checked_mul(num_non_zero_bytes as u64)?;
 
+    let gas_access_list_address = config
+        .gas_access_list_address
+        .checked_mul(access_list.len() as u64)?;
+    let gas_access_list_storage = config.gas_access_list_storage_key.checked_mul(
+        access_list
+            .iter()
+            .map(|a| a.storage_keys.len() as u64)
+            .sum(),
+    )?;
+
     base_gas
         .checked_add(gas_zero_bytes)
         .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
+        .and_then(|gas| gas.checked_add(gas_access_list_address))
+        .and_then(|gas| gas.checked_add(gas_access_list_storage))
 }
 
 fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {

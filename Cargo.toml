@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "1.5.0"
+version = "1.6.0"
 authors = ["NEAR <hello@near.org>"]
 edition = "2018"
 description = ""
@@ -45,6 +45,7 @@ lto = true
 opt-level = 3
 
 [dependencies]
+base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
 blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
@@ -62,7 +63,7 @@ logos = { version = "0.12", default-features = false, features = ["export_derive
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 byte-slice-cast = { version = "1.0", default-features = false }
-rjson = { version = "0.3.1", default-features = false }
+rjson = { git = "https://github.com/aurora-is-near/rjson", rev = "cc3da949", default-features = false, features = ["integer"] }
 
 [dev-dependencies]
 bstr = "0.2"
@@ -80,7 +81,6 @@ rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
 lazy-static-include = "3.1.1"
-base64 = "0.13.0"
 
 [features]
 default = ["sha2", "std"]
