@@ -23,7 +23,7 @@ jobs:
         run: |
           cache-util restore cargo_git cargo_registry sccache yarn_cache
           cache-util restore aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}:target
-      - run: ${{ matrix.net }}net-test-build
+      - run: make ${{ matrix.net }}net-test-build
       - name: List directories
         run: |
           ls -la target/wasm32-unknown-unknown/release
