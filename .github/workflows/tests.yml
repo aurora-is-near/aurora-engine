@@ -31,6 +31,7 @@ jobs:
       - run: cargo test --features ${{ matrix.net }}net-test
 #      - run: make test-${{ matrix.net }}net
 #      - run: rm -rf target/solidity_build/
+#      - run: rm -rf etc/eth-contracts/res
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
@@ -48,6 +49,7 @@ jobs:
       - run: make mainnet-debug evm-bully=yes
       - run: ls -lH mainnet-debug.wasm
 #      - run: rm -rf target/solidity_build/
+#      - run: rm -rf etc/eth-contracts/res
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
