@@ -107,7 +107,7 @@ impl HardFork for Berlin {}
 type PrecompileFn = fn(&[u8], u64, &Context, bool) -> PrecompileResult;
 
 pub(crate) struct Precompiles {
-    addresses: Vec<Address>,
+    pub addresses: Vec<Address>,
     fun: Vec<PrecompileFn>,
 }
 
@@ -198,7 +198,7 @@ impl Precompiles {
         Self::new_istanbul()
     }
 
-    fn get_fun(&self, address: &Address) -> Option<PrecompileFn> {
+    pub fn get_fun(&self, address: &Address) -> Option<PrecompileFn> {
         self.addresses
             .iter()
             .position(|e| e == address)

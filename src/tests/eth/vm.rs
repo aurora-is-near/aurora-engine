@@ -68,7 +68,7 @@ fn vm_test(name: &str, eth_test: Test) {
     let metadata = StackSubstateMetadata::new(eth_test.unwrap_to_gas_limit(), &config);
     let state = MemoryStackState::new(metadata, &backend);
     let mut executor = StackExecutor::new(state, &config);
-    
+
     let code = eth_test.unwrap_to_code();
     let data = eth_test.unwrap_to_data();
     let context = eth_test.unwrap_to_context();
