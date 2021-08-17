@@ -1,5 +1,13 @@
 ---
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - "*"
+
 name: Tests
 jobs:
   test:
@@ -11,29 +19,39 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-        with:
-          submodules: recursive
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      - name: Cache lookup for target dir
-        run: cache-util -restore -path target -key aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}
+      - name: Restore cache
+        run: |
+          cache-util restore cargo_git cargo_registry sccache yarn_cache
+          cache-util restore aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}:target
       - run: make ${{ matrix.net }}net-test-build
-      - name: Run ${{ matrix.net }}net cargo test
-        run: cargo test --locked --verbose --features ${{ matrix.net }}net-test
-      - name: Caching target dir
-        run: cache-util -save -move -path target -key aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}
+      - name: List directories
+        run: |
+          ls -la target/wasm32-unknown-unknown/release
+          ls -la
+      - run: cargo test --features ${{ matrix.net }}net-test
+#      - run: make test-${{ matrix.net }}net
+#      - run: rm -rf target/solidity_build/
+      - name: Save cache
+        run: |
+          cache-util save cargo_git cargo_registry sccache yarn_cache
+          cache-util msave aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}:target
   bully-build:
     name: Bully build
     runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      - name: Cache lookup for target dir
-        run: cache-util -restore -path target -key aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}
+      - name: Restore cache
+        run: |
+          cache-util restore cargo_git cargo_registry sccache yarn_cache
+          cache-util restore aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
       - run: make mainnet-debug evm-bully=yes
       - run: ls -lH mainnet-debug.wasm
-      - name: Cache target dir
-        run: cache-util -save -move -path target -key aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}
+#      - run: rm -rf target/solidity_build/
+      - name: Save cache
+        run: |
+          cache-util save cargo_git cargo_registry sccache yarn_cache
+          cache-util msave aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0

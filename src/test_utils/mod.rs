@@ -29,7 +29,7 @@ use crate::types::AccountId;
     not(any(feature = "testnet", feature = "betanet"))
 ))]
 lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "mainnet-release.wasm"
+    EVM_WASM_BYTES => "mainnet-test.wasm"
 }
 
 #[cfg(all(
@@ -37,7 +37,7 @@ lazy_static_include::lazy_static_include_bytes! {
     not(any(feature = "mainnet", feature = "betanet"))
 ))]
 lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "testnet-release.wasm"
+    EVM_WASM_BYTES => "testnet-test.wasm"
 }
 
 #[cfg(all(
@@ -45,7 +45,7 @@ lazy_static_include::lazy_static_include_bytes! {
     not(any(feature = "mainnet", feature = "testnet"))
 ))]
 lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "betanet-release.wasm"
+    EVM_WASM_BYTES => "betanet-test.wasm"
 }
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.

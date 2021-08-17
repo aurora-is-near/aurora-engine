@@ -332,9 +332,9 @@ impl Engine {
             BLOCK_HASH_PREFIX_SIZE + BLOCK_HEIGHT_SIZE + CHAIN_ID_SIZE + account_id.len(),
         );
         data.push(BLOCK_HASH_PREFIX);
-        data.extend_from_slice(&block_height.to_be_bytes());
         data.extend_from_slice(&chain_id);
         data.extend_from_slice(account_id);
+        data.extend_from_slice(&block_height.to_be_bytes());
 
         #[cfg(not(feature = "contract"))]
         {

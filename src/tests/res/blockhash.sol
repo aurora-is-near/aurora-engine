@@ -6,7 +6,7 @@ contract BlockHash {
 
   function test() public view {
     require(
-      blockhash(0) == hex"a7ac0e4bd5ad1654392b64ecd40a69f983e8ce7c315639a339d19a880902457a", 
+      blockhash(0) == hex"ec035c7409243a343a8fd798077fb0a5f879cc32c9cd31fd07baa2292e4d3d7c",
       "Bad block hash"
     );
   }

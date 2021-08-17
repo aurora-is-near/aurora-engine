@@ -26,7 +26,7 @@ pub(crate) const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnectorContract {
     contract: EthConnector,
-    pub ft: FungibleToken,
+    ft: FungibleToken,
     paused_mask: PausedMask,
 }
 
@@ -584,7 +584,7 @@ impl EthConnectorContract {
     }
 
     /// Save eth-connector contract data
-    pub(crate) fn save_ft_contract(&mut self) {
+    fn save_ft_contract(&mut self) {
         sdk::save_contract(
             &Self::get_contract_key(&EthConnectorStorageId::FungibleToken),
             &self.ft,
