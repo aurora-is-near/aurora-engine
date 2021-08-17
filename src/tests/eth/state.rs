@@ -1,11 +1,12 @@
 use super::utils::*;
-use evm::backend::{MemoryAccount, MemoryVicinity};
+use evm::backend::{MemoryAccount, MemoryVicinity, MemoryBackend};
 use evm::Config;
 use parity_crypto::publickey;
 use primitive_types::{H160, H256, U256};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::io::BufReader;
+use evm::executor::{StackSubstateMetadata, MemoryStackState};
 
 #[derive(Deserialize, Debug)]
 pub struct Test(ethjson::test_helpers::state::State);
@@ -44,50 +45,34 @@ impl Test {
     }
 }
 
-pub fn test_state(name: &str, test: Test) {
-    use std::thread;
-
-    const STACK_SIZE: usize = 16 * 1024 * 1024;
-
-    let name = name.to_string();
-    // Spawn thread with explicit stack size
-    let child = thread::Builder::new()
-        .stack_size(STACK_SIZE)
-        .spawn(move || test_run(&name, test))
-        .unwrap();
-
-    // Wait for thread to join
-    child.join().unwrap();
-}
-
-pub fn test_run(name: &str, test: Test) {
+pub fn state_test(name: &str, eth_test: Test) {
     print!("Running test {} ... ", name);
-    for (spec, _states) in &test.0.post_states {
-        let (_gasometer_config, _delete_empty) = match spec {
+    for (spec,states) in &eth_test.0.post_states {
+        let (gasometer_config, _delete_empty) = match spec {
             ethjson::spec::ForkSpec::Istanbul => (Config::istanbul(), true),
             spec => {
                 println!("Skip spec {:?}", spec);
                 continue;
             }
         };
-        /*
-        let original_state = test.unwrap_to_pre_state();
-        let vicinity = test.unwrap_to_vicinity();
-        let caller = test.unwrap_caller();
+
+        let original_state = eth_test.unwrap_to_pre_state();
+        let vicinity = eth_test.unwrap_to_vicinity();
+        let _caller = eth_test.unwrap_caller();
 
         for (i, state) in states.iter().enumerate() {
             print!("Running {}:{:?}:{} ... ", name, spec, i);
 
-            let transaction = test.0.transaction.select(&state.indexes);
+            let transaction = eth_test.0.transaction.select(&state.indexes);
             let gas_limit: u64 = transaction.gas_limit.into();
-            let data: Vec<u8> = transaction.data.into();
+            let _data: Vec<u8> = transaction.data.into();
 
             let mut backend = MemoryBackend::new(&vicinity, original_state.clone());
-            let metadata = StackSubstateMetadata::new(transaction.gas_limit.into(), &gasometer_config);
+            let metadata = StackSubstateMetadata::new(gas_limit, &gasometer_config);
             let executor_state = MemoryStackState::new(metadata, &backend);
             // TODO: adapt precompile to the fork spec
             let precompile = istanbul_precompile;
-            let mut executor = StackExecutor::new_with_precompile(
+/*            let mut executor = StackExecutor::new_with_precompile(
                 executor_state,
                 &gasometer_config,
                 precompile,
@@ -128,9 +113,9 @@ pub fn test_run(name: &str, test: Test) {
             let (values, logs) = executor.into_state().deconstruct();
             backend.apply(values, logs, delete_empty);
             assert_valid_hash(&state.hash.0, backend.state());
-
+*/
             println!("passed");
-        }*/
+        }
     }
 }
 
@@ -159,7 +144,7 @@ pub fn run(dir: &str) {
             .expect("Parse test cases failed");
 
         for (name, test) in coll {
-            test_state(&name, test);
+            state_test(&name, test);
         }
     }
 }
