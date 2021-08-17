@@ -29,9 +29,6 @@ jobs:
           ls -la target/wasm32-unknown-unknown/release
           ls -la
       - run: cargo test --features ${{ matrix.net }}net-test
-#      - run: make test-${{ matrix.net }}net
-#      - run: rm -rf target/solidity_build/
-#      - run: rm -rf etc/eth-contracts/res
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
@@ -48,8 +45,6 @@ jobs:
           cache-util restore aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
       - run: make mainnet-debug evm-bully=yes
       - run: ls -lH mainnet-debug.wasm
-#      - run: rm -rf target/solidity_build/
-#      - run: rm -rf etc/eth-contracts/res
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
