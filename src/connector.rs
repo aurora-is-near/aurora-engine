@@ -487,7 +487,7 @@ impl EthConnectorContract {
         ));
         // `ft_resolve_transfer` can change `total_supply` so we should save the contract
         self.save_ft_contract();
-        sdk::return_output(amount.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", amount.to_string()).as_bytes());
     }
 
     /// FT transfer call from sender account (invoker account) to receiver
