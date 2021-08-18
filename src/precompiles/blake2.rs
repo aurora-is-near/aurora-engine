@@ -120,12 +120,12 @@ mod tests {
 
     fn test_blake2f_out_of_gas() -> EvmPrecompileResult {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, Some(11), &new_context())
+        Blake2F::run(&input, Some(11), &new_context(), false)
     }
 
     fn test_blake2f_empty() -> EvmPrecompileResult {
         let input = [0u8; 0];
-        Blake2F::run(&input, Some(0), &new_context())
+        Blake2F::run(&input, Some(0), &new_context(), false)
     }
 
     fn test_blake2f_invalid_len_1() -> EvmPrecompileResult {
@@ -143,7 +143,7 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, Some(12), &new_context())
+        Blake2F::run(&input, Some(12), &new_context(), false)
     }
 
     fn test_blake2f_invalid_len_2() -> EvmPrecompileResult {
@@ -161,7 +161,7 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, Some(12), &new_context())
+        Blake2F::run(&input, Some(12), &new_context(), false)
     }
 
     fn test_blake2f_invalid_flag() -> EvmPrecompileResult {
@@ -179,7 +179,7 @@ mod tests {
             02",
         )
         .unwrap();
-        Blake2F::run(&input, Some(12), &new_context())
+        Blake2F::run(&input, Some(12), &new_context(), false)
     }
 
     fn test_blake2f_r_0() -> Vec<u8> {
@@ -197,14 +197,14 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, Some(12), &new_context())
+        Blake2F::run(&input, Some(12), &new_context(), false)
             .unwrap()
             .output
     }
 
     fn test_blake2f_r_12() -> Vec<u8> {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, Some(12), &new_context())
+        Blake2F::run(&input, Some(12), &new_context(), false)
             .unwrap()
             .output
     }
@@ -224,7 +224,7 @@ mod tests {
             00",
         )
         .unwrap();
-        Blake2F::run(&input, Some(12), &new_context())
+        Blake2F::run(&input, Some(12), &new_context(), false)
             .unwrap()
             .output
     }

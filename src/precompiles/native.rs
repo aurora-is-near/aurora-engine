@@ -40,7 +40,7 @@ impl ExitToNear {
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
-    pub(super) const ADDRESS: Address =
+    pub(crate) const ADDRESS: Address =
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
@@ -59,7 +59,12 @@ impl Precompile for ExitToNear {
     }
 
     #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context) -> EvmPrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        _context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);
@@ -189,7 +194,7 @@ impl ExitToEthereum {
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
-    pub(super) const ADDRESS: Address =
+    pub(crate) const ADDRESS: Address =
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
 }
 
@@ -199,7 +204,12 @@ impl Precompile for ExitToEthereum {
     }
 
     #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context) -> EvmPrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        _context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);

@@ -417,7 +417,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context())
+        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -438,7 +438,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context())
+        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -452,7 +452,7 @@ mod tests {
             0000000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = Bn128Add::<Byzantium>::run(&input, Some(499), &new_context());
+        let res = Bn128Add::<Byzantium>::run(&input, Some(499), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -464,7 +464,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context())
+        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -479,7 +479,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context());
+        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -502,7 +502,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context())
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -515,7 +515,7 @@ mod tests {
             0200000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(39_999), &new_context());
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(39_999), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // zero multiplication test
@@ -533,7 +533,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context())
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -547,7 +547,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context())
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -561,7 +561,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context());
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -590,7 +590,7 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context())
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -612,7 +612,7 @@ mod tests {
             12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
         )
         .unwrap();
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(259_999), &new_context());
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(259_999), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -621,7 +621,7 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context())
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -638,7 +638,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context());
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
@@ -654,7 +654,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context());
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN",)))

@@ -360,7 +360,7 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
-            let res = ModExp::<Byzantium>::run(&input, Some(*test_gas), &new_context())
+            let res = ModExp::<Byzantium>::run(&input, Some(*test_gas), &new_context(), false)
                 .unwrap()
                 .output;
             let expected = hex::decode(&test.expected).unwrap();
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_empty_input() {
-        let res = ModExp::<Berlin>::run(&[], Some(100_000), &new_context()).unwrap();
+        let res = ModExp::<Berlin>::run(&[], Some(100_000), &new_context(), false).unwrap();
         let expected: Vec<u8> = Vec::new();
         assert_eq!(res.output, expected)
     }

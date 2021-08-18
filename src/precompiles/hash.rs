@@ -38,7 +38,12 @@ impl Precompile for SHA256 {
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(not(feature = "contract"))]
-    fn run(input: &[u8], target_gas: Option<u64>, _context: &Context) -> EvmPrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        _context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         use sha2::Digest;
 
         let cost = Self::required_gas(input)?;
@@ -142,7 +147,9 @@ mod tests {
             hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
                 .unwrap();
 
-        let res = SHA256::run(input, Some(60), &new_context()).unwrap().output;
+        let res = SHA256::run(input, Some(60), &new_context(), false)
+            .unwrap()
+            .output;
         assert_eq!(res, expected);
     }
 
@@ -153,7 +160,7 @@ mod tests {
             hex::decode("0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31")
                 .unwrap();
 
-        let res = RIPEMD160::run(input, Some(600), &new_context())
+        let res = RIPEMD160::run(input, Some(600), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
