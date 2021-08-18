@@ -438,7 +438,7 @@ impl EthConnectorContract {
             args.account_id, balance
         ));
 
-        sdk::return_output(balance.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", balance.to_string()).as_bytes());
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
