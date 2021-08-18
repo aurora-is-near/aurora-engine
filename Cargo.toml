@@ -86,7 +86,6 @@ ethjson = { git = "https://github.com/rust-blockchain/evm-tests.git", features =
 triehash-ethereum = { git = "https://github.com/rust-blockchain/evm-tests.git" }
 parity-crypto = { version = "0.9", features = ["publickey"] }
 parity-bytes = "0.1"
-# ethcore-builtin = { git = "https://github.com/rust-blockchain/evm-tests.git" }
 
 [features]
 default = ["sha2", "std"]
