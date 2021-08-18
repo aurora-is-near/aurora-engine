@@ -159,7 +159,6 @@ fn call_deposit_eth_to_aurora(master_account: &UserAccount, contract: &str) {
         10,
     );
     res.assert_success();
-    //println!("{:#?}", res.promise_results());
 }
 
 fn get_eth_on_near_balance(master_account: &UserAccount, acc: &str, contract: &str) -> u128 {
@@ -173,10 +172,9 @@ fn get_eth_on_near_balance(master_account: &UserAccount, acc: &str, contract: &s
         "ft_balance_of",
         json!({ "account_id": acc }).to_string().as_bytes(),
     );
-    String::from_utf8(balance.unwrap())
-        .unwrap()
-        .parse()
-        .unwrap()
+    let val_str = String::from_utf8(balance.unwrap()).unwrap();
+    let val = &val_str[1..val_str.len() - 1];
+    val.parse().unwrap()
 }
 
 fn get_eth_balance(master_account: &UserAccount, address: EthAddress, contract: &str) -> u128 {
@@ -190,18 +188,16 @@ fn get_eth_balance(master_account: &UserAccount, address: EthAddress, contract: 
         "ft_balance_of_eth",
         &BalanceOfEthCallArgs { address }.try_to_vec().unwrap(),
     );
-    String::from_utf8(balance.unwrap())
-        .unwrap()
-        .parse()
-        .unwrap()
+    let val_str = String::from_utf8(balance.unwrap()).unwrap();
+    let val = &val_str[1..val_str.len() - 1];
+    val.parse().unwrap()
 }
 
 fn total_supply(master_account: &UserAccount, contract: &str) -> u128 {
     let balance = master_account.view(contract.parse().unwrap(), "ft_total_supply", &[]);
-    String::from_utf8(balance.unwrap())
-        .unwrap()
-        .parse()
-        .unwrap()
+    let val_str = String::from_utf8(balance.unwrap()).unwrap();
+    let val = &val_str[1..val_str.len() - 1];
+    val.parse().unwrap()
 }
 
 fn total_eth_supply_on_near(master_account: &UserAccount, contract: &str) -> u128 {
@@ -210,10 +206,9 @@ fn total_eth_supply_on_near(master_account: &UserAccount, contract: &str) -> u12
         "ft_total_eth_supply_on_near",
         &[],
     );
-    String::from_utf8(balance.unwrap())
-        .unwrap()
-        .parse()
-        .unwrap()
+    let val_str = String::from_utf8(balance.unwrap()).unwrap();
+    let val = &val_str[1..val_str.len() - 1];
+    val.parse().unwrap()
 }
 
 fn total_eth_supply_on_aurora(master_account: &UserAccount, contract: &str) -> u128 {
@@ -222,10 +217,9 @@ fn total_eth_supply_on_aurora(master_account: &UserAccount, contract: &str) -> u
         "ft_total_eth_supply_on_aurora",
         &[],
     );
-    String::from_utf8(balance.unwrap())
-        .unwrap()
-        .parse()
-        .unwrap()
+    let val_str = String::from_utf8(balance.unwrap()).unwrap();
+    let val = &val_str[1..val_str.len() - 1];
+    val.parse().unwrap()
 }
 
 #[test]

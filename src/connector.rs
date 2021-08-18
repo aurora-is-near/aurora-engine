@@ -416,14 +416,14 @@ impl EthConnectorContract {
     pub fn ft_total_eth_supply_on_near(&self) {
         let total_supply = self.ft.ft_total_eth_supply_on_near();
         crate::log!(&format!("Total ETH supply on NEAR: {}", total_supply));
-        sdk::return_output(total_supply.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
     }
 
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
     pub fn ft_total_eth_supply_on_aurora(&self) {
         let total_supply = self.ft.ft_total_eth_supply_on_aurora();
         crate::log!(&format!("Total ETH supply on Aurora: {}", total_supply));
-        sdk::return_output(total_supply.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
     }
 
     /// Return balance of nETH (ETH on Near)
@@ -453,7 +453,7 @@ impl EthConnectorContract {
             hex::encode(args.address),
             balance
         ));
-        sdk::return_output(balance.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", balance.to_string()).as_bytes());
     }
 
     /// Transfer between NEAR accounts
