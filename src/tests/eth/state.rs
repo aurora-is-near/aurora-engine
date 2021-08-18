@@ -57,7 +57,7 @@ impl<'backend, 'config, B> evm::executor::Precompiles<MemoryStackState<'backend,
         input: &[u8],
         target_gas: Option<u64>,
         context: &evm::Context,
-        state: &mut MemoryStackState<B>,
+        _state: &mut MemoryStackState<B>,
         is_static: bool,
     ) -> Option<Result<evm::executor::PrecompileOutput, ExitError>> {
         let target_gas = match target_gas {
@@ -66,8 +66,7 @@ impl<'backend, 'config, B> evm::executor::Precompiles<MemoryStackState<'backend,
         };
 
         let output = self.get_fun(&address).map(|fun| {
-            let mut res = (fun)(input, target_gas, context, is_static);
-            res
+            (fun)(input, target_gas, context, is_static)
         });
 
         output.map(|res| res.map(Into::into))
@@ -208,7 +207,6 @@ fn st_code_size_limit() {
 fn st_create2() {
     run("GeneralStateTests/stCreate2")
 }
-
 #[test]
 fn st_create() {
     run("GeneralStateTests/stCreateTest")
@@ -271,22 +269,9 @@ fn st_precompiled_contracts2() {
 fn st_quadratic_complexity() {
     run("GeneralStateTests/stQuadraticComplexityTest")
 }
-/*
-#[test]
-fn st_random2() {
-    run("GeneralStateTests/stRandom2")
-}
-#[test]
-fn st_recursive_create() {
-    run("GeneralStateTests/stRecursiveCreate")
-}
 #[test]
 fn st_refund() {
     run("GeneralStateTests/stRefundTest")
-}
-#[test]
-fn st_return_data() {
-    run("GeneralStateTests/stReturnDataTest")
 }
 #[test]
 #[ignore]
@@ -304,10 +289,6 @@ fn st_shift() {
 #[test]
 fn st_sload() {
     run("GeneralStateTests/stSLoadTest")
-}
-#[test]
-fn st_solidity() {
-    run("GeneralStateTests/stSolidityTest")
 }
 #[test]
 #[ignore]
@@ -332,13 +313,9 @@ fn st_static_call() {
     run("GeneralStateTests/stStaticCall")
 }
 #[test]
-fn st_system_operations() {
-    run("GeneralStateTests/stSystemOperationsTest")
-}
-#[test]
 fn st_transaction() {
     run("GeneralStateTests/stTransactionTest")
-}*/
+}
 #[test]
 fn st_transition() {
     run("GeneralStateTests/stTransitionTest")
@@ -351,53 +328,84 @@ fn st_wallet() {
 fn st_zero_calls_revert() {
     run("GeneralStateTests/stZeroCallsRevert");
 }
-
 #[test]
 fn st_zero_calls() {
     run("GeneralStateTests/stZeroCallsTest")
 }
 
 
-/*
-
 #[test]
-fn st_delegate_call_homestead() {
-    run("GeneralStateTests/stDelegatecallTestHomestead")
-}
-#[test]
-fn st_call_create_call_code() {
-    run("GeneralStateTests/stCallCreateCallCodeTest")
-}
-#[test]
-fn st_call_code() {
-    run("GeneralStateTests/stCallCodes")
-}
-#[test]
+#[ignore]
 fn st_call_delegate_codes_call_code_homestead() {
     run("GeneralStateTests/stCallDelegateCodesCallCodeHomestead")
 }
 #[test]
+#[ignore]
 fn st_call_delegate_codes_homestead() {
     run("GeneralStateTests/stCallDelegateCodesHomestead")
 }
 #[test]
+#[ignore]
 fn st_changed_eip150() {
     run("GeneralStateTests/stChangedEIP150")
 }
 #[test]
+#[ignore]
 fn st_random() {
     run("GeneralStateTests/stRandom")
 }
 #[test]
+#[ignore]
 fn st_precompiled_contracts() {
     run("GeneralStateTests/stPreCompiledContracts")
 }
 #[test]
+#[ignore]
 fn st_zero_knowledge() {
     run("GeneralStateTests/stZeroKnowledge")
 }
 #[test]
+#[ignore]
 fn st_zero_knowledge2() {
     run("GeneralStateTests/stZeroKnowledge2")
 }
-*/
+#[test]
+#[ignore]
+fn st_random2() {
+    run("GeneralStateTests/stRandom2")
+}
+#[test]
+#[ignore]
+fn st_recursive_create() {
+    run("GeneralStateTests/stRecursiveCreate")
+}
+#[test]
+#[ignore]
+fn st_return_data() {
+    run("GeneralStateTests/stReturnDataTest")
+}
+#[test]
+#[ignore]
+fn st_delegate_call_homestead() {
+    run("GeneralStateTests/stDelegatecallTestHomestead")
+}
+#[test]
+#[ignore]
+fn st_call_create_call_code() {
+    run("GeneralStateTests/stCallCreateCallCodeTest")
+}
+#[test]
+#[ignore]
+fn st_call_code() {
+    run("GeneralStateTests/stCallCodes")
+}
+#[test]
+#[ignore]
+fn st_system_operations() {
+    run("GeneralStateTests/stSystemOperationsTest")
+}
+#[test]
+#[ignore]
+fn st_solidity() {
+    run("GeneralStateTests/stSolidityTest")
+}
