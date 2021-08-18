@@ -129,7 +129,6 @@ dependencies = [
  "evm-core",
  "git2",
  "hex",
- "lazy-static-include",
  "libsecp256k1",
  "logos",
  "near-crypto 0.1.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",

@@ -24,30 +24,6 @@ use crate::transaction::{
 use crate::types;
 use crate::types::AccountId;
 
-#[cfg(all(
-    feature = "mainnet-test",
-    not(any(feature = "testnet", feature = "betanet"))
-))]
-lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "mainnet-test.wasm"
-}
-
-#[cfg(all(
-    feature = "testnet-test",
-    not(any(feature = "mainnet", feature = "betanet"))
-))]
-lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "testnet-test.wasm"
-}
-
-#[cfg(all(
-    feature = "betanet-test",
-    not(any(feature = "mainnet", feature = "testnet"))
-))]
-lazy_static_include::lazy_static_include_bytes! {
-    EVM_WASM_BYTES => "betanet-test.wasm"
-}
-
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
 pub fn origin() -> AccountId {
@@ -328,10 +304,18 @@ impl AuroraRunner {
 impl Default for AuroraRunner {
     fn default() -> Self {
         let aurora_account_id = "aurora".to_string();
+        let evm_wasm_bytes = if cfg!(feature = "mainnet-test") {
+            std::fs::read("mainnet-test.wasm").unwrap()
+        } else if cfg!(feature = "testnet-test") {
+            std::fs::read("testnet-test.wasm").unwrap()
+        } else {
+            std::fs::read("betanet-test.wasm").unwrap()
+        };
+
         Self {
             aurora_account_id: aurora_account_id.clone(),
             chain_id: 1313161556, // NEAR betanet
-            code: ContractCode::new(EVM_WASM_BYTES.to_vec(), None),
+            code: ContractCode::new(evm_wasm_bytes, None),
             cache: Default::default(),
             ext: Default::default(),
             context: VMContext {
