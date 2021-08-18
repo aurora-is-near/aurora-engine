@@ -65,9 +65,9 @@ impl<'backend, 'config, B> evm::executor::Precompiles<MemoryStackState<'backend,
             None => return Some(Err(ExitError::OutOfGas)),
         };
 
-        let output = self.get_fun(&address).map(|fun| {
-            (fun)(input, target_gas, context, is_static)
-        });
+        let output = self
+            .get_fun(&address)
+            .map(|fun| (fun)(input, target_gas, context, is_static));
 
         output.map(|res| res.map(Into::into))
     }
@@ -332,7 +332,6 @@ fn st_zero_calls_revert() {
 fn st_zero_calls() {
     run("GeneralStateTests/stZeroCallsTest")
 }
-
 
 #[test]
 #[ignore]
