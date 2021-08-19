@@ -122,7 +122,7 @@ mod contract {
     pub extern "C" fn get_version() {
         let version = match option_env!("NEAR_EVM_VERSION") {
             Some(v) => v.as_bytes(),
-            None => include_bytes!("../VERSION"),
+            None => include_bytes!("../../VERSION"),
         };
         sdk::return_output(version)
     }
@@ -383,7 +383,7 @@ mod contract {
 
         let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
 
-        let erc20_contract = include_bytes!("../etc/eth-contracts/res/EvmErc20.bin");
+        let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
         let deploy_args = ethabi::encode(&[
             ethabi::Token::String("Empty".to_string()),
             ethabi::Token::String("EMPTY".to_string()),
