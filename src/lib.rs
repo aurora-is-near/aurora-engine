@@ -421,8 +421,8 @@ mod contract {
     pub extern "C" fn view() {
         let args: ViewCallArgs = sdk::read_input_borsh().sdk_unwrap();
         let engine = Engine::new(Address::from_slice(&args.sender)).sdk_unwrap();
-        let result = Engine::view_with_args(&engine, args);
-        result.sdk_process()
+        let result = Engine::view_with_args(&engine, args).sdk_unwrap();
+        sdk::return_output(&result.try_to_vec().sdk_expect("ERR_SERIALIZE"));
     }
 
     #[no_mangle]
