@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `view` call has been correctly updated to return the Borsh serialization of `TransactionStatus`. Prior it was returning a string with the result of the transaction by name. 
 
+- `ft_balance_of` return was changed as prior it was returning a non-JSON string value `0`. This has been fixed to return `"0"`.
+
 ## [1.6.0] - 2021-08-13
 
 ### Breaking changes
