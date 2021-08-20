@@ -138,6 +138,7 @@ dependencies = [
  "near-vm-logic 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
  "near-vm-runner 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
  "num",
+ "prelude",
  "primitive-types",
  "rand 0.7.3",
  "ripemd160",
@@ -149,10 +150,6 @@ dependencies = [
  "sha3 0.9.1",
  "wee_alloc",
 ]
-
-[[package]]
-name = "aurora-engine-precompiles"
-version = "0.1.0"
 
 [[package]]
 name = "autocfg"
@@ -2807,6 +2804,17 @@ name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
+
+[[package]]
+name = "precompiles"
+version = "0.1.0"
+
+[[package]]
+name = "prelude"
+version = "0.1.0"
+dependencies = [
+ "primitive-types",
+]
 
 [[package]]
 name = "primitive-types"

@@ -1,5 +1,5 @@
 [package]
-name = "precompiles"
+name = "prelude"
 version = "0.1.0"
 authors = ["NEAR <hello@near.org>"]
 editiaon = "2018"
@@ -13,3 +13,4 @@ publish = false
 autobenches = false
 
 [dependencies]
+primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }

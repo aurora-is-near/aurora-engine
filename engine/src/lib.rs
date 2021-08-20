@@ -8,13 +8,14 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+pub use prelude;
+
 use crate::parameters::PromiseCreateArgs;
 
 mod map;
 #[cfg(feature = "meta-call")]
 pub mod meta_parsing;
 pub mod parameters;
-pub mod prelude;
 pub mod storage;
 pub mod transaction;
 pub mod types;
