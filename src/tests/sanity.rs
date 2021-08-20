@@ -362,7 +362,8 @@ fn test_balance_evm_and_nep_141() {
         );
         assert!(maybe_err.is_none());
         let result = maybe_result.unwrap();
-        String::from_utf8(result.return_data.as_value().unwrap())
+        let val = result.return_data.as_value().unwrap();
+        String::from_utf8(val[1..val.len() - 1].to_vec())
             .unwrap()
             .parse()
             .unwrap()
@@ -376,7 +377,8 @@ fn test_balance_evm_and_nep_141() {
                 runner.call("ft_total_eth_supply_on_aurora", caller.clone(), Vec::new());
             assert!(maybe_err.is_none());
             let result = maybe_result.unwrap();
-            String::from_utf8(result.return_data.as_value().unwrap())
+            let val = result.return_data.as_value().unwrap();
+            String::from_utf8(val[1..val.len() - 1].to_vec())
                 .unwrap()
                 .parse()
                 .unwrap()
