@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "1.6.0"
+version = "1.6.1"
 authors = ["NEAR <hello@near.org>"]
 edition = "2018"
 description = ""
@@ -80,7 +80,6 @@ libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
-lazy-static-include = "3.1.1"
 
 [features]
 default = ["sha2", "std"]
