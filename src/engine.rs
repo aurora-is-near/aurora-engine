@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
@@ -10,15 +11,22 @@ use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
     FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
-    ViewCallArgs,
+    TransactionStatus, ViewCallArgs,
 };
 
-use crate::precompiles;
-use crate::prelude::{Address, TryInto, Vec, H256, U256};
+use crate::precompiles::Precompiles;
+use crate::prelude::{is_valid_account_id, Address, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
+
+/// Used as the first byte in the concatenation of data used to compute the blockhash.
+/// Could be useful in the future as a version byte, or to distinguish different types of blocks.
+const BLOCK_HASH_PREFIX: u8 = 0;
+const BLOCK_HASH_PREFIX_SIZE: usize = 1;
+const BLOCK_HEIGHT_SIZE: usize = 8;
+const CHAIN_ID_SIZE: usize = 32;
 
 #[cfg(not(feature = "contract"))]
 pub fn current_address() -> Address {
@@ -48,9 +56,27 @@ macro_rules! assert_or_finish {
     };
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct EngineError {
+    pub kind: EngineErrorKind,
+    pub gas_used: u64,
+}
+
+impl AsRef<str> for EngineError {
+    fn as_ref(&self) -> &str {
+        self.kind.to_str()
+    }
+}
+
+impl AsRef<[u8]> for EngineError {
+    fn as_ref(&self) -> &[u8] {
+        self.kind.to_str().as_bytes()
+    }
+}
+
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum EngineError {
+pub enum EngineErrorKind {
     /// Normal EVM errors.
     EvmError(ExitError),
     /// Fatal EVM errors.
@@ -59,9 +85,16 @@ pub enum EngineError {
     IncorrectNonce,
 }
 
-impl EngineError {
+impl EngineErrorKind {
+    pub fn with_gas_used(self, gas_used: u64) -> EngineError {
+        EngineError {
+            kind: self,
+            gas_used,
+        }
+    }
+
     pub fn to_str(&self) -> &str {
-        use EngineError::*;
+        use EngineErrorKind::*;
         match self {
             EvmError(ExitError::StackUnderflow) => "ERR_STACK_UNDERFLOW",
             EvmError(ExitError::StackOverflow) => "ERR_STACK_OVERFLOW",
@@ -85,27 +118,27 @@ impl EngineError {
     }
 }
 
-impl AsRef<str> for EngineError {
+impl AsRef<str> for EngineErrorKind {
     fn as_ref(&self) -> &str {
         self.to_str()
     }
 }
 
-impl AsRef<[u8]> for EngineError {
+impl AsRef<[u8]> for EngineErrorKind {
     fn as_ref(&self) -> &[u8] {
         self.to_str().as_bytes()
     }
 }
 
-impl From<ExitError> for EngineError {
+impl From<ExitError> for EngineErrorKind {
     fn from(e: ExitError) -> Self {
-        EngineError::EvmError(e)
+        EngineErrorKind::EvmError(e)
     }
 }
 
-impl From<ExitFatal> for EngineError {
+impl From<ExitFatal> for EngineErrorKind {
     fn from(e: ExitFatal) -> Self {
-        EngineError::EvmFatal(e)
+        EngineErrorKind::EvmFatal(e)
     }
 }
 
@@ -114,17 +147,96 @@ pub type EngineResult<T> = Result<T, EngineError>;
 
 trait ExitIntoResult {
     /// Checks if the EVM exit is ok or an error.
-    fn into_result(self) -> EngineResult<()>;
+    fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind>;
 }
 
 impl ExitIntoResult for ExitReason {
-    fn into_result(self) -> EngineResult<()> {
+    fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
         use ExitReason::*;
         match self {
-            Succeed(_) | Revert(_) => Ok(()),
+            Succeed(_) => Ok(TransactionStatus::Succeed(data)),
+            Revert(_) => Ok(TransactionStatus::Revert(data)),
+            Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
+            Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
+            Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
             Error(e) => Err(e.into()),
             Fatal(e) => Err(e.into()),
         }
+    }
+}
+
+pub struct BalanceOverflow;
+impl AsRef<[u8]> for BalanceOverflow {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_BALANCE_OVERFLOW"
+    }
+}
+
+/// Errors resulting from trying to pay for gas
+pub enum GasPaymentError {
+    /// Overflow adding ETH to an account balance (should never happen)
+    BalanceOverflow(BalanceOverflow),
+    /// Overflow in gas * gas_price calculation
+    EthAmountOverflow,
+    /// Not enough balance for account to cover the gas cost
+    OutOfFund,
+}
+impl AsRef<[u8]> for GasPaymentError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::BalanceOverflow(overflow) => overflow.as_ref(),
+            Self::EthAmountOverflow => b"ERR_GAS_ETH_AMOUNT_OVERFLOW",
+            Self::OutOfFund => b"ERR_OUT_OF_FUND",
+        }
+    }
+}
+impl From<BalanceOverflow> for GasPaymentError {
+    fn from(overflow: BalanceOverflow) -> Self {
+        Self::BalanceOverflow(overflow)
+    }
+}
+
+pub const ERR_INVALID_NEP141_ACCOUNT_ID: &str = "ERR_INVALID_NEP141_ACCOUNT_ID";
+
+#[derive(Debug)]
+pub enum GetErc20FromNep141Error {
+    InvalidNep141AccountId,
+    Nep141NotFound,
+}
+
+impl GetErc20FromNep141Error {
+    pub fn to_str(&self) -> &str {
+        match self {
+            Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
+            Self::Nep141NotFound => "ERR_NEP141_NOT_FOUND",
+        }
+    }
+}
+
+impl AsRef<[u8]> for GetErc20FromNep141Error {
+    fn as_ref(&self) -> &[u8] {
+        self.to_str().as_bytes()
+    }
+}
+
+#[derive(Debug)]
+pub enum RegisterTokenError {
+    InvalidNep141AccountId,
+    TokenAlreadyRegistered,
+}
+
+impl RegisterTokenError {
+    pub fn to_str(&self) -> &str {
+        match self {
+            Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
+            Self::TokenAlreadyRegistered => "ERR_NEP141_TOKEN_ALREADY_REGISTERED",
+        }
+    }
+}
+
+impl AsRef<[u8]> for RegisterTokenError {
+    fn as_ref(&self) -> &[u8] {
+        self.to_str().as_bytes()
     }
 }
 
@@ -147,7 +259,7 @@ impl AsRef<[u8]> for EngineStateError {
 /// Should not contain anything large or enumerable.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
 pub struct EngineState {
-    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],
     /// Account which can upgrade this contract.
     /// Use empty to disable updatability.
@@ -201,6 +313,93 @@ impl Engine {
         );
     }
 
+    /// There is one Aurora block per NEAR block height (note: when heights in NEAR are skipped
+    /// they are interpreted as empty blocks on Aurora). The blockhash is derived from the height
+    /// according to
+    /// ```text
+    /// block_hash = sha256(concat(
+    ///     BLOCK_HASH_PREFIX,
+    ///     block_height as u64,
+    ///     chain_id,
+    ///     engine_account_id,
+    /// ))
+    /// ```
+    pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u8]) -> H256 {
+        debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, mem::size_of_val(&BLOCK_HASH_PREFIX));
+        debug_assert_eq!(BLOCK_HEIGHT_SIZE, mem::size_of_val(&block_height));
+        debug_assert_eq!(CHAIN_ID_SIZE, mem::size_of_val(&chain_id));
+        let mut data = Vec::with_capacity(
+            BLOCK_HASH_PREFIX_SIZE + BLOCK_HEIGHT_SIZE + CHAIN_ID_SIZE + account_id.len(),
+        );
+        data.push(BLOCK_HASH_PREFIX);
+        data.extend_from_slice(&chain_id);
+        data.extend_from_slice(account_id);
+        data.extend_from_slice(&block_height.to_be_bytes());
+
+        #[cfg(not(feature = "contract"))]
+        {
+            use sha2::Digest;
+
+            let output = sha2::Sha256::digest(&data);
+            H256(output.into())
+        }
+
+        #[cfg(feature = "contract")]
+        sdk::sha256(&data)
+    }
+
+    pub fn charge_gas_limit(
+        sender: &Address,
+        gas_limit: U256,
+        gas_price: U256,
+    ) -> Result<Wei, GasPaymentError> {
+        // Early exit as performance optimization
+        if gas_price.is_zero() {
+            return Ok(Wei::zero());
+        }
+
+        let payment_for_gas = Wei::new(
+            gas_limit
+                .checked_mul(gas_price)
+                .ok_or(GasPaymentError::EthAmountOverflow)?,
+        );
+        let account_balance = Self::get_balance(sender);
+        let remaining_balance = account_balance
+            .checked_sub(payment_for_gas)
+            .ok_or(GasPaymentError::OutOfFund)?;
+
+        Self::set_balance(sender, &remaining_balance);
+
+        Ok(payment_for_gas)
+    }
+
+    pub fn refund_unused_gas(
+        sender: &Address,
+        relayer: &Address,
+        prepaid_amount: Wei,
+        used_gas: u64,
+        gas_price: U256,
+    ) -> Result<(), GasPaymentError> {
+        // Early exit as performance optimization
+        if gas_price.is_zero() {
+            return Ok(());
+        }
+
+        let used_amount = Wei::new(
+            gas_price
+                .checked_mul(used_gas.into())
+                .ok_or(GasPaymentError::EthAmountOverflow)?,
+        );
+        // We cannot have used more than the gas_limit
+        debug_assert!(used_amount <= prepaid_amount);
+        let refund_amount = prepaid_amount - used_amount;
+
+        Self::add_balance(sender, refund_amount)?;
+        Self::add_balance(relayer, used_amount)?;
+
+        Ok(())
+    }
+
     /// Fails if state is not found.
     pub fn get_state() -> Result<EngineState, EngineStateError> {
         match sdk::read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
@@ -240,11 +439,11 @@ impl Engine {
     /// Checks the nonce to ensure that the address matches the transaction
     /// nonce.
     #[inline]
-    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> EngineResult<()> {
+    pub fn check_nonce(address: &Address, transaction_nonce: &U256) -> Result<(), EngineErrorKind> {
         let account_nonce = Self::get_nonce(address);
 
         if transaction_nonce != &account_nonce {
-            return Err(EngineError::IncorrectNonce);
+            return Err(EngineErrorKind::IncorrectNonce);
         }
 
         Ok(())
@@ -254,6 +453,13 @@ impl Engine {
         sdk::read_storage(&address_to_key(KeyPrefix::Nonce, address))
             .map(|value| U256::from_big_endian(&value))
             .unwrap_or_else(U256::zero)
+    }
+
+    pub fn add_balance(address: &Address, amount: Wei) -> Result<(), BalanceOverflow> {
+        let current_balance = Self::get_balance(address);
+        let new_balance = current_balance.checked_add(amount).ok_or(BalanceOverflow)?;
+        Self::set_balance(address, &new_balance);
+        Ok(())
     }
 
     pub fn set_balance(address: &Address, balance: &Wei) {
@@ -340,7 +546,7 @@ impl Engine {
     pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let value = Wei::zero();
-        self.deploy_code(origin, value, input, u64::MAX)
+        self.deploy_code(origin, value, input, u64::MAX, Vec::new())
     }
 
     pub fn deploy_code(
@@ -349,27 +555,31 @@ impl Engine {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
+        access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor(gas_limit);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
-        let (status, result) = (
-            executor.transact_create(origin, value.raw(), input, gas_limit),
+        let (exit_reason, result) = (
+            executor.transact_create(origin, value.raw(), input, gas_limit, access_list),
             address,
         );
-        let is_succeed = status.is_succeed();
-        if let Err(e) = status.into_result() {
-            Engine::increment_nonce(&origin);
-            return Err(e);
-        }
+
         let used_gas = executor.used_gas();
+        let status = match exit_reason.into_result(result.0.to_vec()) {
+            Ok(status) => status,
+            Err(e) => {
+                Engine::increment_nonce(&origin);
+                return Err(e.with_gas_used(used_gas));
+            }
+        };
+
         let (values, logs, promises) = executor.into_state().deconstruct();
         self.apply(values, Vec::<Log>::new(), true);
         Self::schedule_promises(promises);
 
         Ok(SubmitResult {
-            status: is_succeed,
+            status,
             gas_used: used_gas,
-            result: result.0.to_vec(),
             logs: logs.into_iter().map(Into::into).collect(),
         })
     }
@@ -378,7 +588,7 @@ impl Engine {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = Wei::zero();
-        self.call(origin, contract, value, args.input, u64::MAX)
+        self.call(origin, contract, value, args.input, u64::MAX, Vec::new())
     }
 
     pub fn call(
@@ -388,17 +598,20 @@ impl Engine {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
+        access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
         let mut executor = self.make_executor(gas_limit);
-        let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
+        let (exit_reason, result) =
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
 
-        let is_succeed = status.is_succeed();
-        if let Err(e) = status.into_result() {
-            Engine::increment_nonce(&origin);
-            return Err(e);
-        }
         let used_gas = executor.used_gas();
+        let status = match exit_reason.into_result(result) {
+            Ok(status) => status,
+            Err(e) => {
+                Engine::increment_nonce(&origin);
+                return Err(e.with_gas_used(used_gas));
+            }
+        };
 
         let (values, logs, promises) = executor.into_state().deconstruct();
 
@@ -408,9 +621,8 @@ impl Engine {
         Self::schedule_promises(promises);
 
         Ok(SubmitResult {
-            status: is_succeed,
+            status,
             gas_used: used_gas,
-            result,
             logs: logs.into_iter().map(Into::into).collect(),
         })
     }
@@ -421,7 +633,7 @@ impl Engine {
         Self::set_nonce(address, &new_nonce);
     }
 
-    pub fn view_with_args(&self, args: ViewCallArgs) -> EngineResult<Vec<u8>> {
+    pub fn view_with_args(&self, args: ViewCallArgs) -> Result<TransactionStatus, EngineErrorKind> {
         let origin = Address::from_slice(&args.sender);
         let contract = Address::from_slice(&args.address);
         let value = U256::from_big_endian(&args.amount);
@@ -435,18 +647,17 @@ impl Engine {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
-    ) -> EngineResult<Vec<u8>> {
+    ) -> Result<TransactionStatus, EngineErrorKind> {
         let mut executor = self.make_executor(gas_limit);
         let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, gas_limit);
-        status.into_result()?;
-        Ok(result)
+            executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
+        status.into_result(result)
     }
 
-    fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState> {
+    fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState, Precompiles> {
         let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
         let state = AuroraStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, CONFIG, precompiles::istanbul_precompiles)
+        StackExecutor::new_with_precompile(state, CONFIG, Precompiles::new_istanbul())
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
@@ -463,15 +674,33 @@ impl Engine {
             .map(|result| Address(result.as_slice().try_into().unwrap()))
     }
 
-    pub fn register_token(&mut self, erc20_token: &[u8], nep141_token: &[u8]) {
-        // Check that this nep141 token was not registered before, they can only be registered once.
-        let map = Self::nep141_erc20_map();
-        assert!(map.lookup_left(nep141_token).is_none());
-        map.insert(nep141_token, erc20_token);
+    pub fn register_token(
+        &mut self,
+        erc20_token: &[u8],
+        nep141_token: &[u8],
+    ) -> Result<(), RegisterTokenError> {
+        match Self::get_erc20_from_nep141(nep141_token) {
+            Err(GetErc20FromNep141Error::Nep141NotFound) => (),
+            Err(GetErc20FromNep141Error::InvalidNep141AccountId) => {
+                return Err(RegisterTokenError::InvalidNep141AccountId)
+            }
+            Ok(_) => return Err(RegisterTokenError::TokenAlreadyRegistered),
+        }
+
+        Self::nep141_erc20_map().insert(nep141_token, erc20_token);
+        Ok(())
     }
 
-    pub fn get_erc20_from_nep141(&self, nep141_token: &[u8]) -> Option<Vec<u8>> {
-        Self::nep141_erc20_map().lookup_left(nep141_token)
+    pub fn get_erc20_from_nep141(
+        nep141_account_id: &[u8],
+    ) -> Result<Vec<u8>, GetErc20FromNep141Error> {
+        if !is_valid_account_id(nep141_account_id) {
+            return Err(GetErc20FromNep141Error::InvalidNep141AccountId);
+        }
+
+        Self::nep141_erc20_map()
+            .lookup_left(nep141_account_id)
+            .ok_or(GetErc20FromNep141Error::Nep141NotFound)
     }
 
     /// Transfers an amount from a given sender to a receiver, provided that
@@ -486,7 +715,7 @@ impl Engine {
         value: Wei,
         gas_limit: u64,
     ) -> EngineResult<SubmitResult> {
-        self.call(sender, receiver, value, Vec::new(), gas_limit)
+        self.call(sender, receiver, value, Vec::new(), gas_limit, Vec::new())
     }
 
     /// Mint tokens for recipient on a particular ERC20 token
@@ -502,8 +731,6 @@ impl Engine {
     pub fn receive_erc20_tokens(&mut self, args: &NEP141FtOnTransferArgs) {
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
-
-        let token = sdk::predecessor_account_id();
 
         // Parse message to determine recipient and fee
         let (recipient, fee) = {
@@ -531,13 +758,11 @@ impl Engine {
             (recipient, fee)
         };
 
+        let token = sdk::predecessor_account_id();
         let erc20_token = Address(unwrap_res_or_finish!(
-            unwrap_res_or_finish!(
-                self.get_erc20_from_nep141(token.as_slice()).ok_or(()),
-                output_on_fail
-            )
-            .as_slice()
-            .try_into(),
+            unwrap_res_or_finish!(Self::get_erc20_from_nep141(&token), output_on_fail)
+                .as_slice()
+                .try_into(),
             output_on_fail
         ));
 
@@ -572,6 +797,7 @@ impl Engine {
                 Wei::zero(),
                 [selector, tail.as_slice()].concat(),
                 u64::MAX,
+                Vec::new(), // TODO: are there values we should put here?
             ),
             output_on_fail
         );
@@ -644,7 +870,15 @@ impl evm::backend::Backend for Engine {
     fn block_hash(&self, number: U256) -> H256 {
         let idx = U256::from(sdk::block_index());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
-            H256::from([255u8; 32])
+            // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
+            #[cfg(feature = "contract")]
+            {
+                let account_id = sdk::current_account_id();
+                Self::compute_block_hash(self.state.chain_id, number.low_u64(), &account_id)
+            }
+
+            #[cfg(not(feature = "contract"))]
+            Self::compute_block_hash(self.state.chain_id, number.low_u64(), b"aurora")
         } else {
             H256::zero()
         }

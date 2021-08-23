@@ -1,5 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
+use crate::fungible_token::FungibleTokenMetadata;
 use crate::prelude::{String, Vec};
 use crate::types::{AccountId, Balance, RawAddress, RawH256, RawU256};
 use crate::{
@@ -61,13 +62,53 @@ impl From<Log> for ResultLog {
     }
 }
 
+/// The status of a transaction.
+#[derive(Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub enum TransactionStatus {
+    Succeed(Vec<u8>),
+    Revert(Vec<u8>),
+    OutOfGas,
+    OutOfFund,
+    OutOfOffset,
+    CallTooDeep,
+}
+
+impl TransactionStatus {
+    pub fn is_ok(&self) -> bool {
+        matches!(*self, TransactionStatus::Succeed(_))
+    }
+
+    pub fn is_revert(&self) -> bool {
+        matches!(*self, TransactionStatus::Revert(_))
+    }
+
+    pub fn is_fail(&self) -> bool {
+        *self == TransactionStatus::OutOfGas
+            || *self == TransactionStatus::OutOfFund
+            || *self == TransactionStatus::OutOfOffset
+            || *self == TransactionStatus::CallTooDeep
+    }
+}
+
+impl AsRef<[u8]> for TransactionStatus {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Succeed(_) => b"SUCCESS",
+            Self::Revert(_) => b"ERR_REVERT",
+            Self::OutOfFund => b"ERR_OUT_OF_FUNDS",
+            Self::OutOfGas => b"ERR_OUT_OF_GAS",
+            Self::OutOfOffset => b"ERR_OUT_OF_OFFSET",
+            Self::CallTooDeep => b"ERR_CALL_TOO_DEEP",
+        }
+    }
+}
+
 /// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
 /// and `deploy_with_input` methods.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct SubmitResult {
-    pub status: bool,
+    pub status: TransactionStatus,
     pub gas_used: u64,
-    pub result: Vec<u8>,
     pub logs: Vec<ResultLog>,
 }
 
@@ -87,10 +128,14 @@ pub struct ViewCallArgs {
     pub input: Vec<u8>,
 }
 
+/// Borsh-encoded parameters for `deploy_erc20_token` function.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
 pub struct DeployErc20TokenArgs {
     pub nep141: AccountId,
 }
+
+/// Borsh-encoded parameters for `get_erc20_from_nep141` function.
+pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgs;
 
 /// Borsh-encoded parameters for the `get_storage_at` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -171,7 +216,7 @@ impl TryFrom<NEP141FtOnTransferArgs> for String {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct PromiseCreateArgs {
     pub target_account_id: AccountId,
     pub method: String,
@@ -222,7 +267,7 @@ pub struct StorageBalance {
 impl StorageBalance {
     pub fn to_json_bytes(&self) -> Vec<u8> {
         crate::prelude::format!(
-            "{{\"total\": \"{}\", \"available\": \"{}\",}}",
+            "{{\"total\": \"{}\", \"available\": \"{}\"}}",
             self.total.to_string(),
             self.available.to_string()
         )
@@ -272,6 +317,7 @@ pub struct FinishDepositEthCallArgs {
 pub struct InitCallArgs {
     pub prover_account: AccountId,
     pub eth_custodian_address: AccountId,
+    pub metadata: FungibleTokenMetadata,
 }
 
 /// Eth-connector Set contract data call args

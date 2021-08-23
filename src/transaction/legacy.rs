@@ -1,50 +1,6 @@
-use crate::prelude::{Address, TryFrom, Vec, U256};
+use crate::prelude::{Address, Vec, U256};
 use crate::types::Wei;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
-
-/// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
-#[derive(Eq, PartialEq)]
-pub enum EthTransaction {
-    Legacy(LegacyEthSignedTransaction),
-}
-
-impl TryFrom<&[u8]> for EthTransaction {
-    type Error = ParseTransactionError;
-
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes[0] <= 0x7f {
-            return Err(ParseTransactionError::UnknownTransactionType);
-        } else if bytes[0] == 0xff {
-            return Err(ParseTransactionError::ReservedSentinel);
-        }
-
-        let legacy = LegacyEthSignedTransaction::decode(&Rlp::new(bytes))?;
-        Ok(Self::Legacy(legacy))
-    }
-}
-
-pub enum ParseTransactionError {
-    UnknownTransactionType,
-    // Per the EIP-2718 spec 0xff is a reserved value
-    ReservedSentinel,
-    RlpDecodeError(DecoderError),
-}
-
-impl From<DecoderError> for ParseTransactionError {
-    fn from(e: DecoderError) -> Self {
-        Self::RlpDecodeError(e)
-    }
-}
-
-impl AsRef<[u8]> for ParseTransactionError {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::UnknownTransactionType => b"ERR_UNKNOWN_TX_TYPE",
-            Self::ReservedSentinel => b"ERR_RESERVED_LEADING_TX_BYTE",
-            Self::RlpDecodeError(_) => b"ERR_TX_RLP_DECODE",
-        }
-    }
-}
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LegacyEthTransaction {
@@ -81,28 +37,9 @@ impl LegacyEthTransaction {
         }
     }
 
+    #[inline]
     pub fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
-        let is_contract_creation = self.to.is_none();
-
-        let base_gas = if is_contract_creation {
-            config.gas_transaction_create
-        } else {
-            config.gas_transaction_call
-        };
-
-        let num_zero_bytes = self.data.iter().filter(|b| **b == 0).count();
-        let num_non_zero_bytes = self.data.len() - num_zero_bytes;
-
-        let gas_zero_bytes = config
-            .gas_transaction_zero_data
-            .checked_mul(num_zero_bytes as u64)?;
-        let gas_non_zero_bytes = config
-            .gas_transaction_non_zero_data
-            .checked_mul(num_non_zero_bytes as u64)?;
-
-        base_gas
-            .checked_add(gas_zero_bytes)
-            .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
+        super::intrinsic_gas(self.to.is_none(), &self.data, &[], config)
     }
 
     /// Returns self.gas as a u64, or None if self.gas > u64::MAX
@@ -131,15 +68,15 @@ impl LegacyEthSignedTransaction {
         let mut rlp_stream = RlpStream::new();
         // See details of CHAIN_ID computation here - https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md#specification
         let (chain_id, rec_id) = match self.v {
-            // ecrecover suppose to handle 0..=28 range for ids.
-            0..=28 => (None, self.v as u8),
+            0..=26 => return None,
+            27..=28 => (None, (self.v - 27) as u8),
             29..=34 => return None,
             _ => (Some((self.v - 35) / 2), ((self.v - 35) % 2) as u8),
         };
         self.transaction
             .rlp_append_unsigned(&mut rlp_stream, chain_id);
         let message_hash = crate::types::keccak(rlp_stream.as_raw());
-        crate::precompiles::ecrecover(message_hash, &vrs_to_arr(rec_id, self.r, self.s)).ok()
+        crate::precompiles::ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s)).ok()
     }
 
     /// Returns chain id encoded in `v` parameter of the signature if that was done, otherwise None.
@@ -178,23 +115,7 @@ impl Decodable for LegacyEthSignedTransaction {
         let nonce = rlp.val_at(0)?;
         let gas_price = rlp.val_at(1)?;
         let gas = rlp.val_at(2)?;
-        let to = {
-            let value = rlp.at(3)?;
-            if value.is_empty() {
-                if value.is_data() {
-                    None
-                } else {
-                    return Err(rlp::DecoderError::RlpExpectedToBeData);
-                }
-            } else {
-                let v: Address = value.as_val()?;
-                if v == Address::zero() {
-                    None
-                } else {
-                    Some(v)
-                }
-            }
-        };
+        let to = super::rlp_extract_to(rlp, 3)?;
         let value = Wei::new(rlp.val_at(4)?);
         let data = rlp.val_at(5)?;
         let v = rlp.val_at(6)?;
@@ -214,14 +135,6 @@ impl Decodable for LegacyEthSignedTransaction {
             s,
         })
     }
-}
-
-fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
-    let mut result = [0u8; 65]; // (r, s, v), typed (uint256, uint256, uint8)
-    r.to_big_endian(&mut result[0..32]);
-    s.to_big_endian(&mut result[32..64]);
-    result[64] = v;
-    result
 }
 
 #[cfg(test)]

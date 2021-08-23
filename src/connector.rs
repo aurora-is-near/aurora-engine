@@ -11,8 +11,6 @@ use crate::engine::Engine;
 use crate::json::parse_json;
 use crate::prelude::*;
 use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
-#[cfg(feature = "log")]
-use alloc::format;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub(crate) const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
@@ -84,6 +82,7 @@ impl EthConnectorContract {
         let contract_data = Self::set_contract_data(SetContractDataCallArgs {
             prover_account: args.prover_account,
             eth_custodian_address: args.eth_custodian_address,
+            metadata: args.metadata,
         });
 
         let current_account_id = sdk::current_account_id();
@@ -118,6 +117,11 @@ impl EthConnectorContract {
         sdk::save_contract(
             &Self::get_contract_key(&EthConnectorStorageId::Contract),
             &contract_data,
+        );
+
+        sdk::save_contract(
+            &Self::get_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
+            &args.metadata,
         );
 
         contract_data
@@ -412,14 +416,14 @@ impl EthConnectorContract {
     pub fn ft_total_eth_supply_on_near(&self) {
         let total_supply = self.ft.ft_total_eth_supply_on_near();
         crate::log!(&format!("Total ETH supply on NEAR: {}", total_supply));
-        sdk::return_output(total_supply.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
     }
 
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
     pub fn ft_total_eth_supply_on_aurora(&self) {
         let total_supply = self.ft.ft_total_eth_supply_on_aurora();
         crate::log!(&format!("Total ETH supply on Aurora: {}", total_supply));
-        sdk::return_output(total_supply.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
     }
 
     /// Return balance of nETH (ETH on Near)
@@ -434,7 +438,7 @@ impl EthConnectorContract {
             args.account_id, balance
         ));
 
-        sdk::return_output(balance.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", balance.to_string()).as_bytes());
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
@@ -449,7 +453,7 @@ impl EthConnectorContract {
             hex::encode(args.address),
             balance
         ));
-        sdk::return_output(balance.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", balance.to_string()).as_bytes());
     }
 
     /// Transfer between NEAR accounts
@@ -483,7 +487,7 @@ impl EthConnectorContract {
         ));
         // `ft_resolve_transfer` can change `total_supply` so we should save the contract
         self.save_ft_contract();
-        sdk::return_output(amount.to_string().as_bytes());
+        sdk::return_output(format!("\"{}\"", amount.to_string()).as_bytes());
     }
 
     /// FT transfer call from sender account (invoker account) to receiver
@@ -617,6 +621,14 @@ impl EthConnectorContract {
     /// Set Eth connector paused flags
     pub fn set_paused_flags(&mut self, args: PauseEthConnectorCallArgs) {
         self.set_paused(args.paused_mask);
+    }
+
+    /// Return metdata
+    pub fn get_metadata() -> Option<FungibleTokenMetadata> {
+        sdk::read_storage(&Self::get_contract_key(
+            &EthConnectorStorageId::FungibleTokenMetadata,
+        ))
+        .and_then(|data| FungibleTokenMetadata::try_from_slice(&data).ok())
     }
 }
 

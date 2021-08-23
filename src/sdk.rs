@@ -5,6 +5,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 const READ_STORAGE_REGISTER_ID: u64 = 0;
 const INPUT_REGISTER_ID: u64 = 0;
+const ECRECOVER_MESSAGE_SIZE: u64 = 32;
+const ECRECOVER_SIGNATURE_LENGTH: u64 = 64;
+const ECRECOVER_MALLEABILITY_FLAG: u64 = 1;
 
 /// Register used to record evicted values from the storage.
 const EVICTED_REGISTER: u64 = 0;
@@ -45,6 +48,16 @@ mod exports {
         fn random_seed(register_id: u64);
         pub(crate) fn sha256(value_len: u64, value_ptr: u64, register_id: u64);
         pub(crate) fn keccak256(value_len: u64, value_ptr: u64, register_id: u64);
+        pub(crate) fn ripemd160(value_len: u64, value_ptr: u64, register_id: u64);
+        pub(crate) fn ecrecover(
+            hash_len: u64,
+            hash_ptr: u64,
+            sig_len: u64,
+            sig_ptr: u64,
+            v: u64,
+            malleability_flag: u64,
+            register_id: u64,
+        ) -> u64;
         // #####################
         // # Miscellaneous API #
         // #####################
@@ -297,7 +310,9 @@ pub fn remove_storage_with_result(key: &[u8]) -> Option<Vec<u8>> {
 
 #[allow(dead_code)]
 pub fn block_timestamp() -> u64 {
-    unsafe { exports::block_timestamp() }
+    // NEAR timestamp is in nanoseconds
+    let timestamp_ns = unsafe { exports::block_timestamp() };
+    timestamp_ns / 1000 // convert to milliseconds for Ethereum compatibility
 }
 
 pub fn block_index() -> u64 {
@@ -369,6 +384,49 @@ pub fn keccak(input: &[u8]) -> H256 {
         let bytes = H256::zero();
         exports::read_register(1, bytes.0.as_ptr() as *const u64 as u64);
         bytes
+    }
+}
+
+/// Calls environment ripemd160 on given input.
+pub fn ripemd160(input: &[u8]) -> [u8; 20] {
+    unsafe {
+        const REGISTER_ID: u64 = 1;
+        exports::ripemd160(input.len() as u64, input.as_ptr() as u64, REGISTER_ID);
+        let bytes = [0u8; 20];
+        exports::read_register(REGISTER_ID, bytes.as_ptr() as u64);
+        bytes
+    }
+}
+
+/// Recover address from message hash and signature.
+pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<crate::prelude::Address, ECRecoverErr> {
+    unsafe {
+        let hash_ptr = hash.as_ptr() as u64;
+        let sig_ptr = signature.as_ptr() as u64;
+        const RECOVER_REGISTER_ID: u64 = 1;
+        const KECCACK_REGISTER_ID: u64 = 2;
+        let result = exports::ecrecover(
+            ECRECOVER_MESSAGE_SIZE,
+            hash_ptr,
+            ECRECOVER_SIGNATURE_LENGTH,
+            sig_ptr,
+            signature[64] as u64,
+            ECRECOVER_MALLEABILITY_FLAG,
+            RECOVER_REGISTER_ID,
+        );
+        if result == (true as u64) {
+            // The result from the ecrecover call is in a register; we can use this
+            // register directly for the input to keccak256. This is why the length is
+            // set to `u64::MAX`.
+            exports::keccak256(u64::MAX, RECOVER_REGISTER_ID, KECCACK_REGISTER_ID);
+            let keccak_hash_bytes = [0u8; 32];
+            exports::read_register(KECCACK_REGISTER_ID, keccak_hash_bytes.as_ptr() as u64);
+            Ok(crate::prelude::Address::from_slice(
+                &keccak_hash_bytes[12..],
+            ))
+        } else {
+            Err(ECRecoverErr)
+        }
     }
 }
 
@@ -576,5 +634,17 @@ impl AsRef<[u8]> for ReadU64Error {
             Self::InvalidU64 => b"ERR_NOT_U64",
             Self::MissingValue => b"ERR_U64_NOT_FOUND",
         }
+    }
+}
+
+pub struct ECRecoverErr;
+impl ECRecoverErr {
+    pub fn as_str(&self) -> &'static str {
+        "ERR_ECRECOVER"
+    }
+}
+impl AsRef<[u8]> for ECRecoverErr {
+    fn as_ref(&self) -> &[u8] {
+        self.as_str().as_bytes()
     }
 }

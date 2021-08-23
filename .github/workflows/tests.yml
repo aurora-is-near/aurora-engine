@@ -1,47 +1,55 @@
 ---
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - "*"
+
 name: Tests
 jobs:
   test:
-    name: Test suite
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        net: [main, test, beta]
+    name: Test suite (${{ matrix.net }}net)
+    runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Cache Cargo artifacts
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install the toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2021-03-25
-          override: true
-      - run: make test-build
-      - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --locked --verbose --features meta-call
+      - name: Restore cache
+        run: |
+          cache-util restore cargo_git cargo_registry sccache yarn_cache
+          cache-util restore aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}:target
+      - run: make ${{ matrix.net }}net-test-build
+      - name: List directories
+        run: |
+          ls -la target/wasm32-unknown-unknown/release
+          ls -la
+      - run: cargo test --features ${{ matrix.net }}net-test
+      - name: Save cache
+        run: |
+          cache-util save cargo_git cargo_registry sccache yarn_cache
+          cache-util msave aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}:target
   bully-build:
     name: Bully build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Install the toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2021-03-25
-          override: true
-      - run: make evm-bully=yes
-      - run: ls -lH release.wasm
+      - name: Restore cache
+        run: |
+          cache-util restore cargo_git cargo_registry sccache yarn_cache
+          cache-util restore aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
+      - run: make mainnet-debug evm-bully=yes
+      - run: ls -lH mainnet-debug.wasm
+      - name: Save cache
+        run: |
+          cache-util save cargo_git cargo_registry sccache yarn_cache
+          cache-util msave aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  RUSTC_WRAPPER: sccache

@@ -1,8 +1,6 @@
 use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
-use crate::prelude::{vec, PhantomData};
+use crate::prelude::{vec, Address};
 use evm::{Context, ExitError};
-
-use crate::AuroraState;
 
 mod costs {
     pub(super) const SHA256_BASE: u64 = 60;
@@ -21,13 +19,13 @@ mod consts {
 }
 
 /// SHA256 precompile.
-pub struct SHA256<S>(PhantomData<S>);
+pub struct SHA256;
 
-impl<S> SHA256<S> {
-    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 2);
+impl SHA256 {
+    pub(super) const ADDRESS: Address = super::make_address(0, 2);
 }
 
-impl<S: AuroraState> Precompile<S> for SHA256<S> {
+impl Precompile for SHA256 {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             (input.len() as u64 + consts::SHA256_WORD_LEN - 1) / consts::SHA256_WORD_LEN
@@ -44,7 +42,6 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
         use sha2::Digest;
@@ -70,7 +67,6 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
         use crate::sdk;
@@ -86,13 +82,22 @@ impl<S: AuroraState> Precompile<S> for SHA256<S> {
 }
 
 /// RIPEMD160 precompile.
-pub struct RIPEMD160<S>(PhantomData<S>);
+pub struct RIPEMD160;
 
-impl<S> RIPEMD160<S> {
-    pub(super) const ADDRESS: [u8; 20] = super::make_address(0, 3);
+impl RIPEMD160 {
+    pub(super) const ADDRESS: Address = super::make_address(0, 3);
+
+    #[cfg(not(feature = "contract"))]
+    fn internal_impl(input: &[u8]) -> [u8; 20] {
+        use ripemd160::Digest;
+        let hash = ripemd160::Ripemd160::digest(input);
+        let mut output = [0u8; 20];
+        output.copy_from_slice(&hash);
+        output
+    }
 }
 
-impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
+impl Precompile for RIPEMD160 {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
         Ok(
             (input.len() as u64 + consts::RIPEMD_WORD_LEN - 1) / consts::RIPEMD_WORD_LEN
@@ -108,16 +113,16 @@ impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
         input: &[u8],
         target_gas: u64,
         _context: &Context,
-        _state: &mut S,
         _is_static: bool,
     ) -> PrecompileResult {
-        use ripemd160::Digest;
-
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
         } else {
-            let hash = ripemd160::Ripemd160::digest(input);
+            #[cfg(not(feature = "contract"))]
+            let hash = Self::internal_impl(input);
+            #[cfg(feature = "contract")]
+            let hash = crate::sdk::ripemd160(input);
             // The result needs to be padded with leading zeros because it is only 20 bytes, but
             // the evm works with 32-byte words.
             let mut output = vec![0u8; 32];
@@ -129,7 +134,7 @@ impl<S: AuroraState> Precompile<S> for RIPEMD160<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{new_context, new_state};
+    use crate::test_utils::new_context;
 
     use super::*;
 
@@ -140,7 +145,7 @@ mod tests {
             hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
                 .unwrap();
 
-        let res = SHA256::run(input, 60, &new_context(), &mut new_state(), false)
+        let res = SHA256::run(input, 60, &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -153,7 +158,7 @@ mod tests {
             hex::decode("0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31")
                 .unwrap();
 
-        let res = RIPEMD160::run(input, 600, &new_context(), &mut new_state(), false)
+        let res = RIPEMD160::run(input, 600, &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);

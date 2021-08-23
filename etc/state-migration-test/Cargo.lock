@@ -31,9 +31,10 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "1.0.0"
+version = "1.6.0"
 dependencies = [
  "aurora-bn",
+ "base64",
  "blake2",
  "borsh",
  "byte-slice-cast",
@@ -66,6 +67,12 @@ name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
+
+[[package]]
+name = "base64"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "beef"
@@ -306,8 +313,7 @@ dependencies = [
 [[package]]
 name = "evm"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff50bbacb1b2149e29cc31bdd73dc2fe6d3cc0d291c438ec1cb3cdb7b2f8aa1c"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
 dependencies = [
  "ethereum",
  "evm-core",
@@ -322,8 +328,7 @@ dependencies = [
 [[package]]
 name = "evm-core"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7828a238e25e8c5b5a23a2114e6f3863780ffd1dca6f7f74eecfd51271a8c573"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
 dependencies = [
  "funty",
  "primitive-types",
@@ -332,8 +337,7 @@ dependencies = [
 [[package]]
 name = "evm-gasometer"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b61792ef56c7772b6d9425674852241dddcbb5fd507e6849c63ce39d1ad74e5e"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
 dependencies = [
  "evm-core",
  "evm-runtime",
@@ -343,8 +347,7 @@ dependencies = [
 [[package]]
 name = "evm-runtime"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b7b8ae833004b1d619997d8a31b61b291b0bb3a7ed0af709342331a9a217d53"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=09d4fe09dcb5fcabed8c1076699c8a2e70f14c23#09d4fe09dcb5fcabed8c1076699c8a2e70f14c23"
 dependencies = [
  "evm-core",
  "primitive-types",
@@ -711,9 +714,8 @@ dependencies = [
 
 [[package]]
 name = "rjson"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5510dbde48c4c37bf69123b1f636b6dd5f8dffe1f4e358af03c46a4947dca219"
+version = "0.3.2"
+source = "git+https://github.com/aurora-is-near/rjson?rev=cc3da949#cc3da9495e7e520900d66d2b517539f74fff93cf"
 
 [[package]]
 name = "rlp"

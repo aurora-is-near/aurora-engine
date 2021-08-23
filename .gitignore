@@ -18,11 +18,10 @@
 artifacts/
 cache/
 node_modules/
-res/
+etc/eth-contracts/res/
 
 # Other
 etc/state-migration-test/target/
 
 node_modules/*
-artifacts/
 cache

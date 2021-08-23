@@ -30,6 +30,7 @@ pub enum EthConnectorStorageId {
     UsedEvent = 0x2,
     PausedMask = 0x3,
     StatisticsAuroraAccountsCounter = 0x4,
+    FungibleTokenMetadata = 0x5,
 }
 
 /// We can't use const generic over Enum, but we can do it over integral type

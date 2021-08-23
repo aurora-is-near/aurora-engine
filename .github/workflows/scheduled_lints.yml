@@ -6,20 +6,12 @@ name: Scheduled_Lints
 jobs:
   clippy:
     name: Nightly_Clippy
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
-      - name: Install the toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-          components: clippy
       - run: make etc/eth-contracts/res/EvmErc20.bin
+      - name: Update toolchain
+        run: rustup update nightly
       - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --no-default-features --features=mainnet -- -D warnings
+        run: cargo +nightly clippy --no-default-features --features=mainnet -- -D warnings
