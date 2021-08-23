@@ -13,7 +13,7 @@ use crate::parameters::{
 };
 
 use crate::precompiles::Precompiles;
-use crate::prelude::{is_valid_account_id, Address, TryInto, Vec, H256, U256};
+use crate::prelude::{is_valid_account_id, Address, Cow, String, TryInto, Vec, H256, U256};
 use crate::sdk;
 use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
@@ -797,7 +797,40 @@ impl Engine {
                 [selector, tail.as_slice()].concat(),
                 u64::MAX,
                 Vec::new(), // TODO: are there values we should put here?
-            ),
+            )
+            .and_then(|submit_result| {
+                match submit_result.status {
+                    TransactionStatus::Succeed(_) => Ok(()),
+                    TransactionStatus::Revert(bytes) => {
+                        let error_message = crate::prelude::format!(
+                            "Reverted with message: {}",
+                            String::from_utf8_lossy(&bytes)
+                        );
+                        Err(EngineError {
+                            kind: EngineErrorKind::EvmError(ExitError::Other(Cow::from(
+                                error_message,
+                            ))),
+                            gas_used: submit_result.gas_used,
+                        })
+                    }
+                    TransactionStatus::OutOfFund => Err(EngineError {
+                        kind: EngineErrorKind::EvmError(ExitError::OutOfFund),
+                        gas_used: submit_result.gas_used,
+                    }),
+                    TransactionStatus::OutOfOffset => Err(EngineError {
+                        kind: EngineErrorKind::EvmError(ExitError::OutOfOffset),
+                        gas_used: submit_result.gas_used,
+                    }),
+                    TransactionStatus::OutOfGas => Err(EngineError {
+                        kind: EngineErrorKind::EvmError(ExitError::OutOfGas),
+                        gas_used: submit_result.gas_used,
+                    }),
+                    TransactionStatus::CallTooDeep => Err(EngineError {
+                        kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
+                        gas_used: submit_result.gas_used,
+                    }),
+                }
+            }),
             output_on_fail
         );
 
