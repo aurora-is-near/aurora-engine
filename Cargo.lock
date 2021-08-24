@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "aurora-bn",
  "base64 0.13.0",
