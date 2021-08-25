@@ -238,7 +238,11 @@ fn get_address_erc20_balance(
             test_utils::address_from_secret_key(&signer.secret_key),
         ))
         .unwrap();
-    U256::from_big_endian(&result)
+    let bytes = match result {
+        crate::parameters::TransactionStatus::Succeed(bytes) => bytes,
+        err => panic!("Unexpected view call status {:?}", err),
+    };
+    U256::from_big_endian(&bytes)
 }
 
 fn parse_erc20_error_message(result: &[u8]) -> String {

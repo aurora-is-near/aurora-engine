@@ -310,34 +310,27 @@ impl AuroraRunner {
         }
     }
 
-    pub fn view_call(&self, args: ViewCallArgs) -> Result<Vec<u8>, VMError> {
+    pub fn view_call(&self, args: ViewCallArgs) -> Result<TransactionStatus, VMError> {
         let input = args.try_to_vec().unwrap();
         let (outcome, maybe_error) = self.one_shot().call("view", "VIEWER".to_string(), input);
-        let status =
+        Ok(
             TransactionStatus::try_from_slice(&Self::bytes_from_outcome(outcome, maybe_error)?)
-                .unwrap();
-        match status {
-            TransactionStatus::Succeed(bytes) => Ok(bytes),
-            err => panic!("View call execution error: {:?}", err),
-        }
+                .unwrap(),
+        )
     }
 
     pub fn profiled_view_call(
         &self,
         args: ViewCallArgs,
-    ) -> (Result<Vec<u8>, VMError>, ProfileData) {
+    ) -> (Result<TransactionStatus, VMError>, ProfileData) {
         let input = args.try_to_vec().unwrap();
         let (outcome, maybe_error, profile) =
             self.one_shot()
                 .profiled_call("view", "VIEWER".to_string(), input);
-        let result = Self::bytes_from_outcome(outcome, maybe_error).unwrap();
-        let status = TransactionStatus::try_from_slice(&result).unwrap();
-        let result = match status {
-            TransactionStatus::Succeed(bytes) => Ok(bytes),
-            err => panic!("View call execution error: {:?}", err),
-        };
+        let status = Self::bytes_from_outcome(outcome, maybe_error)
+            .map(|bytes| TransactionStatus::try_from_slice(&bytes).unwrap());
 
-        (result, profile)
+        (status, profile)
     }
 
     pub fn get_balance(&self, address: Address) -> types::Wei {
