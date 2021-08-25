@@ -2809,7 +2809,11 @@ checksum = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
 name = "prelude"
 version = "0.1.0"
 dependencies = [
+ "borsh",
+ "ethabi",
+ "hex",
  "primitive-types",
+ "sha3 0.9.1",
 ]
 
 [[package]]

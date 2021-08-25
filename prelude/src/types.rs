@@ -1,18 +1,8 @@
+use super::{str, vec, Add, Address, String, Sub, Vec, H256, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
-use prelude::{self, str, Address, String, ToString, Vec, H256, U256};
-#[cfg(not(feature = "contract"))]
-use prelude::{format, vec};
-
-#[cfg(not(feature = "contract"))]
-use ethabi::{ParamType, Token};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
-
-use crate::sdk;
-
-#[cfg(not(feature = "contract"))]
-use ethabi::param_type::Writer;
 
 pub type AccountId = String;
 pub type Balance = u128;
@@ -67,19 +57,6 @@ pub struct Proof {
     pub proof: Vec<Vec<u8>>,
 }
 
-impl Proof {
-    pub fn get_key(&self) -> String {
-        let mut data = self.log_index.try_to_vec().unwrap();
-        data.extend(self.receipt_index.try_to_vec().unwrap());
-        data.extend(self.header_data.clone());
-        sdk::sha256(&data[..])
-            .0
-            .iter()
-            .map(|n| n.to_string())
-            .collect()
-    }
-}
-
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default)]
 pub struct Wei(U256);
@@ -127,14 +104,14 @@ impl Wei {
         self.0.checked_add(other.0).map(Self)
     }
 }
-impl prelude::Sub for Wei {
+impl Sub for Wei {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
         Self(self.0 - other.0)
     }
 }
-impl prelude::Add for Wei {
+impl Add for Wei {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
@@ -205,12 +182,6 @@ pub fn bytes_to_hex(v: &[u8]) -> String {
     result
 }
 
-#[cfg(feature = "contract")]
-#[inline]
-pub fn keccak(data: &[u8]) -> H256 {
-    sdk::keccak(data)
-}
-
 #[cfg(not(feature = "contract"))]
 #[inline]
 pub fn keccak(data: &[u8]) -> H256 {
@@ -232,7 +203,7 @@ impl<T> Stack<T> {
     pub fn new() -> Self {
         Self {
             stack: Vec::new(),
-            boundaries: prelude::vec![0],
+            boundaries: vec![0],
         }
     }
 
@@ -264,83 +235,6 @@ pub fn str_from_slice(inp: &[u8]) -> &str {
 #[cfg(feature = "contract")]
 pub trait ExpectUtf8<T> {
     fn expect_utf8(self, message: &[u8]) -> T;
-}
-
-#[cfg(feature = "contract")]
-impl<T> ExpectUtf8<T> for Option<T> {
-    fn expect_utf8(self, message: &[u8]) -> T {
-        match self {
-            Some(t) => t,
-            None => sdk::panic_utf8(message),
-        }
-    }
-}
-
-#[cfg(feature = "contract")]
-impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
-    fn expect_utf8(self, message: &[u8]) -> T {
-        match self {
-            Ok(t) => t,
-            Err(_) => sdk::panic_utf8(message),
-        }
-    }
-}
-
-pub trait SdkExpect<T> {
-    fn sdk_expect(self, msg: &str) -> T;
-}
-
-impl<T> SdkExpect<T> for Option<T> {
-    fn sdk_expect(self, msg: &str) -> T {
-        match self {
-            Some(t) => t,
-            None => sdk::panic_utf8(msg.as_ref()),
-        }
-    }
-}
-
-impl<T, E> SdkExpect<T> for core::result::Result<T, E> {
-    fn sdk_expect(self, msg: &str) -> T {
-        match self {
-            Ok(t) => t,
-            Err(_) => sdk::panic_utf8(msg.as_ref()),
-        }
-    }
-}
-
-pub trait SdkUnwrap<T> {
-    fn sdk_unwrap(self) -> T;
-}
-
-impl<T> SdkUnwrap<T> for Option<T> {
-    fn sdk_unwrap(self) -> T {
-        match self {
-            Some(t) => t,
-            None => sdk::panic_utf8("ERR_UNWRAP".as_bytes()),
-        }
-    }
-}
-
-impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for core::result::Result<T, E> {
-    fn sdk_unwrap(self) -> T {
-        match self {
-            Ok(t) => t,
-            Err(e) => sdk::panic_utf8(e.as_ref()),
-        }
-    }
-}
-
-pub(crate) trait SdkProcess<T> {
-    fn sdk_process(self);
-}
-
-impl<T: AsRef<[u8]>, E: AsRef<[u8]>> SdkProcess<T> for Result<T, E> {
-    fn sdk_process(self) {
-        match self {
-            Ok(r) => sdk::return_output(r.as_ref()),
-            Err(e) => sdk::panic_utf8(e.as_ref()),
-        }
-    }
 }
 
 #[cfg(test)]

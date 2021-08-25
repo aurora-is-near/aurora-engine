@@ -41,38 +41,6 @@ impl EthEvent {
             log,
         }
     }
-
-    /// Build log_entry_data from ethereum event
-    #[cfg(not(feature = "contract"))]
-    #[allow(dead_code)]
-    pub fn params_to_log_entry_data(
-        name: &str,
-        params: EventParams,
-        locker_address: EthAddress,
-        indexes: Vec<Vec<u8>>,
-        values: Vec<Token>,
-    ) -> Vec<u8> {
-        let event = Event {
-            name: name.to_string(),
-            inputs: params.into_iter().collect(),
-            anonymous: false,
-        };
-        let params: Vec<ParamType> = event.inputs.iter().map(|p| p.kind.clone()).collect();
-        let topics = indexes
-            .into_iter()
-            .map(|value| {
-                let mut result: [u8; 32] = Default::default();
-                result[12..].copy_from_slice(value.as_slice());
-                H256::from(result)
-            })
-            .collect();
-        let log_entry = LogEntry {
-            address: locker_address.into(),
-            topics: vec![vec![long_signature(&event.name, &params).0.into()], topics].concat(),
-            data: ethabi::encode(&values),
-        };
-        rlp::encode(&log_entry).to_vec()
-    }
 }
 
 /// Data that was emitted by Deposited event.

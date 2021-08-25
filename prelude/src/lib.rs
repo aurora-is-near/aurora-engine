@@ -55,6 +55,8 @@ pub use std::{
 
 pub use primitive_types::{H160, H256, U256};
 
+pub mod types;
+
 /// See: https://ethereum-magicians.org/t/increasing-address-size-from-20-to-32-bytes/5485
 pub type Address = H160;
 
