@@ -1,8 +1,8 @@
 [package]
-name = "precompiles"
+name = "sdk"
 version = "0.1.0"
 authors = ["NEAR <hello@near.org>"]
-editiaon = "2018"
+edition = "2018"
 description = ""
 documentation = ""
 readme = true
@@ -13,3 +13,9 @@ publish = false
 autobenches = false
 
 [dependencies]
+prelude = { path = "../prelude", default-features = false }
+borsh = { version = "0.8.2", default-features = false }
+
+[features]
+contract = []
+log = []

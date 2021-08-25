@@ -8,7 +8,8 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
-pub use prelude;
+use prelude;
+use sdk;
 
 use crate::parameters::PromiseCreateArgs;
 
@@ -29,7 +30,6 @@ mod fungible_token;
 mod json;
 mod log_entry;
 mod precompiles;
-pub mod sdk;
 
 #[cfg(test)]
 mod benches;

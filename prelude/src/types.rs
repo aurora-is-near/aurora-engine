@@ -218,11 +218,6 @@ pub fn str_from_slice(inp: &[u8]) -> &str {
     str::from_utf8(inp).unwrap()
 }
 
-#[cfg(feature = "contract")]
-pub trait ExpectUtf8<T> {
-    fn expect_utf8(self, message: &[u8]) -> T;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

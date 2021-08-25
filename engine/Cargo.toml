@@ -46,6 +46,7 @@ opt-level = 3
 
 [dependencies]
 prelude = { path = "../prelude", default-features = false }
+sdk = { path = "../sdk", default-features = false }
 base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
 blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
