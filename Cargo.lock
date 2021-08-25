@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "1.6.1"
+version = "1.6.0"
 dependencies = [
  "aurora-bn",
  "base64 0.13.0",
@@ -138,6 +138,7 @@ dependencies = [
  "near-vm-logic 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
  "near-vm-runner 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
  "num",
+ "prelude",
  "primitive-types",
  "rand 0.7.3",
  "ripemd160",
@@ -2803,6 +2804,43 @@ name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
+
+[[package]]
+name = "prelude"
+version = "0.1.0"
+dependencies = [
+ "aurora-bn",
+ "base64 0.13.0",
+ "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
+ "borsh",
+ "bstr",
+ "byte-slice-cast",
+ "criterion",
+ "ethabi",
+ "evm",
+ "evm-core",
+ "git2",
+ "hex",
+ "libsecp256k1",
+ "logos",
+ "near-crypto 0.1.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
+ "near-primitives-core 0.1.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
+ "near-sdk",
+ "near-sdk-sim",
+ "near-vm-logic 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
+ "near-vm-runner 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
+ "num",
+ "primitive-types",
+ "rand 0.7.3",
+ "ripemd160",
+ "rjson",
+ "rlp",
+ "serde",
+ "serde_json",
+ "sha2 0.9.5",
+ "sha3 0.9.1",
+ "wee_alloc",
+]
 
 [[package]]
 name = "primitive-types"

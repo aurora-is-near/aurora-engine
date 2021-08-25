@@ -1,0 +1,86 @@
+[package]
+name = "prelude"
+version = "0.1.0"
+authors = ["NEAR <hello@near.org>"]
+edition = "2018"
+description = ""
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "CC0-1.0"
+publish = false
+autobenches = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = true
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[profile.dev]
+# Due to a strange bug, setting this to 3 will cause test failures
+opt-level = "z"
+debug = false
+debug-assertions = true
+overflow-checks = true
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[profile.bench]
+# lto must be enabled in the bench profile as well for
+# it to actually happen when running tests with --release
+lto = true
+opt-level = 3
+
+[dependencies]
+base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
+blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
+borsh = { version = "0.8.2", default-features = false }
+bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "09d4fe09dcb5fcabed8c1076699c8a2e70f14c23", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "09d4fe09dcb5fcabed8c1076699c8a2e70f14c23", default-features = false }
+libsecp256k1 = { version = "0.3.5", default-features = false }
+num = { version = "0.4.0", default-features = false, features = ["alloc"] }
+primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }
+ripemd160 = { version = "0.9.1", default-features = false }
+rlp = { version = "0.5.0", default-features = false }
+sha2 = { version = "0.9.3", default-features = false, optional = true }
+sha3 = { version = "0.9.1", default-features = false }
+wee_alloc = { version = "0.4.5", default-features = false }
+logos = { version = "0.12", default-features = false, features = ["export_derive"] }
+ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+byte-slice-cast = { version = "1.0", default-features = false }
+rjson = { git = "https://github.com/aurora-is-near/rjson", rev = "cc3da949", default-features = false, features = ["integer"] }
+
+[dev-dependencies]
+bstr = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = { version = "0.4.3", default-features = false }
+near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "1b9843fe5b652928582e33879fc92ba87a639450" }
+near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "1b9843fe5b652928582e33879fc92ba87a639450" }
+near-crypto = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+near-vm-runner = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+near-vm-logic = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+near-primitives-core = { git = "https://github.com/near/nearcore.git", branch = "1.20.1"}
+libsecp256k1 = "0.3.5"
+rand = "0.7.3"
+criterion = "0.3.4"
+git2 = "0.13"
+
+[features]
+default = ["std"]
+std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "logos/std", "bn/std"]
