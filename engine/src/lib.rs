@@ -8,6 +8,8 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
+pub use prelude;
+
 use crate::parameters::PromiseCreateArgs;
 
 mod map;

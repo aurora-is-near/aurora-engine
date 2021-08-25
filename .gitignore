@@ -12,7 +12,7 @@
 
 # Rust artifacts
 /*.wasm
-/target/
+target/
 
 # Solidity artifacts
 artifacts/

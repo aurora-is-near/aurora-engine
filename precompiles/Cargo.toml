@@ -1,0 +1,15 @@
+[package]
+name = "precompiles"
+version = "0.1.0"
+authors = ["NEAR <hello@near.org>"]
+editiaon = "2018"
+description = ""
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "CC0-1.0"
+publish = false
+autobenches = false
+
+[dependencies]
