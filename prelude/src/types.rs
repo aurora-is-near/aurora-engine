@@ -1,8 +1,5 @@
-use super::{str, vec, Add, Address, String, Sub, Vec, H256, U256};
+use super::{str, vec, Add, Address, String, Sub, Vec, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
-
-#[cfg(not(feature = "contract"))]
-use sha3::{Digest, Keccak256};
 
 pub type AccountId = String;
 pub type Balance = u128;
@@ -180,17 +177,6 @@ pub fn bytes_to_hex(v: &[u8]) -> String {
         result.push(HEX_ALPHABET[(x % 16) as usize] as char);
     }
     result
-}
-
-#[cfg(not(feature = "contract"))]
-#[inline]
-pub fn keccak(data: &[u8]) -> H256 {
-    H256::from_slice(Keccak256::digest(data).as_slice())
-}
-
-#[allow(dead_code)]
-pub fn near_account_to_evm_address(addr: &[u8]) -> Address {
-    Address::from_slice(&keccak(addr)[12..])
 }
 
 #[derive(Default)]

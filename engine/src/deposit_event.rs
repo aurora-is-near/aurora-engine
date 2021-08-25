@@ -1,5 +1,3 @@
-#[cfg(not(feature = "contract"))]
-use prelude::Vec;
 use prelude::{vec, String, ToString, Vec};
 
 use crate::log_entry::LogEntry;
@@ -95,21 +93,5 @@ impl DepositedEvent {
             amount,
             fee,
         }
-    }
-
-    #[cfg(not(feature = "contract"))]
-    #[allow(dead_code)]
-    pub fn to_log_entry_data(&self) -> Vec<u8> {
-        EthEvent::params_to_log_entry_data(
-            DEPOSITED_EVENT,
-            DepositedEvent::event_params(),
-            self.eth_custodian_address,
-            vec![self.sender.to_vec()],
-            vec![
-                ethabi::Token::String(self.recipient.clone()),
-                ethabi::Token::Uint(self.amount),
-                ethabi::Token::Uint(self.fee),
-            ],
-        )
     }
 }

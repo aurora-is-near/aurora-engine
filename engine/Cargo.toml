@@ -85,7 +85,7 @@ git2 = "0.13"
 [features]
 default = ["sha2", "std"]
 std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "logos/std", "bn/std", "prelude/std"]
-contract = []
+contract = ["prelude/contract"]
 evm_bully = []
 log = []
 meta-call = []

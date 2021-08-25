@@ -1,6 +1,7 @@
 CARGO = cargo
 NEAR  = near
 FEATURES = mainnet
+FEATURES_CLIPPY = contract
 
 ifeq ($(evm-bully),yes)
   FEATURES := $(FEATURES),evm_bully
@@ -103,7 +104,7 @@ check-format:
 	$(CARGO) fmt -- --check
 
 check-clippy:
-	$(CARGO) clippy --no-default-features --features=$(FEATURES) -- -D warnings
+	$(CARGO) clippy --no-default-features --features=$(FEATURES_CLIPPY) -- -D warnings
 
 test-sol:
 	cd etc/eth-contracts && yarn && yarn test

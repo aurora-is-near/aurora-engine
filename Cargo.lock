@@ -2810,9 +2810,13 @@ name = "prelude"
 version = "0.1.0"
 dependencies = [
  "borsh",
+ "bstr",
  "ethabi",
  "hex",
  "primitive-types",
+ "rand 0.7.3",
+ "serde",
+ "serde_json",
  "sha3 0.9.1",
 ]
 

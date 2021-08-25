@@ -1,18 +1,10 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use prelude::{self, str, Address, String, ToString, Vec, H256, U256};
-#[cfg(not(feature = "contract"))]
-use prelude::{format, vec};
-
-#[cfg(not(feature = "contract"))]
-use ethabi::{ParamType, Token};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
 
 use crate::sdk;
-
-#[cfg(not(feature = "contract"))]
-use ethabi::param_type::Writer;
 
 pub type AccountId = String;
 pub type Balance = u128;
