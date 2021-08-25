@@ -10,7 +10,7 @@ const DEPLOY_CONTRACT_GAS: u64 = 1_000_000_000;
 impl TesterConstructor {
     pub fn load() -> Self {
         Self(solidity::ContractConstructor::compile_from_extended_json(
-            "etc/eth-contracts/artifacts/contracts/test/Tester.sol/Tester.json",
+            "../etc/eth-contracts/artifacts/contracts/test/Tester.sol/Tester.json",
         ))
     }
 
