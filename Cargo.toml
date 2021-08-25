@@ -1,5 +1,8 @@
 [workspace]
 members = [
     "engine",
-    "prelude"
+    "prelude",
+]
+exclude = [
+    "etc/state-migration-test"
 ]

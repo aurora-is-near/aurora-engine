@@ -38,4 +38,4 @@ rpath = false
 
 [dependencies]
 borsh = { version = "0.8.2", default-features = false }
-aurora-engine = { path = "../../", default-features = false, features = ["sha2"] }
+aurora-engine = { path = "../../engine", default-features = false, features = ["sha2"] }

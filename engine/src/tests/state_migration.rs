@@ -88,7 +88,7 @@ impl AuroraAccount {
 }
 
 fn contract_bytes() -> Vec<u8> {
-    let base_path = Path::new("etc").join("state-migration-test");
+    let base_path = Path::new("../etc").join("state-migration-test");
     let output_path = base_path
         .join("target/wasm32-unknown-unknown/release/aurora_engine_state_migration_test.wasm");
     compile(base_path);
