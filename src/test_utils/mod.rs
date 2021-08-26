@@ -11,9 +11,10 @@ use near_vm_runner::{MockCompiledContractCache, VMError};
 use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
+use std::borrow::Cow;
 
 use crate::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
+use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs};
 use crate::prelude::Address;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
@@ -78,7 +79,6 @@ pub(crate) struct AuroraRunner {
     pub wasm_config: VMConfig,
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
-    pub profile: ProfileData,
     pub previous_logs: Vec<String>,
 }
 
@@ -93,10 +93,32 @@ pub(crate) struct OneShotAuroraRunner<'a> {
 
 impl<'a> OneShotAuroraRunner<'a> {
     pub fn call(
+        self,
+        method_name: &str,
+        caller_account_id: String,
+        input: Vec<u8>,
+    ) -> (Option<VMOutcome>, Option<VMError>) {
+        self.call_with_optional_profile(method_name, caller_account_id, input, None)
+    }
+
+    pub fn profiled_call(
+        self,
+        method_name: &str,
+        caller_account_id: String,
+        input: Vec<u8>,
+    ) -> (Option<VMOutcome>, Option<VMError>, ProfileData) {
+        let profile = Default::default();
+        let (outcome, error) =
+            self.call_with_optional_profile(method_name, caller_account_id, input, Some(&profile));
+        (outcome, error, profile)
+    }
+
+    fn call_with_optional_profile(
         mut self,
         method_name: &str,
         caller_account_id: String,
         input: Vec<u8>,
+        maybe_profile: Option<&ProfileData>,
     ) -> (Option<VMOutcome>, Option<VMError>) {
         AuroraRunner::update_context(
             &mut self.context,
@@ -105,6 +127,7 @@ impl<'a> OneShotAuroraRunner<'a> {
             input,
         );
 
+        let profile = maybe_profile.map(Cow::Borrowed).unwrap_or_default();
         near_vm_runner::run(
             &self.base.code,
             method_name,
@@ -115,7 +138,7 @@ impl<'a> OneShotAuroraRunner<'a> {
             &[],
             self.base.current_protocol_version,
             Some(&self.base.cache),
-            &self.base.profile,
+            profile.as_ref(),
         )
     }
 }
@@ -153,7 +176,27 @@ impl AuroraRunner {
             caller_account_id.clone(),
             caller_account_id,
             input,
+            None,
         )
+    }
+
+    // Might be useful for optimizing performance in the future
+    #[allow(dead_code)]
+    pub fn profiled_call(
+        &mut self,
+        method_name: &str,
+        caller_account_id: String,
+        input: Vec<u8>,
+    ) -> (Option<VMOutcome>, Option<VMError>, ProfileData) {
+        let profile = Default::default();
+        let (outcome, error) = self.call_with_signer(
+            method_name,
+            caller_account_id.clone(),
+            caller_account_id,
+            input,
+            Some(&profile),
+        );
+        (outcome, error, profile)
     }
 
     pub fn call_with_signer(
@@ -162,6 +205,7 @@ impl AuroraRunner {
         caller_account_id: String,
         signer_account_id: String,
         input: Vec<u8>,
+        maybe_profile: Option<&ProfileData>,
     ) -> (Option<VMOutcome>, Option<VMError>) {
         Self::update_context(
             &mut self.context,
@@ -170,6 +214,7 @@ impl AuroraRunner {
             input,
         );
 
+        let profile = maybe_profile.map(Cow::Borrowed).unwrap_or_default();
         let (maybe_outcome, maybe_error) = near_vm_runner::run(
             &self.code,
             method_name,
@@ -180,7 +225,7 @@ impl AuroraRunner {
             &[],
             self.current_protocol_version,
             Some(&self.cache),
-            &self.profile,
+            profile.as_ref(),
         );
         if let Some(outcome) = &maybe_outcome {
             self.context.storage_usage = outcome.storage_usage;
@@ -269,6 +314,29 @@ impl AuroraRunner {
         }
     }
 
+    pub fn view_call(&self, args: ViewCallArgs) -> Result<TransactionStatus, VMError> {
+        let input = args.try_to_vec().unwrap();
+        let (outcome, maybe_error) = self.one_shot().call("view", "VIEWER".to_string(), input);
+        Ok(
+            TransactionStatus::try_from_slice(&Self::bytes_from_outcome(outcome, maybe_error)?)
+                .unwrap(),
+        )
+    }
+
+    pub fn profiled_view_call(
+        &self,
+        args: ViewCallArgs,
+    ) -> (Result<TransactionStatus, VMError>, ProfileData) {
+        let input = args.try_to_vec().unwrap();
+        let (outcome, maybe_error, profile) =
+            self.one_shot()
+                .profiled_call("view", "VIEWER".to_string(), input);
+        let status = Self::bytes_from_outcome(outcome, maybe_error)
+            .map(|bytes| TransactionStatus::try_from_slice(&bytes).unwrap());
+
+        (status, profile)
+    }
+
     pub fn get_balance(&self, address: Address) -> types::Wei {
         types::Wei::new(self.getter_method_call("get_balance", address))
     }
@@ -280,28 +348,26 @@ impl AuroraRunner {
     // Used in `get_balance` and `get_nonce`. This function exists to avoid code duplication
     // since the contract's `get_nonce` and `get_balance` have the same type signature.
     fn getter_method_call(&self, method_name: &str, address: Address) -> U256 {
-        let mut context = self.context.clone();
-        Self::update_context(
-            &mut context,
-            "GETTER".to_string(),
+        let (outcome, maybe_error) = self.one_shot().call(
+            method_name,
             "GETTER".to_string(),
             address.as_bytes().to_vec(),
-        );
-        let (outcome, maybe_error) = near_vm_runner::run(
-            &self.code,
-            method_name,
-            &mut self.ext.clone(),
-            context,
-            &self.wasm_config,
-            &self.fees_config,
-            &[],
-            self.current_protocol_version,
-            Some(&self.cache),
-            &self.profile,
         );
         assert!(maybe_error.is_none());
         let bytes = outcome.unwrap().return_data.as_value().unwrap();
         U256::from_big_endian(&bytes)
+    }
+
+    fn bytes_from_outcome(
+        maybe_outcome: Option<VMOutcome>,
+        maybe_error: Option<VMError>,
+    ) -> Result<Vec<u8>, VMError> {
+        if let Some(error) = maybe_error {
+            Err(error)
+        } else {
+            let bytes = maybe_outcome.unwrap().return_data.as_value().unwrap();
+            Ok(bytes)
+        }
     }
 }
 
@@ -343,7 +409,6 @@ impl Default for AuroraRunner {
             wasm_config: Default::default(),
             fees_config: Default::default(),
             current_protocol_version: u32::MAX,
-            profile: Default::default(),
             previous_logs: Default::default(),
         }
     }
@@ -410,6 +475,15 @@ pub(crate) fn create_eth_transaction(
         data,
     };
     sign_transaction(tx, chain_id, secret_key)
+}
+
+pub(crate) fn as_view_call(tx: LegacyEthTransaction, sender: Address) -> ViewCallArgs {
+    ViewCallArgs {
+        sender: sender.0,
+        address: tx.to.unwrap().0,
+        amount: tx.value.to_bytes(),
+        input: tx.data,
+    }
 }
 
 pub(crate) fn sign_transaction(
