@@ -2,8 +2,8 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::parameters::{SubmitResult, TransactionStatus};
 use crate::test_utils;
 use crate::tests::state_migration;
-use crate::types::{self, Wei, ERC20_MINT_SELECTOR};
 use borsh::BorshSerialize;
+use prelude::types::{self, Wei, ERC20_MINT_SELECTOR};
 use prelude::{Address, U256};
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
@@ -187,7 +187,7 @@ fn test_transfer_charging_gas_success() {
     let expected_dest_balance = TRANSFER_AMOUNT;
     let expected_relayer_balance = spent_amount;
     let relayer_address =
-        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+        engine_types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
 
     // validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -240,7 +240,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
 
     // validate post-state
     let relayer =
-        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+        engine_types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
     test_utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
@@ -283,7 +283,7 @@ fn test_block_hash() {
     let runner = test_utils::AuroraRunner::default();
     let chain_id = {
         let number = prelude::U256::from(runner.chain_id);
-        crate::types::u256_to_arr(&number)
+        prelude::types::u256_to_arr(&number)
     };
     let account_id = runner.aurora_account_id;
     let block_hash = crate::engine::Engine::compute_block_hash(chain_id, 10, account_id.as_bytes());

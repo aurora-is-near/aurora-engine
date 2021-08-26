@@ -4,7 +4,7 @@ use secp256k1::SecretKey;
 
 use crate::test_utils::standard_precompiles::{PrecompilesConstructor, PrecompilesContract};
 use crate::test_utils::{address_from_secret_key, deploy_evm, sign_transaction, SUBMIT};
-use crate::types::Wei;
+use prelude::types::Wei;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;

@@ -2,7 +2,7 @@ use crate::test_utils::{
     self,
     standard_precompiles::{PrecompilesConstructor, PrecompilesContract},
 };
-use crate::types::Wei;
+use prelude::types::Wei;
 use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);

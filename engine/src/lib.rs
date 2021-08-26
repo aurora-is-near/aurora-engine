@@ -8,18 +8,15 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
-use prelude;
-use sdk;
-
 use crate::parameters::PromiseCreateArgs;
 
 mod map;
 #[cfg(feature = "meta-call")]
 pub mod meta_parsing;
 pub mod parameters;
+pub mod proof;
 pub mod storage;
 pub mod transaction;
-pub mod types;
 
 mod admin_controlled;
 #[cfg_attr(not(feature = "contract"), allow(dead_code))]
@@ -90,13 +87,10 @@ mod contract {
     };
 
     use crate::json::parse_json;
-    use crate::sdk;
     use crate::storage::{bytes_to_key, KeyPrefix};
-    use crate::types::{
-        near_account_to_evm_address, u256_to_arr, SdkExpect, SdkProcess, SdkUnwrap,
-        ERR_FAILED_PARSE,
-    };
+    use prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
     use prelude::{Address, ToString, TryInto, H160, H256, U256};
+    use sdk::types::{near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap};
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -403,7 +397,7 @@ mod contract {
             Err(e) => sdk::panic_utf8(e.as_ref()),
         };
 
-        crate::log!(prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str());
+        sdk::log!(prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str());
         engine
             .register_token(address.as_bytes(), args.nep141.as_bytes())
             .sdk_unwrap();
@@ -470,7 +464,7 @@ mod contract {
         for account_balance in args.genesis_alloc {
             Engine::set_balance(
                 &Address(account_balance.address),
-                &crate::types::Wei::new(U256::from(account_balance.balance)),
+                &types::Wei::new(U256::from(account_balance.balance)),
             )
         }
         // return new chain ID
@@ -647,7 +641,7 @@ mod contract {
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
-        crate::log!("Call from verify_log_entry");
+        sdk::log!("Call from verify_log_entry");
         let data = true.try_to_vec().unwrap();
         sdk::return_output(&data[..]);
     }

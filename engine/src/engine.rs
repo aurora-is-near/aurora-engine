@@ -15,10 +15,9 @@ use crate::parameters::{
 };
 
 use crate::precompiles::Precompiles;
-use crate::sdk;
 use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
-use crate::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
+use prelude::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
 use prelude::{is_valid_account_id, Address, TryInto, Vec, H256, U256};
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
@@ -30,7 +29,7 @@ const CHAIN_ID_SIZE: usize = 32;
 
 #[cfg(not(feature = "contract"))]
 pub fn current_address() -> Address {
-    crate::types::near_account_to_evm_address("engine".as_bytes())
+    prelude::types::near_account_to_evm_address("engine".as_bytes())
 }
 
 macro_rules! unwrap_res_or_finish {

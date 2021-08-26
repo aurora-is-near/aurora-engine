@@ -87,7 +87,7 @@ impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for core::result::Result<T, E> {
     }
 }
 
-pub(crate) trait SdkProcess<T> {
+pub trait SdkProcess<T> {
     fn sdk_process(self);
 }
 

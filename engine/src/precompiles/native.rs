@@ -7,8 +7,8 @@ use prelude::Vec;
 use {
     crate::parameters::WithdrawCallArgs,
     crate::storage::{bytes_to_key, KeyPrefix},
-    crate::types::AccountId,
     borsh::BorshSerialize,
+    prelude::types::AccountId,
     prelude::{is_valid_account_id, Cow, String, ToString, TryInto, U256},
 };
 
@@ -24,7 +24,7 @@ trait ReturnPromise {
 }
 
 mod costs {
-    use crate::types::Gas;
+    use prelude::types::Gas;
 
     // TODO(#51): Determine the correct amount of gas
     pub(super) const EXIT_TO_NEAR_GAS: Gas = 0;
@@ -53,7 +53,7 @@ impl ExitToNear {
 #[cfg(feature = "contract")]
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
     AccountId::from_utf8(
-        crate::sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
+        sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
             .expect(ERR_TARGET_TOKEN_NOT_FOUND),
     )
     .unwrap()
@@ -110,7 +110,7 @@ impl Precompile for ExitToNear {
 
                 if is_valid_account_id(input) {
                     (
-                        String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                        String::from_utf8(sdk::current_account_id()).unwrap(),
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         prelude::format!(
@@ -241,7 +241,7 @@ impl Precompile for ExitToEthereum {
                 // Input slice format:
                 //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
                 (
-                    String::from_utf8(crate::sdk::current_account_id()).unwrap(),
+                    String::from_utf8(sdk::current_account_id()).unwrap(),
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {
@@ -320,7 +320,7 @@ impl Precompile for ExitToEthereum {
 #[cfg(test)]
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
-    use crate::types::near_account_to_evm_address;
+    use prelude::types::near_account_to_evm_address;
 
     #[test]
     fn test_precompile_id() {

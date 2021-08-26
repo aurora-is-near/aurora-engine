@@ -69,8 +69,6 @@ impl Precompile for SHA256 {
         _context: &Context,
         _is_static: bool,
     ) -> PrecompileResult {
-        use crate::sdk;
-
         let cost = Self::required_gas(input)?;
         if cost > target_gas {
             Err(ExitError::OutOfGas)
@@ -122,7 +120,7 @@ impl Precompile for RIPEMD160 {
             #[cfg(not(feature = "contract"))]
             let hash = Self::internal_impl(input);
             #[cfg(feature = "contract")]
-            let hash = crate::sdk::ripemd160(input);
+            let hash = sdk::ripemd160(input);
             // The result needs to be padded with leading zeros because it is only 20 bytes, but
             // the evm works with 32-byte words.
             let mut output = vec![0u8; 32];

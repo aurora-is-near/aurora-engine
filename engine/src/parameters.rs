@@ -1,14 +1,12 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::fungible_token::FungibleTokenMetadata;
-use crate::types::{AccountId, Balance, RawAddress, RawH256, RawU256};
-use crate::{
-    admin_controlled::PausedMask,
-    json, sdk,
-    types::{EthAddress, Proof, SdkUnwrap},
-};
+use crate::proof::Proof;
+use crate::{admin_controlled::PausedMask, json};
 use evm::backend::Log;
+use prelude::types::{AccountId, Balance, EthAddress, RawAddress, RawH256, RawU256};
 use prelude::{is_valid_account_id, String, ToString, TryFrom, Vec};
+use sdk::types::SdkUnwrap;
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(BorshSerialize, BorshDeserialize)]

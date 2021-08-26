@@ -4,8 +4,8 @@ use evm::{ExitError, Transfer};
 
 use crate::engine::Engine;
 use crate::parameters::PromiseCreateArgs;
-use crate::types::Stack;
 use crate::AuroraState;
+use prelude::types::Stack;
 use prelude::{Vec, H160, H256, U256};
 
 pub struct AuroraStackState<'backend, 'config> {

@@ -60,7 +60,7 @@ impl EthTransaction {
     pub fn destructure(
         self,
     ) -> (
-        crate::types::Wei,
+        prelude::types::Wei,
         Option<u64>,
         Vec<u8>,
         Option<Address>,

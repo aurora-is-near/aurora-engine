@@ -1,7 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use prelude::Vec;
 
-use crate::sdk;
 use crate::storage::{bytes_to_key, KeyPrefixU8};
 
 /// An non-iterable implementation of a map that stores its content directly on the trie.

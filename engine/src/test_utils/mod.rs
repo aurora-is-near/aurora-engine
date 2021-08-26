@@ -20,9 +20,9 @@ use crate::transaction::{
     access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
     LegacyEthSignedTransaction, LegacyEthTransaction,
 };
-use crate::types;
-use crate::types::AccountId;
+use prelude::types::AccountId;
 use prelude::Address;
+use types;
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
@@ -185,14 +185,19 @@ impl AuroraRunner {
         (maybe_outcome, maybe_error)
     }
 
-    pub fn create_address(&mut self, address: Address, init_balance: types::Wei, init_nonce: U256) {
+    pub fn create_address(
+        &mut self,
+        address: Address,
+        init_balance: engine_types::Wei,
+        init_nonce: U256,
+    ) {
         let trie = &mut self.ext.fake_trie;
 
         let balance_key = storage::address_to_key(storage::KeyPrefix::Balance, &address);
         let balance_value = init_balance.to_bytes();
 
         let nonce_key = storage::address_to_key(storage::KeyPrefix::Nonce, &address);
-        let nonce_value = types::u256_to_arr(&init_nonce);
+        let nonce_value = engine_types::u256_to_arr(&init_nonce);
 
         let ft_key = storage::bytes_to_key(
             storage::KeyPrefix::EthConnector,
@@ -265,8 +270,8 @@ impl AuroraRunner {
         }
     }
 
-    pub fn get_balance(&self, address: Address) -> types::Wei {
-        types::Wei::new(self.getter_method_call("get_balance", address))
+    pub fn get_balance(&self, address: Address) -> engine_types::Wei {
+        engine_types::Wei::new(self.getter_method_call("get_balance", address))
     }
 
     pub fn get_nonce(&self, address: Address) -> U256 {
@@ -348,7 +353,7 @@ impl Default for AuroraRunner {
 pub(crate) fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     let args = NewCallArgs {
-        chain_id: types::u256_to_arr(&U256::from(runner.chain_id)),
+        chain_id: engine_types::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: runner.aurora_account_id.clone(),
         bridge_prover_id: "bridge_prover.near".to_string(),
         upgrade_delay_blocks: 1,
@@ -378,7 +383,11 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     runner
 }
 
-pub(crate) fn transfer(to: Address, amount: types::Wei, nonce: U256) -> LegacyEthTransaction {
+pub(crate) fn transfer(
+    to: Address,
+    amount: engine_types::Wei,
+    nonce: U256,
+) -> LegacyEthTransaction {
     LegacyEthTransaction {
         nonce,
         gas_price: Default::default(),
@@ -391,7 +400,7 @@ pub(crate) fn transfer(to: Address, amount: types::Wei, nonce: U256) -> LegacyEt
 
 pub(crate) fn create_eth_transaction(
     to: Option<Address>,
-    value: types::Wei,
+    value: engine_types::Wei,
     data: Vec<u8>,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
@@ -415,7 +424,7 @@ pub(crate) fn sign_transaction(
 ) -> LegacyEthSignedTransaction {
     let mut rlp_stream = RlpStream::new();
     tx.rlp_append_unsigned(&mut rlp_stream, chain_id);
-    let message_hash = types::keccak(rlp_stream.as_raw());
+    let message_hash = engine_types::keccak(rlp_stream.as_raw());
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
 
     let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
@@ -440,7 +449,7 @@ pub(crate) fn sign_access_list_transaction(
     let mut rlp_stream = RlpStream::new();
     rlp_stream.append(&access_list::TYPE_BYTE);
     tx.rlp_append_unsigned(&mut rlp_stream);
-    let message_hash = types::keccak(rlp_stream.as_raw());
+    let message_hash = engine_types::keccak(rlp_stream.as_raw());
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
 
     let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
@@ -457,7 +466,7 @@ pub(crate) fn sign_access_list_transaction(
 
 pub(crate) fn address_from_secret_key(sk: &SecretKey) -> Address {
     let pk = PublicKey::from_secret_key(sk);
-    let hash = types::keccak(&pk.serialize()[1..]);
+    let hash = engine_types::keccak(&pk.serialize()[1..]);
     Address::from_slice(&hash[12..])
 }
 
@@ -473,7 +482,7 @@ pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
 pub(crate) fn validate_address_balance_and_nonce(
     runner: &AuroraRunner,
     address: Address,
-    expected_balance: types::Wei,
+    expected_balance: engine_types::Wei,
     expected_nonce: U256,
 ) {
     assert_eq!(runner.get_balance(address), expected_balance, "balance");

@@ -1,15 +1,14 @@
 use crate::json::JsonValue;
-use crate::types::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "log")]
 use prelude::format;
+use prelude::types::*;
 use prelude::BTreeMap;
 use {
     crate::connector,
     crate::engine,
     crate::json::parse_json,
     crate::parameters::*,
-    crate::sdk,
     crate::storage,
     prelude::{self, Ordering, String, ToString, TryInto, Vec, U256},
 };
@@ -210,7 +209,7 @@ impl FungibleToken {
         }
         self.internal_withdraw_eth_from_near(sender_id, amount);
         self.internal_deposit_eth_to_near(receiver_id, amount);
-        crate::log!(&format!(
+        sdk::log!(&format!(
             "Transfer {} from {} to {}",
             amount, sender_id, receiver_id
         ));
@@ -334,7 +333,7 @@ impl FungibleToken {
                     receiver_balance
                 };
                 self.accounts_insert(receiver_id, receiver_balance - refund_amount);
-                crate::log!(&format!(
+                sdk::log!(&format!(
                     "Decrease receiver {} balance to: {}",
                     receiver_id,
                     receiver_balance - refund_amount
@@ -343,7 +342,7 @@ impl FungibleToken {
                 return if let Some(sender_balance) = self.accounts_get(sender_id) {
                     let sender_balance = u128::try_from_slice(&sender_balance[..]).unwrap();
                     self.accounts_insert(sender_id, sender_balance + refund_amount);
-                    crate::log!(&format!(
+                    sdk::log!(&format!(
                         "Refund amount {} from {} to {}",
                         refund_amount, receiver_id, sender_id
                     ));
@@ -351,7 +350,7 @@ impl FungibleToken {
                 } else {
                     // Sender's account was deleted, so we need to burn tokens.
                     self.total_eth_supply_on_near -= refund_amount;
-                    crate::log!("The account of the sender was deleted");
+                    sdk::log!("The account of the sender was deleted");
                     (amount, refund_amount)
                 };
             }
@@ -390,7 +389,7 @@ impl FungibleToken {
                 sdk::panic_utf8(b"ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE")
             }
         } else {
-            crate::log!(&format!("The account {} is not registered", &account_id));
+            sdk::log!(&format!("The account {} is not registered", &account_id));
             None
         }
     }
@@ -431,7 +430,7 @@ impl FungibleToken {
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let account_id = account_id.unwrap_or(&predecessor_account_id);
         if self.accounts_contains_key(account_id) {
-            crate::log!("The account is already registered, refunding the deposit");
+            sdk::log!("The account is already registered, refunding the deposit");
             if amount > 0 {
                 let promise0 = sdk::promise_batch_create(&sdk::predecessor_account_id());
                 sdk::promise_batch_action_transfer(promise0, amount);

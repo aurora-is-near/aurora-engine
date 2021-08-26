@@ -1,8 +1,8 @@
 use prelude::{vec, String, ToString, Vec};
 
 use crate::log_entry::LogEntry;
-use crate::types::*;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
+use prelude::types::*;
 use primitive_types::U256;
 
 const DEPOSITED_EVENT: &str = "Deposited";

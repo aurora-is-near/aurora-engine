@@ -1,4 +1,4 @@
-use crate::types::Wei;
+use prelude::types::Wei;
 use prelude::{Address, Vec, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
@@ -75,7 +75,7 @@ impl LegacyEthSignedTransaction {
         };
         self.transaction
             .rlp_append_unsigned(&mut rlp_stream, chain_id);
-        let message_hash = crate::types::keccak(rlp_stream.as_raw());
+        let message_hash = sdk::keccak(rlp_stream.as_raw());
         crate::precompiles::ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s)).ok()
     }
 
