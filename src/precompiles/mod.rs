@@ -122,10 +122,7 @@ impl Precompiles {
             ExitToNear::run,
             ExitToEthereum::run,
         ];
-        let mut map = BTreeMap::new();
-        for (address, fun) in addresses.into_iter().zip(fun) {
-            map.insert(address, fun);
-        }
+        let map = addresses.into_iter().zip(fun).collect();
 
         Precompiles(map)
     }
