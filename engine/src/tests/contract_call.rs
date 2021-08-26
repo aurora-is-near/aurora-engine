@@ -1,4 +1,4 @@
-use crate::test_utils::{origin, AuroraRunner, Signer};
+use crate::test_utils::{AuroraRunner, Signer};
 
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor};
@@ -23,7 +23,7 @@ fn setup_test() -> (AuroraRunner, Signer, [u8; 20], Tester) {
         token,
         tester.contract.address.into(),
         1_000_000_000,
-        origin(),
+        test_utils::erc20_admin_account(),
     );
 
     (runner, signer, token, tester)
