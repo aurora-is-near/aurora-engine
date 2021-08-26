@@ -386,6 +386,8 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_big_input() {
+        use prelude::types::u256_to_arr;
+
         let base_len = U256::from(4);
         let exp_len = U256::from(u64::MAX);
         let mod_len = U256::from(4);
@@ -393,11 +395,11 @@ mod tests {
         let exp = U256::MAX;
 
         let mut input: Vec<u8> = Vec::new();
-        input.extend_from_slice(&types::u256_to_arr(&base_len));
-        input.extend_from_slice(&types::u256_to_arr(&exp_len));
-        input.extend_from_slice(&types::u256_to_arr(&mod_len));
+        input.extend_from_slice(&u256_to_arr(&base_len));
+        input.extend_from_slice(&u256_to_arr(&exp_len));
+        input.extend_from_slice(&u256_to_arr(&mod_len));
         input.extend_from_slice(&base.to_be_bytes());
-        input.extend_from_slice(&types::u256_to_arr(&exp));
+        input.extend_from_slice(&u256_to_arr(&exp));
 
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();
@@ -405,6 +407,8 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_bigger_input() {
+        use prelude::types::u256_to_arr;
+
         let base_len = U256::MAX;
         let exp_len = U256::MAX;
         let mod_len = U256::MAX;
@@ -412,11 +416,11 @@ mod tests {
         let exp = U256::MAX;
 
         let mut input: Vec<u8> = Vec::new();
-        input.extend_from_slice(&types::u256_to_arr(&base_len));
-        input.extend_from_slice(&types::u256_to_arr(&exp_len));
-        input.extend_from_slice(&types::u256_to_arr(&mod_len));
+        input.extend_from_slice(&u256_to_arr(&base_len));
+        input.extend_from_slice(&u256_to_arr(&exp_len));
+        input.extend_from_slice(&u256_to_arr(&mod_len));
         input.extend_from_slice(&base.to_be_bytes());
-        input.extend_from_slice(&types::u256_to_arr(&exp));
+        input.extend_from_slice(&u256_to_arr(&exp));
 
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();

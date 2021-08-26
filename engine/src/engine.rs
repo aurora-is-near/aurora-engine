@@ -29,7 +29,7 @@ const CHAIN_ID_SIZE: usize = 32;
 
 #[cfg(not(feature = "contract"))]
 pub fn current_address() -> Address {
-    prelude::types::near_account_to_evm_address("engine".as_bytes())
+    sdk::types::near_account_to_evm_address("engine".as_bytes())
 }
 
 macro_rules! unwrap_res_or_finish {

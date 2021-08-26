@@ -3,8 +3,9 @@ use {
     crate::parameters::MetaCallArgs,
     borsh::BorshSerialize,
     near_crypto::{InMemorySigner, KeyType, PublicKey, Signature, Signer},
-    prelude::types::{keccak, u256_to_arr, InternalMetaCallArgs, Wei},
+    prelude::types::{u256_to_arr, InternalMetaCallArgs, Wei},
     prelude::{Address, U256},
+    sdk::keccak,
 };
 
 fn encode_meta_call_function_args(

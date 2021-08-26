@@ -3,7 +3,7 @@ use crate::parameters::{SubmitResult, TransactionStatus};
 use crate::test_utils;
 use crate::tests::state_migration;
 use borsh::BorshSerialize;
-use prelude::types::{self, Wei, ERC20_MINT_SELECTOR};
+use prelude::types::{Wei, ERC20_MINT_SELECTOR};
 use prelude::{Address, U256};
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
@@ -187,7 +187,7 @@ fn test_transfer_charging_gas_success() {
     let expected_dest_balance = TRANSFER_AMOUNT;
     let expected_relayer_balance = spent_amount;
     let relayer_address =
-        engine_types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
 
     // validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -240,7 +240,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
 
     // validate post-state
     let relayer =
-        engine_types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
     test_utils::validate_address_balance_and_nonce(
         &runner,
         source_address,

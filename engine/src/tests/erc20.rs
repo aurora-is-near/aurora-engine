@@ -5,7 +5,7 @@ use crate::test_utils::{
     Signer,
 };
 use bstr::ByteSlice;
-use prelude::types::{self, Wei};
+use prelude::types::Wei;
 use prelude::{Address, U256};
 use secp256k1::SecretKey;
 
@@ -77,7 +77,7 @@ fn erc20_mint_out_of_gas() {
     );
     test_utils::validate_address_balance_and_nonce(
         &runner,
-        engine_types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes()),
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes()),
         Wei::new_u64(GAS_LIMIT * GAS_PRICE),
         U256::zero(),
     );

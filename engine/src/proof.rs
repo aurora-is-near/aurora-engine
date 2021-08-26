@@ -1,9 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use prelude::{self, String, ToString, Vec};
 
-#[cfg(not(feature = "contract"))]
-use sha3::{Digest, Keccak256};
-
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
 #[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
 pub struct Proof {
