@@ -1,5 +1,5 @@
 use crate::precompiles::{
-    Berlin, Byzantium, HardFork, Precompile, PrecompileOutput, PrecompileResult,
+    Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
 };
 use crate::prelude::{Address, PhantomData, Vec, U256};
 use evm::{Context, ExitError};
@@ -106,17 +106,19 @@ impl Precompile for ModExp<Byzantium> {
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
     fn run(
         input: &[u8],
-        target_gas: u64,
+        target_gas: Option<u64>,
         _context: &Context,
         _is_static: bool,
-    ) -> PrecompileResult {
+    ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            Err(ExitError::OutOfGas)
-        } else {
-            let output = Self::run_inner(input)?;
-            Ok(PrecompileOutput::without_logs(cost, output))
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
+
+        let output = Self::run_inner(input)?;
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -143,17 +145,19 @@ impl Precompile for ModExp<Berlin> {
 
     fn run(
         input: &[u8],
-        target_gas: u64,
+        target_gas: Option<u64>,
         _context: &Context,
         _is_static: bool,
-    ) -> PrecompileResult {
+    ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            Err(ExitError::OutOfGas)
-        } else {
-            let output = Self::run_inner(input)?;
-            Ok(PrecompileOutput::without_logs(cost, output))
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
+
+        let output = Self::run_inner(input)?;
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -356,7 +360,7 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
-            let res = ModExp::<Byzantium>::run(&input, *test_gas, &new_context(), false)
+            let res = ModExp::<Byzantium>::run(&input, Some(*test_gas), &new_context(), false)
                 .unwrap()
                 .output;
             let expected = hex::decode(&test.expected).unwrap();
@@ -424,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_empty_input() {
-        let res = ModExp::<Berlin>::run(&[], 100_000, &new_context(), false).unwrap();
+        let res = ModExp::<Berlin>::run(&[], Some(100_000), &new_context(), false).unwrap();
         let expected: Vec<u8> = Vec::new();
         assert_eq!(res.output, expected)
     }

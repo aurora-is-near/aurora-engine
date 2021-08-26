@@ -1,21 +1,21 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor::{StackExecutor, StackSubstateMetadata};
+use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
 use crate::connector::{self, EthConnectorContract};
 use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
-    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, SubmitResult,
-    TransactionStatus, ViewCallArgs,
+    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, ResultLog,
+    SubmitResult, TransactionStatus, ViewCallArgs,
 };
 
+use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::precompiles::Precompiles;
 use crate::prelude::{is_valid_account_id, Address, Cow, String, TryInto, Vec, H256, U256};
 use crate::sdk;
-use crate::state::AuroraStackState;
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 use crate::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
 
@@ -571,14 +571,15 @@ impl Engine {
             }
         };
 
-        let (values, logs, promises) = executor.into_state().deconstruct();
+        let (values, logs) = executor.into_state().deconstruct();
+        let logs = Self::filter_promises_from_logs(logs);
+
         self.apply(values, Vec::<Log>::new(), true);
-        Self::schedule_promises(promises);
 
         Ok(SubmitResult {
             status,
             gas_used: used_gas,
-            logs: logs.into_iter().map(Into::into).collect(),
+            logs,
         })
     }
 
@@ -611,17 +612,17 @@ impl Engine {
             }
         };
 
-        let (values, logs, promises) = executor.into_state().deconstruct();
+        let (values, logs) = executor.into_state().deconstruct();
+        let logs = Self::filter_promises_from_logs(logs);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
-        Self::schedule_promises(promises);
 
         Ok(SubmitResult {
             status,
             gas_used: used_gas,
-            logs: logs.into_iter().map(Into::into).collect(),
+            logs,
         })
     }
 
@@ -652,10 +653,10 @@ impl Engine {
         status.into_result(result)
     }
 
-    fn make_executor(&self, gas_limit: u64) -> StackExecutor<AuroraStackState, Precompiles> {
+    fn make_executor(&self, gas_limit: u64) -> StackExecutor<MemoryStackState<Engine>> {
         let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
-        let state = AuroraStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, CONFIG, Precompiles::new_istanbul())
+        let state = MemoryStackState::new(metadata, self);
+        StackExecutor::new_with_precompile(state, CONFIG, Precompiles::new_istanbul().0)
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
@@ -846,25 +847,39 @@ impl Engine {
         Default::default()
     }
 
-    fn schedule_promises(promises: impl IntoIterator<Item = PromiseCreateArgs>) {
-        for promise in promises {
-            #[cfg(feature = "log")]
-            sdk::log_utf8(
-                crate::prelude::format!(
-                    "Call contract: {}.{}",
-                    promise.target_account_id,
-                    promise.method
-                )
-                .as_bytes(),
-            );
-            sdk::promise_create(
-                promise.target_account_id.as_bytes(),
-                promise.method.as_bytes(),
-                promise.args.as_slice(),
-                promise.attached_balance,
-                promise.attached_gas,
-            );
-        }
+    fn filter_promises_from_logs<T: IntoIterator<Item = Log>>(logs: T) -> Vec<ResultLog> {
+        logs.into_iter()
+            .filter_map(|log| {
+                if log.address == ExitToNear::ADDRESS || log.address == ExitToEthereum::ADDRESS {
+                    if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
+                        Self::schedule_promise(promise);
+                    }
+                    // do not pass on these "internal logs" to caller
+                    None
+                } else {
+                    Some(log.into())
+                }
+            })
+            .collect()
+    }
+
+    fn schedule_promise(promise: PromiseCreateArgs) {
+        #[cfg(feature = "log")]
+        sdk::log_utf8(
+            crate::prelude::format!(
+                "Call contract: {}.{}",
+                promise.target_account_id,
+                promise.method
+            )
+            .as_bytes(),
+        );
+        sdk::promise_create(
+            promise.target_account_id.as_bytes(),
+            promise.method.as_bytes(),
+            promise.args.as_slice(),
+            promise.attached_balance,
+            promise.attached_gas,
+        );
     }
 }
 

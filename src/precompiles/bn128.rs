@@ -1,5 +1,5 @@
 use crate::precompiles::{
-    Byzantium, HardFork, Istanbul, Precompile, PrecompileOutput, PrecompileResult,
+    Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput,
 };
 use crate::prelude::*;
 use evm::{Context, ExitError};
@@ -104,14 +104,21 @@ impl Precompile for Bn128Add<Byzantium> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
-    fn run(input: &[u8], target_gas: u64, context: &Context, _is_static: bool) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            Err(ExitError::OutOfGas)
-        } else {
-            let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput::without_logs(cost, output))
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
+
+        let output = Self::run_inner(input, context)?;
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -125,14 +132,20 @@ impl Precompile for Bn128Add<Istanbul> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
-    fn run(input: &[u8], target_gas: u64, context: &Context, _is_static: bool) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            Err(ExitError::OutOfGas)
-        } else {
-            let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput::without_logs(cost, output))
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
+        let output = Self::run_inner(input, context)?;
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -176,14 +189,21 @@ impl Precompile for Bn128Mul<Byzantium> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
-    fn run(input: &[u8], target_gas: u64, context: &Context, _is_static: bool) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            Err(ExitError::OutOfGas)
-        } else {
-            let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput::without_logs(cost, output))
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
+
+        let output = Self::run_inner(input, context)?;
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -196,14 +216,21 @@ impl Precompile for Bn128Mul<Istanbul> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
-    fn run(input: &[u8], target_gas: u64, context: &Context, _is_static: bool) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            Err(ExitError::OutOfGas)
-        } else {
-            let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput::without_logs(cost, output))
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
+
+        let output = Self::run_inner(input, context)?;
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -319,14 +346,21 @@ impl Precompile for Bn128Pair<Byzantium> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
-    fn run(input: &[u8], target_gas: u64, context: &Context, _is_static: bool) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            Err(ExitError::OutOfGas)
-        } else {
-            let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput::without_logs(cost, output))
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
+
+        let output = Self::run_inner(input, context)?;
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -342,14 +376,21 @@ impl Precompile for Bn128Pair<Istanbul> {
     ///
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
-    fn run(input: &[u8], target_gas: u64, context: &Context, _is_static: bool) -> PrecompileResult {
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            Err(ExitError::OutOfGas)
-        } else {
-            let output = Self::run_inner(input, context)?;
-            Ok(PrecompileOutput::without_logs(cost, output))
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
+
+        let output = Self::run_inner(input, context)?;
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -376,7 +417,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, 500, &new_context(), false)
+        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -397,7 +438,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, 500, &new_context(), false)
+        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -411,7 +452,7 @@ mod tests {
             0000000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = Bn128Add::<Byzantium>::run(&input, 499, &new_context(), false);
+        let res = Bn128Add::<Byzantium>::run(&input, Some(499), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -423,7 +464,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, 500, &new_context(), false)
+        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -438,7 +479,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, 500, &new_context(), false);
+        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -461,7 +502,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, 40_000, &new_context(), false)
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -474,7 +515,7 @@ mod tests {
             0200000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = Bn128Mul::<Byzantium>::run(&input, 39_999, &new_context(), false);
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(39_999), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // zero multiplication test
@@ -492,7 +533,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, 40_000, &new_context(), false)
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -506,7 +547,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, 40_000, &new_context(), false)
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -520,7 +561,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, 40_000, &new_context(), false);
+        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -549,7 +590,7 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, 260_000, &new_context(), false)
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -571,7 +612,7 @@ mod tests {
             12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
         )
         .unwrap();
-        let res = Bn128Pair::<Byzantium>::run(&input, 259_999, &new_context(), false);
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(259_999), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -580,7 +621,7 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, 260_000, &new_context(), false)
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -597,7 +638,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, 260_000, &new_context(), false);
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
@@ -613,7 +654,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, 260_000, &new_context(), false);
+        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN",)))
