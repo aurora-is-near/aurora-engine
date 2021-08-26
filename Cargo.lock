@@ -3234,6 +3234,7 @@ version = "0.1.0"
 dependencies = [
  "borsh",
  "prelude",
+ "sha3 0.9.1",
 ]
 
 [[package]]

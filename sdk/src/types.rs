@@ -1,6 +1,9 @@
 use crate::*;
 use prelude::Address;
 
+#[cfg(not(feature = "contract"))]
+use sha3::{Digest, Keccak256};
+
 #[cfg(feature = "contract")]
 #[inline]
 pub fn keccak(data: &[u8]) -> H256 {

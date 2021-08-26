@@ -4,7 +4,8 @@ use logos::Logos;
 use rlp::{Decodable, DecoderError, Rlp};
 
 use crate::parameters::MetaCallArgs;
-use prelude::types::{keccak, u256_to_arr, InternalMetaCallArgs, RawU256, Wei};
+use prelude::types::{u256_to_arr, InternalMetaCallArgs, RawU256, Wei};
+use sdk::keccak;
 use prelude::{vec, Address, Box, HashMap, String, ToOwned, ToString, Vec, H256, U256};
 
 /// Internal errors to propagate up and format in the single place.
