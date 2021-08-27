@@ -1,9 +1,10 @@
 CARGO = cargo
 NEAR  = near
 FEATURES = mainnet
+ADDITIONAL_FEATURES =
 
 ifeq ($(evm-bully),yes)
-  FEATURES := $(FEATURES),evm_bully
+  ADDITIONAL_FEATURES := $(ADDITIONAL_FEATURES),evm_bully
 endif
 
 # TODO: This isn't updating the `FEATURES` for some reason. Disabled to prevent accidental compilation of the same binary.
@@ -76,14 +77,14 @@ target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock 
 		--target wasm32-unknown-unknown \
 		--release \
 		--no-default-features \
-		--features=$(FEATURES) \
+		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps
 
 target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
 	$(CARGO) build \
 		--target wasm32-unknown-unknown \
 		--no-default-features \
-		--features=$(FEATURES) \
+		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps
 
 etc/eth-contracts/res/EvmErc20.bin: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
@@ -96,7 +97,7 @@ check-format:
 	$(CARGO) fmt -- --check
 
 check-clippy:
-	$(CARGO) clippy --no-default-features --features=$(FEATURES) -- -D warnings
+	$(CARGO) clippy --no-default-features --features=$(FEATURES)$(ADDITIONAL_FEATURES) -- -D warnings
 
 test-sol:
 	cd etc/eth-contracts && yarn && yarn test
