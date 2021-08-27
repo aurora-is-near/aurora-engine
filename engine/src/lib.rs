@@ -3,26 +3,29 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
 
-#[cfg(not(feature = "std"))]
-extern crate alloc;
-#[cfg(not(feature = "std"))]
-extern crate core;
+mod lib {
+    #[cfg(not(feature = "std"))]
+    extern crate alloc;
+    #[cfg(not(feature = "std"))]
+    extern crate core;
 
-use crate::parameters::PromiseCreateArgs;
+    pub use crate::parameters::*;
+}
+use lib::*;
 
 mod map;
 #[cfg(feature = "meta-call")]
-pub mod meta_parsing;
-pub mod parameters;
-pub mod proof;
-pub mod storage;
-pub mod transaction;
+mod meta_parsing;
+mod parameters;
+mod proof;
+mod storage;
+mod transaction;
 
 mod admin_controlled;
 #[cfg_attr(not(feature = "contract"), allow(dead_code))]
 mod connector;
 mod deposit_event;
-pub mod engine;
+mod engine;
 mod fungible_token;
 mod json;
 mod log_entry;
@@ -30,6 +33,7 @@ mod precompiles;
 
 #[cfg(test)]
 mod benches;
+mod prelude;
 mod state;
 #[cfg(test)]
 mod test_utils;

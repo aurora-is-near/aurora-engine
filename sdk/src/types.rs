@@ -1,5 +1,4 @@
 use crate::*;
-use prelude::Address;
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};

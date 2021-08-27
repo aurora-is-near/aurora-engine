@@ -5,10 +5,12 @@
 
 pub mod types;
 
-use borsh::{BorshDeserialize, BorshSerialize};
-use prelude::types::PromiseResult;
-use prelude::types::STORAGE_PRICE_PER_BYTE;
-use prelude::{vec, Vec, H256};
+mod lib {
+    pub use borsh::{BorshDeserialize, BorshSerialize};
+    pub use prelude::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
+    pub use prelude::{vec, Address, Vec, H256};
+}
+use lib::*;
 
 const READ_STORAGE_REGISTER_ID: u64 = 0;
 const INPUT_REGISTER_ID: u64 = 0;

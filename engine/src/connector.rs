@@ -1,16 +1,6 @@
-use crate::fungible_token::*;
-use crate::parameters::*;
+use crate::prelude::*;
 use crate::proof::Proof;
-use prelude::types::{AccountId, Balance, EthAddress, Gas, PromiseResult, ERR_FAILED_PARSE};
-use sdk::types::SdkUnwrap;
-
-use crate::admin_controlled::{AdminControlled, PausedMask};
-use crate::deposit_event::*;
-use crate::engine::Engine;
-use crate::json::parse_json;
-use crate::storage::{self, EthConnectorStorageId, KeyPrefix};
-use borsh::{BorshDeserialize, BorshSerialize};
-use prelude::*;
+use crate::storage;
 
 pub(crate) const ERC20_ADMIN_PREFIX: &str = "erc20.";
 pub(crate) const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";

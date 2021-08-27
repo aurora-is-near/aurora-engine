@@ -43,6 +43,7 @@ impl LegacyEthTransaction {
     }
 
     /// Returns self.gas as a u64, or None if self.gas > u64::MAX
+    #[allow(unused)]
     pub fn get_gas_limit(&self) -> Option<u64> {
         use prelude::TryInto;
         self.gas.try_into().ok()
