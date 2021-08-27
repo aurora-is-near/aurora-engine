@@ -4,6 +4,7 @@ mod eth_deploy_code;
 mod eth_erc20;
 mod eth_standard_precompiles;
 mod eth_transfer;
+mod nft_pagination;
 
 // We don't want to run in CI, so ignore. To run locally use `cargo test --release -- --ignored`
 #[test]
