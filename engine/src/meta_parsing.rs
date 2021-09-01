@@ -164,6 +164,7 @@ pub fn encode_address(addr: Address) -> Vec<u8> {
     bytes
 }
 
+#[allow(dead_code)]
 pub fn encode_string(s: &str) -> Vec<u8> {
     let mut bytes = vec![];
     bytes.extend_from_slice(keccak(s.as_bytes()).as_bytes());

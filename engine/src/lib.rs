@@ -34,7 +34,6 @@ mod precompiles;
 #[cfg(test)]
 mod benches;
 mod prelude;
-mod state;
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]
@@ -51,7 +50,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
     #[cfg(feature = "log")]
     {
-        use alloc::{format, string::ToString};
+        use crate::prelude::{format, ToString};
         if let Some(msg) = info.message() {
             let msg = if let Some(log) = info.location() {
                 format!("{} [{}]", msg, log)

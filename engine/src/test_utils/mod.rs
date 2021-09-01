@@ -341,8 +341,8 @@ impl AuroraRunner {
         (status, profile)
     }
 
-    pub fn get_balance(&self, address: Address) -> types::Wei {
-        types::Wei::new(self.getter_method_call("get_balance", address))
+    pub fn get_balance(&self, address: Address) -> crate::prelude::types::Wei {
+        crate::prelude::types::Wei::new(self.getter_method_call("get_balance", address))
     }
 
     pub fn get_nonce(&self, address: Address) -> U256 {
