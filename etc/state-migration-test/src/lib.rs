@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use aurora_engine::engine::{Engine, EngineState};
 use aurora_engine::storage;
 use borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_sdk as sdk;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 struct NewFancyState {

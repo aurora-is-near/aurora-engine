@@ -1,7 +1,7 @@
+use crate::prelude::types::Wei;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{self, solidity};
 use crate::transaction::LegacyEthTransaction;
-use crate::prelude::types::Wei;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 use std::process::Command;

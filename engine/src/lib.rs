@@ -18,14 +18,14 @@ mod map;
 mod meta_parsing;
 mod parameters;
 mod proof;
-mod storage;
+pub mod storage;
 mod transaction;
 
 mod admin_controlled;
 #[cfg_attr(not(feature = "contract"), allow(dead_code))]
 mod connector;
 mod deposit_event;
-mod engine;
+pub mod engine;
 mod fungible_token;
 mod json;
 mod log_entry;
@@ -50,7 +50,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
     #[cfg(feature = "log")]
     {
-        use crate::prelude::{format, ToString};
+        use crate::prelude::{format, sdk, ToString};
         if let Some(msg) = info.message() {
             let msg = if let Some(log) = info.location() {
                 format!("{} [{}]", msg, log)
@@ -88,12 +88,15 @@ mod contract {
         PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult, TransactionStatus,
         TransferCallCallArgs, ViewCallArgs,
     };
+    use crate::prelude::sdk;
 
     use crate::json::parse_json;
+    use crate::prelude::sdk::types::{
+        near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
+    };
     use crate::storage::{bytes_to_key, KeyPrefix};
     use prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
     use prelude::{Address, ToString, TryInto, H160, H256, U256};
-    use sdk::types::{near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap};
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -175,7 +178,7 @@ mod contract {
         sdk::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
     }
 
-    /// Called as part of the upgrade process (see `sdk::self_deploy`). This function is meant
+    /// Called as part of the upgrade process (see `engine-sdk::self_deploy`). This function is meant
     /// to make any necessary changes to the state such that it aligns with the newly deployed
     /// code.
     #[no_mangle]

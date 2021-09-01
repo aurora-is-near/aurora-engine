@@ -23,20 +23,20 @@ impl<const K: KeyPrefixU8> LookupMap<K> {
     #[allow(dead_code)]
     pub fn contains_key_raw(&self, key_raw: &[u8]) -> bool {
         let storage_key = self.raw_key_to_storage_key(key_raw);
-        sdk::storage_has_key(&storage_key)
+        crate::prelude::sdk::storage_has_key(&storage_key)
     }
 
     /// Returns the serialized value corresponding to the serialized key.
     #[allow(dead_code)]
     pub fn get_raw(&self, key_raw: &[u8]) -> Option<Vec<u8>> {
         let storage_key = self.raw_key_to_storage_key(key_raw);
-        sdk::read_storage(&storage_key)
+        crate::prelude::sdk::read_storage(&storage_key)
     }
 
     /// Inserts a serialized key-value pair into the map.
     pub fn insert_raw(&mut self, key_raw: &[u8], value_raw: &[u8]) {
         let storage_key = self.raw_key_to_storage_key(key_raw);
-        sdk::write_storage(&storage_key, value_raw);
+        crate::prelude::sdk::write_storage(&storage_key, value_raw);
     }
 
     /// Removes a serialized key from the map, returning the serialized value at the key if the key
@@ -44,7 +44,7 @@ impl<const K: KeyPrefixU8> LookupMap<K> {
     #[allow(dead_code)]
     pub fn remove_raw(&mut self, key_raw: &[u8]) -> Option<Vec<u8>> {
         let storage_key = self.raw_key_to_storage_key(key_raw);
-        sdk::remove_storage_with_result(&storage_key)
+        crate::prelude::sdk::remove_storage_with_result(&storage_key)
     }
 }
 

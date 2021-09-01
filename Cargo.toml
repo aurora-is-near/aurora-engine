@@ -2,7 +2,7 @@
 members = [
     "engine",
     "prelude",
-    "sdk"
+    "engine-sdk"
 ]
 exclude = [
     "etc/state-migration-test"

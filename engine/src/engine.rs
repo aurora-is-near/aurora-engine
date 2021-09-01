@@ -11,6 +11,7 @@ use crate::parameters::{
     FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, ResultLog,
     SubmitResult, TransactionStatus, ViewCallArgs,
 };
+use crate::prelude::sdk;
 
 use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::precompiles::Precompiles;

@@ -34,6 +34,7 @@ name = "aurora-engine"
 version = "1.7.0"
 dependencies = [
  "aurora-bn",
+ "aurora-engine-sdk",
  "base64",
  "blake2",
  "borsh",
@@ -50,10 +51,18 @@ dependencies = [
  "ripemd160",
  "rjson",
  "rlp",
- "sdk",
  "sha2",
  "sha3 0.9.1",
  "wee_alloc",
+]
+
+[[package]]
+name = "aurora-engine-sdk"
+version = "1.0.0"
+dependencies = [
+ "borsh",
+ "prelude",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -61,8 +70,8 @@ name = "aurora-engine-state-migration-test"
 version = "1.0.0"
 dependencies = [
  "aurora-engine",
+ "aurora-engine-sdk",
  "borsh",
- "sdk",
 ]
 
 [[package]]
@@ -757,15 +766,6 @@ name = "rustc-hex"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e75f6a532d0fd9f7f13144f392b6ad56a32696bfcd9c78f797f16bbb6f072d6"
-
-[[package]]
-name = "sdk"
-version = "0.1.0"
-dependencies = [
- "borsh",
- "prelude",
- "sha3 0.9.1",
-]
 
 [[package]]
 name = "serde"

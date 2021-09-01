@@ -1,4 +1,5 @@
 use crate::parameters::PromiseCreateArgs;
+use crate::prelude::sdk;
 use evm::{Context, ExitError};
 use prelude::Address;
 #[cfg(not(feature = "contract"))]
@@ -340,7 +341,7 @@ impl Precompile for ExitToEthereum {
 #[cfg(test)]
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
-    use sdk::types::near_account_to_evm_address;
+    use crate::prelude::near_account_to_evm_address;
 
     #[test]
     fn test_precompile_id() {

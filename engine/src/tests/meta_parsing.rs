@@ -1,11 +1,11 @@
 use {
     crate::meta_parsing::{near_erc712_domain, parse_meta_call, prepare_meta_call_args},
     crate::parameters::MetaCallArgs,
+    crate::prelude::keccak,
     borsh::BorshSerialize,
     near_crypto::{InMemorySigner, KeyType, PublicKey, Signature, Signer},
     prelude::types::{u256_to_arr, InternalMetaCallArgs, Wei},
     prelude::{Address, U256},
-    sdk::keccak,
 };
 
 fn encode_meta_call_function_args(

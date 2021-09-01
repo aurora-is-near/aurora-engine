@@ -1,6 +1,6 @@
 [package]
-name = "sdk"
-version = "0.1.0"
+name = "aurora-engine-sdk"
+version = "1.0.0"
 authors = ["NEAR <hello@near.org>"]
 edition = "2018"
 description = ""

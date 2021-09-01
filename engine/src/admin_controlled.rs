@@ -1,3 +1,4 @@
+use crate::prelude::sdk;
 pub type PausedMask = u8;
 
 pub(crate) const ERR_PAUSED: &str = "ERR_PAUSED";

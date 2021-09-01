@@ -118,6 +118,7 @@ name = "aurora-engine"
 version = "1.7.0"
 dependencies = [
  "aurora-bn",
+ "aurora-engine-sdk",
  "base64 0.13.0",
  "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh",
@@ -144,12 +145,20 @@ dependencies = [
  "ripemd160",
  "rjson",
  "rlp",
- "sdk",
  "serde",
  "serde_json",
  "sha2 0.9.5",
  "sha3 0.9.1",
  "wee_alloc",
+]
+
+[[package]]
+name = "aurora-engine-sdk"
+version = "1.0.0"
+dependencies = [
+ "borsh",
+ "prelude",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -3227,15 +3236,6 @@ name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
-
-[[package]]
-name = "sdk"
-version = "0.1.0"
-dependencies = [
- "borsh",
- "prelude",
- "sha3 0.9.1",
-]
 
 [[package]]
 name = "semver"
