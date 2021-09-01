@@ -1,6 +1,6 @@
 use evm::{Context, ExitError};
 
-use crate::precompiles::{Precompile, PrecompileOutput, PrecompileResult};
+use crate::precompiles::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use prelude::{mem, Address, Borrowed, TryInto};
 
 /// Blake2 costs.
@@ -40,17 +40,19 @@ impl Precompile for Blake2F {
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
     fn run(
         input: &[u8],
-        target_gas: u64,
+        target_gas: Option<u64>,
         _context: &Context,
         _is_static: bool,
-    ) -> PrecompileResult {
+    ) -> EvmPrecompileResult {
         if input.len() != consts::INPUT_LENGTH {
             return Err(ExitError::Other(Borrowed("ERR_BLAKE2F_INVALID_LEN")));
         }
 
         let cost = Self::required_gas(input)?;
-        if cost > target_gas {
-            return Err(ExitError::OutOfGas);
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
 
         let mut rounds_bytes = [0u8; 4];
@@ -87,7 +89,7 @@ impl Precompile for Blake2F {
         let finished = input[212] != 0;
 
         let output = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
-        Ok(PrecompileOutput::without_logs(cost, output))
+        Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
 
@@ -116,17 +118,17 @@ mod tests {
             0000000000000000\
             01";
 
-    fn test_blake2f_out_of_gas() -> PrecompileResult {
+    fn test_blake2f_out_of_gas() -> EvmPrecompileResult {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, 11, &new_context(), false)
+        Blake2F::run(&input, Some(11), &new_context(), false)
     }
 
-    fn test_blake2f_empty() -> PrecompileResult {
+    fn test_blake2f_empty() -> EvmPrecompileResult {
         let input = [0u8; 0];
-        Blake2F::run(&input, 0, &new_context(), false)
+        Blake2F::run(&input, Some(0), &new_context(), false)
     }
 
-    fn test_blake2f_invalid_len_1() -> PrecompileResult {
+    fn test_blake2f_invalid_len_1() -> EvmPrecompileResult {
         let input = hex::decode(
             "\
             00000c\
@@ -141,10 +143,10 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), false)
+        Blake2F::run(&input, Some(12), &new_context(), false)
     }
 
-    fn test_blake2f_invalid_len_2() -> PrecompileResult {
+    fn test_blake2f_invalid_len_2() -> EvmPrecompileResult {
         let input = hex::decode(
             "\
             000000000c\
@@ -159,10 +161,10 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), false)
+        Blake2F::run(&input, Some(12), &new_context(), false)
     }
 
-    fn test_blake2f_invalid_flag() -> PrecompileResult {
+    fn test_blake2f_invalid_flag() -> EvmPrecompileResult {
         let input = hex::decode(
             "\
             0000000c\
@@ -177,7 +179,7 @@ mod tests {
             02",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), false)
+        Blake2F::run(&input, Some(12), &new_context(), false)
     }
 
     fn test_blake2f_r_0() -> Vec<u8> {
@@ -195,14 +197,14 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), false)
+        Blake2F::run(&input, Some(12), &new_context(), false)
             .unwrap()
             .output
     }
 
     fn test_blake2f_r_12() -> Vec<u8> {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F::run(&input, 12, &new_context(), false)
+        Blake2F::run(&input, Some(12), &new_context(), false)
             .unwrap()
             .output
     }
@@ -222,7 +224,7 @@ mod tests {
             00",
         )
         .unwrap();
-        Blake2F::run(&input, 12, &new_context(), false)
+        Blake2F::run(&input, Some(12), &new_context(), false)
             .unwrap()
             .output
     }

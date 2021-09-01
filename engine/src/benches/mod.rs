@@ -4,6 +4,7 @@ mod eth_deploy_code;
 mod eth_erc20;
 mod eth_standard_precompiles;
 mod eth_transfer;
+mod nft_pagination;
 
 // We don't want to run in CI, so ignore. To run locally use `cargo test --release -- --ignored`
 #[test]
@@ -17,4 +18,19 @@ fn benches() {
     eth_transfer::eth_transfer_benchmark(&mut c);
 
     c.final_summary();
+}
+
+#[test]
+#[ignore]
+fn measure_nft_pagination_gas_usage() {
+    const TOTAL_TOKENS: usize = 500;
+    let data_sizes = [100, 500, 1000, 2000];
+    let tokens_per_page = [1, 2, 4, 8, 16, 32];
+
+    for size in data_sizes {
+        for n_tokens in tokens_per_page {
+            let gas_used = nft_pagination::measure_gas_usage(TOTAL_TOKENS, size, n_tokens);
+            println!("{},{},{}", size, n_tokens, gas_used);
+        }
+    }
 }

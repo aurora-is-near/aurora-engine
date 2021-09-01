@@ -8,20 +8,16 @@ use {
     crate::parameters::WithdrawCallArgs,
     crate::storage::{bytes_to_key, KeyPrefix},
     borsh::BorshSerialize,
+    evm::backend::Log,
     prelude::types::AccountId,
-    prelude::{is_valid_account_id, Cow, String, ToString, TryInto, U256},
+    prelude::{is_valid_account_id, vec, Cow, String, ToString, TryInto, Vec, U256},
 };
 
-use super::{Precompile, PrecompileResult};
+use super::{EvmPrecompileResult, Precompile};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 use crate::precompiles::PrecompileOutput;
-use crate::state::AuroraStackState;
-
-trait ReturnPromise {
-    fn promise(&self, state: &mut AuroraStackState) -> PromiseCreateArgs;
-}
 
 mod costs {
     use prelude::types::Gas;
@@ -46,7 +42,7 @@ impl ExitToNear {
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
-    pub(super) const ADDRESS: Address =
+    pub(crate) const ADDRESS: Address =
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
@@ -67,26 +63,30 @@ impl Precompile for ExitToNear {
     #[cfg(not(feature = "contract"))]
     fn run(
         input: &[u8],
-        target_gas: u64,
+        target_gas: Option<u64>,
         _context: &Context,
         _is_static: bool,
-    ) -> PrecompileResult {
-        if Self::required_gas(input)? > target_gas {
-            return Err(ExitError::OutOfGas);
+    ) -> EvmPrecompileResult {
+        if let Some(target_gas) = target_gas {
+            if Self::required_gas(input)? > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
 
-        Ok(PrecompileOutput {
-            output: Vec::new(),
-            cost: 0,
-            logs: Vec::new(),
-            promise: None,
-        })
+        Ok(PrecompileOutput::default().into())
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: u64, context: &Context, is_static: bool) -> PrecompileResult {
-        if Self::required_gas(input)? > target_gas {
-            return Err(ExitError::OutOfGas);
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        is_static: bool,
+    ) -> EvmPrecompileResult {
+        if let Some(target_gas) = target_gas {
+            if Self::required_gas(input)? > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
 
         // It's not allowed to call exit precompiles in static mode
@@ -166,18 +166,26 @@ impl Precompile for ExitToNear {
             _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
         };
 
-        let promise = PromiseCreateArgs {
+        let promise: Vec<u8> = PromiseCreateArgs {
             target_account_id: nep141_address,
             method: "ft_transfer".to_string(),
             args: args.as_bytes().to_vec(),
             attached_balance: 1,
             attached_gas: costs::FT_TRANSFER_GAS,
+        }
+        .try_to_vec()
+        .unwrap();
+        let log = Log {
+            address: Self::ADDRESS,
+            topics: Vec::new(),
+            data: promise,
         };
 
         Ok(PrecompileOutput {
-            promise: Some(promise),
+            logs: vec![log],
             ..Default::default()
-        })
+        }
+        .into())
     }
 }
 
@@ -188,7 +196,7 @@ impl ExitToEthereum {
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
-    pub(super) const ADDRESS: Address =
+    pub(crate) const ADDRESS: Address =
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
 }
 
@@ -200,26 +208,30 @@ impl Precompile for ExitToEthereum {
     #[cfg(not(feature = "contract"))]
     fn run(
         input: &[u8],
-        target_gas: u64,
+        target_gas: Option<u64>,
         _context: &Context,
         _is_static: bool,
-    ) -> PrecompileResult {
-        if Self::required_gas(input)? > target_gas {
-            return Err(ExitError::OutOfGas);
+    ) -> EvmPrecompileResult {
+        if let Some(target_gas) = target_gas {
+            if Self::required_gas(input)? > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
 
-        Ok(PrecompileOutput {
-            output: Vec::new(),
-            cost: 0,
-            logs: Vec::new(),
-            promise: None,
-        })
+        Ok(PrecompileOutput::default().into())
     }
 
     #[cfg(feature = "contract")]
-    fn run(input: &[u8], target_gas: u64, context: &Context, is_static: bool) -> PrecompileResult {
-        if Self::required_gas(input)? > target_gas {
-            return Err(ExitError::OutOfGas);
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        is_static: bool,
+    ) -> EvmPrecompileResult {
+        if let Some(target_gas) = target_gas {
+            if Self::required_gas(input)? > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
         }
 
         // It's not allowed to call exit precompiles in static mode
@@ -308,12 +320,20 @@ impl Precompile for ExitToEthereum {
             args: serialized_args,
             attached_balance: 1,
             attached_gas: costs::WITHDRAWAL_GAS,
+        }
+        .try_to_vec()
+        .unwrap();
+        let log = Log {
+            address: Self::ADDRESS,
+            topics: Vec::new(),
+            data: promise,
         };
 
         Ok(PrecompileOutput {
-            promise: Some(promise),
+            logs: vec![log],
             ..Default::default()
-        })
+        }
+        .into())
     }
 }
 
