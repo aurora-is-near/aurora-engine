@@ -471,7 +471,7 @@ mod contract {
         for account_balance in args.genesis_alloc {
             Engine::set_balance(
                 &Address(account_balance.address),
-                &types::Wei::new(U256::from(account_balance.balance)),
+                &crate::prelude::types::Wei::new(U256::from(account_balance.balance)),
             )
         }
         // return new chain ID
