@@ -1,13 +1,5 @@
-use crate::prelude::sdk;
-use borsh::{BorshDeserialize, BorshSerialize};
-
-use crate::fungible_token::FungibleTokenMetadata;
-use crate::prelude::{format, AccountId, Balance, EthAddress, RawAddress, RawH256, RawU256};
-use crate::prelude::{is_valid_account_id, String, ToString, TryFrom, Vec};
-use crate::proof::Proof;
-use crate::{admin_controlled::PausedMask, json};
+use crate::prelude::*;
 use evm::backend::Log;
-use sdk::types::SdkUnwrap;
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -186,10 +178,10 @@ pub struct NEP141FtOnTransferArgs {
     pub msg: String,
 }
 
-impl TryFrom<json::JsonValue> for NEP141FtOnTransferArgs {
-    type Error = json::JsonError;
+impl TryFrom<JsonValue> for NEP141FtOnTransferArgs {
+    type Error = JsonError;
 
-    fn try_from(value: json::JsonValue) -> Result<Self, Self::Error> {
+    fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
         Ok(Self {
             sender_id: value.string("sender_id")?,
             amount: value.u128("amount")?,
@@ -199,11 +191,11 @@ impl TryFrom<json::JsonValue> for NEP141FtOnTransferArgs {
 }
 
 impl TryFrom<NEP141FtOnTransferArgs> for String {
-    type Error = json::ParseError;
+    type Error = ParseError;
 
     fn try_from(value: NEP141FtOnTransferArgs) -> Result<Self, Self::Error> {
         if !is_valid_account_id(value.sender_id.as_bytes()) {
-            return Err(json::ParseError::InvalidAccountId);
+            return Err(ParseError::InvalidAccountId);
         }
 
         Ok(format!(
@@ -332,8 +324,8 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
-impl From<json::JsonValue> for TransferCallCallArgs {
-    fn from(v: json::JsonValue) -> Self {
+impl From<JsonValue> for TransferCallCallArgs {
+    fn from(v: JsonValue) -> Self {
         Self {
             receiver_id: v.string("receiver_id").sdk_unwrap(),
             amount: v.u128("amount").sdk_unwrap(),
@@ -349,8 +341,8 @@ pub struct StorageBalanceOfCallArgs {
     pub account_id: AccountId,
 }
 
-impl From<json::JsonValue> for StorageBalanceOfCallArgs {
-    fn from(v: json::JsonValue) -> Self {
+impl From<JsonValue> for StorageBalanceOfCallArgs {
+    fn from(v: JsonValue) -> Self {
         Self {
             account_id: v.string("account_id").sdk_unwrap(),
         }
@@ -364,8 +356,8 @@ pub struct StorageDepositCallArgs {
     pub registration_only: Option<bool>,
 }
 
-impl From<json::JsonValue> for StorageDepositCallArgs {
-    fn from(v: json::JsonValue) -> Self {
+impl From<JsonValue> for StorageDepositCallArgs {
+    fn from(v: JsonValue) -> Self {
         Self {
             account_id: v.string("account_id").ok(),
             registration_only: v.bool("registration_only").ok(),
@@ -379,8 +371,8 @@ pub struct StorageWithdrawCallArgs {
     pub amount: Option<u128>,
 }
 
-impl From<json::JsonValue> for StorageWithdrawCallArgs {
-    fn from(v: json::JsonValue) -> Self {
+impl From<JsonValue> for StorageWithdrawCallArgs {
+    fn from(v: JsonValue) -> Self {
         Self {
             amount: v.u128("amount").ok(),
         }
@@ -395,8 +387,8 @@ pub struct TransferCallArgs {
     pub memo: Option<String>,
 }
 
-impl From<json::JsonValue> for TransferCallArgs {
-    fn from(v: json::JsonValue) -> Self {
+impl From<JsonValue> for TransferCallArgs {
+    fn from(v: JsonValue) -> Self {
         Self {
             receiver_id: v.string("receiver_id").sdk_unwrap(),
             amount: v.u128("amount").sdk_unwrap(),
@@ -423,8 +415,8 @@ pub struct BalanceOfEthCallArgs {
     pub address: EthAddress,
 }
 
-impl From<json::JsonValue> for BalanceOfCallArgs {
-    fn from(v: json::JsonValue) -> Self {
+impl From<JsonValue> for BalanceOfCallArgs {
+    fn from(v: JsonValue) -> Self {
         Self {
             account_id: v.string("account_id").sdk_unwrap(),
         }
@@ -463,8 +455,8 @@ impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
     }
 }
 
-impl From<json::JsonValue> for ResolveTransferCallArgs {
-    fn from(v: json::JsonValue) -> Self {
+impl From<JsonValue> for ResolveTransferCallArgs {
+    fn from(v: JsonValue) -> Self {
         Self {
             sender_id: v.string("sender_id").sdk_unwrap(),
             receiver_id: v.string("receiver_id").sdk_unwrap(),

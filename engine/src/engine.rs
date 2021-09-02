@@ -1,23 +1,13 @@
-use borsh::{BorshDeserialize, BorshSerialize};
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm::ExitFatal;
-use evm::{Config, CreateScheme, ExitError, ExitReason};
+use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
-use crate::connector::{self, EthConnectorContract};
 use crate::map::{BijectionMap, LookupMap};
-use crate::parameters::{
-    FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, ResultLog,
-    SubmitResult, TransactionStatus, ViewCallArgs,
-};
-use crate::prelude::sdk;
+use crate::prelude::*;
 
 use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::precompiles::Precompiles;
-use crate::prelude::{is_valid_account_id, Address, TryInto, Vec, H256, U256};
-use crate::prelude::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
-use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -789,7 +779,7 @@ impl Engine {
             ethabi::Token::Uint(args.amount.into()),
         ]);
 
-        let erc20_admin_address = connector::erc20_admin_address(&sdk::current_account_id());
+        let erc20_admin_address = erc20_admin_address(&sdk::current_account_id());
         unwrap_res_or_finish!(
             self.call(
                 erc20_admin_address,

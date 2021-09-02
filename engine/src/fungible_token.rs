@@ -1,15 +1,4 @@
-use crate::json::JsonValue;
 use crate::prelude::*;
-use borsh::{BorshDeserialize, BorshSerialize};
-use {
-    crate::connector,
-    crate::engine,
-    crate::json::parse_json,
-    crate::parameters::*,
-    crate::prelude::sdk,
-    crate::prelude::{self, Ordering, String, ToString, TryInto, Vec, U256},
-    crate::storage,
-};
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
@@ -102,9 +91,7 @@ impl FungibleToken {
 
     /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
-        engine::Engine::get_balance(&prelude::Address(address))
-            .raw()
-            .as_u128()
+        Engine::get_balance(&Address(address)).raw().as_u128()
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
@@ -125,10 +112,7 @@ impl FungibleToken {
     pub fn internal_deposit_eth_to_aurora(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_add(amount) {
-            engine::Engine::set_balance(
-                &prelude::Address(address),
-                &Wei::new(U256::from(new_balance)),
-            );
+            Engine::set_balance(&Address(address), &Wei::new(U256::from(new_balance)));
             self.total_eth_supply_on_aurora = self
                 .total_eth_supply_on_aurora
                 .checked_add(amount)
@@ -175,10 +159,7 @@ impl FungibleToken {
     pub fn internal_withdraw_eth_from_aurora(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_sub(amount) {
-            engine::Engine::set_balance(
-                &prelude::Address(address),
-                &Wei::new(U256::from(new_balance)),
-            );
+            Engine::set_balance(&Address(address), &Wei::new(U256::from(new_balance)));
             self.total_eth_supply_on_aurora = self
                 .total_eth_supply_on_aurora
                 .checked_sub(amount)
@@ -278,7 +259,7 @@ impl FungibleToken {
             receiver_id.as_bytes(),
             b"ft_on_transfer",
             data1.as_bytes(),
-            connector::NO_DEPOSIT,
+            NO_DEPOSIT,
             GAS_FOR_FT_ON_TRANSFER,
         );
         let promise1 = sdk::promise_then(
@@ -286,7 +267,7 @@ impl FungibleToken {
             &sdk::current_account_id(),
             b"ft_resolve_transfer",
             &data2[..],
-            connector::NO_DEPOSIT,
+            NO_DEPOSIT,
             GAS_FOR_RESOLVE_TRANSFER,
         );
         sdk::promise_return(promise1);

@@ -43,17 +43,6 @@ pub fn validate_eth_address(address: String) -> Result<EthAddress, ValidationErr
     Ok(result)
 }
 
-#[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
-#[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
-pub struct Proof {
-    pub log_index: u64,
-    pub log_entry_data: Vec<u8>,
-    pub receipt_index: u64,
-    pub receipt_data: Vec<u8>,
-    pub header_data: Vec<u8>,
-    pub proof: Vec<Vec<u8>>,
-}
-
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default)]
 pub struct Wei(U256);

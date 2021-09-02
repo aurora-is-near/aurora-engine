@@ -9,7 +9,7 @@ mod lib {
     #[cfg(not(feature = "std"))]
     extern crate core;
 
-    pub use crate::parameters::*;
+    pub use crate::prelude::*;
 }
 use lib::*;
 
@@ -50,7 +50,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
     #[cfg(feature = "log")]
     {
-        use crate::prelude::{format, sdk, ToString};
         if let Some(msg) = info.message() {
             let msg = if let Some(log) = info.location() {
                 format!("{} [{}]", msg, log)
@@ -75,28 +74,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::{BorshDeserialize, BorshSerialize};
-
-    use crate::connector::{self, EthConnectorContract};
-    use crate::engine::{Engine, EngineState, GasPaymentError};
-    use crate::fungible_token::FungibleTokenMetadata;
-    #[cfg(feature = "evm_bully")]
-    use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::parameters::{
-        DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetErc20FromNep141CallArgs,
-        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult, TransactionStatus,
-        TransferCallCallArgs, ViewCallArgs,
-    };
-    use crate::prelude::sdk;
-
-    use crate::json::parse_json;
-    use crate::prelude::sdk::types::{
-        near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
-    };
-    use crate::prelude::{u256_to_arr, ERR_FAILED_PARSE};
-    use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
-    use crate::storage::{bytes_to_key, KeyPrefix};
+    use super::*;
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -216,7 +194,6 @@ mod contract {
     /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
     pub extern "C" fn submit() {
-        use crate::prelude::TryFrom;
         use crate::transaction::EthTransaction;
 
         let input = sdk::read_input();
@@ -384,7 +361,7 @@ mod contract {
 
         let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
 
-        let erc20_admin_address = connector::erc20_admin_address(&sdk::current_account_id());
+        let erc20_admin_address = erc20_admin_address(&sdk::current_account_id());
         let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
         let deploy_args = ethabi::encode(&[
             ethabi::Token::String("Empty".to_string()),

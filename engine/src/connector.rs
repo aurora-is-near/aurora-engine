@@ -1,6 +1,4 @@
 use crate::prelude::*;
-use crate::proof::Proof;
-use crate::storage;
 
 pub(crate) const ERC20_ADMIN_PREFIX: &str = "erc20.";
 pub(crate) const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
