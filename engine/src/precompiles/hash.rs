@@ -1,7 +1,6 @@
 use crate::precompiles::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use crate::prelude::sdk;
+use crate::prelude::*;
 use evm::{Context, ExitError};
-use prelude::{vec, Address};
 
 mod costs {
     pub(super) const SHA256_BASE: u64 = 60;

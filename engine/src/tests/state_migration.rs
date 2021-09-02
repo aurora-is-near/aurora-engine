@@ -1,8 +1,8 @@
 use crate::parameters::{InitCallArgs, NewCallArgs};
+use crate::prelude::U256;
 use crate::test_utils::AuroraRunner;
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
-use prelude::U256;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -35,7 +35,7 @@ pub fn deploy_evm() -> AuroraAccount {
     );
     let prover_account = "prover.near".to_string();
     let new_args = NewCallArgs {
-        chain_id: prelude::types::u256_to_arr(&U256::from(aurora_runner.chain_id)),
+        chain_id: crate::prelude::u256_to_arr(&U256::from(aurora_runner.chain_id)),
         owner_id: main_account.account_id.clone().into(),
         bridge_prover_id: prover_account.clone(),
         upgrade_delay_blocks: 1,

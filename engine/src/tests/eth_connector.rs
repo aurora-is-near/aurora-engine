@@ -6,14 +6,14 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawCallArgs, WithdrawResult,
 };
+use crate::prelude::EthAddress;
+use crate::prelude::U256;
 use crate::proof::Proof;
 use borsh::{BorshDeserialize, BorshSerialize};
 use byte_slice_cast::AsByteSlice;
 use near_sdk::test_utils::accounts;
 use near_sdk_sim::transaction::ExecutionStatus;
 use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
-use prelude::types::EthAddress;
-use primitive_types::U256;
 use serde_json::json;
 
 const CONTRACT_ACC: &'static str = "eth_connector.root";

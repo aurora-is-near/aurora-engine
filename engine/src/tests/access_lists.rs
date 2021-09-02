@@ -1,8 +1,8 @@
+use crate::prelude::Wei;
+use crate::prelude::{H256, U256};
 use crate::test_utils;
 use crate::transaction::access_list::{self, AccessListEthTransaction, AccessTuple};
 use crate::transaction::EthTransaction;
-use prelude::types::Wei;
-use prelude::{H256, U256};
 use std::convert::TryFrom;
 use std::iter;
 

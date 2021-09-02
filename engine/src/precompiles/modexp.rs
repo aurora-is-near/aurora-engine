@@ -1,9 +1,9 @@
 use crate::precompiles::{
     Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
 };
+use crate::prelude::{Address, PhantomData, Vec, U256};
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
-use prelude::{Address, PhantomData, Vec, U256};
 
 pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
@@ -390,7 +390,7 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_big_input() {
-        use prelude::types::u256_to_arr;
+        use crate::prelude::types::u256_to_arr;
 
         let base_len = U256::from(4);
         let exp_len = U256::from(u64::MAX);
@@ -411,7 +411,7 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_bigger_input() {
-        use prelude::types::u256_to_arr;
+        use crate::prelude::u256_to_arr;
 
         let base_len = U256::MAX;
         let exp_len = U256::MAX;

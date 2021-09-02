@@ -1,8 +1,8 @@
 use crate::precompiles::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use crate::prelude::sdk;
+use crate::prelude::*;
 use ethabi::Address;
 use evm::{Context, ExitError};
-use prelude::*;
 
 mod costs {
     pub(super) const ECRECOVER_BASE: u64 = 3_000;

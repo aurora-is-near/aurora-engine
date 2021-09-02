@@ -1,5 +1,4 @@
-use prelude::Vec;
-use primitive_types::{H160, H256};
+use crate::prelude::{Vec, H160, H256};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct LogEntry {

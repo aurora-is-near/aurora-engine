@@ -1,5 +1,5 @@
+use crate::prelude::U256;
 use criterion::{BatchSize, BenchmarkId, Criterion};
-use prelude::U256;
 use secp256k1::SecretKey;
 
 use crate::test_utils::erc20::{ERC20Constructor, ERC20};
@@ -15,7 +15,7 @@ pub(crate) fn eth_erc20_benchmark(c: &mut Criterion) {
     let source_account = SecretKey::random(&mut rng);
     runner.create_address(
         address_from_secret_key(&source_account),
-        prelude::types::Wei::new_u64(INITIAL_BALANCE),
+        crate::prelude::types::Wei::new_u64(INITIAL_BALANCE),
         INITIAL_NONCE.into(),
     );
     let calling_account_id = "some-account.near".to_string();

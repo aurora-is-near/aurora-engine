@@ -16,14 +16,14 @@ use std::borrow::Cow;
 
 use crate::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs};
+use crate::prelude::AccountId;
+use crate::prelude::Address;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 use crate::transaction::{
     access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
     LegacyEthSignedTransaction, LegacyEthTransaction,
 };
-use prelude::types::AccountId;
-use prelude::Address;
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
@@ -237,7 +237,7 @@ impl AuroraRunner {
     pub fn create_address(
         &mut self,
         address: Address,
-        init_balance: prelude::types::Wei,
+        init_balance: crate::prelude::Wei,
         init_nonce: U256,
     ) {
         let trie = &mut self.ext.fake_trie;
@@ -246,7 +246,7 @@ impl AuroraRunner {
         let balance_value = init_balance.to_bytes();
 
         let nonce_key = storage::address_to_key(storage::KeyPrefix::Nonce, &address);
-        let nonce_value = prelude::types::u256_to_arr(&init_nonce);
+        let nonce_value = crate::prelude::u256_to_arr(&init_nonce);
 
         let ft_key = storage::bytes_to_key(
             storage::KeyPrefix::EthConnector,
@@ -422,7 +422,7 @@ impl Default for AuroraRunner {
 pub(crate) fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     let args = NewCallArgs {
-        chain_id: prelude::types::u256_to_arr(&U256::from(runner.chain_id)),
+        chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: runner.aurora_account_id.clone(),
         bridge_prover_id: "bridge_prover.near".to_string(),
         upgrade_delay_blocks: 1,
@@ -454,7 +454,7 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
 
 pub(crate) fn transfer(
     to: Address,
-    amount: prelude::types::Wei,
+    amount: crate::prelude::Wei,
     nonce: U256,
 ) -> LegacyEthTransaction {
     LegacyEthTransaction {
@@ -469,7 +469,7 @@ pub(crate) fn transfer(
 
 pub(crate) fn create_eth_transaction(
     to: Option<Address>,
-    value: prelude::types::Wei,
+    value: crate::prelude::Wei,
     data: Vec<u8>,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
@@ -560,7 +560,7 @@ pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
 pub(crate) fn validate_address_balance_and_nonce(
     runner: &AuroraRunner,
     address: Address,
-    expected_balance: prelude::types::Wei,
+    expected_balance: crate::prelude::Wei,
     expected_nonce: U256,
 ) {
     assert_eq!(runner.get_balance(address), expected_balance, "balance");

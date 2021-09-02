@@ -1,7 +1,7 @@
 use evm::{Context, ExitError};
 
 use crate::precompiles::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use prelude::{mem, Address, Borrowed, TryInto};
+use crate::prelude::{mem, Address, Borrowed, TryInto};
 
 /// Blake2 costs.
 mod costs {
@@ -95,8 +95,8 @@ impl Precompile for Blake2F {
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::Vec;
     use crate::test_utils::new_context;
-    use prelude::Vec;
 
     use super::*;
 

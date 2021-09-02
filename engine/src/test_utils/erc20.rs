@@ -1,6 +1,6 @@
+use crate::prelude::{Address, U256};
 use crate::test_utils::solidity;
 use crate::transaction::LegacyEthTransaction;
-use prelude::{Address, U256};
 use std::path::{Path, PathBuf};
 use std::sync::Once;
 

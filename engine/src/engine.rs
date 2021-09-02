@@ -15,9 +15,9 @@ use crate::prelude::sdk;
 
 use crate::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::precompiles::Precompiles;
+use crate::prelude::{is_valid_account_id, Address, TryInto, Vec, H256, U256};
+use crate::prelude::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
 use crate::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix, KeyPrefixU8};
-use prelude::types::{u256_to_arr, AccountId, Wei, ERC20_MINT_SELECTOR};
-use prelude::{is_valid_account_id, Address, TryInto, Vec, H256, U256};
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -728,7 +728,7 @@ impl Engine {
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
     pub fn receive_erc20_tokens(&mut self, args: &NEP141FtOnTransferArgs) {
-        let str_amount = prelude::format!("\"{}\"", args.amount);
+        let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
 
         // Parse message to determine recipient and fee
@@ -803,9 +803,9 @@ impl Engine {
                 match submit_result.status {
                     TransactionStatus::Succeed(_) => Ok(()),
                     TransactionStatus::Revert(bytes) => {
-                        let error_message = prelude::format!(
+                        let error_message = crate::prelude::format!(
                             "Reverted with message: {}",
-                            prelude::String::from_utf8_lossy(&bytes)
+                            crate::prelude::String::from_utf8_lossy(&bytes)
                         );
                         Err(EngineError {
                             kind: EngineErrorKind::EvmError(ExitError::Other(prelude::Cow::from(

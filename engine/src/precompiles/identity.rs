@@ -1,7 +1,7 @@
 use crate::precompiles::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
-use prelude::Address;
+use crate::prelude::Address;
 
 /// Identity precompile costs.
 mod costs {

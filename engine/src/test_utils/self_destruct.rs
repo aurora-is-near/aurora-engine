@@ -1,9 +1,9 @@
 use crate::parameters::FunctionCallArgs;
+use crate::prelude::Address;
+use crate::prelude::U256;
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use crate::transaction::LegacyEthTransaction;
 use borsh::BorshSerialize;
-use prelude::Address;
-use primitive_types::U256;
 use std::convert::TryInto;
 
 pub(crate) struct SelfDestructFactoryConstructor(pub solidity::ContractConstructor);

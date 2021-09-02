@@ -1,4 +1,4 @@
-use prelude::{Address, TryFrom, Vec, U256};
+use crate::prelude::{Address, TryFrom, Vec, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 
 pub(crate) mod access_list;
@@ -60,13 +60,13 @@ impl EthTransaction {
     pub fn destructure(
         self,
     ) -> (
-        prelude::types::Wei,
+        crate::prelude::Wei,
         Option<u64>,
         Vec<u8>,
         Option<Address>,
         Vec<AccessTuple>,
     ) {
-        use prelude::TryInto;
+        use crate::prelude::TryInto;
         match self {
             Self::Legacy(tx) => {
                 let tx = tx.transaction;

@@ -1,8 +1,8 @@
 use crate::precompiles::{
     Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput,
 };
+use crate::prelude::*;
 use evm::{Context, ExitError};
-use prelude::*;
 
 /// bn128 costs.
 mod costs {

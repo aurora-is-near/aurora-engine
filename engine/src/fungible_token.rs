@@ -1,17 +1,14 @@
 use crate::json::JsonValue;
+use crate::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "log")]
-use prelude::format;
-use prelude::types::*;
-use prelude::BTreeMap;
 use {
     crate::connector,
     crate::engine,
     crate::json::parse_json,
     crate::parameters::*,
     crate::prelude::sdk,
+    crate::prelude::{self, Ordering, String, ToString, TryInto, Vec, U256},
     crate::storage,
-    prelude::{self, Ordering, String, ToString, TryInto, Vec, U256},
 };
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;

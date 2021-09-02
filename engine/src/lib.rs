@@ -15,11 +15,11 @@ use lib::*;
 
 mod map;
 #[cfg(feature = "meta-call")]
-mod meta_parsing;
-mod parameters;
+pub mod meta_parsing;
+pub mod parameters;
 mod proof;
 pub mod storage;
-mod transaction;
+pub mod transaction;
 
 mod admin_controlled;
 #[cfg_attr(not(feature = "contract"), allow(dead_code))]
@@ -94,9 +94,9 @@ mod contract {
     use crate::prelude::sdk::types::{
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
+    use crate::prelude::{u256_to_arr, ERR_FAILED_PARSE};
+    use crate::prelude::{Address, ToString, TryInto, H160, H256, U256};
     use crate::storage::{bytes_to_key, KeyPrefix};
-    use prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
-    use prelude::{Address, ToString, TryInto, H160, H256, U256};
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -216,8 +216,8 @@ mod contract {
     /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
     pub extern "C" fn submit() {
+        use crate::prelude::TryFrom;
         use crate::transaction::EthTransaction;
-        use prelude::TryFrom;
 
         let input = sdk::read_input();
 
@@ -262,7 +262,7 @@ mod contract {
                     let result = SubmitResult {
                         status: TransactionStatus::OutOfFund,
                         gas_used: 0,
-                        logs: prelude::Vec::new(),
+                        logs: crate::prelude::Vec::new(),
                     };
                     sdk::return_output(&result.try_to_vec().unwrap());
                     return;
@@ -335,7 +335,7 @@ mod contract {
             meta_call_args.value,
             meta_call_args.input,
             u64::MAX, // TODO: is there a gas limit with meta calls?
-            prelude::Vec::new(),
+            crate::prelude::Vec::new(),
         );
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))

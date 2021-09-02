@@ -2,11 +2,11 @@ use crate::prelude::sdk;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::fungible_token::FungibleTokenMetadata;
+use crate::prelude::{is_valid_account_id, String, ToString, TryFrom, Vec};
+use crate::prelude::{AccountId, Balance, EthAddress, RawAddress, RawH256, RawU256};
 use crate::proof::Proof;
 use crate::{admin_controlled::PausedMask, json};
 use evm::backend::Log;
-use prelude::types::{AccountId, Balance, EthAddress, RawAddress, RawH256, RawU256};
-use prelude::{is_valid_account_id, String, ToString, TryFrom, Vec};
 use sdk::types::SdkUnwrap;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -266,7 +266,7 @@ pub struct StorageBalance {
 
 impl StorageBalance {
     pub fn to_json_bytes(&self) -> Vec<u8> {
-        prelude::format!(
+        crate::prelude::format!(
             "{{\"total\": \"{}\", \"available\": \"{}\"}}",
             self.total.to_string(),
             self.available.to_string()

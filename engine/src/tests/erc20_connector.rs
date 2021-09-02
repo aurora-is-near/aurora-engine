@@ -1,4 +1,5 @@
 use crate::parameters::{FunctionCallArgs, SubmitResult};
+use crate::prelude::*;
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use crate::transaction::LegacyEthSignedTransaction;
@@ -6,8 +7,6 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
 use near_vm_logic::VMOutcome;
 use near_vm_runner::VMError;
-use prelude::types::{AccountId, Balance, RawAddress, Wei};
-use prelude::*;
 use secp256k1::SecretKey;
 use serde_json::json;
 use sha3::Digest;

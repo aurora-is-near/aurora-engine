@@ -1,8 +1,8 @@
 use criterion::{BatchSize, Criterion};
 use secp256k1::SecretKey;
 
+use crate::prelude::types::Wei;
 use crate::test_utils::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};
-use prelude::types::Wei;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;

@@ -1,17 +1,11 @@
-use crate::parameters::PromiseCreateArgs;
-use crate::prelude::sdk;
+use crate::prelude::*;
 use evm::{Context, ExitError};
-use prelude::Address;
-#[cfg(not(feature = "contract"))]
-use prelude::Vec;
 #[cfg(feature = "contract")]
 use {
-    crate::parameters::WithdrawCallArgs,
+    crate::parameters::{PromiseCreateArgs, WithdrawCallArgs},
     crate::storage::{bytes_to_key, KeyPrefix},
     borsh::BorshSerialize,
     evm::backend::Log,
-    prelude::types::AccountId,
-    prelude::{is_valid_account_id, vec, Cow, String, ToString, TryInto, Vec, U256},
 };
 
 use super::{EvmPrecompileResult, Precompile};
@@ -21,7 +15,7 @@ const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 use crate::precompiles::PrecompileOutput;
 
 mod costs {
-    use prelude::types::Gas;
+    use crate::prelude::Gas;
 
     // TODO(#51): Determine the correct amount of gas
     pub(super) const EXIT_TO_NEAR_GAS: Gas = 0;
@@ -114,7 +108,7 @@ impl Precompile for ExitToNear {
                         String::from_utf8(sdk::current_account_id()).unwrap(),
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
-                        prelude::format!(
+                        crate::prelude::format!(
                             r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
                             String::from_utf8(input.to_vec()).unwrap(),
                             context.apparent_value.as_u128()
@@ -152,7 +146,7 @@ impl Precompile for ExitToNear {
                         nep141_address,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
-                        prelude::format!(
+                        crate::prelude::format!(
                             r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
                             receiver_account_id,
                             amount
@@ -296,7 +290,7 @@ impl Precompile for ExitToEthereum {
                         nep141_address,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and hexadecimal respectively.
-                        prelude::format!(
+                        crate::prelude::format!(
                             r#"{{"amount": "{}", "recipient": "{}"}}"#,
                             amount,
                             eth_recipient

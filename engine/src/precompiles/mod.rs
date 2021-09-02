@@ -1,4 +1,5 @@
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
+use crate::prelude::{vec, Address, BTreeMap, Vec};
 use crate::{
     precompiles::blake2::Blake2F,
     precompiles::bn128::{Bn128Add, Bn128Mul, Bn128Pair},
@@ -11,7 +12,6 @@ use crate::{
 use evm::backend::Log;
 use evm::ExitSucceed;
 use evm::{Context, ExitError};
-use prelude::{vec, Address, BTreeMap, Vec};
 
 mod blake2;
 mod bn128;
@@ -234,7 +234,7 @@ const fn make_address(x: u32, y: u128) -> Address {
 #[cfg(test)]
 mod tests {
     use crate::precompiles::{Byzantium, Istanbul};
-    use prelude::Address;
+    use crate::prelude::Address;
     use rand::Rng;
 
     #[test]

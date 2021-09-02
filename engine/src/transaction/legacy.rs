@@ -1,6 +1,6 @@
 use crate::prelude::sdk;
-use prelude::types::Wei;
-use prelude::{Address, Vec, U256};
+use crate::prelude::Wei;
+use crate::prelude::{Address, Vec, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -46,7 +46,7 @@ impl LegacyEthTransaction {
     /// Returns self.gas as a u64, or None if self.gas > u64::MAX
     #[allow(unused)]
     pub fn get_gas_limit(&self) -> Option<u64> {
-        use prelude::TryInto;
+        use crate::prelude::TryInto;
         self.gas.try_into().ok()
     }
 }
@@ -142,7 +142,7 @@ impl Decodable for LegacyEthSignedTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use prelude::*;
+    use crate::prelude::*;
 
     #[test]
     fn test_eth_signed_no_chain_sender() {

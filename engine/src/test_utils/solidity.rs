@@ -1,6 +1,6 @@
+use crate::prelude::{Address, U256};
 use crate::transaction::LegacyEthTransaction;
 use near_sdk::serde_json;
-use prelude::{Address, U256};
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;

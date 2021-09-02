@@ -1,13 +1,13 @@
 use crate::parameters::TransactionStatus;
 use crate::prelude::sdk;
+use crate::prelude::Wei;
+use crate::prelude::{Address, U256};
 use crate::test_utils::{
     self,
     erc20::{ERC20Constructor, ERC20},
     Signer,
 };
 use bstr::ByteSlice;
-use prelude::types::Wei;
-use prelude::{Address, U256};
 use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1_000_000;
