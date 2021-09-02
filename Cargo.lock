@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "1.7.0"
+version = "1.7.1"
 dependencies = [
  "aurora-bn",
  "aurora-engine-sdk",
@@ -160,6 +160,10 @@ dependencies = [
  "borsh",
  "sha3 0.9.1",
 ]
+
+[[package]]
+name = "aurora-engine-tests"
+version = "1.0.0"
 
 [[package]]
 name = "aurora-engine-types"

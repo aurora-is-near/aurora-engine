@@ -1,0 +1,17 @@
+[package]
+name = "aurora-engine-tests"
+version = "1.0.0"
+authors = ["NEAR <hello@near.org>"]
+edition = "2018"
+description = ""
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "GPL-3.0"
+publish = false
+autobenches = false
+
+[dependencies]
+
+[dev-dependencies]

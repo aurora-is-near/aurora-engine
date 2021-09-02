@@ -1,14 +1,8 @@
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
-use crate::prelude::{vec, Address, BTreeMap, Vec};
-use crate::{
-    precompiles::blake2::Blake2F,
-    precompiles::bn128::{Bn128Add, Bn128Mul, Bn128Pair},
-    precompiles::hash::{RIPEMD160, SHA256},
-    precompiles::identity::Identity,
-    precompiles::modexp::ModExp,
-    precompiles::native::{ExitToEthereum, ExitToNear},
-    precompiles::secp256k1::ECRecover,
+use crate::precompiles::{
+    blake2::*, bn128::*, hash::*, identity::*, modexp::*, native::*, secp256k1::*,
 };
+use crate::prelude::*;
 use evm::backend::Log;
 use evm::ExitSucceed;
 use evm::{Context, ExitError};
