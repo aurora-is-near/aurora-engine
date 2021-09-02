@@ -1,6 +1,6 @@
+pub use crate::prelude::Vec;
 use crate::storage::{bytes_to_key, KeyPrefixU8};
 use borsh::{BorshDeserialize, BorshSerialize};
-pub use prelude::Vec;
 
 /// An non-iterable implementation of a map that stores its content directly on the trie.
 /// Use `key_prefix` as a unique prefix for keys.

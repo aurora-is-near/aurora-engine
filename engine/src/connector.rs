@@ -100,10 +100,7 @@ impl EthConnectorContract {
         // Get initial contract arguments
         let contract_data = EthConnector {
             prover_account: args.prover_account,
-            eth_custodian_address: crate::prelude::types::validate_eth_address(
-                args.eth_custodian_address,
-            )
-            .sdk_unwrap(),
+            eth_custodian_address: validate_eth_address(args.eth_custodian_address).sdk_unwrap(),
         };
         // Save eth-connector specific data
         sdk::save_contract(
@@ -559,7 +556,7 @@ impl EthConnectorContract {
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (fee, relayer) {
-            (fee, Some(prelude::H160(evm_relayer_address))) if fee > 0 => {
+            (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
                 self.mint_eth_on_aurora(message_data.recipient, args.amount - fee);
                 self.mint_eth_on_aurora(evm_relayer_address, fee);
             }

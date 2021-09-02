@@ -13,7 +13,7 @@ publish = false
 autobenches = false
 
 [dependencies]
-prelude = { path = "../prelude", default-features = false }
+aurora-engine-types = { path = "../engine-types", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }
 

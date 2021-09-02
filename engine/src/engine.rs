@@ -37,7 +37,7 @@ macro_rules! unwrap_res_or_finish {
             Ok(v) => v,
             Err(_e) => {
                 #[cfg(feature = "log")]
-                sdk::log(prelude::format!("{:?}", _e).as_str());
+                sdk::log(crate::prelude::format!("{:?}", _e).as_str());
                 sdk::return_output($output);
                 return;
             }
@@ -808,9 +808,9 @@ impl Engine {
                             crate::prelude::String::from_utf8_lossy(&bytes)
                         );
                         Err(EngineError {
-                            kind: EngineErrorKind::EvmError(ExitError::Other(prelude::Cow::from(
-                                error_message,
-                            ))),
+                            kind: EngineErrorKind::EvmError(ExitError::Other(
+                                crate::prelude::Cow::from(error_message),
+                            )),
                             gas_used: submit_result.gas_used,
                         })
                     }

@@ -119,6 +119,7 @@ version = "1.7.0"
 dependencies = [
  "aurora-bn",
  "aurora-engine-sdk",
+ "aurora-engine-types",
  "base64 0.13.0",
  "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh",
@@ -139,7 +140,6 @@ dependencies = [
  "near-vm-logic 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
  "near-vm-runner 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
  "num",
- "prelude",
  "primitive-types",
  "rand 0.7.3",
  "ripemd160",
@@ -156,8 +156,23 @@ dependencies = [
 name = "aurora-engine-sdk"
 version = "1.0.0"
 dependencies = [
+ "aurora-engine-types",
  "borsh",
- "prelude",
+ "sha3 0.9.1",
+]
+
+[[package]]
+name = "aurora-engine-types"
+version = "1.0.0"
+dependencies = [
+ "borsh",
+ "bstr",
+ "ethabi",
+ "hex",
+ "primitive-types",
+ "rand 0.7.3",
+ "serde",
+ "serde_json",
  "sha3 0.9.1",
 ]
 
@@ -2814,21 +2829,6 @@ name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
-
-[[package]]
-name = "prelude"
-version = "0.1.0"
-dependencies = [
- "borsh",
- "bstr",
- "ethabi",
- "hex",
- "primitive-types",
- "rand 0.7.3",
- "serde",
- "serde_json",
- "sha3 0.9.1",
-]
 
 [[package]]
 name = "primitive-types"

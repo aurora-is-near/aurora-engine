@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "engine",
-    "prelude",
+    "engine-types",
     "engine-sdk"
 ]
 exclude = [

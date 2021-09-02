@@ -45,7 +45,7 @@ lto = true
 opt-level = 3
 
 [dependencies]
-prelude = { path = "../prelude", default-features = false }
+aurora-engine-types = { path = "../engine-types", default-features = false }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
 base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
 blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
@@ -85,8 +85,8 @@ git2 = "0.13"
 
 [features]
 default = ["sha2", "std"]
-std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "logos/std", "bn/std", "prelude/std"]
-contract = ["prelude/contract", "aurora-engine-sdk/contract"]
+std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "logos/std", "bn/std", "aurora-engine-types/std"]
+contract = ["aurora-engine-types/contract", "aurora-engine-sdk/contract"]
 evm_bully = []
 log = ["aurora-engine-sdk/log"]
 meta-call = []

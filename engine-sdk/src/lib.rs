@@ -6,9 +6,9 @@
 pub mod types;
 
 mod lib {
+    pub use aurora_engine_types::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
+    pub use aurora_engine_types::{vec, Address, Vec, H256};
     pub use borsh::{BorshDeserialize, BorshSerialize};
-    pub use prelude::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
-    pub use prelude::{vec, Address, Vec, H256};
 }
 use lib::*;
 
@@ -408,7 +408,7 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
 }
 
 /// Recover address from message hash and signature.
-pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<prelude::Address, ECRecoverErr> {
+pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> {
     unsafe {
         let hash_ptr = hash.as_ptr() as u64;
         let sig_ptr = signature.as_ptr() as u64;
@@ -430,7 +430,7 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<prelude::Address, ECRec
             exports::keccak256(u64::MAX, RECOVER_REGISTER_ID, KECCACK_REGISTER_ID);
             let keccak_hash_bytes = [0u8; 32];
             exports::read_register(KECCACK_REGISTER_ID, keccak_hash_bytes.as_ptr() as u64);
-            Ok(prelude::Address::from_slice(&keccak_hash_bytes[12..]))
+            Ok(Address::from_slice(&keccak_hash_bytes[12..]))
         } else {
             Err(ECRecoverErr)
         }

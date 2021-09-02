@@ -404,7 +404,7 @@ mod contract {
             Err(e) => sdk::panic_utf8(e.as_ref()),
         };
 
-        sdk::log!(prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str());
+        sdk::log!(crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str());
         engine
             .register_token(address.as_bytes(), args.nep141.as_bytes())
             .sdk_unwrap();

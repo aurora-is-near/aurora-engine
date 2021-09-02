@@ -2,8 +2,8 @@ use crate::prelude::sdk;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::fungible_token::FungibleTokenMetadata;
+use crate::prelude::{format, AccountId, Balance, EthAddress, RawAddress, RawH256, RawU256};
 use crate::prelude::{is_valid_account_id, String, ToString, TryFrom, Vec};
-use crate::prelude::{AccountId, Balance, EthAddress, RawAddress, RawH256, RawU256};
 use crate::proof::Proof;
 use crate::{admin_controlled::PausedMask, json};
 use evm::backend::Log;
@@ -206,7 +206,7 @@ impl TryFrom<NEP141FtOnTransferArgs> for String {
             return Err(json::ParseError::InvalidAccountId);
         }
 
-        Ok(prelude::format!(
+        Ok(format!(
             r#"{{"sender_id": "{}", "amount": "{}", "msg": "{}"}}"#,
             value.sender_id,
             value.amount,
@@ -266,7 +266,7 @@ pub struct StorageBalance {
 
 impl StorageBalance {
     pub fn to_json_bytes(&self) -> Vec<u8> {
-        crate::prelude::format!(
+        format!(
             "{{\"total\": \"{}\", \"available\": \"{}\"}}",
             self.total.to_string(),
             self.available.to_string()
