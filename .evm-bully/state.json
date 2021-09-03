@@ -3,5 +3,8 @@
         "aurora-cli": "a9ecf31c550d02e19a87aecce1b3626cfc84c410",
         "nearcore": "8a377fda0b4ce319385c463f1ae46e4b0b29dcd9",
         "evm-bully": "1125b5fc1527f344928e611143c1aef8d2e4e5de"
+    },
+    "progress": {
+        "goerli": "goerli-block-5644-tx-0.tar.gz"
     }
 }
