@@ -186,8 +186,9 @@ fn test_transfer_charging_gas_success() {
     let expected_source_balance = INITIAL_BALANCE - TRANSFER_AMOUNT - spent_amount;
     let expected_dest_balance = TRANSFER_AMOUNT;
     let expected_relayer_balance = spent_amount;
-    let relayer_address =
-        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+    let relayer_address = types::near_account_to_evm_address(
+        runner.context.predecessor_account_id.as_ref().as_bytes(),
+    );
 
     // validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -239,8 +240,9 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
-    let relayer =
-        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+    let relayer = types::near_account_to_evm_address(
+        runner.context.predecessor_account_id.as_ref().as_bytes(),
+    );
     test_utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
@@ -323,11 +325,8 @@ fn test_block_hash_contract() {
 fn test_ft_metadata() {
     let mut runner = test_utils::deploy_evm();
 
-    let (maybe_outcome, maybe_error) = runner.call(
-        "ft_metadata",
-        runner.context.signer_account_id.clone(),
-        Vec::new(),
-    );
+    let account_id: String = runner.context.signer_account_id.clone().into();
+    let (maybe_outcome, maybe_error) = runner.call("ft_metadata", &account_id, Vec::new());
     assert!(maybe_error.is_none());
     let outcome = maybe_outcome.unwrap();
     let json_value = crate::json::parse_json(&outcome.return_data.as_value().unwrap()).unwrap();
