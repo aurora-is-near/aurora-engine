@@ -1,5 +1,4 @@
-use crate::prelude::sdk;
-use borsh::{BorshDeserialize, BorshSerialize};
+use crate::prelude::*;
 use evm::Context;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
@@ -9,16 +8,10 @@ use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome};
 use near_vm_runner::{MockCompiledContractCache, VMError};
-use primitive_types::U256;
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 use std::borrow::Cow;
 
-use crate::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs};
-use crate::prelude::AccountId;
-use crate::prelude::Address;
-use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 use crate::transaction::{
     access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
@@ -342,7 +335,7 @@ impl AuroraRunner {
         (status, profile)
     }
 
-    pub fn get_balance(&self, address: Address) -> crate::prelude::types::Wei {
+    pub fn get_balance(&self, address: Address) -> Wei {
         crate::prelude::types::Wei::new(self.getter_method_call("get_balance", address))
     }
 

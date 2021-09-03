@@ -340,7 +340,7 @@ fn test_ft_metadata() {
 }
 
 // Same as `test_eth_transfer_insufficient_balance` above, except runs through
-// `near-engine-sdk-sim` instead of `near-vm-runner`. This is important because `near-engine-sdk-sim`
+// `near-sdk-sim` instead of `near-vm-runner`. This is important because `near-sdk-sim`
 // has more production logic, in particular, state revert on contract panic.
 // TODO: should be able to generalize the `call` backend of `AuroraRunner` so that this
 //       test does not need to be written twice.
@@ -375,7 +375,7 @@ fn test_eth_transfer_insufficient_balance_sim() {
     );
 }
 
-// Same as `test_eth_transfer_charging_gas_not_enough_balance` but run through `near-engine-sdk-sim`.
+// Same as `test_eth_transfer_charging_gas_not_enough_balance` but run through `near-sdk-sim`.
 #[test]
 fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
     let (aurora, mut signer, address) = initialize_evm_sim();
