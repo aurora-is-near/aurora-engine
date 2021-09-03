@@ -76,7 +76,7 @@ const MAX_ACCOUNT_ID_LEN: u64 = 64;
 
 /// Returns `true` if the given account ID is valid and `false` otherwise.
 ///
-/// Taken from near-engine-sdk-rs:
+/// Taken from near-sdk-rs:
 /// (https://github.com/near/near-sdk-rs/blob/42f62384c3acd024829501ee86e480917da03896/near-sdk/src/environment/env.rs#L816-L843)
 pub fn is_valid_account_id(account_id: &[u8]) -> bool {
     if (account_id.len() as u64) < MIN_ACCOUNT_ID_LEN

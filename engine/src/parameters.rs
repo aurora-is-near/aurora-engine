@@ -63,7 +63,6 @@ pub enum TransactionStatus {
 }
 
 impl TransactionStatus {
-    #[allow(unused)]
     pub fn is_ok(&self) -> bool {
         matches!(*self, TransactionStatus::Succeed(_))
     }
