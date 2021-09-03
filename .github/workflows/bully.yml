@@ -1,0 +1,41 @@
+---
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - "*"
+
+name: Bully-testing
+jobs:
+  test:
+    strategy:
+      matrix:
+        net: [goerli]
+    name: Test with ${{ matrix.net }}
+    runs-on: self-hosted
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Restore cache
+        run: |
+          cache-util restore cargo_git cargo_registry sccache yarn_cache
+          cache-util restore aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
+      - name: Build aurora-engine
+        run: make evm-bully=yes
+      - name: Execute
+        run: |
+          rm -rf ./evm-bully/workdir
+          cd .evm-bully
+          ./prepare.sh
+          ./run-bully.sh -${{ matrix.net }}
+      - name: Save cache
+        run: |
+          cache-util save cargo_git cargo_registry sccache yarn_cache
+          cache-util msave aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTC_WRAPPER: sccache
