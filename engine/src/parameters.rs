@@ -67,12 +67,10 @@ impl TransactionStatus {
         matches!(*self, TransactionStatus::Succeed(_))
     }
 
-    #[allow(unused)]
     pub fn is_revert(&self) -> bool {
         matches!(*self, TransactionStatus::Revert(_))
     }
 
-    #[allow(unused)]
     pub fn is_fail(&self) -> bool {
         *self == TransactionStatus::OutOfGas
             || *self == TransactionStatus::OutOfFund
