@@ -17,16 +17,16 @@ mod map;
 #[cfg(feature = "meta-call")]
 pub mod meta_parsing;
 pub mod parameters;
-mod proof;
+pub mod proof;
 pub mod storage;
 pub mod transaction;
 
 mod admin_controlled;
 #[cfg_attr(not(feature = "contract"), allow(dead_code))]
-mod connector;
+pub mod connector;
 mod deposit_event;
 pub mod engine;
-mod fungible_token;
+pub mod fungible_token;
 mod json;
 mod log_entry;
 mod precompiles;
