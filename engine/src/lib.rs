@@ -30,10 +30,10 @@ pub mod fungible_token;
 pub mod json;
 mod log_entry;
 mod precompiles;
+mod prelude;
 
 #[cfg(test)]
 mod benches;
-mod prelude;
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]

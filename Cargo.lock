@@ -162,46 +162,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aurora-engine-tests"
-version = "1.0.0"
-dependencies = [
- "aurora-bn",
- "aurora-engine",
- "aurora-engine-sdk",
- "aurora-engine-types",
- "base64 0.13.0",
- "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
- "borsh",
- "bstr",
- "byte-slice-cast",
- "criterion",
- "ethabi",
- "evm",
- "evm-core",
- "git2",
- "hex",
- "libsecp256k1",
- "logos",
- "near-crypto 0.1.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
- "near-primitives-core 0.1.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
- "near-sdk",
- "near-sdk-sim",
- "near-vm-logic 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
- "near-vm-runner 3.0.0 (git+https://github.com/near/nearcore.git?branch=1.20.1)",
- "num",
- "primitive-types",
- "rand 0.7.3",
- "ripemd160",
- "rjson",
- "rlp",
- "serde",
- "serde_json",
- "sha2 0.9.5",
- "sha3 0.9.1",
- "wee_alloc",
-]
-
-[[package]]
 name = "aurora-engine-types"
 version = "1.0.0"
 dependencies = [

@@ -52,7 +52,7 @@ impl Precompile for Identity {
         Ok(PrecompileOutput::without_logs(cost, input.to_vec()).into())
     }
 }
-
+/*
 #[cfg(test)]
 mod tests {
     use evm::ExitError;
@@ -93,3 +93,4 @@ mod tests {
         assert_eq!(res, input.to_vec());
     }
 }
+*/
