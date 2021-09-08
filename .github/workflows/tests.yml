@@ -4,9 +4,7 @@ on:
     branches:
       - master
       - develop
-  pull_request:
-    branches:
-      - "*"
+  pull_request: "*"
 
 name: Tests
 jobs:
