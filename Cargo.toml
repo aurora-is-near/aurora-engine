@@ -3,7 +3,7 @@ members = [
     "engine",
     "engine-types",
     "engine-sdk",
-    #"engine-tests"
+    "engine-tests"
 ]
 exclude = [
     "etc/state-migration-test"

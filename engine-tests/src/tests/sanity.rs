@@ -1,10 +1,10 @@
-use crate::fungible_token::FungibleTokenMetadata;
-use crate::parameters::{SubmitResult, TransactionStatus};
-use crate::prelude::sdk;
 use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::test_utils;
 use crate::tests::state_migration;
+use aurora_engine::fungible_token::FungibleTokenMetadata;
+use aurora_engine::parameters::{SubmitResult, TransactionStatus};
+use aurora_engine_sdk as sdk;
 use borsh::BorshSerialize;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
@@ -287,7 +287,8 @@ fn test_block_hash() {
         crate::prelude::u256_to_arr(&number)
     };
     let account_id = runner.aurora_account_id;
-    let block_hash = crate::engine::Engine::compute_block_hash(chain_id, 10, account_id.as_bytes());
+    let block_hash =
+        aurora_engine::engine::Engine::compute_block_hash(chain_id, 10, account_id.as_bytes());
 
     assert_eq!(
         hex::encode(block_hash.0).as_str(),
@@ -331,11 +332,12 @@ fn test_ft_metadata() {
     );
     assert!(maybe_error.is_none());
     let outcome = maybe_outcome.unwrap();
-    let json_value = crate::json::parse_json(&outcome.return_data.as_value().unwrap()).unwrap();
+    let json_value =
+        aurora_engine::json::parse_json(&outcome.return_data.as_value().unwrap()).unwrap();
 
     assert_eq!(
         json_value,
-        crate::json::JsonValue::from(FungibleTokenMetadata::default())
+        aurora_engine::json::JsonValue::from(FungibleTokenMetadata::default())
     );
 }
 

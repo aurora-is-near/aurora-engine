@@ -1,8 +1,8 @@
-use crate::parameters::{FunctionCallArgs, SubmitResult};
 use crate::prelude::*;
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
-use crate::transaction::LegacyEthSignedTransaction;
+use aurora_engine::parameters::{FunctionCallArgs, SubmitResult};
+use aurora_engine::transaction::LegacyEthSignedTransaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
 use near_vm_logic::VMOutcome;

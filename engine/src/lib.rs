@@ -33,10 +33,6 @@ mod precompiles;
 mod prelude;
 
 #[cfg(test)]
-mod benches;
-#[cfg(test)]
-mod test_utils;
-#[cfg(test)]
 mod tests;
 
 #[cfg(target_arch = "wasm32")]
