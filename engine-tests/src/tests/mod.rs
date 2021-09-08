@@ -5,6 +5,7 @@ mod erc20_connector;
 mod eth_connector;
 #[cfg(feature = "meta-call")]
 mod meta_parsing;
+mod precompiles;
 mod sanity;
 mod self_destruct_state;
 mod standard_precompiles;

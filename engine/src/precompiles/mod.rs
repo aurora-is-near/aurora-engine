@@ -224,7 +224,7 @@ const fn make_address(x: u32, y: u128) -> Address {
         y_bytes[15],
     ])
 }
-/*
+
 #[cfg(test)]
 mod tests {
     use crate::precompiles::{Byzantium, Istanbul};
@@ -275,4 +275,3 @@ mod tests {
         (u32::from_be_bytes(x_bytes), u128::from_be_bytes(y_bytes))
     }
 }
-*/
