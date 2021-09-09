@@ -92,11 +92,11 @@ impl Precompile for Blake2F {
         Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
-/*
+
 #[cfg(test)]
 mod tests {
+    use super::super::utils::new_context;
     use crate::prelude::Vec;
-    use crate::test_utils::new_context;
 
     use super::*;
 
@@ -278,4 +278,3 @@ mod tests {
         assert_eq!(test_blake2f_final_block_false(), expected);
     }
 }
-*/
