@@ -331,7 +331,7 @@ impl Precompile for ExitToEthereum {
         .into())
     }
 }
-/*
+
 #[cfg(test)]
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
@@ -349,4 +349,3 @@ mod tests {
         );
     }
 }
-*/

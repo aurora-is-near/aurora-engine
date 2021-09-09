@@ -194,10 +194,10 @@ fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
 
     (base_len, exp_len, mod_len)
 }
-/*
+
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::new_context;
+    use super::super::utils::new_context;
 
     use super::*;
 
@@ -437,4 +437,3 @@ mod tests {
         assert_eq!(res.output, expected)
     }
 }
-*/

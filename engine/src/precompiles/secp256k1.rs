@@ -110,11 +110,11 @@ impl Precompile for ECRecover {
         Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
-/*
+
 #[cfg(test)]
 mod tests {
+    use super::super::utils::new_context;
     use super::*;
-    use crate::test_utils::new_context;
 
     fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
         matches!(ecrecover(hash, signature), Ok(s) if s == signer)
@@ -201,4 +201,3 @@ mod tests {
         // assert_eq!(res, expected);
     }
 }
-*/

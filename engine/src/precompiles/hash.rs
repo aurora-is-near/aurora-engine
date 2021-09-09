@@ -131,10 +131,10 @@ impl Precompile for RIPEMD160 {
         Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }
-/*
+
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::new_context;
+    use super::super::utils::new_context;
 
     use super::*;
 
@@ -164,4 +164,3 @@ mod tests {
         assert_eq!(res, expected);
     }
 }
-*/

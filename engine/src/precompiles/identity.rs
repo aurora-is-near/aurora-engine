@@ -52,12 +52,12 @@ impl Precompile for Identity {
         Ok(PrecompileOutput::without_logs(cost, input.to_vec()).into())
     }
 }
-/*
+
 #[cfg(test)]
 mod tests {
     use evm::ExitError;
 
-    use crate::test_utils::new_context;
+    use super::super::utils::new_context;
 
     use super::*;
 
@@ -93,4 +93,3 @@ mod tests {
         assert_eq!(res, input.to_vec());
     }
 }
-*/
