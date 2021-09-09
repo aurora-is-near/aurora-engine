@@ -32,9 +32,6 @@ mod log_entry;
 mod precompiles;
 mod prelude;
 
-#[cfg(test)]
-mod tests;
-
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
