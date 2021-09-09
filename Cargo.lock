@@ -209,6 +209,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-precompiles"
+version = "1.0.0"
+dependencies = [
+ "borsh",
+ "ethabi",
+ "hex",
+ "primitive-types",
+ "rand 0.7.3",
+ "serde",
+ "serde_json",
+ "sha3 0.9.1",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
