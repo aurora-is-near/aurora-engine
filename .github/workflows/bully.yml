@@ -51,6 +51,11 @@ jobs:
           cache-util msave aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
       - name: Run evm-bully
         run: ./.evm-bully/evm_bully_run.sh ${{ matrix.net }}
+      - name: Upload breakpoint archive
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.net }}-breakpoint
+          path: .evm-bully/workdir/evm-bully/*.tar.gz
 
 env:
   CARGO_TERM_COLOR: always
