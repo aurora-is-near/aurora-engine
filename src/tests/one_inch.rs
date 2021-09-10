@@ -36,8 +36,7 @@ fn deploy_1_inch_limit_order_contract(
     runner: &mut test_utils::AuroraRunner,
     signer: &mut test_utils::Signer,
 ) -> VMOutcome {
-    let sources_dir = download_solidity_sources();
-    let contract_path = compile_solidity_sources(sources_dir);
+    let contract_path = download_and_compile_solidity_sources();
     let constructor =
         test_utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
 
@@ -61,7 +60,17 @@ fn deploy_1_inch_limit_order_contract(
     outcome.unwrap()
 }
 
-fn compile_solidity_sources(sources_dir: PathBuf) -> PathBuf {
+fn download_and_compile_solidity_sources() -> PathBuf {
+    let sources_dir = Path::new("target").join("limit-order-protocol");
+    if !sources_dir.exists() {
+        // Contracts not already present, so download them (but only once, even
+        // if multiple tests running in parallel saw `contracts_dir` does not exist).
+        DOWNLOAD_ONCE.call_once(|| {
+            let url = "https://github.com/1inch/limit-order-protocol";
+            git2::Repository::clone(url, &sources_dir).unwrap();
+        });
+    }
+
     COMPILE_ONCE.call_once(|| {
         // install packages
         let status = Command::new("/usr/bin/env")
@@ -86,21 +95,6 @@ fn compile_solidity_sources(sources_dir: PathBuf) -> PathBuf {
     });
 
     sources_dir.join("artifacts/contracts/LimitOrderProtocol.sol/LimitOrderProtocol.json")
-}
-
-fn download_solidity_sources() -> PathBuf {
-    let sources_dir = Path::new("target").join("limit-order-protocol");
-    if sources_dir.exists() {
-        sources_dir
-    } else {
-        // Contracts not already present, so download them (but only once, even
-        // if multiple tests running in parallel saw `contracts_dir` does not exist).
-        DOWNLOAD_ONCE.call_once(|| {
-            let url = "https://github.com/1inch/limit-order-protocol";
-            git2::Repository::clone(url, &sources_dir).unwrap();
-        });
-        sources_dir
-    }
 }
 
 fn initialize() -> (test_utils::AuroraRunner, test_utils::Signer) {
