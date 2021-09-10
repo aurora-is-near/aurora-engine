@@ -13,11 +13,22 @@ mod lib {
 use lib::*;
 
 mod blake2;
+mod bn128;
+mod hash;
+mod identity;
+mod modexp;
+mod native;
+mod secp256k1;
 #[cfg(test)]
 mod utils;
 
-//pub(crate) use crate::precompiles::secp256k1::ecrecover;
-
+use crate::blake2::Blake2F;
+use crate::bn128::{Bn128Add, Bn128Mul, Bn128Pair};
+use crate::hash::{RIPEMD160, SHA256};
+use crate::identity::Identity;
+use crate::modexp::ModExp;
+use crate::native::{ExitToEthereum, ExitToNear};
+use crate::secp256k1::ECRecover;
 use evm::backend::Log;
 use evm::ExitSucceed;
 use evm::{Context, ExitError};
@@ -102,7 +113,7 @@ impl HardFork for Berlin {}
 type PrecompileFn = fn(&[u8], Option<u64>, &Context, bool) -> EvmPrecompileResult;
 
 pub struct Precompiles(pub BTreeMap<Address, PrecompileFn>);
-/*
+
 impl Precompiles {
     #[allow(dead_code)]
     pub fn new_homestead() -> Self {
@@ -199,7 +210,7 @@ impl Precompiles {
         Self::new_istanbul()
     }
 }
-*/
+
 /// const fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
@@ -229,11 +240,10 @@ const fn make_address(x: u32, y: u128) -> Address {
         y_bytes[15],
     ])
 }
-/*
+
 #[cfg(test)]
 mod tests {
-    use crate::precompiles::{Byzantium, Istanbul};
-    use crate::prelude::Address;
+    use crate::{Address, Byzantium, Istanbul};
     use rand::Rng;
 
     #[test]
@@ -280,4 +290,3 @@ mod tests {
         (u32::from_be_bytes(x_bytes), u128::from_be_bytes(y_bytes))
     }
 }
-*/
