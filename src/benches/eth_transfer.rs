@@ -26,13 +26,12 @@ pub(crate) fn eth_transfer_benchmark(c: &mut Criterion) {
         &source_account,
     );
     let input = rlp::encode(&transaction).to_vec();
-    let calling_account_id = "some-account.near".to_string();
+    let calling_account_id = "some-account.near";
 
     // measure gas usage
-    let (output, maybe_err) =
-        runner
-            .one_shot()
-            .call(SUBMIT, calling_account_id.clone(), input.clone());
+    let (output, maybe_err) = runner
+        .one_shot()
+        .call(SUBMIT, calling_account_id, input.clone());
     assert!(maybe_err.is_none());
     let gas = output.unwrap().burnt_gas;
     // TODO(#45): capture this in a file
@@ -42,7 +41,7 @@ pub(crate) fn eth_transfer_benchmark(c: &mut Criterion) {
     // measure wall-clock time
     c.bench_function("eth_transfer", |b| {
         b.iter_batched(
-            || (runner.one_shot(), calling_account_id.clone(), input.clone()),
+            || (runner.one_shot(), calling_account_id, input.clone()),
             |(r, c, i)| r.call(SUBMIT, c, i),
             BatchSize::SmallInput,
         )

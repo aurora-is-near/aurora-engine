@@ -76,7 +76,7 @@ impl test_utils::AuroraRunner {
         caller_account_id: String,
         input: Vec<u8>,
     ) -> CallResult {
-        let (outcome, error) = self.call(method_name, caller_account_id, input);
+        let (outcome, error) = self.call(method_name, &caller_account_id, input);
         CallResult { outcome, error }
     }
 
@@ -87,13 +87,8 @@ impl test_utils::AuroraRunner {
         signer_account_id: String,
         input: Vec<u8>,
     ) -> CallResult {
-        let (outcome, error) = self.call_with_signer(
-            method_name,
-            caller_account_id,
-            signer_account_id,
-            input,
-            None,
-        );
+        let (outcome, error) =
+            self.call_with_signer(method_name, &caller_account_id, &signer_account_id, input);
         CallResult { outcome, error }
     }
 
