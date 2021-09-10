@@ -6,7 +6,7 @@
     },
     "progress": {
         "goerli": "goerli-block-5644-tx-0.tar.gz",
-        "rinkeby": "some-wrong-stuff",
-        "ropsten": "some-wrong-stuff"
+        "rinkeby": "rinkeby-block-55-tx-0.tar.gz",
+        "ropsten": "ropsten-block-11-tx-0.tar.gz"
     }
 }
