@@ -1,4 +1,5 @@
-use crate::prelude::*;
+use crate::*;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 // NOTE: We start at 0x7 as our initial value as our original storage was not
 // version prefixed and ended as 0x6.
@@ -111,6 +112,3 @@ fn generation_storage_key(address: &Address, key: &H256, generation: u32) -> [u8
     result[26..58].copy_from_slice(&key.0);
     result
 }
-
-#[cfg(test)]
-mod tests {}

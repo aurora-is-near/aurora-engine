@@ -4,9 +4,9 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use aurora_engine::engine::{Engine, EngineState};
-use aurora_engine::storage;
-use borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_sdk as sdk;
+use aurora_engine_types::storage;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(BorshDeserialize, BorshSerialize)]
 struct NewFancyState {

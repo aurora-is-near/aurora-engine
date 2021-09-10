@@ -15,7 +15,7 @@ mod consts {
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000001
 // Quite a few library methods rely on this and that should be changed. This
 // should only be for precompiles.
-pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
+pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     assert_eq!(signature.len(), 65);
 
     #[cfg(feature = "contract")]

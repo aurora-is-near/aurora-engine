@@ -7,18 +7,20 @@
 mod lib {
     pub use aurora_engine_sdk as sdk;
     pub use aurora_engine_sdk::types::*;
+    pub use aurora_engine_types::parameters::*;
+    pub use aurora_engine_types::storage::*;
     pub use aurora_engine_types::types::*;
     pub use aurora_engine_types::*;
 }
 use lib::*;
 
-mod blake2;
-mod bn128;
-mod hash;
-mod identity;
-mod modexp;
-mod native;
-mod secp256k1;
+pub mod blake2;
+pub mod bn128;
+pub mod hash;
+pub mod identity;
+pub mod modexp;
+pub mod native;
+pub mod secp256k1;
 #[cfg(test)]
 mod utils;
 

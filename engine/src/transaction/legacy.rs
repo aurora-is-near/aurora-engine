@@ -1,3 +1,4 @@
+use crate::precompiles::secp256k1::ecrecover;
 use crate::prelude::sdk;
 use crate::prelude::Wei;
 use crate::prelude::{Address, Vec, U256};
@@ -78,7 +79,7 @@ impl LegacyEthSignedTransaction {
         self.transaction
             .rlp_append_unsigned(&mut rlp_stream, chain_id);
         let message_hash = sdk::keccak(rlp_stream.as_raw());
-        crate::precompiles::ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s)).ok()
+        ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s)).ok()
     }
 
     /// Returns chain id encoded in `v` parameter of the signature if that was done, otherwise None.

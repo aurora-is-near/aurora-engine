@@ -1,3 +1,4 @@
+use crate::prelude::parameters::WithdrawCallArgs;
 use crate::prelude::EthAddress;
 use crate::prelude::U256;
 use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
@@ -6,7 +7,7 @@ use aurora_engine::connector::{
 };
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
-    InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawCallArgs, WithdrawResult,
+    InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use byte_slice_cast::AsByteSlice;

@@ -1,5 +1,4 @@
 use crate::prelude::{Address, Wei, U256};
-use aurora_engine::storage;
 use aurora_engine_sdk as sdk;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::config::VMConfig;
@@ -242,15 +241,21 @@ impl AuroraRunner {
     ) {
         let trie = &mut self.ext.fake_trie;
 
-        let balance_key = storage::address_to_key(storage::KeyPrefix::Balance, &address);
+        let balance_key = crate::prelude::storage::address_to_key(
+            crate::prelude::storage::KeyPrefix::Balance,
+            &address,
+        );
         let balance_value = init_balance.to_bytes();
 
-        let nonce_key = storage::address_to_key(storage::KeyPrefix::Nonce, &address);
+        let nonce_key = crate::prelude::storage::address_to_key(
+            crate::prelude::storage::KeyPrefix::Nonce,
+            &address,
+        );
         let nonce_value = crate::prelude::u256_to_arr(&init_nonce);
 
-        let ft_key = storage::bytes_to_key(
-            storage::KeyPrefix::EthConnector,
-            &[storage::EthConnectorStorageId::FungibleToken as u8],
+        let ft_key = crate::prelude::storage::bytes_to_key(
+            crate::prelude::storage::KeyPrefix::EthConnector,
+            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
         );
         let ft_value = {
             let mut current_ft: FungibleToken = trie

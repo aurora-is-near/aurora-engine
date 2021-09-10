@@ -3,6 +3,7 @@
 
 # Visual Studio Code
 .vscode/
+.run/
 
 # IDEA
 .idea

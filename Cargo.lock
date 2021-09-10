@@ -118,6 +118,7 @@ name = "aurora-engine"
 version = "1.7.2"
 dependencies = [
  "aurora-bn",
+ "aurora-engine-precompiles",
  "aurora-engine-sdk",
  "aurora-engine-types",
  "base64 0.13.0",
@@ -149,7 +150,6 @@ name = "aurora-engine-precompiles"
 version = "1.0.0"
 dependencies = [
  "aurora-bn",
- "aurora-engine",
  "aurora-engine-sdk",
  "aurora-engine-types",
  "base64 0.13.0",
