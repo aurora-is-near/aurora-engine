@@ -27,6 +27,7 @@ jobs:
     strategy:
       matrix:
         net: [goerli, ropsten, rinkeby]
+      fail-fast: false
     name: Bully-test with ${{ matrix.net }}
     runs-on: self-hosted
     steps:
