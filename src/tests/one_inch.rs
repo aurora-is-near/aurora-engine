@@ -23,6 +23,7 @@ fn test_1_inch_limit_order_deploy() {
     let profile = test_utils::ExecutionProfile::new(&outcome);
     let result: SubmitResult =
         SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+    assert!(result.status.is_ok());
 
     // more than 4 million Ethereum gas used
     assert!(result.gas_used > 4_000_000);
