@@ -5,16 +5,29 @@ on:
       - master
       - develop
   pull_request:
-    branches:
-      - "*"
 
 name: Bully-testing
 jobs:
-  test:
+
+  prebuild-nearcore:
+    name: Prebuild nearcore
+    runs-on: self-hosted
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Restore cache (global)
+        run: cache-util restore cargo_git cargo_registry sccache
+      - name: Try restore nearcore, or build otherwise
+        run: ./.evm-bully/nearcore_restore_or_build.sh
+      - name: Save result to cache
+        run: ./.evm-bully/nearcore_save_to_cache.sh
+
+  bully-test:
+    needs: prebuild-nearcore
     strategy:
       matrix:
-        net: [goerli]
-    name: Test with ${{ matrix.net }}
+        net: [goerli, ropsten, rinkeby]
+    name: Bully-test with ${{ matrix.net }}
     runs-on: self-hosted
     steps:
       - name: Clone the repository
@@ -22,19 +35,22 @@ jobs:
       - name: Restore cache
         run: |
           cache-util restore cargo_git cargo_registry sccache yarn_cache
-          cache-util restore aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
+          cache-util restore aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target 
       - name: Build aurora-engine
         run: make evm-bully=yes
-      - name: Execute
-        run: |
-          rm -rf ./evm-bully/workdir
-          cd .evm-bully
-          ./prepare.sh
-          ./run-bully.sh -${{ matrix.net }}
+      - name: Install aurora-cli
+        run: ./.evm-bully/aurora_cli_install.sh
+      - name: Try restore nearcore, or build otherwise
+        run: ./.evm-bully/nearcore_restore_or_build.sh
+      - name: Build evm-bully
+        run: ./.evm-bully/evm_bully_build.sh
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
           cache-util msave aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
+      - name: Run evm-bully
+        run: ./.evm-bully/evm_bully_run.sh ${{ matrix.net }}
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
