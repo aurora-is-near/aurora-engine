@@ -4,7 +4,7 @@ use crate::prelude::{Address, U256};
 use crate::test_utils;
 use crate::tests::state_migration;
 use crate::types::{self, Wei, ERC20_MINT_SELECTOR};
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
@@ -12,6 +12,17 @@ const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
+
+#[test]
+fn test_num_wasm_functions() {
+    // Counts the number of functions in our wasm output.
+    // See https://github.com/near/nearcore/issues/4814 for context
+    let runner = test_utils::deploy_evm();
+    let artifact = get_compiled_artifact(&runner);
+    let module_info = artifact.info();
+    let num_functions = module_info.func_assoc.len();
+    assert!(num_functions <= 1280);
+}
 
 /// Tests we can transfer Eth from one account to another and that the balances are correctly
 /// updated.
@@ -436,4 +447,21 @@ fn query_address_sim(
         near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
         other => panic!("Unexpected outcome: {:?}", other),
     }
+}
+
+fn get_compiled_artifact(
+    runner: &test_utils::AuroraRunner,
+) -> wasmer_runtime_core::cache::Artifact {
+    use near_primitives::types::CompiledContractCache;
+
+    near_vm_runner::precompile_contract(&runner.code, &runner.wasm_config, Some(&runner.cache))
+        .unwrap();
+    let cache_key = near_vm_runner::get_contract_cache_key(
+        &runner.code,
+        Default::default(),
+        &runner.wasm_config,
+    );
+    let cache_record: Vec<u8> =
+        Vec::try_from_slice(&runner.cache.get(cache_key.as_ref()).unwrap().unwrap()[1..]).unwrap();
+    wasmer_runtime_core::cache::Artifact::deserialize(&cache_record).unwrap()
 }
