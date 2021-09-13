@@ -1,7 +1,5 @@
-use crate::parameters::PromiseCreateArgs;
 pub(crate) use crate::precompiles::secp256k1::ecrecover;
-use crate::prelude::{vec, Vec};
-use crate::AuroraState;
+use crate::prelude::{vec, BTreeMap, Vec};
 use crate::{
     precompiles::blake2::Blake2F,
     precompiles::bn128::{Bn128Add, Bn128Mul, Bn128Pair},
@@ -11,11 +9,10 @@ use crate::{
     precompiles::native::{ExitToEthereum, ExitToNear},
     precompiles::secp256k1::ECRecover,
     prelude::Address,
-    state::AuroraStackState,
 };
 use evm::backend::Log;
 use evm::ExitSucceed;
-use evm::{executor, Context, ExitError};
+use evm::{Context, ExitError};
 
 mod blake2;
 mod bn128;
@@ -23,6 +20,7 @@ mod hash;
 mod identity;
 mod modexp;
 #[cfg_attr(not(feature = "contract"), allow(dead_code))]
+// TODO: Refactor where the addresses are.
 pub(crate) mod native;
 mod secp256k1;
 
@@ -31,7 +29,6 @@ pub struct PrecompileOutput {
     pub cost: u64,
     pub output: Vec<u8>,
     pub logs: Vec<Log>,
-    pub promise: Option<PromiseCreateArgs>,
 }
 
 impl PrecompileOutput {
@@ -40,7 +37,6 @@ impl PrecompileOutput {
             cost,
             output,
             logs: Vec::new(),
-            promise: None,
         }
     }
 }
@@ -51,7 +47,6 @@ impl Default for PrecompileOutput {
             cost: 0,
             output: Vec::new(),
             logs: Vec::new(),
-            promise: None,
         }
     }
 }
@@ -67,9 +62,6 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
     }
 }
 
-/// A precompile operation result.
-type PrecompileResult = Result<PrecompileOutput, ExitError>;
-
 type EvmPrecompileResult = Result<evm::executor::PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
@@ -78,7 +70,12 @@ pub trait Precompile {
     fn required_gas(input: &[u8]) -> Result<u64, ExitError>;
 
     /// Runs the precompile function.
-    fn run(input: &[u8], target_gas: u64, context: &Context, is_static: bool) -> PrecompileResult;
+    fn run(
+        input: &[u8],
+        target_gas: Option<u64>,
+        context: &Context,
+        is_static: bool,
+    ) -> EvmPrecompileResult;
 }
 
 /// Hard fork marker.
@@ -104,12 +101,9 @@ impl HardFork for Istanbul {}
 
 impl HardFork for Berlin {}
 
-type PrecompileFn = fn(&[u8], u64, &Context, bool) -> PrecompileResult;
+type PrecompileFn = fn(&[u8], Option<u64>, &Context, bool) -> EvmPrecompileResult;
 
-pub(crate) struct Precompiles {
-    addresses: Vec<Address>,
-    fun: Vec<PrecompileFn>,
-}
+pub struct Precompiles(pub BTreeMap<Address, PrecompileFn>);
 
 impl Precompiles {
     #[allow(dead_code)]
@@ -128,8 +122,9 @@ impl Precompiles {
             ExitToNear::run,
             ExitToEthereum::run,
         ];
+        let map = addresses.into_iter().zip(fun).collect();
 
-        Precompiles { addresses, fun }
+        Precompiles(map)
     }
 
     #[allow(dead_code)]
@@ -158,8 +153,12 @@ impl Precompiles {
             ExitToNear::run,
             ExitToEthereum::run,
         ];
+        let mut map = BTreeMap::new();
+        for (address, fun) in addresses.into_iter().zip(fun) {
+            map.insert(address, fun);
+        }
 
-        Precompiles { addresses, fun }
+        Precompiles(map)
     }
 
     pub fn new_istanbul() -> Self {
@@ -189,55 +188,17 @@ impl Precompiles {
             ExitToNear::run,
             ExitToEthereum::run,
         ];
+        let mut map = BTreeMap::new();
+        for (address, fun) in addresses.into_iter().zip(fun) {
+            map.insert(address, fun);
+        }
 
-        Precompiles { addresses, fun }
+        Precompiles(map)
     }
 
     #[allow(dead_code)]
     fn new_berlin() -> Self {
         Self::new_istanbul()
-    }
-
-    fn get_fun(&self, address: &Address) -> Option<PrecompileFn> {
-        self.addresses
-            .iter()
-            .position(|e| e == address)
-            .and_then(|i| self.fun.get(i))
-            .copied()
-    }
-}
-
-/// Matches the address given to Homestead precompiles.
-impl<'backend, 'config> executor::Precompiles<AuroraStackState<'backend, 'config>> for Precompiles {
-    fn run(
-        &self,
-        address: Address,
-        input: &[u8],
-        target_gas: Option<u64>,
-        context: &Context,
-        state: &mut AuroraStackState,
-        is_static: bool,
-    ) -> Option<EvmPrecompileResult> {
-        let target_gas = match target_gas {
-            Some(t) => t,
-            None => return Some(EvmPrecompileResult::Err(ExitError::OutOfGas)),
-        };
-
-        let output = self.get_fun(&address).map(|fun| {
-            let mut res = (fun)(input, target_gas, context, is_static);
-            if let Ok(output) = &mut res {
-                if let Some(promise) = output.promise.take() {
-                    state.add_promise(promise)
-                }
-            }
-            res
-        });
-
-        output.map(|res| res.map(Into::into))
-    }
-
-    fn addresses(&self) -> &[Address] {
-        &self.addresses
     }
 }
 

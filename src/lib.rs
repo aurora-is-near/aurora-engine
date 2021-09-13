@@ -32,7 +32,6 @@ pub mod sdk;
 
 #[cfg(test)]
 mod benches;
-mod state;
 #[cfg(test)]
 mod test_utils;
 #[cfg(test)]
@@ -76,7 +75,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
-    use crate::connector::EthConnectorContract;
+    use crate::connector::{self, EthConnectorContract};
     use crate::engine::{Engine, EngineState, GasPaymentError};
     use crate::fungible_token::FungibleTokenMetadata;
     #[cfg(feature = "evm_bully")]
@@ -383,12 +382,13 @@ mod contract {
 
         let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
 
+        let erc20_admin_address = connector::erc20_admin_address(&sdk::current_account_id());
         let erc20_contract = include_bytes!("../etc/eth-contracts/res/EvmErc20.bin");
         let deploy_args = ethabi::encode(&[
             ethabi::Token::String("Empty".to_string()),
             ethabi::Token::String("EMPTY".to_string()),
             ethabi::Token::Uint(ethabi::Uint::from(0)),
-            ethabi::Token::Address(current_address()),
+            ethabi::Token::Address(erc20_admin_address),
         ]);
 
         let address = match Engine::deploy_code_with_input(
@@ -645,43 +645,6 @@ mod contract {
         sdk::return_output(json_data.to_string().as_bytes())
     }
 
-    /// Due to the design change to stop minting and burning bridged ETH tokens
-    /// (see https://github.com/aurora-is-near/aurora-engine/pull/133 ),
-    /// there is currently an incorrect number of tokens in the Aurora NEP-141 token
-    /// account. This issue only impacts testnet because at the time the design was changed
-    /// the eth-connector had not been deployed to mainnet. The purpose of this function is
-    /// to mint the correct number of tokens in order to make up for the ones that were burned
-    /// before the design change in #133.
-    #[cfg(feature = "testnet")]
-    #[no_mangle]
-    pub extern "C" fn balance_evm_and_nep_141() {
-        use crate::precompiles::native::{ExitToEthereum, ExitToNear};
-        use crate::prelude::String;
-
-        let mut connector = EthConnectorContract::get_instance();
-        let aurora_account = unsafe { String::from_utf8_unchecked(sdk::current_account_id()) };
-        let aurora_nep_141_balance = connector.ft.ft_balance_of(&aurora_account);
-        let total_evm_balance = connector.ft.ft_total_eth_supply_on_aurora();
-        let exit_to_near_balance = Engine::get_balance(&ExitToNear::ADDRESS).raw().low_u128();
-        let exit_to_eth_balance = Engine::get_balance(&ExitToEthereum::ADDRESS)
-            .raw()
-            .low_u128();
-
-        // ETH sent to the exit precompiles is no longer accessible (and would have already been
-        // transferred from the Aurora account in the NEP-141 contract).
-        let available_evm_balance = total_evm_balance - exit_to_eth_balance - exit_to_near_balance;
-
-        // After #133 it should be true that `aurora_nep_141_balance == available_evm_balance`.
-        // If it is not then we mint tokens to make this the case.
-        if aurora_nep_141_balance < available_evm_balance {
-            let missing_balance = available_evm_balance - aurora_nep_141_balance;
-            connector
-                .ft
-                .internal_deposit_eth_to_near(&aurora_account, missing_balance);
-            connector.save_ft_contract();
-        }
-    }
-
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn verify_log_entry() {
@@ -731,10 +694,6 @@ mod contract {
 
     fn predecessor_address() -> Address {
         near_account_to_evm_address(&sdk::predecessor_account_id())
-    }
-
-    pub fn current_address() -> Address {
-        near_account_to_evm_address(&sdk::current_account_id())
     }
 }
 

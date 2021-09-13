@@ -20,7 +20,7 @@ fn erc20_mint() {
     // Validate pre-state
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &mut source_account, dest_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
     );
 
     // Do mint transaction
@@ -33,7 +33,7 @@ fn erc20_mint() {
     // Validate post-state
     assert_eq!(
         U256::from(mint_amount),
-        get_address_erc20_balance(&mut runner, &mut source_account, dest_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
     );
 }
 
@@ -44,7 +44,7 @@ fn erc20_mint_out_of_gas() {
     // Validate pre-state
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &mut source_account, dest_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
     );
 
     // Try mint transaction
@@ -69,18 +69,42 @@ fn erc20_mint_out_of_gas() {
     assert_eq!(error.status, TransactionStatus::OutOfGas);
 
     // Validate post-state
+
     test_utils::validate_address_balance_and_nonce(
         &runner,
         test_utils::address_from_secret_key(&source_account.secret_key),
         Wei::new_u64(INITIAL_BALANCE - GAS_LIMIT * GAS_PRICE),
-        (INITIAL_NONCE + 3).into(),
+        (INITIAL_NONCE + 2).into(),
     );
     test_utils::validate_address_balance_and_nonce(
         &runner,
-        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes()),
+        types::near_account_to_evm_address(
+            runner.context.predecessor_account_id.as_ref().as_bytes(),
+        ),
         Wei::new_u64(GAS_LIMIT * GAS_PRICE),
         U256::zero(),
     );
+}
+
+#[test]
+fn profile_erc20_get_balance() {
+    let (mut runner, mut source_account, _, contract) = initialize_erc20();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+
+    let outcome = runner.submit_with_signer(&mut source_account, |nonce| {
+        contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
+    });
+    assert!(outcome.is_ok());
+
+    let balance_tx = contract.balance_of(source_address, U256::zero());
+    let (result, profile) =
+        runner.profiled_view_call(test_utils::as_view_call(balance_tx, source_address));
+    assert!(result.is_ok());
+
+    // call costs less than 6 Tgas
+    assert!(profile.all_gas() / 1_000_000_000_000 < 6);
+    // at least 70% of the cost is spent on wasm computation (as opposed to host functions)
+    assert!((100 * profile.wasm_gas()) / profile.all_gas() > 70);
 }
 
 #[test]
@@ -96,11 +120,11 @@ fn erc20_transfer_success() {
     // Validate pre-state
     assert_eq!(
         U256::from(INITIAL_BALANCE),
-        get_address_erc20_balance(&mut runner, &mut source_account, source_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, source_address, &contract)
     );
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &mut source_account, dest_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
     );
 
     // Do transfer
@@ -114,11 +138,11 @@ fn erc20_transfer_success() {
     // Validate post-state
     assert_eq!(
         U256::from(INITIAL_BALANCE - TRANSFER_AMOUNT),
-        get_address_erc20_balance(&mut runner, &mut source_account, source_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, source_address, &contract)
     );
     assert_eq!(
         U256::from(TRANSFER_AMOUNT),
-        get_address_erc20_balance(&mut runner, &mut source_account, dest_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
     );
 }
 
@@ -135,11 +159,11 @@ fn erc20_transfer_insufficient_balance() {
     // Validate pre-state
     assert_eq!(
         U256::from(INITIAL_BALANCE),
-        get_address_erc20_balance(&mut runner, &mut source_account, source_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, source_address, &contract)
     );
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &mut source_account, dest_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
     );
 
     // Do transfer
@@ -154,11 +178,11 @@ fn erc20_transfer_insufficient_balance() {
     // Validate post-state
     assert_eq!(
         U256::from(INITIAL_BALANCE),
-        get_address_erc20_balance(&mut runner, &mut source_account, source_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, source_address, &contract)
     );
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &mut source_account, dest_address, &contract)
+        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
     );
 }
 
@@ -205,15 +229,22 @@ fn deploy_erc_20_out_of_gas() {
 
 fn get_address_erc20_balance(
     runner: &mut test_utils::AuroraRunner,
-    signer: &mut Signer,
+    signer: &Signer,
     address: Address,
     contract: &ERC20,
 ) -> U256 {
-    let outcome = runner
-        .submit_with_signer(signer, |nonce| contract.balance_of(address, nonce))
+    let balance_tx = contract.balance_of(address, signer.nonce.into());
+    let result = runner
+        .view_call(test_utils::as_view_call(
+            balance_tx,
+            test_utils::address_from_secret_key(&signer.secret_key),
+        ))
         .unwrap();
-    let output = test_utils::unwrap_success(outcome);
-    U256::from_big_endian(&output)
+    let bytes = match result {
+        crate::parameters::TransactionStatus::Succeed(bytes) => bytes,
+        err => panic!("Unexpected view call status {:?}", err),
+    };
+    U256::from_big_endian(&bytes)
 }
 
 fn parse_erc20_error_message(result: &[u8]) -> String {

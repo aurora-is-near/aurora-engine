@@ -13,7 +13,7 @@ use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
+use crate::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs};
 use crate::prelude::Address;
 use crate::storage;
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
@@ -28,6 +28,10 @@ use crate::types::AccountId;
 
 pub fn origin() -> AccountId {
     "aurora".to_string()
+}
+
+pub fn erc20_admin_account() -> AccountId {
+    [crate::connector::ERC20_ADMIN_PREFIX, &origin()].concat()
 }
 
 pub(crate) const SUBMIT: &str = "submit";
@@ -74,7 +78,6 @@ pub(crate) struct AuroraRunner {
     pub wasm_config: VMConfig,
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
-    pub profile: ProfileData,
     pub previous_logs: Vec<String>,
 }
 
@@ -88,15 +91,29 @@ pub(crate) struct OneShotAuroraRunner<'a> {
 }
 
 impl<'a> OneShotAuroraRunner<'a> {
+    pub fn profiled_call(
+        self,
+        method_name: &str,
+        caller_account_id: &str,
+        input: Vec<u8>,
+    ) -> (Option<VMOutcome>, Option<VMError>, ExecutionProfile) {
+        let (outcome, error) = self.call(method_name, caller_account_id, input);
+        let profile = outcome
+            .as_ref()
+            .map(ExecutionProfile::new)
+            .unwrap_or_default();
+        (outcome, error, profile)
+    }
+
     pub fn call(
         mut self,
         method_name: &str,
-        caller_account_id: String,
+        caller_account_id: &str,
         input: Vec<u8>,
     ) -> (Option<VMOutcome>, Option<VMError>) {
         AuroraRunner::update_context(
             &mut self.context,
-            caller_account_id.clone(),
+            caller_account_id,
             caller_account_id,
             input,
         );
@@ -111,7 +128,6 @@ impl<'a> OneShotAuroraRunner<'a> {
             &[],
             self.base.current_protocol_version,
             Some(&self.base.cache),
-            &self.base.profile,
         )
     }
 }
@@ -127,36 +143,31 @@ impl AuroraRunner {
 
     pub fn update_context(
         context: &mut VMContext,
-        caller_account_id: String,
-        signer_account_id: String,
+        caller_account_id: &str,
+        signer_account_id: &str,
         input: Vec<u8>,
     ) {
         context.block_index += 1;
         context.block_timestamp += 100;
         context.input = input;
-        context.signer_account_id = signer_account_id;
-        context.predecessor_account_id = caller_account_id;
+        context.signer_account_id = as_account_id(signer_account_id);
+        context.predecessor_account_id = as_account_id(caller_account_id);
     }
 
     pub fn call(
         &mut self,
         method_name: &str,
-        caller_account_id: String,
+        caller_account_id: &str,
         input: Vec<u8>,
     ) -> (Option<VMOutcome>, Option<VMError>) {
-        self.call_with_signer(
-            method_name,
-            caller_account_id.clone(),
-            caller_account_id,
-            input,
-        )
+        self.call_with_signer(method_name, caller_account_id, caller_account_id, input)
     }
 
     pub fn call_with_signer(
         &mut self,
         method_name: &str,
-        caller_account_id: String,
-        signer_account_id: String,
+        caller_account_id: &str,
+        signer_account_id: &str,
         input: Vec<u8>,
     ) -> (Option<VMOutcome>, Option<VMError>) {
         Self::update_context(
@@ -176,7 +187,6 @@ impl AuroraRunner {
             &[],
             self.current_protocol_version,
             Some(&self.cache),
-            &self.profile,
         );
         if let Some(outcome) = &maybe_outcome {
             self.context.storage_usage = outcome.storage_usage;
@@ -227,7 +237,7 @@ impl AuroraRunner {
         account: &SecretKey,
         transaction: LegacyEthTransaction,
     ) -> Result<SubmitResult, VMError> {
-        let calling_account_id = "some-account.near".to_string();
+        let calling_account_id = "some-account.near";
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
 
         let (output, maybe_err) =
@@ -249,7 +259,7 @@ impl AuroraRunner {
         constructor_tx: F,
         contract_constructor: T,
     ) -> DeployedContract {
-        let calling_account_id = "some-account.near".to_string();
+        let calling_account_id = "some-account.near";
         let tx = constructor_tx(&contract_constructor);
         let signed_tx = sign_transaction(tx, Some(self.chain_id), account);
         let (output, maybe_err) =
@@ -265,6 +275,28 @@ impl AuroraRunner {
         }
     }
 
+    pub fn view_call(&self, args: ViewCallArgs) -> Result<TransactionStatus, VMError> {
+        let input = args.try_to_vec().unwrap();
+        let (outcome, maybe_error) = self.one_shot().call("view", "viewer", input);
+        Ok(
+            TransactionStatus::try_from_slice(&Self::bytes_from_outcome(outcome, maybe_error)?)
+                .unwrap(),
+        )
+    }
+
+    pub fn profiled_view_call(
+        &self,
+        args: ViewCallArgs,
+    ) -> (Result<TransactionStatus, VMError>, ExecutionProfile) {
+        let input = args.try_to_vec().unwrap();
+        let (outcome, maybe_error, profile) =
+            self.one_shot().profiled_call("view", "viewer", input);
+        let status = Self::bytes_from_outcome(outcome, maybe_error)
+            .map(|bytes| TransactionStatus::try_from_slice(&bytes).unwrap());
+
+        (status, profile)
+    }
+
     pub fn get_balance(&self, address: Address) -> types::Wei {
         types::Wei::new(self.getter_method_call("get_balance", address))
     }
@@ -276,28 +308,24 @@ impl AuroraRunner {
     // Used in `get_balance` and `get_nonce`. This function exists to avoid code duplication
     // since the contract's `get_nonce` and `get_balance` have the same type signature.
     fn getter_method_call(&self, method_name: &str, address: Address) -> U256 {
-        let mut context = self.context.clone();
-        Self::update_context(
-            &mut context,
-            "GETTER".to_string(),
-            "GETTER".to_string(),
-            address.as_bytes().to_vec(),
-        );
-        let (outcome, maybe_error) = near_vm_runner::run(
-            &self.code,
-            method_name,
-            &mut self.ext.clone(),
-            context,
-            &self.wasm_config,
-            &self.fees_config,
-            &[],
-            self.current_protocol_version,
-            Some(&self.cache),
-            &self.profile,
-        );
+        let (outcome, maybe_error) =
+            self.one_shot()
+                .call(method_name, "getter", address.as_bytes().to_vec());
         assert!(maybe_error.is_none());
         let bytes = outcome.unwrap().return_data.as_value().unwrap();
         U256::from_big_endian(&bytes)
+    }
+
+    fn bytes_from_outcome(
+        maybe_outcome: Option<VMOutcome>,
+        maybe_error: Option<VMError>,
+    ) -> Result<Vec<u8>, VMError> {
+        if let Some(error) = maybe_error {
+            Err(error)
+        } else {
+            let bytes = maybe_outcome.unwrap().return_data.as_value().unwrap();
+            Ok(bytes)
+        }
     }
 }
 
@@ -319,10 +347,10 @@ impl Default for AuroraRunner {
             cache: Default::default(),
             ext: Default::default(),
             context: VMContext {
-                current_account_id: aurora_account_id.clone(),
-                signer_account_id: aurora_account_id.clone(),
+                current_account_id: as_account_id(&aurora_account_id),
+                signer_account_id: as_account_id(&aurora_account_id),
                 signer_account_pk: vec![],
-                predecessor_account_id: aurora_account_id,
+                predecessor_account_id: as_account_id(&aurora_account_id),
                 input: vec![],
                 block_index: 0,
                 block_timestamp: 0,
@@ -333,15 +361,41 @@ impl Default for AuroraRunner {
                 attached_deposit: 0,
                 prepaid_gas: 10u64.pow(18),
                 random_seed: vec![],
-                is_view: false,
+                view_config: None,
                 output_data_receivers: vec![],
             },
             wasm_config: Default::default(),
             fees_config: Default::default(),
             current_protocol_version: u32::MAX,
-            profile: Default::default(),
             previous_logs: Default::default(),
         }
+    }
+}
+
+/// Wrapper around `ProfileData` to still include the wasm gas usage
+/// (which was removed in https://github.com/near/nearcore/pull/4438).
+#[derive(Default, Clone)]
+pub(crate) struct ExecutionProfile {
+    host_breakdown: ProfileData,
+    wasm_gas: u64,
+}
+
+impl ExecutionProfile {
+    pub fn new(outcome: &VMOutcome) -> Self {
+        let wasm_gas =
+            outcome.burnt_gas - outcome.profile.host_gas() - outcome.profile.action_gas();
+        Self {
+            host_breakdown: outcome.profile.clone(),
+            wasm_gas,
+        }
+    }
+
+    pub fn wasm_gas(&self) -> u64 {
+        self.wasm_gas
+    }
+
+    pub fn all_gas(&self) -> u64 {
+        self.wasm_gas + self.host_breakdown.host_gas() + self.host_breakdown.action_gas()
     }
 }
 
@@ -354,11 +408,8 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
         upgrade_delay_blocks: 1,
     };
 
-    let (_, maybe_error) = runner.call(
-        "new",
-        runner.aurora_account_id.clone(),
-        args.try_to_vec().unwrap(),
-    );
+    let account_id = runner.aurora_account_id.clone();
+    let (_, maybe_error) = runner.call("new", &account_id, args.try_to_vec().unwrap());
 
     assert!(maybe_error.is_none());
 
@@ -367,11 +418,8 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
         eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
         metadata: FungibleTokenMetadata::default(),
     };
-    let (_, maybe_error) = runner.call(
-        "new_eth_connector",
-        runner.aurora_account_id.clone(),
-        args.try_to_vec().unwrap(),
-    );
+    let (_, maybe_error) =
+        runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
 
     assert!(maybe_error.is_none());
 
@@ -406,6 +454,15 @@ pub(crate) fn create_eth_transaction(
         data,
     };
     sign_transaction(tx, chain_id, secret_key)
+}
+
+pub(crate) fn as_view_call(tx: LegacyEthTransaction, sender: Address) -> ViewCallArgs {
+    ViewCallArgs {
+        sender: sender.0,
+        address: tx.to.unwrap().0,
+        amount: tx.value.to_bytes(),
+        input: tx.data,
+    }
 }
 
 pub(crate) fn sign_transaction(
@@ -496,6 +553,10 @@ pub(crate) fn address_from_hex(address: &str) -> Address {
     };
 
     Address::from_slice(&bytes)
+}
+
+pub(crate) fn as_account_id(account_id: &str) -> near_primitives_core::types::AccountId {
+    account_id.parse().unwrap()
 }
 
 pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {

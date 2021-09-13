@@ -1,6 +1,5 @@
 use crate::prelude::{Address, U256};
 use crate::transaction::LegacyEthTransaction;
-use near_sdk::serde_json;
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
@@ -95,11 +94,20 @@ impl ContractConstructor {
 
 impl DeployedContract {
     pub fn call_method_without_args(&self, method_name: &str, nonce: U256) -> LegacyEthTransaction {
+        self.call_method_with_args(method_name, &[], nonce)
+    }
+
+    pub fn call_method_with_args(
+        &self,
+        method_name: &str,
+        args: &[ethabi::Token],
+        nonce: U256,
+    ) -> LegacyEthTransaction {
         let data = self
             .abi
             .function(method_name)
             .unwrap()
-            .encode_input(&[])
+            .encode_input(args)
             .unwrap();
         LegacyEthTransaction {
             nonce,

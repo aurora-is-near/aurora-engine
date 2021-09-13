@@ -186,8 +186,9 @@ fn test_transfer_charging_gas_success() {
     let expected_source_balance = INITIAL_BALANCE - TRANSFER_AMOUNT - spent_amount;
     let expected_dest_balance = TRANSFER_AMOUNT;
     let expected_relayer_balance = spent_amount;
-    let relayer_address =
-        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+    let relayer_address = types::near_account_to_evm_address(
+        runner.context.predecessor_account_id.as_ref().as_bytes(),
+    );
 
     // validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -239,8 +240,9 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
-    let relayer =
-        types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+    let relayer = types::near_account_to_evm_address(
+        runner.context.predecessor_account_id.as_ref().as_bytes(),
+    );
     test_utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
@@ -323,11 +325,8 @@ fn test_block_hash_contract() {
 fn test_ft_metadata() {
     let mut runner = test_utils::deploy_evm();
 
-    let (maybe_outcome, maybe_error) = runner.call(
-        "ft_metadata",
-        runner.context.signer_account_id.clone(),
-        Vec::new(),
-    );
+    let account_id: String = runner.context.signer_account_id.clone().into();
+    let (maybe_outcome, maybe_error) = runner.call("ft_metadata", &account_id, Vec::new());
     assert!(maybe_error.is_none());
     let outcome = maybe_outcome.unwrap();
     let json_value = crate::json::parse_json(&outcome.return_data.as_value().unwrap()).unwrap();
@@ -336,71 +335,6 @@ fn test_ft_metadata() {
         json_value,
         crate::json::JsonValue::from(FungibleTokenMetadata::default())
     );
-}
-
-#[cfg(feature = "testnet-test")]
-#[test]
-fn test_balance_evm_and_nep_141() {
-    use crate::precompiles::native::{ExitToEthereum, ExitToNear};
-
-    let (mut runner, _, _) = initialize_transfer();
-    let caller = runner.aurora_account_id.clone();
-
-    // Include some ETH at the exit precompiles addresses for testing purposes
-    runner.create_address(ExitToNear::ADDRESS, TRANSFER_AMOUNT, U256::zero());
-    runner.create_address(
-        ExitToEthereum::ADDRESS,
-        TRANSFER_AMOUNT + TRANSFER_AMOUNT,
-        U256::zero(),
-    );
-
-    let aurora_balance = |runner: &mut test_utils::AuroraRunner| -> u128 {
-        let (maybe_result, maybe_err) = runner.call(
-            "ft_balance_of",
-            caller.clone(),
-            format!(r#"{{"account_id": "{}"}}"#, runner.aurora_account_id).into_bytes(),
-        );
-        assert!(maybe_err.is_none());
-        let result = maybe_result.unwrap();
-        let val = result.return_data.as_value().unwrap();
-        String::from_utf8(val[1..val.len() - 1].to_vec())
-            .unwrap()
-            .parse()
-            .unwrap()
-    };
-
-    let evm_balance = |runner: &mut test_utils::AuroraRunner| -> u128 {
-        let exit_to_near_balance = runner.get_balance(ExitToNear::ADDRESS).raw().low_u128();
-        let exit_to_eth_balance = runner.get_balance(ExitToEthereum::ADDRESS).raw().low_u128();
-        let total_evm_balance: u128 = {
-            let (maybe_result, maybe_err) =
-                runner.call("ft_total_eth_supply_on_aurora", caller.clone(), Vec::new());
-            assert!(maybe_err.is_none());
-            let result = maybe_result.unwrap();
-            let val = result.return_data.as_value().unwrap();
-            String::from_utf8(val[1..val.len() - 1].to_vec())
-                .unwrap()
-                .parse()
-                .unwrap()
-        };
-        total_evm_balance - exit_to_near_balance - exit_to_eth_balance
-    };
-
-    // There is not enough in the Aurora NEP-141 account, relative to how much is in the EVM;
-    assert_eq!(evm_balance(&mut runner), INITIAL_BALANCE.raw().low_u128());
-    assert_eq!(aurora_balance(&mut runner), 0);
-
-    // Call method to restore balance
-    let (_, maybe_err) = runner.call("balance_evm_and_nep_141", caller.clone(), Vec::new());
-    assert!(maybe_err.is_none());
-
-    // Balance is restored
-    assert_eq!(aurora_balance(&mut runner), evm_balance(&mut runner));
-
-    // Calling multiple times is a no-op
-    let (_, maybe_err) = runner.call("balance_evm_and_nep_141", caller.clone(), Vec::new());
-    assert!(maybe_err.is_none());
-    assert_eq!(aurora_balance(&mut runner), evm_balance(&mut runner));
 }
 
 // Same as `test_eth_transfer_insufficient_balance` above, except runs through
