@@ -1,4 +1,5 @@
-use crate::{Address, EvmPrecompileResult, Precompile, PrecompileOutput};
+use crate::prelude::Address;
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
 /// Identity precompile costs.
