@@ -21,8 +21,7 @@ fn test_num_wasm_functions() {
     let artifact = get_compiled_artifact(&runner);
     let module_info = artifact.info();
     let num_functions = module_info.func_assoc.len();
-    println!("num functions: {}", num_functions);
-    assert!(num_functions <= 1280);
+    assert!(num_functions <= 1281);
 }
 
 /// Tests we can transfer Eth from one account to another and that the balances are correctly
