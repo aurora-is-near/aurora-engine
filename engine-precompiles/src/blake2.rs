@@ -96,7 +96,7 @@ impl Precompile for Blake2F {
 #[cfg(test)]
 mod tests {
     use super::super::utils::new_context;
-    use crate::Vec;
+    use crate::prelude::Vec;
 
     use super::*;
 

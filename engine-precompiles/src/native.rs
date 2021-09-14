@@ -336,7 +336,7 @@ impl Precompile for ExitToEthereum {
 #[cfg(test)]
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
-    use aurora_engine_sdk::types::near_account_to_evm_address;
+    use crate::prelude::sdk::types::near_account_to_evm_address;
 
     #[test]
     fn test_precompile_id() {
