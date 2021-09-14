@@ -30,10 +30,6 @@ pub fn origin() -> AccountId {
     "aurora".to_string()
 }
 
-pub fn erc20_admin_account() -> AccountId {
-    [crate::connector::ERC20_ADMIN_PREFIX, &origin()].concat()
-}
-
 pub(crate) const SUBMIT: &str = "submit";
 
 pub(crate) mod erc20;
