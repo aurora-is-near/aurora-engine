@@ -14,6 +14,76 @@ const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
 #[test]
+fn test_override_state() {
+    let (mut runner, mut account1, viewer_address) = initialize_transfer();
+    let account1_address = test_utils::address_from_secret_key(&account1.secret_key);
+    let mut account2 = test_utils::Signer::random();
+    let account2_address = test_utils::address_from_secret_key(&account2.secret_key);
+    runner.create_address(account2_address, INITIAL_BALANCE, INITIAL_NONCE.into());
+
+    let contract = test_utils::solidity::ContractConstructor::compile_from_source(
+        "src/tests/res",
+        "target/solidity_build",
+        "poster.sol",
+        "Poster",
+    );
+
+    // deploy contract
+    let result = runner
+        .submit_with_signer(&mut account1, |nonce| {
+            crate::transaction::LegacyEthTransaction {
+                nonce,
+                gas_price: Default::default(),
+                gas: u64::MAX.into(),
+                to: None,
+                value: Default::default(),
+                data: contract.code.clone(),
+            }
+        })
+        .unwrap();
+    let address = Address::from_slice(&test_utils::unwrap_success(result));
+    let contract = contract.deployed_at(address);
+
+    // define functions to interact with the contract
+    let get_address = |runner: &test_utils::AuroraRunner| {
+        let result = runner
+            .view_call(test_utils::as_view_call(
+                contract.call_method_without_args("get", U256::zero()),
+                viewer_address,
+            ))
+            .unwrap();
+        match result {
+            crate::parameters::TransactionStatus::Succeed(bytes) => {
+                Address::from_slice(&bytes[12..32])
+            }
+            _ => panic!("tx failed"),
+        }
+    };
+
+    let post_address = |runner: &mut test_utils::AuroraRunner, signer: &mut test_utils::Signer| {
+        let result = runner
+            .submit_with_signer(signer, |nonce| {
+                contract.call_method_with_args(
+                    "post",
+                    &[ethabi::Token::String("Hello, world!".to_string())],
+                    nonce,
+                )
+            })
+            .unwrap();
+        assert!(result.status.is_ok());
+    };
+
+    // Assert the initial state is 0
+    assert_eq!(get_address(&runner), Address([0; 20]));
+    post_address(&mut runner, &mut account1);
+    // Assert the address matches the first caller
+    assert_eq!(get_address(&runner), account1_address);
+    post_address(&mut runner, &mut account2);
+    // Assert the address matches the second caller
+    assert_eq!(get_address(&runner), account2_address);
+}
+
+#[test]
 fn test_num_wasm_functions() {
     // Counts the number of functions in our wasm output.
     // See https://github.com/near/nearcore/issues/4814 for context

@@ -5,7 +5,11 @@ contract Poster {
     event NewPost(address indexed user, string content);
     
     address public sender_address;
-    
+
+    function get() public view returns (address) {
+        return sender_address;
+    }
+
     function post(string calldata content) public {
         sender_address = msg.sender;
         emit NewPost(sender_address, content);
