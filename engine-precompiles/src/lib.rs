@@ -4,22 +4,13 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
 
-mod lib {
-    pub use aurora_engine_sdk as sdk;
-    pub use aurora_engine_sdk::types::*;
-    pub use aurora_engine_types::parameters::*;
-    pub use aurora_engine_types::storage::*;
-    pub use aurora_engine_types::types::*;
-    pub use aurora_engine_types::*;
-}
-use lib::*;
-
 pub mod blake2;
 pub mod bn128;
 pub mod hash;
 pub mod identity;
 pub mod modexp;
 pub mod native;
+mod prelude;
 pub mod secp256k1;
 #[cfg(test)]
 mod utils;
@@ -30,10 +21,10 @@ use crate::hash::{RIPEMD160, SHA256};
 use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{ExitToEthereum, ExitToNear};
+use crate::prelude::{vec, Address, BTreeMap, Vec};
 use crate::secp256k1::ECRecover;
 use evm::backend::Log;
-use evm::ExitSucceed;
-use evm::{Context, ExitError};
+use evm::{Context, ExitError, ExitSucceed};
 
 #[derive(Debug)]
 pub struct PrecompileOutput {

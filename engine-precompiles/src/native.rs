@@ -1,19 +1,24 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::PrecompileOutput;
-use crate::*;
-use evm::{Context, ExitError};
 #[cfg(feature = "contract")]
-use {
-    crate::{bytes_to_key, KeyPrefix},
-    crate::{PromiseCreateArgs, WithdrawCallArgs},
-    borsh::BorshSerialize,
-    evm::backend::Log,
+use crate::prelude::{
+    format, is_valid_account_id,
+    parameters::{PromiseCreateArgs, WithdrawCallArgs},
+    sdk,
+    storage::{bytes_to_key, KeyPrefix},
+    types::AccountId,
+    vec, BorshSerialize, Cow, String, ToString, TryInto, Vec, U256,
 };
+
+use crate::prelude::Address;
+use crate::PrecompileOutput;
+#[cfg(feature = "contract")]
+use evm::backend::Log;
+use evm::{Context, ExitError};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 mod costs {
-    use crate::Gas;
+    use crate::prelude::types::Gas;
 
     // TODO(#51): Determine the correct amount of gas
     pub(super) const EXIT_TO_NEAR_GAS: Gas = 0;
@@ -331,7 +336,7 @@ impl Precompile for ExitToEthereum {
 #[cfg(test)]
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
-    use crate::near_account_to_evm_address;
+    use aurora_engine_sdk::types::near_account_to_evm_address;
 
     #[test]
     fn test_precompile_id() {

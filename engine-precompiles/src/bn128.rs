@@ -1,4 +1,5 @@
-use crate::*;
+use crate::prelude::{Address, Borrowed, PhantomData, Vec};
+use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
 /// bn128 costs.

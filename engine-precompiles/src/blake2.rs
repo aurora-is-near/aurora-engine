@@ -1,6 +1,7 @@
 use evm::{Context, ExitError};
 
-use crate::{mem, Address, Borrowed, EvmPrecompileResult, Precompile, PrecompileOutput, TryInto};
+use crate::prelude::{mem, Address, Borrowed, TryInto};
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 
 /// Blake2 costs.
 mod costs {

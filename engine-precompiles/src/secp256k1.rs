@@ -1,4 +1,5 @@
-use crate::{sdk, vec, Borrowed, EvmPrecompileResult, Precompile, PrecompileOutput, H256};
+use crate::prelude::{sdk, vec, Borrowed, H256};
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use ethabi::Address;
 use evm::{Context, ExitError};
 

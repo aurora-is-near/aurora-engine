@@ -1,7 +1,5 @@
-use crate::{
-    Address, Berlin, Byzantium, EvmPrecompileResult, HardFork, PhantomData, Precompile,
-    PrecompileOutput, Vec, U256,
-};
+use crate::prelude::{Address, PhantomData, Vec, U256};
+use crate::{Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput};
 
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
@@ -201,7 +199,7 @@ mod tests {
     use crate::utils::new_context;
 
     use super::*;
-    use crate::u256_to_arr;
+    use crate::prelude::types::u256_to_arr;
 
     // Byzantium tests: https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp.json
     // Berlin tests:https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp_eip2565.json

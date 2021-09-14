@@ -1,4 +1,6 @@
-use crate::*;
+#[cfg(feature = "contract")]
+use crate::prelude::sdk;
+use crate::prelude::{vec, Address};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
