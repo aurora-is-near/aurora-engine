@@ -235,7 +235,7 @@ const fn make_address(x: u32, y: u128) -> prelude::Address {
 
 #[cfg(test)]
 mod tests {
-    use crate::{prelude::Address, Byzantium, Istanbul};
+    use crate::{prelude, Byzantium, Istanbul};
     use rand::Rng;
 
     #[test]
