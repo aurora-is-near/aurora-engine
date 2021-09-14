@@ -75,11 +75,15 @@ impl ContractConstructor {
     }
 
     pub fn deploy_without_args(&self, nonce: U256) -> LegacyEthTransaction {
+        self.deploy_with_args(nonce, &[])
+    }
+
+    pub fn deploy_with_args(&self, nonce: U256, args: &[ethabi::Token]) -> LegacyEthTransaction {
         let data = self
             .abi
             .constructor()
             .unwrap()
-            .encode_input(self.code.clone(), &[])
+            .encode_input(self.code.clone(), args)
             .unwrap();
         LegacyEthTransaction {
             nonce,
