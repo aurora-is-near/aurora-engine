@@ -131,7 +131,6 @@ dependencies = [
  "hex",
  "libsecp256k1",
  "logos",
- "near-sdk-sim",
  "num",
  "primitive-types",
  "rand 0.7.3",
