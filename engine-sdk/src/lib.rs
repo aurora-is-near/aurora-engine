@@ -3,14 +3,13 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
 
-pub mod types;
+use crate::prelude::{
+    vec, Address, BorshDeserialize, BorshSerialize, PromiseResult, Vec, H256,
+    STORAGE_PRICE_PER_BYTE,
+};
 
-mod lib {
-    pub use aurora_engine_types::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
-    pub use aurora_engine_types::{vec, Address, Vec, H256};
-    pub use borsh::{BorshDeserialize, BorshSerialize};
-}
-use lib::*;
+mod prelude;
+pub mod types;
 
 const READ_STORAGE_REGISTER_ID: u64 = 0;
 const INPUT_REGISTER_ID: u64 = 0;
@@ -289,6 +288,7 @@ pub fn remove_storage(key: &[u8]) {
         exports::storage_remove(key.len() as u64, key.as_ptr() as u64, EVICTED_REGISTER);
     }
 }
+
 /// Returns the size of the blob stored in the given register.
 /// * If register is used, then returns the size, which can potentially be zero;
 /// * If register is not used, returns `u64::MAX`
@@ -618,6 +618,7 @@ pub fn storage_has_key(key: &[u8]) -> bool {
 }
 
 pub struct IncorrectInputLength;
+
 impl AsRef<[u8]> for IncorrectInputLength {
     fn as_ref(&self) -> &[u8] {
         b"ERR_INCORRECT_INPUT_LENGTH"
@@ -625,6 +626,7 @@ impl AsRef<[u8]> for IncorrectInputLength {
 }
 
 pub struct ArgParseErr;
+
 impl AsRef<[u8]> for ArgParseErr {
     fn as_ref(&self) -> &[u8] {
         b"ERR_ARG_PARSE"
@@ -635,6 +637,7 @@ pub enum ReadU64Error {
     InvalidU64,
     MissingValue,
 }
+
 impl AsRef<[u8]> for ReadU64Error {
     fn as_ref(&self) -> &[u8] {
         match self {
@@ -645,11 +648,13 @@ impl AsRef<[u8]> for ReadU64Error {
 }
 
 pub struct ECRecoverErr;
+
 impl ECRecoverErr {
     pub fn as_str(&self) -> &'static str {
         "ERR_ECRECOVER"
     }
 }
+
 impl AsRef<[u8]> for ECRecoverErr {
     fn as_ref(&self) -> &[u8] {
         self.as_str().as_bytes()
