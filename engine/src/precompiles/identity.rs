@@ -57,7 +57,7 @@ impl Precompile for Identity {
 mod tests {
     use evm::ExitError;
 
-    use crate::test_utils::new_context;
+    use super::super::utils::new_context;
 
     use super::*;
 

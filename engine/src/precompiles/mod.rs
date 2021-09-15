@@ -16,6 +16,8 @@ mod modexp;
 // TODO: Refactor where the addresses are.
 pub(crate) mod native;
 mod secp256k1;
+#[cfg(test)]
+mod utils;
 
 #[derive(Debug)]
 pub struct PrecompileOutput {

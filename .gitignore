@@ -6,7 +6,7 @@
 
 # IDEA
 .idea
-
+.run/
 # Editor backup files
 *~
 

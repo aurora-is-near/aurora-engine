@@ -134,7 +134,7 @@ impl Precompile for RIPEMD160 {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::new_context;
+    use super::super::utils::new_context;
 
     use super::*;
 

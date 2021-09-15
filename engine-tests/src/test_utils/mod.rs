@@ -1,5 +1,4 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use evm::Context;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
@@ -563,14 +562,6 @@ pub(crate) fn validate_address_balance_and_nonce(
 ) {
     assert_eq!(runner.get_balance(address), expected_balance, "balance");
     assert_eq!(runner.get_nonce(address), expected_nonce, "nonce");
-}
-
-pub fn new_context() -> Context {
-    Context {
-        address: Default::default(),
-        caller: Default::default(),
-        apparent_value: Default::default(),
-    }
 }
 
 pub(crate) fn address_from_hex(address: &str) -> Address {

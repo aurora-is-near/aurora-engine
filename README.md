@@ -168,3 +168,8 @@ aurora dump-storage
 
 [`master`]:  https://github.com/aurora-is-near/aurora-engine/commits/master
 [`develop`]: https://github.com/aurora-is-near/aurora-engine/commits/develop
+
+## License
+**aurora-engine** has multiple licenses:
+* all crates except `engine-test` has **CCO-1.0** license
+* `engine-test` has **GPL-v3** license

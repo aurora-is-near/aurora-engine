@@ -4,6 +4,7 @@
 #![cfg_attr(feature = "log", feature(panic_info_message))]
 
 pub mod types;
+pub use types::keccak;
 
 mod lib {
     pub use aurora_engine_types::types::{PromiseResult, STORAGE_PRICE_PER_BYTE};
@@ -380,16 +381,6 @@ pub fn signer_account_pk() -> Vec<u8> {
 pub fn sha256(input: &[u8]) -> H256 {
     unsafe {
         exports::sha256(input.len() as u64, input.as_ptr() as u64, 1);
-        let bytes = H256::zero();
-        exports::read_register(1, bytes.0.as_ptr() as *const u64 as u64);
-        bytes
-    }
-}
-
-/// Calls environment keccak256 on given input.
-pub fn keccak(input: &[u8]) -> H256 {
-    unsafe {
-        exports::keccak256(input.len() as u64, input.as_ptr() as u64, 1);
         let bytes = H256::zero();
         exports::read_register(1, bytes.0.as_ptr() as *const u64 as u64);
         bytes

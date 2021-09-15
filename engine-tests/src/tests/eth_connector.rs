@@ -1,14 +1,13 @@
-use crate::admin_controlled::{PausedMask, ERR_PAUSED};
-use crate::connector::{
-    ERR_NOT_ENOUGH_BALANCE_FOR_FEE, PAUSE_DEPOSIT, PAUSE_WITHDRAW, UNPAUSE_ALL,
-};
-use crate::fungible_token::FungibleTokenMetadata;
-use crate::parameters::{
-    InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawCallArgs, WithdrawResult,
-};
 use crate::prelude::EthAddress;
 use crate::prelude::U256;
-use crate::proof::Proof;
+use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
+use aurora_engine::connector::{
+    ERR_NOT_ENOUGH_BALANCE_FOR_FEE, PAUSE_DEPOSIT, PAUSE_WITHDRAW, UNPAUSE_ALL,
+};
+use aurora_engine::fungible_token::FungibleTokenMetadata;
+use aurora_engine::parameters::{
+    InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawCallArgs, WithdrawResult,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 use byte_slice_cast::AsByteSlice;
 use near_sdk::test_utils::accounts;
@@ -28,6 +27,18 @@ const RECIPIENT_ETH_ADDRESS: &'static str = "891b2749238b27ff58e951088e55b04de71
 const EVM_CUSTODIAN_ADDRESS: &'static str = "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E";
 const DEPOSITED_EVM_AMOUNT: u128 = 10200;
 const DEPOSITED_EVM_FEE: u128 = 200;
+
+#[derive(
+    Default, BorshDeserialize, BorshSerialize, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub struct Proof {
+    pub log_index: u64,
+    pub log_entry_data: Vec<u8>,
+    pub receipt_index: u64,
+    pub receipt_data: Vec<u8>,
+    pub header_data: Vec<u8>,
+    pub proof: Vec<Vec<u8>>,
+}
 
 #[derive(BorshDeserialize, Debug)]
 pub struct IsUsedProofResult {

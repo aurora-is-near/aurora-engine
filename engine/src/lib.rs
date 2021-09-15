@@ -21,23 +21,16 @@ pub mod proof;
 pub mod storage;
 pub mod transaction;
 
-mod admin_controlled;
+pub mod admin_controlled;
 #[cfg_attr(not(feature = "contract"), allow(dead_code))]
 pub mod connector;
 mod deposit_event;
 pub mod engine;
 pub mod fungible_token;
-mod json;
+pub mod json;
 mod log_entry;
 mod precompiles;
-
-#[cfg(test)]
-mod benches;
 mod prelude;
-#[cfg(test)]
-mod test_utils;
-#[cfg(test)]
-mod tests;
 
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]

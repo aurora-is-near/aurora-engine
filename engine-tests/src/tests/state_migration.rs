@@ -1,6 +1,6 @@
-use crate::parameters::{InitCallArgs, NewCallArgs};
 use crate::prelude::U256;
 use crate::test_utils::AuroraRunner;
+use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
 use std::fs;

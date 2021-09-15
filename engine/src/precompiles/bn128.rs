@@ -396,7 +396,7 @@ impl Precompile for Bn128Pair<Istanbul> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::new_context;
+    use super::super::utils::new_context;
 
     use super::*;
 
