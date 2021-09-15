@@ -1,8 +1,7 @@
 use crate::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{self, solidity, ExecutionProfile};
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use std::sync::Once;
 
 static DOWNLOAD_ONCE: Once = Once::new();
@@ -255,38 +254,9 @@ impl Pool {
 }
 
 fn download_and_compile_solidity_sources() -> PathBuf {
-    let sources_dir = Path::new("target").join("liquidity-protocol");
-    if !sources_dir.exists() {
-        // Contracts not already present, so download them (but only once, even
-        // if multiple tests running in parallel saw `contracts_dir` does not exist).
-        DOWNLOAD_ONCE.call_once(|| {
-            let url = "https://github.com/1inch/liquidity-protocol";
-            git2::Repository::clone(url, &sources_dir).unwrap();
-        });
-    }
-
-    COMPILE_ONCE.call_once(|| {
-        // install packages
-        let status = Command::new("/usr/bin/env")
-            .current_dir(&sources_dir)
-            .args(["yarn", "install"])
-            .status()
-            .unwrap();
-        assert!(status.success());
-
-        let hardhat = |command: &str| {
-            let status = Command::new("/usr/bin/env")
-                .current_dir(&sources_dir)
-                .args(["node_modules/hardhat/internal/cli/cli.js", command])
-                .status()
-                .unwrap();
-            assert!(status.success());
-        };
-
-        // clean and compile
-        hardhat("clean");
-        hardhat("compile");
-    });
-
-    sources_dir.join("artifacts/contracts")
+    super::download_and_compile_solidity_sources(
+        "liquidity-protocol",
+        &DOWNLOAD_ONCE,
+        &COMPILE_ONCE,
+    )
 }
