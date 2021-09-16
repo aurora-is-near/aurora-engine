@@ -1,4 +1,5 @@
-use crate::*;
+use crate::prelude::{Address, H256};
+use crate::{panic_utf8, return_output};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
