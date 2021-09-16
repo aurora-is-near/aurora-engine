@@ -1,37 +1,43 @@
-pub(crate) use crate::precompiles::secp256k1::ecrecover;
-use crate::precompiles::{
-    blake2::*, bn128::*, hash::*, identity::*, modexp::*, native::*, secp256k1::*,
-};
-use crate::prelude::*;
-use evm::backend::Log;
-use evm::ExitSucceed;
-use evm::{Context, ExitError};
+#![allow(dead_code)]
+#![feature(array_methods)]
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![cfg_attr(feature = "log", feature(panic_info_message))]
 
-mod blake2;
-mod bn128;
-mod hash;
-mod identity;
-mod modexp;
-#[cfg_attr(not(feature = "contract"), allow(dead_code))]
-// TODO: Refactor where the addresses are.
-pub(crate) mod native;
-mod secp256k1;
+pub mod blake2;
+pub mod bn128;
+pub mod hash;
+pub mod identity;
+pub mod modexp;
+pub mod native;
+mod prelude;
+pub mod secp256k1;
 #[cfg(test)]
 mod utils;
+
+use crate::blake2::Blake2F;
+use crate::bn128::{Bn128Add, Bn128Mul, Bn128Pair};
+use crate::hash::{RIPEMD160, SHA256};
+use crate::identity::Identity;
+use crate::modexp::ModExp;
+use crate::native::{ExitToEthereum, ExitToNear};
+use crate::secp256k1::ECRecover;
+use evm::backend::Log;
+use evm::{Context, ExitError, ExitSucceed};
 
 #[derive(Debug)]
 pub struct PrecompileOutput {
     pub cost: u64,
-    pub output: Vec<u8>,
-    pub logs: Vec<Log>,
+    pub output: prelude::Vec<u8>,
+    pub logs: prelude::Vec<Log>,
 }
 
 impl PrecompileOutput {
-    pub fn without_logs(cost: u64, output: Vec<u8>) -> Self {
+    pub fn without_logs(cost: u64, output: prelude::Vec<u8>) -> Self {
         Self {
             cost,
             output,
-            logs: Vec::new(),
+            logs: prelude::Vec::new(),
         }
     }
 }
@@ -40,8 +46,8 @@ impl Default for PrecompileOutput {
     fn default() -> Self {
         PrecompileOutput {
             cost: 0,
-            output: Vec::new(),
-            logs: Vec::new(),
+            output: prelude::Vec::new(),
+            logs: prelude::Vec::new(),
         }
     }
 }
@@ -98,19 +104,19 @@ impl HardFork for Berlin {}
 
 type PrecompileFn = fn(&[u8], Option<u64>, &Context, bool) -> EvmPrecompileResult;
 
-pub struct Precompiles(pub BTreeMap<Address, PrecompileFn>);
+pub struct Precompiles(pub prelude::BTreeMap<prelude::Address, PrecompileFn>);
 
 impl Precompiles {
     #[allow(dead_code)]
     pub fn new_homestead() -> Self {
-        let addresses = vec![
+        let addresses = prelude::vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: Vec<PrecompileFn> = vec![
+        let fun: prelude::Vec<PrecompileFn> = prelude::vec![
             ECRecover::run,
             SHA256::run,
             RIPEMD160::run,
@@ -124,7 +130,7 @@ impl Precompiles {
 
     #[allow(dead_code)]
     pub fn new_byzantium() -> Self {
-        let addresses = vec![
+        let addresses = prelude::vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
@@ -136,7 +142,7 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: Vec<PrecompileFn> = vec![
+        let fun: prelude::Vec<PrecompileFn> = prelude::vec![
             ECRecover::run,
             SHA256::run,
             RIPEMD160::run,
@@ -148,7 +154,7 @@ impl Precompiles {
             ExitToNear::run,
             ExitToEthereum::run,
         ];
-        let mut map = BTreeMap::new();
+        let mut map = prelude::BTreeMap::new();
         for (address, fun) in addresses.into_iter().zip(fun) {
             map.insert(address, fun);
         }
@@ -157,7 +163,7 @@ impl Precompiles {
     }
 
     pub fn new_istanbul() -> Self {
-        let addresses = vec![
+        let addresses = prelude::vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
@@ -170,7 +176,7 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: Vec<PrecompileFn> = vec![
+        let fun: prelude::Vec<PrecompileFn> = prelude::vec![
             ECRecover::run,
             SHA256::run,
             RIPEMD160::run,
@@ -183,7 +189,7 @@ impl Precompiles {
             ExitToNear::run,
             ExitToEthereum::run,
         ];
-        let mut map = BTreeMap::new();
+        let mut map = prelude::BTreeMap::new();
         for (address, fun) in addresses.into_iter().zip(fun) {
             map.insert(address, fun);
         }
@@ -200,10 +206,10 @@ impl Precompiles {
 /// const fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
-const fn make_address(x: u32, y: u128) -> Address {
+const fn make_address(x: u32, y: u128) -> prelude::Address {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
-    Address([
+    prelude::Address([
         x_bytes[0],
         x_bytes[1],
         x_bytes[2],
@@ -229,8 +235,7 @@ const fn make_address(x: u32, y: u128) -> Address {
 
 #[cfg(test)]
 mod tests {
-    use crate::precompiles::{Byzantium, Istanbul};
-    use crate::prelude::Address;
+    use crate::{prelude, Byzantium, Istanbul};
     use rand::Rng;
 
     #[test]
@@ -254,20 +259,20 @@ mod tests {
 
         let mut rng = rand::thread_rng();
         for _ in 0..u8::MAX {
-            let address: Address = Address(rng.gen());
+            let address: prelude::Address = prelude::Address(rng.gen());
             let (x, y) = split_address(address);
             assert_eq!(address, super::make_address(x, y))
         }
     }
 
-    fn u8_to_address(x: u8) -> Address {
+    fn u8_to_address(x: u8) -> prelude::Address {
         let mut bytes = [0u8; 20];
         bytes[19] = x;
-        Address(bytes)
+        prelude::Address(bytes)
     }
 
     // Inverse function of `super::make_address`.
-    fn split_address(a: Address) -> (u32, u128) {
+    fn split_address(a: prelude::Address) -> (u32, u128) {
         let mut x_bytes = [0u8; 4];
         let mut y_bytes = [0u8; 16];
 

@@ -18,7 +18,6 @@ mod map;
 pub mod meta_parsing;
 pub mod parameters;
 pub mod proof;
-pub mod storage;
 pub mod transaction;
 
 pub mod admin_controlled;
@@ -29,7 +28,6 @@ pub mod engine;
 pub mod fungible_token;
 pub mod json;
 mod log_entry;
-mod precompiles;
 mod prelude;
 
 #[cfg(target_arch = "wasm32")]

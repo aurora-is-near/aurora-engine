@@ -495,8 +495,8 @@ impl FungibleToken {
     /// Key for store contract statistics data
     fn get_statistic_key() -> Vec<u8> {
         storage::bytes_to_key(
-            storage::KeyPrefix::EthConnector,
-            &[storage::EthConnectorStorageId::StatisticsAuroraAccountsCounter as u8],
+            crate::prelude::storage::KeyPrefix::EthConnector,
+            &[crate::prelude::EthConnectorStorageId::StatisticsAuroraAccountsCounter as u8],
         )
     }
 }

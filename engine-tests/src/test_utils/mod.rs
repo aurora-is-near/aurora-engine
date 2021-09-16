@@ -19,7 +19,7 @@ use crate::prelude::transaction::{
     access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
     LegacyEthSignedTransaction, LegacyEthTransaction,
 };
-use crate::prelude::{connector, sdk, storage, AccountId, Address, Wei, U256};
+use crate::prelude::{connector, sdk, AccountId, Address, Wei, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
@@ -239,15 +239,21 @@ impl AuroraRunner {
     ) {
         let trie = &mut self.ext.fake_trie;
 
-        let balance_key = storage::address_to_key(storage::KeyPrefix::Balance, &address);
+        let balance_key = crate::prelude::storage::address_to_key(
+            crate::prelude::storage::KeyPrefix::Balance,
+            &address,
+        );
         let balance_value = init_balance.to_bytes();
 
-        let nonce_key = storage::address_to_key(storage::KeyPrefix::Nonce, &address);
+        let nonce_key = crate::prelude::storage::address_to_key(
+            crate::prelude::storage::KeyPrefix::Nonce,
+            &address,
+        );
         let nonce_value = crate::prelude::u256_to_arr(&init_nonce);
 
-        let ft_key = storage::bytes_to_key(
-            storage::KeyPrefix::EthConnector,
-            &[storage::EthConnectorStorageId::FungibleToken as u8],
+        let ft_key = crate::prelude::storage::bytes_to_key(
+            crate::prelude::storage::KeyPrefix::EthConnector,
+            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
         );
         let ft_value = {
             let mut current_ft: FungibleToken = trie

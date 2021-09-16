@@ -1,3 +1,4 @@
+use crate::precompiles::secp256k1::ecrecover;
 use crate::prelude::sdk;
 use crate::prelude::Wei;
 use crate::prelude::{Address, Vec, H256, U256};
@@ -92,7 +93,7 @@ impl AccessListEthSignedTransaction {
         rlp_stream.append(&TYPE_BYTE);
         self.transaction_data.rlp_append_unsigned(&mut rlp_stream);
         let message_hash = sdk::keccak(rlp_stream.as_raw());
-        crate::precompiles::ecrecover(
+        ecrecover(
             message_hash,
             &super::vrs_to_arr(self.parity, self.r, self.s),
         )

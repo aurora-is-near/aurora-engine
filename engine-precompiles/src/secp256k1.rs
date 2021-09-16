@@ -1,6 +1,5 @@
-use crate::precompiles::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use crate::prelude::sdk;
-use crate::prelude::*;
+use crate::prelude::{sdk, vec, Borrowed, H256};
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use ethabi::Address;
 use evm::{Context, ExitError};
 
@@ -17,7 +16,7 @@ mod consts {
 /// See: https://etherscan.io/address/0000000000000000000000000000000000000001
 // Quite a few library methods rely on this and that should be changed. This
 // should only be for precompiles.
-pub(crate) fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
+pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     assert_eq!(signature.len(), 65);
 
     #[cfg(feature = "contract")]
@@ -113,8 +112,8 @@ impl Precompile for ECRecover {
 
 #[cfg(test)]
 mod tests {
-    use super::super::utils::new_context;
     use super::*;
+    use crate::utils::new_context;
 
     fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
         matches!(ecrecover(hash, signature), Ok(s) if s == signer)

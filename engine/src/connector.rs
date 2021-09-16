@@ -50,7 +50,7 @@ impl EthConnectorContract {
     }
 
     fn get_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
-        storage::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
+        crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
     }
 
     fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorStorageId) -> T {
