@@ -1,11 +1,11 @@
 use crate::parameters::SubmitResult;
+use crate::prelude::U256;
 use crate::test_utils;
+use crate::test_utils::one_inch::liquidity_protocol;
 use crate::types::Wei;
 use borsh::BorshDeserialize;
 use near_vm_logic::VMOutcome;
 use secp256k1::SecretKey;
-use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Once;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
@@ -13,6 +13,75 @@ const INITIAL_NONCE: u64 = 0;
 
 static DOWNLOAD_ONCE: Once = Once::new();
 static COMPILE_ONCE: Once = Once::new();
+
+#[test]
+fn test_1inch_liquidity_protocol() {
+    let (mut runner, mut source_account) = initialize();
+    let mut helper = liquidity_protocol::Helper {
+        runner: &mut runner,
+        signer: &mut source_account,
+    };
+
+    let (result, profile, deployer_address) = helper.create_mooniswap_deployer();
+    assert!(result.gas_used >= 5_100_000); // more than 5.1M EVM gas used
+    assert!(profile.all_gas() <= 43_000_000_000_000); // less than 43 NEAR Tgas used
+
+    let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
+    assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
+    assert!(profile.all_gas() <= 32_000_000_000_000); // less than 32 NEAR Tgas used
+
+    // create some ERC-20 tokens to have a liquidity pool for
+    let signer_address = test_utils::address_from_secret_key(&helper.signer.secret_key);
+    let token_a = helper.create_erc20("TokenA", "AAA");
+    let token_b = helper.create_erc20("TokenB", "BBB");
+    helper.mint_erc20_tokens(&token_a, signer_address);
+    helper.mint_erc20_tokens(&token_b, signer_address);
+
+    let (result, profile, pool) =
+        helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
+    assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
+    assert!(profile.all_gas() <= 103_000_000_000_000); // less than 103 NEAR Tgas used
+
+    // Approve giving ERC-20 tokens to the pool
+    helper.approve_erc20_tokens(&token_a, pool.address());
+    helper.approve_erc20_tokens(&token_b, pool.address());
+
+    let (result, profile) = helper.pool_deposit(
+        &pool,
+        liquidity_protocol::DepositArgs {
+            min_token_a: U256::zero(),
+            min_token_b: U256::zero(),
+            max_token_a: 10_000.into(),
+            max_token_b: 10_000.into(),
+        },
+    );
+    assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
+    assert!(profile.all_gas() <= 117_000_000_000_000); // less than 117 NEAR Tgas used
+
+    let (result, profile) = helper.pool_swap(
+        &pool,
+        liquidity_protocol::SwapArgs {
+            src_token: token_a.0.address,
+            dst_token: token_b.0.address,
+            amount: 1000.into(),
+            min_amount: U256::one(),
+            referral: signer_address,
+        },
+    );
+    assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
+    assert!(profile.all_gas() <= 136_000_000_000_000); // less than 136 NEAR Tgas used
+
+    let (result, profile) = helper.pool_withdraw(
+        &pool,
+        liquidity_protocol::WithdrawArgs {
+            amount: 100.into(),
+            min_token_a: U256::one(),
+            min_token_b: U256::one(),
+        },
+    );
+    assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
+    assert!(profile.all_gas() <= 102_000_000_000_000); // less than 102 NEAR Tgas used
+}
 
 #[test]
 fn test_1_inch_limit_order_deploy() {
@@ -37,7 +106,12 @@ fn deploy_1_inch_limit_order_contract(
     runner: &mut test_utils::AuroraRunner,
     signer: &mut test_utils::Signer,
 ) -> VMOutcome {
-    let contract_path = download_and_compile_solidity_sources();
+    let artifacts_path = test_utils::one_inch::download_and_compile_solidity_sources(
+        "limit-order-protocol",
+        &DOWNLOAD_ONCE,
+        &COMPILE_ONCE,
+    );
+    let contract_path = artifacts_path.join("LimitOrderProtocol.sol/LimitOrderProtocol.json");
     let constructor =
         test_utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
 
@@ -59,43 +133,6 @@ fn deploy_1_inch_limit_order_contract(
     );
     assert!(error.is_none());
     outcome.unwrap()
-}
-
-fn download_and_compile_solidity_sources() -> PathBuf {
-    let sources_dir = Path::new("target").join("limit-order-protocol");
-    if !sources_dir.exists() {
-        // Contracts not already present, so download them (but only once, even
-        // if multiple tests running in parallel saw `contracts_dir` does not exist).
-        DOWNLOAD_ONCE.call_once(|| {
-            let url = "https://github.com/1inch/limit-order-protocol";
-            git2::Repository::clone(url, &sources_dir).unwrap();
-        });
-    }
-
-    COMPILE_ONCE.call_once(|| {
-        // install packages
-        let status = Command::new("/usr/bin/env")
-            .current_dir(&sources_dir)
-            .args(["yarn", "install"])
-            .status()
-            .unwrap();
-        assert!(status.success());
-
-        let hardhat = |command: &str| {
-            let status = Command::new("/usr/bin/env")
-                .current_dir(&sources_dir)
-                .args(["node_modules/hardhat/internal/cli/cli.js", command])
-                .status()
-                .unwrap();
-            assert!(status.success());
-        };
-
-        // clean and compile
-        hardhat("clean");
-        hardhat("compile");
-    });
-
-    sources_dir.join("artifacts/contracts/LimitOrderProtocol.sol/LimitOrderProtocol.json")
 }
 
 fn initialize() -> (test_utils::AuroraRunner, test_utils::Signer) {
