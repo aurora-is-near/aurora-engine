@@ -5,7 +5,9 @@ use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::ExitFatal;
 use evm::{Config, CreateScheme, ExitError, ExitReason};
 
-use crate::connector::{self, EthConnectorContract};
+use crate::connector::EthConnectorContract;
+#[cfg(feature = "contract")]
+use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::parameters::{
     FunctionCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PromiseCreateArgs, ResultLog,
@@ -789,7 +791,7 @@ impl Engine {
             ethabi::Token::Uint(args.amount.into()),
         ]);
 
-        let erc20_admin_address = connector::erc20_admin_address(&sdk::current_account_id());
+        let erc20_admin_address = current_address();
         unwrap_res_or_finish!(
             self.call(
                 erc20_admin_address,

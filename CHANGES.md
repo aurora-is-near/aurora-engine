@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.3] - 2021-09-14
+
+### Changes
+
+- Revert ERC20 admin address changes for the time being by [@joshuajbouw].
+
 ## [1.6.2] - 2021-09-13
 
 ### Changes
@@ -80,7 +86,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.2...master
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.3...master
+[1.6.3]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.2...1.6.3
 [1.6.2]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.1...1.6.2
 [1.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.0...1.6.1
 [1.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.5.0...1.6.0

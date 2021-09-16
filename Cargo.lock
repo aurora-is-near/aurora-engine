@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "1.6.1"
+version = "1.6.3"
 dependencies = [
  "aurora-bn",
  "base64 0.13.0",
@@ -132,6 +132,7 @@ dependencies = [
  "libsecp256k1",
  "logos",
  "near-crypto 0.1.0 (git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9)",
+ "near-primitives 0.1.0 (git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9)",
  "near-primitives-core 0.1.0 (git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9)",
  "near-sdk",
  "near-sdk-sim",
@@ -147,6 +148,7 @@ dependencies = [
  "serde_json",
  "sha2 0.9.5",
  "sha3 0.9.1",
+ "wasmer-runtime-core-near",
  "wee_alloc",
 ]
 

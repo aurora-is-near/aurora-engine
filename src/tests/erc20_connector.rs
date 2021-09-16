@@ -245,7 +245,7 @@ fn test_mint() {
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(0));
     let amount = 10;
-    let _result = runner.mint(token, address, amount, test_utils::erc20_admin_account());
+    let _result = runner.mint(token, address, amount, origin());
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(amount));
 }
@@ -361,12 +361,7 @@ fn test_transfer_erc20_token() {
         U256::zero()
     );
 
-    runner.mint(
-        token,
-        peer0.address,
-        to_mint,
-        test_utils::erc20_admin_account(),
-    );
+    runner.mint(token, peer0.address, to_mint, origin());
 
     assert_eq!(
         runner.balance_of(token, peer0.address, origin()),

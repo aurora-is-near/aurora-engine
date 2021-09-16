@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "1.6.2"
+version = "1.6.3"
 authors = ["NEAR <hello@near.org>"]
 edition = "2018"
 description = ""
@@ -76,6 +76,8 @@ near-crypto = { git = "https://github.com/near/nearcore.git", rev = "8a377fda0b4
 near-vm-runner = { git = "https://github.com/near/nearcore.git", rev = "8a377fda0b4ce319385c463f1ae46e4b0b29dcd9"}
 near-vm-logic = { git = "https://github.com/near/nearcore.git", rev = "8a377fda0b4ce319385c463f1ae46e4b0b29dcd9"}
 near-primitives-core = { git = "https://github.com/near/nearcore.git", rev = "8a377fda0b4ce319385c463f1ae46e4b0b29dcd9"}
+near-primitives = { git = "https://github.com/near/nearcore.git", rev = "8a377fda0b4ce319385c463f1ae46e4b0b29dcd9"}
+wasmer-runtime-core = { version = "0.18.2", package = "wasmer-runtime-core-near"}
 libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
