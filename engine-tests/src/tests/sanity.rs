@@ -92,6 +92,7 @@ fn test_num_wasm_functions() {
     let artifact = get_compiled_artifact(&runner);
     let module_info = artifact.info();
     let num_functions = module_info.func_assoc.len();
+    assert_eq!(num_functions, 1281);
     assert!(num_functions <= 1281);
 }
 
