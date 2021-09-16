@@ -18,7 +18,7 @@ use crate::prelude::transaction::{
     access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
     LegacyEthSignedTransaction, LegacyEthTransaction,
 };
-use crate::prelude::{connector, sdk, AccountId, Address, Wei, U256};
+use crate::prelude::{sdk, AccountId, Address, Wei, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
