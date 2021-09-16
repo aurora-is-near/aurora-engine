@@ -1,5 +1,3 @@
-use crate::prelude::{Address, Wei, U256};
-use aurora_engine_sdk as sdk;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
@@ -13,16 +11,16 @@ use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 use std::borrow::Cow;
 
-use crate::prelude::AccountId;
-use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
-use aurora_engine::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use aurora_engine::parameters::{
+use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
+use crate::prelude::parameters::{
     InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs,
 };
-use aurora_engine::transaction::{
+use crate::prelude::transaction::{
     access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
     LegacyEthSignedTransaction, LegacyEthTransaction,
 };
+use crate::prelude::{connector, sdk, AccountId, Address, Wei, U256};
+use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
@@ -31,7 +29,7 @@ pub fn origin() -> AccountId {
 }
 
 pub fn erc20_admin_account() -> AccountId {
-    [aurora_engine::connector::ERC20_ADMIN_PREFIX, &origin()].concat()
+    [connector::ERC20_ADMIN_PREFIX, &origin()].concat()
 }
 
 pub(crate) const SUBMIT: &str = "submit";

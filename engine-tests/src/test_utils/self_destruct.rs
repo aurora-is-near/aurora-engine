@@ -1,7 +1,7 @@
-use crate::prelude::{Address, U256};
+use crate::prelude::{
+    parameters::FunctionCallArgs, transaction::LegacyEthTransaction, Address, U256,
+};
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
-use aurora_engine::parameters::FunctionCallArgs;
-use aurora_engine::transaction::LegacyEthTransaction;
 use borsh::BorshSerialize;
 use std::convert::TryInto;
 
@@ -87,6 +87,7 @@ impl SelfDestructConstructor {
         ))
     }
 }
+
 pub(crate) struct SelfDestruct {
     contract: solidity::DeployedContract,
 }
