@@ -1,15 +1,15 @@
 use crate::prelude::*;
 
-pub(crate) const ERC20_ADMIN_PREFIX: &str = "erc20.";
-pub(crate) const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
+pub const ERC20_ADMIN_PREFIX: &str = "erc20.";
+pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
 // Note: Is 40Tgas always enough?
 const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
 
-pub(crate) const UNPAUSE_ALL: PausedMask = 0;
-pub(crate) const PAUSE_DEPOSIT: PausedMask = 1 << 0;
-pub(crate) const PAUSE_WITHDRAW: PausedMask = 1 << 1;
+pub const UNPAUSE_ALL: PausedMask = 0;
+pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
+pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnectorContract {
@@ -50,7 +50,7 @@ impl EthConnectorContract {
     }
 
     fn get_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
-        storage::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
+        crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
     }
 
     fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorStorageId) -> T {

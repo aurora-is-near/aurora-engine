@@ -1,21 +1,24 @@
-use crate::prelude::*;
-use evm::{Context, ExitError};
+use super::{EvmPrecompileResult, Precompile};
 #[cfg(feature = "contract")]
-use {
-    crate::parameters::{PromiseCreateArgs, WithdrawCallArgs},
-    crate::storage::{bytes_to_key, KeyPrefix},
-    borsh::BorshSerialize,
-    evm::backend::Log,
+use crate::prelude::{
+    format, is_valid_account_id,
+    parameters::{PromiseCreateArgs, WithdrawCallArgs},
+    sdk,
+    storage::{bytes_to_key, KeyPrefix},
+    types::AccountId,
+    vec, BorshSerialize, Cow, String, ToString, TryInto, Vec, U256,
 };
 
-use super::{EvmPrecompileResult, Precompile};
+use crate::prelude::Address;
+use crate::PrecompileOutput;
+#[cfg(feature = "contract")]
+use evm::backend::Log;
+use evm::{Context, ExitError};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
-use crate::precompiles::PrecompileOutput;
-
 mod costs {
-    use crate::prelude::Gas;
+    use crate::prelude::types::Gas;
 
     // TODO(#51): Determine the correct amount of gas
     pub(super) const EXIT_TO_NEAR_GAS: Gas = 0;
@@ -37,7 +40,7 @@ impl ExitToNear {
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
-    pub(crate) const ADDRESS: Address =
+    pub const ADDRESS: Address =
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
@@ -108,7 +111,7 @@ impl Precompile for ExitToNear {
                         String::from_utf8(sdk::current_account_id()).unwrap(),
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
-                        crate::prelude::format!(
+                        format!(
                             r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
                             String::from_utf8(input.to_vec()).unwrap(),
                             context.apparent_value.as_u128()
@@ -146,10 +149,9 @@ impl Precompile for ExitToNear {
                         nep141_address,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
-                        crate::prelude::format!(
+                        format!(
                             r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            receiver_account_id,
-                            amount
+                            receiver_account_id, amount
                         ),
                     )
                 } else {
@@ -191,7 +193,7 @@ impl ExitToEthereum {
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
-    pub(crate) const ADDRESS: Address =
+    pub const ADDRESS: Address =
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
 }
 
@@ -290,10 +292,9 @@ impl Precompile for ExitToEthereum {
                         nep141_address,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and hexadecimal respectively.
-                        crate::prelude::format!(
+                        format!(
                             r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                            amount,
-                            eth_recipient
+                            amount, eth_recipient
                         )
                         .as_bytes()
                         .to_vec(),
@@ -335,7 +336,7 @@ impl Precompile for ExitToEthereum {
 #[cfg(test)]
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
-    use crate::prelude::near_account_to_evm_address;
+    use crate::prelude::sdk::types::near_account_to_evm_address;
 
     #[test]
     fn test_precompile_id() {

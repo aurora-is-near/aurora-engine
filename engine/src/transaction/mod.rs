@@ -1,7 +1,7 @@
 use crate::prelude::{Address, TryFrom, Vec, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 
-pub(crate) mod access_list;
+pub mod access_list;
 pub(crate) mod legacy;
 
 use access_list::AccessTuple;

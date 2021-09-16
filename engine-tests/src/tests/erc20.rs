@@ -1,5 +1,3 @@
-use crate::parameters::TransactionStatus;
-use crate::prelude::sdk;
 use crate::prelude::Wei;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{
@@ -7,6 +5,8 @@ use crate::test_utils::{
     erc20::{ERC20Constructor, ERC20},
     Signer,
 };
+use aurora_engine::parameters::TransactionStatus;
+use aurora_engine_sdk as sdk;
 use bstr::ByteSlice;
 use secp256k1::SecretKey;
 
@@ -240,7 +240,7 @@ fn get_address_erc20_balance(
         ))
         .unwrap();
     let bytes = match result {
-        crate::parameters::TransactionStatus::Succeed(bytes) => bytes,
+        aurora_engine::parameters::TransactionStatus::Succeed(bytes) => bytes,
         err => panic!("Unexpected view call status {:?}", err),
     };
     U256::from_big_endian(&bytes)

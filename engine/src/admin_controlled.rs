@@ -2,7 +2,7 @@ use crate::prelude::sdk;
 
 pub type PausedMask = u8;
 
-pub(crate) const ERR_PAUSED: &str = "ERR_PAUSED";
+pub const ERR_PAUSED: &str = "ERR_PAUSED";
 
 pub trait AdminControlled {
     /// Returns true if the current account is owner

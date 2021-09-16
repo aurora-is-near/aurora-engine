@@ -115,9 +115,80 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "1.7.0"
+version = "1.7.3"
 dependencies = [
  "aurora-bn",
+ "aurora-engine-precompiles",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "base64 0.13.0",
+ "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
+ "borsh",
+ "byte-slice-cast",
+ "ethabi",
+ "evm",
+ "evm-core",
+ "hex",
+ "libsecp256k1",
+ "logos",
+ "num",
+ "primitive-types",
+ "rand 0.7.3",
+ "ripemd160",
+ "rjson",
+ "rlp",
+ "serde",
+ "serde_json",
+ "sha2 0.9.5",
+ "sha3 0.9.1",
+ "wee_alloc",
+]
+
+[[package]]
+name = "aurora-engine-precompiles"
+version = "1.0.0"
+dependencies = [
+ "aurora-bn",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "base64 0.13.0",
+ "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
+ "borsh",
+ "byte-slice-cast",
+ "ethabi",
+ "evm",
+ "evm-core",
+ "hex",
+ "libsecp256k1",
+ "logos",
+ "num",
+ "primitive-types",
+ "rand 0.7.3",
+ "ripemd160",
+ "rjson",
+ "rlp",
+ "serde",
+ "serde_json",
+ "sha2 0.9.5",
+ "sha3 0.9.1",
+ "wee_alloc",
+]
+
+[[package]]
+name = "aurora-engine-sdk"
+version = "1.0.0"
+dependencies = [
+ "aurora-engine-types",
+ "borsh",
+ "sha3 0.9.1",
+]
+
+[[package]]
+name = "aurora-engine-tests"
+version = "1.0.0"
+dependencies = [
+ "aurora-bn",
+ "aurora-engine",
  "aurora-engine-sdk",
  "aurora-engine-types",
  "base64 0.13.0",
@@ -150,15 +221,6 @@ dependencies = [
  "sha2 0.9.5",
  "sha3 0.9.1",
  "wee_alloc",
-]
-
-[[package]]
-name = "aurora-engine-sdk"
-version = "1.0.0"
-dependencies = [
- "aurora-engine-types",
- "borsh",
- "sha3 0.9.1",
 ]
 
 [[package]]

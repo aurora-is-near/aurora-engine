@@ -205,14 +205,6 @@ impl TryFrom<NEP141FtOnTransferArgs> for String {
     }
 }
 
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
-pub struct PromiseCreateArgs {
-    pub target_account_id: AccountId,
-    pub method: String,
-    pub args: Vec<u8>,
-    pub attached_balance: u128,
-    pub attached_gas: u64,
-}
 /// Eth-connector deposit arguments
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct DepositCallArgs {
@@ -392,13 +384,6 @@ impl From<JsonValue> for TransferCallArgs {
             memo: v.string("memo").ok(),
         }
     }
-}
-
-/// withdraw NEAR eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct WithdrawCallArgs {
-    pub recipient_address: EthAddress,
-    pub amount: Balance,
 }
 
 /// balance_of args for json invocation

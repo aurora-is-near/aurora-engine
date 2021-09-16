@@ -1,5 +1,4 @@
-use crate::prelude::*;
-use evm::Context;
+use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
@@ -12,11 +11,16 @@ use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 use std::borrow::Cow;
 
-use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
-use crate::transaction::{
+use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
+use crate::prelude::parameters::{
+    InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs,
+};
+use crate::prelude::transaction::{
     access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
     LegacyEthSignedTransaction, LegacyEthTransaction,
 };
+use crate::prelude::{connector, sdk, AccountId, Address, Wei, U256};
+use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
@@ -25,7 +29,7 @@ pub fn origin() -> AccountId {
 }
 
 pub fn erc20_admin_account() -> AccountId {
-    [crate::connector::ERC20_ADMIN_PREFIX, &origin()].concat()
+    [connector::ERC20_ADMIN_PREFIX, &origin()].concat()
 }
 
 pub(crate) const SUBMIT: &str = "submit";
@@ -235,15 +239,21 @@ impl AuroraRunner {
     ) {
         let trie = &mut self.ext.fake_trie;
 
-        let balance_key = storage::address_to_key(storage::KeyPrefix::Balance, &address);
+        let balance_key = crate::prelude::storage::address_to_key(
+            crate::prelude::storage::KeyPrefix::Balance,
+            &address,
+        );
         let balance_value = init_balance.to_bytes();
 
-        let nonce_key = storage::address_to_key(storage::KeyPrefix::Nonce, &address);
+        let nonce_key = crate::prelude::storage::address_to_key(
+            crate::prelude::storage::KeyPrefix::Nonce,
+            &address,
+        );
         let nonce_value = crate::prelude::u256_to_arr(&init_nonce);
 
-        let ft_key = storage::bytes_to_key(
-            storage::KeyPrefix::EthConnector,
-            &[storage::EthConnectorStorageId::FungibleToken as u8],
+        let ft_key = crate::prelude::storage::bytes_to_key(
+            crate::prelude::storage::KeyPrefix::EthConnector,
+            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
         );
         let ft_value = {
             let mut current_ft: FungibleToken = trie
@@ -558,14 +568,6 @@ pub(crate) fn validate_address_balance_and_nonce(
 ) {
     assert_eq!(runner.get_balance(address), expected_balance, "balance");
     assert_eq!(runner.get_nonce(address), expected_nonce, "nonce");
-}
-
-pub fn new_context() -> Context {
-    Context {
-        address: Default::default(),
-        caller: Default::default(),
-        apparent_value: Default::default(),
-    }
 }
 
 pub(crate) fn address_from_hex(address: &str) -> Address {

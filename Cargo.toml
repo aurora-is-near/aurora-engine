@@ -2,7 +2,9 @@
 members = [
     "engine",
     "engine-types",
-    "engine-sdk"
+    "engine-sdk",
+    "engine-precompiles",
+    "engine-tests"
 ]
 exclude = [
     "etc/state-migration-test"

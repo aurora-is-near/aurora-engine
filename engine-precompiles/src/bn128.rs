@@ -1,7 +1,5 @@
-use crate::precompiles::{
-    Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput,
-};
-use crate::prelude::*;
+use crate::prelude::{Address, Borrowed, PhantomData, Vec};
+use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
 /// bn128 costs.
@@ -396,7 +394,7 @@ impl Precompile for Bn128Pair<Istanbul> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::new_context;
+    use crate::utils::new_context;
 
     use super::*;
 

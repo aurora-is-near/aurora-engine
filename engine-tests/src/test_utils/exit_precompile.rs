@@ -1,7 +1,5 @@
-use crate::parameters::SubmitResult;
-use crate::prelude::{Address, U256};
+use crate::prelude::{parameters::SubmitResult, transaction::LegacyEthTransaction, Address, U256};
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
-use crate::transaction::LegacyEthTransaction;
 
 pub(crate) struct TesterConstructor(pub solidity::ContractConstructor);
 

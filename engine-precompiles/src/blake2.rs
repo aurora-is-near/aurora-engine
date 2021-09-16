@@ -1,7 +1,7 @@
 use evm::{Context, ExitError};
 
-use crate::precompiles::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use crate::prelude::{mem, Address, Borrowed, TryInto};
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 
 /// Blake2 costs.
 mod costs {
@@ -17,7 +17,7 @@ mod consts {
 pub(super) struct Blake2F;
 
 impl Blake2F {
-    pub(super) const ADDRESS: Address = super::make_address(0, 9);
+    pub(super) const ADDRESS: Address = crate::make_address(0, 9);
 }
 
 impl Precompile for Blake2F {
@@ -95,8 +95,8 @@ impl Precompile for Blake2F {
 
 #[cfg(test)]
 mod tests {
+    use super::super::utils::new_context;
     use crate::prelude::Vec;
-    use crate::test_utils::new_context;
 
     use super::*;
 
