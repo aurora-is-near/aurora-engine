@@ -18,7 +18,7 @@ pub mod proof;
 pub mod transaction;
 
 pub mod admin_controlled;
-#[cfg_attr(not(feature = "contract"), allow(dead_code))]
+#[cfg_attr(feature = "contract", allow(dead_code))]
 pub mod connector;
 mod deposit_event;
 pub mod engine;
@@ -72,8 +72,8 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetErc20FromNep141CallArgs,
-        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+        DeployErc20TokenArgs, FunctionCallArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
+        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult, TransactionStatus,
         TransferCallCallArgs, ViewCallArgs,
     };
@@ -555,6 +555,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
+        use sdk::types::ExpectUtf8;
         // Check is payable
         sdk::assert_one_yocto();
 

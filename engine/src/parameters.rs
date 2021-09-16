@@ -419,28 +419,6 @@ pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,
 }
 
-pub trait ExpectUtf8<T> {
-    fn expect_utf8(self, message: &[u8]) -> T;
-}
-
-impl<T> ExpectUtf8<T> for Option<T> {
-    fn expect_utf8(self, message: &[u8]) -> T {
-        match self {
-            Some(t) => t,
-            None => sdk::panic_utf8(message),
-        }
-    }
-}
-
-impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
-    fn expect_utf8(self, message: &[u8]) -> T {
-        match self {
-            Ok(t) => t,
-            Err(_) => sdk::panic_utf8(message),
-        }
-    }
-}
-
 impl From<JsonValue> for ResolveTransferCallArgs {
     fn from(v: JsonValue) -> Self {
         Self {
