@@ -3,16 +3,12 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
 
-mod lib {
-    #[cfg(not(feature = "std"))]
-    extern crate alloc;
-    #[cfg(not(feature = "std"))]
-    extern crate core;
+use aurora_engine_types::parameters::PromiseCreateArgs;
 
-    pub use crate::prelude::*;
-}
-
-use lib::*;
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+extern crate core;
 
 mod map;
 #[cfg(feature = "meta-call")]
@@ -42,15 +38,17 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
     #[cfg(feature = "log")]
     {
+        use prelude::ToString;
+
         if let Some(msg) = info.message() {
             let msg = if let Some(log) = info.location() {
-                format!("{} [{}]", msg, log)
+                prelude::format!("{} [{}]", msg, log)
             } else {
                 msg.to_string()
             };
-            sdk::panic_utf8(msg.as_bytes());
+            prelude::sdk::panic_utf8(msg.as_bytes());
         } else if let Some(log) = info.location() {
-            sdk::panic_utf8(log.to_string().as_bytes());
+            prelude::sdk::panic_utf8(log.to_string().as_bytes());
         }
     }
 
@@ -81,11 +79,12 @@ mod contract {
     };
 
     use crate::json::parse_json;
-    use crate::prelude::{Address, ToString, TryFrom, TryInto, H160, H256, U256};
-    use crate::sdk;
-    use crate::sdk::types::{near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap};
-    use crate::storage::{bytes_to_key, KeyPrefix};
-    use crate::types::{u256_to_arr, ERR_FAILED_PARSE};
+    use crate::prelude::sdk::types::{
+        near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
+    };
+    use crate::prelude::storage::{bytes_to_key, KeyPrefix};
+    use crate::prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
+    use crate::prelude::{sdk, Address, ToString, TryFrom, TryInto, H160, H256, U256};
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";

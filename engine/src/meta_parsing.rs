@@ -1,4 +1,5 @@
-use crate::precompiles::secp256k1::ecrecover;
+use crate::parameters::MetaCallArgs;
+use crate::prelude::precompiles::secp256k1::ecrecover;
 use crate::prelude::*;
 use ethabi::{encode, Token as ABIToken};
 use logos::Logos;

@@ -1,3 +1,6 @@
+use crate::parameters::{
+    FunctionCallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs,
+};
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
@@ -9,8 +12,9 @@ use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::prelude::*;
 
-use crate::precompiles::native::{ExitToEthereum, ExitToNear};
-use crate::precompiles::Precompiles;
+use crate::parameters::{NewCallArgs, TransactionStatus};
+use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
+use crate::prelude::precompiles::Precompiles;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.

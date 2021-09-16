@@ -1,4 +1,8 @@
+use crate::admin_controlled::PausedMask;
+use crate::fungible_token::FungibleTokenMetadata;
+use crate::json::{JsonError, JsonValue, ParseError};
 use crate::prelude::*;
+use crate::proof::Proof;
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
