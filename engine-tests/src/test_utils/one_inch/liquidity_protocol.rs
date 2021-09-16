@@ -1,4 +1,4 @@
-use crate::parameters::SubmitResult;
+use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{self, solidity, ExecutionProfile};
 use std::path::PathBuf;
@@ -27,7 +27,7 @@ impl<'a> Helper<'a> {
         let (result, profile) = self
             .runner
             .submit_with_signer_profiled(self.signer, |nonce| {
-                crate::transaction::LegacyEthTransaction {
+                crate::prelude::transaction::LegacyEthTransaction {
                     nonce,
                     gas_price: Default::default(),
                     gas: u64::MAX.into(),
@@ -223,7 +223,9 @@ impl<'a> Helper<'a> {
 }
 
 pub(crate) struct PoolDeployer(solidity::DeployedContract);
+
 pub(crate) struct PoolFactory(solidity::DeployedContract);
+
 pub(crate) struct Pool(solidity::DeployedContract);
 
 pub(crate) struct DepositArgs {

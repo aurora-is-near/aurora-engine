@@ -32,7 +32,7 @@ fn test_override_state() {
     // deploy contract
     let result = runner
         .submit_with_signer(&mut account1, |nonce| {
-            crate::transaction::LegacyEthTransaction {
+            crate::prelude::transaction::LegacyEthTransaction {
                 nonce,
                 gas_price: Default::default(),
                 gas: u64::MAX.into(),
@@ -54,7 +54,7 @@ fn test_override_state() {
             ))
             .unwrap();
         match result {
-            crate::parameters::TransactionStatus::Succeed(bytes) => {
+            crate::prelude::parameters::TransactionStatus::Succeed(bytes) => {
                 Address::from_slice(&bytes[12..32])
             }
             _ => panic!("tx failed"),
@@ -322,7 +322,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
-    let relayer = types::near_account_to_evm_address(
+    let relayer = sdk::types::near_account_to_evm_address(
         runner.context.predecessor_account_id.as_ref().as_bytes(),
     );
 

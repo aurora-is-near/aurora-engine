@@ -1,8 +1,7 @@
-use crate::parameters::SubmitResult;
-use crate::prelude::U256;
+use crate::prelude::parameters::SubmitResult;
+use crate::prelude::{Wei, U256};
 use crate::test_utils;
 use crate::test_utils::one_inch::liquidity_protocol;
-use crate::types::Wei;
 use borsh::BorshDeserialize;
 use near_vm_logic::VMOutcome;
 use secp256k1::SecretKey;
@@ -116,7 +115,7 @@ fn deploy_1_inch_limit_order_contract(
         test_utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
 
     let nonce = signer.use_nonce();
-    let deploy_tx = crate::transaction::LegacyEthTransaction {
+    let deploy_tx = crate::prelude::transaction::LegacyEthTransaction {
         nonce: nonce.into(),
         gas_price: Default::default(),
         gas: u64::MAX.into(),
