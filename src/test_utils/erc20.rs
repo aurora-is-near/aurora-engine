@@ -115,6 +115,24 @@ impl ERC20 {
         }
     }
 
+    pub fn approve(&self, spender: Address, amount: U256, nonce: U256) -> LegacyEthTransaction {
+        let data = self
+            .0
+            .abi
+            .function("approve")
+            .unwrap()
+            .encode_input(&[ethabi::Token::Address(spender), ethabi::Token::Uint(amount)])
+            .unwrap();
+        LegacyEthTransaction {
+            nonce,
+            gas_price: Default::default(),
+            gas: u64::MAX.into(),
+            to: Some(self.0.address),
+            value: Default::default(),
+            data,
+        }
+    }
+
     pub fn balance_of(&self, address: Address, nonce: U256) -> LegacyEthTransaction {
         let data = self
             .0

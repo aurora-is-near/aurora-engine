@@ -34,6 +34,7 @@ pub(crate) const SUBMIT: &str = "submit";
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
+pub(crate) mod one_inch;
 pub(crate) mod self_destruct;
 pub(crate) mod solidity;
 pub(crate) mod standard_precompiles;
@@ -144,7 +145,7 @@ impl AuroraRunner {
         input: Vec<u8>,
     ) {
         context.block_index += 1;
-        context.block_timestamp += 100;
+        context.block_timestamp += 1_000_000_000;
         context.input = input;
         context.signer_account_id = as_account_id(signer_account_id);
         context.predecessor_account_id = as_account_id(caller_account_id);
@@ -223,9 +224,18 @@ impl AuroraRunner {
         signer: &mut Signer,
         make_tx: F,
     ) -> Result<SubmitResult, VMError> {
+        self.submit_with_signer_profiled(signer, make_tx)
+            .map(|(result, _)| result)
+    }
+
+    pub fn submit_with_signer_profiled<F: FnOnce(U256) -> LegacyEthTransaction>(
+        &mut self,
+        signer: &mut Signer,
+        make_tx: F,
+    ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
         let nonce = signer.use_nonce();
         let tx = make_tx(nonce.into());
-        self.submit_transaction(&signer.secret_key, tx)
+        self.submit_transaction_profiled(&signer.secret_key, tx)
     }
 
     pub fn submit_transaction(
@@ -233,6 +243,15 @@ impl AuroraRunner {
         account: &SecretKey,
         transaction: LegacyEthTransaction,
     ) -> Result<SubmitResult, VMError> {
+        self.submit_transaction_profiled(account, transaction)
+            .map(|(result, _)| result)
+    }
+
+    pub fn submit_transaction_profiled(
+        &mut self,
+        account: &SecretKey,
+        transaction: LegacyEthTransaction,
+    ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
         let calling_account_id = "some-account.near";
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
 
@@ -242,10 +261,11 @@ impl AuroraRunner {
         if let Some(err) = maybe_err {
             Err(err)
         } else {
+            let output = output.unwrap();
+            let profile = ExecutionProfile::new(&output);
             let submit_result =
-                SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap())
-                    .unwrap();
-            Ok(submit_result)
+                SubmitResult::try_from_slice(&output.return_data.as_value().unwrap()).unwrap();
+            Ok((submit_result, profile))
         }
     }
 
@@ -558,6 +578,13 @@ pub(crate) fn as_account_id(account_id: &str) -> near_primitives_core::types::Ac
 pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {
     match result.status {
         TransactionStatus::Succeed(ret) => ret,
+        other => panic!("Unexpected status: {:?}", other),
+    }
+}
+
+pub fn unwrap_success_slice(result: &SubmitResult) -> &[u8] {
+    match &result.status {
+        TransactionStatus::Succeed(ret) => &ret,
         other => panic!("Unexpected status: {:?}", other),
     }
 }
