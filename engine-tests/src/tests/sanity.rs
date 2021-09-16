@@ -14,6 +14,87 @@ const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
+#[test]
+fn test_override_state() {
+    let (mut runner, mut account1, viewer_address) = initialize_transfer();
+    let account1_address = test_utils::address_from_secret_key(&account1.secret_key);
+    let mut account2 = test_utils::Signer::random();
+    let account2_address = test_utils::address_from_secret_key(&account2.secret_key);
+    runner.create_address(account2_address, INITIAL_BALANCE, INITIAL_NONCE.into());
+
+    let contract = test_utils::solidity::ContractConstructor::compile_from_source(
+        "src/tests/res",
+        "target/solidity_build",
+        "poster.sol",
+        "Poster",
+    );
+
+    // deploy contract
+    let result = runner
+        .submit_with_signer(&mut account1, |nonce| {
+            crate::transaction::LegacyEthTransaction {
+                nonce,
+                gas_price: Default::default(),
+                gas: u64::MAX.into(),
+                to: None,
+                value: Default::default(),
+                data: contract.code.clone(),
+            }
+        })
+        .unwrap();
+    let address = Address::from_slice(&test_utils::unwrap_success(result));
+    let contract = contract.deployed_at(address);
+
+    // define functions to interact with the contract
+    let get_address = |runner: &test_utils::AuroraRunner| {
+        let result = runner
+            .view_call(test_utils::as_view_call(
+                contract.call_method_without_args("get", U256::zero()),
+                viewer_address,
+            ))
+            .unwrap();
+        match result {
+            crate::parameters::TransactionStatus::Succeed(bytes) => {
+                Address::from_slice(&bytes[12..32])
+            }
+            _ => panic!("tx failed"),
+        }
+    };
+
+    let post_address = |runner: &mut test_utils::AuroraRunner, signer: &mut test_utils::Signer| {
+        let result = runner
+            .submit_with_signer(signer, |nonce| {
+                contract.call_method_with_args(
+                    "post",
+                    &[ethabi::Token::String("Hello, world!".to_string())],
+                    nonce,
+                )
+            })
+            .unwrap();
+        assert!(result.status.is_ok());
+    };
+
+    // Assert the initial state is 0
+    assert_eq!(get_address(&runner), Address([0; 20]));
+    post_address(&mut runner, &mut account1);
+    // Assert the address matches the first caller
+    assert_eq!(get_address(&runner), account1_address);
+    post_address(&mut runner, &mut account2);
+    // Assert the address matches the second caller
+    assert_eq!(get_address(&runner), account2_address);
+}
+
+#[test]
+fn test_num_wasm_functions() {
+    // Counts the number of functions in our wasm output.
+    // See https://github.com/near/nearcore/issues/4814 for context
+    let runner = test_utils::deploy_evm();
+    let artifact = get_compiled_artifact(&runner);
+    let module_info = artifact.info();
+    let num_functions = module_info.func_assoc.len();
+    assert!(num_functions <= 1281);
+}
+
 /// Tests we can transfer Eth from one account to another and that the balances are correctly
 /// updated.
 #[test]
@@ -187,8 +268,9 @@ fn test_transfer_charging_gas_success() {
     let expected_source_balance = INITIAL_BALANCE - TRANSFER_AMOUNT - spent_amount;
     let expected_dest_balance = TRANSFER_AMOUNT;
     let expected_relayer_balance = spent_amount;
-    let relayer_address =
-        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+    let relayer_address = sdk::types::near_account_to_evm_address(
+        runner.context.predecessor_account_id.as_ref().as_bytes(),
+    );
 
     // validate post-state
     test_utils::validate_address_balance_and_nonce(
@@ -240,8 +322,10 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
-    let relayer =
-        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+    let relayer = types::near_account_to_evm_address(
+        runner.context.predecessor_account_id.as_ref().as_bytes(),
+    );
+
     test_utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
@@ -325,11 +409,8 @@ fn test_block_hash_contract() {
 fn test_ft_metadata() {
     let mut runner = test_utils::deploy_evm();
 
-    let (maybe_outcome, maybe_error) = runner.call(
-        "ft_metadata",
-        runner.context.signer_account_id.clone(),
-        Vec::new(),
-    );
+    let account_id: String = runner.context.signer_account_id.clone().into();
+    let (maybe_outcome, maybe_error) = runner.call("ft_metadata", &account_id, Vec::new());
     assert!(maybe_error.is_none());
     let outcome = maybe_outcome.unwrap();
     let json_value =
@@ -440,4 +521,21 @@ fn query_address_sim(
         near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
         other => panic!("Unexpected outcome: {:?}", other),
     }
+}
+
+fn get_compiled_artifact(
+    runner: &test_utils::AuroraRunner,
+) -> wasmer_runtime_core::cache::Artifact {
+    use near_primitives::types::CompiledContractCache;
+
+    near_vm_runner::precompile_contract(&runner.code, &runner.wasm_config, Some(&runner.cache))
+        .unwrap();
+    let cache_key = near_vm_runner::get_contract_cache_key(
+        &runner.code,
+        Default::default(),
+        &runner.wasm_config,
+    );
+    let cache_record: Vec<u8> =
+        Vec::try_from_slice(&runner.cache.get(cache_key.as_ref()).unwrap().unwrap()[1..]).unwrap();
+    wasmer_runtime_core::cache::Artifact::deserialize(&cache_record).unwrap()
 }

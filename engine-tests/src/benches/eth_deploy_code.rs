@@ -33,15 +33,14 @@ pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
             rlp::encode(&transaction).to_vec()
         })
         .collect();
-    let calling_account_id = "some-account.near".to_string();
+    let calling_account_id = "some-account.near";
 
     // measure gas usage
     for input in inputs.iter() {
         let input_size = input.len();
-        let (output, maybe_err) =
-            runner
-                .one_shot()
-                .call(SUBMIT, calling_account_id.clone(), input.clone());
+        let (output, maybe_err) = runner
+            .one_shot()
+            .call(SUBMIT, calling_account_id, input.clone());
         assert!(maybe_err.is_none());
         let output = output.unwrap();
         let gas = output.burnt_gas;
@@ -59,7 +58,7 @@ pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(input_size));
         group.bench_function(id, |b| {
             b.iter_batched(
-                || (runner.one_shot(), calling_account_id.clone(), input.clone()),
+                || (runner.one_shot(), calling_account_id, input.clone()),
                 |(r, c, i)| r.call(SUBMIT, c, i),
                 BatchSize::SmallInput,
             )

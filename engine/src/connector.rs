@@ -1,6 +1,5 @@
 use crate::prelude::*;
 
-pub const ERC20_ADMIN_PREFIX: &str = "erc20.";
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 pub const NO_DEPOSIT: Balance = 0;
 const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
@@ -617,11 +616,6 @@ impl EthConnectorContract {
         ))
         .and_then(|data| FungibleTokenMetadata::try_from_slice(&data).ok())
     }
-}
-
-pub(crate) fn erc20_admin_address(base_account_id: &[u8]) -> Address {
-    let erc20_admin_account_id = [ERC20_ADMIN_PREFIX.as_bytes(), base_account_id].concat();
-    sdk::types::near_account_to_evm_address(erc20_admin_account_id.as_slice())
 }
 
 impl AdminControlled for EthConnectorContract {

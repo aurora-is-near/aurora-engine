@@ -179,7 +179,7 @@ impl SelfDestruct {
         .try_to_vec()
         .unwrap();
 
-        runner.call("call", "anyone".to_string(), input);
+        runner.call("call", "anyone", input);
     }
 }
 

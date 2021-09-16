@@ -58,7 +58,7 @@ fn init_contract(
     custodian_address: &str,
 ) -> UserAccount {
     let contract_account = master_account.deploy(
-        &crate::test_utils::AuroraRunner::default().code.code,
+        crate::test_utils::AuroraRunner::default().code.code(),
         contract_name.parse().unwrap(),
         to_yocto("1000000"),
     );

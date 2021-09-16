@@ -3,6 +3,9 @@ use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
+use crate::connector::EthConnectorContract;
+#[cfg(feature = "contract")]
+use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::prelude::*;
 
@@ -154,6 +157,7 @@ impl ExitIntoResult for ExitReason {
 }
 
 pub struct BalanceOverflow;
+
 impl AsRef<[u8]> for BalanceOverflow {
     fn as_ref(&self) -> &[u8] {
         b"ERR_BALANCE_OVERFLOW"
@@ -169,6 +173,7 @@ pub enum GasPaymentError {
     /// Not enough balance for account to cover the gas cost
     OutOfFund,
 }
+
 impl AsRef<[u8]> for GasPaymentError {
     fn as_ref(&self) -> &[u8] {
         match self {
@@ -178,6 +183,7 @@ impl AsRef<[u8]> for GasPaymentError {
         }
     }
 }
+
 impl From<BalanceOverflow> for GasPaymentError {
     fn from(overflow: BalanceOverflow) -> Self {
         Self::BalanceOverflow(overflow)
@@ -671,7 +677,7 @@ impl Engine {
         match Self::get_erc20_from_nep141(nep141_token) {
             Err(GetErc20FromNep141Error::Nep141NotFound) => (),
             Err(GetErc20FromNep141Error::InvalidNep141AccountId) => {
-                return Err(RegisterTokenError::InvalidNep141AccountId)
+                return Err(RegisterTokenError::InvalidNep141AccountId);
             }
             Ok(_) => return Err(RegisterTokenError::TokenAlreadyRegistered),
         }
@@ -779,7 +785,7 @@ impl Engine {
             ethabi::Token::Uint(args.amount.into()),
         ]);
 
-        let erc20_admin_address = erc20_admin_address(&sdk::current_account_id());
+        let erc20_admin_address = current_address();
         unwrap_res_or_finish!(
             self.call(
                 erc20_admin_address,

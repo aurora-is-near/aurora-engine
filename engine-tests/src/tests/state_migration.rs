@@ -29,7 +29,7 @@ pub fn deploy_evm() -> AuroraAccount {
     let aurora_runner = AuroraRunner::default();
     let main_account = near_sdk_sim::init_simulator(None);
     let contract_account = main_account.deploy(
-        &aurora_runner.code.code,
+        aurora_runner.code.code(),
         aurora_runner.aurora_account_id.parse().unwrap(),
         5 * near_sdk_sim::STORAGE_AMOUNT,
     );

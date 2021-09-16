@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.6.3] - 2021-09-14
+
+### Changes
+
+- Revert ERC20 admin address changes for the time being by [@joshuajbouw].
+
+## [1.6.2] - 2021-09-13
+
+### Changes
+
+- ERC20 admin address has been changed to have a dedicated account by [@sept-en].
+- Precompile promises were fixed that were broken in rust-blockchain/evm by [@joshuajbouw] and [@birchmd].
+- Return format of `ft_balance_of` was fixed by [@joshuajbouw].
+
+### Removed
+
+- Testnet balancing `balance_evm_and_nep141` has been removed by [@birchmd].
+
 ## [1.6.1] - 2021-08-23
 
 ### Breaking changes
@@ -66,6 +86,9 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.3...master
+[1.6.3]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.2...1.6.3
+[1.6.2]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.1...1.6.2
 [1.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.0...1.6.1
 [1.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.5.0...1.6.0
 [1.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.4.3...1.5.0
@@ -77,3 +100,7 @@ struct SubmitResult {
 [1.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/aurora-is-near/aurora-engine/tree/1.0.0
+
+[@birchmd]: https://github.com/birchmd
+[@joshuajbouw]: https://github.com/joshuajbouw
+[@sept-en]: https://github.com/sept-en

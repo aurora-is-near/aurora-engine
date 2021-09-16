@@ -11,6 +11,7 @@ mod lib {
 
     pub use crate::prelude::*;
 }
+
 use lib::*;
 
 mod map;
@@ -65,7 +66,26 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use super::*;
+    use borsh::{BorshDeserialize, BorshSerialize};
+
+    use crate::connector::EthConnectorContract;
+    use crate::engine::{Engine, EngineState, GasPaymentError};
+    use crate::fungible_token::FungibleTokenMetadata;
+    #[cfg(feature = "evm_bully")]
+    use crate::parameters::{BeginBlockArgs, BeginChainArgs};
+    use crate::parameters::{
+        DeployErc20TokenArgs, ExpectUtf8, FunctionCallArgs, GetErc20FromNep141CallArgs,
+        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult, TransactionStatus,
+        TransferCallCallArgs, ViewCallArgs,
+    };
+
+    use crate::json::parse_json;
+    use crate::prelude::{Address, ToString, TryFrom, TryInto, H160, H256, U256};
+    use crate::sdk;
+    use crate::sdk::types::{near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap};
+    use crate::storage::{bytes_to_key, KeyPrefix};
+    use crate::types::{u256_to_arr, ERR_FAILED_PARSE};
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -352,8 +372,9 @@ mod contract {
 
         let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
 
-        let erc20_admin_address = erc20_admin_address(&sdk::current_account_id());
+        let erc20_admin_address = current_address();
         let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
+
         let deploy_args = ethabi::encode(&[
             ethabi::Token::String("Empty".to_string()),
             ethabi::Token::String("EMPTY".to_string()),
@@ -384,7 +405,6 @@ mod contract {
     ///
     /// NONMUTATIVE METHODS
     ///
-
     #[no_mangle]
     pub extern "C" fn view() {
         let args: ViewCallArgs = sdk::read_input_borsh().sdk_unwrap();
@@ -426,7 +446,6 @@ mod contract {
     ///
     /// BENCHMARKING METHODS
     ///
-
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_chain() {
@@ -662,6 +681,10 @@ mod contract {
 
     fn predecessor_address() -> Address {
         near_account_to_evm_address(&sdk::predecessor_account_id())
+    }
+
+    pub fn current_address() -> Address {
+        near_account_to_evm_address(&sdk::current_account_id())
     }
 }
 

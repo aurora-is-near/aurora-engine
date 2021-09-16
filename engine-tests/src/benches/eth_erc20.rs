@@ -18,7 +18,7 @@ pub(crate) fn eth_erc20_benchmark(c: &mut Criterion) {
         crate::prelude::types::Wei::new_u64(INITIAL_BALANCE),
         INITIAL_NONCE.into(),
     );
-    let calling_account_id = "some-account.near".to_string();
+    let calling_account_id = "some-account.near";
 
     // deploy the erc20 contract
     let constructor = ERC20Constructor::load();
@@ -54,13 +54,7 @@ pub(crate) fn eth_erc20_benchmark(c: &mut Criterion) {
     // measure mint wall-clock time
     group.bench_function(mint_id, |b| {
         b.iter_batched(
-            || {
-                (
-                    runner.one_shot(),
-                    calling_account_id.clone(),
-                    mint_tx_bytes.clone(),
-                )
-            },
+            || (runner.one_shot(), calling_account_id, mint_tx_bytes.clone()),
             |(r, c, i)| r.call(SUBMIT, c, i),
             BatchSize::SmallInput,
         )
@@ -68,8 +62,7 @@ pub(crate) fn eth_erc20_benchmark(c: &mut Criterion) {
 
     // Measure mint gas usage; don't use `one_shot` because we want to keep this state change for
     // the next benchmark where we transfer some of the minted tokens.
-    let (output, maybe_error) =
-        runner.call(SUBMIT, calling_account_id.clone(), mint_tx_bytes.clone());
+    let (output, maybe_error) = runner.call(SUBMIT, calling_account_id, mint_tx_bytes.clone());
     assert!(maybe_error.is_none());
     let output = output.unwrap();
     let gas = output.burnt_gas;
@@ -79,11 +72,10 @@ pub(crate) fn eth_erc20_benchmark(c: &mut Criterion) {
     println!("ETH_ERC20_MINT ETH GAS: {:?}", eth_gas);
 
     // Measure transfer gas usage
-    let (output, maybe_err) = runner.one_shot().call(
-        SUBMIT,
-        calling_account_id.clone(),
-        transfer_tx_bytes.clone(),
-    );
+    let (output, maybe_err) =
+        runner
+            .one_shot()
+            .call(SUBMIT, calling_account_id, transfer_tx_bytes.clone());
     assert!(maybe_err.is_none());
     let output = output.unwrap();
     let gas = output.burnt_gas;
@@ -98,7 +90,7 @@ pub(crate) fn eth_erc20_benchmark(c: &mut Criterion) {
             || {
                 (
                     runner.one_shot(),
-                    calling_account_id.clone(),
+                    calling_account_id,
                     transfer_tx_bytes.clone(),
                 )
             },
