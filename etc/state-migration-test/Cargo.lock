@@ -10,9 +10,9 @@ checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
 name = "anyhow"
-version = "1.0.40"
+version = "1.0.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
+checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
 
 [[package]]
 name = "arrayref"
@@ -259,8 +259,8 @@ dependencies = [
 
 [[package]]
 name = "ethabi"
-version = "13.0.0"
-source = "git+https://github.com/darwinia-network/ethabi?branch=xavier-no-std#baacf174d5c2f12122c4ee3fe31506fb52069983"
+version = "14.1.0"
+source = "git+https://github.com/darwinia-network/ethabi?branch=xavier-no-std#09da0834d95f8b43377ca22d7b1c97a2401f4b0c"
 dependencies = [
  "anyhow",
  "ethereum-types",
@@ -283,12 +283,12 @@ dependencies = [
 
 [[package]]
 name = "ethereum"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "567ce064a8232c16e2b2c2173a936b91fbe35c2f2c5278871f5a1a31688b42e9"
+checksum = "42ccff962ede8fe7c3ec53d46b8316f3c53377a701a30c0325918b38ce04a497"
 dependencies = [
+ "bytes",
  "ethereum-types",
- "funty",
  "hash-db",
  "hash256-std-hasher",
  "rlp",
@@ -299,9 +299,9 @@ dependencies = [
 
 [[package]]
 name = "ethereum-types"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f64b5df66a228d85e4b17e5d6c6aa43b0310898ffe8a85988c4c032357aaabfd"
+checksum = "0dd6bde671199089e601e8d47e153368b893ef885f11f365a3261ec58153c211"
 dependencies = [
  "ethbloom",
  "fixed-hash",
@@ -313,7 +313,7 @@ dependencies = [
 [[package]]
 name = "evm"
 version = "0.30.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=01e000cbf081dada77ac6b325a6521341044d970#01e000cbf081dada77ac6b325a6521341044d970"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
 dependencies = [
  "ethereum",
  "evm-core",
@@ -328,7 +328,7 @@ dependencies = [
 [[package]]
 name = "evm-core"
 version = "0.30.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=01e000cbf081dada77ac6b325a6521341044d970#01e000cbf081dada77ac6b325a6521341044d970"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
 dependencies = [
  "funty",
  "primitive-types",
@@ -337,7 +337,7 @@ dependencies = [
 [[package]]
 name = "evm-gasometer"
 version = "0.30.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=01e000cbf081dada77ac6b325a6521341044d970#01e000cbf081dada77ac6b325a6521341044d970"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
 dependencies = [
  "evm-core",
  "evm-runtime",
@@ -347,7 +347,7 @@ dependencies = [
 [[package]]
 name = "evm-runtime"
 version = "0.30.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=01e000cbf081dada77ac6b325a6521341044d970#01e000cbf081dada77ac6b325a6521341044d970"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
 dependencies = [
  "evm-core",
  "primitive-types",
@@ -623,9 +623,9 @@ checksum = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
 
 [[package]]
 name = "primitive-types"
-version = "0.9.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2415937401cb030a2a0a4d922483f945fa068f52a7dbb22ce0fe5f2b6f6adace"
+checksum = "05e4722c697a58a99d5d06a08c30821d7c082a4632198de1eaa5a6c22ef42373"
 dependencies = [
  "fixed-hash",
  "impl-rlp",
@@ -847,9 +847,9 @@ checksum = "879f6906492a7cd215bfa4cf595b600146ccfac0c79bcbd1f3000162af5e8b06"
 
 [[package]]
 name = "uint"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e11fe9a9348741cf134085ad57c249508345fe16411b3d7fb4ff2da2f1d6382e"
+checksum = "6470ab50f482bde894a037a57064480a246dbfdd5960bd65a44824693f08da5f"
 dependencies = [
  "byteorder",
  "crunchy",
