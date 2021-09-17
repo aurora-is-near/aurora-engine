@@ -141,7 +141,7 @@ impl Decodable for LegacyEthSignedTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
+    use crate::prelude;
 
     #[test]
     fn test_eth_signed_no_chain_sender() {
