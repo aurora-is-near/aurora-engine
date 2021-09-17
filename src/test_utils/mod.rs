@@ -22,7 +22,7 @@ use crate::transaction::{
     LegacyEthSignedTransaction, LegacyEthTransaction,
 };
 use crate::types;
-use crate::types::AccountId;
+use crate::types::{AccountId, Wei};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
@@ -314,22 +314,30 @@ impl AuroraRunner {
     }
 
     pub fn get_balance(&self, address: Address) -> types::Wei {
-        types::Wei::new(self.getter_method_call("get_balance", address))
+        types::Wei::new(self.u256_getter_method_call("get_balance", address))
     }
 
     pub fn get_nonce(&self, address: Address) -> U256 {
-        self.getter_method_call("get_nonce", address)
+        self.u256_getter_method_call("get_nonce", address)
+    }
+
+    pub fn get_code(&self, address: Address) -> Vec<u8> {
+        self.getter_method_call("get_code", address)
+    }
+
+    fn u256_getter_method_call(&self, method_name: &str, address: Address) -> U256 {
+        let bytes = self.getter_method_call(method_name, address);
+        U256::from_big_endian(&bytes)
     }
 
     // Used in `get_balance` and `get_nonce`. This function exists to avoid code duplication
     // since the contract's `get_nonce` and `get_balance` have the same type signature.
-    fn getter_method_call(&self, method_name: &str, address: Address) -> U256 {
+    fn getter_method_call(&self, method_name: &str, address: Address) -> Vec<u8> {
         let (outcome, maybe_error) =
             self.one_shot()
                 .call(method_name, "getter", address.as_bytes().to_vec());
         assert!(maybe_error.is_none());
-        let bytes = outcome.unwrap().return_data.as_value().unwrap();
-        U256::from_big_endian(&bytes)
+        outcome.unwrap().return_data.as_value().unwrap()
     }
 
     fn bytes_from_outcome(
@@ -450,6 +458,39 @@ pub(crate) fn transfer(to: Address, amount: types::Wei, nonce: U256) -> LegacyEt
         to: Some(to),
         value: amount,
         data: Vec::new(),
+    }
+}
+
+pub(crate) fn create_deploy_transaction(
+    contract_bytes: Vec<u8>,
+    nonce: U256,
+) -> LegacyEthTransaction {
+    let len = contract_bytes.len();
+    if len > u16::MAX as usize {
+        panic!("Cannot deploy a contract with that many bytes!");
+    }
+    let len = len as u16;
+    // This bit of EVM byte code essentially says:
+    // "If msg.value > 0 revert; otherwise return `len` amount of bytes that come after me
+    // in the code." By prepending this to `contract_bytes` we create a valid EVM program which
+    // returns `contract_bytes`, which is exactly what we want.
+    let init_code = format!(
+        "608060405234801561001057600080fd5b5061{}806100206000396000f300",
+        hex::encode(len.to_be_bytes())
+    );
+    let data = hex::decode(init_code)
+        .unwrap()
+        .into_iter()
+        .chain(contract_bytes.into_iter())
+        .collect();
+
+    LegacyEthTransaction {
+        nonce,
+        gas_price: Default::default(),
+        gas: u64::MAX.into(),
+        to: None,
+        value: Wei::zero(),
+        data,
     }
 }
 
