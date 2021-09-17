@@ -10,7 +10,11 @@ use crate::connector::EthConnectorContract;
 #[cfg(feature = "contract")]
 use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
-use crate::prelude::*;
+use crate::prelude::{
+    address_to_key, bytes_to_key, is_valid_account_id, sdk, storage_to_key, u256_to_arr, AccountId,
+    Address, BorshDeserialize, BorshSerialize, KeyPrefix, KeyPrefixU8, PromiseCreateArgs, TryInto,
+    Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
+};
 
 use crate::parameters::{NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
