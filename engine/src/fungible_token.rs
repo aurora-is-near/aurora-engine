@@ -196,13 +196,15 @@ impl FungibleToken {
         }
         self.internal_withdraw_eth_from_near(sender_id, amount);
         self.internal_deposit_eth_to_near(receiver_id, amount);
-        sdk::log!(&format!(
+        sdk::log!(&crate::prelude::format!(
             "Transfer {} from {} to {}",
-            amount, sender_id, receiver_id
+            amount,
+            sender_id,
+            receiver_id
         ));
         #[cfg(feature = "log")]
         if let Some(memo) = memo {
-            sdk::log(&format!("Memo: {}", memo));
+            sdk::log(&crate::prelude::format!("Memo: {}", memo));
         }
     }
 
@@ -320,7 +322,7 @@ impl FungibleToken {
                     receiver_balance
                 };
                 self.accounts_insert(receiver_id, receiver_balance - refund_amount);
-                sdk::log!(&format!(
+                sdk::log!(&crate::prelude::format!(
                     "Decrease receiver {} balance to: {}",
                     receiver_id,
                     receiver_balance - refund_amount
@@ -329,9 +331,11 @@ impl FungibleToken {
                 return if let Some(sender_balance) = self.accounts_get(sender_id) {
                     let sender_balance = u128::try_from_slice(&sender_balance[..]).unwrap();
                     self.accounts_insert(sender_id, sender_balance + refund_amount);
-                    sdk::log!(&format!(
+                    sdk::log!(&crate::prelude::format!(
                         "Refund amount {} from {} to {}",
-                        refund_amount, receiver_id, sender_id
+                        refund_amount,
+                        receiver_id,
+                        sender_id
                     ));
                     (amount - refund_amount, 0)
                 } else {
@@ -376,7 +380,10 @@ impl FungibleToken {
                 sdk::panic_utf8(b"ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE")
             }
         } else {
-            sdk::log!(&format!("The account {} is not registered", &account_id));
+            sdk::log!(&crate::prelude::format!(
+                "The account {} is not registered",
+                &account_id
+            ));
             None
         }
     }
