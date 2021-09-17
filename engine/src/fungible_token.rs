@@ -2,7 +2,11 @@ use crate::connector::NO_DEPOSIT;
 use crate::engine::Engine;
 use crate::json::{parse_json, JsonValue};
 use crate::parameters::{FtResolveTransfer, NEP141FtOnTransferArgs, StorageBalance};
-use crate::prelude::*;
+use crate::prelude::{
+    sdk, storage, str_from_slice, AccountId, Address, BTreeMap, Balance, BorshDeserialize,
+    BorshSerialize, EthAddress, Gas, Ordering, PromiseResult, StorageBalanceBounds, StorageUsage,
+    String, ToString, TryInto, Vec, Wei, U256,
+};
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
