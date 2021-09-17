@@ -68,8 +68,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_eq!(profile.all_gas(), 136_000_000_000_000); // less than 136 NEAR Tgas used
-    assert!(profile.all_gas() <= 136_000_000_000_000); // less than 136 NEAR Tgas used
+    assert!(profile.all_gas() <= 160_000_000_000_000); // less than 160 NEAR Tgas used
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
