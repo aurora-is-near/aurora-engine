@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::prelude::{sdk, BorshDeserialize, BorshSerialize, String, ToString, Vec};
 
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
 #[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
