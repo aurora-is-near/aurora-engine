@@ -6,6 +6,7 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{SubmitResult, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use borsh::{BorshDeserialize, BorshSerialize};
+use rand::RngCore;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
@@ -13,6 +14,32 @@ const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
+
+#[test]
+fn test_deploy_contract() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    // Randomly generate some "contract code"
+    const LEN: usize = 567;
+    let code: Vec<u8> = {
+        let mut rng = rand::thread_rng();
+        let mut buf = vec![0u8; LEN];
+        rng.fill_bytes(&mut buf);
+        buf
+    };
+
+    // Deploy that code
+    let result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            test_utils::create_deploy_transaction(code.clone(), nonce)
+        })
+        .unwrap();
+    let address = Address::from_slice(test_utils::unwrap_success_slice(&result));
+
+    // Confirm the code stored at that address is equal to the input code.
+    let stored_code = runner.get_code(address);
+    assert_eq!(code, stored_code);
+}
 
 #[test]
 fn test_override_state() {

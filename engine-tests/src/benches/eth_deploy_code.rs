@@ -2,11 +2,12 @@ use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
 use secp256k1::SecretKey;
 
 use crate::prelude::types::Wei;
-use crate::test_utils::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};
+use crate::test_utils::{
+    address_from_secret_key, create_deploy_transaction, deploy_evm, sign_transaction, SUBMIT,
+};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
-const TRANSFER_AMOUNT: Wei = Wei::zero();
 
 pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
     let mut runner = deploy_evm();
@@ -17,20 +18,16 @@ pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    let inputs: Vec<_> = [1, 4, 8, 12, 16]
+    let inputs: Vec<_> = [1, 4, 8, 10, 13, 14]
         .iter()
         .copied()
         .map(|n| {
             let code_size = 2usize.pow(n);
             let code: Vec<u8> = vec![0; code_size];
-            let transaction = create_eth_transaction(
-                None,
-                TRANSFER_AMOUNT.into(),
-                code,
-                Some(runner.chain_id),
-                &source_account,
-            );
-            rlp::encode(&transaction).to_vec()
+            let transaction = create_deploy_transaction(code, INITIAL_NONCE.into());
+            let signed_transaction =
+                sign_transaction(transaction, Some(runner.chain_id), &source_account);
+            rlp::encode(&signed_transaction).to_vec()
         })
         .collect();
     let calling_account_id = "some-account.near";
