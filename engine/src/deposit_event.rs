@@ -1,5 +1,5 @@
 use crate::log_entry::LogEntry;
-use crate::prelude::*;
+use crate::prelude::{vec, EthAddress, String, ToString, Vec, U256};
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
 const DEPOSITED_EVENT: &str = "Deposited";
