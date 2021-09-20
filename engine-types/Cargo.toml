@@ -28,4 +28,3 @@ rand = "0.7.3"
 [features]
 default = ["std"]
 std = ["primitive-types/std"]
-    
