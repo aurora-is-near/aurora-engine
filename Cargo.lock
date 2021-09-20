@@ -187,23 +187,18 @@ dependencies = [
 name = "aurora-engine-tests"
 version = "1.0.0"
 dependencies = [
- "aurora-bn",
  "aurora-engine",
  "aurora-engine-sdk",
  "aurora-engine-types",
- "base64 0.13.0",
- "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh 0.8.2",
  "bstr",
  "byte-slice-cast",
  "criterion",
  "ethabi",
  "evm",
- "evm-core",
  "git2",
  "hex",
  "libsecp256k1",
- "logos",
  "near-crypto 0.1.0 (git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9)",
  "near-primitives 0.1.0 (git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9)",
  "near-primitives-core 0.1.0 (git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9)",
@@ -211,18 +206,12 @@ dependencies = [
  "near-sdk-sim",
  "near-vm-logic 3.0.0 (git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9)",
  "near-vm-runner",
- "num",
- "primitive-types 0.9.0",
  "rand 0.7.3",
- "ripemd160",
- "rjson",
  "rlp",
  "serde",
  "serde_json",
- "sha2 0.9.5",
  "sha3 0.9.1",
  "wasmer-runtime-core-near",
- "wee_alloc",
 ]
 
 [[package]]
