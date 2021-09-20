@@ -100,8 +100,8 @@ fn test_1_inch_limit_order_deploy() {
 
     // more than 4 million Ethereum gas used
     assert!(result.gas_used > 4_000_000);
-    // less than 42 NEAR Tgas used
-    assert!(profile.all_gas() < 42_000_000_000_000);
+    // less than 43 NEAR Tgas used
+    assert!(profile.all_gas() < 43_000_000_000_000);
     // at least 70% of which is from wasm execution
     assert!(100 * profile.wasm_gas() / profile.all_gas() > 70);
 }
