@@ -39,7 +39,12 @@ fn test_1inch_liquidity_protocol() {
     let (result, profile, pool) =
         helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
     assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
-    assert!(profile.all_gas() <= 120_000_000_000_000); // less than 103 NEAR Tgas used
+    let total_gas = profile.all_gas();
+    assert!(
+        total_gas <= 104_000_000_000_000,
+        "{} is not less than 104 Tgas",
+        total_gas
+    ); // less than 104 NEAR Tgas used
 
     // Approve giving ERC-20 tokens to the pool
     helper.approve_erc20_tokens(&token_a, pool.address());
@@ -55,7 +60,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
-    assert!(profile.all_gas() <= 143_000_000_000_000); // less than 143 NEAR Tgas used
+    assert!(profile.all_gas() <= 117_000_000_000_000); // less than 117 NEAR Tgas used
 
     let (result, profile) = helper.pool_swap(
         &pool,
@@ -68,7 +73,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert!(profile.all_gas() <= 160_000_000_000_000); // less than 160 NEAR Tgas used
+    assert!(profile.all_gas() <= 136_000_000_000_000); // less than 136 NEAR Tgas used
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
@@ -79,7 +84,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
-    assert!(profile.all_gas() <= 121_000_000_000_000); // less than 121 NEAR Tgas used
+    assert!(profile.all_gas() <= 102_000_000_000_000); // less than 102 NEAR Tgas used
 }
 
 #[test]

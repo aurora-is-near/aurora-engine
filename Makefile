@@ -75,9 +75,10 @@ betanet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
 target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
-	RUSTFLAGS='-C link-arg=-s' $(CARGO) build \
+	RUSTFLAGS='-C link-arg=-s -C codegen-units=1 -C panic=abort' $(CARGO) build \
 		--target wasm32-unknown-unknown \
 		--release \
+		--verbose \
 		--no-default-features \
 		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps
