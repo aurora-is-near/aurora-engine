@@ -49,9 +49,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.40"
+version = "1.0.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
+checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
 
 [[package]]
 name = "arrayref"
@@ -132,7 +132,7 @@ dependencies = [
  "libsecp256k1",
  "logos",
  "num",
- "primitive-types 0.9.0",
+ "primitive-types 0.10.1",
  "rand 0.7.3",
  "ripemd160",
  "rjson",
@@ -162,7 +162,7 @@ dependencies = [
  "libsecp256k1",
  "logos",
  "num",
- "primitive-types 0.9.0",
+ "primitive-types 0.10.1",
  "rand 0.7.3",
  "ripemd160",
  "rjson",
@@ -222,7 +222,7 @@ dependencies = [
  "bstr",
  "ethabi",
  "hex",
- "primitive-types 0.9.0",
+ "primitive-types 0.10.1",
  "rand 0.7.3",
  "serde",
  "serde_json",
@@ -1234,11 +1234,11 @@ dependencies = [
 
 [[package]]
 name = "ethabi"
-version = "13.0.0"
-source = "git+https://github.com/darwinia-network/ethabi?branch=xavier-no-std#baacf174d5c2f12122c4ee3fe31506fb52069983"
+version = "14.1.0"
+source = "git+https://github.com/darwinia-network/ethabi?branch=xavier-no-std#09da0834d95f8b43377ca22d7b1c97a2401f4b0c"
 dependencies = [
  "anyhow",
- "ethereum-types",
+ "ethereum-types 0.12.0",
  "hex",
  "serde",
  "serde_json",
@@ -1262,12 +1262,12 @@ dependencies = [
 
 [[package]]
 name = "ethereum"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "567ce064a8232c16e2b2c2173a936b91fbe35c2f2c5278871f5a1a31688b42e9"
+checksum = "42ccff962ede8fe7c3ec53d46b8316f3c53377a701a30c0325918b38ce04a497"
 dependencies = [
- "ethereum-types",
- "funty",
+ "bytes",
+ "ethereum-types 0.12.0",
  "hash-db",
  "hash256-std-hasher",
  "parity-scale-codec",
@@ -1293,6 +1293,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ethereum-types"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dd6bde671199089e601e8d47e153368b893ef885f11f365a3261ec58153c211"
+dependencies = [
+ "ethbloom",
+ "fixed-hash",
+ "impl-rlp",
+ "primitive-types 0.10.1",
+ "uint",
+]
+
+[[package]]
 name = "event-listener"
 version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1301,7 +1314,7 @@ checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 [[package]]
 name = "evm"
 version = "0.30.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=01e000cbf081dada77ac6b325a6521341044d970#01e000cbf081dada77ac6b325a6521341044d970"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
 dependencies = [
  "environmental",
  "ethereum",
@@ -1310,7 +1323,7 @@ dependencies = [
  "evm-runtime",
  "log",
  "parity-scale-codec",
- "primitive-types 0.9.0",
+ "primitive-types 0.10.1",
  "rlp",
  "serde",
  "sha3 0.8.2",
@@ -1319,33 +1332,33 @@ dependencies = [
 [[package]]
 name = "evm-core"
 version = "0.30.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=01e000cbf081dada77ac6b325a6521341044d970#01e000cbf081dada77ac6b325a6521341044d970"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
 dependencies = [
  "funty",
  "parity-scale-codec",
- "primitive-types 0.9.0",
+ "primitive-types 0.10.1",
  "serde",
 ]
 
 [[package]]
 name = "evm-gasometer"
 version = "0.30.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=01e000cbf081dada77ac6b325a6521341044d970#01e000cbf081dada77ac6b325a6521341044d970"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
 dependencies = [
  "environmental",
  "evm-core",
  "evm-runtime",
- "primitive-types 0.9.0",
+ "primitive-types 0.10.1",
 ]
 
 [[package]]
 name = "evm-runtime"
 version = "0.30.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=01e000cbf081dada77ac6b325a6521341044d970#01e000cbf081dada77ac6b325a6521341044d970"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
 dependencies = [
  "environmental",
  "evm-core",
- "primitive-types 0.9.0",
+ "primitive-types 0.10.1",
  "sha3 0.8.2",
 ]
 
@@ -2152,7 +2165,7 @@ dependencies = [
  "curve25519-dalek",
  "derive_more",
  "ed25519-dalek",
- "ethereum-types",
+ "ethereum-types 0.11.0",
  "lazy_static",
  "libc",
  "parity-secp256k1",
@@ -2459,7 +2472,7 @@ dependencies = [
  "ripemd160",
  "serde",
  "sha2 0.9.5",
- "sha3 0.9.1",
+ "sha3 0.8.2",
 ]
 
 [[package]]
@@ -2479,7 +2492,7 @@ dependencies = [
  "ripemd160",
  "serde",
  "sha2 0.9.5",
- "sha3 0.9.1",
+ "sha3 0.8.2",
 ]
 
 [[package]]
@@ -2935,6 +2948,7 @@ checksum = "05e4722c697a58a99d5d06a08c30821d7c082a4632198de1eaa5a6c22ef42373"
 dependencies = [
  "fixed-hash",
  "impl-codec",
+ "impl-rlp",
  "uint",
 ]
 
@@ -3359,9 +3373,9 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.118"
+version = "1.0.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06c64263859d87aa2eb554587e2d23183398d617427327cf2b3d0ed8c69e4800"
+checksum = "f12d06de37cf59146fbdecab66aa99f9fe4f78722e3607577a5375d66bd0c913"
 dependencies = [
  "serde_derive",
 ]
@@ -3397,9 +3411,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.118"
+version = "1.0.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c84d3526699cd55261af4b941e4e725444df67aa4f9e6a3564f18030d12672df"
+checksum = "d7bc1a1ab1961464eae040d96713baa5a724a8152c1222492465b54322ec508b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3626,18 +3640,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.24"
+version = "1.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0f4a65597094d4483ddaed134f409b2cb7c1beccf25201a9f73c719254fa98e"
+checksum = "602eca064b2d83369e2b2f34b09c70b605402801927c65c11071ac911d299b88"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.24"
+version = "1.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7765189610d8241a44529806d6fd1f2e0a08734313a35d5b3a556f92b381f3c0"
+checksum = "bad553cc2c78e8de258400763a647e80e6d1b31ee237275d756f6836d204494c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3756,9 +3770,9 @@ checksum = "879f6906492a7cd215bfa4cf595b600146ccfac0c79bcbd1f3000162af5e8b06"
 
 [[package]]
 name = "uint"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e11fe9a9348741cf134085ad57c249508345fe16411b3d7fb4ff2da2f1d6382e"
+checksum = "6470ab50f482bde894a037a57064480a246dbfdd5960bd65a44824693f08da5f"
 dependencies = [
  "byteorder",
  "crunchy",
