@@ -1,6 +1,8 @@
 CARGO = cargo
 NEAR  = near
 FEATURES = mainnet
+# More strict clippy rules
+FEATURES_CLIPPY = contract
 ADDITIONAL_FEATURES =
 
 ifeq ($(evm-bully),yes)
@@ -76,6 +78,7 @@ target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock 
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build \
 		--target wasm32-unknown-unknown \
 		--release \
+		--verbose \
 		--no-default-features \
 		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps
@@ -97,7 +100,7 @@ check-format:
 	$(CARGO) fmt -- --check
 
 check-clippy:
-	$(CARGO) clippy --no-default-features --features=$(FEATURES)$(ADDITIONAL_FEATURES) -- -D warnings
+	$(CARGO) clippy --no-default-features --features=$(FEATURES_CLIPPY)$(ADDITIONAL_FEATURES) -- -D warnings
 
 test-sol:
 	cd etc/eth-contracts && yarn && yarn test

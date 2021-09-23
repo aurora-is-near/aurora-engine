@@ -6,8 +6,6 @@ on:
       - master
       - develop
   pull_request:
-    branches:
-      - "*"
 
 name: Lints
 jobs:
