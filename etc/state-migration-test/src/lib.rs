@@ -4,7 +4,8 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use aurora_engine::engine::{Engine, EngineState};
-use aurora_engine::{sdk, storage};
+use aurora_engine_sdk as sdk;
+use aurora_engine_types::storage;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(BorshDeserialize, BorshSerialize)]
