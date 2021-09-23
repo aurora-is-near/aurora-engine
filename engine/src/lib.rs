@@ -27,6 +27,8 @@ pub mod json;
 mod log_entry;
 mod prelude;
 
+// This comment is added just to make some change. Do not merge.
+
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
