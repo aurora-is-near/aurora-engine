@@ -3,16 +3,17 @@
 
 # Visual Studio Code
 .vscode/
+.run/
 
 # IDEA
 .idea
-
+.run/
 # Editor backup files
 *~
 
 # Rust artifacts
 /*.wasm
-/target/
+target/
 
 # Solidity artifacts
 artifacts/
