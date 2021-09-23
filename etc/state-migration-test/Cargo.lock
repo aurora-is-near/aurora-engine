@@ -31,9 +31,12 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "1.6.3"
+version = "1.7.0"
 dependencies = [
  "aurora-bn",
+ "aurora-engine-precompiles",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
  "base64",
  "blake2",
  "borsh",
@@ -55,11 +58,60 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-precompiles"
+version = "1.0.0"
+dependencies = [
+ "aurora-bn",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "base64",
+ "blake2",
+ "borsh",
+ "byte-slice-cast",
+ "ethabi",
+ "evm",
+ "evm-core",
+ "hex",
+ "libsecp256k1",
+ "logos",
+ "num",
+ "primitive-types",
+ "ripemd160",
+ "rjson",
+ "rlp",
+ "sha2",
+ "sha3 0.9.1",
+ "wee_alloc",
+]
+
+[[package]]
+name = "aurora-engine-sdk"
+version = "1.0.0"
+dependencies = [
+ "aurora-engine-types",
+ "borsh",
+ "sha3 0.9.1",
+]
+
+[[package]]
 name = "aurora-engine-state-migration-test"
 version = "1.0.0"
 dependencies = [
  "aurora-engine",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
  "borsh",
+]
+
+[[package]]
+name = "aurora-engine-types"
+version = "1.0.0"
+dependencies = [
+ "borsh",
+ "ethabi",
+ "hex",
+ "primitive-types",
+ "sha3 0.9.1",
 ]
 
 [[package]]

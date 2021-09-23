@@ -1,0 +1,60 @@
+[package]
+name = "aurora-engine"
+version = "1.7.0"
+authors = ["NEAR <hello@near.org>"]
+edition = "2018"
+description = ""
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "CC0-1.0"
+publish = false
+autobenches = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aurora-engine-types = { path = "../engine-types", default-features = false }
+aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
+aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
+base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
+blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
+borsh = { version = "0.8.2", default-features = false }
+bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "01e000cbf081dada77ac6b325a6521341044d970", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "01e000cbf081dada77ac6b325a6521341044d970", default-features = false }
+libsecp256k1 = { version = "0.3.5", default-features = false }
+num = { version = "0.4.0", default-features = false, features = ["alloc"] }
+primitive-types = { version = "0.9.0", default-features = false, features = ["rlp"] }
+ripemd160 = { version = "0.9.1", default-features = false }
+rlp = { version = "0.5.0", default-features = false }
+sha2 = { version = "0.9.3", default-features = false, optional = true }
+sha3 = { version = "0.9.1", default-features = false }
+wee_alloc = { version = "0.4.5", default-features = false }
+logos = { version = "0.12", default-features = false, features = ["export_derive"] }
+ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+byte-slice-cast = { version = "1.0", default-features = false }
+rjson = { git = "https://github.com/aurora-is-near/rjson", rev = "cc3da949", default-features = false, features = ["integer"] }
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = "0.7.3"
+
+[features]
+default = ["sha2", "std"]
+std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "logos/std", "bn/std", "aurora-engine-types/std"]
+contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
+evm_bully = []
+log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]
+meta-call = []
+integration-test = ["log"]
+mainnet = ["contract", "log"]
+testnet = ["contract", "log"]
+betanet = ["contract", "log", "meta-call"]
+mainnet-test = ["meta-call"]
+testnet-test = ["meta-call"]
+betanet-test = ["meta-call"]
