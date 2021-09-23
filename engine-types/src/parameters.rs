@@ -9,6 +9,7 @@ pub struct PromiseCreateArgs {
     pub args: Vec<u8>,
     pub attached_balance: u128,
     pub attached_gas: u64,
+    pub parent_promise: Option<u64>,
 }
 
 /// withdraw NEAR eth-connector call args

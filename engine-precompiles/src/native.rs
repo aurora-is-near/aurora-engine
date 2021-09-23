@@ -169,6 +169,7 @@ impl Precompile for ExitToNear {
             args: args.as_bytes().to_vec(),
             attached_balance: 1,
             attached_gas: costs::FT_TRANSFER_GAS,
+            parent_promise: None,
         }
         .try_to_vec()
         .unwrap();
@@ -316,6 +317,7 @@ impl Precompile for ExitToEthereum {
             args: serialized_args,
             attached_balance: 1,
             attached_gas: costs::WITHDRAWAL_GAS,
+            parent_promise: None,
         }
         .try_to_vec()
         .unwrap();
