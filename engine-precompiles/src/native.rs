@@ -172,6 +172,7 @@ impl Precompile for ExitToNear {
         }
         .try_to_vec()
         .unwrap();
+
         let log = Log {
             address: Self::ADDRESS,
             topics: Vec::new(),
