@@ -18,10 +18,3 @@ pub struct WithdrawCallArgs {
     pub recipient_address: EthAddress,
     pub amount: Balance,
 }
-
-/// Refund failed exit precompile transfer
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct RefundDepositCallArgs {
-    pub receiver_address: EthAddress,
-    pub amount: Balance,
-}

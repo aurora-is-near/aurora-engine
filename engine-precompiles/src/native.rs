@@ -107,14 +107,16 @@ impl Precompile for ExitToNear {
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
                 if is_valid_account_id(input) {
+                    let receiver_id = String::from_utf8(input.to_vec()).unwrap();
+                    let amount = context.apparent_value.as_u128();
+                    context.apparent_value.as_u128();
                     (
                         String::from_utf8(sdk::current_account_id()).unwrap(),
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
                             r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            String::from_utf8(input.to_vec()).unwrap(),
-                            context.apparent_value.as_u128()
+                            receiver_id, amount,
                         ),
                     )
                 } else {
@@ -151,7 +153,7 @@ impl Precompile for ExitToNear {
                         // as decimal and valid account id respectively.
                         format!(
                             r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            receiver_account_id, amount
+                            receiver_account_id, amount,
                         ),
                     )
                 } else {
@@ -178,17 +180,14 @@ impl Precompile for ExitToNear {
             topics: Vec::new(),
             data: promise,
         };
-        /*
-        let refund_contract_address = String::from_utf8(sdk::current_account_id()).unwrap();
-        let refund_args =       RefundDepositCallArgs
-        let refund_args= RefundDepositCallArg =
-        let refund_promise = PromiseCreateArgs {
-            target_account_id: refund_contract_address,
-            method: "refund_deposit".to_string(),
-            args: refund_args,
+
+        let refund_promise: Vec<u8> = PromiseCreateArgs {
+            target_account_id: String::from_utf8(sdk::current_account_id()).unwrap(),
+            method: "ft_transfer".to_string(),
+            args: args.as_bytes().to_vec(),
             attached_balance: 1,
-            attached_gas: costs::WITHDRAWAL_GAS,
-            parent_promise: Some(0),
+            attached_gas: costs::FT_TRANSFER_GAS,
+            parent_promise: None,
         }
         .try_to_vec()
         .unwrap();
@@ -196,10 +195,10 @@ impl Precompile for ExitToNear {
             address: Self::ADDRESS,
             topics: Vec::new(),
             data: refund_promise,
-        };*/
+        };
 
         Ok(PrecompileOutput {
-            logs: vec![log],
+            logs: vec![log, refund_log],
             ..Default::default()
         }
         .into())
