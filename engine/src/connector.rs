@@ -5,9 +5,10 @@ use crate::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::json::parse_json;
 use crate::parameters::{
     BalanceOfCallArgs, BalanceOfEthCallArgs, FinishDepositCallArgs, InitCallArgs,
-    NEP141FtOnTransferArgs, PauseEthConnectorCallArgs, ResolveTransferCallArgs,
-    SetContractDataCallArgs, StorageBalanceOfCallArgs, StorageDepositCallArgs,
-    StorageWithdrawCallArgs, TransferCallArgs, TransferCallCallArgs, WithdrawResult,
+    NEP141FtOnTransferArgs, PauseEthConnectorCallArgs, RefundDepositCallArgs,
+    ResolveTransferCallArgs, SetContractDataCallArgs, StorageBalanceOfCallArgs,
+    StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallArgs, TransferCallCallArgs,
+    WithdrawResult,
 };
 use crate::prelude::sdk::types::{ExpectUtf8, SdkUnwrap};
 use crate::prelude::{
@@ -336,6 +337,31 @@ impl EthConnectorContract {
             // Save new contract data
             self.save_ft_contract();
         }
+    }
+
+    /// Refund failed exit precompile transfer funds
+    /// issue: #269
+    pub fn refund_deposit(&mut self) {
+        sdk::assert_private_call();
+        let data: RefundDepositCallArgs =
+            RefundDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+        sdk::log!(&format!("Refund deposit with the amount: {}", data.amount));
+
+        let promise_result = sdk::promise_result(0);
+        if let PromiseResult::Successful(_) = promise_result {
+            return;
+        }
+
+        // Check promise results. If failed proceed refund
+        match promise_result {
+            PromiseResult::Failed => {}
+            // This shouldn't be reachable
+            _ => sdk::panic_utf8(b"ERR_WRONG_PROMISE_STATUS"),
+        }
+        sdk::log!("Start refunding");
+        self.burn_eth_on_aurora(data.receiver_address, data.amount);
+        self.save_ft_contract();
+        sdk::log!("Refund success");
     }
 
     /// Internal logic for explicitly setting an eth balance (needed by ApplyBackend for Engine)

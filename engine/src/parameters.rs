@@ -283,6 +283,13 @@ pub struct FinishDepositCallArgs {
     pub msg: Option<Vec<u8>>,
 }
 
+/// Refund failed exit precompile transfer
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct RefundDepositCallArgs {
+    pub receiver_address: EthAddress,
+    pub amount: Balance,
+}
+
 /// Deposit ETH args
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
 pub struct DepositEthCallArgs {
