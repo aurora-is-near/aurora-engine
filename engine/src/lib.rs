@@ -510,11 +510,6 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn refund_deposit() {
-        EthConnectorContract::get_instance().refund_deposit();
-    }
-
-    #[no_mangle]
     pub extern "C" fn is_used_proof() {
         let args = IsUsedProofCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
 
