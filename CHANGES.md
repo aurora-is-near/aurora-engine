@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.4] - 2021-09-24
+
+### Changes
+
+- Fix JSON formatting in `ft_metadata` method by [@birchmd].
+- Fix bug in `block.timestamp` (units should be seconds) by [@birchmd].
+
 ## [1.6.3] - 2021-09-14
 
 ### Changes
