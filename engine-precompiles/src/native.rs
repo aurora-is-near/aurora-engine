@@ -6,7 +6,7 @@ use crate::prelude::{
     sdk,
     storage::{bytes_to_key, KeyPrefix},
     types::AccountId,
-    vec, BorshSerialize, Cow, String, ToString, TryInto, Vec, U256,
+    vec, BorshSerialize, Cow, String, ToString, TryInto, Vec, H160, U256,
 };
 
 use crate::prelude::Address;
@@ -31,6 +31,75 @@ mod costs {
 
     // TODO(#51): Determine the correct amount of gas
     pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
+}
+
+pub(crate) mod events {
+    use crate::prelude::{vec, Address, String, H256, U256};
+
+    /// Derived from event signature (see tests::test_exit_signatures)
+    pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
+        0xbe5650b8d0ad81b6b2807ab7c8f2892d,
+        0xdb19f1b8174ea910f914d5103e196cce,
+    );
+    /// Derived from event signature (see tests::test_exit_signatures)
+    pub const EXIT_TO_ETH_SIGNATURE: H256 = crate::make_h256(
+        0x4c58d7f2fd84892be1460b9ed55b722b,
+        0x7f7c790c0bd00cd06aadff27ca3bdb2e,
+    );
+
+    /// ExitToNear(bool indexed is_erc20, string indexed dest, uint amount)
+    pub struct ExitToNear {
+        pub is_erc20: bool,
+        pub dest: String,
+        pub amount: U256,
+    }
+
+    impl ExitToNear {
+        pub fn encode(self) -> ethabi::RawLog {
+            let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
+            let topics = vec![
+                EXIT_TO_NEAR_SIGNATURE,
+                encode_bool(self.is_erc20),
+                aurora_engine_sdk::keccak(&ethabi::encode(&[ethabi::Token::String(self.dest)])),
+            ];
+
+            ethabi::RawLog { topics, data }
+        }
+    }
+
+    /// ExitToEth(bool indexed is_erc20, address indexed dest, uint amount)
+    pub struct ExitToEth {
+        pub is_erc20: bool,
+        pub dest: Address,
+        pub amount: U256,
+    }
+
+    impl ExitToEth {
+        pub fn encode(self) -> ethabi::RawLog {
+            let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
+            let topics = vec![
+                EXIT_TO_ETH_SIGNATURE,
+                encode_bool(self.is_erc20),
+                encode_address(self.dest),
+            ];
+
+            ethabi::RawLog { topics, data }
+        }
+    }
+
+    fn encode_bool(b: bool) -> H256 {
+        let mut result = [0u8; 32];
+        if b {
+            result[31] = 1;
+        }
+        H256(result)
+    }
+
+    fn encode_address(a: Address) -> H256 {
+        let mut result = [0u8; 32];
+        result[12..].copy_from_slice(a.as_ref());
+        H256(result)
+    }
 }
 
 pub struct ExitToNear; //TransferEthToNear
@@ -99,7 +168,7 @@ impl Precompile for ExitToNear {
         let flag = input[0];
         input = &input[1..];
 
-        let (nep141_address, args) = match flag {
+        let (nep141_address, args, exit_event) = match flag {
             0x0 => {
                 // ETH transfer
                 //
@@ -107,15 +176,21 @@ impl Precompile for ExitToNear {
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
                 if is_valid_account_id(input) {
+                    let dest_account = String::from_utf8(input.to_vec()).unwrap();
                     (
                         String::from_utf8(sdk::current_account_id()).unwrap(),
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
                             r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            String::from_utf8(input.to_vec()).unwrap(),
+                            dest_account,
                             context.apparent_value.as_u128()
                         ),
+                        events::ExitToNear {
+                            is_erc20: false,
+                            dest: dest_account,
+                            amount: context.apparent_value,
+                        },
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from(
@@ -140,7 +215,7 @@ impl Precompile for ExitToNear {
 
                 let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
-                let amount = U256::from_big_endian(&input[..32]).as_u128();
+                let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
 
                 if is_valid_account_id(input) {
@@ -151,8 +226,14 @@ impl Precompile for ExitToNear {
                         // as decimal and valid account id respectively.
                         format!(
                             r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            receiver_account_id, amount
+                            receiver_account_id,
+                            amount.as_u128()
                         ),
+                        events::ExitToNear {
+                            is_erc20: true,
+                            dest: receiver_account_id,
+                            amount,
+                        },
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from(
@@ -172,14 +253,20 @@ impl Precompile for ExitToNear {
         }
         .try_to_vec()
         .unwrap();
-        let log = Log {
+        let promise_log = Log {
             address: Self::ADDRESS,
             topics: Vec::new(),
             data: promise,
         };
+        let exit_event_log = exit_event.encode();
+        let exit_event_log = Log {
+            address: Self::ADDRESS,
+            topics: exit_event_log.topics,
+            data: exit_event_log.data,
+        };
 
         Ok(PrecompileOutput {
-            logs: vec![log],
+            logs: vec![promise_log, exit_event_log],
             ..Default::default()
         }
         .into())
@@ -243,24 +330,30 @@ impl Precompile for ExitToEthereum {
         let flag = input[0];
         input = &input[1..];
 
-        let (nep141_address, serialized_args) = match flag {
+        let (nep141_address, serialized_args, exit_event) = match flag {
             0x0 => {
                 // ETH transfer
                 //
                 // Input slice format:
                 //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
+                let recipient_address = input
+                    .try_into()
+                    .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
                 (
                     String::from_utf8(sdk::current_account_id()).unwrap(),
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {
-                        recipient_address: input.try_into().map_err(|_| {
-                            ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS"))
-                        })?,
+                        recipient_address,
                         amount: context.apparent_value.as_u128(),
                     }
                     .try_to_vec()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
+                    events::ExitToEth {
+                        is_erc20: false,
+                        dest: H160(recipient_address),
+                        amount: context.apparent_value,
+                    },
                 )
             }
             0x1 => {
@@ -281,12 +374,14 @@ impl Precompile for ExitToEthereum {
 
                 let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
 
-                let amount = U256::from_big_endian(&input[..32]).as_u128();
+                let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
                     let eth_recipient: String = hex::encode(input.to_vec());
+                    // unwrap cannot fail since we checked the length already
+                    let recipient_address = input.try_into().unwrap();
 
                     (
                         nep141_address,
@@ -294,10 +389,16 @@ impl Precompile for ExitToEthereum {
                         // as decimal and hexadecimal respectively.
                         format!(
                             r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                            amount, eth_recipient
+                            amount.as_u128(),
+                            eth_recipient
                         )
                         .as_bytes()
                         .to_vec(),
+                        events::ExitToEth {
+                            is_erc20: true,
+                            dest: H160(recipient_address),
+                            amount,
+                        },
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")));
@@ -319,14 +420,20 @@ impl Precompile for ExitToEthereum {
         }
         .try_to_vec()
         .unwrap();
-        let log = Log {
+        let promise_log = Log {
             address: Self::ADDRESS,
             topics: Vec::new(),
             data: promise,
         };
+        let exit_event_log = exit_event.encode();
+        let exit_event_log = Log {
+            address: Self::ADDRESS,
+            topics: exit_event_log.topics,
+            data: exit_event_log.data,
+        };
 
         Ok(PrecompileOutput {
-            logs: vec![log],
+            logs: vec![promise_log, exit_event_log],
             ..Default::default()
         }
         .into())
@@ -337,6 +444,7 @@ impl Precompile for ExitToEthereum {
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
     use crate::prelude::sdk::types::near_account_to_evm_address;
+    use crate::prelude::{vec, ToString};
 
     #[test]
     fn test_precompile_id() {
@@ -347,6 +455,62 @@ mod tests {
         assert_eq!(
             ExitToNear::ADDRESS,
             near_account_to_evm_address("exitToNear".as_bytes())
+        );
+    }
+
+    #[test]
+    fn test_exit_signatures() {
+        let exit_to_near = ethabi::Event {
+            name: "ExitToNear".to_string(),
+            inputs: vec![
+                ethabi::EventParam {
+                    name: "is_erc20".to_string(),
+                    kind: ethabi::ParamType::Bool,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "dest".to_string(),
+                    kind: ethabi::ParamType::String,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "amount".to_string(),
+                    kind: ethabi::ParamType::Int(256),
+                    indexed: false,
+                },
+            ],
+            anonymous: false,
+        };
+
+        let exit_to_eth = ethabi::Event {
+            name: "ExitToEth".to_string(),
+            inputs: vec![
+                ethabi::EventParam {
+                    name: "is_erc20".to_string(),
+                    kind: ethabi::ParamType::Bool,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "dest".to_string(),
+                    kind: ethabi::ParamType::Address,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "amount".to_string(),
+                    kind: ethabi::ParamType::Int(256),
+                    indexed: false,
+                },
+            ],
+            anonymous: false,
+        };
+
+        assert_eq!(
+            exit_to_near.signature(),
+            super::events::EXIT_TO_NEAR_SIGNATURE
+        );
+        assert_eq!(
+            exit_to_eth.signature(),
+            super::events::EXIT_TO_ETH_SIGNATURE
         );
     }
 }
