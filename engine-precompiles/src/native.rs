@@ -178,6 +178,25 @@ impl Precompile for ExitToNear {
             topics: Vec::new(),
             data: promise,
         };
+        /*
+        let refund_contract_address = String::from_utf8(sdk::current_account_id()).unwrap();
+        let refund_args =       RefundDepositCallArgs
+        let refund_args= RefundDepositCallArg =
+        let refund_promise = PromiseCreateArgs {
+            target_account_id: refund_contract_address,
+            method: "refund_deposit".to_string(),
+            args: refund_args,
+            attached_balance: 1,
+            attached_gas: costs::WITHDRAWAL_GAS,
+            parent_promise: Some(0),
+        }
+        .try_to_vec()
+        .unwrap();
+        let refund_log = Log {
+            address: Self::ADDRESS,
+            topics: Vec::new(),
+            data: refund_promise,
+        };*/
 
         Ok(PrecompileOutput {
             logs: vec![log],
