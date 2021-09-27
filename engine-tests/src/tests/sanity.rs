@@ -42,6 +42,54 @@ fn test_deploy_contract() {
 }
 
 #[test]
+fn test_timestamp() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+        "src/tests/res",
+        "target/solidity_build",
+        "timestamp.sol",
+        "Timestamp",
+    );
+
+    // deploy contract
+    let nonce = signer.use_nonce();
+    let contract = runner.deploy_contract(
+        &signer.secret_key,
+        |c| crate::prelude::transaction::LegacyEthTransaction {
+            nonce: nonce.into(),
+            gas_price: Default::default(),
+            gas: u64::MAX.into(),
+            to: None,
+            value: Default::default(),
+            data: c.code.clone(),
+        },
+        constructor,
+    );
+
+    // set timestamp
+    let t = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap();
+    let t_ns = t.as_nanos();
+    let t_s = U256::from(t.as_secs());
+    runner.context.block_timestamp = t_ns as u64;
+
+    // call contract
+    let result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            contract.call_method_without_args("getCurrentBlockTimestamp", nonce)
+        })
+        .unwrap();
+    let timestamp = U256::from_big_endian(&test_utils::unwrap_success(result));
+
+    // Check time is correct.
+    // The `+1`  is needed here because the runner increments the context
+    // timestamp by 1 second automatically before each transaction.
+    assert_eq!(t_s + 1, timestamp);
+}
+
+#[test]
 fn test_override_state() {
     let (mut runner, mut account1, viewer_address) = initialize_transfer();
     let account1_address = test_utils::address_from_secret_key(&account1.secret_key);
