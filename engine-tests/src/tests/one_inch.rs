@@ -103,8 +103,8 @@ fn test_1_inch_limit_order_deploy() {
         SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
-    // more than 4 million Ethereum gas used
-    assert!(result.gas_used > 4_000_000);
+    // more than 3.5 million Ethereum gas used
+    assert!(result.gas_used > 3_500_000);
     // less than 43 NEAR Tgas used
     assert!(profile.all_gas() < 43_000_000_000_000);
     // at least 70% of which is from wasm execution
