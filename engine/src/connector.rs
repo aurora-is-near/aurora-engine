@@ -111,6 +111,10 @@ impl EthConnectorContract {
 
     /// Sets the contract data and returns it back
     pub fn set_contract_data(args: SetContractDataCallArgs) -> EthConnector {
+        assert!(
+            is_valid_account_id(args.prover_account.as_bytes()),
+            "ERR_INVALID_ACCOUNT_ID"
+        );
         // Get initial contract arguments
         let contract_data = EthConnector {
             prover_account: args.prover_account,
