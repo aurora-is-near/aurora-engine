@@ -1,9 +1,14 @@
-use crate::prelude::{parameters::SubmitResult, transaction::LegacyEthTransaction, Address, U256};
+use crate::prelude::{
+    parameters::SubmitResult, transaction::LegacyEthTransaction, Address, Wei, U256,
+};
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 
 pub(crate) struct TesterConstructor(pub solidity::ContractConstructor);
 
 const DEPLOY_CONTRACT_GAS: u64 = 1_000_000_000;
+pub const DEST_ACCOUNT: &str = "target.aurora";
+pub const DEST_ADDRESS: Address =
+    aurora_engine_precompiles::make_address(0xe0f5206b, 0xbd039e7b0592d8918820024e2a7437b9);
 
 impl TesterConstructor {
     pub fn load() -> Self {
@@ -54,6 +59,7 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         method: &str,
+        value: Wei,
         params: &[ethabi::Token],
     ) -> Result<SubmitResult, Revert> {
         let data = self
@@ -69,7 +75,7 @@ impl Tester {
             gas_price: Default::default(),
             gas: U256::from(DEPLOY_CONTRACT_GAS),
             to: Some(self.contract.address),
-            value: Default::default(),
+            value,
             data,
         };
 
@@ -89,7 +95,13 @@ impl Tester {
     ) -> String {
         let output_type = &[ethabi::ParamType::String];
         let result = self
-            .call_function(runner, signer, "helloWorld", &[ethabi::Token::String(name)])
+            .call_function(
+                runner,
+                signer,
+                "helloWorld",
+                Wei::zero(),
+                &[ethabi::Token::String(name)],
+            )
             .unwrap();
         let output_bytes = test_utils::unwrap_success(result);
         let output = ethabi::decode(output_type, &output_bytes).unwrap();
@@ -106,7 +118,13 @@ impl Tester {
         signer: &mut Signer,
         flag: bool,
     ) -> Result<SubmitResult, Revert> {
-        self.call_function(runner, signer, "withdraw", &[ethabi::Token::Bool(flag)])
+        self.call_function(
+            runner,
+            signer,
+            "withdraw",
+            Wei::zero(),
+            &[ethabi::Token::Bool(flag)],
+        )
     }
 
     pub fn withdraw_and_fail(
@@ -119,6 +137,7 @@ impl Tester {
             runner,
             signer,
             "withdrawAndFail",
+            Wei::zero(),
             &[ethabi::Token::Bool(flag)],
         )
     }
@@ -133,6 +152,7 @@ impl Tester {
             runner,
             signer,
             "tryWithdrawAndAvoidFail",
+            Wei::zero(),
             &[ethabi::Token::Bool(flag)],
         )
     }
@@ -147,8 +167,35 @@ impl Tester {
             runner,
             signer,
             "tryWithdrawAndAvoidFailAndSucceed",
+            Wei::zero(),
             &[ethabi::Token::Bool(flag)],
         )
+    }
+
+    pub fn withdraw_eth(
+        &self,
+        runner: &mut AuroraRunner,
+        signer: &mut Signer,
+        is_to_near: bool,
+        amount: Wei,
+    ) -> Result<SubmitResult, Revert> {
+        if is_to_near {
+            self.call_function(
+                runner,
+                signer,
+                "withdrawEthToNear",
+                amount,
+                &[ethabi::Token::Bytes(DEST_ACCOUNT.as_bytes().to_vec())],
+            )
+        } else {
+            self.call_function(
+                runner,
+                signer,
+                "withdrawEthToEthereum",
+                amount,
+                &[ethabi::Token::Address(DEST_ADDRESS)],
+            )
+        }
     }
 }
 
