@@ -36,7 +36,7 @@ fn hello_world_solidity() {
     let name = "AuroraG".to_string();
     let expected = format!("Hello {}!", name);
 
-    let result = tester.hello_world(&mut runner, &mut signer, name).unwrap();
+    let result = tester.hello_world(&mut runner, &mut signer, name);
     assert_eq!(expected, result);
 }
 

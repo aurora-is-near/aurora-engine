@@ -55,8 +55,7 @@ impl Tester {
         signer: &mut Signer,
         method: &str,
         params: &[ethabi::Token],
-        output_type: &[ethabi::ParamType],
-    ) -> Result<Vec<ethabi::Token>, SubmitResult> {
+    ) -> Result<SubmitResult, Revert> {
         let data = self
             .contract
             .abi
@@ -75,12 +74,10 @@ impl Tester {
         };
 
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
-
-        if result.status.is_ok() {
-            let result = test_utils::unwrap_success(result);
-            Ok(ethabi::decode(output_type, result.as_slice()).unwrap())
-        } else {
-            Err(result)
+        match result.status {
+            aurora_engine::parameters::TransactionStatus::Succeed(_) => Ok(result),
+            aurora_engine::parameters::TransactionStatus::Revert(bytes) => Err(Revert(bytes)),
+            other => panic!("Unexpected status {:?}", other),
         }
     }
 
@@ -89,17 +86,16 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         name: String,
-    ) -> Result<String, SubmitResult> {
-        let result = self.call_function(
-            runner,
-            signer,
-            "helloWorld",
-            &[ethabi::Token::String(name)],
-            &[ethabi::ParamType::String],
-        )?;
+    ) -> String {
+        let output_type = &[ethabi::ParamType::String];
+        let result = self
+            .call_function(runner, signer, "helloWorld", &[ethabi::Token::String(name)])
+            .unwrap();
+        let output_bytes = test_utils::unwrap_success(result);
+        let output = ethabi::decode(output_type, &output_bytes).unwrap();
 
-        match &result[..] {
-            [ethabi::Token::String(string)] => Ok(string.to_string()),
+        match &output[..] {
+            [ethabi::Token::String(string)] => string.to_string(),
             _ => unreachable!(),
         }
     }
@@ -109,15 +105,9 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         flag: bool,
-    ) -> Result<(), SubmitResult> {
-        self.call_function(
-            runner,
-            signer,
-            "withdraw",
-            &[ethabi::Token::Bool(flag)],
-            &[],
-        )
-        .map(|_| ())
+    ) -> Result<(), Revert> {
+        self.call_function(runner, signer, "withdraw", &[ethabi::Token::Bool(flag)])
+            .map(|_| ())
     }
 
     pub fn withdraw_and_fail(
@@ -125,13 +115,12 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         flag: bool,
-    ) -> Result<(), SubmitResult> {
+    ) -> Result<(), Revert> {
         self.call_function(
             runner,
             signer,
             "withdrawAndFail",
             &[ethabi::Token::Bool(flag)],
-            &[],
         )
         .map(|_| ())
     }
@@ -141,13 +130,12 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         flag: bool,
-    ) -> Result<(), SubmitResult> {
+    ) -> Result<(), Revert> {
         self.call_function(
             runner,
             signer,
             "tryWithdrawAndAvoidFail",
             &[ethabi::Token::Bool(flag)],
-            &[],
         )
         .map(|_| ())
     }
@@ -157,14 +145,16 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         flag: bool,
-    ) -> Result<(), SubmitResult> {
+    ) -> Result<(), Revert> {
         self.call_function(
             runner,
             signer,
             "tryWithdrawAndAvoidFailAndSucceed",
             &[ethabi::Token::Bool(flag)],
-            &[],
         )
         .map(|_| ())
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct Revert(Vec<u8>);
