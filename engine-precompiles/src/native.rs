@@ -33,18 +33,18 @@ mod costs {
     pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
 }
 
-pub(crate) mod events {
-    use crate::prelude::{vec, Address, String, H256, U256};
+pub mod events {
+    use crate::prelude::{vec, Address, String, ToString, H256, U256};
 
     /// Derived from event signature (see tests::test_exit_signatures)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
-        0xbe5650b8d0ad81b6b2807ab7c8f2892d,
-        0xdb19f1b8174ea910f914d5103e196cce,
+        0x4bd8f58b14f86d1103530f22f339e5ae,
+        0xcfb084f432b43f6fdda8abe6d1ffa1c3,
     );
     /// Derived from event signature (see tests::test_exit_signatures)
     pub const EXIT_TO_ETH_SIGNATURE: H256 = crate::make_h256(
-        0x4c58d7f2fd84892be1460b9ed55b722b,
-        0x7f7c790c0bd00cd06aadff27ca3bdb2e,
+        0x03069c4a74ef98a028eacca7d6190516,
+        0x64e2c62a0c357b9644a33466c1014b5e,
     );
 
     /// ExitToNear(bool indexed is_erc20, string indexed dest, uint amount)
@@ -99,6 +99,54 @@ pub(crate) mod events {
         let mut result = [0u8; 32];
         result[12..].copy_from_slice(a.as_ref());
         H256(result)
+    }
+
+    pub fn exit_to_near_schema() -> ethabi::Event {
+        ethabi::Event {
+            name: "ExitToNear".to_string(),
+            inputs: vec![
+                ethabi::EventParam {
+                    name: "is_erc20".to_string(),
+                    kind: ethabi::ParamType::Bool,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "dest".to_string(),
+                    kind: ethabi::ParamType::String,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "amount".to_string(),
+                    kind: ethabi::ParamType::Uint(256),
+                    indexed: false,
+                },
+            ],
+            anonymous: false,
+        }
+    }
+
+    pub fn exit_to_eth_schema() -> ethabi::Event {
+        ethabi::Event {
+            name: "ExitToEth".to_string(),
+            inputs: vec![
+                ethabi::EventParam {
+                    name: "is_erc20".to_string(),
+                    kind: ethabi::ParamType::Bool,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "dest".to_string(),
+                    kind: ethabi::ParamType::Address,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "amount".to_string(),
+                    kind: ethabi::ParamType::Uint(256),
+                    indexed: false,
+                },
+            ],
+            anonymous: false,
+        }
     }
 }
 
@@ -444,7 +492,6 @@ impl Precompile for ExitToEthereum {
 mod tests {
     use super::{ExitToEthereum, ExitToNear};
     use crate::prelude::sdk::types::near_account_to_evm_address;
-    use crate::prelude::{vec, ToString};
 
     #[test]
     fn test_precompile_id() {
@@ -460,49 +507,8 @@ mod tests {
 
     #[test]
     fn test_exit_signatures() {
-        let exit_to_near = ethabi::Event {
-            name: "ExitToNear".to_string(),
-            inputs: vec![
-                ethabi::EventParam {
-                    name: "is_erc20".to_string(),
-                    kind: ethabi::ParamType::Bool,
-                    indexed: true,
-                },
-                ethabi::EventParam {
-                    name: "dest".to_string(),
-                    kind: ethabi::ParamType::String,
-                    indexed: true,
-                },
-                ethabi::EventParam {
-                    name: "amount".to_string(),
-                    kind: ethabi::ParamType::Int(256),
-                    indexed: false,
-                },
-            ],
-            anonymous: false,
-        };
-
-        let exit_to_eth = ethabi::Event {
-            name: "ExitToEth".to_string(),
-            inputs: vec![
-                ethabi::EventParam {
-                    name: "is_erc20".to_string(),
-                    kind: ethabi::ParamType::Bool,
-                    indexed: true,
-                },
-                ethabi::EventParam {
-                    name: "dest".to_string(),
-                    kind: ethabi::ParamType::Address,
-                    indexed: true,
-                },
-                ethabi::EventParam {
-                    name: "amount".to_string(),
-                    kind: ethabi::ParamType::Int(256),
-                    indexed: false,
-                },
-            ],
-            anonymous: false,
-        };
+        let exit_to_near = super::events::exit_to_near_schema();
+        let exit_to_eth = super::events::exit_to_eth_schema();
 
         assert_eq!(
             exit_to_near.signature(),

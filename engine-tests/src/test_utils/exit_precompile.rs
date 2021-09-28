@@ -105,9 +105,8 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         flag: bool,
-    ) -> Result<(), Revert> {
+    ) -> Result<SubmitResult, Revert> {
         self.call_function(runner, signer, "withdraw", &[ethabi::Token::Bool(flag)])
-            .map(|_| ())
     }
 
     pub fn withdraw_and_fail(
@@ -115,14 +114,13 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         flag: bool,
-    ) -> Result<(), Revert> {
+    ) -> Result<SubmitResult, Revert> {
         self.call_function(
             runner,
             signer,
             "withdrawAndFail",
             &[ethabi::Token::Bool(flag)],
         )
-        .map(|_| ())
     }
 
     pub fn try_withdraw_and_avoid_fail(
@@ -130,14 +128,13 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         flag: bool,
-    ) -> Result<(), Revert> {
+    ) -> Result<SubmitResult, Revert> {
         self.call_function(
             runner,
             signer,
             "tryWithdrawAndAvoidFail",
             &[ethabi::Token::Bool(flag)],
         )
-        .map(|_| ())
     }
 
     pub fn try_withdraw_and_avoid_fail_and_succeed(
@@ -145,14 +142,13 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         flag: bool,
-    ) -> Result<(), Revert> {
+    ) -> Result<SubmitResult, Revert> {
         self.call_function(
             runner,
             signer,
             "tryWithdrawAndAvoidFailAndSucceed",
             &[ethabi::Token::Bool(flag)],
         )
-        .map(|_| ())
     }
 }
 
