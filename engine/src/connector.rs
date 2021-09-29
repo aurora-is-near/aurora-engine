@@ -469,8 +469,13 @@ impl EthConnectorContract {
         let args = TransferCallArgs::from(
             parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
-        self.ft
-            .ft_transfer(&args.receiver_id, args.amount, &args.memo);
+        let receiver_id = args.receiver_id;
+        assert!(
+            is_valid_account_id(receiver_id.as_bytes()),
+            "ERR_INVALID_ACCOUNT_ID"
+        );
+
+        self.ft.ft_transfer(&receiver_id, args.amount, &args.memo);
         self.save_ft_contract();
         sdk::log!(&format!(
             "Transfer amount {} to {} success with memo: {:?}",
