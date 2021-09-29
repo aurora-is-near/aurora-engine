@@ -513,6 +513,11 @@ impl EthConnectorContract {
             "{}",
             ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
         );
+        let receiver_id = args.receiver_id;
+        assert!(
+            is_valid_account_id(receiver_id.as_bytes()),
+            "ERR_INVALID_ACCOUNT_ID"
+        );
 
         // Additional check overflow before process `ft_on_transfer`
         // But don't check overflow for relayer
@@ -528,7 +533,7 @@ impl EthConnectorContract {
             .is_some());
 
         self.ft
-            .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
+            .ft_transfer_call(&receiver_id, args.amount, &args.memo, args.msg);
     }
 
     /// FT storage deposit logic
