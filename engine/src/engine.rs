@@ -277,10 +277,21 @@ pub struct EngineState {
 
 impl From<NewCallArgs> for EngineState {
     fn from(args: NewCallArgs) -> Self {
+        let owner_id = args.owner_id;
+        let bridge_prover_id = args.bridge_prover_id;
+        assert!(
+            is_valid_account_id(owner_id.as_bytes()),
+            "ERR_INVALID_ACCOUNT_ID"
+        );
+        assert!(
+            is_valid_account_id(bridge_prover_id.as_bytes()),
+            "ERR_INVALID_ACCOUNT_ID"
+        );
+
         EngineState {
             chain_id: args.chain_id,
-            owner_id: args.owner_id,
-            bridge_prover_id: args.bridge_prover_id,
+            owner_id,
+            bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
             relayers_evm_addresses: LookupMap::new(),
         }

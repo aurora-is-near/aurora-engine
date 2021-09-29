@@ -7,6 +7,7 @@ use crate::prelude::{
     BorshSerialize, EthAddress, Gas, Ordering, PromiseResult, StorageBalanceBounds, StorageUsage,
     String, ToString, TryInto, Vec, Wei, U256,
 };
+use aurora_engine_types::is_valid_account_id;
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
@@ -423,6 +424,11 @@ impl FungibleToken {
         let amount: Balance = sdk::attached_deposit();
         let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let account_id = account_id.unwrap_or(&predecessor_account_id);
+        assert!(
+            is_valid_account_id(account_id.as_bytes()),
+            "ERR_INVALID_ACCOUNT_ID"
+        );
+
         if self.accounts_contains_key(account_id) {
             sdk::log!("The account is already registered, refunding the deposit");
             if amount > 0 {
