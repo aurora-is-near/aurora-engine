@@ -14,10 +14,10 @@ documentation.
 
 Network | Contract ID         | Chain ID   | Version
 ------- | ------------------- | ---------- | ------
-Mainnet | [`aurora`][Mainnet] | 1313161554 | 1.6.3
-Testnet | [`aurora`][Testnet] | 1313161555 | 1.6.3
-Betanet | [`aurora`][Betanet] | 1313161556 | 1.6.3
-Local   | `aurora.test.near`  | 1313161556 | 1.6.3
+Mainnet | [`aurora`][Mainnet] | 1313161554 | 1.6.4
+Testnet | [`aurora`][Testnet] | 1313161555 | 1.6.4
+Betanet | [`aurora`][Betanet] | 1313161556 | 1.6.4
+Local   | `aurora.test.near`  | 1313161556 | 1.6.4
 
 [Mainnet]: https://explorer.near.org/accounts/aurora
 [Testnet]: https://explorer.testnet.near.org/accounts/aurora
@@ -168,3 +168,8 @@ aurora dump-storage
 
 [`master`]:  https://github.com/aurora-is-near/aurora-engine/commits/master
 [`develop`]: https://github.com/aurora-is-near/aurora-engine/commits/develop
+
+## License
+**aurora-engine** has multiple licenses:
+* all crates except `engine-test` has **CCO-1.0** license
+* `engine-test` has **GPL-v3** license
