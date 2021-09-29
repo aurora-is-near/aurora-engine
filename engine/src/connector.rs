@@ -138,16 +138,16 @@ impl EthConnectorContract {
     fn parse_event_message(&self, message: &str) -> TokenMessageData {
         let data: Vec<_> = message.split(':').collect();
         assert!(data.len() < 3);
+        let account_id = data[0];
+        assert!(
+            is_valid_account_id(account_id.as_bytes()),
+            "ERR_INVALID_ACCOUNT_ID"
+        );
         if data.len() == 1 {
-            let account_id = data[0];
-            assert!(
-                is_valid_account_id(account_id.as_bytes()),
-                "ERR_INVALID_ACCOUNT_ID"
-            );
             TokenMessageData::Near(account_id.into())
         } else {
             TokenMessageData::Eth {
-                address: data[0].into(),
+                address: account_id.into(),
                 message: data[1].into(),
             }
         }
