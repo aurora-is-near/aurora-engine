@@ -863,16 +863,11 @@ impl Engine {
     }
 
     fn filter_promises_from_logs<T: IntoIterator<Item = Log>>(logs: T) -> Vec<ResultLog> {
-        let mut promise_id = None;
         logs.into_iter()
             .filter_map(|log| {
                 if log.address == ExitToNear::ADDRESS || log.address == ExitToEthereum::ADDRESS {
-                    if let Ok(mut promise) = PromiseCreateArgs::try_from_slice(&log.data) {
-                        // Set parent promise for chain promises
-                        if promise.parent_promise.is_some() {
-                            promise.parent_promise = promise_id;
-                        }
-                        promise_id = Some(Self::schedule_promise(promise));
+                    if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
+                        Self::schedule_promise(promise);
                     }
                     // do not pass on these "internal logs" to caller
                     None
@@ -883,7 +878,7 @@ impl Engine {
             .collect()
     }
 
-    fn schedule_promise(promise: PromiseCreateArgs) -> u64 {
+    fn schedule_promise(promise: PromiseCreateArgs) {
         #[cfg(feature = "log")]
         sdk::log_utf8(
             crate::prelude::format!(
@@ -893,25 +888,13 @@ impl Engine {
             )
             .as_bytes(),
         );
-        // Invoke chain promise
-        if let Some(parent_promise_id) = promise.parent_promise {
-            sdk::promise_then(
-                parent_promise_id,
-                promise.target_account_id.as_bytes(),
-                promise.method.as_bytes(),
-                promise.args.as_slice(),
-                promise.attached_balance,
-                promise.attached_gas,
-            )
-        } else {
-            sdk::promise_create(
-                promise.target_account_id.as_bytes(),
-                promise.method.as_bytes(),
-                promise.args.as_slice(),
-                promise.attached_balance,
-                promise.attached_gas,
-            )
-        }
+        sdk::promise_create(
+            promise.target_account_id.as_bytes(),
+            promise.method.as_bytes(),
+            promise.args.as_slice(),
+            promise.attached_balance,
+            promise.attached_gas,
+        );
     }
 }
 

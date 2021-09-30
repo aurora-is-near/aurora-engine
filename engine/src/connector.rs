@@ -479,7 +479,7 @@ impl EthConnectorContract {
         self.save_ft_contract();
         sdk::log!(&format!(
             "Transfer amount {} to {} success with memo: {:?}",
-            args.amount, args.receiver_id, args.memo
+            args.amount, receiver_id, args.memo
         ));
     }
 

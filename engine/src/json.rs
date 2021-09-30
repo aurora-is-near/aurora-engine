@@ -235,15 +235,35 @@ impl TryFrom<&JsonValue> for u128 {
 
 impl core::fmt::Debug for JsonValue {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        match *self {
+        match self {
             JsonValue::Null => f.write_str("null"),
-            JsonValue::String(ref v) => f.write_fmt(format_args!("\"{}\"", v)),
-            JsonValue::F64(ref v) => f.write_fmt(format_args!("{}", v)),
-            JsonValue::I64(ref v) => f.write_fmt(format_args!("{}", v)),
-            JsonValue::U64(ref v) => f.write_fmt(format_args!("{}", v)),
-            JsonValue::Bool(ref v) => f.write_fmt(format_args!("{}", v)),
-            JsonValue::Array(ref v) => f.write_fmt(format_args!("{:?}", v)),
-            JsonValue::Object(ref v) => f.write_fmt(format_args!("{:#?}", v)),
+            JsonValue::String(v) => f.write_fmt(format_args!("\"{}\"", v)),
+            JsonValue::F64(v) => f.write_fmt(format_args!("{}", v)),
+            JsonValue::I64(v) => f.write_fmt(format_args!("{}", v)),
+            JsonValue::U64(v) => f.write_fmt(format_args!("{}", v)),
+            JsonValue::Bool(v) => f.write_fmt(format_args!("{}", v)),
+            JsonValue::Array(arr) => {
+                f.write_str("[")?;
+                let mut items = arr.iter();
+                if let Some(item) = items.next() {
+                    f.write_fmt(format_args!("{:?}", item))?;
+                }
+                for item in items {
+                    f.write_fmt(format_args!(", {:?}", item))?;
+                }
+                f.write_str("]")
+            }
+            JsonValue::Object(kvs) => {
+                f.write_str("{")?;
+                let mut pairs = kvs.iter();
+                if let Some((key, value)) = pairs.next() {
+                    f.write_fmt(format_args!("\"{}\": {:?}", key, value))?;
+                }
+                for (key, value) in pairs {
+                    f.write_fmt(format_args!(", \"{}\": {:?}", key, value))?;
+                }
+                f.write_str("}")
+            }
         }
     }
 }
@@ -466,5 +486,73 @@ mod tests {
         let json = JsonValue::from("abcd".to_string());
         let err = JsonValue::parse_u8(&json).unwrap_err();
         assert_eq!(err, JsonError::InvalidU8);
+    }
+
+    #[test]
+    fn test_json_serialization() {
+        // Test showing valid json (without trailing commas) is produced from the
+        // `Display` impl on `JsonValue`.
+
+        // empty object
+        let object = JsonValue::Object(BTreeMap::new());
+        assert_eq!(&format!("{}", object), "{}");
+
+        // object with 1 field
+        let object = JsonValue::Object(
+            vec![("pi".to_string(), JsonValue::F64(std::f64::consts::PI))]
+                .into_iter()
+                .collect(),
+        );
+        assert_eq!(&format!("{}", object), "{\"pi\": 3.141592653589793}");
+
+        // object with 2 fields
+        let object = JsonValue::Object(
+            vec![
+                ("pi".to_string(), JsonValue::F64(std::f64::consts::PI)),
+                ("Pie".to_string(), JsonValue::String("Apple".to_string())),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        assert_eq!(
+            &format!("{}", object),
+            "{\"Pie\": \"Apple\", \"pi\": 3.141592653589793}"
+        );
+
+        // object with empty array
+        let object = JsonValue::Object(
+            vec![("empty".to_string(), JsonValue::Array(vec![]))]
+                .into_iter()
+                .collect(),
+        );
+        assert_eq!(&format!("{}", object), "{\"empty\": []}");
+
+        // object with single element array
+        let object = JsonValue::Object(
+            vec![(
+                "numbers".to_string(),
+                JsonValue::Array(vec![JsonValue::U64(42)]),
+            )]
+            .into_iter()
+            .collect(),
+        );
+        assert_eq!(&format!("{}", object), "{\"numbers\": [42]}");
+
+        // object with two-element array
+        let object = JsonValue::Object(
+            vec![(
+                "words".to_string(),
+                JsonValue::Array(vec![
+                    JsonValue::String("Hello".to_string()),
+                    JsonValue::String("World".to_string()),
+                ]),
+            )]
+            .into_iter()
+            .collect(),
+        );
+        assert_eq!(
+            &format!("{}", object),
+            "{\"words\": [\"Hello\", \"World\"]}"
+        );
     }
 }
