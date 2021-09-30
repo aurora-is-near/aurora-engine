@@ -14,10 +14,10 @@ documentation.
 
 Network | Contract ID         | Chain ID   | Version
 ------- | ------------------- | ---------- | ------
-Mainnet | [`aurora`][Mainnet] | 1313161554 | 1.6.3
-Testnet | [`aurora`][Testnet] | 1313161555 | 1.6.3
-Betanet | [`aurora`][Betanet] | 1313161556 | 1.6.3
-Local   | `aurora.test.near`  | 1313161556 | 1.6.3
+Mainnet | [`aurora`][Mainnet] | 1313161554 | 1.6.4
+Testnet | [`aurora`][Testnet] | 1313161555 | 1.6.4
+Betanet | [`aurora`][Betanet] | 1313161556 | 1.6.4
+Local   | `aurora.test.near`  | 1313161556 | 1.6.4
 
 [Mainnet]: https://explorer.near.org/accounts/aurora
 [Testnet]: https://explorer.testnet.near.org/accounts/aurora

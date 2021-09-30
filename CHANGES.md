@@ -7,40 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.4] - 2021-09-29
+
+### Changes
+
+- Fix JSON formatting in `ft_metadata` method by [@birchmd].
+- Fix a bug in `block.timestamp` (units should be seconds) by [@birchmd].
+
 ## [1.6.3] - 2021-09-14
 
 ### Changes
 
-- Revert ERC20 admin address changes for the time being by [@joshuajbouw].
+- Revert the ERC-20 admin address changes for the time being by [@joshuajbouw].
 
 ## [1.6.2] - 2021-09-13
 
 ### Changes
 
-- ERC20 admin address has been changed to have a dedicated account by [@sept-en].
-- Precompile promises were fixed that were broken in rust-blockchain/evm by [@joshuajbouw] and [@birchmd].
-- Return format of `ft_balance_of` was fixed by [@joshuajbouw].
+- Change the ERC-20 admin address to have a dedicated account by [@sept-en].
+- Fix precompile promises that were broken in rust-blockchain/evm by
+  [@joshuajbouw] and [@birchmd].
+- Fix the return format of `ft_balance_of` by [@joshuajbouw].
 
 ### Removed
 
-- Testnet balancing `balance_evm_and_nep141` has been removed by [@birchmd].
+- Remove Testnet balancing `balance_evm_and_nep141` by [@birchmd].
 
 ## [1.6.1] - 2021-08-23
 
 ### Breaking changes
 
-- The `view` call has been correctly updated to return the Borsh
-  serialization of `TransactionStatus`. Previously, it was returning a
-  string with the result of the transaction by name.
+- Update the `view` call to correctly return the Borsh serialization of
+  `TransactionStatus`. Previously, it returned a string with the result of
+  the transaction by name.
 
-- The `ft_balance_of` result was changed as previously it was returning a
-  non-JSON string value `0`. This has been fixed to return `"0"`.
+- Change the `ft_balance_of` result as previously it returned a non-JSON
+  string value `0`. This has been fixed to return `"0"`.
 
 ## [1.6.0] - 2021-08-13
 
 ### Breaking changes
 
-- The transaction status of `submit` was changed as running out of gas,
+- Change the transaction status of `submit` as running out of gas,
   funds, or being out-of-the-offset are not fatal errors but failed
   executions.
 
@@ -86,7 +94,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.3...master
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.4...master
+[1.6.4]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.3...1.6.4
 [1.6.3]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.2...1.6.3
 [1.6.2]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.1...1.6.2
 [1.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.0...1.6.1
