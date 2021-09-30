@@ -48,7 +48,7 @@ fn hello_world_solidity() {
 
 #[test]
 fn withdraw() {
-    let (mut runner, mut signer, _token, tester) = setup_test();
+    let (mut runner, mut signer, token, tester) = setup_test();
 
     let test_data = vec![
         (true, "Call contract: tt.testnet.ft_transfer"),
@@ -93,8 +93,8 @@ fn withdraw() {
         };
         let expected_event = vec![
             ethabi::LogParam {
-                name: "is_erc20".to_string(),
-                value: ethabi::Token::Bool(true),
+                name: "erc20_address".to_string(),
+                value: ethabi::Token::Address(Address(token)),
             },
             dest,
             ethabi::LogParam {
@@ -182,8 +182,8 @@ fn withdraw_eth() {
     let schema = aurora_engine_precompiles::native::events::exit_to_near_schema();
     let mut expected_event = vec![
         ethabi::LogParam {
-            name: "is_erc20".to_string(),
-            value: ethabi::Token::Bool(false),
+            name: "erc20_address".to_string(),
+            value: ethabi::Token::Address(aurora_engine_precompiles::native::events::ETH_ADDRESS),
         },
         ethabi::LogParam {
             name: "dest".to_string(),

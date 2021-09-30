@@ -38,18 +38,24 @@ pub mod events {
 
     /// Derived from event signature (see tests::test_exit_signatures)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
-        0x4bd8f58b14f86d1103530f22f339e5ae,
-        0xcfb084f432b43f6fdda8abe6d1ffa1c3,
+        0x9911ed49bdd24e0d6947f8ec7fd769b5,
+        0x180bfa870111bab3ba2f68e9691df397,
     );
     /// Derived from event signature (see tests::test_exit_signatures)
     pub const EXIT_TO_ETH_SIGNATURE: H256 = crate::make_h256(
-        0x03069c4a74ef98a028eacca7d6190516,
-        0x64e2c62a0c357b9644a33466c1014b5e,
+        0xb3d4ed1e141441b1b7f65a734e7477f3,
+        0x22aee02cc2a29017e53e0c1b5aa9e965,
     );
 
-    /// ExitToNear(bool indexed is_erc20, string indexed dest, uint amount)
+    /// The exit precompile events have an `erc20_address` field to indicate
+    /// which ERC-20 token is being withdrawn. However, ETH is not an ERC-20 token
+    /// So we need to have some other address to fill this field. This constant is
+    /// used for this purpose.
+    pub const ETH_ADDRESS: Address = Address([0; 20]);
+
+    /// ExitToNear(Address indexed erc20_address, string indexed dest, uint amount)
     pub struct ExitToNear {
-        pub is_erc20: bool,
+        pub erc20_address: Address,
         pub dest: String,
         pub amount: U256,
     }
@@ -59,7 +65,7 @@ pub mod events {
             let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
             let topics = vec![
                 EXIT_TO_NEAR_SIGNATURE,
-                encode_bool(self.is_erc20),
+                encode_address(self.erc20_address),
                 aurora_engine_sdk::keccak(&ethabi::encode(&[ethabi::Token::String(self.dest)])),
             ];
 
@@ -67,9 +73,9 @@ pub mod events {
         }
     }
 
-    /// ExitToEth(bool indexed is_erc20, address indexed dest, uint amount)
+    /// ExitToEth(Address indexed erc20_address, address indexed dest, uint amount)
     pub struct ExitToEth {
-        pub is_erc20: bool,
+        pub erc20_address: Address,
         pub dest: Address,
         pub amount: U256,
     }
@@ -79,20 +85,12 @@ pub mod events {
             let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
             let topics = vec![
                 EXIT_TO_ETH_SIGNATURE,
-                encode_bool(self.is_erc20),
+                encode_address(self.erc20_address),
                 encode_address(self.dest),
             ];
 
             ethabi::RawLog { topics, data }
         }
-    }
-
-    fn encode_bool(b: bool) -> H256 {
-        let mut result = [0u8; 32];
-        if b {
-            result[31] = 1;
-        }
-        H256(result)
     }
 
     fn encode_address(a: Address) -> H256 {
@@ -106,8 +104,8 @@ pub mod events {
             name: "ExitToNear".to_string(),
             inputs: vec![
                 ethabi::EventParam {
-                    name: "is_erc20".to_string(),
-                    kind: ethabi::ParamType::Bool,
+                    name: "erc20_address".to_string(),
+                    kind: ethabi::ParamType::Address,
                     indexed: true,
                 },
                 ethabi::EventParam {
@@ -130,8 +128,8 @@ pub mod events {
             name: "ExitToEth".to_string(),
             inputs: vec![
                 ethabi::EventParam {
-                    name: "is_erc20".to_string(),
-                    kind: ethabi::ParamType::Bool,
+                    name: "erc20_address".to_string(),
+                    kind: ethabi::ParamType::Address,
                     indexed: true,
                 },
                 ethabi::EventParam {
@@ -235,7 +233,7 @@ impl Precompile for ExitToNear {
                             context.apparent_value.as_u128()
                         ),
                         events::ExitToNear {
-                            is_erc20: false,
+                            erc20_address: events::ETH_ADDRESS,
                             dest: dest_account,
                             amount: context.apparent_value,
                         },
@@ -261,7 +259,8 @@ impl Precompile for ExitToNear {
                     )));
                 }
 
-                let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
+                let erc20_address = context.caller;
+                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes());
 
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
@@ -278,7 +277,7 @@ impl Precompile for ExitToNear {
                             amount.as_u128()
                         ),
                         events::ExitToNear {
-                            is_erc20: true,
+                            erc20_address,
                             dest: receiver_account_id,
                             amount,
                         },
@@ -398,7 +397,7 @@ impl Precompile for ExitToEthereum {
                     .try_to_vec()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
                     events::ExitToEth {
-                        is_erc20: false,
+                        erc20_address: events::ETH_ADDRESS,
                         dest: H160(recipient_address),
                         amount: context.apparent_value,
                     },
@@ -420,7 +419,8 @@ impl Precompile for ExitToEthereum {
                     )));
                 }
 
-                let nep141_address = get_nep141_from_erc20(context.caller.as_bytes());
+                let erc20_address = context.caller;
+                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes());
 
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
@@ -443,7 +443,7 @@ impl Precompile for ExitToEthereum {
                         .as_bytes()
                         .to_vec(),
                         events::ExitToEth {
-                            is_erc20: true,
+                            erc20_address,
                             dest: H160(recipient_address),
                             amount,
                         },
