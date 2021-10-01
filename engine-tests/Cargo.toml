@@ -16,6 +16,7 @@ autobenches = false
 aurora-engine = { path = "../engine", default-features = false, features=["sha2"] }
 aurora-engine-types = { path = "../engine-types", default-features = false }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
+aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 byte-slice-cast = { version = "1.0", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }

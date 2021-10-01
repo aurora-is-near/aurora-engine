@@ -206,7 +206,7 @@ impl Precompiles {
 /// const fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
-const fn make_address(x: u32, y: u128) -> prelude::Address {
+pub const fn make_address(x: u32, y: u128) -> prelude::Address {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
     prelude::Address([
@@ -214,6 +214,45 @@ const fn make_address(x: u32, y: u128) -> prelude::Address {
         x_bytes[1],
         x_bytes[2],
         x_bytes[3],
+        y_bytes[0],
+        y_bytes[1],
+        y_bytes[2],
+        y_bytes[3],
+        y_bytes[4],
+        y_bytes[5],
+        y_bytes[6],
+        y_bytes[7],
+        y_bytes[8],
+        y_bytes[9],
+        y_bytes[10],
+        y_bytes[11],
+        y_bytes[12],
+        y_bytes[13],
+        y_bytes[14],
+        y_bytes[15],
+    ])
+}
+
+const fn make_h256(x: u128, y: u128) -> prelude::H256 {
+    let x_bytes = x.to_be_bytes();
+    let y_bytes = y.to_be_bytes();
+    prelude::H256([
+        x_bytes[0],
+        x_bytes[1],
+        x_bytes[2],
+        x_bytes[3],
+        x_bytes[4],
+        x_bytes[5],
+        x_bytes[6],
+        x_bytes[7],
+        x_bytes[8],
+        x_bytes[9],
+        x_bytes[10],
+        x_bytes[11],
+        x_bytes[12],
+        x_bytes[13],
+        x_bytes[14],
+        x_bytes[15],
         y_bytes[0],
         y_bytes[1],
         y_bytes[2],
