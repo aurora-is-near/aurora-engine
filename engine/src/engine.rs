@@ -855,11 +855,18 @@ impl Engine {
         logs.into_iter()
             .filter_map(|log| {
                 if log.address == ExitToNear::ADDRESS || log.address == ExitToEthereum::ADDRESS {
-                    if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
-                        Self::schedule_promise(promise);
+                    if log.topics.is_empty() {
+                        if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
+                            Self::schedule_promise(promise);
+                        }
+                        // do not pass on these "internal logs" to caller
+                        None
+                    } else {
+                        // The exit precompiles do produce externally consumable logs in
+                        // addition to the promises. The external logs have a non-empty
+                        // `topics` field.
+                        Some(log.into())
                     }
-                    // do not pass on these "internal logs" to caller
-                    None
                 } else {
                     Some(log.into())
                 }

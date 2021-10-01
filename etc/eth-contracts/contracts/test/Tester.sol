@@ -39,4 +39,25 @@ contract Tester {
         this.tryWithdrawAndAvoidFail(toNear);
         this.withdraw(toNear);
     }
+
+    function withdrawEthToNear(bytes memory recipient) external payable {
+        bytes memory input = abi.encodePacked("\x00", recipient);
+        uint input_size = 1 + recipient.length;
+        uint256 amount = msg.value;
+
+        assembly {
+            let res := call(gas(), 0xe9217bc70b7ed1f598ddd3199e80b093fa71124f, amount, add(input, 32), input_size, 0, 32)
+        }
+    }
+
+    function withdrawEthToEthereum(address recipient) external payable {
+        bytes20 recipient_b = bytes20(recipient);
+        bytes memory input = abi.encodePacked("\x00", recipient_b);
+        uint input_size = 1 + 20;
+        uint256 amount = msg.value;
+
+        assembly {
+            let res := call(gas(), 0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab, amount, add(input, 32), input_size, 0, 32)
+        }
+    }
 }
