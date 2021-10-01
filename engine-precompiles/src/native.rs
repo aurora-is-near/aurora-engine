@@ -38,13 +38,13 @@ pub mod events {
 
     /// Derived from event signature (see tests::test_exit_signatures)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
-        0x9911ed49bdd24e0d6947f8ec7fd769b5,
-        0x180bfa870111bab3ba2f68e9691df397,
+        0x5a91b8bc9c1981673db8fb226dbd8fcd,
+        0xd0c23f45cd28abb31403a5392f6dd0c7,
     );
     /// Derived from event signature (see tests::test_exit_signatures)
     pub const EXIT_TO_ETH_SIGNATURE: H256 = crate::make_h256(
-        0xb3d4ed1e141441b1b7f65a734e7477f3,
-        0x22aee02cc2a29017e53e0c1b5aa9e965,
+        0xd046c2bb01a5622bc4b9696332391d87,
+        0x491373762eeac0831c48400e2d5a5f07,
     );
 
     /// The exit precompile events have an `erc20_address` field to indicate
@@ -53,8 +53,18 @@ pub mod events {
     /// used for this purpose.
     pub const ETH_ADDRESS: Address = Address([0; 20]);
 
-    /// ExitToNear(Address indexed erc20_address, string indexed dest, uint amount)
+    /// ExitToNear(
+    ///    Address indexed sender,
+    ///    Address indexed erc20_address,
+    ///    string indexed dest,
+    ///    uint amount
+    /// )
+    /// Note: in the ERC-20 exit case `sender` == `erc20_address` because it is
+    /// the ERC-20 contract which calls the exit precompile. However in the case
+    /// of ETH exit the sender will give the true sender (and the `erc20_address`
+    /// will not be meaningful because ETH is not an ERC-20 token).
     pub struct ExitToNear {
+        pub sender: Address,
         pub erc20_address: Address,
         pub dest: String,
         pub amount: U256,
@@ -65,6 +75,7 @@ pub mod events {
             let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
             let topics = vec![
                 EXIT_TO_NEAR_SIGNATURE,
+                encode_address(self.sender),
                 encode_address(self.erc20_address),
                 aurora_engine_sdk::keccak(&ethabi::encode(&[ethabi::Token::String(self.dest)])),
             ];
@@ -73,8 +84,18 @@ pub mod events {
         }
     }
 
-    /// ExitToEth(Address indexed erc20_address, address indexed dest, uint amount)
+    /// ExitToEth(
+    ///    Address indexed sender,
+    ///    Address indexed erc20_address,
+    ///    string indexed dest,
+    ///    uint amount
+    /// )
+    /// Note: in the ERC-20 exit case `sender` == `erc20_address` because it is
+    /// the ERC-20 contract which calls the exit precompile. However in the case
+    /// of ETH exit the sender will give the true sender (and the `erc20_address`
+    /// will not be meaningful because ETH is not an ERC-20 token).
     pub struct ExitToEth {
+        pub sender: Address,
         pub erc20_address: Address,
         pub dest: Address,
         pub amount: U256,
@@ -85,6 +106,7 @@ pub mod events {
             let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
             let topics = vec![
                 EXIT_TO_ETH_SIGNATURE,
+                encode_address(self.sender),
                 encode_address(self.erc20_address),
                 encode_address(self.dest),
             ];
@@ -103,6 +125,11 @@ pub mod events {
         ethabi::Event {
             name: "ExitToNear".to_string(),
             inputs: vec![
+                ethabi::EventParam {
+                    name: "sender".to_string(),
+                    kind: ethabi::ParamType::Address,
+                    indexed: true,
+                },
                 ethabi::EventParam {
                     name: "erc20_address".to_string(),
                     kind: ethabi::ParamType::Address,
@@ -127,6 +154,11 @@ pub mod events {
         ethabi::Event {
             name: "ExitToEth".to_string(),
             inputs: vec![
+                ethabi::EventParam {
+                    name: "sender".to_string(),
+                    kind: ethabi::ParamType::Address,
+                    indexed: true,
+                },
                 ethabi::EventParam {
                     name: "erc20_address".to_string(),
                     kind: ethabi::ParamType::Address,
@@ -233,6 +265,7 @@ impl Precompile for ExitToNear {
                             context.apparent_value.as_u128()
                         ),
                         events::ExitToNear {
+                            sender: context.caller,
                             erc20_address: events::ETH_ADDRESS,
                             dest: dest_account,
                             amount: context.apparent_value,
@@ -277,6 +310,7 @@ impl Precompile for ExitToNear {
                             amount.as_u128()
                         ),
                         events::ExitToNear {
+                            sender: erc20_address,
                             erc20_address,
                             dest: receiver_account_id,
                             amount,
@@ -397,6 +431,7 @@ impl Precompile for ExitToEthereum {
                     .try_to_vec()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
                     events::ExitToEth {
+                        sender: context.caller,
                         erc20_address: events::ETH_ADDRESS,
                         dest: H160(recipient_address),
                         amount: context.apparent_value,
@@ -443,6 +478,7 @@ impl Precompile for ExitToEthereum {
                         .as_bytes()
                         .to_vec(),
                         events::ExitToEth {
+                            sender: erc20_address,
                             erc20_address,
                             dest: H160(recipient_address),
                             amount,
