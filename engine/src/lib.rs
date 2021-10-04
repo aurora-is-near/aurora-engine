@@ -84,7 +84,8 @@ mod contract {
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
-    use crate::prelude::{sdk, Address, ToString, TryFrom, TryInto, H160, H256, U256};
+    use crate::prelude::{sdk, vec, Address, ToString, TryFrom, TryInto, H160, H256, U256};
+    use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -204,87 +205,84 @@ mod contract {
     /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
     pub extern "C" fn submit() {
-        use crate::transaction::EthTransaction;
-
         let input = sdk::read_input();
 
-        let signed_transaction = EthTransaction::try_from(input.as_slice()).sdk_unwrap();
+        let transaction: NormalizedEthTransaction = EthTransactionKind::try_from(input.as_slice())
+            .sdk_unwrap()
+            .into();
 
         let state = Engine::get_state().sdk_unwrap();
 
         // Validate the chain ID, if provided inside the signature:
-        if let Some(chain_id) = signed_transaction.chain_id() {
+        if let Some(chain_id) = transaction.chain_id {
             if U256::from(chain_id) != U256::from(state.chain_id) {
                 sdk::panic_utf8(b"ERR_INVALID_CHAIN_ID");
             }
         }
 
         // Retrieve the signer of the transaction:
-        let sender = signed_transaction
-            .sender()
+        let sender = transaction
+            .address
             .sdk_expect("ERR_INVALID_ECDSA_SIGNATURE");
 
         #[cfg(feature = "log")]
         sdk::log(crate::prelude::format!("signer_address {:?}", sender).as_str());
 
-        Engine::check_nonce(&sender, signed_transaction.nonce()).sdk_unwrap();
+        Engine::check_nonce(&sender, &transaction.nonce).sdk_unwrap();
 
         // Check intrinsic gas is covered by transaction gas limit
-        match signed_transaction.intrinsic_gas(crate::engine::CONFIG) {
+        match transaction.intrinsic_gas(crate::engine::CONFIG) {
             None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
             Some(intrinsic_gas) => {
-                if signed_transaction.gas_limit() < intrinsic_gas.into() {
+                if transaction.gas_limit < intrinsic_gas.into() {
                     sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
                 }
             }
         }
 
-        // Pay for gas
-        let gas_price = signed_transaction.gas_price();
-        let prepaid_amount =
-            match Engine::charge_gas_limit(&sender, signed_transaction.gas_limit(), gas_price) {
-                Ok(amount) => amount,
-                // If the account does not have enough funds to cover the gas cost then we still
-                // must increment the nonce to prevent the transaction from being replayed in the
-                // future when the state may have changed such that it could pass.
-                Err(GasPaymentError::OutOfFund) => {
-                    Engine::increment_nonce(&sender);
-                    let result = SubmitResult::new(
-                        TransactionStatus::OutOfFund,
-                        0,
-                        crate::prelude::Vec::new(),
-                    );
-                    sdk::return_output(&result.try_to_vec().unwrap());
-                    return;
-                }
-                // If an overflow happens then the transaction is statically invalid
-                // (i.e. validity does not depend on state), so we do not need to increment the nonce.
-                Err(err) => sdk::panic_utf8(err.as_ref()),
-            };
+        if transaction.max_priority_fee_per_gas > transaction.max_fee_per_gas {
+            sdk::panic_utf8(b"ERR_MAX_PRIORITY_FEE_GREATER")
+        }
 
         // Figure out what kind of a transaction this is, and execute it:
         let mut engine = Engine::new_with_state(state, sender);
-        let (value, gas_limit, data, maybe_receiver, access_list) =
-            signed_transaction.destructure();
-        let gas_limit = gas_limit.sdk_expect(GAS_OVERFLOW);
-        let access_list = access_list
+        let prepaid_amount = match engine.charge_gas(&sender, &transaction) {
+            Ok(gas_result) => gas_result,
+            Err(GasPaymentError::OutOfFund) => {
+                Engine::increment_nonce(&sender);
+                let result = SubmitResult::new(TransactionStatus::OutOfFund, 0, vec![]);
+                sdk::return_output(&result.try_to_vec().unwrap());
+                return;
+            }
+            Err(err) => sdk::panic_utf8(err.as_ref()),
+        };
+        let gas_limit: u64 = transaction.gas_limit.try_into().sdk_expect(GAS_OVERFLOW);
+        let access_list = transaction
+            .access_list
             .into_iter()
             .map(|a| (a.address, a.storage_keys))
             .collect();
-        let result = if let Some(receiver) = maybe_receiver {
+        let result = if let Some(receiver) = transaction.to {
             Engine::call(
                 &mut engine,
                 sender,
                 receiver,
-                value,
-                data,
+                transaction.value,
+                transaction.data,
                 gas_limit,
                 access_list,
             )
             // TODO: charge for storage
         } else {
             // Execute a contract deployment:
-            Engine::deploy_code(&mut engine, sender, value, data, gas_limit, access_list)
+            Engine::deploy_code(
+                &mut engine,
+                sender,
+                transaction.value,
+                transaction.data,
+                gas_limit,
+                access_list,
+            )
             // TODO: charge for storage
         };
 
@@ -294,8 +292,7 @@ mod contract {
             Ok(submit_result) => submit_result.gas_used,
             Err(engine_err) => engine_err.gas_used,
         };
-        Engine::refund_unused_gas(&sender, &relayer, prepaid_amount, gas_used, gas_price)
-            .sdk_unwrap();
+        Engine::refund_unused_gas(&sender, gas_used, prepaid_amount, &relayer).sdk_unwrap();
 
         // return result to user
         result
