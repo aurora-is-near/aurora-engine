@@ -1,5 +1,5 @@
 use crate::prelude::{
-    parameters::FunctionCallArgs, transaction::LegacyEthTransaction, Address, U256,
+    parameters::FunctionCallArgs, transaction::legacy::TransactionLegacy, Address, U256,
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use borsh::BorshSerialize;
@@ -16,7 +16,7 @@ impl SelfDestructFactoryConstructor {
         ))
     }
 
-    pub fn deploy(&self, nonce: u64) -> LegacyEthTransaction {
+    pub fn deploy(&self, nonce: u64) -> TransactionLegacy {
         let data = self
             .0
             .abi
@@ -25,10 +25,10 @@ impl SelfDestructFactoryConstructor {
             .encode_input(self.0.code.clone(), &[])
             .unwrap();
 
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce: nonce.into(),
             gas_price: Default::default(),
-            gas: U256::from(DEFAULT_GAS),
+            gas_limit: U256::from(DEFAULT_GAS),
             to: None,
             value: Default::default(),
             data,
@@ -62,10 +62,10 @@ impl SelfDestructFactory {
             .encode_input(&[])
             .unwrap();
 
-        let tx = LegacyEthTransaction {
+        let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: U256::from(DEFAULT_GAS),
+            gas_limit: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
             value: Default::default(),
             data,
@@ -102,10 +102,10 @@ impl SelfDestruct {
             .encode_input(&[])
             .unwrap();
 
-        let tx = LegacyEthTransaction {
+        let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: U256::from(DEFAULT_GAS),
+            gas_limit: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
             value: Default::default(),
             data,
@@ -130,10 +130,10 @@ impl SelfDestruct {
             .encode_input(&[])
             .unwrap();
 
-        let tx = LegacyEthTransaction {
+        let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: U256::from(DEFAULT_GAS),
+            gas_limit: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
             value: Default::default(),
             data,
@@ -151,10 +151,10 @@ impl SelfDestruct {
             .encode_input(&[])
             .unwrap();
 
-        let tx = LegacyEthTransaction {
+        let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: U256::from(DEFAULT_GAS),
+            gas_limit: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
             value: Default::default(),
             data,

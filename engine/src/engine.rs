@@ -10,15 +10,15 @@ use crate::connector::EthConnectorContract;
 #[cfg(feature = "contract")]
 use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
+use crate::parameters::{NewCallArgs, TransactionStatus};
+use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
+use crate::prelude::precompiles::Precompiles;
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, AccountId, Address,
     BorshDeserialize, BorshSerialize, KeyPrefix, KeyPrefixU8, PromiseCreateArgs, TryFrom, TryInto,
     Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
 };
-
-use crate::parameters::{NewCallArgs, TransactionStatus};
-use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
-use crate::prelude::precompiles::Precompiles;
+use crate::transaction::NormalizedEthTransaction;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -265,7 +265,7 @@ struct StackExecutorParams {
 impl StackExecutorParams {
     fn new(gas_limit: u64) -> Self {
         Self {
-            precompiles: Precompiles::new_istanbul(),
+            precompiles: Precompiles::new_london(),
             gas_limit,
         }
     }
@@ -273,11 +273,18 @@ impl StackExecutorParams {
     fn make_executor<'a>(
         &'a self,
         engine: &'a Engine,
-    ) -> executor::StackExecutor<'static, 'a, executor::MemoryStackState<Engine>> {
+    ) -> executor::StackExecutor<'static, 'a, executor::MemoryStackState<Engine>, Precompiles> {
         let metadata = executor::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::MemoryStackState::new(metadata, engine);
-        executor::StackExecutor::new_with_precompile(state, CONFIG, &self.precompiles.0)
+        executor::StackExecutor::new_with_precompiles(state, CONFIG, &self.precompiles)
     }
+}
+
+#[derive(Debug, Default)]
+pub struct GasPaymentResult {
+    pub prepaid_amount: Wei,
+    pub effective_gas_price: U256,
+    pub priority_fee_per_gas: U256,
 }
 
 /// Engine internal state, mostly configuration.
@@ -313,10 +320,11 @@ impl From<NewCallArgs> for EngineState {
 pub struct Engine {
     state: EngineState,
     origin: Address,
+    gas_price: U256,
 }
 
 // TODO: upgrade to Berlin HF
-pub(crate) const CONFIG: &Config = &Config::istanbul();
+pub(crate) const CONFIG: &Config = &Config::london();
 
 /// Key for storing the state of the engine.
 const STATE_KEY: &[u8; 5] = b"STATE";
@@ -327,7 +335,11 @@ impl Engine {
     }
 
     pub fn new_with_state(state: EngineState, origin: Address) -> Self {
-        Self { state, origin }
+        Self {
+            state,
+            origin,
+            gas_price: U256::zero(),
+        }
     }
 
     /// Saves state into the storage.
@@ -373,54 +385,67 @@ impl Engine {
         sdk::sha256(&data)
     }
 
-    pub fn charge_gas_limit(
+    pub fn charge_gas(
+        &mut self,
         sender: &Address,
-        gas_limit: U256,
-        gas_price: U256,
-    ) -> Result<Wei, GasPaymentError> {
-        // Early exit as performance optimization
-        if gas_price.is_zero() {
-            return Ok(Wei::zero());
+        transaction: &NormalizedEthTransaction,
+    ) -> Result<GasPaymentResult, GasPaymentError> {
+        if transaction.max_fee_per_gas.is_zero() {
+            return Ok(GasPaymentResult::default());
         }
 
-        let payment_for_gas = Wei::new(
-            gas_limit
-                .checked_mul(gas_price)
-                .ok_or(GasPaymentError::EthAmountOverflow)?,
-        );
-        let account_balance = Self::get_balance(sender);
-        let remaining_balance = account_balance
-            .checked_sub(payment_for_gas)
+        let priority_fee_per_gas = transaction
+            .max_priority_fee_per_gas
+            .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
+        let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
+        let gas_limit = transaction.gas_limit;
+        let prepaid_amount = gas_limit
+            .checked_mul(effective_gas_price)
+            .map(Wei::new)
+            .ok_or(GasPaymentError::EthAmountOverflow)?;
+
+        let new_balance = Self::get_balance(sender)
+            .checked_sub(prepaid_amount)
             .ok_or(GasPaymentError::OutOfFund)?;
 
-        Self::set_balance(sender, &remaining_balance);
+        Self::set_balance(sender, &new_balance);
 
-        Ok(payment_for_gas)
+        self.gas_price = effective_gas_price;
+
+        Ok(GasPaymentResult {
+            prepaid_amount,
+            effective_gas_price,
+            priority_fee_per_gas,
+        })
     }
 
     pub fn refund_unused_gas(
         sender: &Address,
+        gas_used: u64,
+        gas_result: GasPaymentResult,
         relayer: &Address,
-        prepaid_amount: Wei,
-        used_gas: u64,
-        gas_price: U256,
     ) -> Result<(), GasPaymentError> {
-        // Early exit as performance optimization
-        if gas_price.is_zero() {
+        if gas_result.effective_gas_price.is_zero() {
             return Ok(());
         }
 
-        let used_amount = Wei::new(
-            gas_price
-                .checked_mul(used_gas.into())
-                .ok_or(GasPaymentError::EthAmountOverflow)?,
-        );
-        // We cannot have used more than the gas_limit
-        debug_assert!(used_amount <= prepaid_amount);
-        let refund_amount = prepaid_amount - used_amount;
+        let gas_to_wei = |price: U256| {
+            U256::from(gas_used)
+                .checked_mul(price)
+                .map(Wei::new)
+                .ok_or(GasPaymentError::EthAmountOverflow)
+        };
 
-        Self::add_balance(sender, refund_amount)?;
-        Self::add_balance(relayer, used_amount)?;
+        let spent_amount = gas_to_wei(gas_result.effective_gas_price)?;
+        let reward_amount = gas_to_wei(gas_result.priority_fee_per_gas)?;
+
+        let refund = gas_result
+            .prepaid_amount
+            .checked_sub(spent_amount)
+            .ok_or(GasPaymentError::EthAmountOverflow)?;
+
+        Self::add_balance(sender, refund)?;
+        Self::add_balance(relayer, reward_amount)?;
 
         Ok(())
     }
@@ -906,12 +931,9 @@ impl Engine {
 }
 
 impl evm::backend::Backend for Engine {
-    /// Returns the gas price.
-    ///
-    /// This is currently zero, but may be changed in the future. This is mainly
-    /// because there already is another cost for transactions.
+    /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
-        U256::zero()
+        self.gas_price
     }
 
     /// Returns the origin address that created the contract.
@@ -990,6 +1012,16 @@ impl evm::backend::Backend for Engine {
     /// See: https://doc.aurora.dev/develop/compat/evm#gaslimit
     fn block_gas_limit(&self) -> U256 {
         U256::max_value()
+    }
+
+    /// Returns the current base fee for the current block.
+    ///
+    /// Currently, this returns 0 as there is no concept of a base fee at this
+    /// time but this may change in the future.
+    ///
+    /// TODO: doc.aurora.dev link
+    fn block_base_fee_per_gas(&self) -> U256 {
+        U256::zero()
     }
 
     /// Returns the states chain ID.

@@ -1,4 +1,4 @@
-use crate::prelude::{transaction::LegacyEthTransaction, Address, U256};
+use crate::prelude::{transaction::legacy::TransactionLegacy, Address, U256};
 use near_sdk::serde_json;
 use serde::Deserialize;
 use std::fs;
@@ -74,21 +74,21 @@ impl ContractConstructor {
         }
     }
 
-    pub fn deploy_without_args(&self, nonce: U256) -> LegacyEthTransaction {
+    pub fn deploy_without_args(&self, nonce: U256) -> TransactionLegacy {
         self.deploy_with_args(nonce, &[])
     }
 
-    pub fn deploy_with_args(&self, nonce: U256, args: &[ethabi::Token]) -> LegacyEthTransaction {
+    pub fn deploy_with_args(&self, nonce: U256, args: &[ethabi::Token]) -> TransactionLegacy {
         let data = self
             .abi
             .constructor()
             .unwrap()
             .encode_input(self.code.clone(), args)
             .unwrap();
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce,
             gas_price: Default::default(),
-            gas: u64::MAX.into(),
+            gas_limit: u64::MAX.into(),
             to: None,
             value: Default::default(),
             data,
@@ -97,7 +97,7 @@ impl ContractConstructor {
 }
 
 impl DeployedContract {
-    pub fn call_method_without_args(&self, method_name: &str, nonce: U256) -> LegacyEthTransaction {
+    pub fn call_method_without_args(&self, method_name: &str, nonce: U256) -> TransactionLegacy {
         self.call_method_with_args(method_name, &[], nonce)
     }
 
@@ -106,17 +106,17 @@ impl DeployedContract {
         method_name: &str,
         args: &[ethabi::Token],
         nonce: U256,
-    ) -> LegacyEthTransaction {
+    ) -> TransactionLegacy {
         let data = self
             .abi
             .function(method_name)
             .unwrap()
             .encode_input(args)
             .unwrap();
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce,
             gas_price: Default::default(),
-            gas: u64::MAX.into(),
+            gas_limit: u64::MAX.into(),
             to: Some(self.address),
             value: Default::default(),
             data,

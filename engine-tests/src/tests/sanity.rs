@@ -111,10 +111,10 @@ fn test_timestamp() {
     let nonce = signer.use_nonce();
     let contract = runner.deploy_contract(
         &signer.secret_key,
-        |c| crate::prelude::transaction::LegacyEthTransaction {
+        |c| crate::prelude::transaction::legacy::TransactionLegacy {
             nonce: nonce.into(),
             gas_price: Default::default(),
-            gas: u64::MAX.into(),
+            gas_limit: u64::MAX.into(),
             to: None,
             value: Default::default(),
             data: c.code.clone(),
@@ -162,10 +162,10 @@ fn test_override_state() {
     // deploy contract
     let result = runner
         .submit_with_signer(&mut account1, |nonce| {
-            crate::prelude::transaction::LegacyEthTransaction {
+            crate::prelude::transaction::legacy::TransactionLegacy {
                 nonce,
                 gas_price: Default::default(),
-                gas: u64::MAX.into(),
+                gas_limit: u64::MAX.into(),
                 to: None,
                 value: Default::default(),
                 data: contract.code.clone(),
@@ -223,8 +223,8 @@ fn test_num_wasm_functions() {
     let module_info = artifact.info();
     let num_functions = module_info.functions.len();
     assert!(
-        num_functions <= 1420,
-        "{} is not less than 1420",
+        num_functions <= 1430,
+        "{} is not less than 1430",
         num_functions
     );
 }
@@ -344,7 +344,7 @@ fn test_eth_transfer_not_enough_gas() {
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
         let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
-        tx.gas = 10_000.into(); // this is not enough gas
+        tx.gas_limit = 10_000.into(); // this is not enough gas
         tx
     };
 
@@ -380,7 +380,7 @@ fn test_transfer_charging_gas_success() {
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
         let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
-        tx.gas = 30_000.into();
+        tx.gas_limit = 30_000.into();
         tx.gas_price = GAS_PRICE.into();
         tx
     };
@@ -435,7 +435,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
         let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
         // With this gas limit and price the account does not
         // have enough balance to cover the gas cost
-        tx.gas = 3_000_000.into();
+        tx.gas_limit = 3_000_000.into();
         tx.gas_price = GAS_PRICE.into();
         tx
     };
@@ -622,7 +622,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
     // Run transaction which will fail (not enough balance to cover gas)
     let nonce = signer.use_nonce();
     let mut tx = test_utils::transfer(Address([1; 20]), TRANSFER_AMOUNT, nonce.into());
-    tx.gas = 3_000_000.into();
+    tx.gas_limit = 3_000_000.into();
     tx.gas_price = GAS_PRICE.into();
     let signed_tx = test_utils::sign_transaction(
         tx,

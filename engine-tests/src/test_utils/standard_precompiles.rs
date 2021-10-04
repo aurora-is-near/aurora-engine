@@ -1,4 +1,4 @@
-use crate::prelude::{transaction::LegacyEthTransaction, U256};
+use crate::prelude::{transaction::legacy::TransactionLegacy, U256};
 use crate::test_utils::solidity;
 use std::path::{Path, PathBuf};
 
@@ -22,7 +22,7 @@ impl PrecompilesConstructor {
         ))
     }
 
-    pub fn deploy(&self, nonce: U256) -> LegacyEthTransaction {
+    pub fn deploy(&self, nonce: U256) -> TransactionLegacy {
         self.0.deploy_without_args(nonce)
     }
 
@@ -36,7 +36,7 @@ impl PrecompilesConstructor {
 }
 
 impl PrecompilesContract {
-    pub fn call_method(&self, method_name: &str, nonce: U256) -> LegacyEthTransaction {
+    pub fn call_method(&self, method_name: &str, nonce: U256) -> TransactionLegacy {
         self.0.call_method_without_args(method_name, nonce)
     }
 
