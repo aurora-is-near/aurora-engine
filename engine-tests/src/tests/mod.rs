@@ -10,3 +10,4 @@ mod sanity;
 mod self_destruct_state;
 mod standard_precompiles;
 mod state_migration;
+pub(crate) mod uniswap;
