@@ -25,7 +25,7 @@ use crate::secp256k1::ECRecover;
 use evm::backend::Log;
 use evm::{Context, ExitError, ExitSucceed};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PrecompileOutput {
     pub cost: u64,
     pub output: prelude::Vec<u8>,
@@ -37,16 +37,6 @@ impl PrecompileOutput {
         Self {
             cost,
             output,
-            logs: prelude::Vec::new(),
-        }
-    }
-}
-
-impl Default for PrecompileOutput {
-    fn default() -> Self {
-        PrecompileOutput {
-            cost: 0,
-            output: prelude::Vec::new(),
             logs: prelude::Vec::new(),
         }
     }
