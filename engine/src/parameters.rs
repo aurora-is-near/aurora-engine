@@ -40,6 +40,7 @@ pub struct MetaCallArgs {
 /// Borsh-encoded log for use in a `SubmitResult`.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct ResultLog {
+    pub address: RawAddress,
     pub topics: Vec<RawU256>,
     pub data: Vec<u8>,
 }
@@ -52,6 +53,7 @@ impl From<Log> for ResultLog {
             .map(|topic| topic.0)
             .collect::<Vec<_>>();
         ResultLog {
+            address: log.address.0,
             topics,
             data: log.data,
         }
@@ -103,9 +105,28 @@ impl AsRef<[u8]> for TransactionStatus {
 /// and `deploy_with_input` methods.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct SubmitResult {
+    version: u8,
     pub status: TransactionStatus,
     pub gas_used: u64,
     pub logs: Vec<ResultLog>,
+}
+
+impl SubmitResult {
+    /// Must be incremented when making breaking changes to the SubmitResult ABI.
+    /// The current value of 7 is chosen because previously a `TransactionStatus` object
+    /// was first in the serialization, which is an enum with less than 7 variants.
+    /// Therefore, no previous `SubmitResult` would have began with a leading 7 byte,
+    /// and this can be used to distinguish the new ABI (with version byte) from the old.
+    const VERSION: u8 = 7;
+
+    pub fn new(status: TransactionStatus, gas_used: u64, logs: Vec<ResultLog>) -> Self {
+        Self {
+            version: Self::VERSION,
+            status,
+            gas_used,
+            logs,
+        }
+    }
 }
 
 /// Borsh-encoded parameters for the `call` function.

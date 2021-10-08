@@ -580,11 +580,7 @@ impl Engine {
 
         self.apply(values, Vec::<Log>::new(), true);
 
-        Ok(SubmitResult {
-            status,
-            gas_used: used_gas,
-            logs,
-        })
+        Ok(SubmitResult::new(status, used_gas, logs))
     }
 
     pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<SubmitResult> {
@@ -623,11 +619,7 @@ impl Engine {
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
 
-        Ok(SubmitResult {
-            status,
-            gas_used: used_gas,
-            logs,
-        })
+        Ok(SubmitResult::new(status, used_gas, logs))
     }
 
     pub fn increment_nonce(address: &Address) {

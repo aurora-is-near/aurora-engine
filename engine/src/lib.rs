@@ -246,11 +246,11 @@ mod contract {
                 // future when the state may have changed such that it could pass.
                 Err(GasPaymentError::OutOfFund) => {
                     Engine::increment_nonce(&sender);
-                    let result = SubmitResult {
-                        status: TransactionStatus::OutOfFund,
-                        gas_used: 0,
-                        logs: crate::prelude::Vec::new(),
-                    };
+                    let result = SubmitResult::new(
+                        TransactionStatus::OutOfFund,
+                        0,
+                        crate::prelude::Vec::new(),
+                    );
                     sdk::return_output(&result.try_to_vec().unwrap());
                     return;
                 }
