@@ -57,6 +57,9 @@ jobs:
         with:
           name: ${{ matrix.net }}-breakpoint
           path: .evm-bully/workdir/*.tar.gz
+      - name: Clean workdir
+        if: ${{ always() }}
+        run: rm -rf .evm-bully/workdir
 
 env:
   CARGO_TERM_COLOR: always
