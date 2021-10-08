@@ -39,7 +39,7 @@ ARTIFACT=$(ls | grep tar | grep $TESTNET | head -1)
 EXPECTED_ARTIFACT=$(jq -r --arg testnet "${TESTNET}" '.progress[$testnet]' $STATE_PATH)
 
 echo "Found output artifact: $ARTIFACT"
-echo "Expected: $ARTIFACT"
+echo "Expected: $EXPECTED_ARTIFACT"
 
 
 RED='\033[0;31m'
