@@ -50,7 +50,7 @@ jobs:
       - name: Make nearcore
         run: ./.evm-bully/scripts/make_nearcore.sh
       - name: Run evm-bully
-        run: ./.evm-bully/scripts/run_bully.sh
+        run: ./.evm-bully/scripts/run_bully.sh ${{ matrix.net }}
       - name: Upload breakpoint archive
         uses: actions/upload-artifact@v2
         with:
