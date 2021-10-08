@@ -18,6 +18,7 @@ if [[ ! -f $NEARCORE_BINARY_PATH ]] && [[ $DOWNLOAD_NEARCORE = true ]]; then
         https://s3.us-west-1.amazonaws.com/build.nearprotocol.com/nearcore/$(uname)/master/${NEARCORE_VERSION}/neard \
         -o $NEARCORE_BINARY_PATH \
         || true
+    chmod +x $NEARCORE_BINARY_PATH || true
 fi
 
 if [[ ! -f $NEARCORE_BINARY_PATH ]]; then
