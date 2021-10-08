@@ -52,6 +52,7 @@ jobs:
       - name: Run evm-bully
         run: ./.evm-bully/scripts/run_bully.sh ${{ matrix.net }}
       - name: Upload breakpoint archive
+        if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.net }}-breakpoint
