@@ -1,0 +1,43 @@
+#!/bin/bash -e
+
+# Absolute path to existing aurora-cli repo.
+# If not set, this pipeline will clone aurora-cli to ./workdir.
+#
+# AURORA_CLI_REPO_PATH=
+
+# If uncommented, aurora-cli repo will not be checkouted.
+# Can be useful for debugging aurora-cli itself.
+# Using it without AURORA_CLI_REPO_PATH set above will
+# break the pipeline.
+#
+# AURORA_CLI_PREVENT_CHECKOUT=true
+
+# Absolute path to aurora-engine contract.
+# If not set, this pipeline will build it from source.
+#
+# AURORA_ENGINE_BINARY_PATH=
+
+# Absolute path to evm-bully executable binary.
+# If not set, this pipeline will build evm-bully from source.
+#
+# EVM_BULLY_BINARY_PATH=
+
+# Absolute path to existing evm-bully repo.
+# If not set, this pipeline will clone evm-bully to ./workdir.
+#
+# EVM_BULLY_REPO_PATH=
+
+# If uncommented, pipeline will try to find/build
+# nearcore executable binary locally.
+#
+# DOWNLOAD_NEARCORE=false
+
+# Absolute path to nearcore executable binary.
+# If not set, this pipeline will build nearcore from source.
+#
+# NEARCORE_BINARY_PATH=
+
+# Absolute path to existing nearcore repo.
+# If not set, this pipeline will clone nearcore to ./workdir.
+#
+# NEARCORE_REPO_PATH=
