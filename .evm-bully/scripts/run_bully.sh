@@ -63,13 +63,13 @@ else
 
     BULLY_PROGRESS=0
     if [[ $BLOCK_NUM -gt $EXPECTED_BLOCK_NUM ]]; then
-        BULLY_PROGRESS = 1
+        BULLY_PROGRESS=1
     elif [[ $BLOCK_NUM -lt $EXPECTED_BLOCK_NUM ]]; then
-        BULLY_PROGRESS = -1
+        BULLY_PROGRESS=-1
     elif [[ $TX_NUM -gt $EXPECTED_TX_NUM ]]; then
-        BULLY_PROGRESS = 1
+        BULLY_PROGRESS=1
     elif [[ $TX_NUM -lt $EXPECTED_TX_NUM ]]; then
-        BULLY_PROGRESS = -1
+        BULLY_PROGRESS=-1
     fi
 
     if [[ $BULLY_PROGRESS = -1 ]]; then
