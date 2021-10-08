@@ -1,9 +1,10 @@
 ---
 on:
-  workflow_run:
-    workflows: ["Tests"]
-    types:
-      - completed
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
 
 name: Bully-testing
 jobs:
@@ -35,6 +36,7 @@ jobs:
       matrix:
         net: [goerli, ropsten, rinkeby]
       fail-fast: false
+      max-parallel: 1
     name: Bully-test with ${{ matrix.net }}
     runs-on: self-hosted
     steps:
