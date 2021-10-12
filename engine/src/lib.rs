@@ -413,6 +413,15 @@ mod contract {
     }
 
     #[no_mangle]
+    pub extern "C" fn get_block_hash() {
+        let block_height = sdk::read_input_borsh().sdk_unwrap();
+        let account_id = sdk::current_account_id();
+        let chain_id = Engine::get_state().map(|state| state.chain_id).sdk_unwrap();
+        let block_hash = Engine::compute_block_hash(chain_id, block_height, &account_id);
+        sdk::return_output(block_hash.as_bytes())
+    }
+
+    #[no_mangle]
     pub extern "C" fn get_code() {
         let address = sdk::read_input_arr20().sdk_unwrap();
         let code = Engine::get_code(&Address(address));

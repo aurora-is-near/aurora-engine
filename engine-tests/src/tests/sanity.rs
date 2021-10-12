@@ -496,6 +496,28 @@ fn test_block_hash() {
 }
 
 #[test]
+fn test_block_hash_api() {
+    let mut runner = test_utils::deploy_evm();
+
+    let block_height: u64 = 10;
+    let (maybe_outcome, maybe_error) = runner.call(
+        "get_block_hash",
+        "any.near",
+        block_height.try_to_vec().unwrap(),
+    );
+    if let Some(error) = maybe_error {
+        panic!("Call failed: {:?}", error);
+    }
+    let outcome = maybe_outcome.unwrap();
+    let block_hash = outcome.return_data.as_value().unwrap();
+
+    assert_eq!(
+        hex::encode(&block_hash).as_str(),
+        "c4a46f076b64877cbd8c5dbfd7bfbbea21a5653b79e3b6d06b6dfb5c88f1c384",
+    );
+}
+
+#[test]
 fn test_block_hash_contract() {
     let (mut runner, mut source_account, _) = initialize_transfer();
     let test_constructor = test_utils::solidity::ContractConstructor::compile_from_source(
