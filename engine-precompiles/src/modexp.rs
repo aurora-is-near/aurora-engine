@@ -167,7 +167,14 @@ fn parse_bytes<T, F: FnOnce(&[u8]) -> T>(input: &[u8], start: usize, size: usize
     }
     let end = start + size;
     if end > len {
-        f(&input[start..len])
+        // Pad on the right with zeros if input is too short
+        let bytes: Vec<u8> = input[start..]
+            .iter()
+            .copied()
+            .chain(core::iter::repeat(0u8))
+            .take(size)
+            .collect();
+        f(&bytes)
     } else {
         f(&input[start..end])
     }
@@ -210,7 +217,18 @@ mod tests {
         name: &'static str,
     }
 
-    const TESTS: [Test; 17] = [
+    const TESTS: [Test; 18] = [
+        Test {
+            input: "\
+            0000000000000000000000000000000000000000000000000000000000000001\
+            0000000000000000000000000000000000000000000000000000000000000020\
+            0000000000000000000000000000000000000000000000000000000000000020\
+            03\
+            fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e\
+            ffffffffffffffffffffffffffffffffffffffffff2f",
+            expected: "162ead82cadefaeaf6e9283248fdf2f2845f6396f6f17c4d5a39f820b6f6b5f9",
+            name: "eth_tests_create2callPrecompiles_test0_berlin",
+        },
         Test {
             input: "\
             0000000000000000000000000000000000000000000000000000000000000001\
@@ -345,14 +363,14 @@ mod tests {
         }
     ];
 
-    const BYZANTIUM_GAS: [u64; 17] = [
-        13_056, 13_056, 204, 204, 3_276, 665, 665, 10_649, 1_894, 1_894, 30_310, 5_580, 5_580,
-        89_292, 17_868, 17_868, 285_900,
+    const BYZANTIUM_GAS: [u64; 18] = [
+        13_056, 13_056, 13_056, 204, 204, 3_276, 665, 665, 10_649, 1_894, 1_894, 30_310, 5_580,
+        5_580, 89_292, 17_868, 17_868, 285_900,
     ];
 
-    const BERLIN_GAS: [u64; 17] = [
-        1_360, 1_360, 200, 200, 341, 200, 200, 1_365, 341, 341, 5_461, 1_365, 1_365, 21_845, 5_461,
-        5_461, 87_381,
+    const BERLIN_GAS: [u64; 18] = [
+        1_360, 1_360, 1_360, 200, 200, 341, 200, 200, 1_365, 341, 341, 5_461, 1_365, 1_365, 21_845,
+        5_461, 5_461, 87_381,
     ];
 
     #[test]
