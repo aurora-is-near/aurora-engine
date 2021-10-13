@@ -11,6 +11,13 @@ pub const DEST_ADDRESS: Address =
     aurora_engine_precompiles::make_address(0xe0f5206b, 0xbd039e7b0592d8918820024e2a7437b9);
 
 impl TesterConstructor {
+    #[cfg(feature = "error_refund")]
+    pub fn load() -> Self {
+        Self(solidity::ContractConstructor::compile_from_extended_json(
+            "../etc/eth-contracts/artifacts/contracts/test/TesterV2.sol/TesterV2.json",
+        ))
+    }
+    #[cfg(not(feature = "error_refund"))]
     pub fn load() -> Self {
         Self(solidity::ContractConstructor::compile_from_extended_json(
             "../etc/eth-contracts/artifacts/contracts/test/Tester.sol/Tester.json",

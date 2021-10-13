@@ -43,3 +43,4 @@ rand = "0.7.3"
 [features]
 contract = []
 log = []
+error_refund = []

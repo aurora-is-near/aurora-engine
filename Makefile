@@ -9,6 +9,10 @@ ifeq ($(evm-bully),yes)
   ADDITIONAL_FEATURES := $(ADDITIONAL_FEATURES),evm_bully
 endif
 
+ifeq ($(error-refund),yes)
+  ADDITIONAL_FEATURES := $(ADDITIONAL_FEATURES),error_refund
+endif
+
 # TODO: This isn't updating the `FEATURES` for some reason. Disabled to prevent accidental compilation of the same binary.
 # all: mainnet testnet betanet
 # all-debug: mainnet-debug testnet-debug betanet-debug
@@ -54,21 +58,21 @@ betanet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 # test builds depend on release since `tests/test_upgrade.rs` includes `mainnet-release.wasm`
 
 test-mainnet: mainnet-test-build
-	$(CARGO) test --features mainnet-test
+	$(CARGO) test --features mainnet-test$(ADDITIONAL_FEATURES)
 mainnet-test-build: FEATURES=mainnet,integration-test,meta-call
 mainnet-test-build: mainnet-test.wasm
 mainnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
 test-testnet: testnet-test-build
-	$(CARGO) test --features testnet-test
+	$(CARGO) test --features testnet-test$(ADDITIONAL_FEATURES)
 testnet-test-build: FEATURES=testnet,integration-test,meta-call
 testnet-test-build: testnet-test.wasm
 testnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
 test-betanet: betanet-test-build
-	$(CARGO) test --features betanet-test
+	$(CARGO) test --features betanet-test$(ADDITIONAL_FEATURES)
 betanet-test-build: FEATURES=betanet,integration-test,meta-call
 betanet-test-build: betanet-test.wasm
 betanet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
