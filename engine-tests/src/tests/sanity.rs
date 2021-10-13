@@ -223,8 +223,8 @@ fn test_num_wasm_functions() {
     let module_info = artifact.info();
     let num_functions = module_info.functions.len();
     assert!(
-        num_functions <= 1430,
-        "{} is not less than 1430",
+        num_functions <= 1440,
+        "{} is not less than 1440",
         num_functions
     );
 }

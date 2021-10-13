@@ -69,8 +69,8 @@ pub fn deploy_evm() -> AuroraAccount {
 }
 
 pub struct AuroraAccount {
-    user: UserAccount,
-    contract: UserAccount,
+    pub user: UserAccount,
+    pub contract: UserAccount,
 }
 
 impl AuroraAccount {
