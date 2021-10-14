@@ -2,7 +2,7 @@
     "version-lock": {
         "aurora-cli": "7f7c2d29c5114db2b6530a6c0fa09b2068f217df",
         "nearcore": "efd0f237a3a8bbaac3e64ed3b8e378e5bc40660d",
-        "evm-bully": "f478cd90e616d4e295105d0f41b0fe320ae92cb9"
+        "evm-bully": "142cb261568bacd6cd2d8c66813124577f2c9a79"
     },
     "progress": {
         "goerli": "goerli-block-5644-tx-0.tar.gz",
