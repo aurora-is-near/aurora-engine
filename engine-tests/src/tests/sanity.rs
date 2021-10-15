@@ -42,6 +42,42 @@ fn test_deploy_contract() {
 }
 
 #[test]
+fn test_deploy_largest_contract() {
+    // Check to see we can deploy the largest allowed contract size within the
+    // NEAR gas limit of 200 Tgas.
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let len = evm::Config::berlin().create_contract_limit.unwrap();
+    let code: Vec<u8> = {
+        let mut rng = rand::thread_rng();
+        let mut buf = vec![0u8; len];
+        rng.fill_bytes(&mut buf);
+        buf
+    };
+
+    // Deploy that code
+    let (result, profile) = runner
+        .submit_with_signer_profiled(&mut signer, |nonce| {
+            test_utils::create_deploy_transaction(code.clone(), nonce)
+        })
+        .unwrap();
+
+    // At least 5 million EVM gas
+    assert!(
+        result.gas_used >= 5_000_000,
+        "{:?} not greater than 5 million",
+        result.gas_used,
+    );
+
+    // Less than 45 NEAR Tgas
+    assert!(
+        profile.all_gas() <= 45_000_000_000_000,
+        "{:?} not less than 45 Tgas",
+        profile.all_gas(),
+    );
+}
+
+#[test]
 fn test_timestamp() {
     let (mut runner, mut signer, _) = initialize_transfer();
 

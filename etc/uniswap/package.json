@@ -1,0 +1,9 @@
+{
+  "name": "uniswap-sources",
+  "version": "0.1.0",
+  "description": "Depends on uniswap packages we need",
+  "dependencies": {
+    "@uniswap/v3-core": "^1.0.0",
+    "@uniswap/v3-periphery": "^1.0.0"
+  }
+}

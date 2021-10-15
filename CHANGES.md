@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2021-10-13
+
+### Changes
+
+- Add EVM events for exit precompiles by [@birchmd]
+
 ## [1.6.4] - 2021-09-29
 
 ### Changes
