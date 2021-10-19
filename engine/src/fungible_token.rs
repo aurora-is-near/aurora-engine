@@ -8,12 +8,13 @@ use crate::prelude::{
     PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryFrom, TryInto, Vec,
     Wei, U256,
 };
+use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
-pub struct FungibleToken {
+pub struct FungibleToken<I: IO + Default> {
     /// Total ETH supply on Near (nETH as NEP-141 token)
     pub total_eth_supply_on_near: Balance,
 
@@ -22,6 +23,9 @@ pub struct FungibleToken {
 
     /// The storage size in bytes for one account.
     pub account_storage_usage: StorageUsage,
+
+    #[borsh_skip]
+    io: I,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
@@ -85,7 +89,7 @@ impl From<FungibleTokenMetadata> for JsonValue {
     }
 }
 
-impl FungibleToken {
+impl<I: IO + Copy + Default> FungibleToken<I> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -100,7 +104,9 @@ impl FungibleToken {
 
     /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
-        Engine::get_balance(&Address(address)).raw().as_u128()
+        Engine::get_balance(&self.io, &Address(address))
+            .raw()
+            .as_u128()
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
@@ -121,7 +127,11 @@ impl FungibleToken {
     pub fn internal_deposit_eth_to_aurora(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_add(amount) {
-            Engine::set_balance(&Address(address), &Wei::new(U256::from(new_balance)));
+            Engine::set_balance(
+                &mut self.io,
+                &Address(address),
+                &Wei::new(U256::from(new_balance)),
+            );
             self.total_eth_supply_on_aurora = self
                 .total_eth_supply_on_aurora
                 .checked_add(amount)
@@ -149,7 +159,11 @@ impl FungibleToken {
     pub fn internal_withdraw_eth_from_aurora(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_sub(amount) {
-            Engine::set_balance(&Address(address), &Wei::new(U256::from(new_balance)));
+            Engine::set_balance(
+                &mut self.io,
+                &Address(address),
+                &Wei::new(U256::from(new_balance)),
+            );
             self.total_eth_supply_on_aurora = self
                 .total_eth_supply_on_aurora
                 .checked_sub(amount)
@@ -448,34 +462,39 @@ impl FungibleToken {
 
     /// Insert account.
     /// Calculate total unique accounts
-    pub fn accounts_insert(&self, account_id: &AccountId, amount: Balance) {
+    pub fn accounts_insert(&mut self, account_id: &AccountId, amount: Balance) {
         if !self.accounts_contains_key(account_id) {
             let key = Self::get_statistic_key();
-            let accounts_counter = sdk::read_u64(&key)
+            let accounts_counter = self
+                .io
+                .read_u64(&key)
                 .unwrap_or(0)
                 .checked_add(1)
                 .expect("ERR_ACCOUNTS_COUNTER_OVERFLOW");
-            sdk::write_storage(&key, &accounts_counter.to_le_bytes());
+            self.io.write_storage(&key, &accounts_counter.to_le_bytes());
         }
-        sdk::save_contract(&Self::account_to_key(account_id), &amount);
+        self.io
+            .write_borsh(&Self::account_to_key(account_id), &amount);
     }
 
     /// Get accounts counter for statistics
     /// It represents total unique accounts.
     pub fn get_accounts_counter(&self) -> u64 {
-        sdk::read_u64(&Self::get_statistic_key()).unwrap_or(0)
+        self.io.read_u64(&Self::get_statistic_key()).unwrap_or(0)
     }
 
     fn accounts_contains_key(&self, account_id: &AccountId) -> bool {
-        sdk::storage_has_key(&Self::account_to_key(account_id))
+        self.io.storage_has_key(&Self::account_to_key(account_id))
     }
 
-    fn accounts_remove(&self, account_id: &AccountId) {
-        sdk::remove_storage(&Self::account_to_key(account_id))
+    fn accounts_remove(&mut self, account_id: &AccountId) {
+        self.io.remove_storage(&Self::account_to_key(account_id));
     }
 
     pub fn accounts_get(&self, account_id: &AccountId) -> Option<Vec<u8>> {
-        sdk::read_storage(&Self::account_to_key(account_id))
+        self.io
+            .read_storage(&Self::account_to_key(account_id))
+            .map(|s| s.to_vec())
     }
 
     /// Fungible token key

@@ -201,9 +201,12 @@ impl ExitToNear {
 
 #[cfg(feature = "contract")]
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
+    use sdk::io::{StorageIntermediate, IO};
     AccountId::try_from(
-        &sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
-            .expect(ERR_TARGET_TOKEN_NOT_FOUND)[..],
+        sdk::near_runtime::Runtime
+            .read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
+            .map(|s| s.to_vec())
+            .expect(ERR_TARGET_TOKEN_NOT_FOUND),
     )
     .unwrap()
 }
