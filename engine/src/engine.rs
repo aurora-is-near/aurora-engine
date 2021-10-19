@@ -1028,10 +1028,6 @@ impl ApplyBackend for Engine {
                 } => {
                     let generation = Self::get_generation(&address);
                     Engine::set_nonce(&address, &basic.nonce);
-
-                    // Apply changes for eth-connector
-                    EthConnectorContract::get_instance()
-                        .internal_set_eth_balance(&address, &basic.balance);
                     Engine::set_balance(&address, &Wei::new(basic.balance));
 
                     if let Some(code) = code {
