@@ -1,5 +1,6 @@
+use crate::io::IO;
+use crate::panic_utf8;
 use crate::prelude::{Address, H256};
-use crate::{panic_utf8, return_output};
 
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
@@ -99,7 +100,7 @@ pub trait SdkProcess<T> {
 impl<T: AsRef<[u8]>, E: AsRef<[u8]>> SdkProcess<T> for Result<T, E> {
     fn sdk_process(self) {
         match self {
-            Ok(r) => return_output(r.as_ref()),
+            Ok(r) => crate::near_runtime::Runtime.return_output(r.as_ref()),
             Err(e) => panic_utf8(e.as_ref()),
         }
     }

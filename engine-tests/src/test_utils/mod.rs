@@ -246,7 +246,7 @@ impl AuroraRunner {
             &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
         );
         let ft_value = {
-            let mut current_ft: FungibleToken = trie
+            let mut current_ft: FungibleToken<aurora_engine_sdk::near_runtime::Runtime> = trie
                 .get(&ft_key)
                 .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
                 .unwrap_or_default();
