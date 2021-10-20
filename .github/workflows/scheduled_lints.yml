@@ -6,7 +6,7 @@ name: Scheduled_Lints
 jobs:
   clippy:
     name: Nightly_Clippy
-    runs-on: self-hosted
+    runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2

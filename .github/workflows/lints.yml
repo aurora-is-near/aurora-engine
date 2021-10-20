@@ -11,7 +11,7 @@ name: Lints
 jobs:
   fmt:
     name: rustfmt
-    runs-on: self-hosted
+    runs-on: [self-hosted, light]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
@@ -19,7 +19,7 @@ jobs:
         run: cargo fmt --all -- --check
   clippy:
     name: Clippy
-    runs-on: self-hosted
+    runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
@@ -31,7 +31,7 @@ jobs:
 
   contracts:
     name: eth-contracts
-    runs-on: self-hosted
+    runs-on: [self-hosted, light]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2

@@ -10,7 +10,7 @@ name: Tests
 jobs:
   test:
     name: Test suite (mainnet, testnet, betanet)
-    runs-on: self-hosted
+    runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
@@ -41,7 +41,7 @@ jobs:
 
   bully-build:
     name: Bully build
-    runs-on: self-hosted
+    runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
