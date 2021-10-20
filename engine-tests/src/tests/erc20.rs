@@ -102,10 +102,15 @@ fn profile_erc20_get_balance() {
         runner.profiled_view_call(test_utils::as_view_call(balance_tx, source_address));
     assert!(result.is_ok());
 
-    // call costs less than 6 Tgas
-    assert!(profile.all_gas() / 1_000_000_000_000 < 6);
+    // call costs less than 4 Tgas
+    test_utils::assert_gas_bound(profile.all_gas(), 4);
     // at least 70% of the cost is spent on wasm computation (as opposed to host functions)
-    assert!((100 * profile.wasm_gas()) / profile.all_gas() > 70);
+    let wasm_fraction = (100 * profile.wasm_gas()) / profile.all_gas();
+    assert!(
+        wasm_fraction > 69,
+        "{}% is not greater than 70%",
+        wasm_fraction
+    );
 }
 
 #[test]

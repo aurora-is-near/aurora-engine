@@ -42,10 +42,10 @@ fn measure_nft_pagination_gas_usage() {
 fn uniswap_benches() {
     let mut c = Criterion::default();
 
-    let mut context = UniswapTestContext::new("uniswap-wasmer0");
+    let mut context = UniswapTestContext::new("uniswap-wasmer2");
     uniswap::uniswap_benchmark(&mut c, &mut context);
 
-    let mut context = UniswapTestContext::new("uniswap-wasmer0-no-gas");
+    let mut context = UniswapTestContext::new("uniswap-wasmer2-no-gas");
     context.no_gas();
     uniswap::uniswap_benchmark(&mut c, &mut context);
 
