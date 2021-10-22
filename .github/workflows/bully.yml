@@ -1,0 +1,68 @@
+---
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+
+name: Bully
+jobs:
+
+  bully-prebuild:
+    name: Prebuild binaries for bully
+    runs-on: [self-hosted, heavy]
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Restore cache (global)
+        run: cache-util restore cargo_git cargo_registry sccache yarn_cache
+      - name: Restore cache (aurora-engine target)
+        run: cache-util restore aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
+      - name: Make aurora-engine
+        run: ./.evm-bully/scripts/make_aurora_engine.sh
+      - name: Make evm-bully
+        run: ./.evm-bully/scripts/make_evm_bully.sh
+      - name: Make nearcore
+        run: ./.evm-bully/scripts/make_nearcore.sh
+      - name: Save cache (global)
+        run: cache-util save cargo_git cargo_registry sccache yarn_cache
+      - name: Save cache (aurora-engine target)
+        run: cache-util msave aurora-engine-target@bully@${{ hashFiles('**/Cargo.lock') }}:target
+
+  bully-test:
+    needs: [bully-prebuild]
+    strategy:
+      matrix:
+        net: [goerli, ropsten, rinkeby]
+      fail-fast: false
+    name: Bully-test with ${{ matrix.net }}
+    runs-on: [self-hosted, heavy]
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Make aurora-cli
+        run: ./.evm-bully/scripts/make_aurora_cli.sh
+      - name: Make aurora-engine
+        run: ./.evm-bully/scripts/make_aurora_engine.sh
+      - name: Make evm-bully
+        run: ./.evm-bully/scripts/make_evm_bully.sh
+      - name: Make nearcore
+        run: ./.evm-bully/scripts/make_nearcore.sh
+      - name: Run evm-bully
+        run: ./.evm-bully/scripts/run_bully.sh ${{ matrix.net }}
+      - name: Upload breakpoint archive
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.net }}-breakpoint
+          path: .evm-bully/workdir/*.tar.gz
+      - name: Clean workdir
+        if: ${{ always() }}
+        run: rm -rf .evm-bully/workdir
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTC_WRAPPER: sccache
+  USE_CACHE_UTIL: 1
