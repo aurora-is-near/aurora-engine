@@ -3,6 +3,7 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
 
+pub mod account_id;
 pub mod parameters;
 pub mod storage;
 pub mod types;
