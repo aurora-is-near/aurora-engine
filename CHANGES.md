@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2021-10-27
+
+### Added
+
+- Public method for computing Aurora blockhash at a given hight by [@birchmd]. ([#303](https://github.com/aurora-is-near/aurora-engine/pull/303))
+
+### Changed
+
+- EVM logs returned in `SubmitResult` include the address the log originates from by [@birchmd]. ([#299](https://github.com/aurora-is-near/aurora-engine/pull/299))
+  - Note: this is a breaking change in the `SubmitResult` binary format.
+
+### Fixed
+
+- Precompile bug fixes by [@birchmd]. ([#305](https://github.com/aurora-is-near/aurora-engine/pull/305), [#306](https://github.com/aurora-is-near/aurora-engine/pull/306))
+- Update to latest `rust-blockchain/evm` version (fixes bug in `JUMPI`) EVM opcode by [@birchmd]. ([#316](https://github.com/aurora-is-near/aurora-engine/pull/316))
+
 ## [1.7.0] - 2021-10-13
 
 ### Changes
@@ -100,7 +116,9 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.4...master
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.0...master
+[2.0.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.7.0...2.0.0
+[1.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.4...1.7.0
 [1.6.4]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.3...1.6.4
 [1.6.3]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.2...1.6.3
 [1.6.2]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.1...1.6.2
