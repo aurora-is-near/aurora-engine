@@ -1239,7 +1239,7 @@ version = "14.1.0"
 source = "git+https://github.com/darwinia-network/ethabi?branch=xavier-no-std#09da0834d95f8b43377ca22d7b1c97a2401f4b0c"
 dependencies = [
  "anyhow",
- "ethereum-types 0.12.0",
+ "ethereum-types 0.12.1",
  "hex",
  "serde",
  "serde_json",
@@ -1256,6 +1256,7 @@ checksum = "779864b9c7f7ead1f092972c3257496c6a84b46dba2ce131dd8a282cb2cc5972"
 dependencies = [
  "crunchy",
  "fixed-hash",
+ "impl-codec",
  "impl-rlp",
  "impl-serde",
  "tiny-keccak",
@@ -1263,17 +1264,18 @@ dependencies = [
 
 [[package]]
 name = "ethereum"
-version = "0.8.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42ccff962ede8fe7c3ec53d46b8316f3c53377a701a30c0325918b38ce04a497"
+checksum = "81fb916554a4dba293ea69c69ad5653e21d770a9d0c2496b5fa0a1f5a3946d87"
 dependencies = [
  "bytes",
- "ethereum-types 0.12.0",
+ "ethereum-types 0.12.1",
  "hash-db",
  "hash256-std-hasher",
  "parity-scale-codec",
  "rlp",
  "rlp-derive",
+ "scale-info",
  "serde",
  "sha3 0.9.1",
  "triehash",
@@ -1295,14 +1297,16 @@ dependencies = [
 
 [[package]]
 name = "ethereum-types"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dd6bde671199089e601e8d47e153368b893ef885f11f365a3261ec58153c211"
+checksum = "05136f7057fe789f06e6d41d07b34e6f70d8c86e5693b60f97aaa6553553bdaf"
 dependencies = [
  "ethbloom",
  "fixed-hash",
+ "impl-codec",
  "impl-rlp",
  "primitive-types 0.10.1",
+ "scale-info",
  "uint",
 ]
 
@@ -1314,8 +1318,8 @@ checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 
 [[package]]
 name = "evm"
-version = "0.30.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
+version = "0.31.1"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
 dependencies = [
  "environmental",
  "ethereum",
@@ -1326,25 +1330,27 @@ dependencies = [
  "parity-scale-codec",
  "primitive-types 0.10.1",
  "rlp",
+ "scale-info",
  "serde",
  "sha3 0.8.2",
 ]
 
 [[package]]
 name = "evm-core"
-version = "0.30.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
+version = "0.31.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
 dependencies = [
  "funty",
  "parity-scale-codec",
  "primitive-types 0.10.1",
+ "scale-info",
  "serde",
 ]
 
 [[package]]
 name = "evm-gasometer"
-version = "0.30.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
+version = "0.31.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
 dependencies = [
  "environmental",
  "evm-core",
@@ -1354,8 +1360,8 @@ dependencies = [
 
 [[package]]
 name = "evm-runtime"
-version = "0.30.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#5ecf36ce393380a89c6f1b09ef79f686fe043624"
+version = "0.31.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
 dependencies = [
  "environmental",
  "evm-core",
@@ -2618,7 +2624,7 @@ dependencies = [
  "ripemd160",
  "serde",
  "sha2 0.8.2",
- "sha3 0.8.2",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -2638,7 +2644,7 @@ dependencies = [
  "ripemd160",
  "serde",
  "sha2 0.9.5",
- "sha3 0.8.2",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -2658,7 +2664,7 @@ dependencies = [
  "ripemd160",
  "serde",
  "sha2 0.9.5",
- "sha3 0.8.2",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -3154,6 +3160,7 @@ dependencies = [
  "fixed-hash",
  "impl-codec",
  "impl-rlp",
+ "scale-info",
  "uint",
 ]
 
@@ -3614,6 +3621,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "scale-info"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c55b744399c25532d63a0d2789b109df8d46fc93752d46b0782991a931a782f"
+dependencies = [
+ "bitvec",
+ "cfg-if 1.0.0",
+ "derive_more",
+ "parity-scale-codec",
+ "scale-info-derive",
+]
+
+[[package]]
+name = "scale-info-derive"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baeb2780690380592f86205aa4ee49815feb2acad8c2f59e6dd207148c3f1fcd"
+dependencies = [
+ "proc-macro-crate 1.1.0",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
