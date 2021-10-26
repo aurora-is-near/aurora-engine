@@ -355,13 +355,16 @@ impl From<JsonValue> for TransferCallCallArgs {
 /// storage_balance_of eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StorageBalanceOfCallArgs {
-    pub account_id: AccountId,
+    pub account_id: crate::prelude::account_id::AccountId,
 }
 
 impl From<JsonValue> for StorageBalanceOfCallArgs {
     fn from(v: JsonValue) -> Self {
         Self {
-            account_id: v.string("account_id").sdk_unwrap(),
+            account_id: crate::prelude::account_id::AccountId::try_from(
+                v.string("account_id").sdk_unwrap(),
+            )
+            .sdk_unwrap(),
         }
     }
 }

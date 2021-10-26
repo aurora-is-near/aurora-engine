@@ -2,7 +2,8 @@
 //!
 //! Inpired by: https://github.com/near/nearcore/tree/master/core/account-id
 
-use crate::{fmt, Box, String};
+use crate::{fmt, str::FromStr, Box, String, TryFrom};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const MIN_ACCOUNT_ID_LEN: usize = 2;
 pub const MAX_ACCOUNT_ID_LEN: usize = 64;
@@ -10,7 +11,7 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 /// Account identifier.
 ///
 /// This guarantees all properly constructed AccountId's are valid for the NEAR network.
-#[derive(Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(BorshSerialize, BorshDeserialize, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd)]
 pub struct AccountId(Box<str>);
 
 impl AccountId {
@@ -55,6 +56,23 @@ impl AccountId {
     }
 }
 
+impl TryFrom<String> for AccountId {
+    type Error = ParseAccountError;
+
+    fn try_from(account_id: String) -> Result<Self, Self::Error> {
+        AccountId::new(&account_id)
+    }
+}
+
+impl FromStr for AccountId {
+    type Err = ParseAccountError;
+
+    fn from_str(account_id: &str) -> Result<Self, Self::Err> {
+        Self::validate(account_id)?;
+        Ok(Self(account_id.into()))
+    }
+}
+
 impl From<AccountId> for String {
     fn from(account_id: AccountId) -> Self {
         account_id.0.into_string()
@@ -73,6 +91,15 @@ impl From<AccountId> for Box<str> {
     }
 }
 
+impl<T: ?Sized> AsRef<T> for AccountId
+where
+    Box<str>: AsRef<T>,
+{
+    fn as_ref(&self) -> &T {
+        self.0.as_ref()
+    }
+}
+
 /// A list of errors that occur when parsing an invalid Account ID.
 #[derive(Eq, Hash, Clone, Debug, PartialEq)]
 pub enum ParseAccountError {
@@ -81,14 +108,19 @@ pub enum ParseAccountError {
     Invalid,
 }
 
+impl AsRef<[u8]> for ParseAccountError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            ParseAccountError::TooLong => b"ERR_ACCOUNT_ID_TO_LONG",
+            ParseAccountError::TooShort => b"ERR_ACCOUNT_ID_TO_SHORT",
+            ParseAccountError::Invalid => b"ERR_ACCOUNT_ID_TO_INVALID",
+        }
+    }
+}
+
 impl fmt::Display for ParseAccountError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ParseAccountError::TooLong => write!(f, "the value is too long for account ID"),
-            ParseAccountError::TooShort => write!(f, "the value is too short for account ID"),
-            ParseAccountError::Invalid => {
-                write!(f, "the value has invalid characters for account ID")
-            }
-        }
+        let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
+        write!(f, "{}", msg)
     }
 }
