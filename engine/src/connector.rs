@@ -137,7 +137,7 @@ impl EthConnectorContract {
         assert!(data.len() < 3);
         let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
         if data.len() == 1 {
-            TokenMessageData::Near(account_id.into())
+            TokenMessageData::Near(account_id)
         } else {
             TokenMessageData::Eth {
                 address: account_id,
@@ -160,7 +160,7 @@ impl EthConnectorContract {
         // Check account
         let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
         OnTransferMessageData {
-            relayer: account_id.into(),
+            relayer: account_id,
             recipient,
             fee: U256::from_little_endian(&fee[..]),
         }
@@ -392,7 +392,8 @@ impl EthConnectorContract {
         .try_to_vec()
         .unwrap();
         // Burn tokens to recipient
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let predecessor_account_id =
+            AccountId::try_from(&sdk::predecessor_account_id()[..]).unwrap();
         self.ft
             .internal_withdraw_eth_from_near(&predecessor_account_id, args.amount);
         // Save new contract data

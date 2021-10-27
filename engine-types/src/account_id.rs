@@ -11,7 +11,9 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 /// Account identifier.
 ///
 /// This guarantees all properly constructed AccountId's are valid for the NEAR network.
-#[derive(BorshSerialize, BorshDeserialize, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(
+    BorshSerialize, BorshDeserialize, Default, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd,
+)]
 pub struct AccountId(Box<str>);
 
 impl AccountId {
