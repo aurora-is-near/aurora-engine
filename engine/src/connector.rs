@@ -543,10 +543,10 @@ impl EthConnectorContract {
 
     /// Get balance of storage
     pub fn storage_balance_of(&self) {
-        let _args = StorageBalanceOfCallArgs::from(
+        let args = StorageBalanceOfCallArgs::from(
             parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
-        //sdk::return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
+        sdk::return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
     }
 
     /// ft_on_transfer callback function

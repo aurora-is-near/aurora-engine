@@ -2,10 +2,11 @@ use crate::connector::NO_DEPOSIT;
 use crate::engine::Engine;
 use crate::json::{parse_json, JsonValue};
 use crate::parameters::{FtResolveTransfer, NEP141FtOnTransferArgs, StorageBalance};
+use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    sdk, storage, str_from_slice, AccountId, Address, BTreeMap, Balance, BorshDeserialize,
-    BorshSerialize, EthAddress, Gas, PromiseResult, StorageBalanceBounds, StorageUsage, String,
-    ToString, TryInto, Vec, Wei, U256,
+    sdk, storage, str_from_slice, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize,
+    EthAddress, Gas, PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryInto,
+    Vec, Wei, U256,
 };
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
@@ -189,7 +190,7 @@ impl FungibleToken {
         }
     }
 
-    pub fn internal_register_account(&mut self, account_id: &str) {
+    pub fn internal_register_account(&mut self, account_id: &AccountId) {
         self.accounts_insert(account_id, 0)
     }
 
@@ -218,7 +219,7 @@ impl FungibleToken {
 
     pub fn ft_transfer_call(
         &mut self,
-        receiver_id: &str,
+        receiver_id: &AccountId,
         amount: Balance,
         memo: &Option<String>,
         msg: String,
@@ -237,9 +238,9 @@ impl FungibleToken {
         .try_into()
         .unwrap();
 
-        let account_id = String::from_utf8(sdk::current_account_id()).unwrap();
+        let account_id = AccountId::try_from(&sdk::current_account_id()[..]).unwrap();
         let data2 = FtResolveTransfer {
-            receiver_id: receiver_id.to_string(),
+            receiver_id: receiver_id,
             amount,
             current_account_id: account_id,
         }
@@ -266,8 +267,8 @@ impl FungibleToken {
 
     pub fn internal_ft_resolve_transfer(
         &mut self,
-        sender_id: &str,
-        receiver_id: &str,
+        sender_id: &AccountId,
+        receiver_id: &AccountId,
         amount: Balance,
     ) -> (u128, u128) {
         // Get the unused amount from the `ft_on_transfer` call result.
@@ -378,7 +379,7 @@ impl FungibleToken {
         }
     }
 
-    pub fn internal_storage_balance_of(&self, account_id: &str) -> Option<StorageBalance> {
+    pub fn internal_storage_balance_of(&self, account_id: &AccountId) -> Option<StorageBalance> {
         if self.accounts_contains_key(account_id) {
             Some(StorageBalance {
                 total: self.storage_balance_bounds().min,
@@ -389,8 +390,8 @@ impl FungibleToken {
         }
     }
 
-    pub fn storage_balance_of(&self, account_id: &str) -> StorageBalance {
-        self.internal_storage_balance_of(account_id)
+    pub fn storage_balance_of(&self, account_id: &AccountId) -> StorageBalance {
+        self.internal_storage_balance_of(account_id.as_ref())
             .unwrap_or_default()
     }
 
@@ -448,7 +449,7 @@ impl FungibleToken {
 
     /// Insert account.
     /// Calculate total unique accounts
-    pub fn accounts_insert(&self, account_id: &str, amount: Balance) {
+    pub fn accounts_insert(&self, account_id: &AccountId, amount: Balance) {
         if !self.accounts_contains_key(account_id) {
             let key = Self::get_statistic_key();
             let accounts_counter = sdk::read_u64(&key)
@@ -466,20 +467,20 @@ impl FungibleToken {
         sdk::read_u64(&Self::get_statistic_key()).unwrap_or(0)
     }
 
-    fn accounts_contains_key(&self, account_id: &str) -> bool {
+    fn accounts_contains_key(&self, account_id: &AccountId) -> bool {
         sdk::storage_has_key(&Self::account_to_key(account_id))
     }
 
-    fn accounts_remove(&self, account_id: &str) {
+    fn accounts_remove(&self, account_id: &AccountId) {
         sdk::remove_storage(&Self::account_to_key(account_id))
     }
 
-    pub fn accounts_get(&self, account_id: &str) -> Option<Vec<u8>> {
+    pub fn accounts_get(&self, account_id: &AccountId) -> Option<Vec<u8>> {
         sdk::read_storage(&Self::account_to_key(account_id))
     }
 
     /// Fungible token key
-    fn account_to_key(account_id: &str) -> Vec<u8> {
+    fn account_to_key(account_id: &AccountId) -> Vec<u8> {
         let mut key = storage::bytes_to_key(
             storage::KeyPrefix::EthConnector,
             &[storage::EthConnectorStorageId::FungibleToken as u8],
