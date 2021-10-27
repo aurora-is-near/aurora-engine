@@ -90,7 +90,7 @@ impl EthConnectorContract {
         });
 
         let current_account_id = sdk::current_account_id();
-        let owner_id = String::from_utf8(current_account_id).unwrap();
+        let owner_id = AccountId::try_from(&current_account_id[..]).unwrap();
         let mut ft = FungibleToken::new();
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
@@ -114,7 +114,8 @@ impl EthConnectorContract {
         // Get initial contract arguments
         let contract_data = EthConnector {
             prover_account: args.prover_account,
-            eth_custodian_address: validate_eth_address(args.eth_custodian_address).sdk_unwrap(),
+            eth_custodian_address: validate_eth_address(args.eth_custodian_address.to_string())
+                .sdk_unwrap(),
         };
         // Save eth-connector specific data
         sdk::save_contract(
@@ -134,7 +135,7 @@ impl EthConnectorContract {
     fn parse_event_message(&self, message: &str) -> TokenMessageData {
         let data: Vec<_> = message.split(':').collect();
         assert!(data.len() < 3);
-        let account_id = AccountId::try_from(data[0]).sdk_unwrap();
+        let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
         if data.len() == 1 {
             TokenMessageData::Near(account_id.into())
         } else {
@@ -157,7 +158,7 @@ impl EthConnectorContract {
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
         // Check account
-        let account_id = AccountId::try_from(data[0]).sdk_unwrap();
+        let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
         OnTransferMessageData {
             relayer: account_id.into(),
             recipient,
@@ -225,13 +226,14 @@ impl EthConnectorContract {
         let mut proof_to_verify = raw_proof;
         proof_to_verify.extend(skip_bridge_call);
         let promise0 = sdk::promise_create(
-            self.contract.prover_account.as_bytes(),
+            self.contract.prover_account.as_ref().as_bytes(),
             b"verify_log_entry",
             &proof_to_verify,
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let predecessor_account_id =
+            AccountId::try_from(&sdk::predecessor_account_id()[..]).unwrap();
 
         // Finalize deposit
         let data = match self.parse_event_message(&event.recipient) {
@@ -260,7 +262,8 @@ impl EthConnectorContract {
                 .try_to_vec()
                 .unwrap();
 
-                let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
+                let current_account_id =
+                    AccountId::try_from(&sdk::current_account_id()[..]).unwrap();
                 // Send to self - current account id
                 FinishDepositCallArgs {
                     new_owner_id: current_account_id,
@@ -550,7 +553,7 @@ impl EthConnectorContract {
         // Special case when predecessor_account_id is current_account_id
         let fee = message_data.fee.as_u128();
         // Mint fee to relayer
-        let relayer = engine.get_relayer(message_data.relayer.as_bytes());
+        let relayer = engine.get_relayer(message_data.relayer.as_ref().as_bytes());
         match (fee, relayer) {
             (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
                 self.mint_eth_on_aurora(message_data.recipient, args.amount - fee);

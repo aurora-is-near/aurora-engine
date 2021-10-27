@@ -91,7 +91,7 @@ impl FungibleToken {
     }
 
     /// Balance of nETH (ETH on NEAR token)
-    pub fn internal_unwrap_balance_of_eth_on_near(&self, account_id: &str) -> Balance {
+    pub fn internal_unwrap_balance_of_eth_on_near(&self, account_id: &AccountId) -> Balance {
         match self.accounts_get(account_id) {
             Some(balance) => u128::try_from_slice(&balance[..]).unwrap(),
             None => sdk::panic_utf8(b"ERR_ACCOUNT_NOT_EXIST"),
@@ -104,7 +104,7 @@ impl FungibleToken {
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
-    pub fn internal_deposit_eth_to_near(&mut self, account_id: &str, amount: Balance) {
+    pub fn internal_deposit_eth_to_near(&mut self, account_id: &AccountId, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_near(account_id);
         if let Some(new_balance) = balance.checked_add(amount) {
             self.accounts_insert(account_id, new_balance);
@@ -194,7 +194,7 @@ impl FungibleToken {
         self.accounts_insert(account_id, 0)
     }
 
-    pub fn ft_transfer(&mut self, receiver_id: &str, amount: Balance, memo: &Option<String>) {
+    pub fn ft_transfer(&mut self, receiver_id: &AccountId, amount: Balance, memo: &Option<String>) {
         sdk::assert_one_yocto();
         let predecessor_account_id = sdk::predecessor_account_id();
         let sender_id = str_from_slice(&predecessor_account_id);
@@ -209,7 +209,7 @@ impl FungibleToken {
         self.total_eth_supply_on_aurora
     }
 
-    pub fn ft_balance_of(&self, account_id: &str) -> u128 {
+    pub fn ft_balance_of(&self, account_id: &AccountId) -> u128 {
         if let Some(data) = self.accounts_get(account_id) {
             u128::try_from_slice(&data[..]).unwrap()
         } else {
@@ -333,8 +333,8 @@ impl FungibleToken {
 
     pub fn ft_resolve_transfer(
         &mut self,
-        sender_id: &str,
-        receiver_id: &str,
+        sender_id: &AccountId,
+        receiver_id: &AccountId,
         amount: u128,
     ) -> u128 {
         self.internal_ft_resolve_transfer(sender_id, receiver_id, amount)
