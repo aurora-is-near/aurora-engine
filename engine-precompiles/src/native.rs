@@ -1,12 +1,11 @@
 use super::{EvmPrecompileResult, Precompile};
 #[cfg(feature = "contract")]
 use crate::prelude::{
-    format, is_valid_account_id,
+    format,
     parameters::{PromiseCreateArgs, WithdrawCallArgs},
     sdk,
     storage::{bytes_to_key, KeyPrefix},
-    types::AccountId,
-    vec, BorshSerialize, Cow, String, ToString, TryInto, Vec, H160, U256,
+    vec, AccountId, BorshSerialize, Cow, String, ToString, TryFrom, TryInto, Vec, H160, U256,
 };
 
 use crate::prelude::Address;
@@ -193,9 +192,9 @@ impl ExitToNear {
 
 #[cfg(feature = "contract")]
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
-    AccountId::from_utf8(
-        sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
-            .expect(ERR_TARGET_TOKEN_NOT_FOUND),
+    AccountId::try_from(
+        &sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
+            .expect(ERR_TARGET_TOKEN_NOT_FOUND)[..],
     )
     .unwrap()
 }
@@ -242,9 +241,8 @@ impl Precompile for ExitToNear {
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
-        let mut input = input;
         let flag = input[0];
-        input = &input[1..];
+        let account_id = AccountId::try_from(&input[1..]);
 
         let (nep141_address, args, exit_event) = match flag {
             0x0 => {
@@ -253,10 +251,9 @@ impl Precompile for ExitToNear {
                 // Input slice format:
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
-                if is_valid_account_id(input) {
-                    let dest_account = String::from_utf8(input.to_vec()).unwrap();
+                if let Ok(dest_account) = account_id {
                     (
-                        String::from_utf8(sdk::current_account_id()).unwrap(),
+                        AccountId::try_from(&sdk::current_account_id()[..]).unwrap(),
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
@@ -267,7 +264,7 @@ impl Precompile for ExitToNear {
                         events::ExitToNear {
                             sender: context.caller,
                             erc20_address: events::ETH_ADDRESS,
-                            dest: dest_account,
+                            dest: dest_account.to_string(),
                             amount: context.apparent_value,
                         },
                     )
@@ -296,10 +293,9 @@ impl Precompile for ExitToNear {
                 let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes());
 
                 let amount = U256::from_big_endian(&input[..32]);
-                input = &input[32..];
+                let account_id = AccountId::try_from(&input[32..]);
 
-                if is_valid_account_id(input) {
-                    let receiver_account_id: AccountId = String::from_utf8(input.to_vec()).unwrap();
+                if let Ok(receiver_account_id) = account_id {
                     (
                         nep141_address,
                         // There is no way to inject json, given the encoding of both arguments
@@ -312,7 +308,7 @@ impl Precompile for ExitToNear {
                         events::ExitToNear {
                             sender: erc20_address,
                             erc20_address,
-                            dest: receiver_account_id,
+                            dest: receiver_account_id.to_string(),
                             amount,
                         },
                     )
@@ -421,7 +417,7 @@ impl Precompile for ExitToEthereum {
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
                 (
-                    String::from_utf8(sdk::current_account_id()).unwrap(),
+                    AccountId::try_from(&sdk::current_account_id()[..]).unwrap(),
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {

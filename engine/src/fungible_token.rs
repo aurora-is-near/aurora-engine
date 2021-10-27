@@ -434,7 +434,8 @@ impl FungibleToken {
 
     pub fn storage_withdraw(&mut self, amount: Option<u128>) -> StorageBalance {
         let predecessor_account_id_bytes = sdk::predecessor_account_id();
-        let predecessor_account_id = AccountId::try_from(&predecessor_account_id_bytes).sdk_unwrap();
+        let predecessor_account_id =
+            AccountId::try_from(&predecessor_account_id_bytes).sdk_unwrap();
         if let Some(storage_balance) = self.internal_storage_balance_of(predecessor_account_id) {
             match amount {
                 Some(amount) if amount > 0 => {
