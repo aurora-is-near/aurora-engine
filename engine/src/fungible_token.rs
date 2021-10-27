@@ -434,7 +434,7 @@ impl FungibleToken {
 
     pub fn storage_withdraw(&mut self, amount: Option<u128>) -> StorageBalance {
         let predecessor_account_id_bytes = sdk::predecessor_account_id();
-        let predecessor_account_id = str_from_slice(&predecessor_account_id_bytes);
+        let predecessor_account_id = AccountId::try_from(&predecessor_account_id_bytes).sdk_unwrap();
         if let Some(storage_balance) = self.internal_storage_balance_of(predecessor_account_id) {
             match amount {
                 Some(amount) if amount > 0 => {
@@ -485,7 +485,7 @@ impl FungibleToken {
             storage::KeyPrefix::EthConnector,
             &[storage::EthConnectorStorageId::FungibleToken as u8],
         );
-        key.extend_from_slice(account_id.as_bytes());
+        key.extend_from_slice(account_id.as_ref().as_bytes());
         key
     }
 
