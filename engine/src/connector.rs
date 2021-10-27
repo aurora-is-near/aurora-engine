@@ -11,9 +11,9 @@ use crate::parameters::{
 };
 use crate::prelude::sdk::types::{ExpectUtf8, SdkUnwrap};
 use crate::prelude::{
-    format, is_valid_account_id, sdk, str, validate_eth_address, AccountId, Address, Balance,
-    BorshDeserialize, BorshSerialize, EthAddress, EthConnectorStorageId, Gas, KeyPrefix,
-    PromiseResult, String, ToString, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160, U256,
+    format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
+    BorshSerialize, EthAddress, EthConnectorStorageId, Gas, KeyPrefix, PromiseResult, String,
+    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160, U256,
 };
 use crate::proof::Proof;
 
@@ -134,16 +134,12 @@ impl EthConnectorContract {
     fn parse_event_message(&self, message: &str) -> TokenMessageData {
         let data: Vec<_> = message.split(':').collect();
         assert!(data.len() < 3);
+        let account_id = AccountId::try_from(data[0]).sdk_unwrap();
         if data.len() == 1 {
-            let account_id = data[0];
-            assert!(
-                is_valid_account_id(account_id.as_bytes()),
-                "ERR_INVALID_ACCOUNT_ID"
-            );
             TokenMessageData::Near(account_id.into())
         } else {
             TokenMessageData::Eth {
-                address: data[0].into(),
+                address: account_id,
                 message: data[1].into(),
             }
         }
@@ -161,11 +157,7 @@ impl EthConnectorContract {
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
         // Check account
-        let account_id = data[0];
-        assert!(
-            is_valid_account_id(account_id.as_bytes()),
-            "ERR_INVALID_ACCOUNT_ID"
-        );
+        let account_id = AccountId::try_from(data[0]).sdk_unwrap();
         OnTransferMessageData {
             relayer: account_id.into(),
             recipient,

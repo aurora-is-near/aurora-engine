@@ -5,8 +5,8 @@ use crate::parameters::{FtResolveTransfer, NEP141FtOnTransferArgs, StorageBalanc
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     sdk, storage, str_from_slice, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize,
-    EthAddress, Gas, PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryInto,
-    Vec, Wei, U256,
+    EthAddress, Gas, PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryFrom,
+    TryInto, Vec, Wei, U256,
 };
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
@@ -225,7 +225,7 @@ impl FungibleToken {
         msg: String,
     ) {
         let predecessor_account_id = sdk::predecessor_account_id();
-        let sender_id = str_from_slice(&predecessor_account_id);
+        let sender_id = AccountId::try_from(&predecessor_account_id).unwrap();
         // Special case for Aurora transfer itself - we shouldn't transfer
         if sender_id != receiver_id {
             self.internal_transfer_eth_on_near(sender_id, receiver_id, amount, memo);
@@ -233,14 +233,14 @@ impl FungibleToken {
         let data1: String = NEP141FtOnTransferArgs {
             amount,
             msg,
-            sender_id: receiver_id.to_string(),
+            sender_id: receiver_id.into(),
         }
         .try_into()
         .unwrap();
 
         let account_id = AccountId::try_from(&sdk::current_account_id()[..]).unwrap();
         let data2 = FtResolveTransfer {
-            receiver_id: receiver_id,
+            receiver_id: receiver_id.into(),
             amount,
             current_account_id: account_id,
         }

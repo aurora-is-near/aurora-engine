@@ -11,8 +11,8 @@ use crate::connector::EthConnectorContract;
 use crate::contract::current_address;
 use crate::map::{BijectionMap, LookupMap};
 use crate::prelude::{
-    address_to_key, bytes_to_key, is_valid_account_id, sdk, storage_to_key, u256_to_arr, AccountId,
-    Address, BorshDeserialize, BorshSerialize, KeyPrefix, KeyPrefixU8, PromiseCreateArgs, TryInto,
+    address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, AccountId, Address,
+    BorshDeserialize, BorshSerialize, KeyPrefix, KeyPrefixU8, PromiseCreateArgs, TryFrom, TryInto,
     Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
 };
 
@@ -689,9 +689,8 @@ impl Engine {
     pub fn get_erc20_from_nep141(
         nep141_account_id: &[u8],
     ) -> Result<Vec<u8>, GetErc20FromNep141Error> {
-        if !is_valid_account_id(nep141_account_id) {
-            return Err(GetErc20FromNep141Error::InvalidNep141AccountId);
-        }
+        AccountId::try_from(nep141_account_id)
+            .map_err(|_| GetErc20FromNep141Error::InvalidNep141AccountId)?;
 
         Self::nep141_erc20_map()
             .lookup_left(nep141_account_id)

@@ -3,8 +3,8 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue, ParseError};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    format, is_valid_account_id, Balance, BorshDeserialize, BorshSerialize, EthAddress, RawAddress,
-    RawH256, RawU256, SdkUnwrap, String, ToString, TryFrom, Vec,
+    format, Balance, BorshDeserialize, BorshSerialize, EthAddress, RawAddress, RawH256, RawU256,
+    SdkUnwrap, String, ToString, TryFrom, Vec,
 };
 use crate::proof::Proof;
 use evm::backend::Log;
@@ -209,7 +209,8 @@ impl TryFrom<JsonValue> for NEP141FtOnTransferArgs {
 
     fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
         Ok(Self {
-            sender_id: value.string("sender_id")?,
+            sender_id: AccountId::try_from(value.string("sender_id")?)
+                .map_err(|_| JsonError::InvalidString)?,
             amount: value.u128("amount")?,
             msg: value.string("msg")?,
         })
@@ -220,10 +221,6 @@ impl TryFrom<NEP141FtOnTransferArgs> for String {
     type Error = ParseError;
 
     fn try_from(value: NEP141FtOnTransferArgs) -> Result<Self, Self::Error> {
-        if !is_valid_account_id(value.sender_id.as_bytes()) {
-            return Err(ParseError::InvalidAccountId);
-        }
-
         Ok(format!(
             r#"{{"sender_id": "{}", "amount": "{}", "msg": "{}"}}"#,
             value.sender_id,
@@ -345,7 +342,7 @@ pub struct TransferCallCallArgs {
 impl From<JsonValue> for TransferCallCallArgs {
     fn from(v: JsonValue) -> Self {
         Self {
-            receiver_id: v.string("receiver_id").sdk_unwrap(),
+            receiver_id: AccountId::try_from(v.string("receiver_id").sdk_unwrap()).sdk_unwrap(),
             amount: v.u128("amount").sdk_unwrap(),
             memo: v.string("memo").ok(),
             msg: v.string("msg").sdk_unwrap(),
@@ -361,7 +358,6 @@ pub struct StorageBalanceOfCallArgs {
 
 impl From<JsonValue> for StorageBalanceOfCallArgs {
     fn from(v: JsonValue) -> Self {
-        use crate::prelude::account_id::AccountId;
         Self {
             account_id: AccountId::try_from(v.string("account_id").sdk_unwrap()).sdk_unwrap(),
         }
@@ -378,7 +374,9 @@ pub struct StorageDepositCallArgs {
 impl From<JsonValue> for StorageDepositCallArgs {
     fn from(v: JsonValue) -> Self {
         Self {
-            account_id: v.string("account_id").ok(),
+            account_id: v
+                .string("account_id")
+                .map_or(None, |acc| AccountId::try_from(acc).ok()),
             registration_only: v.bool("registration_only").ok(),
         }
     }
@@ -409,7 +407,7 @@ pub struct TransferCallArgs {
 impl From<JsonValue> for TransferCallArgs {
     fn from(v: JsonValue) -> Self {
         Self {
-            receiver_id: v.string("receiver_id").sdk_unwrap(),
+            receiver_id: AccountId::try_from(v.string("receiver_id").sdk_unwrap()).sdk_unwrap(),
             amount: v.u128("amount").sdk_unwrap(),
             memo: v.string("memo").ok(),
         }
@@ -430,7 +428,7 @@ pub struct BalanceOfEthCallArgs {
 impl From<JsonValue> for BalanceOfCallArgs {
     fn from(v: JsonValue) -> Self {
         Self {
-            account_id: v.string("account_id").sdk_unwrap(),
+            account_id: AccountId::try_from(v.string("account_id").sdk_unwrap()).sdk_unwrap(),
         }
     }
 }
@@ -448,8 +446,8 @@ pub struct PauseEthConnectorCallArgs {
 impl From<JsonValue> for ResolveTransferCallArgs {
     fn from(v: JsonValue) -> Self {
         Self {
-            sender_id: v.string("sender_id").sdk_unwrap(),
-            receiver_id: v.string("receiver_id").sdk_unwrap(),
+            sender_id: AccountId::try_from(v.string("sender_id").sdk_unwrap()).sdk_unwrap(),
+            receiver_id: AccountId::try_from(v.string("receiver_id").sdk_unwrap()).sdk_unwrap(),
             amount: v.u128("amount").sdk_unwrap(),
         }
     }
