@@ -253,7 +253,7 @@ impl Precompile for ExitToNear {
 
                 if let Ok(dest_account) = account_id {
                     (
-                        AccountId::try_from(&sdk::current_account_id()[..]).unwrap(),
+                        AccountId::try_from(sdk::current_account_id()).unwrap(),
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
@@ -417,7 +417,7 @@ impl Precompile for ExitToEthereum {
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
                 (
-                    AccountId::try_from(&sdk::current_account_id()[..]).unwrap(),
+                    AccountId::try_from(sdk::current_account_id()).unwrap(),
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {

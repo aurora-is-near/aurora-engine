@@ -197,7 +197,7 @@ impl FungibleToken {
     pub fn ft_transfer(&mut self, receiver_id: &AccountId, amount: Balance, memo: &Option<String>) {
         sdk::assert_one_yocto();
         let predecessor_account_id = sdk::predecessor_account_id();
-        let sender_id = AccountId::try_from(&predecessor_account_id[..]).unwrap();
+        let sender_id = AccountId::try_from(predecessor_account_id).unwrap();
         self.internal_transfer_eth_on_near(&sender_id, receiver_id, amount, memo);
     }
 
@@ -225,7 +225,7 @@ impl FungibleToken {
         msg: String,
     ) {
         let predecessor_account_id = sdk::predecessor_account_id();
-        let sender_id = AccountId::try_from(&predecessor_account_id[..]).unwrap();
+        let sender_id = AccountId::try_from(predecessor_account_id).unwrap();
         // Special case for Aurora transfer itself - we shouldn't transfer
         if &sender_id != receiver_id {
             self.internal_transfer_eth_on_near(&sender_id, receiver_id, amount, memo);
@@ -238,7 +238,7 @@ impl FungibleToken {
         .try_into()
         .unwrap();
 
-        let account_id = AccountId::try_from(&sdk::current_account_id()[..]).unwrap();
+        let account_id = AccountId::try_from(sdk::current_account_id()).unwrap();
         let data2 = FtResolveTransfer {
             receiver_id: receiver_id.clone(),
             amount,
@@ -347,7 +347,7 @@ impl FungibleToken {
     ) -> Option<(AccountId, Balance)> {
         sdk::assert_one_yocto();
         let account_id_key = sdk::predecessor_account_id();
-        let account_id = AccountId::try_from(&account_id_key[..]).unwrap();
+        let account_id = AccountId::try_from(account_id_key.clone()).unwrap();
         let force = force.unwrap_or(false);
         if let Some(balance) = self.accounts_get(&account_id) {
             let balance = u128::try_from_slice(&balance[..]).unwrap();
@@ -403,8 +403,7 @@ impl FungibleToken {
         registration_only: Option<bool>,
     ) -> StorageBalance {
         let amount: Balance = sdk::attached_deposit();
-        let predecessor_account_id =
-            AccountId::try_from(&sdk::predecessor_account_id()[..]).unwrap();
+        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
         let account_id = account_id.unwrap_or(&predecessor_account_id);
         if self.accounts_contains_key(account_id) {
             sdk::log!("The account is already registered, refunding the deposit");
@@ -435,8 +434,7 @@ impl FungibleToken {
 
     pub fn storage_withdraw(&mut self, amount: Option<u128>) -> StorageBalance {
         let predecessor_account_id_bytes = sdk::predecessor_account_id();
-        let predecessor_account_id =
-            AccountId::try_from(&predecessor_account_id_bytes[..]).unwrap();
+        let predecessor_account_id = AccountId::try_from(predecessor_account_id_bytes).unwrap();
         if let Some(storage_balance) = self.internal_storage_balance_of(&predecessor_account_id) {
             match amount {
                 Some(amount) if amount > 0 => {

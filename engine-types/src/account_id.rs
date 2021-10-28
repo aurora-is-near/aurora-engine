@@ -98,6 +98,14 @@ impl TryFrom<&[u8]> for AccountId {
     }
 }
 
+impl TryFrom<Vec<u8>> for AccountId {
+    type Error = ParseAccountError;
+
+    fn try_from(account_id: Vec<u8>) -> Result<Self, Self::Error> {
+        AccountId::try_from(&account_id[..])
+    }
+}
+
 impl FromStr for AccountId {
     type Err = ParseAccountError;
 

@@ -90,7 +90,7 @@ impl EthConnectorContract {
         });
 
         let current_account_id = sdk::current_account_id();
-        let owner_id = AccountId::try_from(&current_account_id[..]).unwrap();
+        let owner_id = AccountId::try_from(current_account_id).unwrap();
         let mut ft = FungibleToken::new();
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
@@ -232,8 +232,7 @@ impl EthConnectorContract {
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
-        let predecessor_account_id =
-            AccountId::try_from(&sdk::predecessor_account_id()[..]).unwrap();
+        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
 
         // Finalize deposit
         let data = match self.parse_event_message(&event.recipient) {
@@ -262,8 +261,7 @@ impl EthConnectorContract {
                 .try_to_vec()
                 .unwrap();
 
-                let current_account_id =
-                    AccountId::try_from(&sdk::current_account_id()[..]).unwrap();
+                let current_account_id = AccountId::try_from(sdk::current_account_id()).unwrap();
                 // Send to self - current account id
                 FinishDepositCallArgs {
                     new_owner_id: current_account_id,
@@ -392,8 +390,7 @@ impl EthConnectorContract {
         .try_to_vec()
         .unwrap();
         // Burn tokens to recipient
-        let predecessor_account_id =
-            AccountId::try_from(&sdk::predecessor_account_id()[..]).unwrap();
+        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
         self.ft
             .internal_withdraw_eth_from_near(&predecessor_account_id, args.amount);
         // Save new contract data
