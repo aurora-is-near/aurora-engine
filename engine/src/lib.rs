@@ -120,14 +120,14 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_owner() {
         let state = Engine::get_state().sdk_unwrap();
-        sdk::return_output(state.owner_id.as_ref().as_bytes());
+        sdk::return_output(state.owner_id.as_bytes());
     }
 
     /// Get bridge prover id for this contract.
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
         let state = Engine::get_state().sdk_unwrap();
-        sdk::return_output(state.bridge_prover_id.as_ref().as_bytes());
+        sdk::return_output(state.bridge_prover_id.as_bytes());
     }
 
     /// Get chain id for this contract.
@@ -394,7 +394,7 @@ mod contract {
 
         sdk::log!(crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str());
         engine
-            .register_token(address.as_bytes(), args.nep141.as_ref().as_bytes())
+            .register_token(address.as_bytes(), args.nep141.as_bytes())
             .sdk_unwrap();
         sdk::return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
 
@@ -617,7 +617,7 @@ mod contract {
                 .sdk_expect("ERR_ARG_PARSE");
 
         sdk::return_output(
-            Engine::get_erc20_from_nep141(args.nep141.as_ref().as_bytes())
+            Engine::get_erc20_from_nep141(args.nep141.as_bytes())
                 .sdk_unwrap()
                 .as_slice(),
         );
@@ -683,7 +683,7 @@ mod contract {
     }
 
     fn require_owner_only(state: &EngineState) {
-        if state.owner_id.as_ref().as_bytes() != sdk::predecessor_account_id() {
+        if state.owner_id.as_bytes() != sdk::predecessor_account_id() {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED");
         }
     }

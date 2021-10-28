@@ -248,7 +248,7 @@ impl FungibleToken {
         .unwrap();
         // Initiating receiver's call and the callback
         let promise0 = sdk::promise_create(
-            receiver_id.as_ref().as_bytes(),
+            receiver_id.as_bytes(),
             b"ft_on_transfer",
             data1.as_bytes(),
             NO_DEPOSIT,
@@ -487,7 +487,7 @@ impl FungibleToken {
             storage::KeyPrefix::EthConnector,
             &[storage::EthConnectorStorageId::FungibleToken as u8],
         );
-        key.extend_from_slice(account_id.as_ref().as_bytes());
+        key.extend_from_slice(account_id.as_bytes());
         key
     }
 

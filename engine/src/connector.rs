@@ -226,7 +226,7 @@ impl EthConnectorContract {
         let mut proof_to_verify = raw_proof;
         proof_to_verify.extend(skip_bridge_call);
         let promise0 = sdk::promise_create(
-            self.contract.prover_account.as_ref().as_bytes(),
+            self.contract.prover_account.as_bytes(),
             b"verify_log_entry",
             &proof_to_verify,
             NO_DEPOSIT,
@@ -554,7 +554,7 @@ impl EthConnectorContract {
         // Special case when predecessor_account_id is current_account_id
         let fee = message_data.fee.as_u128();
         // Mint fee to relayer
-        let relayer = engine.get_relayer(message_data.relayer.as_ref().as_bytes());
+        let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (fee, relayer) {
             (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
                 self.mint_eth_on_aurora(message_data.recipient, args.amount - fee);

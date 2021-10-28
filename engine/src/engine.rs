@@ -876,7 +876,7 @@ impl Engine {
             .as_bytes(),
         );
         sdk::promise_create(
-            promise.target_account_id.as_ref().as_bytes(),
+            promise.target_account_id.as_bytes(),
             promise.method.as_bytes(),
             promise.args.as_slice(),
             promise.attached_balance,

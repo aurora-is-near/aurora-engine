@@ -2,7 +2,7 @@
 //!
 //! Inpired by: https://github.com/near/nearcore/tree/master/core/account-id
 
-use crate::{fmt, str, str::FromStr, Box, String, TryFrom};
+use crate::{fmt, str, str::FromStr, Box, String, TryFrom, Vec};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const MIN_ACCOUNT_ID_LEN: usize = 2;
@@ -20,6 +20,10 @@ impl AccountId {
     pub fn new(account_id: &str) -> Result<Self, ParseAccountError> {
         Self::validate(account_id)?;
         Ok(Self(account_id.into()))
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.as_ref().as_bytes()
     }
 
     pub fn validate(account_id: &str) -> Result<(), ParseAccountError> {
@@ -118,6 +122,12 @@ impl fmt::Display for AccountId {
 impl From<AccountId> for Box<str> {
     fn from(value: AccountId) -> Box<str> {
         value.0
+    }
+}
+
+impl From<AccountId> for Vec<u8> {
+    fn from(account_id: AccountId) -> Vec<u8> {
+        account_id.as_bytes().to_vec()
     }
 }
 
