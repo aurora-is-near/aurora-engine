@@ -56,6 +56,25 @@ impl AccountId {
                 .ok_or(ParseAccountError::Invalid)
         }
     }
+
+    pub fn is_top_level_account_id(&self) -> bool {
+        self.0.len() >= MIN_ACCOUNT_ID_LEN
+            && self.0.len() <= MAX_ACCOUNT_ID_LEN
+            && self.as_ref() != "system"
+            && !self.as_ref().contains('.')
+    }
+
+    /// Returns true if the signer_id can create a direct sub-account with the given account Id.
+    pub fn is_sub_account_of(&self, parent_account_id: &AccountId) -> bool {
+        if parent_account_id.0.len() >= self.0.len() {
+            return false;
+        }
+        // Will not panic, since valid account id is utf-8 only and the length is checked above.
+        // e.g. when `near` creates `aa.near`, it splits into `aa.` and `near`
+        let (prefix, suffix) = self.0.split_at(self.0.len() - parent_account_id.0.len());
+
+        prefix.find('.') == Some(prefix.len() - 1) && suffix == parent_account_id.as_ref()
+    }
 }
 
 impl TryFrom<String> for AccountId {
@@ -140,6 +159,14 @@ impl fmt::Display for ParseAccountError {
 mod tests {
     use super::*;
 
+    fn is_implicit(account_id: &str) -> bool {
+        account_id.len() == 64
+            && account_id
+                .as_bytes()
+                .iter()
+                .all(|b| matches!(b, b'a'..=b'f' | b'0'..=b'9'))
+    }
+
     pub const OK_ACCOUNT_IDS: [&str; 24] = [
         "aa",
         "a-a",
@@ -200,11 +227,7 @@ mod tests {
     fn test_is_valid_account_id() {
         for account_id in OK_ACCOUNT_IDS.iter().cloned() {
             if let Err(err) = AccountId::validate(account_id) {
-                panic!(
-                    "Valid account id {:?} marked invalid: {}",
-                    account_id,
-                    err.kind()
-                );
+                panic!("Valid account id {:?} marked invalid: {}", account_id, err);
             }
         }
 
@@ -386,13 +409,13 @@ mod tests {
             assert!(
                 matches!(
                     valid_account_id.parse::<AccountId>(),
-                    Ok(account_id) if AccountId::is_implicit(account_id.as_ref())
+                    Ok(account_id) if is_implicit(account_id.as_ref())
                 ),
                 "Account ID {} should be valid 64-len hex",
                 valid_account_id
             );
             assert!(
-                AccountId::is_implicit(valid_account_id),
+                is_implicit(valid_account_id),
                 "Account ID {} should be valid 64-len hex",
                 valid_account_id
             );
@@ -410,13 +433,13 @@ mod tests {
             assert!(
                 !matches!(
                     invalid_account_id.parse::<AccountId>(),
-                    Ok(account_id) if AccountId::is_implicit(account_id.as_ref())
+                    Ok(account_id) if is_implicit(account_id.as_ref())
                 ),
                 "Account ID {} should be invalid 64-len hex",
                 invalid_account_id
             );
             assert!(
-                !AccountId::is_implicit(invalid_account_id),
+                !is_implicit(invalid_account_id),
                 "Account ID {} should be invalid 64-len hex",
                 invalid_account_id
             );
