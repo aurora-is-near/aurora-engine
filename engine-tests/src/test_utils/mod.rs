@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use core::str::FromStr;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
@@ -10,6 +11,7 @@ use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
+use crate::prelude::account_id::AccountId;
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::prelude::parameters::{
     InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs,
@@ -18,13 +20,13 @@ use crate::prelude::transaction::{
     access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
     LegacyEthSignedTransaction, LegacyEthTransaction,
 };
-use crate::prelude::{sdk, AccountId, Address, Wei, U256};
+use crate::prelude::{sdk, Address, TryFrom, Wei, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
 pub fn origin() -> AccountId {
-    "aurora".to_string()
+    AccountId::from_str("aurora").unwrap()
 }
 
 pub(crate) const SUBMIT: &str = "submit";
@@ -439,8 +441,8 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     let args = NewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
-        owner_id: runner.aurora_account_id.clone(),
-        bridge_prover_id: "bridge_prover.near".to_string(),
+        owner_id: AccountId::try_from(runner.aurora_account_id.clone()).unwrap(),
+        bridge_prover_id: AccountId::from_str("bridge_prover.near").unwrap(),
         upgrade_delay_blocks: 1,
     };
 
@@ -450,8 +452,9 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     assert!(maybe_error.is_none());
 
     let args = InitCallArgs {
-        prover_account: "prover.near".to_string(),
-        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+        prover_account: AccountId::from_str("prover.near").unwrap(),
+        eth_custodian_address: AccountId::from_str("d045f7e19B2488924B97F9c145b5E51D0D895A65")
+            .unwrap(),
         metadata: FungibleTokenMetadata::default(),
     };
     let (_, maybe_error) =

@@ -1,9 +1,11 @@
-use crate::prelude::{AccountId, Address, Balance, RawAddress, TryInto, Wei, U256};
+use crate::prelude::account_id::AccountId;
+use crate::prelude::{Address, Balance, RawAddress, TryFrom, TryInto, Wei, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{FunctionCallArgs, SubmitResult};
 use aurora_engine::transaction::LegacyEthSignedTransaction;
 use borsh::{BorshDeserialize, BorshSerialize};
+use core::str::FromStr;
 use ethabi::Token;
 use near_vm_logic::VMOutcome;
 use near_vm_runner::VMError;
@@ -99,7 +101,7 @@ impl test_utils::AuroraRunner {
     ) -> CallResult {
         self.make_call(
             "call",
-            origin,
+            origin.to_string(),
             (FunctionCallArgs { contract, input }).try_to_vec().unwrap(),
         )
     }
@@ -109,11 +111,15 @@ impl test_utils::AuroraRunner {
         input: LegacyEthSignedTransaction,
         origin: AccountId,
     ) -> CallResult {
-        self.make_call("submit", origin, rlp::encode(&input).to_vec())
+        self.make_call("submit", origin.to_string(), rlp::encode(&input).to_vec())
     }
 
     pub fn deploy_erc20_token(&mut self, nep141: &AccountId) -> RawAddress {
-        let result = self.make_call("deploy_erc20_token", origin(), nep141.try_to_vec().unwrap());
+        let result = self.make_call(
+            "deploy_erc20_token",
+            origin().to_string(),
+            nep141.try_to_vec().unwrap(),
+        );
 
         result.check_ok();
 
@@ -203,10 +209,10 @@ impl test_utils::AuroraRunner {
     ) -> String {
         let res = self.make_call_with_signer(
             "ft_on_transfer",
-            nep141,
-            relayer_id,
+            nep141.to_string(),
+            relayer_id.to_string(),
             json!({
-                "sender_id": sender_id,
+                "sender_id": sender_id.to_string(),
                 "amount": amount.to_string(),
                 "msg": msg
             })
@@ -224,7 +230,7 @@ impl test_utils::AuroraRunner {
     ) -> CallResult {
         self.make_call(
             "register_relayer",
-            relayer_account_id,
+            relayer_account_id.to_string(),
             relayer_address.as_fixed_bytes().try_to_vec().unwrap(),
         )
     }
@@ -233,13 +239,13 @@ impl test_utils::AuroraRunner {
 #[test]
 fn test_deploy_erc20_token() {
     let mut runner = AuroraRunner::new();
-    runner.deploy_erc20_token(&"tt.testnet".to_string());
+    runner.deploy_erc20_token(&AccountId::from_str("tt.testnet").unwrap());
 }
 
 #[test]
 fn test_mint() {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let token = runner.deploy_erc20_token(&AccountId::from_str("tt.testnet").unwrap());
     let address = runner.create_account().address;
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(0));
@@ -252,12 +258,17 @@ fn test_mint() {
 #[test]
 fn test_mint_not_admin() {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let token = runner.deploy_erc20_token(&AccountId::from_str("tt.testnet").unwrap());
     let address = runner.create_account().address;
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(0));
     let amount = 10;
-    runner.mint(token, address, amount, "not_admin".to_string());
+    runner.mint(
+        token,
+        address,
+        amount,
+        AccountId::from_str("not_admin").unwrap(),
+    );
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(0));
 }
@@ -265,8 +276,8 @@ fn test_mint_not_admin() {
 #[test]
 fn test_ft_on_transfer() {
     let mut runner = AuroraRunner::new();
-    let nep141 = "tt.testnet".to_string();
-    let alice = "alice".to_string();
+    let nep141 = AccountId::from_str("tt.testnet").unwrap();
+    let alice = AccountId::from_str("alice").unwrap();
     let token = runner.deploy_erc20_token(&nep141);
     let amount = 10;
     let recipient = runner.create_account().address;
@@ -285,8 +296,8 @@ fn test_ft_on_transfer() {
 #[test]
 fn test_ft_on_transfer_fail() {
     let mut runner = AuroraRunner::new();
-    let nep141 = "tt.testnet".to_string();
-    let alice = "alice".to_string();
+    let nep141 = AccountId::from_str("tt.testnet").unwrap();
+    let alice = AccountId::from_str("alice").unwrap();
     let amount = 10;
 
     let recipient = runner.create_account().address;
@@ -304,14 +315,14 @@ fn test_relayer_charge_fee() {
     let fee = 51;
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
-    let token = runner.deploy_erc20_token(&nep141);
+    let token = runner.deploy_erc20_token(&AccountId::try_from(nep141.clone()).unwrap());
     let recipient = runner.create_account().address;
 
     let recipient_balance = runner.get_balance(recipient.into());
     assert_eq!(recipient_balance, INITIAL_BALANCE);
 
     let relayer = create_ethereum_address();
-    runner.register_relayer(alice.clone(), relayer);
+    runner.register_relayer(AccountId::try_from(alice.clone()).unwrap(), relayer);
     let relayer_balance = runner.get_balance(relayer);
     assert_eq!(relayer_balance, Wei::zero());
 
@@ -322,9 +333,9 @@ fn test_relayer_charge_fee() {
     U256::from(fee).to_big_endian(fee_encoded);
 
     runner.ft_on_transfer(
-        nep141,
-        alice.clone(),
-        alice,
+        AccountId::try_from(nep141).unwrap(),
+        AccountId::try_from(alice.clone()).unwrap(),
+        AccountId::try_from(alice).unwrap(),
         amount,
         hex::encode(recipient) + &hex::encode(fee_encoded),
     );
@@ -344,7 +355,7 @@ fn test_relayer_charge_fee() {
 #[test]
 fn test_transfer_erc20_token() {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let token = runner.deploy_erc20_token(&AccountId::from_str("tt.testnet").unwrap());
     let peer0 = runner.create_account();
     let peer1 = runner.create_account();
 

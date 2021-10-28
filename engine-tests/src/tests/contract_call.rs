@@ -1,12 +1,14 @@
+use crate::prelude::account_id::AccountId;
 use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
 use crate::test_utils::{origin, AuroraRunner, Signer};
+use core::str::FromStr;
 
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS};
 
 fn setup_test() -> (AuroraRunner, Signer, [u8; 20], Tester) {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let token = runner.deploy_erc20_token(&AccountId::from_str("tt.testnet").unwrap());
     let mut signer = test_utils::Signer::random();
     runner.create_address(
         test_utils::address_from_secret_key(&signer.secret_key),
