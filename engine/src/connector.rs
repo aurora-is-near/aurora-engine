@@ -114,8 +114,7 @@ impl EthConnectorContract {
         // Get initial contract arguments
         let contract_data = EthConnector {
             prover_account: args.prover_account,
-            eth_custodian_address: validate_eth_address(args.eth_custodian_address.to_string())
-                .sdk_unwrap(),
+            eth_custodian_address: validate_eth_address(args.eth_custodian_address).sdk_unwrap(),
         };
         // Save eth-connector specific data
         sdk::save_contract(
