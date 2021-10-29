@@ -323,7 +323,7 @@ pub struct FinishDepositEthCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct InitCallArgs {
     pub prover_account: AccountId,
-    pub eth_custodian_address: AccountId,
+    pub eth_custodian_address: String,
     pub metadata: FungibleTokenMetadata,
 }
 

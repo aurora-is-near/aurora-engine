@@ -80,13 +80,16 @@ fn init_contract(
             STORAGE_AMOUNT,
         )
         .assert_success();
+
+    //AccountId::try_from(custodian_address.to_string()).unwrap()
+    println!("# {:?}", custodian_address);
     contract_account
         .call(
             contract_name.parse().unwrap(),
             "new_eth_connector",
             &InitCallArgs {
                 prover_account: AccountId::try_from(PROVER_ACCOUNT.to_string()).unwrap(),
-                eth_custodian_address: AccountId::try_from(custodian_address.to_string()).unwrap(),
+                eth_custodian_address: custodian_address.to_string(),
                 metadata: FungibleTokenMetadata::default(),
             }
             .try_to_vec()

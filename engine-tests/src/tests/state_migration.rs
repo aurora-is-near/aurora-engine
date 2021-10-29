@@ -52,7 +52,7 @@ pub fn deploy_evm() -> AuroraAccount {
         .assert_success();
     let init_args = InitCallArgs {
         prover_account,
-        eth_custodian_address: AccountId::new("d045f7e19B2488924B97F9c145b5E51D0D895A65").unwrap(),
+        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
         metadata: Default::default(),
     };
     contract_account

@@ -453,8 +453,7 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
 
     let args = InitCallArgs {
         prover_account: AccountId::from_str("prover.near").unwrap(),
-        eth_custodian_address: AccountId::from_str("d045f7e19B2488924B97F9c145b5E51D0D895A65")
-            .unwrap(),
+        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
         metadata: FungibleTokenMetadata::default(),
     };
     let (_, maybe_error) =
