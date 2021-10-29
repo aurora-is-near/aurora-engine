@@ -72,6 +72,7 @@ fn withdraw() {
         let exit_events = parse_exit_events(withdraw_result, &schema);
 
         // One exit event
+        println!("{:#?}", exit_events);
         assert!(exit_events.len() == 1);
 
         let dest = if is_to_near {
@@ -164,12 +165,16 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
     ];
 
     for (flag, expected) in test_data {
-        println!("{}", flag);
+        println!("flag: {}", flag);
         assert!(tester
             .try_withdraw_and_avoid_fail_and_succeed(&mut runner, &mut signer, flag)
             .is_ok());
         // One promise is scheduled
-        println!("{:?} {:?}", runner.previous_logs, expected.to_string());
+        println!(
+            "tester: {:?} {:?}",
+            runner.previous_logs,
+            expected.to_string()
+        );
         assert!(runner.previous_logs.contains(&expected.to_string()));
     }
 }

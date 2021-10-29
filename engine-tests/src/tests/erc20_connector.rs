@@ -313,8 +313,8 @@ fn test_relayer_charge_fee() {
     let mut runner = AuroraRunner::new();
     let amount = 10;
     let fee = 51;
-    let nep141 = "tt.testnet".to_string();
-    let alice = "alice".to_string();
+    let nep141 = AccountId::from_str("tt.testnet").unwrap();
+    let alice = AccountId::from_str("alice").unwrap();
     let token = runner.deploy_erc20_token(&AccountId::try_from(nep141.clone()).unwrap());
     let recipient = runner.create_account().address;
 
@@ -322,7 +322,7 @@ fn test_relayer_charge_fee() {
     assert_eq!(recipient_balance, INITIAL_BALANCE);
 
     let relayer = create_ethereum_address();
-    runner.register_relayer(AccountId::try_from(alice.clone()).unwrap(), relayer);
+    runner.register_relayer(alice.clone(), relayer);
     let relayer_balance = runner.get_balance(relayer);
     assert_eq!(relayer_balance, Wei::zero());
 
@@ -333,9 +333,9 @@ fn test_relayer_charge_fee() {
     U256::from(fee).to_big_endian(fee_encoded);
 
     runner.ft_on_transfer(
-        AccountId::try_from(nep141).unwrap(),
-        AccountId::try_from(alice.clone()).unwrap(),
-        AccountId::try_from(alice).unwrap(),
+        nep141,
+        alice.clone(),
+        alice,
         amount,
         hex::encode(recipient) + &hex::encode(fee_encoded),
     );
