@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2021-11-01
+
+### Added
+
+- Logging number of storage writes by [@birchmd]. ([#322](https://github.com/aurora-is-near/aurora-engine/pull/322))
+
+### Fixed
+
+- Show full address in logging transaction sender on `submit` by [@birchmd]. ([#321](https://github.com/aurora-is-near/aurora-engine/pull/321))
+
 ## [2.0.1] - 2021-11-01
 
 ### Added
@@ -123,6 +133,8 @@ struct SubmitResult {
 ## [1.0.0] - 2021-05-12
 
 [Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.0...master
+[2.0.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.0...2.0.2
+[2.0.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.0...2.0.1
 [2.0.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.7.0...2.0.0
 [1.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.4...1.7.0
 [1.6.4]: https://github.com/aurora-is-near/aurora-engine/compare/1.6.3...1.6.4
