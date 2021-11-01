@@ -372,6 +372,9 @@ impl Default for AuroraRunner {
         } else {
             std::fs::read("../betanet-test.wasm").unwrap()
         };
+        let mut wasm_config = VMConfig::default();
+        // See https://github.com/near/nearcore/pull/4979/
+        wasm_config.regular_op_cost = 2207874;
 
         Self {
             aurora_account_id: aurora_account_id.clone(),
@@ -397,8 +400,8 @@ impl Default for AuroraRunner {
                 view_config: None,
                 output_data_receivers: vec![],
             },
-            wasm_config: Default::default(),
-            fees_config: Default::default(),
+            wasm_config,
+            fees_config: RuntimeFeesConfig::test(),
             current_protocol_version: u32::MAX,
             previous_logs: Default::default(),
         }
@@ -648,4 +651,14 @@ pub fn panic_on_fail(status: TransactionStatus) {
         TransactionStatus::Revert(message) => panic!("{}", String::from_utf8_lossy(&message)),
         other => panic!("{}", String::from_utf8_lossy(other.as_ref())),
     }
+}
+
+pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
+    let bound = tgas_bound * 1_000_000_000_000;
+    assert!(
+        total_gas <= bound,
+        "{} Tgas is not less than {} Tgas",
+        total_gas / 1_000_000_000_000,
+        tgas_bound,
+    );
 }

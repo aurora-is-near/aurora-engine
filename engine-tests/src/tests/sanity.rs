@@ -69,12 +69,8 @@ fn test_deploy_largest_contract() {
         result.gas_used,
     );
 
-    // Less than 45 NEAR Tgas
-    assert!(
-        profile.all_gas() <= 45_000_000_000_000,
-        "{:?} not less than 45 Tgas",
-        profile.all_gas(),
-    );
+    // Less than 28 NEAR Tgas
+    test_utils::assert_gas_bound(profile.all_gas(), 28);
 }
 
 #[test]
@@ -202,7 +198,7 @@ fn test_num_wasm_functions() {
     let runner = test_utils::deploy_evm();
     let artifact = get_compiled_artifact(&runner);
     let module_info = artifact.info();
-    let num_functions = module_info.func_assoc.len();
+    let num_functions = module_info.functions.len();
     assert!(
         num_functions <= 1400,
         "{} is not less than 1400",
@@ -496,6 +492,28 @@ fn test_block_hash() {
 }
 
 #[test]
+fn test_block_hash_api() {
+    let mut runner = test_utils::deploy_evm();
+
+    let block_height: u64 = 10;
+    let (maybe_outcome, maybe_error) = runner.call(
+        "get_block_hash",
+        "any.near",
+        block_height.try_to_vec().unwrap(),
+    );
+    if let Some(error) = maybe_error {
+        panic!("Call failed: {:?}", error);
+    }
+    let outcome = maybe_outcome.unwrap();
+    let block_hash = outcome.return_data.as_value().unwrap();
+
+    assert_eq!(
+        hex::encode(&block_hash).as_str(),
+        "c4a46f076b64877cbd8c5dbfd7bfbbea21a5653b79e3b6d06b6dfb5c88f1c384",
+    );
+}
+
+#[test]
 fn test_block_hash_contract() {
     let (mut runner, mut source_account, _) = initialize_transfer();
     let test_constructor = test_utils::solidity::ContractConstructor::compile_from_source(
@@ -638,19 +656,24 @@ fn query_address_sim(
     }
 }
 
-fn get_compiled_artifact(
-    runner: &test_utils::AuroraRunner,
-) -> wasmer_runtime_core::cache::Artifact {
+fn get_compiled_artifact(runner: &test_utils::AuroraRunner) -> wasmer::Module {
     use near_primitives::types::CompiledContractCache;
 
-    near_vm_runner::precompile_contract(&runner.code, &runner.wasm_config, Some(&runner.cache))
-        .unwrap();
-    let cache_key = near_vm_runner::get_contract_cache_key(
+    let current_protocol_version = u32::MAX;
+    let vm_kind = near_vm_runner::VMKind::for_protocol_version(current_protocol_version);
+    near_vm_runner::precompile_contract(
         &runner.code,
-        Default::default(),
         &runner.wasm_config,
-    );
-    let cache_record: Vec<u8> =
+        current_protocol_version,
+        Some(&runner.cache),
+    )
+    .unwrap()
+    .unwrap();
+    let cache_key =
+        near_vm_runner::get_contract_cache_key(&runner.code, vm_kind, &runner.wasm_config);
+    let cache_record =
         Vec::try_from_slice(&runner.cache.get(cache_key.as_ref()).unwrap().unwrap()[1..]).unwrap();
-    wasmer_runtime_core::cache::Artifact::deserialize(&cache_record).unwrap()
+    let store = wasmer::Store::new(&wasmer::Universal::new(wasmer::Singlepass::new()).engine());
+
+    unsafe { wasmer::Module::deserialize(&store, &cache_record).unwrap() }
 }

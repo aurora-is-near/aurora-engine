@@ -3,7 +3,7 @@ use crate::parameters::{
 };
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
+use evm::executor;
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::connector::EthConnectorContract;
@@ -254,6 +254,29 @@ impl AsRef<[u8]> for EngineStateError {
             Self::NotFound => b"ERR_STATE_NOT_FOUND",
             Self::DeserializationFailed => b"ERR_STATE_CORRUPTED",
         }
+    }
+}
+
+struct StackExecutorParams {
+    precompiles: Precompiles,
+    gas_limit: u64,
+}
+
+impl StackExecutorParams {
+    fn new(gas_limit: u64) -> Self {
+        Self {
+            precompiles: Precompiles::new_istanbul(),
+            gas_limit,
+        }
+    }
+
+    fn make_executor<'a>(
+        &'a self,
+        engine: &'a Engine,
+    ) -> executor::StackExecutor<'static, 'a, executor::MemoryStackState<Engine>> {
+        let metadata = executor::StackSubstateMetadata::new(self.gas_limit, CONFIG);
+        let state = executor::MemoryStackState::new(metadata, engine);
+        executor::StackExecutor::new_with_precompile(state, CONFIG, &self.precompiles.0)
     }
 }
 
@@ -559,7 +582,8 @@ impl Engine {
         gas_limit: u64,
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
-        let mut executor = self.make_executor(gas_limit);
+        let executor_params = StackExecutorParams::new(gas_limit);
+        let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (exit_reason, result) = (
             executor.transact_create(origin, value.raw(), input, gas_limit, access_list),
@@ -580,11 +604,7 @@ impl Engine {
 
         self.apply(values, Vec::<Log>::new(), true);
 
-        Ok(SubmitResult {
-            status,
-            gas_used: used_gas,
-            logs,
-        })
+        Ok(SubmitResult::new(status, used_gas, logs))
     }
 
     pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<SubmitResult> {
@@ -603,7 +623,8 @@ impl Engine {
         gas_limit: u64,
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
-        let mut executor = self.make_executor(gas_limit);
+        let executor_params = StackExecutorParams::new(gas_limit);
+        let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
 
@@ -623,11 +644,7 @@ impl Engine {
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
 
-        Ok(SubmitResult {
-            status,
-            gas_used: used_gas,
-            logs,
-        })
+        Ok(SubmitResult::new(status, used_gas, logs))
     }
 
     pub fn increment_nonce(address: &Address) {
@@ -651,16 +668,11 @@ impl Engine {
         input: Vec<u8>,
         gas_limit: u64,
     ) -> Result<TransactionStatus, EngineErrorKind> {
-        let mut executor = self.make_executor(gas_limit);
+        let executor_params = StackExecutorParams::new(gas_limit);
+        let mut executor = executor_params.make_executor(self);
         let (status, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
         status.into_result(result)
-    }
-
-    fn make_executor(&self, gas_limit: u64) -> StackExecutor<MemoryStackState<Engine>> {
-        let metadata = StackSubstateMetadata::new(gas_limit, CONFIG);
-        let state = MemoryStackState::new(metadata, self);
-        StackExecutor::new_with_precompile(state, CONFIG, Precompiles::new_istanbul().0)
     }
 
     pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
@@ -1036,10 +1048,6 @@ impl ApplyBackend for Engine {
                 } => {
                     let generation = Self::get_generation(&address);
                     Engine::set_nonce(&address, &basic.nonce);
-
-                    // Apply changes for eth-connector
-                    EthConnectorContract::get_instance()
-                        .internal_set_eth_balance(&address, &basic.balance);
                     Engine::set_balance(&address, &Wei::new(basic.balance));
 
                     if let Some(code) = code {

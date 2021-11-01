@@ -338,16 +338,6 @@ impl EthConnectorContract {
         }
     }
 
-    /// Internal logic for explicitly setting an eth balance (needed by ApplyBackend for Engine)
-    pub(crate) fn internal_set_eth_balance(&mut self, address: &Address, amount: &U256) {
-        // Call to `as_u128` here should be fine because u128::MAX is a value greater than
-        // all the Wei in existence, so a u128 should always be able to represent
-        // the balance of a single account.
-        self.ft
-            .internal_set_eth_balance(address.0, amount.as_u128());
-        self.save_ft_contract();
-    }
-
     /// Internal ETH withdraw ETH logic
     pub(crate) fn internal_remove_eth(&mut self, address: &Address, amount: &U256) {
         self.burn_eth_on_aurora(address.0, amount.as_u128());

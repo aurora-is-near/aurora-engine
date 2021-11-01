@@ -4,8 +4,8 @@ use crate::json::{parse_json, JsonValue};
 use crate::parameters::{FtResolveTransfer, NEP141FtOnTransferArgs, StorageBalance};
 use crate::prelude::{
     sdk, storage, str_from_slice, AccountId, Address, BTreeMap, Balance, BorshDeserialize,
-    BorshSerialize, EthAddress, Gas, Ordering, PromiseResult, StorageBalanceBounds, StorageUsage,
-    String, ToString, TryInto, Vec, Wei, U256,
+    BorshSerialize, EthAddress, Gas, PromiseResult, StorageBalanceBounds, StorageUsage, String,
+    ToString, TryInto, Vec, Wei, U256,
 };
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
@@ -127,25 +127,6 @@ impl FungibleToken {
                 .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
         } else {
             sdk::panic_utf8(b"ERR_BALANCE_OVERFLOW");
-        }
-    }
-
-    /// Needed by engine to update balances after a transaction (see ApplyBackend for Engine)
-    pub(crate) fn internal_set_eth_balance(&mut self, address: EthAddress, new_balance: Balance) {
-        let current_balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
-        match current_balance.cmp(&new_balance) {
-            Ordering::Less => {
-                // current_balance is smaller, so we need to deposit
-                let diff = new_balance - current_balance;
-                self.internal_deposit_eth_to_aurora(address, diff);
-            }
-            Ordering::Greater => {
-                // current_balance is larger, so we need to withdraw
-                let diff = current_balance - new_balance;
-                self.internal_withdraw_eth_from_aurora(address, diff);
-            }
-            // if the balances are equal then we do not need to do anything
-            Ordering::Equal => (),
         }
     }
 

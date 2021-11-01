@@ -28,23 +28,15 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    assert!(
-        profile.all_gas() <= 165_000_000_000_000,
-        "{} is not less than 165 Tgas",
-        profile.all_gas(),
-    );
+    test_utils::assert_gas_bound(profile.all_gas(), 107);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
-    assert!(wasm_fraction >= 80, "{}% not more than 80%", wasm_fraction);
+    assert!(wasm_fraction >= 70, "{}% not more than 70%", wasm_fraction);
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    assert!(
-        profile.all_gas() <= 106_000_000_000_000,
-        "{} is not less than 106 Tgas",
-        profile.all_gas(),
-    );
+    test_utils::assert_gas_bound(profile.all_gas(), 68);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
-    assert!(wasm_fraction >= 80, "{}% not more than 80%", wasm_fraction);
+    assert!(wasm_fraction >= 72, "{}% not more than 72%", wasm_fraction);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

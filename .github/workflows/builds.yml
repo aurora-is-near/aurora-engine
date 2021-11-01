@@ -7,7 +7,7 @@ name: Builds
 jobs:
   release:
     name: Release
-    runs-on: self-hosted
+    runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
@@ -29,7 +29,7 @@ jobs:
         uses: EndBug/latest-tag@latest
   debug:
     name: Debug
-    runs-on: self-hosted
+    runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2

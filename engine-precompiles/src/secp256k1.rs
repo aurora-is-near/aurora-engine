@@ -89,7 +89,7 @@ impl Precompile for ECRecover {
         let v_bit = match v[31] {
             27 | 28 if v[..31] == [0; 31] => v[31] - 27,
             _ => {
-                return Ok(PrecompileOutput::without_logs(0, vec![255u8; 32]).into());
+                return Ok(PrecompileOutput::without_logs(cost, vec![255u8; 32]).into());
             }
         };
         signature[64] = v_bit; // v

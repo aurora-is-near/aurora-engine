@@ -9,31 +9,39 @@ on:
 name: Tests
 jobs:
   test:
-    strategy:
-      matrix:
-        net: [main, test, beta]
-    name: Test suite (${{ matrix.net }}net)
-    runs-on: self-hosted
+    name: Test suite (mainnet, testnet, betanet)
+    runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
       - name: Restore cache
         run: |
           cache-util restore cargo_git cargo_registry sccache yarn_cache
-          cache-util restore aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}:target
-      - run: make ${{ matrix.net }}net-test-build
+          cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+
+      - run: make mainnet-test-build
       - name: List directories
-        run: |
-          ls -la target/wasm32-unknown-unknown/release
-          ls -la
-      - run: cargo test --features ${{ matrix.net }}net-test
+        run: ls -la target/wasm32-unknown-unknown/release && ls -la
+      - run: cargo test --features mainnet-test
+
+      - run: make testnet-test-build
+      - name: List directories
+        run: ls -la target/wasm32-unknown-unknown/release && ls -la
+      - run: cargo test --features testnet-test
+
+      - run: make betanet-test-build
+      - name: List directories
+        run: ls -la target/wasm32-unknown-unknown/release && ls -la
+      - run: cargo test --features betanet-test
+ 
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
-          cache-util msave aurora-engine-target@${{ matrix.net }}net@${{ hashFiles('**/Cargo.lock') }}:target
+          cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+
   bully-build:
     name: Bully build
-    runs-on: self-hosted
+    runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2

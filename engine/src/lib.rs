@@ -246,11 +246,11 @@ mod contract {
                 // future when the state may have changed such that it could pass.
                 Err(GasPaymentError::OutOfFund) => {
                     Engine::increment_nonce(&sender);
-                    let result = SubmitResult {
-                        status: TransactionStatus::OutOfFund,
-                        gas_used: 0,
-                        logs: crate::prelude::Vec::new(),
-                    };
+                    let result = SubmitResult::new(
+                        TransactionStatus::OutOfFund,
+                        0,
+                        crate::prelude::Vec::new(),
+                    );
                     sdk::return_output(&result.try_to_vec().unwrap());
                     return;
                 }
@@ -410,6 +410,15 @@ mod contract {
         let engine = Engine::new(Address::from_slice(&args.sender)).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args).sdk_unwrap();
         sdk::return_output(&result.try_to_vec().sdk_expect("ERR_SERIALIZE"));
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_block_hash() {
+        let block_height = sdk::read_input_borsh().sdk_unwrap();
+        let account_id = sdk::current_account_id();
+        let chain_id = Engine::get_state().map(|state| state.chain_id).sdk_unwrap();
+        let block_hash = Engine::compute_block_hash(chain_id, block_height, &account_id);
+        sdk::return_output(block_hash.as_bytes())
     }
 
     #[no_mangle]
