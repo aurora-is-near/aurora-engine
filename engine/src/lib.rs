@@ -224,8 +224,7 @@ mod contract {
             .sender()
             .sdk_expect("ERR_INVALID_ECDSA_SIGNATURE");
 
-        #[cfg(feature = "log")]
-        sdk::log(crate::prelude::format!("signer_address {:?}", sender).as_str());
+        sdk::log!(crate::prelude::format!("signer_address {:?}", sender).as_str());
 
         Engine::check_nonce(&sender, signed_transaction.nonce()).sdk_unwrap();
 
