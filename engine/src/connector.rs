@@ -492,7 +492,7 @@ impl EthConnectorContract {
             args.receiver_id, args.amount,
         ));
         // Verify message data before `ft_on_transfer` call to avoid verification panics
-        if args.receiver_id == "aurora" {
+        if args.receiver_id.as_bytes() == &sdk::current_account_id()[..] {
             let message_data = self.parse_on_transfer_message(&args.msg);
             // Check is transfer amount > fee
             assert!(
