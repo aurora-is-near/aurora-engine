@@ -458,6 +458,100 @@ fn test_ft_transfer_call_eth() {
 }
 
 #[test]
+fn test_ft_transfer_call_without_message() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    call_deposit_eth_to_near(&contract, CONTRACT_ACC);
+
+    let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
+
+    let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE);
+
+    let res = contract.call(
+        CONTRACT_ACC.parse().unwrap(),
+        "register_relayer",
+        &RegisterRelayerCallArgs {
+            address: validate_eth_address(CUSTODIAN_ADDRESS),
+        }
+        .try_to_vec()
+        .unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    res.assert_success();
+
+    let transfer_amount = 50;
+    // Send to Aurora contract with wrong message should failed
+    let res = contract.call(
+        CONTRACT_ACC.parse().unwrap(),
+        "ft_transfer_call",
+        json!({
+            "receiver_id": CONTRACT_ACC,
+            "amount": transfer_amount.to_string(),
+            "msg": "",
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    match res.outcome().status {
+        ExecutionStatus::Failure(_) => {}
+        _ => panic!("should panice"),
+    }
+
+    // Sending to excternal receiver with empty message should be success
+    let transfer_amount = 22;
+    let res = contract.call(
+        CONTRACT_ACC.parse().unwrap(),
+        "ft_transfer_call",
+        json!({
+            "receiver_id": "some-test-acc",
+            "amount": transfer_amount.to_string(),
+            "msg": "",
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+
+    let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
+
+    let balance = get_eth_on_near_balance(&master_account, "some-test-acc", CONTRACT_ACC);
+    assert_eq!(balance, 2 * transfer_amount);
+
+    let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE - 2 * transfer_amount);
+
+    let balance = get_eth_balance(
+        &master_account,
+        validate_eth_address(RECIPIENT_ETH_ADDRESS),
+        CONTRACT_ACC,
+    );
+    assert_eq!(balance, 0);
+
+    let balance = get_eth_balance(
+        &master_account,
+        validate_eth_address(CUSTODIAN_ADDRESS),
+        CONTRACT_ACC,
+    );
+    assert_eq!(balance, 0);
+
+    let balance = total_supply(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT);
+
+    let balance = total_eth_supply_on_near(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT);
+
+    let balance = total_eth_supply_on_aurora(&master_account, CONTRACT_ACC);
+    assert_eq!(balance, 0);
+}
+
+#[test]
 fn test_deposit_with_same_proof() {
     let (_master_account, contract) = init(CUSTODIAN_ADDRESS);
 

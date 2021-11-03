@@ -508,12 +508,14 @@ impl EthConnectorContract {
                 .ft
                 .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
             assert!(amount_for_check.checked_add(args.amount).is_some());
+
+            // It'll call only on Aurora contract
+            assert!(self
+                .ft
+                .total_eth_supply_on_aurora
+                .checked_add(args.amount)
+                .is_some());
         }
-        assert!(self
-            .ft
-            .total_eth_supply_on_aurora
-            .checked_add(args.amount)
-            .is_some());
 
         self.ft
             .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
