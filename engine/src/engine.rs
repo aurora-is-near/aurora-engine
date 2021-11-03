@@ -1108,8 +1108,8 @@ impl ApplyBackend for Engine {
         if code_bytes_written > 0 {
             writes_counter += 1;
         }
-        sdk::log!(crate::prelude::format!("total_writes_count: {}", writes_counter).as_str());
-        sdk::log!(crate::prelude::format!("total_bytes_written: {}", total_bytes).as_str());
+        sdk::log!(crate::prelude::format!("total_writes_count {}", writes_counter).as_str());
+        sdk::log!(crate::prelude::format!("total_bytes_written {}", total_bytes).as_str());
     }
 }
 
