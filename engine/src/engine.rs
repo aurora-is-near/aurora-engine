@@ -1037,6 +1037,8 @@ impl ApplyBackend for Engine {
         I: IntoIterator<Item = (H256, H256)>,
         L: IntoIterator<Item = Log>,
     {
+        let mut writes_counter: usize = 0;
+        let mut code_bytes_written: usize = 0;
         for apply in values {
             match apply {
                 Apply::Modify {
@@ -1049,9 +1051,17 @@ impl ApplyBackend for Engine {
                     let generation = Self::get_generation(&address);
                     Engine::set_nonce(&address, &basic.nonce);
                     Engine::set_balance(&address, &Wei::new(basic.balance));
+                    writes_counter += 2; // 1 for nonce, 1 for balance
 
                     if let Some(code) = code {
-                        Engine::set_code(&address, &code)
+                        Engine::set_code(&address, &code);
+                        code_bytes_written = code.len();
+                        sdk::log!(crate::prelude::format!(
+                            "code_write_at_address {:?} {}",
+                            address,
+                            code_bytes_written,
+                        )
+                        .as_str());
                     }
 
                     let next_generation = if reset_storage {
@@ -1067,6 +1077,7 @@ impl ApplyBackend for Engine {
                         } else {
                             Engine::set_storage(&address, &index, &value, next_generation)
                         }
+                        writes_counter += 1;
                     }
 
                     // We only need to remove the account if:
@@ -1079,14 +1090,26 @@ impl ApplyBackend for Engine {
                         && generation == next_generation
                     {
                         Engine::remove_account(&address, generation);
+                        writes_counter += 1;
                     }
                 }
                 Apply::Delete { address } => {
                     let generation = Self::get_generation(&address);
                     Engine::remove_account(&address, generation);
+                    writes_counter += 1;
                 }
             }
         }
+        // These variable are only used if logging feature is enabled.
+        // In production logging is always enabled so we can ignore the warnings.
+        #[allow(unused_variables)]
+        let total_bytes = 32 * writes_counter + code_bytes_written;
+        #[allow(unused_assignments)]
+        if code_bytes_written > 0 {
+            writes_counter += 1;
+        }
+        sdk::log!(crate::prelude::format!("total_writes_count {}", writes_counter).as_str());
+        sdk::log!(crate::prelude::format!("total_written_bytes {}", total_bytes).as_str());
     }
 }
 
