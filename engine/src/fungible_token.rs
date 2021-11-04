@@ -1,7 +1,7 @@
 use crate::connector::NO_DEPOSIT;
 use crate::engine::Engine;
 use crate::json::{parse_json, JsonValue};
-use crate::parameters::{FtResolveTransfer, NEP141FtOnTransferArgs, StorageBalance};
+use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     sdk, storage, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress, Gas,
@@ -233,16 +233,15 @@ impl FungibleToken {
         let data1: String = NEP141FtOnTransferArgs {
             amount,
             msg,
-            sender_id: receiver_id.clone(),
+            sender_id: sender_id.clone(),
         }
         .try_into()
         .unwrap();
 
-        let account_id = AccountId::try_from(sdk::current_account_id()).unwrap();
-        let data2 = FtResolveTransfer {
+        let data2 = ResolveTransferCallArgs {
             receiver_id: receiver_id.clone(),
             amount,
-            current_account_id: account_id,
+            sender_id: sender_id.clone(),
         }
         .try_to_vec()
         .unwrap();

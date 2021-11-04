@@ -224,6 +224,8 @@ mod contract {
             .sender()
             .sdk_expect("ERR_INVALID_ECDSA_SIGNATURE");
 
+        sdk::log!(crate::prelude::format!("signer_address {:?}", sender).as_str());
+
         Engine::check_nonce(&sender, signed_transaction.nonce()).sdk_unwrap();
 
         // Check intrinsic gas is covered by transaction gas limit
