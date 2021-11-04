@@ -460,6 +460,7 @@ fn test_ft_transfer_call_eth() {
 #[test]
 fn test_ft_transfer_call_without_message() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+    let recipient_account = create_user_account(&master_account);
     call_deposit_eth_to_near(&contract, CONTRACT_ACC);
 
     let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
@@ -498,12 +499,18 @@ fn test_ft_transfer_call_without_message() {
     );
     match res.outcome().status {
         ExecutionStatus::Failure(_) => {}
-        _ => panic!("should panice"),
+        _ => panic!("Expected execution failure"),
     }
 
-    // Sending to excternal receiver with empty message should be success
+    // Assert balances remain unchanged
+    let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
+    let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE);
+
+    // Sending to random account should not change balances
     let transfer_amount = 22;
-    let res = contract.call(
+    let res = recipient_account.call(
         CONTRACT_ACC.parse().unwrap(),
         "ft_transfer_call",
         json!({
@@ -518,14 +525,45 @@ fn test_ft_transfer_call_without_message() {
     );
     res.assert_success();
 
+    // some-test-acc does not implement `ft_on_transfer` therefore the call fails and the transfer is reverted.
     let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
-
     let balance = get_eth_on_near_balance(&master_account, "some-test-acc", CONTRACT_ACC);
-    assert_eq!(balance, 2 * transfer_amount);
-
+    assert_eq!(balance, 0);
     let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE - 2 * transfer_amount);
+    assert_eq!(balance, DEPOSITED_FEE);
+
+    // Sending to external receiver with empty message should be success
+    let dummy_ft_receiver = master_account.deploy(
+        &dummy_ft_receiver_bytes(),
+        "ft-rec".parse().unwrap(),
+        near_sdk_sim::STORAGE_AMOUNT,
+    );
+    let res = recipient_account.call(
+        CONTRACT_ACC.parse().unwrap(),
+        "ft_transfer_call",
+        json!({
+            "receiver_id": dummy_ft_receiver.account_id(),
+            "amount": transfer_amount.to_string(),
+            "msg": "",
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+
+    let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE - transfer_amount);
+    let balance = get_eth_on_near_balance(
+        &master_account,
+        dummy_ft_receiver.account_id().as_ref(),
+        CONTRACT_ACC,
+    );
+    assert_eq!(balance, transfer_amount);
+    let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE);
 
     let balance = get_eth_balance(
         &master_account,
@@ -1362,4 +1400,12 @@ fn test_ft_transfer_wrong_u128_json_type() {
         "ERR_EXPECTED_STRING_GOT_NUMBER",
         "Expected failure as number type can't be parsed to u128",
     );
+}
+
+/// Bytes for a NEAR smart contract implementing `ft_on_transfer`
+fn dummy_ft_receiver_bytes() -> Vec<u8> {
+    let base_path = std::path::Path::new("../etc").join("ft-receiver");
+    let output_path = base_path.join("target/wasm32-unknown-unknown/release/ft_receiver.wasm");
+    crate::test_utils::rust::compile(base_path);
+    std::fs::read(output_path).unwrap()
 }
