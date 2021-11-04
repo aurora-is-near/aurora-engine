@@ -36,5 +36,6 @@ members = [
     "engine-tests"
 ]
 exclude = [
-    "etc/state-migration-test"
+    "etc/state-migration-test",
+    "etc/ft-receiver",
 ]
