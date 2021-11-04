@@ -1,11 +1,10 @@
 use crate::prelude::U256;
-use crate::test_utils::AuroraRunner;
+use crate::test_utils::{self, AuroraRunner};
 use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 #[test]
 fn test_state_migration() {
@@ -90,18 +89,6 @@ fn contract_bytes() -> Vec<u8> {
     let base_path = Path::new("../etc").join("state-migration-test");
     let output_path = base_path
         .join("target/wasm32-unknown-unknown/release/aurora_engine_state_migration_test.wasm");
-    compile(base_path);
+    test_utils::rust::compile(base_path);
     fs::read(output_path).unwrap()
-}
-
-fn compile<P: AsRef<Path>>(source_path: P) {
-    let output = Command::new("cargo")
-        .current_dir(source_path)
-        .args(&["build", "--target", "wasm32-unknown-unknown", "--release"])
-        .output()
-        .unwrap();
-
-    if !output.status.success() {
-        panic!("{}", String::from_utf8(output.stderr).unwrap());
-    }
 }
