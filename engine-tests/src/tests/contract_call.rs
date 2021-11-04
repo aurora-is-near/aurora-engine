@@ -1,14 +1,12 @@
-use crate::prelude::account_id::AccountId;
 use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
 use crate::test_utils::{origin, AuroraRunner, Signer};
-use core::str::FromStr;
 
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS};
 
 fn setup_test() -> (AuroraRunner, Signer, [u8; 20], Tester) {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&AccountId::from_str("tt.testnet").unwrap());
+    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
     let mut signer = test_utils::Signer::random();
     runner.create_address(
         test_utils::address_from_secret_key(&signer.secret_key),
@@ -72,7 +70,6 @@ fn withdraw() {
         let exit_events = parse_exit_events(withdraw_result, &schema);
 
         // One exit event
-        println!("{:#?}", exit_events);
         assert!(exit_events.len() == 1);
 
         let dest = if is_to_near {
@@ -165,16 +162,12 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
     ];
 
     for (flag, expected) in test_data {
-        println!("flag: {}", flag);
+        println!("{}", flag);
         assert!(tester
             .try_withdraw_and_avoid_fail_and_succeed(&mut runner, &mut signer, flag)
             .is_ok());
         // One promise is scheduled
-        println!(
-            "tester: {:?} {:?}",
-            runner.previous_logs,
-            expected.to_string()
-        );
+        println!("{:?} {:?}", runner.previous_logs, expected.to_string());
         assert!(runner.previous_logs.contains(&expected.to_string()));
     }
 }

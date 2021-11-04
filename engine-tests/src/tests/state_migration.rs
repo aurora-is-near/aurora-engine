@@ -1,7 +1,6 @@
 use crate::prelude::U256;
-use crate::test_utils::AuroraRunner;
+use crate::test_utils::{str_to_account_id, AuroraRunner};
 use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
-use aurora_engine_types::account_id::AccountId;
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
 use std::fs;
@@ -34,10 +33,10 @@ pub fn deploy_evm() -> AuroraAccount {
         aurora_runner.aurora_account_id.parse().unwrap(),
         5 * near_sdk_sim::STORAGE_AMOUNT,
     );
-    let prover_account = AccountId::new("prover.near").unwrap();
+    let prover_account = str_to_account_id("prover.near");
     let new_args = NewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(aurora_runner.chain_id)),
-        owner_id: AccountId::new(main_account.account_id.clone().as_str()).unwrap(),
+        owner_id: str_to_account_id(main_account.account_id.clone().as_str()),
         bridge_prover_id: prover_account.clone(),
         upgrade_delay_blocks: 1,
     };

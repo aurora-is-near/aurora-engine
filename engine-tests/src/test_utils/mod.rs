@@ -1,5 +1,5 @@
+use aurora_engine_types::account_id::AccountId;
 use borsh::{BorshDeserialize, BorshSerialize};
-use core::str::FromStr;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
@@ -11,7 +11,6 @@ use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
-use crate::prelude::account_id::AccountId;
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::prelude::parameters::{
     InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs,
@@ -20,13 +19,13 @@ use crate::prelude::transaction::{
     access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
     LegacyEthSignedTransaction, LegacyEthTransaction,
 };
-use crate::prelude::{sdk, Address, TryFrom, Wei, U256};
+use crate::prelude::{sdk, Address, Wei, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
-pub fn origin() -> AccountId {
-    AccountId::from_str("aurora").unwrap()
+pub fn origin() -> String {
+    "aurora".to_string()
 }
 
 pub(crate) const SUBMIT: &str = "submit";
@@ -441,8 +440,8 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     let args = NewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
-        owner_id: AccountId::try_from(runner.aurora_account_id.clone()).unwrap(),
-        bridge_prover_id: AccountId::from_str("bridge_prover.near").unwrap(),
+        owner_id: str_to_account_id(runner.aurora_account_id.as_str()),
+        bridge_prover_id: str_to_account_id("bridge_prover.near"),
         upgrade_delay_blocks: 1,
     };
 
@@ -452,7 +451,7 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     assert!(maybe_error.is_none());
 
     let args = InitCallArgs {
-        prover_account: AccountId::from_str("prover.near").unwrap(),
+        prover_account: str_to_account_id("prover.near"),
         eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
         metadata: FungibleTokenMetadata::default(),
     };
@@ -624,6 +623,11 @@ pub(crate) fn address_from_hex(address: &str) -> Address {
 
 pub(crate) fn as_account_id(account_id: &str) -> near_primitives_core::types::AccountId {
     account_id.parse().unwrap()
+}
+
+pub(crate) fn str_to_account_id(account_id: &str) -> AccountId {
+    use aurora_engine_types::str::FromStr;
+    AccountId::from_str(account_id).unwrap()
 }
 
 pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {

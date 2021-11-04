@@ -1,7 +1,7 @@
-use crate::prelude::account_id::AccountId;
+use crate::prelude::EthAddress;
 use crate::prelude::WithdrawCallArgs;
 use crate::prelude::U256;
-use crate::prelude::{EthAddress, TryFrom};
+use crate::test_utils::str_to_account_id;
 use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
 use aurora_engine::connector::{
     ERR_NOT_ENOUGH_BALANCE_FOR_FEE, PAUSE_DEPOSIT, PAUSE_WITHDRAW, UNPAUSE_ALL,
@@ -69,9 +69,8 @@ fn init_contract(
             "new",
             &NewCallArgs {
                 chain_id: [0u8; 32],
-                owner_id: AccountId::try_from(master_account.account_id.clone().to_string())
-                    .unwrap(),
-                bridge_prover_id: AccountId::try_from(accounts(0).to_string()).unwrap(),
+                owner_id: str_to_account_id(master_account.account_id.clone().as_str()),
+                bridge_prover_id: str_to_account_id(accounts(0).as_str()),
                 upgrade_delay_blocks: 1,
             }
             .try_to_vec()
@@ -80,16 +79,13 @@ fn init_contract(
             STORAGE_AMOUNT,
         )
         .assert_success();
-
-    //AccountId::try_from(custodian_address.to_string()).unwrap()
-    println!("# {:?}", custodian_address);
     contract_account
         .call(
             contract_name.parse().unwrap(),
             "new_eth_connector",
             &InitCallArgs {
-                prover_account: AccountId::try_from(PROVER_ACCOUNT.to_string()).unwrap(),
-                eth_custodian_address: custodian_address.to_string(),
+                prover_account: str_to_account_id(PROVER_ACCOUNT.into()),
+                eth_custodian_address: custodian_address.into(),
                 metadata: FungibleTokenMetadata::default(),
             }
             .try_to_vec()
