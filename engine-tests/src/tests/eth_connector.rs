@@ -534,8 +534,8 @@ fn test_ft_transfer_call_without_message() {
     assert_eq!(balance, DEPOSITED_FEE);
 
     // Sending to external receiver with empty message should be success
-    let ft_receiver = master_account.deploy(
-        &ft_receiver_bytes(),
+    let dummy_ft_receiver = master_account.deploy(
+        &dummy_ft_receiver_bytes(),
         "ft-rec".parse().unwrap(),
         near_sdk_sim::STORAGE_AMOUNT,
     );
@@ -543,7 +543,7 @@ fn test_ft_transfer_call_without_message() {
         CONTRACT_ACC.parse().unwrap(),
         "ft_transfer_call",
         json!({
-            "receiver_id": ft_receiver.account_id(),
+            "receiver_id": dummy_ft_receiver.account_id(),
             "amount": transfer_amount.to_string(),
             "msg": "",
         })
@@ -558,7 +558,7 @@ fn test_ft_transfer_call_without_message() {
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE - transfer_amount);
     let balance = get_eth_on_near_balance(
         &master_account,
-        ft_receiver.account_id().as_ref(),
+        dummy_ft_receiver.account_id().as_ref(),
         CONTRACT_ACC,
     );
     assert_eq!(balance, transfer_amount);
@@ -1403,7 +1403,7 @@ fn test_ft_transfer_wrong_u128_json_type() {
 }
 
 /// Bytes for a NEAR smart contract implementing `ft_on_transfer`
-fn ft_receiver_bytes() -> Vec<u8> {
+fn dummy_ft_receiver_bytes() -> Vec<u8> {
     let base_path = std::path::Path::new("../etc").join("ft-receiver");
     let output_path = base_path.join("target/wasm32-unknown-unknown/release/ft_receiver.wasm");
     crate::test_utils::rust::compile(base_path);

@@ -6,10 +6,10 @@ use near_sdk::{near_bindgen, log, PromiseOrValue};
 /// Will happily take and NEP-141
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, Default)]
-struct FTR;
+struct DummyFungibleTokenReceiver;
 
 #[near_bindgen]
-impl FungibleTokenReceiver for FTR {
+impl FungibleTokenReceiver for DummyFungibleTokenReceiver {
     fn ft_on_transfer(
         &mut self,
         sender_id: ValidAccountId,
