@@ -11,7 +11,7 @@ mod costs {
 
     pub(super) const RIPEMD160_BASE: u64 = 600;
 
-    pub(super) const RIPEMD160_PER_WORD: u64 = 12;
+    pub(super) const RIPEMD160_PER_WORD: u64 = 120;
 }
 
 mod consts {
