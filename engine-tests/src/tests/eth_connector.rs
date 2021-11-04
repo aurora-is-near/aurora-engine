@@ -460,10 +460,7 @@ fn test_ft_transfer_call_eth() {
 #[test]
 fn test_ft_transfer_call_without_message() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
-    let recipient_account = master_account.create_user(
-        DEPOSITED_RECIPIENT.parse().unwrap(),
-        near_sdk_sim::STORAGE_AMOUNT,
-    );
+    let recipient_account = create_user_account(&master_account);
     call_deposit_eth_to_near(&contract, CONTRACT_ACC);
 
     let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
