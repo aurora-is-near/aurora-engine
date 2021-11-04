@@ -258,14 +258,6 @@ pub struct WithdrawResult {
     pub eth_custodian_address: RawAddress,
 }
 
-/// ft_resolve_transfer eth-connector call args
-#[derive(BorshSerialize)]
-pub struct FtResolveTransfer {
-    pub receiver_id: AccountId,
-    pub amount: Balance,
-    pub current_account_id: AccountId,
-}
-
 /// Fungible token storage balance
 #[derive(Default)]
 pub struct StorageBalance {
@@ -285,7 +277,7 @@ impl StorageBalance {
     }
 }
 
-/// resolve_transfer eth-connector call args
+/// ft_resolve_transfer eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct ResolveTransferCallArgs {
     pub sender_id: AccountId,

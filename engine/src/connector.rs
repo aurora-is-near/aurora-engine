@@ -492,26 +492,30 @@ impl EthConnectorContract {
             args.receiver_id, args.amount,
         ));
         // Verify message data before `ft_on_transfer` call to avoid verification panics
-        let message_data = self.parse_on_transfer_message(&args.msg);
-        // Check is transfer amount > fee
-        assert!(
-            args.amount > message_data.fee.as_u128(),
-            "{}",
-            ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
-        );
+        if args.receiver_id.as_bytes() == &sdk::current_account_id()[..] {
+            let message_data = self.parse_on_transfer_message(&args.msg);
+            // Check is transfer amount > fee
+            assert!(
+                args.amount > message_data.fee.as_u128(),
+                "{}",
+                ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
+            );
 
-        // Additional check overflow before process `ft_on_transfer`
-        // But don't check overflow for relayer
-        // Note: It can't overflow because the total supply doesn't change during transfer.
-        let amount_for_check = self
-            .ft
-            .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
-        assert!(amount_for_check.checked_add(args.amount).is_some());
-        assert!(self
-            .ft
-            .total_eth_supply_on_aurora
-            .checked_add(args.amount)
-            .is_some());
+            // Additional check overflow before process `ft_on_transfer`
+            // But don't check overflow for relayer
+            // Note: It can't overflow because the total supply doesn't change during transfer.
+            let amount_for_check = self
+                .ft
+                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
+            assert!(amount_for_check.checked_add(args.amount).is_some());
+
+            // It'll call only on Aurora contract
+            assert!(self
+                .ft
+                .total_eth_supply_on_aurora
+                .checked_add(args.amount)
+                .is_some());
+        }
 
         self.ft
             .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
