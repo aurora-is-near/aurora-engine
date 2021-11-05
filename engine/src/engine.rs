@@ -9,17 +9,16 @@ use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 use crate::connector::EthConnectorContract;
 #[cfg(feature = "contract")]
 use crate::contract::current_address;
-use crate::map::{BijectionMap, LookupMap};
+use crate::map::BijectionMap;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::near_runtime::Runtime;
 
 use crate::parameters::{NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, AccountId, Address,
-    BorshDeserialize, BorshSerialize, KeyPrefix, KeyPrefixU8, PromiseArgs, PromiseCreateArgs,
-    TryFrom, TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
+    BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, TryFrom, TryInto,
+    Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
 };
 use crate::transaction::NormalizedEthTransaction;
 
@@ -201,6 +200,44 @@ impl From<BalanceOverflow> for GasPaymentError {
     }
 }
 
+pub struct ERC20Address(Address);
+impl AsRef<[u8]> for ERC20Address {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+impl TryFrom<Vec<u8>> for ERC20Address {
+    type Error = AddressParseError;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        if bytes.len() == 20 {
+            Ok(Self(Address::from_slice(&bytes)))
+        } else {
+            Err(AddressParseError)
+        }
+    }
+}
+pub struct AddressParseError;
+impl AsRef<[u8]> for AddressParseError {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_PARSE_ADDRESS"
+    }
+}
+
+pub struct NEP141Account(AccountId);
+impl AsRef<[u8]> for NEP141Account {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+impl TryFrom<Vec<u8>> for NEP141Account {
+    type Error = aurora_engine_types::account_id::ParseAccountError;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        AccountId::try_from(bytes).map(Self)
+    }
+}
+
 pub const ERR_INVALID_NEP141_ACCOUNT_ID: &str = "ERR_INVALID_NEP141_ACCOUNT_ID";
 
 #[derive(Debug)]
@@ -274,7 +311,7 @@ impl StackExecutorParams {
         }
     }
 
-    fn make_executor<'a, I: IO + Default + Copy>(
+    fn make_executor<'a, I: IO + Copy>(
         &'a self,
         engine: &'a Engine<I>,
     ) -> executor::StackExecutor<'static, 'a, executor::MemoryStackState<Engine<I>>, Precompiles>
@@ -306,9 +343,6 @@ pub struct EngineState {
     pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
-    /// Mapping between relayer account id and relayer evm address
-    pub relayers_evm_addresses:
-        LookupMap<Runtime, { KeyPrefix::RelayerEvmAddressMap as KeyPrefixU8 }>,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -318,7 +352,6 @@ impl From<NewCallArgs> for EngineState {
             owner_id: args.owner_id,
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-            relayers_evm_addresses: LookupMap::default(),
         }
     }
 }
@@ -336,7 +369,7 @@ pub(crate) const CONFIG: &Config = &Config::london();
 /// Key for storing the state of the engine.
 const STATE_KEY: &[u8; 5] = b"STATE";
 
-impl<I: IO + Copy + Default> Engine<I> {
+impl<I: IO + Copy> Engine<I> {
     pub fn new(origin: Address, io: I) -> Result<Self, EngineStateError> {
         Engine::get_state(&io).map(|state| Self::new_with_state(state, origin, io))
     }
@@ -688,26 +721,32 @@ impl<I: IO + Copy + Default> Engine<I> {
         status.into_result(result)
     }
 
-    pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
-        self.state
-            .relayers_evm_addresses
-            .insert_raw(account_id, evm_address.as_bytes());
+    fn relayer_key(account_id: &[u8]) -> Vec<u8> {
+        bytes_to_key(KeyPrefix::RelayerEvmAddressMap, account_id)
     }
 
-    #[allow(dead_code)]
+    pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
+        let key = Self::relayer_key(account_id);
+        self.io.write_storage(&key, evm_address.as_bytes());
+    }
+
     pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
-        self.state
-            .relayers_evm_addresses
-            .get_raw(account_id)
-            .map(|result| Address(result.as_slice().try_into().unwrap()))
+        let key = Self::relayer_key(account_id);
+        self.io
+            .read_storage(&key)
+            .map(|v| Address::from_slice(&v.to_vec()))
+    }
+
+    pub fn nep141_erc20_map(io: I) -> BijectionMap<NEP141Account, ERC20Address, I> {
+        BijectionMap::new(KeyPrefix::Nep141Erc20Map, KeyPrefix::Erc20Nep141Map, io)
     }
 
     pub fn register_token(
         &mut self,
-        erc20_token: &[u8],
-        nep141_token: &[u8],
+        erc20_token: Address,
+        nep141_token: AccountId,
     ) -> Result<(), RegisterTokenError> {
-        match Self::get_erc20_from_nep141(self.io, nep141_token) {
+        match Self::get_erc20_from_nep141(&self.io, &nep141_token) {
             Err(GetErc20FromNep141Error::Nep141NotFound) => (),
             Err(GetErc20FromNep141Error::InvalidNep141AccountId) => {
                 return Err(RegisterTokenError::InvalidNep141AccountId);
@@ -715,19 +754,19 @@ impl<I: IO + Copy + Default> Engine<I> {
             Ok(_) => return Err(RegisterTokenError::TokenAlreadyRegistered),
         }
 
-        Self::nep141_erc20_map(self.io).insert(nep141_token, erc20_token);
+        let erc20_token = ERC20Address(erc20_token);
+        let nep141_token = NEP141Account(nep141_token);
+        Self::nep141_erc20_map(self.io).insert(&nep141_token, &erc20_token);
         Ok(())
     }
 
     pub fn get_erc20_from_nep141(
-        io: I,
-        nep141_account_id: &[u8],
+        io: &I,
+        nep141_account_id: &AccountId,
     ) -> Result<Vec<u8>, GetErc20FromNep141Error> {
-        AccountId::try_from(nep141_account_id)
-            .map_err(|_| GetErc20FromNep141Error::InvalidNep141AccountId)?;
-
-        Self::nep141_erc20_map(io)
-            .lookup_left(nep141_account_id)
+        let key = bytes_to_key(KeyPrefix::Nep141Erc20Map, nep141_account_id.as_bytes());
+        io.read_storage(&key)
+            .map(|v| v.to_vec())
             .ok_or(GetErc20FromNep141Error::Nep141NotFound)
     }
 
@@ -787,10 +826,10 @@ impl<I: IO + Copy + Default> Engine<I> {
             (recipient, fee)
         };
 
-        let token = sdk::predecessor_account_id();
+        let token = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
         let erc20_token = Address(unwrap_res_or_finish!(
             unwrap_res_or_finish!(
-                Self::get_erc20_from_nep141(self.io, &token),
+                Self::get_erc20_from_nep141(&self.io, &token),
                 output_on_fail,
                 self.io
             )
@@ -876,16 +915,6 @@ impl<I: IO + Copy + Default> Engine<I> {
         // TODO(marX)
         // Everything succeed so return "0"
         self.io.return_output(b"\"0\"");
-    }
-
-    pub fn nep141_erc20_map(
-        io: I,
-    ) -> BijectionMap<
-        I,
-        { KeyPrefix::Nep141Erc20Map as KeyPrefixU8 },
-        { KeyPrefix::Erc20Nep141Map as KeyPrefixU8 },
-    > {
-        BijectionMap { io }
     }
 
     fn filter_promises_from_logs<T: IntoIterator<Item = Log>>(logs: T) -> Vec<ResultLog> {
@@ -984,7 +1013,7 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
     sdk::sha256(&data)
 }
 
-impl<I: IO + Default + Copy> evm::backend::Backend for Engine<I> {
+impl<I: IO + Copy> evm::backend::Backend for Engine<I> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
         self.gas_price
@@ -1115,7 +1144,7 @@ impl<I: IO + Default + Copy> evm::backend::Backend for Engine<I> {
     }
 }
 
-impl<J: IO + Default + Copy> ApplyBackend for Engine<J> {
+impl<J: IO + Copy> ApplyBackend for Engine<J> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,

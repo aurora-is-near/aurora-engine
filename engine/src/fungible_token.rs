@@ -14,7 +14,29 @@ const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
-pub struct FungibleToken<I: IO + Default> {
+pub struct FungibleToken {
+    /// Total ETH supply on Near (nETH as NEP-141 token)
+    pub total_eth_supply_on_near: Balance,
+
+    /// Total ETH supply on Aurora (ETH in Aurora EVM)
+    pub total_eth_supply_on_aurora: Balance,
+
+    /// The storage size in bytes for one account.
+    pub account_storage_usage: StorageUsage,
+}
+
+impl FungibleToken {
+    pub fn ops<I: IO>(self, io: I) -> FungibleTokenOps<I> {
+        FungibleTokenOps {
+            total_eth_supply_on_near: self.total_eth_supply_on_near,
+            total_eth_supply_on_aurora: self.total_eth_supply_on_aurora,
+            account_storage_usage: self.account_storage_usage,
+            io,
+        }
+    }
+}
+
+pub struct FungibleTokenOps<I: IO> {
     /// Total ETH supply on Near (nETH as NEP-141 token)
     pub total_eth_supply_on_near: Balance,
 
@@ -24,7 +46,6 @@ pub struct FungibleToken<I: IO + Default> {
     /// The storage size in bytes for one account.
     pub account_storage_usage: StorageUsage,
 
-    #[borsh_skip]
     io: I,
 }
 
@@ -89,9 +110,17 @@ impl From<FungibleTokenMetadata> for JsonValue {
     }
 }
 
-impl<I: IO + Copy + Default> FungibleToken<I> {
-    pub fn new() -> Self {
-        Self::default()
+impl<I: IO + Copy> FungibleTokenOps<I> {
+    pub fn new(io: I) -> Self {
+        FungibleToken::default().ops(io)
+    }
+
+    pub fn data(&self) -> FungibleToken {
+        FungibleToken {
+            total_eth_supply_on_near: self.total_eth_supply_on_near,
+            total_eth_supply_on_aurora: self.total_eth_supply_on_aurora,
+            account_storage_usage: self.account_storage_usage,
+        }
     }
 
     /// Balance of nETH (ETH on NEAR token)

@@ -417,9 +417,7 @@ mod contract {
         };
 
         sdk::log!(crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str());
-        engine
-            .register_token(address.as_bytes(), args.nep141.as_bytes())
-            .sdk_unwrap();
+        engine.register_token(address, args.nep141).sdk_unwrap();
         io.return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
 
         // TODO: charge for storage
@@ -742,7 +740,7 @@ mod contract {
         let args: GetErc20FromNep141CallArgs = io.read_input_borsh().sdk_unwrap();
 
         io.return_output(
-            Engine::get_erc20_from_nep141(io, args.nep141.as_bytes())
+            Engine::get_erc20_from_nep141(&io, &args.nep141)
                 .sdk_unwrap()
                 .as_slice(),
         );
@@ -751,11 +749,13 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_nep141_from_erc20() {
         let mut io = Runtime;
+        let erc20_address: crate::engine::ERC20Address =
+            io.read_input().to_vec().try_into().sdk_unwrap();
         io.return_output(
             Engine::nep141_erc20_map(io)
-                .lookup_right(io.read_input().to_vec().as_slice())
+                .lookup_right(&erc20_address)
                 .sdk_expect("ERC20_NOT_FOUND")
-                .as_slice(),
+                .as_ref(),
         );
     }
 

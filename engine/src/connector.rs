@@ -1,7 +1,7 @@
 use crate::admin_controlled::{AdminControlled, PausedMask};
 use crate::deposit_event::DepositedEvent;
 use crate::engine::Engine;
-use crate::fungible_token::{FungibleToken, FungibleTokenMetadata};
+use crate::fungible_token::{FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::json::parse_json;
 use crate::parameters::{
     BalanceOfCallArgs, BalanceOfEthCallArgs, FinishDepositCallArgs, InitCallArgs,
@@ -29,10 +29,9 @@ pub const UNPAUSE_ALL: PausedMask = 0;
 pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
 pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct EthConnectorContract<I: IO + Default> {
+pub struct EthConnectorContract<I: IO> {
     contract: EthConnector,
-    ft: FungibleToken<I>,
+    ft: FungibleTokenOps<I>,
     paused_mask: PausedMask,
     io: I,
 }
@@ -62,11 +61,15 @@ pub struct OnTransferMessageData {
     pub fee: U256,
 }
 
-impl<I: IO + Default + Copy> EthConnectorContract<I> {
+impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn get_instance(io: I) -> Self {
         Self {
             contract: Self::get_contract_data(&io, &EthConnectorStorageId::Contract),
-            ft: Self::get_contract_data(&io, &EthConnectorStorageId::FungibleToken),
+            ft: Self::get_contract_data::<FungibleToken>(
+                &io,
+                &EthConnectorStorageId::FungibleToken,
+            )
+            .ops(io),
             paused_mask: Self::get_contract_data(&io, &EthConnectorStorageId::PausedMask),
             io,
         }
@@ -103,7 +106,7 @@ impl<I: IO + Default + Copy> EthConnectorContract<I> {
 
         let current_account_id = sdk::current_account_id();
         let owner_id = AccountId::try_from(current_account_id).unwrap();
-        let mut ft = FungibleToken::new();
+        let mut ft = FungibleTokenOps::new(io);
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
 
@@ -599,7 +602,7 @@ impl<I: IO + Default + Copy> EthConnectorContract<I> {
     fn save_ft_contract(&mut self) {
         self.io.write_borsh(
             &Self::get_contract_key(&EthConnectorStorageId::FungibleToken),
-            &self.ft,
+            &self.ft.data(),
         );
     }
 
@@ -644,7 +647,7 @@ impl<I: IO + Default + Copy> EthConnectorContract<I> {
     }
 }
 
-impl<I: IO + Default + Copy> AdminControlled for EthConnectorContract<I> {
+impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
     fn get_paused(&self) -> PausedMask {
         self.paused_mask
     }
