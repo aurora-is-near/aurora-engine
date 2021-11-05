@@ -46,7 +46,10 @@ pub struct EthConnector {
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub enum TokenMessageData {
     Near(AccountId),
-    Eth { address: AccountId, message: String },
+    Eth {
+        receiver_id: AccountId,
+        message: String,
+    },
 }
 
 /// On-transfer message
@@ -139,7 +142,7 @@ impl EthConnectorContract {
             TokenMessageData::Near(account_id)
         } else {
             TokenMessageData::Eth {
-                address: account_id,
+                receiver_id: account_id,
                 message: data[1].into(),
             }
         }
@@ -248,11 +251,14 @@ impl EthConnectorContract {
             .unwrap(),
             // Deposit to Eth accounts
             // fee is being minted in the `ft_on_transfer` callback method
-            TokenMessageData::Eth { address, message } => {
+            TokenMessageData::Eth {
+                receiver_id,
+                message,
+            } => {
                 // Transfer to self and then transfer ETH in `ft_on_transfer`
                 // address - is NEAR account
                 let transfer_data = TransferCallCallArgs {
-                    receiver_id: address,
+                    receiver_id,
                     amount: event.amount.as_u128(),
                     memo: None,
                     msg: self.set_message_for_on_transfer(event.fee, message),
