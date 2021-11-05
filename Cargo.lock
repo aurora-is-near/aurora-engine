@@ -122,15 +122,15 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
  "base64 0.13.0",
- "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh 0.8.2",
  "byte-slice-cast",
  "ethabi",
- "evm",
- "evm-core",
+ "evm 0.31.1 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
+ "evm-core 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
  "hex",
  "libsecp256k1",
  "logos",
+ "near-blake2",
  "num",
  "primitive-types 0.10.1",
  "rand 0.7.3",
@@ -152,15 +152,15 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
  "base64 0.13.0",
- "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh 0.8.2",
  "byte-slice-cast",
  "ethabi",
- "evm",
- "evm-core",
+ "evm 0.31.1 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
+ "evm-core 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
  "hex",
  "libsecp256k1",
  "logos",
+ "near-blake2",
  "num",
  "primitive-types 0.10.1",
  "rand 0.7.3",
@@ -196,7 +196,7 @@ dependencies = [
  "byte-slice-cast",
  "criterion",
  "ethabi",
- "evm",
+ "evm 0.31.1 (git+https://github.com/aurora-is-near/sputnikvm.git)",
  "git2",
  "hex",
  "libsecp256k1",
@@ -320,16 +320,6 @@ name = "blake2"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10a5720225ef5daecf08657f23791354e1685a8c91a4c60c7f3d3b2892f978f4"
-dependencies = [
- "crypto-mac 0.8.0",
- "digest 0.9.0",
- "opaque-debug 0.3.0",
-]
-
-[[package]]
-name = "blake2"
-version = "0.9.1"
-source = "git+https://github.com/near/near-blake2.git#736ff607cc8160af87ffa697c14ebef85050138f"
 dependencies = [
  "crypto-mac 0.8.0",
  "digest 0.9.0",
@@ -1319,13 +1309,13 @@ checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 [[package]]
 name = "evm"
 version = "0.31.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c#58895a8fa9dfef02bf9928cad975e3f03b05972c"
 dependencies = [
  "environmental",
  "ethereum",
- "evm-core",
- "evm-gasometer",
- "evm-runtime",
+ "evm-core 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
+ "evm-gasometer 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
+ "evm-runtime 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
  "log",
  "parity-scale-codec",
  "primitive-types 0.10.1",
@@ -1336,9 +1326,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "evm"
+version = "0.31.1"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+dependencies = [
+ "ethereum",
+ "evm-core 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git)",
+ "evm-gasometer 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git)",
+ "evm-runtime 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git)",
+ "log",
+ "primitive-types 0.10.1",
+ "rlp",
+ "sha3 0.8.2",
+]
+
+[[package]]
 name = "evm-core"
 version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c#58895a8fa9dfef02bf9928cad975e3f03b05972c"
 dependencies = [
  "funty",
  "parity-scale-codec",
@@ -1348,14 +1353,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "evm-core"
+version = "0.31.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+dependencies = [
+ "funty",
+ "primitive-types 0.10.1",
+]
+
+[[package]]
+name = "evm-gasometer"
+version = "0.31.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+dependencies = [
+ "environmental",
+ "evm-core 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
+ "evm-runtime 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
+ "primitive-types 0.10.1",
+]
+
+[[package]]
 name = "evm-gasometer"
 version = "0.31.0"
 source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
 dependencies = [
- "environmental",
- "evm-core",
- "evm-runtime",
+ "evm-core 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git)",
+ "evm-runtime 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git)",
  "primitive-types 0.10.1",
+]
+
+[[package]]
+name = "evm-runtime"
+version = "0.31.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+dependencies = [
+ "environmental",
+ "evm-core 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git?rev=58895a8fa9dfef02bf9928cad975e3f03b05972c)",
+ "primitive-types 0.10.1",
+ "sha3 0.8.2",
 ]
 
 [[package]]
@@ -1363,8 +1398,7 @@ name = "evm-runtime"
 version = "0.31.0"
 source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
 dependencies = [
- "environmental",
- "evm-core",
+ "evm-core 0.31.0 (git+https://github.com/aurora-is-near/sputnikvm.git)",
  "primitive-types 0.10.1",
  "sha3 0.8.2",
 ]
@@ -2148,6 +2182,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "near-blake2"
+version = "0.9.1"
+source = "git+https://github.com/near/near-blake2.git?rev=cebb7df79608a7058017940830d37c37d55d21fe#cebb7df79608a7058017940830d37c37d55d21fe"
+dependencies = [
+ "crypto-mac 0.8.0",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
+]
+
+[[package]]
 name = "near-chain-configs"
 version = "0.1.0"
 source = "git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9#8a377fda0b4ce319385c463f1ae46e4b0b29dcd9"
@@ -2169,7 +2213,7 @@ version = "0.1.0"
 source = "git+https://github.com/near/nearcore.git?rev=0c9ad79a18e431f843e6123cf4559f9c2c5dd228#0c9ad79a18e431f843e6123cf4559f9c2c5dd228"
 dependencies = [
  "arrayref",
- "blake2 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "blake2",
  "borsh 0.9.1",
  "bs58",
  "c2-chacha",
@@ -2195,7 +2239,7 @@ version = "0.1.0"
 source = "git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9#8a377fda0b4ce319385c463f1ae46e4b0b29dcd9"
 dependencies = [
  "arrayref",
- "blake2 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "blake2",
  "borsh 0.8.2",
  "bs58",
  "c2-chacha",
@@ -2221,7 +2265,7 @@ version = "0.1.0"
 source = "git+https://github.com/near/nearcore.git?rev=8a37d39629885a41dde58b60642bcf1e99407d90#8a37d39629885a41dde58b60642bcf1e99407d90"
 dependencies = [
  "arrayref",
- "blake2 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "blake2",
  "borsh 0.8.2",
  "bs58",
  "c2-chacha",

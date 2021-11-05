@@ -20,11 +20,11 @@ aurora-engine-types = { path = "../engine-types", default-features = false }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
 base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
-blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
+near-blake2 = { git = "https://github.com/near/near-blake2.git", rev = "cebb7df79608a7058017940830d37c37d55d21fe", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "58895a8fa9dfef02bf9928cad975e3f03b05972c", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "58895a8fa9dfef02bf9928cad975e3f03b05972c", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.10.0", default-features = false, features = ["rlp"] }
