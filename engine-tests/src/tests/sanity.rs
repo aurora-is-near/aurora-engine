@@ -16,6 +16,29 @@ const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
 #[test]
+fn test_state_format() {
+    // The purpose of this test is to make sure that if we accidentally
+    // change the binary format of the `EngineState` then we will know
+    // about it. This is important because changing the state format will
+    // break the contract unless we do a state migration.
+    let args = aurora_engine::parameters::NewCallArgs {
+        chain_id: aurora_engine_types::types::u256_to_arr(&666.into()),
+        owner_id: "boss".into(),
+        bridge_prover_id: "prover_mcprovy_face".into(),
+        upgrade_delay_blocks: 3,
+    };
+    let state: aurora_engine::engine::EngineState = args.into();
+    let expected_hex: String = [
+        "000000000000000000000000000000000000000000000000000000000000029a",
+        "04000000626f7373",
+        "1300000070726f7665725f6d6370726f76795f66616365",
+        "0300000000000000",
+    ]
+    .concat();
+    assert_eq!(hex::encode(state.try_to_vec().unwrap()), expected_hex);
+}
+
+#[test]
 fn test_deploy_contract() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
