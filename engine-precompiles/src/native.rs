@@ -241,8 +241,9 @@ impl Precompile for ExitToNear {
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
+        let mut input = input;
         let flag = input[0];
-        let account_id = AccountId::try_from(&input[1..]);
+        input = &input[1..];
 
         let (nep141_address, args, exit_event) = match flag {
             0x0 => {
@@ -251,7 +252,7 @@ impl Precompile for ExitToNear {
                 // Input slice format:
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
-                if let Ok(dest_account) = account_id {
+                if let Ok(dest_account) = AccountId::try_from(input) {
                     (
                         AccountId::try_from(sdk::current_account_id()).unwrap(),
                         // There is no way to inject json, given the encoding of both arguments
