@@ -294,9 +294,9 @@ impl Precompile for ExitToNear {
                 let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes());
 
                 let amount = U256::from_big_endian(&input[..32]);
-                let account_id = AccountId::try_from(&input[32..]);
+                input = &input[32..];
 
-                if let Ok(receiver_account_id) = account_id {
+                if let Ok(receiver_account_id) = AccountId::try_from(input) {
                     (
                         nep141_address,
                         // There is no way to inject json, given the encoding of both arguments
