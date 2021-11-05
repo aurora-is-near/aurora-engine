@@ -1,6 +1,6 @@
 use crate::admin_controlled::PausedMask;
 use crate::fungible_token::FungibleTokenMetadata;
-use crate::json::{JsonError, JsonValue, ParseError};
+use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     format, Balance, BorshDeserialize, BorshSerialize, EthAddress, RawAddress, RawH256, RawU256,
@@ -217,17 +217,15 @@ impl TryFrom<JsonValue> for NEP141FtOnTransferArgs {
     }
 }
 
-impl TryFrom<NEP141FtOnTransferArgs> for String {
-    type Error = ParseError;
-
-    fn try_from(value: NEP141FtOnTransferArgs) -> Result<Self, Self::Error> {
-        Ok(format!(
+impl From<NEP141FtOnTransferArgs> for String {
+    fn from(value: NEP141FtOnTransferArgs) -> Self {
+        format!(
             r#"{{"sender_id": "{}", "amount": "{}", "msg": "{}"}}"#,
             value.sender_id,
             value.amount,
             // Escape message to avoid json injection attacks
             value.msg.replace("\\", "\\\\").replace("\"", "\\\"")
-        ))
+        )
     }
 }
 
