@@ -1,0 +1,5 @@
+name: Emails
+on: ["push", "pull_request"]
+jobs:
+  test:
+    uses: aurora-is-near/.github/.github/workflows/check_emails.yml@test
