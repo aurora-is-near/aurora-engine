@@ -44,7 +44,7 @@ pub fn validate_eth_address(address: String) -> Result<EthAddress, ValidationErr
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default, BorshSerialize, BorshDeserialize)]
 pub struct Wei(U256);
 impl Wei {
     const ETH_TO_WEI: U256 = U256([1_000_000_000_000_000_000, 0, 0, 0]);

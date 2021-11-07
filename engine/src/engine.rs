@@ -1,5 +1,5 @@
 use crate::parameters::{
-    FunctionCallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs,
+    FunctionCallArgs, FunctionCallArgsLegacy, CallArgsType, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs,
 };
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
@@ -607,11 +607,25 @@ impl Engine {
         Ok(SubmitResult::new(status, used_gas, logs))
     }
 
-    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<SubmitResult> {
-        let origin = self.origin();
-        let contract = Address(args.contract);
-        let value = Wei::zero();
-        self.call(origin, contract, value, args.input, u64::MAX, Vec::new())
+    pub fn call_with_args(&mut self, args: impl Into<CallArgsType>) -> EngineResult<SubmitResult> {
+        let args = args.into();
+        let result = match args {
+            CallArgsType::New(call_args) => {
+                let contract = Address(call_args.contract);
+                let value = call_args.value;
+                let input = call_args.input;
+                let origin = self.origin();
+                self.call(origin, contract, value, input, u64::MAX, Vec::new())
+            }
+            CallArgsType::Legacy(call_args) => {
+                let contract = Address(call_args.contract);
+                let value = Wei::zero();
+                let input = call_args.input;
+                let origin = self.origin();
+                self.call(origin, contract, value, input, u64::MAX, Vec::new())
+            }
+        };
+        result
     }
 
     pub fn call(

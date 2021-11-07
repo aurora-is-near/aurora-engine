@@ -3,7 +3,7 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue, ParseError};
 use crate::prelude::{
     format, is_valid_account_id, AccountId, Balance, BorshDeserialize, BorshSerialize, EthAddress,
-    RawAddress, RawH256, RawU256, SdkUnwrap, String, ToString, TryFrom, Vec,
+    RawAddress, RawH256, RawU256, SdkUnwrap, String, ToString, TryFrom, Vec, Wei
 };
 use crate::proof::Proof;
 use evm::backend::Log;
@@ -133,7 +133,37 @@ impl SubmitResult {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FunctionCallArgs {
     pub contract: RawAddress,
+    pub value: Wei,
     pub input: Vec<u8>,
+}
+
+/// Legacy Borsh-encoded parameters for the `call` function.
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct FunctionCallArgsLegacy {
+    pub contract: RawAddress,
+    pub input: Vec<u8>,
+}
+
+pub enum CallArgsType
+where
+    Self: Sized,
+{
+    New(FunctionCallArgs),
+    Legacy(FunctionCallArgsLegacy),
+}
+
+pub fn CallArgsTypeWrap<T: Into<CallArgsType>>(args: T) -> impl Into<CallArgsType> { args }
+
+impl From<FunctionCallArgs> for CallArgsType {
+    fn from(call_args: FunctionCallArgs) -> Self {
+        Self::New(call_args)
+    }
+}
+
+impl From<FunctionCallArgsLegacy> for CallArgsType {
+    fn from(call_args: FunctionCallArgsLegacy) -> Self {
+        Self::Legacy(call_args)
+    }
 }
 
 /// Borsh-encoded parameters for the `view` function.
