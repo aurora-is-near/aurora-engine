@@ -1,5 +1,5 @@
 use crate::prelude::{
-    parameters::FunctionCallArgs, transaction::LegacyEthTransaction, Address, U256,
+    parameters::FunctionCallArgs, transaction::LegacyEthTransaction, Address, U256, WeiU256
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use borsh::BorshSerialize;
@@ -174,6 +174,7 @@ impl SelfDestruct {
 
         let input = FunctionCallArgs {
             contract: self.contract.address.into(),
+            value: WeiU256::default(),
             input: data.to_vec(),
         }
         .try_to_vec()

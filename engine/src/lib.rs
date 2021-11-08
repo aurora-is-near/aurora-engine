@@ -71,7 +71,11 @@ mod contract {
     use crate::fungible_token::FungibleTokenMetadata;
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::parameters::{self, CallArgsType, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult, TransactionStatus, TransferCallCallArgs, ViewCallArgs};
+    use crate::parameters::{
+        self, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
+        NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult,
+        TransactionStatus, TransferCallCallArgs, ViewCallArgs, CallArgsType,
+    };
 
     use crate::json::parse_json;
     use crate::prelude::sdk::types::{
@@ -187,8 +191,7 @@ mod contract {
     /// Call method on the EVM contract.
     #[no_mangle]
     pub extern "C" fn call() {
-//      let args: impl Into<CallArgsType> = sdk::read_input_borsh().sdk_unwrap();
-        let args = parameters::CallArgsTypeWrap(sdk::read_input_borsh().sdk_unwrap());
+        let args = parameters::call_args_type_wrap(sdk::read_input_borsh().sdk_unwrap());
         let mut engine = Engine::new(predecessor_address()).sdk_unwrap();
         Engine::call_with_args(&mut engine, args)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))

@@ -1,4 +1,4 @@
-use crate::prelude::{AccountId, Address, Balance, RawAddress, TryInto, Wei, U256};
+use crate::prelude::{AccountId, Address, Balance, RawAddress, TryInto, Wei, U256, WeiU256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{FunctionCallArgs, SubmitResult};
@@ -100,7 +100,7 @@ impl test_utils::AuroraRunner {
         self.make_call(
             "call",
             origin,
-            (FunctionCallArgs { contract, input }).try_to_vec().unwrap(),
+            (FunctionCallArgs { contract, value: WeiU256::default(), input }).try_to_vec().unwrap(),
         )
     }
 

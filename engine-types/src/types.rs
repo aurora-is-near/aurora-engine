@@ -4,11 +4,15 @@ use borsh::{BorshDeserialize, BorshSerialize};
 pub type AccountId = String;
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
-pub type RawU256 = [u8; 32]; // Big-endian large integer type.
-pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
+/// Big-endian large integer type.
+pub type RawU256 = [u8; 32];
+/// Unformatted binary data of fixed length.
+pub type RawH256 = [u8; 32];
 pub type EthAddress = [u8; 20];
 pub type Gas = u64;
 pub type StorageUsage = u64;
+/// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
+pub type WeiU256 = [u64; 4];
 
 /// Selector to call mint function in ERC 20 contract
 ///
@@ -44,7 +48,7 @@ pub fn validate_eth_address(address: String) -> Result<EthAddress, ValidationErr
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default)]
 pub struct Wei(U256);
 impl Wei {
     const ETH_TO_WEI: U256 = U256([1_000_000_000_000_000_000, 0, 0, 0]);
@@ -102,6 +106,13 @@ impl Add for Wei {
 
     fn add(self, other: Self) -> Self::Output {
         Self(self.0 + other.0)
+    }
+}
+
+/// Type casting from Wei compatible Borsh-encoded raw value into the Wei value, to attach an ETH balance to the transaction
+impl From<WeiU256> for Wei {
+    fn from(value: WeiU256) -> Self {
+        Wei(U256(value))
     }
 }
 
