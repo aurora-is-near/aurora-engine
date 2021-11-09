@@ -97,6 +97,45 @@ fn test_deploy_largest_contract() {
 }
 
 #[test]
+fn test_log_address() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let mut deploy_contract = |name: &str, signer: &mut test_utils::Signer| {
+        let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+            "src/tests/res",
+            "target/solidity_build",
+            "caller.sol",
+            name,
+        );
+
+        let nonce = signer.use_nonce();
+        runner.deploy_contract(
+            &signer.secret_key,
+            |c| c.deploy_without_constructor(nonce.into()),
+            constructor,
+        )
+    };
+
+    let greet_contract = deploy_contract("Greeter", &mut signer);
+    let caller_contract = deploy_contract("Caller", &mut signer);
+
+    let result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            caller_contract.call_method_with_args(
+                "greet",
+                &[ethabi::Token::Address(greet_contract.address)],
+                nonce,
+            )
+        })
+        .unwrap();
+
+    // Address included in the log should come from the contract emitting the log,
+    // not the contract that invoked the call.
+    let log_address = result.logs.first().unwrap().address;
+    assert_eq!(Address(log_address), greet_contract.address);
+}
+
+#[test]
 fn test_timestamp() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
@@ -111,14 +150,7 @@ fn test_timestamp() {
     let nonce = signer.use_nonce();
     let contract = runner.deploy_contract(
         &signer.secret_key,
-        |c| crate::prelude::transaction::legacy::TransactionLegacy {
-            nonce: nonce.into(),
-            gas_price: Default::default(),
-            gas_limit: u64::MAX.into(),
-            to: None,
-            value: Default::default(),
-            data: c.code.clone(),
-        },
+        |c| c.deploy_without_constructor(nonce.into()),
         constructor,
     );
 
