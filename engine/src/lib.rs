@@ -74,7 +74,7 @@ mod contract {
     use crate::parameters::{
         self, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
         NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult,
-        TransactionStatus, TransferCallCallArgs, ViewCallArgs, CallArgsType,
+        TransactionStatus, TransferCallCallArgs, ViewCallArgs,
     };
 
     use crate::json::parse_json;
