@@ -70,7 +70,7 @@ fn withdraw() {
         let exit_events = parse_exit_events(withdraw_result, &schema);
 
         // One exit event
-        assert!(exit_events.len() == 1);
+        assert_eq!(exit_events.len(), 1);
 
         let dest = if is_to_near {
             // transferred to "target.aurora" (defined in Tester.sol)

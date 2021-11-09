@@ -1,6 +1,7 @@
 use crate::prelude::EthAddress;
 use crate::prelude::WithdrawCallArgs;
 use crate::prelude::U256;
+use crate::test_utils::str_to_account_id;
 use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
 use aurora_engine::connector::{
     ERR_NOT_ENOUGH_BALANCE_FOR_FEE, PAUSE_DEPOSIT, PAUSE_WITHDRAW, UNPAUSE_ALL,
@@ -68,8 +69,8 @@ fn init_contract(
             "new",
             &NewCallArgs {
                 chain_id: [0u8; 32],
-                owner_id: master_account.account_id.clone().into(),
-                bridge_prover_id: accounts(0).to_string(),
+                owner_id: str_to_account_id(master_account.account_id.clone().as_str()),
+                bridge_prover_id: str_to_account_id(accounts(0).as_str()),
                 upgrade_delay_blocks: 1,
             }
             .try_to_vec()
@@ -83,7 +84,7 @@ fn init_contract(
             contract_name.parse().unwrap(),
             "new_eth_connector",
             &InitCallArgs {
-                prover_account: PROVER_ACCOUNT.into(),
+                prover_account: str_to_account_id(PROVER_ACCOUNT.into()),
                 eth_custodian_address: custodian_address.into(),
                 metadata: FungibleTokenMetadata::default(),
             }

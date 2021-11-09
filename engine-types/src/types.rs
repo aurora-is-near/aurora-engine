@@ -1,7 +1,6 @@
 use super::{str, vec, Add, Address, String, Sub, Vec, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
 
-pub type AccountId = String;
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32]; // Big-endian large integer type.
