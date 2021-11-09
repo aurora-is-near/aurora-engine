@@ -591,6 +591,76 @@ fn test_ft_transfer_call_without_message() {
 }
 
 #[test]
+fn test_deposit_with_0x_prefix() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+
+    let eth_custodian_address: [u8; 20] = {
+        let mut buf = [0u8; 20];
+        let bytes = hex::decode(CUSTODIAN_ADDRESS).unwrap();
+        buf.copy_from_slice(&bytes);
+        buf
+    };
+    let recipient_address = [10u8; 20];
+    let deposit_amount = U256::from(17);
+    let deposit_event = aurora_engine::deposit_event::DepositedEvent {
+        eth_custodian_address,
+        sender: [0u8; 20],
+        // Note the 0x prefix before the deposit address.
+        recipient: [
+            CONTRACT_ACC,
+            ":",
+            "0x",
+            hex::encode(&recipient_address).as_str(),
+        ]
+        .concat(),
+        amount: deposit_amount,
+        fee: U256::zero(),
+    };
+
+    let event_schema = ethabi::Event {
+        name: aurora_engine::deposit_event::DEPOSITED_EVENT.into(),
+        inputs: aurora_engine::deposit_event::DepositedEvent::event_params(),
+        anonymous: false,
+    };
+    let log_entry = aurora_engine::log_entry::LogEntry {
+        address: eth_custodian_address.into(),
+        topics: vec![
+            event_schema.signature(),
+            // the sender is not important
+            crate::prelude::H256::zero(),
+        ],
+        data: ethabi::encode(&[
+            ethabi::Token::String(deposit_event.recipient),
+            ethabi::Token::Uint(deposit_event.amount),
+            ethabi::Token::Uint(deposit_event.fee),
+        ]),
+    };
+    let proof = Proof {
+        log_index: 1,
+        // Only this field matters for the purpose of this test
+        log_entry_data: rlp::encode(&log_entry).to_vec(),
+        receipt_index: 1,
+        receipt_data: Vec::new(),
+        header_data: Vec::new(),
+        proof: Vec::new(),
+    };
+
+    let res = master_account.call(
+        contract.account_id(),
+        "deposit",
+        &proof.try_to_vec().unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    res.assert_success();
+
+    let aurora_balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(aurora_balance, deposit_amount.low_u128());
+    let address_balance = get_eth_balance(&master_account, recipient_address, CONTRACT_ACC);
+    assert_eq!(address_balance, deposit_amount.low_u128());
+}
+
+#[test]
 fn test_deposit_with_same_proof() {
     let (_master_account, contract) = init(CUSTODIAN_ADDRESS);
 

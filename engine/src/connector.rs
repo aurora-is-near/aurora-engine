@@ -13,7 +13,8 @@ use crate::prelude::sdk::types::{ExpectUtf8, SdkUnwrap};
 use crate::prelude::{
     format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
     BorshSerialize, EthAddress, EthConnectorStorageId, Gas, KeyPrefix, PromiseResult, String,
-    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160, U256,
+    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, ERR_INVALID_ETH_ADDRESS, H160,
+    U256,
 };
 use crate::proof::Proof;
 
@@ -175,8 +176,16 @@ impl EthConnectorContract {
         // Relayer == predecessor
         let relayer_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let mut data = fee.as_byte_slice().to_vec();
-        let message = hex::decode(message).expect(ERR_FAILED_PARSE);
-        data.extend(message);
+        let address = if message.len() == 42 {
+            message
+                .strip_prefix("0x")
+                .expect(ERR_INVALID_ETH_ADDRESS)
+                .to_string()
+        } else {
+            message
+        };
+        let address_bytes = hex::decode(address).expect(ERR_FAILED_PARSE);
+        data.extend(address_bytes);
         [relayer_account_id, hex::encode(data)].join(":")
     }
 
