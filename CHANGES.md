@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Depositing ETH from Ethereum to Aurora now allows an `0x` prefix on the recipeint address by [@joshuajbouw]. ([#337](https://github.com/aurora-is-near/aurora-engine/pull/337))
+- Depositing ETH from Ethereum to Aurora now allows an `0x` prefix on the recipient address by [@joshuajbouw]. ([#337](https://github.com/aurora-is-near/aurora-engine/pull/337))
 
 ## [2.1.0] - 2021-11-04
 
