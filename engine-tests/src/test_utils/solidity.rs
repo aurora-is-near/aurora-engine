@@ -74,6 +74,17 @@ impl ContractConstructor {
         }
     }
 
+    pub fn deploy_without_constructor(&self, nonce: U256) -> TransactionLegacy {
+        TransactionLegacy {
+            nonce,
+            gas_price: Default::default(),
+            gas_limit: u64::MAX.into(),
+            to: None,
+            value: Default::default(),
+            data: self.code.clone(),
+        }
+    }
+
     pub fn deploy_without_args(&self, nonce: U256) -> TransactionLegacy {
         self.deploy_with_args(nonce, &[])
     }
