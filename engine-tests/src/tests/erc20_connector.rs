@@ -1,4 +1,4 @@
-use crate::prelude::{AccountId, Address, Balance, RawAddress, TryInto, Wei, U256};
+use crate::prelude::{Address, Balance, RawAddress, TryInto, Wei, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{FunctionCallArgs, SubmitResult};
@@ -91,12 +91,7 @@ impl test_utils::AuroraRunner {
         CallResult { outcome, error }
     }
 
-    pub fn evm_call(
-        &mut self,
-        contract: RawAddress,
-        input: Vec<u8>,
-        origin: AccountId,
-    ) -> CallResult {
+    pub fn evm_call(&mut self, contract: RawAddress, input: Vec<u8>, origin: String) -> CallResult {
         self.make_call(
             "call",
             origin,
@@ -104,15 +99,11 @@ impl test_utils::AuroraRunner {
         )
     }
 
-    pub fn evm_submit(
-        &mut self,
-        input: LegacyEthSignedTransaction,
-        origin: AccountId,
-    ) -> CallResult {
+    pub fn evm_submit(&mut self, input: LegacyEthSignedTransaction, origin: String) -> CallResult {
         self.make_call("submit", origin, rlp::encode(&input).to_vec())
     }
 
-    pub fn deploy_erc20_token(&mut self, nep141: &AccountId) -> RawAddress {
+    pub fn deploy_erc20_token(&mut self, nep141: &String) -> RawAddress {
         let result = self.make_call("deploy_erc20_token", origin(), nep141.try_to_vec().unwrap());
 
         result.check_ok();
@@ -134,7 +125,7 @@ impl test_utils::AuroraRunner {
         }
     }
 
-    pub fn balance_of(&mut self, token: RawAddress, target: RawAddress, origin: AccountId) -> U256 {
+    pub fn balance_of(&mut self, token: RawAddress, target: RawAddress, origin: String) -> U256 {
         let input = build_input("balanceOf(address)", &[Token::Address(target.into())]);
         let result = self.evm_call(token, input, origin);
         result.check_ok();
@@ -147,7 +138,7 @@ impl test_utils::AuroraRunner {
         token: RawAddress,
         target: RawAddress,
         amount: u64,
-        origin: AccountId,
+        origin: String,
     ) -> CallResult {
         let input = build_input(
             "mint(address,uint256)",
@@ -162,7 +153,7 @@ impl test_utils::AuroraRunner {
     }
 
     #[allow(dead_code)]
-    pub fn admin(&mut self, token: RawAddress, origin: AccountId) -> CallResult {
+    pub fn admin(&mut self, token: RawAddress, origin: String) -> CallResult {
         let input = build_input("admin()", &[]);
         let result = self.evm_call(token, input, origin);
         result.check_ok();
@@ -175,7 +166,7 @@ impl test_utils::AuroraRunner {
         sender: SecretKey,
         receiver: RawAddress,
         amount: u64,
-        origin: AccountId,
+        origin: String,
     ) -> CallResult {
         // transfer(address recipient, uint256 amount)
         let input = build_input(
@@ -195,9 +186,9 @@ impl test_utils::AuroraRunner {
 
     pub fn ft_on_transfer(
         &mut self,
-        nep141: AccountId,
-        sender_id: AccountId,
-        relayer_id: AccountId,
+        nep141: String,
+        sender_id: String,
+        relayer_id: String,
         amount: Balance,
         msg: String,
     ) -> String {
@@ -219,7 +210,7 @@ impl test_utils::AuroraRunner {
 
     pub fn register_relayer(
         &mut self,
-        relayer_account_id: AccountId,
+        relayer_account_id: String,
         relayer_address: Address,
     ) -> CallResult {
         self.make_call(
