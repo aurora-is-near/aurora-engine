@@ -109,6 +109,7 @@ pub struct U128(pub u128);
 
 pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
 pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
+pub const ERR_INVALID_ETH_ADDRESS: &str = "ERR_INVALID_ETH_ADDRESS";
 
 /// Internal args format for meta call.
 #[derive(Debug)]
