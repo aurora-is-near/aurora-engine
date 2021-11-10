@@ -385,7 +385,7 @@ dependencies = [
 [[package]]
 name = "evm"
 version = "0.31.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
 dependencies = [
  "ethereum",
  "evm-core",
@@ -400,7 +400,7 @@ dependencies = [
 [[package]]
 name = "evm-core"
 version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
 dependencies = [
  "funty",
  "primitive-types",
@@ -409,7 +409,7 @@ dependencies = [
 [[package]]
 name = "evm-gasometer"
 version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
 dependencies = [
  "evm-core",
  "evm-runtime",
@@ -419,7 +419,7 @@ dependencies = [
 [[package]]
 name = "evm-runtime"
 version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#58895a8fa9dfef02bf9928cad975e3f03b05972c"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
 dependencies = [
  "evm-core",
  "primitive-types",

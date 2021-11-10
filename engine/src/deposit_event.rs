@@ -2,7 +2,7 @@ use crate::log_entry::LogEntry;
 use crate::prelude::{vec, EthAddress, String, ToString, Vec, U256};
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
-const DEPOSITED_EVENT: &str = "Deposited";
+pub const DEPOSITED_EVENT: &str = "Deposited";
 
 pub type EventParams = Vec<EventParam>;
 
@@ -50,7 +50,7 @@ pub struct DepositedEvent {
 
 impl DepositedEvent {
     #[allow(dead_code)]
-    fn event_params() -> EventParams {
+    pub fn event_params() -> EventParams {
         vec![
             EventParam {
                 name: "sender".to_string(),
@@ -78,11 +78,23 @@ impl DepositedEvent {
     /// Parses raw Ethereum logs proof's entry data
     pub fn from_log_entry_data(data: &[u8]) -> Self {
         let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data);
-        let sender = event.log.params[0].value.clone().into_address().unwrap().0;
-
-        let recipient = event.log.params[1].value.clone().to_string();
-        let amount = event.log.params[2].value.clone().into_uint().unwrap();
-        let fee = event.log.params[3].value.clone().into_uint().unwrap();
+        let sender = event.log.params[0]
+            .value
+            .clone()
+            .into_address()
+            .expect("INVALID_SENDER")
+            .0;
+        let recipient: String = event.log.params[1].value.clone().to_string();
+        let amount = event.log.params[2]
+            .value
+            .clone()
+            .into_uint()
+            .expect("INVALID_AMOUNT");
+        let fee = event.log.params[3]
+            .value
+            .clone()
+            .into_uint()
+            .expect("INVALID_FEE");
         Self {
             eth_custodian_address: event.eth_custodian_address,
             sender,

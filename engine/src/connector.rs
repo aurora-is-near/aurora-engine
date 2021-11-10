@@ -11,11 +11,13 @@ use crate::parameters::{
 };
 use crate::prelude::sdk::types::{ExpectUtf8, SdkUnwrap};
 use crate::prelude::{
-    format, is_valid_account_id, sdk, str, validate_eth_address, AccountId, Address, Balance,
-    BorshDeserialize, BorshSerialize, EthAddress, EthConnectorStorageId, Gas, KeyPrefix,
-    PromiseResult, String, ToString, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160, U256,
+    format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
+    BorshSerialize, EthAddress, EthConnectorStorageId, Gas, KeyPrefix, PromiseResult, String,
+    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, ERR_INVALID_ETH_ADDRESS, H160,
+    U256,
 };
 use crate::proof::Proof;
+use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 pub const NO_DEPOSIT: Balance = 0;
@@ -28,10 +30,11 @@ pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
 pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct EthConnectorContract {
+pub struct EthConnectorContract<I: IO + Default> {
     contract: EthConnector,
-    ft: FungibleToken,
+    ft: FungibleToken<I>,
     paused_mask: PausedMask,
+    io: I,
 }
 
 /// eth-connector specific data
@@ -46,7 +49,10 @@ pub struct EthConnector {
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub enum TokenMessageData {
     Near(AccountId),
-    Eth { address: AccountId, message: String },
+    Eth {
+        receiver_id: AccountId,
+        message: String,
+    },
 }
 
 /// On-transfer message
@@ -56,12 +62,13 @@ pub struct OnTransferMessageData {
     pub fee: U256,
 }
 
-impl EthConnectorContract {
-    pub fn get_instance() -> Self {
+impl<I: IO + Default + Copy> EthConnectorContract<I> {
+    pub fn get_instance(io: I) -> Self {
         Self {
-            contract: Self::get_contract_data(&EthConnectorStorageId::Contract),
-            ft: Self::get_contract_data(&EthConnectorStorageId::FungibleToken),
-            paused_mask: Self::get_contract_data(&EthConnectorStorageId::PausedMask),
+            contract: Self::get_contract_data(&io, &EthConnectorStorageId::Contract),
+            ft: Self::get_contract_data(&io, &EthConnectorStorageId::FungibleToken),
+            paused_mask: Self::get_contract_data(&io, &EthConnectorStorageId::PausedMask),
+            io,
         }
     }
 
@@ -69,34 +76,39 @@ impl EthConnectorContract {
         crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
     }
 
-    fn get_contract_data<T: BorshDeserialize>(suffix: &EthConnectorStorageId) -> T {
-        let data = sdk::read_storage(&Self::get_contract_key(suffix)).expect("Failed read storage");
-        T::try_from_slice(&data[..]).unwrap()
+    fn get_contract_data<T: BorshDeserialize>(io: &I, suffix: &EthConnectorStorageId) -> T {
+        io.read_storage(&Self::get_contract_key(suffix))
+            .expect("Failed read storage")
+            .to_value()
+            .unwrap()
     }
 
     /// Init eth-connector contract specific data
-    pub fn init_contract(args: InitCallArgs) {
+    pub fn init_contract(mut io: I, args: InitCallArgs) {
         // Check is it already initialized
         assert!(
-            !sdk::storage_has_key(&Self::get_contract_key(&EthConnectorStorageId::Contract)),
+            !io.storage_has_key(&Self::get_contract_key(&EthConnectorStorageId::Contract)),
             "ERR_CONTRACT_INITIALIZED"
         );
         sdk::log!("[init contract]");
 
-        let contract_data = Self::set_contract_data(SetContractDataCallArgs {
-            prover_account: args.prover_account,
-            eth_custodian_address: args.eth_custodian_address,
-            metadata: args.metadata,
-        });
+        let contract_data = Self::set_contract_data(
+            &mut io,
+            SetContractDataCallArgs {
+                prover_account: args.prover_account,
+                eth_custodian_address: args.eth_custodian_address,
+                metadata: args.metadata,
+            },
+        );
 
         let current_account_id = sdk::current_account_id();
-        let owner_id = String::from_utf8(current_account_id).unwrap();
+        let owner_id = AccountId::try_from(current_account_id).unwrap();
         let mut ft = FungibleToken::new();
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
 
         let paused_mask = UNPAUSE_ALL;
-        sdk::save_contract(
+        io.write_borsh(
             &Self::get_contract_key(&EthConnectorStorageId::PausedMask),
             &paused_mask,
         );
@@ -105,24 +117,25 @@ impl EthConnectorContract {
             contract: contract_data,
             ft,
             paused_mask,
+            io,
         }
         .save_ft_contract();
     }
 
     /// Sets the contract data and returns it back
-    pub fn set_contract_data(args: SetContractDataCallArgs) -> EthConnector {
+    pub fn set_contract_data(io: &mut I, args: SetContractDataCallArgs) -> EthConnector {
         // Get initial contract arguments
         let contract_data = EthConnector {
             prover_account: args.prover_account,
             eth_custodian_address: validate_eth_address(args.eth_custodian_address).sdk_unwrap(),
         };
         // Save eth-connector specific data
-        sdk::save_contract(
+        io.write_borsh(
             &Self::get_contract_key(&EthConnectorStorageId::Contract),
             &contract_data,
         );
 
-        sdk::save_contract(
+        io.write_borsh(
             &Self::get_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
             &args.metadata,
         );
@@ -134,16 +147,12 @@ impl EthConnectorContract {
     fn parse_event_message(&self, message: &str) -> TokenMessageData {
         let data: Vec<_> = message.split(':').collect();
         assert!(data.len() < 3);
+        let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
         if data.len() == 1 {
-            let account_id = data[0];
-            assert!(
-                is_valid_account_id(account_id.as_bytes()),
-                "ERR_INVALID_ACCOUNT_ID"
-            );
-            TokenMessageData::Near(account_id.into())
+            TokenMessageData::Near(account_id)
         } else {
             TokenMessageData::Eth {
-                address: data[0].into(),
+                receiver_id: account_id,
                 message: data[1].into(),
             }
         }
@@ -161,13 +170,9 @@ impl EthConnectorContract {
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
         // Check account
-        let account_id = data[0];
-        assert!(
-            is_valid_account_id(account_id.as_bytes()),
-            "ERR_INVALID_ACCOUNT_ID"
-        );
+        let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
         OnTransferMessageData {
-            relayer: account_id.into(),
+            relayer: account_id,
             recipient,
             fee: U256::from_little_endian(&fee[..]),
         }
@@ -180,19 +185,26 @@ impl EthConnectorContract {
         // Relayer == predecessor
         let relayer_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let mut data = fee.as_byte_slice().to_vec();
-        let message = hex::decode(message).expect(ERR_FAILED_PARSE);
-        data.extend(message);
+        let address = if message.len() == 42 {
+            message
+                .strip_prefix("0x")
+                .expect(ERR_INVALID_ETH_ADDRESS)
+                .to_string()
+        } else {
+            message
+        };
+        let address_bytes = hex::decode(address).expect(ERR_FAILED_PARSE);
+        data.extend(address_bytes);
         [relayer_account_id, hex::encode(data)].join(":")
     }
 
     /// Deposit all types of tokens
-    pub fn deposit(&self) {
+    pub fn deposit(&self, raw_proof: Vec<u8>) {
         self.assert_not_paused(PAUSE_DEPOSIT);
 
         sdk::log!("[Deposit tokens]");
 
         // Get incoming deposit arguments
-        let raw_proof = sdk::read_input();
         let proof: Proof = Proof::try_from_slice(&raw_proof).expect(ERR_FAILED_PARSE);
         // Fetch event data from Proof
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
@@ -239,7 +251,7 @@ impl EthConnectorContract {
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
 
         // Finalize deposit
         let data = match self.parse_event_message(&event.recipient) {
@@ -256,11 +268,14 @@ impl EthConnectorContract {
             .unwrap(),
             // Deposit to Eth accounts
             // fee is being minted in the `ft_on_transfer` callback method
-            TokenMessageData::Eth { address, message } => {
+            TokenMessageData::Eth {
+                receiver_id,
+                message,
+            } => {
                 // Transfer to self and then transfer ETH in `ft_on_transfer`
                 // address - is NEAR account
                 let transfer_data = TransferCallCallArgs {
-                    receiver_id: address,
+                    receiver_id,
                     amount: event.amount.as_u128(),
                     memo: None,
                     msg: self.set_message_for_on_transfer(event.fee, message),
@@ -268,7 +283,7 @@ impl EthConnectorContract {
                 .try_to_vec()
                 .unwrap();
 
-                let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
+                let current_account_id = AccountId::try_from(sdk::current_account_id()).unwrap();
                 // Send to self - current account id
                 FinishDepositCallArgs {
                     new_owner_id: current_account_id,
@@ -299,10 +314,7 @@ impl EthConnectorContract {
     /// is that in this case we only calculate the amount to be credited but
     /// do not save it, however, if an error occurs during the calculation,
     /// this will happen before `record_proof`. After that contract will save.
-    pub fn finish_deposit(&mut self) {
-        sdk::assert_private_call();
-        let data: FinishDepositCallArgs =
-            FinishDepositCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+    pub fn finish_deposit(&mut self, data: FinishDepositCallArgs) {
         sdk::log!(&format!("Finish deposit with the amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
 
@@ -384,45 +396,44 @@ impl EthConnectorContract {
 
     /// Withdraw nETH from NEAR accounts
     /// NOTE: it should be without any log data
-    pub fn withdraw_eth_from_near(&mut self) {
+    pub fn withdraw_eth_from_near(&mut self, args: WithdrawCallArgs) -> WithdrawResult {
         self.assert_not_paused(PAUSE_WITHDRAW);
 
         sdk::assert_one_yocto();
-        let args = WithdrawCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
-        let res = WithdrawResult {
-            recipient_id: args.recipient_address,
-            amount: args.amount,
-            eth_custodian_address: self.contract.eth_custodian_address,
-        }
-        .try_to_vec()
-        .unwrap();
         // Burn tokens to recipient
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
         self.ft
             .internal_withdraw_eth_from_near(&predecessor_account_id, args.amount);
         // Save new contract data
         self.save_ft_contract();
-        sdk::return_output(&res[..]);
+
+        WithdrawResult {
+            recipient_id: args.recipient_address,
+            amount: args.amount,
+            eth_custodian_address: self.contract.eth_custodian_address,
+        }
     }
 
     /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
-    pub fn ft_total_eth_supply_on_near(&self) {
+    pub fn ft_total_eth_supply_on_near(&mut self) {
         let total_supply = self.ft.ft_total_eth_supply_on_near();
         sdk::log!(&format!("Total ETH supply on NEAR: {}", total_supply));
-        sdk::return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
+        self.io
+            .return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
     }
 
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
-    pub fn ft_total_eth_supply_on_aurora(&self) {
+    pub fn ft_total_eth_supply_on_aurora(&mut self) {
         let total_supply = self.ft.ft_total_eth_supply_on_aurora();
         sdk::log!(&format!("Total ETH supply on Aurora: {}", total_supply));
-        sdk::return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
+        self.io
+            .return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
     }
 
     /// Return balance of nETH (ETH on Near)
-    pub fn ft_balance_of(&self) {
+    pub fn ft_balance_of(&mut self) {
         let args = BalanceOfCallArgs::from(
-            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
 
         let balance = self.ft.ft_balance_of(&args.account_id);
@@ -431,13 +442,13 @@ impl EthConnectorContract {
             args.account_id, balance
         ));
 
-        sdk::return_output(format!("\"{}\"", balance.to_string()).as_bytes());
+        self.io
+            .return_output(format!("\"{}\"", balance.to_string()).as_bytes());
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
-    pub fn ft_balance_of_eth_on_aurora(&self) {
-        let args =
-            BalanceOfEthCallArgs::try_from_slice(&sdk::read_input()).expect(ERR_FAILED_PARSE);
+    pub fn ft_balance_of_eth_on_aurora(&mut self) {
+        let args: BalanceOfEthCallArgs = self.io.read_input().to_value().expect(ERR_FAILED_PARSE);
         let balance = self
             .ft
             .internal_unwrap_balance_of_eth_on_aurora(args.address);
@@ -446,14 +457,15 @@ impl EthConnectorContract {
             hex::encode(args.address),
             balance
         ));
-        sdk::return_output(format!("\"{}\"", balance.to_string()).as_bytes());
+        self.io
+            .return_output(format!("\"{}\"", balance.to_string()).as_bytes());
     }
 
     /// Transfer between NEAR accounts
     pub fn ft_transfer(&mut self) {
         sdk::assert_one_yocto();
         let args = TransferCallArgs::from(
-            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
         self.ft
             .ft_transfer(&args.receiver_id, args.amount, &args.memo);
@@ -470,7 +482,7 @@ impl EthConnectorContract {
         // Check if previous promise succeeded
         assert_eq!(sdk::promise_results_count(), 1);
 
-        let args = ResolveTransferCallArgs::try_from_slice(&sdk::read_input()).unwrap();
+        let args: ResolveTransferCallArgs = self.io.read_input().to_value().unwrap();
         let amount = self
             .ft
             .ft_resolve_transfer(&args.sender_id, &args.receiver_id, args.amount);
@@ -480,7 +492,8 @@ impl EthConnectorContract {
         ));
         // `ft_resolve_transfer` can change `total_supply` so we should save the contract
         self.save_ft_contract();
-        sdk::return_output(format!("\"{}\"", amount.to_string()).as_bytes());
+        self.io
+            .return_output(format!("\"{}\"", amount.to_string()).as_bytes());
     }
 
     /// FT transfer call from sender account (invoker account) to receiver
@@ -524,37 +537,38 @@ impl EthConnectorContract {
     /// FT storage deposit logic
     pub fn storage_deposit(&mut self) {
         let args = StorageDepositCallArgs::from(
-            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
 
         let res = self
             .ft
             .storage_deposit(args.account_id.as_ref(), args.registration_only);
         self.save_ft_contract();
-        sdk::return_output(&res.to_json_bytes());
+        self.io.return_output(&res.to_json_bytes());
     }
 
     /// FT storage withdraw
     pub fn storage_withdraw(&mut self) {
         sdk::assert_one_yocto();
         let args = StorageWithdrawCallArgs::from(
-            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
         let res = self.ft.storage_withdraw(args.amount);
         self.save_ft_contract();
-        sdk::return_output(&res.to_json_bytes());
+        self.io.return_output(&res.to_json_bytes());
     }
 
     /// Get balance of storage
-    pub fn storage_balance_of(&self) {
+    pub fn storage_balance_of(&mut self) {
         let args = StorageBalanceOfCallArgs::from(
-            parse_json(&sdk::read_input()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
-        sdk::return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
+        self.io
+            .return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
     }
 
     /// ft_on_transfer callback function
-    pub fn ft_on_transfer(&mut self, engine: &Engine, args: &NEP141FtOnTransferArgs) {
+    pub fn ft_on_transfer(&mut self, engine: &Engine<I>, args: &NEP141FtOnTransferArgs) {
         sdk::log!("Call ft_on_transfer");
         // Parse message with specific rules
         let message_data = self.parse_on_transfer_message(&args.msg);
@@ -571,18 +585,19 @@ impl EthConnectorContract {
             _ => self.mint_eth_on_aurora(message_data.recipient, args.amount),
         }
         self.save_ft_contract();
-        sdk::return_output("\"0\"".as_bytes());
+        self.io.return_output("\"0\"".as_bytes());
     }
 
     /// Get accounts counter for statistics.
     /// It represents total unique accounts (all-time, including accounts which now have zero balance).
-    pub fn get_accounts_counter(&self) {
-        sdk::return_output(&self.ft.get_accounts_counter().to_le_bytes());
+    pub fn get_accounts_counter(&mut self) {
+        self.io
+            .return_output(&self.ft.get_accounts_counter().to_le_bytes());
     }
 
     /// Save eth-connector contract data
     fn save_ft_contract(&mut self) {
-        sdk::save_contract(
+        self.io.write_borsh(
             &Self::get_contract_key(&EthConnectorStorageId::FungibleToken),
             &self.ft,
         );
@@ -596,13 +611,13 @@ impl EthConnectorContract {
     }
 
     /// Save already used event proof as hash key
-    fn save_used_event(&self, key: &str) {
-        sdk::save_contract(&self.used_event_key(key), &0u8);
+    fn save_used_event(&mut self, key: &str) {
+        self.io.write_borsh(&self.used_event_key(key), &0u8);
     }
 
     /// Check is event of proof already used
     fn check_used_event(&self, key: &str) -> bool {
-        sdk::storage_has_key(&self.used_event_key(key))
+        self.io.storage_has_key(&self.used_event_key(key))
     }
 
     /// Checks whether the provided proof was already used
@@ -621,22 +636,22 @@ impl EthConnectorContract {
     }
 
     /// Return metdata
-    pub fn get_metadata() -> Option<FungibleTokenMetadata> {
-        sdk::read_storage(&Self::get_contract_key(
+    pub fn get_metadata(io: &I) -> Option<FungibleTokenMetadata> {
+        io.read_storage(&Self::get_contract_key(
             &EthConnectorStorageId::FungibleTokenMetadata,
         ))
-        .and_then(|data| FungibleTokenMetadata::try_from_slice(&data).ok())
+        .and_then(|data| data.to_value().ok())
     }
 }
 
-impl AdminControlled for EthConnectorContract {
+impl<I: IO + Default + Copy> AdminControlled for EthConnectorContract<I> {
     fn get_paused(&self) -> PausedMask {
         self.paused_mask
     }
 
     fn set_paused(&mut self, paused_mask: PausedMask) {
         self.paused_mask = paused_mask;
-        sdk::save_contract(
+        self.io.write_borsh(
             &Self::get_contract_key(&EthConnectorStorageId::PausedMask),
             &self.paused_mask,
         );

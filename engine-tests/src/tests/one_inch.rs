@@ -125,10 +125,10 @@ fn deploy_1_inch_limit_order_contract(
         test_utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
 
     let nonce = signer.use_nonce();
-    let deploy_tx = crate::prelude::transaction::LegacyEthTransaction {
+    let deploy_tx = crate::prelude::transaction::legacy::TransactionLegacy {
         nonce: nonce.into(),
         gas_price: Default::default(),
-        gas: u64::MAX.into(),
+        gas_limit: u64::MAX.into(),
         to: None,
         value: Default::default(),
         data: constructor.code,

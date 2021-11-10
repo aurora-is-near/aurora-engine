@@ -23,6 +23,7 @@ use crate::modexp::ModExp;
 use crate::native::{ExitToEthereum, ExitToNear};
 use crate::secp256k1::ECRecover;
 use evm::backend::Log;
+use evm::executor;
 use evm::{Context, ExitError, ExitSucceed};
 
 #[derive(Debug, Default)]
@@ -95,6 +96,26 @@ impl HardFork for Berlin {}
 type PrecompileFn = fn(&[u8], Option<u64>, &Context, bool) -> EvmPrecompileResult;
 
 pub struct Precompiles(pub prelude::BTreeMap<prelude::Address, PrecompileFn>);
+
+impl executor::PrecompileSet for Precompiles {
+    fn execute(
+        &self,
+        address: prelude::Address,
+        input: &[u8],
+        gas_limit: Option<u64>,
+        context: &Context,
+        is_static: bool,
+    ) -> Option<Result<executor::PrecompileOutput, executor::PrecompileFailure>> {
+        self.0.get(&address).map(|f| {
+            f(input, gas_limit, context, is_static)
+                .map_err(|exit_status| executor::PrecompileFailure::Error { exit_status })
+        })
+    }
+
+    fn is_precompile(&self, address: prelude::Address) -> bool {
+        self.0.contains_key(&address)
+    }
+}
 
 impl Precompiles {
     #[allow(dead_code)]
@@ -187,9 +208,44 @@ impl Precompiles {
         Precompiles(map)
     }
 
-    #[allow(dead_code)]
-    fn new_berlin() -> Self {
-        Self::new_istanbul()
+    pub fn new_berlin() -> Self {
+        let addresses = prelude::vec![
+            ECRecover::ADDRESS,
+            SHA256::ADDRESS,
+            RIPEMD160::ADDRESS,
+            Identity::ADDRESS,
+            ModExp::<Berlin>::ADDRESS,
+            Bn128Add::<Istanbul>::ADDRESS,
+            Bn128Mul::<Istanbul>::ADDRESS,
+            Bn128Pair::<Istanbul>::ADDRESS,
+            Blake2F::ADDRESS,
+            ExitToNear::ADDRESS,
+            ExitToEthereum::ADDRESS,
+        ];
+        let fun: prelude::Vec<PrecompileFn> = prelude::vec![
+            ECRecover::run,
+            SHA256::run,
+            RIPEMD160::run,
+            Identity::run,
+            ModExp::<Berlin>::run,
+            Bn128Add::<Istanbul>::run,
+            Bn128Mul::<Istanbul>::run,
+            Bn128Pair::<Istanbul>::run,
+            Blake2F::run,
+            ExitToNear::run,
+            ExitToEthereum::run,
+        ];
+        let mut map = prelude::BTreeMap::new();
+        for (address, fun) in addresses.into_iter().zip(fun) {
+            map.insert(address, fun);
+        }
+
+        Precompiles(map)
+    }
+
+    pub fn new_london() -> Self {
+        // no precompile changes in London HF
+        Self::new_berlin()
     }
 }
 

@@ -16,6 +16,29 @@ const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
 #[test]
+fn test_state_format() {
+    // The purpose of this test is to make sure that if we accidentally
+    // change the binary format of the `EngineState` then we will know
+    // about it. This is important because changing the state format will
+    // break the contract unless we do a state migration.
+    let args = aurora_engine::parameters::NewCallArgs {
+        chain_id: aurora_engine_types::types::u256_to_arr(&666.into()),
+        owner_id: "boss".parse().unwrap(),
+        bridge_prover_id: "prover_mcprovy_face".parse().unwrap(),
+        upgrade_delay_blocks: 3,
+    };
+    let state: aurora_engine::engine::EngineState = args.into();
+    let expected_hex: String = [
+        "000000000000000000000000000000000000000000000000000000000000029a",
+        "04000000626f7373",
+        "1300000070726f7665725f6d6370726f76795f66616365",
+        "0300000000000000",
+    ]
+    .concat();
+    assert_eq!(hex::encode(state.try_to_vec().unwrap()), expected_hex);
+}
+
+#[test]
 fn test_deploy_contract() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
@@ -74,6 +97,45 @@ fn test_deploy_largest_contract() {
 }
 
 #[test]
+fn test_log_address() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let mut deploy_contract = |name: &str, signer: &mut test_utils::Signer| {
+        let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+            "src/tests/res",
+            "target/solidity_build",
+            "caller.sol",
+            name,
+        );
+
+        let nonce = signer.use_nonce();
+        runner.deploy_contract(
+            &signer.secret_key,
+            |c| c.deploy_without_constructor(nonce.into()),
+            constructor,
+        )
+    };
+
+    let greet_contract = deploy_contract("Greeter", &mut signer);
+    let caller_contract = deploy_contract("Caller", &mut signer);
+
+    let result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            caller_contract.call_method_with_args(
+                "greet",
+                &[ethabi::Token::Address(greet_contract.address)],
+                nonce,
+            )
+        })
+        .unwrap();
+
+    // Address included in the log should come from the contract emitting the log,
+    // not the contract that invoked the call.
+    let log_address = result.logs.first().unwrap().address;
+    assert_eq!(Address(log_address), greet_contract.address);
+}
+
+#[test]
 fn test_timestamp() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
@@ -88,14 +150,7 @@ fn test_timestamp() {
     let nonce = signer.use_nonce();
     let contract = runner.deploy_contract(
         &signer.secret_key,
-        |c| crate::prelude::transaction::LegacyEthTransaction {
-            nonce: nonce.into(),
-            gas_price: Default::default(),
-            gas: u64::MAX.into(),
-            to: None,
-            value: Default::default(),
-            data: c.code.clone(),
-        },
+        |c| c.deploy_without_constructor(nonce.into()),
         constructor,
     );
 
@@ -139,10 +194,10 @@ fn test_override_state() {
     // deploy contract
     let result = runner
         .submit_with_signer(&mut account1, |nonce| {
-            crate::prelude::transaction::LegacyEthTransaction {
+            crate::prelude::transaction::legacy::TransactionLegacy {
                 nonce,
                 gas_price: Default::default(),
-                gas: u64::MAX.into(),
+                gas_limit: u64::MAX.into(),
                 to: None,
                 value: Default::default(),
                 data: contract.code.clone(),
@@ -200,8 +255,8 @@ fn test_num_wasm_functions() {
     let module_info = artifact.info();
     let num_functions = module_info.functions.len();
     assert!(
-        num_functions <= 1400,
-        "{} is not less than 1400",
+        num_functions <= 1440,
+        "{} is not less than 1440",
         num_functions
     );
 }
@@ -321,7 +376,7 @@ fn test_eth_transfer_not_enough_gas() {
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
         let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
-        tx.gas = 10_000.into(); // this is not enough gas
+        tx.gas_limit = 10_000.into(); // this is not enough gas
         tx
     };
 
@@ -357,7 +412,7 @@ fn test_transfer_charging_gas_success() {
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
         let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
-        tx.gas = 30_000.into();
+        tx.gas_limit = 30_000.into();
         tx.gas_price = GAS_PRICE.into();
         tx
     };
@@ -412,7 +467,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
         let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
         // With this gas limit and price the account does not
         // have enough balance to cover the gas cost
-        tx.gas = 3_000_000.into();
+        tx.gas_limit = 3_000_000.into();
         tx.gas_price = GAS_PRICE.into();
         tx
     };
@@ -482,8 +537,7 @@ fn test_block_hash() {
         crate::prelude::u256_to_arr(&number)
     };
     let account_id = runner.aurora_account_id;
-    let block_hash =
-        aurora_engine::engine::Engine::compute_block_hash(chain_id, 10, account_id.as_bytes());
+    let block_hash = aurora_engine::engine::compute_block_hash(chain_id, 10, account_id.as_bytes());
 
     assert_eq!(
         hex::encode(block_hash.0).as_str(),
@@ -599,7 +653,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
     // Run transaction which will fail (not enough balance to cover gas)
     let nonce = signer.use_nonce();
     let mut tx = test_utils::transfer(Address([1; 20]), TRANSFER_AMOUNT, nonce.into());
-    tx.gas = 3_000_000.into();
+    tx.gas_limit = 3_000_000.into();
     tx.gas_price = GAS_PRICE.into();
     let signed_tx = test_utils::sign_transaction(
         tx,

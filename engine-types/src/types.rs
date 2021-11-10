@@ -1,7 +1,6 @@
 use super::{str, vec, Add, Address, String, Sub, Vec, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
 
-pub type AccountId = String;
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32]; // Big-endian large integer type.
@@ -46,6 +45,7 @@ pub fn validate_eth_address(address: String) -> Result<EthAddress, ValidationErr
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default)]
 pub struct Wei(U256);
+
 impl Wei {
     const ETH_TO_WEI: U256 = U256([1_000_000_000_000_000_000, 0, 0, 0]);
 
@@ -90,6 +90,7 @@ impl Wei {
         self.0.checked_add(other.0).map(Self)
     }
 }
+
 impl Sub for Wei {
     type Output = Self;
 
@@ -97,6 +98,7 @@ impl Sub for Wei {
         Self(self.0 - other.0)
     }
 }
+
 impl Add for Wei {
     type Output = Self;
 
@@ -110,6 +112,7 @@ pub struct U128(pub u128);
 
 pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
 pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
+pub const ERR_INVALID_ETH_ADDRESS: &str = "ERR_INVALID_ETH_ADDRESS";
 
 /// Internal args format for meta call.
 #[derive(Debug)]

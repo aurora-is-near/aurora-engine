@@ -27,7 +27,7 @@
   },
   "scripts": {
     "compile": "hardhat compile",
-    "build": "yarn compile && node main.js ./artifacts/contracts/EvmErc20.sol/EvmErc20.json",
+    "build": "yarn compile && node main.js ./artifacts/contracts/EvmErc20.sol/EvmErc20.json && node main.js ./artifacts/contracts/EvmErc20V2.sol/EvmErc20V2.json",
     "test": "yarn hardhat test",
     "coverage": "hardhat coverage",
     "lint:js": "eslint .",
