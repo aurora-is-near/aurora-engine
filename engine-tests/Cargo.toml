@@ -42,10 +42,10 @@ libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
-# ethjson = { git = "https://github.com/rust-blockchain/evm-tests.git", features = ["test-helpers"] }
-# triehash-ethereum = { git = "https://github.com/rust-blockchain/evm-tests.git" }
-# parity-crypto = { version = "0.9", features = ["publickey"] }
-# parity-bytes = "0.1"
+parity-bytes = "0.1"
+ethjson = { git = "https://github.com/rust-blockchain/evm-tests.git", features = ["test-helpers"] }
+triehash-ethereum = { git = "https://github.com/rust-blockchain/evm-tests.git" }
+parity-crypto = { version = "0.9", features = ["publickey"] }
 
 [features]
 meta-call = ["aurora-engine/meta-call"]

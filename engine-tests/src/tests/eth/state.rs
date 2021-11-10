@@ -1,11 +1,11 @@
 use super::utils::*;
-use engine_precompiles::Precompiles;
+use crate::prelude::{H160, H256, U256};
+use aurora_engine_precompiles::Precompiles;
 use evm::backend::ApplyBackend;
 use evm::backend::{MemoryAccount, MemoryBackend, MemoryVicinity};
 use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
 use evm::{Config, ExitError};
 use parity_crypto::publickey;
-use primitive_types::{H160, H256, U256};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::io::BufReader;

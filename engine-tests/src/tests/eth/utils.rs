@@ -1,4 +1,4 @@
-use crate::primitive_types::{H160, H256, U256};
+use crate::prelude::{H160, H256, U256};
 use evm::backend::MemoryAccount;
 use sha3::{Digest, Keccak256};
 use std::collections::BTreeMap;
