@@ -1,5 +1,5 @@
 use crate::connector::NO_DEPOSIT;
-use crate::engine::Engine;
+use crate::engine;
 use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
@@ -132,7 +132,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 
     /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
-        Engine::get_balance(&self.io, &Address(address))
+        engine::get_balance(&self.io, &Address(address))
             .raw()
             .as_u128()
     }
@@ -155,7 +155,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     pub fn internal_deposit_eth_to_aurora(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_add(amount) {
-            Engine::set_balance(
+            engine::set_balance(
                 &mut self.io,
                 &Address(address),
                 &Wei::new(U256::from(new_balance)),
@@ -187,7 +187,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     pub fn internal_withdraw_eth_from_aurora(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_sub(amount) {
-            Engine::set_balance(
+            engine::set_balance(
                 &mut self.io,
                 &Address(address),
                 &Wei::new(U256::from(new_balance)),

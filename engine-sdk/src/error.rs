@@ -45,3 +45,21 @@ impl AsRef<[u8]> for ReadU256Error {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct PrivateCallError;
+
+impl AsRef<[u8]> for PrivateCallError {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_PRIVATE_CALL"
+    }
+}
+
+#[derive(Debug)]
+pub struct OneYoctoAttachError;
+
+impl AsRef<[u8]> for OneYoctoAttachError {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_1YOCTO_ATTACH"
+    }
+}

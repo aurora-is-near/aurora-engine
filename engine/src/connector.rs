@@ -17,6 +17,7 @@ use crate::prelude::{
     U256,
 };
 use crate::proof::Proof;
+use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
@@ -609,7 +610,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// ft_on_transfer callback function
-    pub fn ft_on_transfer(&mut self, engine: &Engine<I>, args: &NEP141FtOnTransferArgs) {
+    pub fn ft_on_transfer<'env, E: Env>(
+        &mut self,
+        engine: &Engine<'env, I, E>,
+        args: &NEP141FtOnTransferArgs,
+    ) {
         sdk::log!("Call ft_on_transfer");
         // Parse message with specific rules
         let message_data = self.parse_on_transfer_message(&args.msg);
