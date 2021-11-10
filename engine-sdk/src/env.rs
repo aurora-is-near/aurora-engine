@@ -2,6 +2,7 @@ use crate::error::{OneYoctoAttachError, PrivateCallError};
 use aurora_engine_types::account_id::AccountId;
 
 /// Timestamp represented by the number of nanoseconds since the Unix Epoch.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Timestamp(u64);
 
 impl Timestamp {
@@ -54,5 +55,42 @@ pub trait Env {
         } else {
             Err(OneYoctoAttachError)
         }
+    }
+}
+
+/// Fully in-memory implementation of the blockchain environment with
+/// fixed values for all the fields.
+pub struct Fixed {
+    pub signer_account_id: AccountId,
+    pub current_account_id: AccountId,
+    pub predecessor_account_id: AccountId,
+    pub block_height: u64,
+    pub block_timestamp: Timestamp,
+    pub attached_deposit: u128,
+}
+
+impl Env for Fixed {
+    fn signer_account_id(&self) -> AccountId {
+        self.signer_account_id.clone()
+    }
+
+    fn current_account_id(&self) -> AccountId {
+        self.current_account_id.clone()
+    }
+
+    fn predecessor_account_id(&self) -> AccountId {
+        self.predecessor_account_id.clone()
+    }
+
+    fn block_height(&self) -> u64 {
+        self.block_height
+    }
+
+    fn block_timestamp(&self) -> Timestamp {
+        self.block_timestamp
+    }
+
+    fn attached_deposit(&self) -> u128 {
+        self.attached_deposit
     }
 }

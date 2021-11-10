@@ -50,7 +50,6 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
     fn from(output: PrecompileOutput) -> Self {
         evm::executor::PrecompileOutput {
             exit_status: ExitSucceed::Returned,
-            // This shouldn't fail, and is expected.
             cost: output.cost.into_u64(),
             output: output.output,
             logs: output.logs,

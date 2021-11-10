@@ -19,5 +19,6 @@ sha3 = { version = "0.9.1", default-features = false }
 sha2 = { version = "0.9.3", default-features = false }
 
 [features]
+std = ["aurora-engine-types/std"]
 contract = []
 log = []

@@ -7,14 +7,11 @@ use aurora_engine_types::types::PromiseResult;
 pub struct PromiseId(u64);
 
 impl PromiseId {
-    // TODO: can remove this annotation when there is a standalone implementation that uses PromiseId.
-    #[allow(dead_code)]
-    pub(crate) fn new(id: u64) -> Self {
+    pub fn new(id: u64) -> Self {
         Self(id)
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn raw(self) -> u64 {
+    pub fn raw(self) -> u64 {
         self.0
     }
 }

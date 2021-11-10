@@ -239,6 +239,7 @@ pub struct StorageBalanceBounds {
 }
 
 /// promise results structure
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromiseResult {
     NotReady,
     Successful(Vec<u8>),

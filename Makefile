@@ -83,6 +83,7 @@ target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock 
 		--target wasm32-unknown-unknown \
 		--release \
 		--verbose \
+		-p aurora-engine \
 		--no-default-features \
 		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps
@@ -90,6 +91,7 @@ target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock 
 target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
 	$(CARGO) build \
 		--target wasm32-unknown-unknown \
+		-p aurora-engine \
 		--no-default-features \
 		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps

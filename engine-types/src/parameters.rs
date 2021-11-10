@@ -11,7 +11,7 @@ pub enum PromiseArgs {
 }
 
 #[must_use]
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
 pub struct PromiseCreateArgs {
     pub target_account_id: AccountId,
     pub method: String,
@@ -27,7 +27,7 @@ pub struct PromiseWithCallbackArgs {
     pub callback: PromiseCreateArgs,
 }
 
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
 pub enum PromiseAction {
     Transfer {
         amount: u128,
@@ -44,7 +44,7 @@ pub enum PromiseAction {
 }
 
 #[must_use]
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
 pub struct PromiseBatchAction {
     pub target_account_id: AccountId,
     pub actions: Vec<PromiseAction>,
