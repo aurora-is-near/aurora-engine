@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2021-11-09
+
+### Added
+
+- Depositing ETH from Ethereum to Aurora now allows an `0x` prefix on the recipient address by [@joshuajbouw]. ([#337](https://github.com/aurora-is-near/aurora-engine/pull/337))
+
 ## [2.1.0] - 2021-11-04
 
 ### Fixed
@@ -139,7 +145,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.1.0...master
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...master
+[2.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.1.0...2.2.0
 [2.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.2...2.1.0
 [2.0.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.1...2.0.2
 [2.0.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.0...2.0.1

@@ -1,7 +1,6 @@
 use super::{str, vec, Add, Address, String, Sub, Vec, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
 
-pub type AccountId = String;
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32]; // Big-endian large integer type.
@@ -110,6 +109,7 @@ pub struct U128(pub u128);
 
 pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
 pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
+pub const ERR_INVALID_ETH_ADDRESS: &str = "ERR_INVALID_ETH_ADDRESS";
 
 /// Internal args format for meta call.
 #[derive(Debug)]

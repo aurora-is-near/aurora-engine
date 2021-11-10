@@ -11,9 +11,10 @@ use crate::parameters::{
 };
 use crate::prelude::sdk::types::{ExpectUtf8, SdkUnwrap};
 use crate::prelude::{
-    format, is_valid_account_id, sdk, str, validate_eth_address, AccountId, Address, Balance,
-    BorshDeserialize, BorshSerialize, EthAddress, EthConnectorStorageId, Gas, KeyPrefix,
-    PromiseResult, String, ToString, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160, U256,
+    format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
+    BorshSerialize, EthAddress, EthConnectorStorageId, Gas, KeyPrefix, PromiseResult, String,
+    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, ERR_INVALID_ETH_ADDRESS, H160,
+    U256,
 };
 use crate::proof::Proof;
 
@@ -46,7 +47,10 @@ pub struct EthConnector {
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub enum TokenMessageData {
     Near(AccountId),
-    Eth { address: AccountId, message: String },
+    Eth {
+        receiver_id: AccountId,
+        message: String,
+    },
 }
 
 /// On-transfer message
@@ -90,7 +94,7 @@ impl EthConnectorContract {
         });
 
         let current_account_id = sdk::current_account_id();
-        let owner_id = String::from_utf8(current_account_id).unwrap();
+        let owner_id = AccountId::try_from(current_account_id).unwrap();
         let mut ft = FungibleToken::new();
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
@@ -134,16 +138,12 @@ impl EthConnectorContract {
     fn parse_event_message(&self, message: &str) -> TokenMessageData {
         let data: Vec<_> = message.split(':').collect();
         assert!(data.len() < 3);
+        let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
         if data.len() == 1 {
-            let account_id = data[0];
-            assert!(
-                is_valid_account_id(account_id.as_bytes()),
-                "ERR_INVALID_ACCOUNT_ID"
-            );
-            TokenMessageData::Near(account_id.into())
+            TokenMessageData::Near(account_id)
         } else {
             TokenMessageData::Eth {
-                address: data[0].into(),
+                receiver_id: account_id,
                 message: data[1].into(),
             }
         }
@@ -161,13 +161,9 @@ impl EthConnectorContract {
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
         // Check account
-        let account_id = data[0];
-        assert!(
-            is_valid_account_id(account_id.as_bytes()),
-            "ERR_INVALID_ACCOUNT_ID"
-        );
+        let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
         OnTransferMessageData {
-            relayer: account_id.into(),
+            relayer: account_id,
             recipient,
             fee: U256::from_little_endian(&fee[..]),
         }
@@ -180,8 +176,16 @@ impl EthConnectorContract {
         // Relayer == predecessor
         let relayer_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let mut data = fee.as_byte_slice().to_vec();
-        let message = hex::decode(message).expect(ERR_FAILED_PARSE);
-        data.extend(message);
+        let address = if message.len() == 42 {
+            message
+                .strip_prefix("0x")
+                .expect(ERR_INVALID_ETH_ADDRESS)
+                .to_string()
+        } else {
+            message
+        };
+        let address_bytes = hex::decode(address).expect(ERR_FAILED_PARSE);
+        data.extend(address_bytes);
         [relayer_account_id, hex::encode(data)].join(":")
     }
 
@@ -239,7 +243,7 @@ impl EthConnectorContract {
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
 
         // Finalize deposit
         let data = match self.parse_event_message(&event.recipient) {
@@ -256,11 +260,14 @@ impl EthConnectorContract {
             .unwrap(),
             // Deposit to Eth accounts
             // fee is being minted in the `ft_on_transfer` callback method
-            TokenMessageData::Eth { address, message } => {
+            TokenMessageData::Eth {
+                receiver_id,
+                message,
+            } => {
                 // Transfer to self and then transfer ETH in `ft_on_transfer`
                 // address - is NEAR account
                 let transfer_data = TransferCallCallArgs {
-                    receiver_id: address,
+                    receiver_id,
                     amount: event.amount.as_u128(),
                     memo: None,
                     msg: self.set_message_for_on_transfer(event.fee, message),
@@ -268,7 +275,7 @@ impl EthConnectorContract {
                 .try_to_vec()
                 .unwrap();
 
-                let current_account_id = String::from_utf8(sdk::current_account_id()).unwrap();
+                let current_account_id = AccountId::try_from(sdk::current_account_id()).unwrap();
                 // Send to self - current account id
                 FinishDepositCallArgs {
                     new_owner_id: current_account_id,
@@ -397,7 +404,7 @@ impl EthConnectorContract {
         .try_to_vec()
         .unwrap();
         // Burn tokens to recipient
-        let predecessor_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
+        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
         self.ft
             .internal_withdraw_eth_from_near(&predecessor_account_id, args.amount);
         // Save new contract data

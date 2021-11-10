@@ -20,11 +20,11 @@ pub mod transaction;
 pub mod admin_controlled;
 #[cfg_attr(feature = "contract", allow(dead_code))]
 pub mod connector;
-mod deposit_event;
+pub mod deposit_event;
 pub mod engine;
 pub mod fungible_token;
 pub mod json;
-mod log_entry;
+pub mod log_entry;
 mod prelude;
 
 #[cfg(target_arch = "wasm32")]
