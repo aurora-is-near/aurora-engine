@@ -13,7 +13,7 @@ publish = false
 autobenches = false
 
 [dependencies]
-aurora-engine = { path = "../engine", default-features = false, features=["sha2"] }
+aurora-engine = { path = "../engine", default-features = false, features = ["sha2"] }
 aurora-engine-types = { path = "../engine-types", default-features = false }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
@@ -24,6 +24,7 @@ evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-feature
 rlp = { version = "0.5.0", default-features = false }
 
 [dev-dependencies]
+aurora-engine-precompiles = { path = "../engine-precompiles" }
 bstr = "0.2"
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std" }
 serde = { version = "1", features = ["derive"] }
@@ -41,6 +42,10 @@ libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
+parity-bytes = "0.1"
+# ethjson = { git = "https://github.com/rust-blockchain/evm-tests.git", features = ["test-helpers"] }
+# triehash-ethereum = { git = "https://github.com/rust-blockchain/evm-tests.git" }
+# parity-crypto = { version = "0.9", features = ["publickey"] }
 
 [features]
 meta-call = ["aurora-engine/meta-call"]

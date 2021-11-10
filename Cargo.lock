@@ -207,6 +207,7 @@ dependencies = [
  "near-sdk-sim",
  "near-vm-logic 3.0.0 (git+https://github.com/near/nearcore.git?rev=0c9ad79a18e431f843e6123cf4559f9c2c5dd228)",
  "near-vm-runner 3.0.0 (git+https://github.com/near/nearcore.git?rev=0c9ad79a18e431f843e6123cf4559f9c2c5dd228)",
+ "parity-bytes",
  "rand 0.7.3",
  "rlp",
  "serde",
@@ -2623,7 +2624,7 @@ dependencies = [
  "near-vm-errors 3.0.0 (git+https://github.com/near/nearcore.git?rev=0c9ad79a18e431f843e6123cf4559f9c2c5dd228)",
  "ripemd160",
  "serde",
- "sha2 0.8.2",
+ "sha2 0.9.5",
  "sha3 0.9.1",
 ]
 
@@ -2974,6 +2975,12 @@ dependencies = [
  "libc",
  "winapi",
 ]
+
+[[package]]
+name = "parity-bytes"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16b56e3a2420138bdb970f84dfb9c774aea80fa0e7371549eedec0d80c209c67"
 
 [[package]]
 name = "parity-scale-codec"
