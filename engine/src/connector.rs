@@ -87,7 +87,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Init eth-connector contract specific data
-    pub fn init_contract(mut io: I, args: InitCallArgs) {
+    pub fn init_contract(mut io: I, owner_id: AccountId, args: InitCallArgs) {
         // Check is it already initialized
         assert!(
             !io.storage_has_key(&Self::get_contract_key(&EthConnectorStorageId::Contract)),
@@ -104,8 +104,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             },
         );
 
-        let current_account_id = sdk::current_account_id();
-        let owner_id = AccountId::try_from(current_account_id).unwrap();
         let mut ft = FungibleTokenOps::new(io);
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
@@ -182,11 +180,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
-    fn set_message_for_on_transfer(&self, fee: U256, message: String) -> String {
+    fn set_message_for_on_transfer(
+        &self,
+        relayer_account_id: &AccountId,
+        fee: U256,
+        message: String,
+    ) -> String {
         use byte_slice_cast::AsByteSlice;
 
-        // Relayer == predecessor
-        let relayer_account_id = String::from_utf8(sdk::predecessor_account_id()).unwrap();
         let mut data = fee.as_byte_slice().to_vec();
         let address = if message.len() == 42 {
             message
@@ -198,12 +199,18 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         };
         let address_bytes = hex::decode(address).expect(ERR_FAILED_PARSE);
         data.extend(address_bytes);
-        [relayer_account_id, hex::encode(data)].join(":")
+        [relayer_account_id.as_ref(), &hex::encode(data)].join(":")
     }
 
     /// Deposit all types of tokens
-    pub fn deposit(&self, raw_proof: Vec<u8>) {
-        self.assert_not_paused(PAUSE_DEPOSIT);
+    pub fn deposit(
+        &self,
+        raw_proof: Vec<u8>,
+        current_account_id: AccountId,
+        predecessor_account_id: AccountId,
+    ) {
+        let is_owner = current_account_id == predecessor_account_id;
+        self.assert_not_paused(PAUSE_DEPOSIT, is_owner);
 
         sdk::log!("[Deposit tokens]");
 
@@ -254,7 +261,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             NO_DEPOSIT,
             GAS_FOR_VERIFY_LOG_ENTRY,
         );
-        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
 
         // Finalize deposit
         let data = match self.parse_event_message(&event.recipient) {
@@ -281,15 +287,18 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                     receiver_id,
                     amount: event.amount.as_u128(),
                     memo: None,
-                    msg: self.set_message_for_on_transfer(event.fee, message),
+                    msg: self.set_message_for_on_transfer(
+                        &predecessor_account_id,
+                        event.fee,
+                        message,
+                    ),
                 }
                 .try_to_vec()
                 .unwrap();
 
-                let current_account_id = AccountId::try_from(sdk::current_account_id()).unwrap();
                 // Send to self - current account id
                 FinishDepositCallArgs {
-                    new_owner_id: current_account_id,
+                    new_owner_id: current_account_id.clone(),
                     amount: event.amount.as_u128(),
                     proof_key: proof.get_key(),
                     relayer_id: predecessor_account_id,
@@ -303,7 +312,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         let promise1 = sdk::promise_then(
             promise0,
-            &sdk::current_account_id(),
+            current_account_id.as_bytes(),
             b"finish_deposit",
             &data[..],
             NO_DEPOSIT,
@@ -317,7 +326,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// is that in this case we only calculate the amount to be credited but
     /// do not save it, however, if an error occurs during the calculation,
     /// this will happen before `record_proof`. After that contract will save.
-    pub fn finish_deposit(&mut self, data: FinishDepositCallArgs) {
+    pub fn finish_deposit(
+        &mut self,
+        predecessor_account_id: AccountId,
+        current_account_id: AccountId,
+        data: FinishDepositCallArgs,
+    ) {
         sdk::log!(&format!("Finish deposit with the amount: {}", data.amount));
         assert_eq!(sdk::promise_results_count(), 1);
 
@@ -341,7 +355,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Save new contract data
             self.save_ft_contract();
             let transfer_call_args = TransferCallCallArgs::try_from_slice(&msg).unwrap();
-            self.ft_transfer_call(transfer_call_args);
+            self.ft_transfer_call(
+                predecessor_account_id,
+                current_account_id,
+                transfer_call_args,
+            );
         } else {
             // Mint - calculate new balances
             self.mint_eth_on_near(data.new_owner_id.clone(), data.amount - data.fee);
@@ -399,14 +417,18 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Withdraw nETH from NEAR accounts
     /// NOTE: it should be without any log data
-    pub fn withdraw_eth_from_near(&mut self, args: WithdrawCallArgs) -> WithdrawResult {
-        self.assert_not_paused(PAUSE_WITHDRAW);
+    pub fn withdraw_eth_from_near(
+        &mut self,
+        current_account_id: &AccountId,
+        predecessor_account_id: &AccountId,
+        args: WithdrawCallArgs,
+    ) -> WithdrawResult {
+        let is_owner = current_account_id == predecessor_account_id;
+        self.assert_not_paused(PAUSE_WITHDRAW, is_owner);
 
-        sdk::assert_one_yocto();
         // Burn tokens to recipient
-        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
         self.ft
-            .internal_withdraw_eth_from_near(&predecessor_account_id, args.amount);
+            .internal_withdraw_eth_from_near(predecessor_account_id, args.amount);
         // Save new contract data
         self.save_ft_contract();
 
@@ -465,13 +487,16 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Transfer between NEAR accounts
-    pub fn ft_transfer(&mut self) {
-        sdk::assert_one_yocto();
+    pub fn ft_transfer(&mut self, predecessor_account_id: &AccountId) {
         let args = TransferCallArgs::from(
             parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         );
-        self.ft
-            .ft_transfer(&args.receiver_id, args.amount, &args.memo);
+        self.ft.internal_transfer_eth_on_near(
+            predecessor_account_id,
+            &args.receiver_id,
+            args.amount,
+            &args.memo,
+        );
         self.save_ft_contract();
         sdk::log!(&format!(
             "Transfer amount {} to {} success with memo: {:?}",
@@ -480,15 +505,17 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// FT resolve transfer logic
-    pub fn ft_resolve_transfer(&mut self) {
-        sdk::assert_private_call();
-        // Check if previous promise succeeded
-        assert_eq!(sdk::promise_results_count(), 1);
-
-        let args: ResolveTransferCallArgs = self.io.read_input().to_value().unwrap();
-        let amount = self
-            .ft
-            .ft_resolve_transfer(&args.sender_id, &args.receiver_id, args.amount);
+    pub fn ft_resolve_transfer(
+        &mut self,
+        args: ResolveTransferCallArgs,
+        promise_result: PromiseResult,
+    ) {
+        let amount = self.ft.ft_resolve_transfer(
+            promise_result,
+            &args.sender_id,
+            &args.receiver_id,
+            args.amount,
+        );
         sdk::log!(&format!(
             "Resolve transfer from {} to {} success",
             args.sender_id, args.receiver_id
@@ -502,13 +529,18 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// FT transfer call from sender account (invoker account) to receiver
     /// We starting early checking for message data to avoid `ft_on_transfer` call panics
     /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
-    pub fn ft_transfer_call(&mut self, args: TransferCallCallArgs) {
+    pub fn ft_transfer_call(
+        &mut self,
+        predecessor_account_id: AccountId,
+        current_account_id: AccountId,
+        args: TransferCallCallArgs,
+    ) {
         sdk::log!(&format!(
             "Transfer call to {} amount {}",
             args.receiver_id, args.amount,
         ));
         // Verify message data before `ft_on_transfer` call to avoid verification panics
-        if args.receiver_id.as_bytes() == &sdk::current_account_id()[..] {
+        if args.receiver_id == current_account_id {
             let message_data = self.parse_on_transfer_message(&args.msg);
             // Check is transfer amount > fee
             assert!(
@@ -533,30 +565,36 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 .is_some());
         }
 
-        self.ft
-            .ft_transfer_call(&args.receiver_id, args.amount, &args.memo, args.msg);
+        self.ft.ft_transfer_call(
+            predecessor_account_id,
+            &args.receiver_id,
+            args.amount,
+            &args.memo,
+            args.msg,
+            &current_account_id,
+        );
     }
 
     /// FT storage deposit logic
-    pub fn storage_deposit(&mut self) {
-        let args = StorageDepositCallArgs::from(
-            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+    pub fn storage_deposit(
+        &mut self,
+        predecessor_account_id: &AccountId,
+        amount: Balance,
+        args: StorageDepositCallArgs,
+    ) {
+        let res = self.ft.storage_deposit(
+            predecessor_account_id,
+            args.account_id.as_ref().unwrap_or(predecessor_account_id),
+            amount,
+            args.registration_only,
         );
-
-        let res = self
-            .ft
-            .storage_deposit(args.account_id.as_ref(), args.registration_only);
         self.save_ft_contract();
         self.io.return_output(&res.to_json_bytes());
     }
 
     /// FT storage withdraw
-    pub fn storage_withdraw(&mut self) {
-        sdk::assert_one_yocto();
-        let args = StorageWithdrawCallArgs::from(
-            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-        );
-        let res = self.ft.storage_withdraw(args.amount);
+    pub fn storage_withdraw(&mut self, account_id: &AccountId, args: StorageWithdrawCallArgs) {
+        let res = self.ft.storage_withdraw(account_id, args.amount);
         self.save_ft_contract();
         self.io.return_output(&res.to_json_bytes());
     }

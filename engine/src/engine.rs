@@ -303,8 +303,7 @@ struct StackExecutorParams {
 }
 
 impl StackExecutorParams {
-    fn new(gas_limit: u64) -> Self {
-        let current_account_id = AccountId::try_from(sdk::current_account_id()).unwrap();
+    fn new(gas_limit: u64, current_account_id: AccountId) -> Self {
         Self {
             precompiles: Precompiles::new_london(current_account_id),
             gas_limit,
@@ -360,6 +359,7 @@ pub struct Engine<I: IO> {
     state: EngineState,
     origin: Address,
     gas_price: U256,
+    current_account_id: AccountId,
     io: I,
 }
 
@@ -370,15 +370,26 @@ pub(crate) const CONFIG: &Config = &Config::london();
 const STATE_KEY: &[u8; 5] = b"STATE";
 
 impl<I: IO + Copy> Engine<I> {
-    pub fn new(origin: Address, io: I) -> Result<Self, EngineStateError> {
-        Engine::get_state(&io).map(|state| Self::new_with_state(state, origin, io))
+    pub fn new(
+        origin: Address,
+        current_account_id: AccountId,
+        io: I,
+    ) -> Result<Self, EngineStateError> {
+        Engine::get_state(&io)
+            .map(|state| Self::new_with_state(state, origin, current_account_id, io))
     }
 
-    pub fn new_with_state(state: EngineState, origin: Address, io: I) -> Self {
+    pub fn new_with_state(
+        state: EngineState,
+        origin: Address,
+        current_account_id: AccountId,
+        io: I,
+    ) -> Self {
         Self {
             state,
             origin,
             gas_price: U256::zero(),
+            current_account_id,
             io,
         }
     }
@@ -628,7 +639,7 @@ impl<I: IO + Copy> Engine<I> {
         gas_limit: u64,
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(gas_limit);
+        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (exit_reason, result) = (
@@ -669,7 +680,7 @@ impl<I: IO + Copy> Engine<I> {
         gas_limit: u64,
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(gas_limit);
+        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
@@ -714,7 +725,7 @@ impl<I: IO + Copy> Engine<I> {
         input: Vec<u8>,
         gas_limit: u64,
     ) -> Result<TransactionStatus, EngineErrorKind> {
-        let executor_params = StackExecutorParams::new(gas_limit);
+        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
         let mut executor = executor_params.make_executor(self);
         let (status, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
@@ -795,7 +806,12 @@ impl<I: IO + Copy> Engine<I> {
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
-    pub fn receive_erc20_tokens(&mut self, args: &NEP141FtOnTransferArgs) {
+    pub fn receive_erc20_tokens(
+        &mut self,
+        token: &AccountId,
+        relayer_account_id: &AccountId,
+        args: &NEP141FtOnTransferArgs,
+    ) {
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
 
@@ -826,10 +842,9 @@ impl<I: IO + Copy> Engine<I> {
             (recipient, fee)
         };
 
-        let token = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
         let erc20_token = Address(unwrap_res_or_finish!(
             unwrap_res_or_finish!(
-                Self::get_erc20_from_nep141(&self.io, &token),
+                Self::get_erc20_from_nep141(&self.io, token),
                 output_on_fail,
                 self.io
             )
@@ -840,9 +855,8 @@ impl<I: IO + Copy> Engine<I> {
         ));
 
         if fee != U256::from(0) {
-            let relayer_account_id = sdk::signer_account_id();
             let relayer_address = unwrap_res_or_finish!(
-                self.get_relayer(relayer_account_id.as_slice()).ok_or(()),
+                self.get_relayer(relayer_account_id.as_bytes()).ok_or(()),
                 output_on_fail,
                 self.io
             );
@@ -1045,14 +1059,11 @@ impl<I: IO + Copy> evm::backend::Backend for Engine<I> {
         let idx = U256::from(sdk::block_index());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
             // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
-            #[cfg(feature = "contract")]
-            {
-                let account_id = sdk::current_account_id();
-                compute_block_hash(self.state.chain_id, number.low_u64(), &account_id)
-            }
-
-            #[cfg(not(feature = "contract"))]
-            compute_block_hash(self.state.chain_id, number.low_u64(), b"aurora")
+            compute_block_hash(
+                self.state.chain_id,
+                number.low_u64(),
+                self.current_account_id.as_bytes(),
+            )
         } else {
             H256::zero()
         }
