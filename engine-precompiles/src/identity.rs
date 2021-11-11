@@ -36,6 +36,7 @@ impl Precompile for Identity {
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000004
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         _context: &Context,
@@ -65,19 +66,21 @@ mod tests {
         let input = [0u8, 1, 2, 3];
 
         let expected = input[0..2].to_vec();
-        let res = Identity::run(&input[0..2], Some(18), &new_context(), false)
+        let res = Identity
+            .run(&input[0..2], Some(18), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
 
         let expected = input.to_vec();
-        let res = Identity::run(&input, Some(18), &new_context(), false)
+        let res = Identity
+            .run(&input, Some(18), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
 
         // gas fail
-        let res = Identity::run(&input[0..2], Some(17), &new_context(), false);
+        let res = Identity.run(&input[0..2], Some(17), &new_context(), false);
 
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
@@ -86,7 +89,8 @@ mod tests {
             0u8, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
             24, 25, 26, 27, 28, 29, 30, 31, 32,
         ];
-        let res = Identity::run(&input, Some(21), &new_context(), false)
+        let res = Identity
+            .run(&input, Some(21), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, input.to_vec());

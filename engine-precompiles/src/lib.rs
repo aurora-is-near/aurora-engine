@@ -22,6 +22,7 @@ use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{ExitToEthereum, ExitToNear};
 use crate::secp256k1::ECRecover;
+use aurora_engine_types::{account_id::AccountId, Address, BTreeMap, Box};
 use evm::backend::Log;
 use evm::executor;
 use evm::{Context, ExitError, ExitSucceed};
@@ -59,10 +60,13 @@ type EvmPrecompileResult = Result<evm::executor::PrecompileOutput, ExitError>;
 /// A precompiled function for use in the EVM.
 pub trait Precompile {
     /// The required gas in order to run the precompile function.
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError>;
+    fn required_gas(input: &[u8]) -> Result<u64, ExitError>
+    where
+        Self: Sized;
 
     /// Runs the precompile function.
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         context: &Context,
@@ -93,9 +97,7 @@ impl HardFork for Istanbul {}
 
 impl HardFork for Berlin {}
 
-type PrecompileFn = fn(&[u8], Option<u64>, &Context, bool) -> EvmPrecompileResult;
-
-pub struct Precompiles(pub prelude::BTreeMap<prelude::Address, PrecompileFn>);
+pub struct Precompiles(pub prelude::BTreeMap<Address, Box<dyn Precompile>>);
 
 impl executor::PrecompileSet for Precompiles {
     fn execute(
@@ -106,8 +108,8 @@ impl executor::PrecompileSet for Precompiles {
         context: &Context,
         is_static: bool,
     ) -> Option<Result<executor::PrecompileOutput, executor::PrecompileFailure>> {
-        self.0.get(&address).map(|f| {
-            f(input, gas_limit, context, is_static)
+        self.0.get(&address).map(|p| {
+            p.run(input, gas_limit, context, is_static)
                 .map_err(|exit_status| executor::PrecompileFailure::Error { exit_status })
         })
     }
@@ -119,7 +121,7 @@ impl executor::PrecompileSet for Precompiles {
 
 impl Precompiles {
     #[allow(dead_code)]
-    pub fn new_homestead() -> Self {
+    pub fn new_homestead(current_account_id: AccountId) -> Self {
         let addresses = prelude::vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -127,20 +129,20 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: prelude::Vec<PrecompileFn> = prelude::vec![
-            ECRecover::run,
-            SHA256::run,
-            RIPEMD160::run,
-            ExitToNear::run,
-            ExitToEthereum::run,
+        let fun: prelude::Vec<Box<dyn Precompile>> = prelude::vec![
+            Box::new(ECRecover),
+            Box::new(SHA256),
+            Box::new(RIPEMD160),
+            Box::new(ExitToNear::new(current_account_id.clone())),
+            Box::new(ExitToEthereum::new(current_account_id)),
         ];
-        let map = addresses.into_iter().zip(fun).collect();
+        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
         Precompiles(map)
     }
 
     #[allow(dead_code)]
-    pub fn new_byzantium() -> Self {
+    pub fn new_byzantium(current_account_id: AccountId) -> Self {
         let addresses = prelude::vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -153,27 +155,24 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: prelude::Vec<PrecompileFn> = prelude::vec![
-            ECRecover::run,
-            SHA256::run,
-            RIPEMD160::run,
-            Identity::run,
-            ModExp::<Byzantium>::run,
-            Bn128Add::<Byzantium>::run,
-            Bn128Mul::<Byzantium>::run,
-            Bn128Pair::<Byzantium>::run,
-            ExitToNear::run,
-            ExitToEthereum::run,
+        let fun: prelude::Vec<Box<dyn Precompile>> = prelude::vec![
+            Box::new(ECRecover),
+            Box::new(SHA256),
+            Box::new(RIPEMD160),
+            Box::new(Identity),
+            Box::new(ModExp::<Byzantium>::new()),
+            Box::new(Bn128Add::<Byzantium>::new()),
+            Box::new(Bn128Mul::<Byzantium>::new()),
+            Box::new(Bn128Pair::<Byzantium>::new()),
+            Box::new(ExitToNear::new(current_account_id.clone())),
+            Box::new(ExitToEthereum::new(current_account_id)),
         ];
-        let mut map = prelude::BTreeMap::new();
-        for (address, fun) in addresses.into_iter().zip(fun) {
-            map.insert(address, fun);
-        }
+        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
         Precompiles(map)
     }
 
-    pub fn new_istanbul() -> Self {
+    pub fn new_istanbul(current_account_id: AccountId) -> Self {
         let addresses = prelude::vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -187,28 +186,25 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: prelude::Vec<PrecompileFn> = prelude::vec![
-            ECRecover::run,
-            SHA256::run,
-            RIPEMD160::run,
-            Identity::run,
-            ModExp::<Byzantium>::run,
-            Bn128Add::<Istanbul>::run,
-            Bn128Mul::<Istanbul>::run,
-            Bn128Pair::<Istanbul>::run,
-            Blake2F::run,
-            ExitToNear::run,
-            ExitToEthereum::run,
+        let fun: prelude::Vec<Box<dyn Precompile>> = prelude::vec![
+            Box::new(ECRecover),
+            Box::new(SHA256),
+            Box::new(RIPEMD160),
+            Box::new(Identity),
+            Box::new(ModExp::<Byzantium>::new()),
+            Box::new(Bn128Add::<Istanbul>::new()),
+            Box::new(Bn128Mul::<Istanbul>::new()),
+            Box::new(Bn128Pair::<Istanbul>::new()),
+            Box::new(Blake2F),
+            Box::new(ExitToNear::new(current_account_id.clone())),
+            Box::new(ExitToEthereum::new(current_account_id)),
         ];
-        let mut map = prelude::BTreeMap::new();
-        for (address, fun) in addresses.into_iter().zip(fun) {
-            map.insert(address, fun);
-        }
+        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
         Precompiles(map)
     }
 
-    pub fn new_berlin() -> Self {
+    pub fn new_berlin(current_account_id: AccountId) -> Self {
         let addresses = prelude::vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -222,30 +218,27 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: prelude::Vec<PrecompileFn> = prelude::vec![
-            ECRecover::run,
-            SHA256::run,
-            RIPEMD160::run,
-            Identity::run,
-            ModExp::<Berlin>::run,
-            Bn128Add::<Istanbul>::run,
-            Bn128Mul::<Istanbul>::run,
-            Bn128Pair::<Istanbul>::run,
-            Blake2F::run,
-            ExitToNear::run,
-            ExitToEthereum::run,
+        let fun: prelude::Vec<Box<dyn Precompile>> = prelude::vec![
+            Box::new(ECRecover),
+            Box::new(SHA256),
+            Box::new(RIPEMD160),
+            Box::new(Identity),
+            Box::new(ModExp::<Berlin>::new()),
+            Box::new(Bn128Add::<Istanbul>::new()),
+            Box::new(Bn128Mul::<Istanbul>::new()),
+            Box::new(Bn128Pair::<Istanbul>::new()),
+            Box::new(Blake2F),
+            Box::new(ExitToNear::new(current_account_id.clone())),
+            Box::new(ExitToEthereum::new(current_account_id)),
         ];
-        let mut map = prelude::BTreeMap::new();
-        for (address, fun) in addresses.into_iter().zip(fun) {
-            map.insert(address, fun);
-        }
+        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
         Precompiles(map)
     }
 
-    pub fn new_london() -> Self {
+    pub fn new_london(current_account_id: AccountId) -> Self {
         // no precompile changes in London HF
-        Self::new_berlin()
+        Self::new_berlin(current_account_id)
     }
 }
 

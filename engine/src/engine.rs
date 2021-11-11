@@ -267,8 +267,9 @@ struct StackExecutorParams {
 
 impl StackExecutorParams {
     fn new(gas_limit: u64) -> Self {
+        let current_account_id = AccountId::try_from(sdk::current_account_id()).unwrap();
         Self {
-            precompiles: Precompiles::new_london(),
+            precompiles: Precompiles::new_london(current_account_id),
             gas_limit,
         }
     }

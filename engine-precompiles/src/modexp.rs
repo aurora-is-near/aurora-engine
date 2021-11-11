@@ -8,6 +8,10 @@ pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
     pub(super) const ADDRESS: Address = super::make_address(0, 5);
+
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
 }
 
 impl<HF: HardFork> ModExp<HF> {
@@ -104,6 +108,7 @@ impl Precompile for ModExp<Byzantium> {
     /// See: https://eips.ethereum.org/EIPS/eip-198
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         _context: &Context,
@@ -143,6 +148,7 @@ impl Precompile for ModExp<Berlin> {
     }
 
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         _context: &Context,
@@ -378,7 +384,8 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
-            let res = ModExp::<Byzantium>::run(&input, Some(*test_gas), &new_context(), false)
+            let res = ModExp::<Byzantium>::new()
+                .run(&input, Some(*test_gas), &new_context(), false)
                 .unwrap()
                 .output;
             let expected = hex::decode(&test.expected).unwrap();
@@ -446,7 +453,9 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_empty_input() {
-        let res = ModExp::<Berlin>::run(&[], Some(100_000), &new_context(), false).unwrap();
+        let res = ModExp::<Berlin>::new()
+            .run(&[], Some(100_000), &new_context(), false)
+            .unwrap();
         let expected: Vec<u8> = Vec::new();
         assert_eq!(res.output, expected)
     }
