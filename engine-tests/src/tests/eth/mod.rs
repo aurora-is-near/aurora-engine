@@ -1,4 +1,4 @@
-mod EIP152;
+mod eip152;
 mod ethcore_builtin;
 mod ethjson;
 mod keccak_hasher;

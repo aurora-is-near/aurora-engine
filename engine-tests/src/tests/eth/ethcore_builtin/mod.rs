@@ -27,8 +27,8 @@ use std::{
     str::FromStr,
 };
 
+use super::eip152::compress;
 use super::ethjson;
-use super::EIP152::compress;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use eth_pairings::public_interface::eip2537::{
     EIP2537Executor, SCALAR_BYTE_LENGTH, SERIALIZED_G1_POINT_BYTE_LENGTH,

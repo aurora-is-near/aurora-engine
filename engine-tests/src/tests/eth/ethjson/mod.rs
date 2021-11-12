@@ -17,6 +17,7 @@
 //! JSON deserialization library
 
 #![warn(missing_docs)]
+#![allow(unused)]
 
 pub mod bytes;
 pub mod hash;

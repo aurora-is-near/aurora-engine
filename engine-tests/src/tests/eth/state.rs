@@ -325,6 +325,7 @@ pub fn run(dir: &str) {
     use std::path::PathBuf;
 
     let mut dest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    dest.push("./ethtests");
     dest.push(dir);
 
     for entry in fs::read_dir(dest).unwrap() {
@@ -495,45 +496,14 @@ pub fn state_test(name: &str, eth_test: Test) {
         }
     }
 }
-
-pub fn run(dir: &str) {
-    use std::fs;
-    use std::fs::File;
-    use std::path::PathBuf;
-
-    let mut dest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    dest.push("src/tests/eth/ethtests");
-    dest.push(dir);
-
-    for entry in fs::read_dir(dest).unwrap() {
-        let entry = entry.unwrap();
-        if let Some(s) = entry.file_name().to_str() {
-            if s.starts_with(".") {
-                continue;
-            }
-        }
-
-        let path = entry.path();
-        let file = File::open(path).expect("Open file failed");
-
-        let reader = BufReader::new(file);
-        let coll = serde_json::from_reader::<_, HashMap<String, Test>>(reader)
-            .expect("Parse test cases failed");
-
-        for (name, test) in coll {
-            state_test(&name, test);
-        }
-    }
-}
-
 */
 
-/*
 #[test]
 fn st_args_zero_one_balance() {
     run("GeneralStateTests/stArgsZeroOneBalance")
 }
 
+/*
 #[test]
 fn st_attack() {
     run("GeneralStateTests/stAttackTest")
