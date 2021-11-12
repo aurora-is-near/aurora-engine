@@ -1,3 +1,4 @@
+use super::ethcore_builtin;
 use super::ethjson::{self, spec::ForkSpec};
 use super::utils::*;
 use crate::prelude::{H160, H256, U256};
@@ -83,7 +84,7 @@ impl Test {
         })
     }
 }
-/*
+
 lazy_static! {
     static ref ISTANBUL_BUILTINS: BTreeMap<H160, ethcore_builtin::Builtin> =
         JsonPrecompile::builtins("./res/istanbul_builtins.json");
@@ -192,7 +193,7 @@ impl JsonPrecompile {
     }
 }
 
-pub fn test(name: &str, test: Test) {
+pub fn state_test(name: &str, test: Test) {
     use std::thread;
 
     const STACK_SIZE: usize = 16 * 1024 * 1024;
@@ -234,13 +235,12 @@ fn test_run(name: &str, test: Test) {
 
         for (i, state) in states.iter().enumerate() {
             print!("Running {}:{:?}:{} ... ", name, spec, i);
-            flush();
 
             let transaction = test.0.transaction.select(&state.indexes);
             let mut backend = MemoryBackend::new(&vicinity, original_state.clone());
 
             // Only execute valid transactions
-            if let Ok(transaction) = crate::utils::transaction::validate(
+            if let Ok(transaction) = transaction::validate(
                 transaction,
                 test.0.env.gas_limit.0,
                 caller_balance,
@@ -316,7 +316,38 @@ fn test_run(name: &str, test: Test) {
         }
     }
 }
-*/
+
+pub fn run(dir: &str) {
+    use std::collections::HashMap;
+    use std::fs;
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::path::PathBuf;
+
+    let mut dest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    dest.push(dir);
+
+    for entry in fs::read_dir(dest).unwrap() {
+        let entry = entry.unwrap();
+        if let Some(s) = entry.file_name().to_str() {
+            if s.starts_with(".") {
+                continue;
+            }
+        }
+
+        let path = entry.path();
+
+        let file = File::open(path).expect("Open file failed");
+
+        let reader = BufReader::new(file);
+        let coll = serde_json::from_reader::<_, HashMap<String, Test>>(reader)
+            .expect("Parse test cases failed");
+
+        for (name, test) in coll {
+            state_test(&name, test);
+        }
+    }
+}
 
 /*use super::ethjson;
 use super::utils::*;

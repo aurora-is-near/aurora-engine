@@ -149,3 +149,66 @@ pub fn assert_valid_hash(h: &H256, b: &BTreeMap<H160, MemoryAccount>) {
         );
     }
 }
+
+pub mod transaction {
+    use super::ethjson::{maybe::MaybeEmpty, transaction::Transaction, uint::Uint};
+    use crate::prelude::{H160, H256, U256};
+    use evm::gasometer::{self, Gasometer};
+
+    pub fn validate(
+        tx: Transaction,
+        block_gas_limit: U256,
+        caller_balance: U256,
+        config: &evm::Config,
+    ) -> Result<Transaction, InvalidTxReason> {
+        match intrinsic_gas(&tx, config) {
+            None => return Err(InvalidTxReason::IntrinsicGas),
+            Some(required_gas) => {
+                if tx.gas_limit < Uint(U256::from(required_gas)) {
+                    return Err(InvalidTxReason::IntrinsicGas);
+                }
+            }
+        }
+
+        if block_gas_limit < tx.gas_limit.0 {
+            return Err(InvalidTxReason::GasLimitReached);
+        }
+
+        let required_funds = tx.gas_limit.0 * tx.gas_price.0 + tx.value.0;
+        if caller_balance < required_funds {
+            return Err(InvalidTxReason::OutOfFund);
+        }
+
+        Ok(tx)
+    }
+
+    fn intrinsic_gas(tx: &Transaction, config: &evm::Config) -> Option<u64> {
+        let is_contract_creation = match tx.to {
+            MaybeEmpty::None => true,
+            MaybeEmpty::Some(_) => false,
+        };
+        let data = &tx.data;
+        let access_list: Vec<(H160, Vec<H256>)> = tx
+            .access_list
+            .iter()
+            .map(|(a, s)| (a.0, s.into_iter().map(|h| h.0).collect()))
+            .collect();
+
+        let cost = if is_contract_creation {
+            gasometer::create_transaction_cost(data, &access_list)
+        } else {
+            gasometer::call_transaction_cost(data, &access_list)
+        };
+
+        let mut g = Gasometer::new(u64::MAX, config);
+        g.record_transaction(cost).ok()?;
+
+        Some(g.total_used_gas())
+    }
+
+    pub enum InvalidTxReason {
+        IntrinsicGas,
+        OutOfFund,
+        GasLimitReached,
+    }
+}
