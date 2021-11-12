@@ -3,7 +3,7 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
 
-use crate::prelude::{vec, Address, PromiseResult, Vec, H256, STORAGE_PRICE_PER_BYTE};
+use crate::prelude::{Address, H256, STORAGE_PRICE_PER_BYTE};
 pub use types::keccak;
 
 pub mod env;
@@ -11,6 +11,7 @@ pub mod error;
 pub mod io;
 pub mod near_runtime;
 mod prelude;
+pub mod promise;
 pub mod types;
 
 use near_runtime::exports;
@@ -18,8 +19,6 @@ use near_runtime::exports;
 const ECRECOVER_MESSAGE_SIZE: u64 = 32;
 const ECRECOVER_SIGNATURE_LENGTH: u64 = 64;
 const ECRECOVER_MALLEABILITY_FLAG: u64 = 1;
-
-const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
 
 #[allow(dead_code)]
 pub fn panic() {
@@ -91,26 +90,6 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
     }
 }
 
-/// Deploy code from given key in place of the current key.
-pub fn self_deploy(code_key: &[u8]) {
-    unsafe {
-        // Load current account id into register 0.
-        exports::current_account_id(0);
-        // Use register 0 as the destination for the promise.
-        let promise_id = exports::promise_batch_create(u64::MAX as _, 0);
-        // Remove code from storage and store it in register 1.
-        exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1);
-        exports::promise_batch_action_deploy_contract(promise_id, u64::MAX, 1);
-        promise_batch_action_function_call(
-            promise_id,
-            b"state_migration",
-            &[],
-            0,
-            GAS_FOR_STATE_MIGRATION,
-        )
-    }
-}
-
 #[allow(dead_code)]
 pub fn log(data: &str) {
     log_utf8(data.as_bytes())
@@ -129,107 +108,8 @@ pub fn prepaid_gas() -> u64 {
     unsafe { exports::prepaid_gas() }
 }
 
-pub fn promise_create(
-    account_id: &[u8],
-    method_name: &[u8],
-    arguments: &[u8],
-    amount: u128,
-    gas: u64,
-) -> u64 {
-    unsafe {
-        exports::promise_create(
-            account_id.len() as _,
-            account_id.as_ptr() as _,
-            method_name.len() as _,
-            method_name.as_ptr() as _,
-            arguments.len() as _,
-            arguments.as_ptr() as _,
-            &amount as *const u128 as _,
-            gas,
-        )
-    }
-}
-
-pub fn promise_then(
-    promise_idx: u64,
-    account_id: &[u8],
-    method_name: &[u8],
-    arguments: &[u8],
-    amount: u128,
-    gas: u64,
-) -> u64 {
-    unsafe {
-        exports::promise_then(
-            promise_idx,
-            account_id.len() as _,
-            account_id.as_ptr() as _,
-            method_name.len() as _,
-            method_name.as_ptr() as _,
-            arguments.len() as _,
-            arguments.as_ptr() as _,
-            &amount as *const u128 as _,
-            gas,
-        )
-    }
-}
-
-pub fn promise_return(promise_idx: u64) {
-    unsafe {
-        exports::promise_return(promise_idx);
-    }
-}
-
-pub fn promise_results_count() -> u64 {
-    unsafe { exports::promise_results_count() }
-}
-
-pub fn promise_result(result_idx: u64) -> PromiseResult {
-    unsafe {
-        match exports::promise_result(result_idx, 0) {
-            0 => PromiseResult::NotReady,
-            1 => {
-                let bytes: Vec<u8> = vec![0; exports::register_len(0) as usize];
-                exports::read_register(0, bytes.as_ptr() as *const u64 as u64);
-                PromiseResult::Successful(bytes)
-            }
-            2 => PromiseResult::Failed,
-            _ => panic_utf8(b"ERR_PROMISE_RETURN_CODE"),
-        }
-    }
-}
-
-pub fn promise_batch_action_transfer(promise_index: u64, amount: u128) {
-    unsafe {
-        exports::promise_batch_action_transfer(promise_index, &amount as *const u128 as _);
-    }
-}
-
 pub fn storage_byte_cost() -> u128 {
     STORAGE_PRICE_PER_BYTE
-}
-
-pub fn promise_batch_create(account_id: &[u8]) -> u64 {
-    unsafe { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) }
-}
-
-pub fn promise_batch_action_function_call(
-    promise_idx: u64,
-    method_name: &[u8],
-    arguments: &[u8],
-    amount: u128,
-    gas: u64,
-) {
-    unsafe {
-        exports::promise_batch_action_function_call(
-            promise_idx,
-            method_name.len() as _,
-            method_name.as_ptr() as _,
-            arguments.len() as _,
-            arguments.as_ptr() as _,
-            &amount as *const u128 as _,
-            gas,
-        )
-    }
 }
 
 pub struct ECRecoverErr;

@@ -19,6 +19,9 @@ use crate::prelude::{
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::parameters::{
+    PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
+};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 pub const NO_DEPOSIT: Balance = 0;
@@ -209,7 +212,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         raw_proof: Vec<u8>,
         current_account_id: AccountId,
         predecessor_account_id: AccountId,
-    ) {
+    ) -> PromiseWithCallbackArgs {
         let is_owner = current_account_id == predecessor_account_id;
         self.assert_not_paused(PAUSE_DEPOSIT, is_owner);
 
@@ -255,13 +258,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let skip_bridge_call = false.try_to_vec().unwrap();
         let mut proof_to_verify = raw_proof;
         proof_to_verify.extend(skip_bridge_call);
-        let promise0 = sdk::promise_create(
-            self.contract.prover_account.as_bytes(),
-            b"verify_log_entry",
-            &proof_to_verify,
-            NO_DEPOSIT,
-            GAS_FOR_VERIFY_LOG_ENTRY,
-        );
+
+        let verify_call = PromiseCreateArgs {
+            target_account_id: self.contract.prover_account.clone(),
+            method: "verify_log_entry".to_string(),
+            args: proof_to_verify,
+            attached_balance: NO_DEPOSIT,
+            attached_gas: GAS_FOR_VERIFY_LOG_ENTRY,
+        };
 
         // Finalize deposit
         let data = match self.parse_event_message(&event.recipient) {
@@ -311,15 +315,17 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             }
         };
 
-        let promise1 = sdk::promise_then(
-            promise0,
-            current_account_id.as_bytes(),
-            b"finish_deposit",
-            &data[..],
-            NO_DEPOSIT,
-            GAS_FOR_FINISH_DEPOSIT,
-        );
-        sdk::promise_return(promise1);
+        let finish_call = PromiseCreateArgs {
+            target_account_id: current_account_id,
+            method: "finish_deposit".to_string(),
+            args: data,
+            attached_balance: NO_DEPOSIT,
+            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+        };
+        PromiseWithCallbackArgs {
+            base: verify_call,
+            callback: finish_call,
+        }
     }
 
     /// Finish deposit (private method)
@@ -332,20 +338,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         current_account_id: AccountId,
         data: FinishDepositCallArgs,
-    ) {
+    ) -> Option<PromiseWithCallbackArgs> {
         sdk::log!(&format!("Finish deposit with the amount: {}", data.amount));
-        assert_eq!(sdk::promise_results_count(), 1);
-
-        // Check promise results
-        let data0: Vec<u8> = match sdk::promise_result(0) {
-            PromiseResult::Successful(x) => x,
-            PromiseResult::Failed => sdk::panic_utf8(b"ERR_PROMISE_FAILED"),
-            // This shouldn't be reachable
-            PromiseResult::NotReady => sdk::panic_utf8(b"ERR_PROMISE_NOT_READY"),
-        };
-        sdk::log!("Check verification_success");
-        let verification_success = bool::try_from_slice(&data0).unwrap();
-        assert!(verification_success, "ERR_VERIFY_PROOF");
 
         // Mint tokens to recipient minus fee
         if let Some(msg) = data.msg {
@@ -356,11 +350,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Save new contract data
             self.save_ft_contract();
             let transfer_call_args = TransferCallCallArgs::try_from_slice(&msg).unwrap();
-            self.ft_transfer_call(
+            let promise = self.ft_transfer_call(
                 predecessor_account_id,
                 current_account_id,
                 transfer_call_args,
             );
+            Some(promise)
         } else {
             // Mint - calculate new balances
             self.mint_eth_on_near(data.new_owner_id.clone(), data.amount - data.fee);
@@ -369,6 +364,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             self.record_proof(&data.proof_key);
             // Save new contract data
             self.save_ft_contract();
+            None
         }
     }
 
@@ -535,7 +531,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         current_account_id: AccountId,
         args: TransferCallCallArgs,
-    ) {
+    ) -> PromiseWithCallbackArgs {
         sdk::log!(&format!(
             "Transfer call to {} amount {}",
             args.receiver_id, args.amount,
@@ -568,29 +564,48 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         self.ft.ft_transfer_call(
             predecessor_account_id,
-            &args.receiver_id,
+            args.receiver_id,
             args.amount,
             &args.memo,
             args.msg,
-            &current_account_id,
-        );
+            current_account_id,
+        )
     }
 
     /// FT storage deposit logic
     pub fn storage_deposit(
         &mut self,
-        predecessor_account_id: &AccountId,
+        predecessor_account_id: AccountId,
         amount: Balance,
         args: StorageDepositCallArgs,
-    ) {
-        let res = self.ft.storage_deposit(
+    ) -> Option<PromiseBatchAction> {
+        let account_id = args
+            .account_id
+            .unwrap_or_else(|| predecessor_account_id.clone());
+        let (res, maybe_promise) = self.ft.storage_deposit(
             predecessor_account_id,
-            args.account_id.as_ref().unwrap_or(predecessor_account_id),
+            &account_id,
             amount,
             args.registration_only,
         );
         self.save_ft_contract();
         self.io.return_output(&res.to_json_bytes());
+        maybe_promise
+    }
+
+    /// FT storage unregister
+    pub fn storage_unregister(
+        &mut self,
+        account_id: AccountId,
+        force: Option<bool>,
+    ) -> Option<PromiseBatchAction> {
+        let res = self.ft.internal_storage_unregister(account_id, force);
+        if res.is_some() {
+            self.io.return_output(b"true");
+        } else {
+            self.io.return_output(b"false");
+        }
+        res.map(|(_, p)| p)
     }
 
     /// FT storage withdraw

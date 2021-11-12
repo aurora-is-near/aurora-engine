@@ -10,6 +10,7 @@ use crate::connector::EthConnectorContract;
 use crate::map::BijectionMap;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 
 use crate::parameters::{NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
@@ -433,19 +434,24 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         })
     }
 
-    pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
+    pub fn deploy_code_with_input<P: PromiseHandler>(
+        &mut self,
+        input: Vec<u8>,
+        handler: &mut P,
+    ) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let value = Wei::zero();
-        self.deploy_code(origin, value, input, u64::MAX, Vec::new())
+        self.deploy_code(origin, value, input, u64::MAX, Vec::new(), handler)
     }
 
-    pub fn deploy_code(
+    pub fn deploy_code<P: PromiseHandler>(
         &mut self,
         origin: Address,
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
+        handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
         let mut executor = executor_params.make_executor(self);
@@ -465,21 +471,34 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(logs);
+        let logs = filter_promises_from_logs(handler, logs);
 
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult::new(status, used_gas, logs))
     }
 
-    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<SubmitResult> {
+    pub fn call_with_args<P: PromiseHandler>(
+        &mut self,
+        args: FunctionCallArgs,
+        handler: &mut P,
+    ) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         let contract = Address(args.contract);
         let value = Wei::zero();
-        self.call(origin, contract, value, args.input, u64::MAX, Vec::new())
+        self.call(
+            origin,
+            contract,
+            value,
+            args.input,
+            u64::MAX,
+            Vec::new(),
+            handler,
+        )
     }
 
-    pub fn call(
+    #[allow(clippy::too_many_arguments)]
+    pub fn call<P: PromiseHandler>(
         &mut self,
         origin: Address,
         contract: Address,
@@ -487,6 +506,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         input: Vec<u8>,
         gas_limit: u64,
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
+        handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
         let mut executor = executor_params.make_executor(self);
@@ -503,7 +523,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(logs);
+        let logs = filter_promises_from_logs(handler, logs);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
@@ -574,14 +594,23 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     ///
     /// If the sender can send, and the receiver can receive, then the transfer
     /// will execute successfully.
-    pub fn transfer(
+    pub fn transfer<P: PromiseHandler>(
         &mut self,
         sender: Address,
         receiver: Address,
         value: Wei,
         gas_limit: u64,
+        handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        self.call(sender, receiver, value, Vec::new(), gas_limit, Vec::new())
+        self.call(
+            sender,
+            receiver,
+            value,
+            Vec::new(),
+            gas_limit,
+            Vec::new(),
+            handler,
+        )
     }
 
     /// Mint tokens for recipient on a particular ERC20 token
@@ -594,12 +623,13 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
-    pub fn receive_erc20_tokens(
+    pub fn receive_erc20_tokens<P: PromiseHandler>(
         &mut self,
         token: &AccountId,
         relayer_account_id: &AccountId,
         args: &NEP141FtOnTransferArgs,
         current_account_id: &AccountId,
+        handler: &mut P,
     ) {
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
@@ -656,6 +686,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                     relayer_address,
                     Wei::new_u64(fee.as_u64()),
                     u64::MAX,
+                    handler,
                 ),
                 output_on_fail,
                 self.io
@@ -677,6 +708,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 [selector, tail.as_slice()].concat(),
                 u64::MAX,
                 Vec::new(), // TODO: are there values we should put here?
+                handler,
             )
             .and_then(|submit_result| {
                 match submit_result.status {
@@ -982,17 +1014,21 @@ fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) 
     remove_all_storage(io, address, generation);
 }
 
-fn filter_promises_from_logs<T: IntoIterator<Item = Log>>(logs: T) -> Vec<ResultLog> {
+fn filter_promises_from_logs<T, P>(handler: &mut P, logs: T) -> Vec<ResultLog>
+where
+    T: IntoIterator<Item = Log>,
+    P: PromiseHandler,
+{
     logs.into_iter()
         .filter_map(|log| {
             if log.address == ExitToNear::ADDRESS || log.address == ExitToEthereum::ADDRESS {
                 if log.topics.is_empty() {
                     if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
                         match promise {
-                            PromiseArgs::Create(promise) => schedule_promise(promise),
+                            PromiseArgs::Create(promise) => schedule_promise(handler, &promise),
                             PromiseArgs::Callback(promise) => {
-                                let base_id = schedule_promise(promise.base);
-                                schedule_promise_callback(base_id, promise.callback)
+                                let base_id = schedule_promise(handler, &promise.base);
+                                schedule_promise_callback(handler, base_id, &promise.callback)
                             }
                         };
                     }
@@ -1011,35 +1047,26 @@ fn filter_promises_from_logs<T: IntoIterator<Item = Log>>(logs: T) -> Vec<Result
         .collect()
 }
 
-fn schedule_promise(promise: PromiseCreateArgs) -> u64 {
+fn schedule_promise<P: PromiseHandler>(handler: &mut P, promise: &PromiseCreateArgs) -> PromiseId {
     sdk::log!(&crate::prelude::format!(
         "call_contract {}.{}",
         promise.target_account_id,
         promise.method
     ));
-    sdk::promise_create(
-        promise.target_account_id.as_bytes(),
-        promise.method.as_bytes(),
-        promise.args.as_slice(),
-        promise.attached_balance,
-        promise.attached_gas,
-    )
+    handler.promise_create_call(promise)
 }
 
-fn schedule_promise_callback(base_id: u64, promise: PromiseCreateArgs) -> u64 {
+fn schedule_promise_callback<P: PromiseHandler>(
+    handler: &mut P,
+    base_id: PromiseId,
+    promise: &PromiseCreateArgs,
+) -> PromiseId {
     sdk::log!(&crate::prelude::format!(
         "callback_call_contract {}.{}",
         promise.target_account_id,
         promise.method
     ));
-    sdk::promise_then(
-        base_id,
-        promise.target_account_id.as_bytes(),
-        promise.method.as_bytes(),
-        promise.args.as_slice(),
-        promise.attached_balance,
-        promise.attached_gas,
-    )
+    handler.promise_attach_callback(base_id, promise)
 }
 
 impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {

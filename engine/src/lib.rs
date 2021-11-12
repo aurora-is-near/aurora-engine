@@ -64,7 +64,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::BorshSerialize;
+    use borsh::{BorshDeserialize, BorshSerialize};
 
     use crate::connector::EthConnectorContract;
     use crate::engine::{self, current_address, Engine, EngineState, GasPaymentError};
@@ -81,6 +81,7 @@ mod contract {
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::Runtime;
+    use aurora_engine_sdk::promise::PromiseHandler;
     use aurora_engine_types::account_id::AccountId;
 
     use crate::json::parse_json;
@@ -99,6 +100,7 @@ mod contract {
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
     const GAS_OVERFLOW: &str = "ERR_GAS_OVERFLOW";
+    const PROMISE_COUNT_ERR: &str = "ERR_PROMISE_COUNT";
 
     ///
     /// ADMINISTRATIVE METHODS
@@ -182,7 +184,7 @@ mod contract {
         if io.block_height() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
         }
-        sdk::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
+        Runtime::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
     }
 
     /// Called as part of the upgrade process (see `engine-sdk::self_deploy`). This function is meant
@@ -210,7 +212,7 @@ mod contract {
             &io,
         )
         .sdk_unwrap();
-        Engine::deploy_code_with_input(&mut engine, input)
+        Engine::deploy_code_with_input(&mut engine, input, &mut Runtime)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();
         // TODO: charge for storage
@@ -229,7 +231,7 @@ mod contract {
             &io,
         )
         .sdk_unwrap();
-        Engine::call_with_args(&mut engine, args)
+        Engine::call_with_args(&mut engine, args, &mut Runtime)
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();
         // TODO: charge for storage
@@ -307,6 +309,7 @@ mod contract {
                 transaction.data,
                 gas_limit,
                 access_list,
+                &mut Runtime,
             )
             // TODO: charge for storage
         } else {
@@ -318,6 +321,7 @@ mod contract {
                 transaction.data,
                 gas_limit,
                 access_list,
+                &mut Runtime,
             )
             // TODO: charge for storage
         };
@@ -363,6 +367,7 @@ mod contract {
             meta_call_args.input,
             u64::MAX, // TODO: is there a gas limit with meta calls?
             crate::prelude::Vec::new(),
+            &mut Runtime,
         );
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
@@ -418,6 +423,7 @@ mod contract {
                 &signer_account_id,
                 &args,
                 &current_account_id,
+                &mut Runtime,
             );
         }
     }
@@ -454,6 +460,7 @@ mod contract {
         let address = match Engine::deploy_code_with_input(
             &mut engine,
             (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec(),
+            &mut Runtime,
         ) {
             Ok(result) => match result.status {
                 TransactionStatus::Succeed(ret) => H160(ret.as_slice().try_into().unwrap()),
@@ -478,13 +485,16 @@ mod contract {
 
         // This function should only be called as the callback of
         // exactly one promise.
-        if sdk::promise_results_count() != 1 {
-            sdk::panic_utf8(b"ERR_PROMISE_COUNT");
+        if io.promise_results_count() != 1 {
+            sdk::panic_utf8(PROMISE_COUNT_ERR.as_bytes());
         }
 
-        let current_account_id = io.current_account_id();
-        // Exit call failed; need to refund tokens
-        if let PromiseResult::Failed = sdk::promise_result(0) {
+        if let Some(PromiseResult::Successful(_)) = io.promise_result(0) {
+            // Promise succeeded -- nothing to do
+        } else {
+            // Exit call failed; need to refund tokens
+
+            let current_account_id = io.current_account_id();
             let args: RefundCallArgs = io.read_input_borsh().sdk_unwrap();
             let refund_result = match args.erc20_address {
                 // ERC-20 exit; re-mint burned tokens
@@ -510,6 +520,7 @@ mod contract {
                             [selector, mint_args.as_slice()].concat(),
                             u64::MAX,
                             Vec::new(),
+                            &mut Runtime,
                         )
                         .sdk_unwrap()
                 }
@@ -528,6 +539,7 @@ mod contract {
                             Vec::new(),
                             u64::MAX,
                             vec![(exit_address, Vec::new()), (refund_address, Vec::new())],
+                            &mut Runtime,
                         )
                         .sdk_unwrap()
                 }
@@ -678,30 +690,51 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn deposit() {
-        let io = Runtime;
+        let mut io = Runtime;
         let raw_proof = io.read_input().to_vec();
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        EthConnectorContract::get_instance(io).deposit(
+        let promise_args = EthConnectorContract::get_instance(io).deposit(
             raw_proof,
             current_account_id,
             predecessor_account_id,
-        )
+        );
+        let promise_id = io.promise_crate_with_callback(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn finish_deposit() {
-        let io = Runtime;
+        let mut io = Runtime;
         io.assert_private_call().sdk_unwrap();
+
+        // Check result from proof verification call
+        if io.promise_results_count() != 1 {
+            sdk::panic_utf8(PROMISE_COUNT_ERR.as_bytes());
+        }
+        let promise_result = match io.promise_result(0) {
+            Some(PromiseResult::Successful(bytes)) => {
+                bool::try_from_slice(&bytes).sdk_expect("ERR_PROMISE_ENCODING")
+            }
+            _ => sdk::panic_utf8(b"ERR_PROMISE_FAILED"),
+        };
+        if !promise_result {
+            sdk::panic_utf8(b"ERR_VERIFY_PROOF");
+        }
 
         let data = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        EthConnectorContract::get_instance(io).finish_deposit(
+        let maybe_promise_args = EthConnectorContract::get_instance(io).finish_deposit(
             predecessor_account_id,
             current_account_id,
             data,
         );
+
+        if let Some(promise_args) = maybe_promise_args {
+            let promise_id = io.promise_crate_with_callback(&promise_args);
+            io.promise_return(promise_id);
+        }
     }
 
     #[no_mangle]
@@ -757,11 +790,12 @@ mod contract {
         let io = Runtime;
 
         io.assert_private_call().sdk_unwrap();
-        // Check if previous promise succeeded
-        assert_eq!(sdk::promise_results_count(), 1);
+        if io.promise_results_count() != 1 {
+            sdk::panic_utf8(PROMISE_COUNT_ERR.as_bytes());
+        }
 
         let args: ResolveTransferCallArgs = io.read_input().to_value().sdk_unwrap();
-        let promise_result = sdk::promise_result(0);
+        let promise_result = io.promise_result(0).sdk_unwrap();
 
         EthConnectorContract::get_instance(io).ft_resolve_transfer(args, promise_result);
     }
@@ -769,7 +803,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
         use sdk::types::ExpectUtf8;
-        let io = Runtime;
+        let mut io = Runtime;
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
 
@@ -778,24 +812,42 @@ mod contract {
         );
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        EthConnectorContract::get_instance(io).ft_transfer_call(
+        let promise_args = EthConnectorContract::get_instance(io).ft_transfer_call(
             predecessor_account_id,
             current_account_id,
             args,
         );
+        let promise_id = io.promise_crate_with_callback(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
-        let io = Runtime;
+        let mut io = Runtime;
         let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
         let predecessor_account_id = io.predecessor_account_id();
         let amount = io.attached_deposit();
-        EthConnectorContract::get_instance(io).storage_deposit(
-            &predecessor_account_id,
+        let maybe_promise = EthConnectorContract::get_instance(io).storage_deposit(
+            predecessor_account_id,
             amount,
             args,
-        )
+        );
+        if let Some(promise) = maybe_promise {
+            io.promise_create_batch(&promise);
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn storage_unregister() {
+        let mut io = Runtime;
+        io.assert_one_yocto().sdk_unwrap();
+        let predecessor_account_id = io.predecessor_account_id();
+        let force = parse_json(&io.read_input().to_vec()).and_then(|args| args.bool("force").ok());
+        let maybe_promise = EthConnectorContract::get_instance(io)
+            .storage_unregister(predecessor_account_id, force);
+        if let Some(promise) = maybe_promise {
+            io.promise_create_batch(&promise);
+        }
     }
 
     #[no_mangle]
@@ -888,7 +940,7 @@ mod contract {
         const GAS_FOR_VERIFY: u64 = 20_000_000_000_000;
         const GAS_FOR_FINISH: u64 = 50_000_000_000_000;
 
-        let io = Runtime;
+        let mut io = Runtime;
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
         let address = Address(args.0);
         let nonce = U256::from(args.1);
@@ -915,21 +967,24 @@ mod contract {
             fee: 0,
             msg: None,
         };
-        let verify_id = sdk::promise_create(
-            aurora_account_id.as_bytes(),
-            b"verify_log_entry",
-            &[],
-            0,
-            GAS_FOR_VERIFY,
-        );
-        sdk::promise_then(
-            verify_id,
-            aurora_account_id.as_bytes(),
-            b"finish_deposit",
-            &args.try_to_vec().unwrap(),
-            0,
-            GAS_FOR_FINISH,
-        );
+        let verify_call = aurora_engine_types::parameters::PromiseCreateArgs {
+            target_account_id: aurora_account_id.clone(),
+            method: "verify_log_entry".to_string(),
+            args: Vec::new(),
+            attached_balance: 0,
+            attached_gas: GAS_FOR_VERIFY,
+        };
+        let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
+            target_account_id: aurora_account_id,
+            method: "finish_deposit".to_string(),
+            args: args.try_to_vec().unwrap(),
+            attached_balance: 0,
+            attached_gas: GAS_FOR_FINISH,
+        };
+        io.promise_crate_with_callback(&aurora_engine_types::parameters::PromiseWithCallbackArgs {
+            base: verify_call,
+            callback: finish_call,
+        });
     }
 
     ///
