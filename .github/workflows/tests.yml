@@ -10,10 +10,12 @@ name: Tests
 jobs:
   test:
     name: Test suite (mainnet, testnet, betanet)
-    runs-on: [self-hosted, heavy]
+    runs-on: [ self-hosted, heavy ]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Restore cache
         run: |
           cache-util restore cargo_git cargo_registry sccache yarn_cache
@@ -33,7 +35,7 @@ jobs:
       - name: List directories
         run: ls -la target/wasm32-unknown-unknown/release && ls -la
       - run: cargo test --features betanet-test
- 
+
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache
@@ -41,7 +43,7 @@ jobs:
 
   bully-build:
     name: Bully build
-    runs-on: [self-hosted, heavy]
+    runs-on: [ self-hosted, heavy ]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v2
