@@ -122,7 +122,6 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
  "base64 0.13.0",
- "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh 0.8.2",
  "byte-slice-cast",
  "ethabi",
@@ -131,6 +130,7 @@ dependencies = [
  "hex",
  "libsecp256k1",
  "logos",
+ "near-blake2",
  "num",
  "primitive-types 0.10.1",
  "rand 0.7.3",
@@ -152,7 +152,6 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
  "base64 0.13.0",
- "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
  "borsh 0.8.2",
  "byte-slice-cast",
  "ethabi",
@@ -161,6 +160,7 @@ dependencies = [
  "hex",
  "libsecp256k1",
  "logos",
+ "near-blake2",
  "num",
  "primitive-types 0.10.1",
  "rand 0.7.3",
@@ -320,16 +320,6 @@ name = "blake2"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10a5720225ef5daecf08657f23791354e1685a8c91a4c60c7f3d3b2892f978f4"
-dependencies = [
- "crypto-mac 0.8.0",
- "digest 0.9.0",
- "opaque-debug 0.3.0",
-]
-
-[[package]]
-name = "blake2"
-version = "0.9.1"
-source = "git+https://github.com/near/near-blake2.git#736ff607cc8160af87ffa697c14ebef85050138f"
 dependencies = [
  "crypto-mac 0.8.0",
  "digest 0.9.0",
@@ -2148,6 +2138,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "near-blake2"
+version = "0.9.1"
+source = "git+https://github.com/near/near-blake2.git?rev=cebb7df79608a7058017940830d37c37d55d21fe#cebb7df79608a7058017940830d37c37d55d21fe"
+dependencies = [
+ "crypto-mac 0.8.0",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
+]
+
+[[package]]
 name = "near-chain-configs"
 version = "0.1.0"
 source = "git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9#8a377fda0b4ce319385c463f1ae46e4b0b29dcd9"
@@ -2169,7 +2169,7 @@ version = "0.1.0"
 source = "git+https://github.com/near/nearcore.git?rev=0c9ad79a18e431f843e6123cf4559f9c2c5dd228#0c9ad79a18e431f843e6123cf4559f9c2c5dd228"
 dependencies = [
  "arrayref",
- "blake2 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "blake2",
  "borsh 0.9.1",
  "bs58",
  "c2-chacha",
@@ -2195,7 +2195,7 @@ version = "0.1.0"
 source = "git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1ae46e4b0b29dcd9#8a377fda0b4ce319385c463f1ae46e4b0b29dcd9"
 dependencies = [
  "arrayref",
- "blake2 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "blake2",
  "borsh 0.8.2",
  "bs58",
  "c2-chacha",
@@ -2221,7 +2221,7 @@ version = "0.1.0"
 source = "git+https://github.com/near/nearcore.git?rev=8a37d39629885a41dde58b60642bcf1e99407d90#8a37d39629885a41dde58b60642bcf1e99407d90"
 dependencies = [
  "arrayref",
- "blake2 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "blake2",
  "borsh 0.8.2",
  "bs58",
  "c2-chacha",
