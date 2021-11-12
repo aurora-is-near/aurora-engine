@@ -1,4 +1,4 @@
-use crate::prelude::{Address, Balance, RawAddress, TryInto, Wei, U256};
+use crate::prelude::{Address, Balance, RawAddress, TryInto, Wei, U256, WeiU256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{FunctionCallArgs, SubmitResult};
@@ -95,7 +95,7 @@ impl test_utils::AuroraRunner {
         self.make_call(
             "call",
             origin,
-            (FunctionCallArgs { contract, input }).try_to_vec().unwrap(),
+            (FunctionCallArgs { contract, value: WeiU256::default(), input }).try_to_vec().unwrap(),
         )
     }
 
@@ -380,7 +380,7 @@ fn test_transfer_erc20_token() {
 // Note: `AuroraRunner` is not suitable for these tests because
 // it does not execute promises; but `near-sdk-sim` does.
 mod sim_tests {
-    use crate::prelude::{types::Wei, Address, U256};
+    use crate::prelude::{types::Wei, Address, U256, WeiU256};
     use crate::test_utils;
     use crate::test_utils::erc20::{ERC20Constructor, ERC20};
     use crate::test_utils::exit_precompile::TesterConstructor;
@@ -707,6 +707,7 @@ mod sim_tests {
         );
         let call_args = FunctionCallArgs {
             contract: erc20.0.address.0,
+            value: WeiU256::default(),
             input,
         };
         source
@@ -746,6 +747,7 @@ mod sim_tests {
         let mint_tx = erc20.mint(dest, amount.into(), 0.into());
         let call_args = FunctionCallArgs {
             contract: erc20.0.address.0,
+            value: WeiU256::default(),
             input: mint_tx.data,
         };
         aurora
@@ -776,6 +778,7 @@ mod sim_tests {
         let balance_tx = erc20.balance_of(address, 0.into());
         let call_args = FunctionCallArgs {
             contract: erc20.0.address.0,
+            value: WeiU256::default(),
             input: balance_tx.data,
         };
         let result = aurora.call("call", &call_args.try_to_vec().unwrap());

@@ -8,6 +8,8 @@ pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 pub type EthAddress = [u8; 20];
 pub type Gas = u64;
 pub type StorageUsage = u64;
+/// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
+pub type WeiU256 = [u8; 32];
 
 /// Selector to call mint function in ERC 20 contract
 ///
@@ -104,6 +106,13 @@ impl Add for Wei {
 
     fn add(self, other: Self) -> Self::Output {
         Self(self.0 + other.0)
+    }
+}
+
+/// Type casting from Wei compatible Borsh-encoded raw value into the Wei value, to attach an ETH balance to the transaction
+impl From<WeiU256> for Wei {
+    fn from(value: WeiU256) -> Self {
+        Wei(value.into())
     }
 }
 

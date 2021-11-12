@@ -72,10 +72,10 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        DeployErc20TokenArgs, FunctionCallArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, SubmitResult, TransactionStatus,
-        TransferCallCallArgs, ViewCallArgs,
+        CallArgsType, DeployErc20TokenArgs, FunctionCallArgs, FunctionCallArgsLegacy,
+        GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
+        NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs,
+        SubmitResult, TransactionStatus, TransferCallCallArgs, ViewCallArgs,
     };
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::Runtime;
@@ -209,11 +209,23 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn call() {
         let io = Runtime;
-        let args: FunctionCallArgs = io.read_input_borsh().sdk_unwrap();
-        let mut engine = Engine::new(predecessor_address(), io).sdk_unwrap();
-        Engine::call_with_args(&mut engine, args)
-            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-            .sdk_process();
+        let args: Option<CallArgsType> = {
+            if let Ok(value) = io.read_input_borsh::<FunctionCallArgs>() {
+                Some(CallArgsType::New(value))
+            } else if let Ok(value) = io.read_input_borsh::<FunctionCallArgsLegacy>() {
+                Some(CallArgsType::Legacy(value))
+            } else {
+                None
+            }
+        };
+        if let Some(args) = args {
+            let mut engine = Engine::new(predecessor_address(), io).sdk_unwrap();
+            Engine::call_with_args(&mut engine, args)
+                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+                .sdk_process();
+        } else {
+            sdk::panic_utf8("ERR_BORSH_DESERIALIZE".as_bytes());
+        }
         // TODO: charge for storage
     }
 

@@ -4,7 +4,7 @@ use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     format, Balance, BorshDeserialize, BorshSerialize, EthAddress, RawAddress, RawH256, RawU256,
-    SdkUnwrap, String, ToString, TryFrom, Vec,
+    SdkUnwrap, String, ToString, TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
 use evm::backend::Log;
@@ -130,11 +130,31 @@ impl SubmitResult {
     }
 }
 
-/// Borsh-encoded parameters for the `call` function.
+/// Borsh-encoded parameters for the engine `call` function.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FunctionCallArgs {
     pub contract: RawAddress,
+    /// Wei compatible Borsh-encoded value field to attach an ETH balance to the transaction
+    pub value: WeiU256,
     pub input: Vec<u8>,
+}
+
+/// Legacy Borsh-encoded parameters for the engine `call` function, to provide backward type compatibility
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct FunctionCallArgsLegacy {
+    pub contract: RawAddress,
+    pub input: Vec<u8>,
+}
+
+/// Deserialized values from bytes to current or legacy Borsh-encoded parameters
+/// for passing to the engine `call` function, and to provide backward type compatibility
+#[derive(BorshSerialize, BorshDeserialize)]
+pub enum CallArgsType
+where
+    Self: Sized,
+{
+    New(FunctionCallArgs),
+    Legacy(FunctionCallArgsLegacy)
 }
 
 /// Borsh-encoded parameters for the `view` function.

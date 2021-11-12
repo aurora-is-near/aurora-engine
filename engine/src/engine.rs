@@ -1,5 +1,5 @@
 use crate::parameters::{
-    FunctionCallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs,
+    CallArgsType, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs,
 };
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
@@ -619,11 +619,23 @@ impl<I: IO + Copy + Default> Engine<I> {
         Ok(SubmitResult::new(status, used_gas, logs))
     }
 
-    pub fn call_with_args(&mut self, args: FunctionCallArgs) -> EngineResult<SubmitResult> {
+    /// Call the EVM contract with arguments (attached ETH balance, input, gas limit, etc.)
+    pub fn call_with_args(&mut self, args: CallArgsType) -> EngineResult<SubmitResult> {
         let origin = self.origin();
-        let contract = Address(args.contract);
-        let value = Wei::zero();
-        self.call(origin, contract, value, args.input, u64::MAX, Vec::new())
+        match args {
+            CallArgsType::New(call_args) => {
+                let contract = Address(call_args.contract);
+                let value = call_args.value.into();
+                let input = call_args.input;
+                self.call(origin, contract, value, input, u64::MAX, Vec::new())
+            }
+            CallArgsType::Legacy(call_args) => {
+                let contract = Address(call_args.contract);
+                let value = Wei::zero();
+                let input = call_args.input;
+                self.call(origin, contract, value, input, u64::MAX, Vec::new())
+            }
+        }
     }
 
     pub fn call(
