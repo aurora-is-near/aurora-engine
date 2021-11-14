@@ -2,7 +2,7 @@
 name = "aurora-engine-precompiles"
 version = "1.0.0"
 authors = ["NEAR <hello@near.org>"]
-edition = "2018"
+edition = "2021"
 description = ""
 documentation = ""
 readme = true
