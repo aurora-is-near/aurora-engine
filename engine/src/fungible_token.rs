@@ -1,12 +1,11 @@
 use crate::connector::NO_DEPOSIT;
-use crate::engine::Engine;
+use crate::engine;
 use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     sdk, storage, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress, Gas,
-    PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryFrom, TryInto, Vec,
-    Wei, U256,
+    PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec, Wei, U256,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
@@ -14,7 +13,29 @@ const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
-pub struct FungibleToken<I: IO + Default> {
+pub struct FungibleToken {
+    /// Total ETH supply on Near (nETH as NEP-141 token)
+    pub total_eth_supply_on_near: Balance,
+
+    /// Total ETH supply on Aurora (ETH in Aurora EVM)
+    pub total_eth_supply_on_aurora: Balance,
+
+    /// The storage size in bytes for one account.
+    pub account_storage_usage: StorageUsage,
+}
+
+impl FungibleToken {
+    pub fn ops<I: IO>(self, io: I) -> FungibleTokenOps<I> {
+        FungibleTokenOps {
+            total_eth_supply_on_near: self.total_eth_supply_on_near,
+            total_eth_supply_on_aurora: self.total_eth_supply_on_aurora,
+            account_storage_usage: self.account_storage_usage,
+            io,
+        }
+    }
+}
+
+pub struct FungibleTokenOps<I: IO> {
     /// Total ETH supply on Near (nETH as NEP-141 token)
     pub total_eth_supply_on_near: Balance,
 
@@ -24,7 +45,6 @@ pub struct FungibleToken<I: IO + Default> {
     /// The storage size in bytes for one account.
     pub account_storage_usage: StorageUsage,
 
-    #[borsh_skip]
     io: I,
 }
 
@@ -89,9 +109,17 @@ impl From<FungibleTokenMetadata> for JsonValue {
     }
 }
 
-impl<I: IO + Copy + Default> FungibleToken<I> {
-    pub fn new() -> Self {
-        Self::default()
+impl<I: IO + Copy> FungibleTokenOps<I> {
+    pub fn new(io: I) -> Self {
+        FungibleToken::default().ops(io)
+    }
+
+    pub fn data(&self) -> FungibleToken {
+        FungibleToken {
+            total_eth_supply_on_near: self.total_eth_supply_on_near,
+            total_eth_supply_on_aurora: self.total_eth_supply_on_aurora,
+            account_storage_usage: self.account_storage_usage,
+        }
     }
 
     /// Balance of nETH (ETH on NEAR token)
@@ -104,7 +132,7 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
 
     /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
-        Engine::get_balance(&self.io, &Address(address))
+        engine::get_balance(&self.io, &Address(address))
             .raw()
             .as_u128()
     }
@@ -127,7 +155,7 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
     pub fn internal_deposit_eth_to_aurora(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_add(amount) {
-            Engine::set_balance(
+            engine::set_balance(
                 &mut self.io,
                 &Address(address),
                 &Wei::new(U256::from(new_balance)),
@@ -159,7 +187,7 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
     pub fn internal_withdraw_eth_from_aurora(&mut self, address: EthAddress, amount: Balance) {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         if let Some(new_balance) = balance.checked_sub(amount) {
-            Engine::set_balance(
+            engine::set_balance(
                 &mut self.io,
                 &Address(address),
                 &Wei::new(U256::from(new_balance)),
@@ -208,13 +236,6 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
         self.accounts_insert(account_id, 0)
     }
 
-    pub fn ft_transfer(&mut self, receiver_id: &AccountId, amount: Balance, memo: &Option<String>) {
-        sdk::assert_one_yocto();
-        let predecessor_account_id = sdk::predecessor_account_id();
-        let sender_id = AccountId::try_from(predecessor_account_id).unwrap();
-        self.internal_transfer_eth_on_near(&sender_id, receiver_id, amount, memo);
-    }
-
     pub fn ft_total_eth_supply_on_near(&self) -> u128 {
         self.total_eth_supply_on_near
     }
@@ -233,13 +254,13 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
 
     pub fn ft_transfer_call(
         &mut self,
+        sender_id: AccountId,
         receiver_id: &AccountId,
         amount: Balance,
         memo: &Option<String>,
         msg: String,
+        current_account_id: &AccountId,
     ) {
-        let predecessor_account_id = sdk::predecessor_account_id();
-        let sender_id = AccountId::try_from(predecessor_account_id).unwrap();
         // Special case for Aurora transfer itself - we shouldn't transfer
         if &sender_id != receiver_id {
             self.internal_transfer_eth_on_near(&sender_id, receiver_id, amount, memo);
@@ -255,7 +276,7 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
         let data2 = ResolveTransferCallArgs {
             receiver_id: receiver_id.clone(),
             amount,
-            sender_id: sender_id.clone(),
+            sender_id,
         }
         .try_to_vec()
         .unwrap();
@@ -269,7 +290,7 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
         );
         let promise1 = sdk::promise_then(
             promise0,
-            &sdk::current_account_id(),
+            current_account_id.as_bytes(),
             b"ft_resolve_transfer",
             &data2[..],
             NO_DEPOSIT,
@@ -280,12 +301,13 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
 
     pub fn internal_ft_resolve_transfer(
         &mut self,
+        promise_result: PromiseResult,
         sender_id: &AccountId,
         receiver_id: &AccountId,
         amount: Balance,
     ) -> (u128, u128) {
         // Get the unused amount from the `ft_on_transfer` call result.
-        let unused_amount = match sdk::promise_result(0) {
+        let unused_amount = match promise_result {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(value) => {
                 if let Some(unused_amount) =
@@ -346,38 +368,37 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
 
     pub fn ft_resolve_transfer(
         &mut self,
+        promise_result: PromiseResult,
         sender_id: &AccountId,
         receiver_id: &AccountId,
         amount: u128,
     ) -> u128 {
-        self.internal_ft_resolve_transfer(sender_id, receiver_id, amount)
+        self.internal_ft_resolve_transfer(promise_result, sender_id, receiver_id, amount)
             .0
     }
 
     pub fn internal_storage_unregister(
         &mut self,
+        account_id: &AccountId,
         force: Option<bool>,
-    ) -> Option<(AccountId, Balance)> {
-        sdk::assert_one_yocto();
-        let account_id_key = sdk::predecessor_account_id();
-        let account_id = AccountId::try_from(account_id_key.clone()).unwrap();
+    ) -> Option<Balance> {
         let force = force.unwrap_or(false);
-        if let Some(balance) = self.accounts_get(&account_id) {
+        if let Some(balance) = self.accounts_get(account_id) {
             let balance = u128::try_from_slice(&balance[..]).unwrap();
             if balance == 0 || force {
-                self.accounts_remove(&account_id);
+                self.accounts_remove(account_id);
                 self.total_eth_supply_on_near -= balance;
                 let amount = self.storage_balance_bounds().min + 1;
-                let promise0 = sdk::promise_batch_create(&account_id_key);
+                let promise0 = sdk::promise_batch_create(account_id.as_bytes());
                 sdk::promise_batch_action_transfer(promise0, amount);
-                Some((account_id.clone(), balance))
+                Some(balance)
             } else {
                 sdk::panic_utf8(b"ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE")
             }
         } else {
             sdk::log!(&crate::prelude::format!(
                 "The account {} is not registered",
-                &account_id
+                account_id
             ));
             None
         }
@@ -412,16 +433,15 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
     #[allow(unused_variables)]
     pub fn storage_deposit(
         &mut self,
-        account_id: Option<&AccountId>,
+        predecessor_account_id: &AccountId,
+        account_id: &AccountId,
+        amount: Balance,
         registration_only: Option<bool>,
     ) -> StorageBalance {
-        let amount: Balance = sdk::attached_deposit();
-        let predecessor_account_id = AccountId::try_from(sdk::predecessor_account_id()).unwrap();
-        let account_id = account_id.unwrap_or(&predecessor_account_id);
         if self.accounts_contains_key(account_id) {
             sdk::log!("The account is already registered, refunding the deposit");
             if amount > 0 {
-                let promise0 = sdk::promise_batch_create(&sdk::predecessor_account_id());
+                let promise0 = sdk::promise_batch_create(predecessor_account_id.as_bytes());
                 sdk::promise_batch_action_transfer(promise0, amount);
             }
         } else {
@@ -433,7 +453,7 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
             self.internal_register_account(account_id);
             let refund = amount - min_balance;
             if refund > 0 {
-                let promise0 = sdk::promise_batch_create(&sdk::predecessor_account_id());
+                let promise0 = sdk::promise_batch_create(predecessor_account_id.as_bytes());
                 sdk::promise_batch_action_transfer(promise0, refund);
             }
         }
@@ -441,14 +461,24 @@ impl<I: IO + Copy + Default> FungibleToken<I> {
     }
 
     #[allow(dead_code)]
-    pub fn storage_unregister(&mut self, force: Option<bool>) -> bool {
-        self.internal_storage_unregister(force).is_some()
+    pub fn storage_unregister(
+        &mut self,
+        attached_near: Balance,
+        account_id: &AccountId,
+        force: Option<bool>,
+    ) -> bool {
+        // assert_one_yocto
+        assert_eq!(attached_near, 1);
+        self.internal_storage_unregister(account_id, force)
+            .is_some()
     }
 
-    pub fn storage_withdraw(&mut self, amount: Option<u128>) -> StorageBalance {
-        let predecessor_account_id_bytes = sdk::predecessor_account_id();
-        let predecessor_account_id = AccountId::try_from(predecessor_account_id_bytes).unwrap();
-        if let Some(storage_balance) = self.internal_storage_balance_of(&predecessor_account_id) {
+    pub fn storage_withdraw(
+        &mut self,
+        account_id: &AccountId,
+        amount: Option<u128>,
+    ) -> StorageBalance {
+        if let Some(storage_balance) = self.internal_storage_balance_of(account_id) {
             match amount {
                 Some(amount) if amount > 0 => {
                     sdk::panic_utf8(b"ERR_WRONG_AMOUNT");

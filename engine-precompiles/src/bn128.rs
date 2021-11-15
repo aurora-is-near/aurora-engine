@@ -68,6 +68,10 @@ pub(super) struct Bn128Add<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> Bn128Add<HF> {
     pub(super) const ADDRESS: Address = super::make_address(0, 6);
+
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
 }
 
 impl<HF: HardFork> Bn128Add<HF> {
@@ -103,6 +107,7 @@ impl Precompile for Bn128Add<Byzantium> {
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         context: &Context,
@@ -131,6 +136,7 @@ impl Precompile for Bn128Add<Istanbul> {
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         context: &Context,
@@ -151,6 +157,10 @@ pub(super) struct Bn128Mul<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> Bn128Mul<HF> {
     pub(super) const ADDRESS: Address = super::make_address(0, 7);
+
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
 }
 
 impl<HF: HardFork> Bn128Mul<HF> {
@@ -188,6 +198,7 @@ impl Precompile for Bn128Mul<Byzantium> {
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         context: &Context,
@@ -215,6 +226,7 @@ impl Precompile for Bn128Mul<Istanbul> {
     /// See: https://eips.ethereum.org/EIPS/eip-196
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         context: &Context,
@@ -236,6 +248,10 @@ pub(super) struct Bn128Pair<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> Bn128Pair<HF> {
     pub(super) const ADDRESS: Address = super::make_address(0, 8);
+
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
 }
 
 impl<HF: HardFork> Bn128Pair<HF> {
@@ -345,6 +361,7 @@ impl Precompile for Bn128Pair<Byzantium> {
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         context: &Context,
@@ -375,6 +392,7 @@ impl Precompile for Bn128Pair<Istanbul> {
     /// See: https://eips.ethereum.org/EIPS/eip-197
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         context: &Context,
@@ -415,7 +433,8 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false)
+        let res = Bn128Add::<Byzantium>::new()
+            .run(&input, Some(500), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -436,7 +455,8 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false)
+        let res = Bn128Add::<Byzantium>::new()
+            .run(&input, Some(500), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -450,7 +470,7 @@ mod tests {
             0000000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = Bn128Add::<Byzantium>::run(&input, Some(499), &new_context(), false);
+        let res = Bn128Add::<Byzantium>::new().run(&input, Some(499), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -462,7 +482,8 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false)
+        let res = Bn128Add::<Byzantium>::new()
+            .run(&input, Some(500), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -477,7 +498,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::run(&input, Some(500), &new_context(), false);
+        let res = Bn128Add::<Byzantium>::new().run(&input, Some(500), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -500,7 +521,8 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false)
+        let res = Bn128Mul::<Byzantium>::new()
+            .run(&input, Some(40_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -513,7 +535,7 @@ mod tests {
             0200000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(39_999), &new_context(), false);
+        let res = Bn128Mul::<Byzantium>::new().run(&input, Some(39_999), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // zero multiplication test
@@ -531,7 +553,8 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false)
+        let res = Bn128Mul::<Byzantium>::new()
+            .run(&input, Some(40_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -545,7 +568,8 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false)
+        let res = Bn128Mul::<Byzantium>::new()
+            .run(&input, Some(40_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -559,7 +583,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::run(&input, Some(40_000), &new_context(), false);
+        let res = Bn128Mul::<Byzantium>::new().run(&input, Some(40_000), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -588,7 +612,8 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false)
+        let res = Bn128Pair::<Byzantium>::new()
+            .run(&input, Some(260_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -610,7 +635,7 @@ mod tests {
             12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
         )
         .unwrap();
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(259_999), &new_context(), false);
+        let res = Bn128Pair::<Byzantium>::new().run(&input, Some(259_999), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -619,7 +644,8 @@ mod tests {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false)
+        let res = Bn128Pair::<Byzantium>::new()
+            .run(&input, Some(260_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -636,7 +662,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false);
+        let res = Bn128Pair::<Byzantium>::new().run(&input, Some(260_000), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
@@ -652,7 +678,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::run(&input, Some(260_000), &new_context(), false);
+        let res = Bn128Pair::<Byzantium>::new().run(&input, Some(260_000), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN",)))

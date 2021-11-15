@@ -41,6 +41,7 @@ impl Precompile for SHA256 {
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(not(feature = "contract"))]
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         _context: &Context,
@@ -64,6 +65,7 @@ impl Precompile for SHA256 {
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(feature = "contract")]
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         _context: &Context,
@@ -110,6 +112,7 @@ impl Precompile for RIPEMD160 {
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000003
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         _context: &Context,
@@ -147,7 +150,8 @@ mod tests {
             hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
                 .unwrap();
 
-        let res = SHA256::run(input, Some(60), &new_context(), false)
+        let res = SHA256
+            .run(input, Some(60), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -160,7 +164,8 @@ mod tests {
             hex::decode("0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31")
                 .unwrap();
 
-        let res = RIPEMD160::run(input, Some(600), &new_context(), false)
+        let res = RIPEMD160
+            .run(input, Some(600), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);

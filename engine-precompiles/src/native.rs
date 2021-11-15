@@ -5,7 +5,7 @@ use crate::prelude::{
     parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
     sdk,
     storage::{bytes_to_key, KeyPrefix},
-    vec, AccountId, BorshSerialize, Cow, String, ToString, TryFrom, TryInto, Vec, H160, U256,
+    vec, BorshSerialize, Cow, String, ToString, TryFrom, TryInto, Vec, H160, U256,
 };
 #[cfg(all(feature = "error_refund", feature = "contract"))]
 use crate::prelude::{
@@ -15,6 +15,7 @@ use crate::prelude::{
 
 use crate::prelude::Address;
 use crate::PrecompileOutput;
+use aurora_engine_types::account_id::AccountId;
 #[cfg(feature = "contract")]
 use evm::backend::Log;
 use evm::{Context, ExitError};
@@ -188,7 +189,10 @@ pub mod events {
     }
 }
 
-pub struct ExitToNear; //TransferEthToNear
+//TransferEthToNear
+pub struct ExitToNear {
+    current_account_id: AccountId,
+}
 
 impl ExitToNear {
     /// Exit to NEAR precompile address
@@ -197,6 +201,10 @@ impl ExitToNear {
     /// This address is computed as: `&keccak("exitToNear")[12..]`
     pub const ADDRESS: Address =
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
+
+    pub fn new(current_account_id: AccountId) -> Self {
+        Self { current_account_id }
+    }
 }
 
 #[cfg(feature = "contract")]
@@ -218,6 +226,7 @@ impl Precompile for ExitToNear {
 
     #[cfg(not(feature = "contract"))]
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         _context: &Context,
@@ -234,6 +243,7 @@ impl Precompile for ExitToNear {
 
     #[cfg(feature = "contract")]
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         context: &Context,
@@ -268,7 +278,7 @@ impl Precompile for ExitToNear {
         let (refund_address, mut input) = parse_input(input);
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input);
-        let current_account_id = AccountId::try_from(sdk::current_account_id()).unwrap();
+        let current_account_id = self.current_account_id.clone();
         #[cfg(feature = "error_refund")]
         let refund_on_error_target = current_account_id.clone();
 
@@ -405,7 +415,9 @@ impl Precompile for ExitToNear {
     }
 }
 
-pub struct ExitToEthereum;
+pub struct ExitToEthereum {
+    current_account_id: AccountId,
+}
 
 impl ExitToEthereum {
     /// Exit to Ethereum precompile address
@@ -414,6 +426,10 @@ impl ExitToEthereum {
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
     pub const ADDRESS: Address =
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
+
+    pub fn new(current_account_id: AccountId) -> Self {
+        Self { current_account_id }
+    }
 }
 
 impl Precompile for ExitToEthereum {
@@ -423,6 +439,7 @@ impl Precompile for ExitToEthereum {
 
     #[cfg(not(feature = "contract"))]
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         _context: &Context,
@@ -439,6 +456,7 @@ impl Precompile for ExitToEthereum {
 
     #[cfg(feature = "contract")]
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         context: &Context,
@@ -472,7 +490,7 @@ impl Precompile for ExitToEthereum {
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
                 (
-                    AccountId::try_from(sdk::current_account_id()).unwrap(),
+                    self.current_account_id.clone(),
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {

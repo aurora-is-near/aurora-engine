@@ -61,6 +61,7 @@ impl Precompile for ECRecover {
     }
 
     fn run(
+        &self,
         input: &[u8],
         target_gas: Option<u64>,
         _context: &Context,
@@ -140,7 +141,8 @@ mod tests {
             hex::decode("000000000000000000000000c08b5542d177ac6686946920409741463a15dddb")
                 .unwrap();
 
-        let res = ECRecover::run(&input, Some(3_000), &new_context(), false)
+        let res = ECRecover
+            .run(&input, Some(3_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -148,7 +150,7 @@ mod tests {
         // out of gas
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b650acf9d3f5f0a2c799776a1254355d5f4061762a237396a99a0e0e3fc2bcd6729514a0dacb2e623ac4abd157cb18163ff942280db4d5caad66ddf941ba12e03").unwrap();
 
-        let res = ECRecover::run(&input, Some(2_999), &new_context(), false);
+        let res = ECRecover.run(&input, Some(2_999), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // bad inputs
@@ -157,7 +159,8 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, Some(3_000), &new_context(), false)
+        let res = ECRecover
+            .run(&input, Some(3_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -167,7 +170,8 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, Some(3_000), &new_context(), false)
+        let res = ECRecover
+            .run(&input, Some(3_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -177,7 +181,8 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, Some(3_000), &new_context(), false)
+        let res = ECRecover
+            .run(&input, Some(3_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -187,7 +192,8 @@ mod tests {
             hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
 
-        let res = ECRecover::run(&input, Some(3_000), &new_context(), false)
+        let res = ECRecover
+            .run(&input, Some(3_000), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);

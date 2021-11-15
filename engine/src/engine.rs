@@ -5,19 +5,17 @@ use evm::executor;
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::connector::EthConnectorContract;
-#[cfg(feature = "contract")]
-use crate::contract::current_address;
-use crate::map::{BijectionMap, LookupMap};
+use crate::map::BijectionMap;
+use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::near_runtime::Runtime;
 
 use crate::parameters::{NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, AccountId, Address,
-    BorshDeserialize, BorshSerialize, KeyPrefix, KeyPrefixU8, PromiseArgs, PromiseCreateArgs,
-    TryFrom, TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
+    BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, TryFrom, TryInto,
+    Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
 };
 use crate::transaction::NormalizedEthTransaction;
 
@@ -28,9 +26,8 @@ const BLOCK_HASH_PREFIX_SIZE: usize = 1;
 const BLOCK_HEIGHT_SIZE: usize = 8;
 const CHAIN_ID_SIZE: usize = 32;
 
-#[cfg(not(feature = "contract"))]
-pub fn current_address() -> Address {
-    sdk::types::near_account_to_evm_address("engine".as_bytes())
+pub fn current_address(current_account_id: &AccountId) -> Address {
+    aurora_engine_sdk::types::near_account_to_evm_address(current_account_id.as_bytes())
 }
 
 macro_rules! unwrap_res_or_finish {
@@ -199,6 +196,44 @@ impl From<BalanceOverflow> for GasPaymentError {
     }
 }
 
+pub struct ERC20Address(Address);
+impl AsRef<[u8]> for ERC20Address {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+impl TryFrom<Vec<u8>> for ERC20Address {
+    type Error = AddressParseError;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        if bytes.len() == 20 {
+            Ok(Self(Address::from_slice(&bytes)))
+        } else {
+            Err(AddressParseError)
+        }
+    }
+}
+pub struct AddressParseError;
+impl AsRef<[u8]> for AddressParseError {
+    fn as_ref(&self) -> &[u8] {
+        b"ERR_PARSE_ADDRESS"
+    }
+}
+
+pub struct NEP141Account(AccountId);
+impl AsRef<[u8]> for NEP141Account {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+impl TryFrom<Vec<u8>> for NEP141Account {
+    type Error = aurora_engine_types::account_id::ParseAccountError;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        AccountId::try_from(bytes).map(Self)
+    }
+}
+
 pub const ERR_INVALID_NEP141_ACCOUNT_ID: &str = "ERR_INVALID_NEP141_ACCOUNT_ID";
 
 #[derive(Debug)]
@@ -264,18 +299,22 @@ struct StackExecutorParams {
 }
 
 impl StackExecutorParams {
-    fn new(gas_limit: u64) -> Self {
+    fn new(gas_limit: u64, current_account_id: AccountId) -> Self {
         Self {
-            precompiles: Precompiles::new_london(),
+            precompiles: Precompiles::new_london(current_account_id),
             gas_limit,
         }
     }
 
-    fn make_executor<'a, I: IO + Default + Copy>(
+    fn make_executor<'a, 'env, I: IO + Copy, E: Env>(
         &'a self,
-        engine: &'a Engine<I>,
-    ) -> executor::StackExecutor<'static, 'a, executor::MemoryStackState<Engine<I>>, Precompiles>
-    {
+        engine: &'a Engine<'env, I, E>,
+    ) -> executor::StackExecutor<
+        'static,
+        'a,
+        executor::MemoryStackState<Engine<'env, I, E>>,
+        Precompiles,
+    > {
         let metadata = executor::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::MemoryStackState::new(metadata, engine);
         executor::StackExecutor::new_with_precompiles(state, CONFIG, &self.precompiles)
@@ -303,9 +342,6 @@ pub struct EngineState {
     pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
-    /// Mapping between relayer account id and relayer evm address
-    pub relayers_evm_addresses:
-        LookupMap<Runtime, { KeyPrefix::RelayerEvmAddressMap as KeyPrefixU8 }>,
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -315,16 +351,17 @@ impl From<NewCallArgs> for EngineState {
             owner_id: args.owner_id,
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-            relayers_evm_addresses: LookupMap::default(),
         }
     }
 }
 
-pub struct Engine<I: IO> {
+pub struct Engine<'env, I: IO, E: Env> {
     state: EngineState,
     origin: Address,
     gas_price: U256,
+    current_account_id: AccountId,
     io: I,
+    env: &'env E,
 }
 
 // TODO: upgrade to Berlin HF
@@ -333,26 +370,31 @@ pub(crate) const CONFIG: &Config = &Config::london();
 /// Key for storing the state of the engine.
 const STATE_KEY: &[u8; 5] = b"STATE";
 
-impl<I: IO + Copy + Default> Engine<I> {
-    pub fn new(origin: Address, io: I) -> Result<Self, EngineStateError> {
-        Engine::get_state(&io).map(|state| Self::new_with_state(state, origin, io))
+impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
+    pub fn new(
+        origin: Address,
+        current_account_id: AccountId,
+        io: I,
+        env: &'env E,
+    ) -> Result<Self, EngineStateError> {
+        get_state(&io).map(|state| Self::new_with_state(state, origin, current_account_id, io, env))
     }
 
-    pub fn new_with_state(state: EngineState, origin: Address, io: I) -> Self {
+    pub fn new_with_state(
+        state: EngineState,
+        origin: Address,
+        current_account_id: AccountId,
+        io: I,
+        env: &'env E,
+    ) -> Self {
         Self {
             state,
             origin,
             gas_price: U256::zero(),
+            current_account_id,
             io,
+            env,
         }
-    }
-
-    /// Saves state into the storage.
-    pub fn set_state(io: &mut I, state: EngineState) {
-        io.write_storage(
-            &bytes_to_key(KeyPrefix::Config, STATE_KEY),
-            &state.try_to_vec().expect("ERR_SER"),
-        );
     }
 
     pub fn charge_gas(
@@ -374,11 +416,11 @@ impl<I: IO + Copy + Default> Engine<I> {
             .map(Wei::new)
             .ok_or(GasPaymentError::EthAmountOverflow)?;
 
-        let new_balance = Self::get_balance(&self.io, sender)
+        let new_balance = get_balance(&self.io, sender)
             .checked_sub(prepaid_amount)
             .ok_or(GasPaymentError::OutOfFund)?;
 
-        Self::set_balance(&mut self.io, sender, &new_balance);
+        set_balance(&mut self.io, sender, &new_balance);
 
         self.gas_price = effective_gas_price;
 
@@ -387,195 +429,6 @@ impl<I: IO + Copy + Default> Engine<I> {
             effective_gas_price,
             priority_fee_per_gas,
         })
-    }
-
-    pub fn refund_unused_gas(
-        io: &mut I,
-        sender: &Address,
-        gas_used: u64,
-        gas_result: GasPaymentResult,
-        relayer: &Address,
-    ) -> Result<(), GasPaymentError> {
-        if gas_result.effective_gas_price.is_zero() {
-            return Ok(());
-        }
-
-        let gas_to_wei = |price: U256| {
-            U256::from(gas_used)
-                .checked_mul(price)
-                .map(Wei::new)
-                .ok_or(GasPaymentError::EthAmountOverflow)
-        };
-
-        let spent_amount = gas_to_wei(gas_result.effective_gas_price)?;
-        let reward_amount = gas_to_wei(gas_result.priority_fee_per_gas)?;
-
-        let refund = gas_result
-            .prepaid_amount
-            .checked_sub(spent_amount)
-            .ok_or(GasPaymentError::EthAmountOverflow)?;
-
-        Self::add_balance(io, sender, refund)?;
-        Self::add_balance(io, relayer, reward_amount)?;
-
-        Ok(())
-    }
-
-    /// Fails if state is not found.
-    pub fn get_state(io: &I) -> Result<EngineState, EngineStateError> {
-        match io.read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
-            None => Err(EngineStateError::NotFound),
-            Some(bytes) => EngineState::try_from_slice(&bytes.to_vec())
-                .map_err(|_| EngineStateError::DeserializationFailed),
-        }
-    }
-
-    pub fn set_code(io: &mut I, address: &Address, code: &[u8]) {
-        io.write_storage(&address_to_key(KeyPrefix::Code, address), code);
-    }
-
-    pub fn remove_code(io: &mut I, address: &Address) {
-        io.remove_storage(&address_to_key(KeyPrefix::Code, address));
-    }
-
-    pub fn get_code(io: &I, address: &Address) -> Vec<u8> {
-        io.read_storage(&address_to_key(KeyPrefix::Code, address))
-            .map(|s| s.to_vec())
-            .unwrap_or_else(Vec::new)
-    }
-
-    pub fn get_code_size(io: &I, address: &Address) -> usize {
-        io.read_storage_len(&address_to_key(KeyPrefix::Code, address))
-            .unwrap_or(0)
-    }
-
-    pub fn set_nonce(io: &mut I, address: &Address, nonce: &U256) {
-        io.write_storage(
-            &address_to_key(KeyPrefix::Nonce, address),
-            &u256_to_arr(nonce),
-        );
-    }
-
-    pub fn remove_nonce(io: &mut I, address: &Address) {
-        io.remove_storage(&address_to_key(KeyPrefix::Nonce, address));
-    }
-
-    /// Checks the nonce to ensure that the address matches the transaction
-    /// nonce.
-    #[inline]
-    pub fn check_nonce(
-        io: &I,
-        address: &Address,
-        transaction_nonce: &U256,
-    ) -> Result<(), EngineErrorKind> {
-        let account_nonce = Self::get_nonce(io, address);
-
-        if transaction_nonce != &account_nonce {
-            return Err(EngineErrorKind::IncorrectNonce);
-        }
-
-        Ok(())
-    }
-
-    pub fn get_nonce(io: &I, address: &Address) -> U256 {
-        io.read_u256(&address_to_key(KeyPrefix::Nonce, address))
-            .unwrap_or_else(|_| U256::zero())
-    }
-
-    pub fn add_balance(io: &mut I, address: &Address, amount: Wei) -> Result<(), BalanceOverflow> {
-        let current_balance = Self::get_balance(io, address);
-        let new_balance = current_balance.checked_add(amount).ok_or(BalanceOverflow)?;
-        Self::set_balance(io, address, &new_balance);
-        Ok(())
-    }
-
-    pub fn set_balance(io: &mut I, address: &Address, balance: &Wei) {
-        io.write_storage(
-            &address_to_key(KeyPrefix::Balance, address),
-            &balance.to_bytes(),
-        );
-    }
-
-    pub fn remove_balance(io: &mut I, address: &Address) {
-        let balance = Self::get_balance(io, address);
-        // Apply changes for eth-conenctor
-        EthConnectorContract::get_instance(*io).internal_remove_eth(address, &balance.raw());
-        io.remove_storage(&address_to_key(KeyPrefix::Balance, address));
-    }
-
-    pub fn get_balance(io: &I, address: &Address) -> Wei {
-        let raw = io
-            .read_u256(&address_to_key(KeyPrefix::Balance, address))
-            .unwrap_or_else(|_| U256::zero());
-        Wei::new(raw)
-    }
-
-    pub fn remove_storage(io: &mut I, address: &Address, key: &H256, generation: u32) {
-        io.remove_storage(storage_to_key(address, key, generation).as_ref());
-    }
-
-    pub fn set_storage(io: &mut I, address: &Address, key: &H256, value: &H256, generation: u32) {
-        io.write_storage(storage_to_key(address, key, generation).as_ref(), &value.0);
-    }
-
-    pub fn get_storage(io: &I, address: &Address, key: &H256, generation: u32) -> H256 {
-        io.read_storage(storage_to_key(address, key, generation).as_ref())
-            .and_then(|value| {
-                if value.len() == 32 {
-                    let mut buf = [0u8; 32];
-                    value.copy_to_slice(&mut buf);
-                    Some(H256(buf))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_else(H256::default)
-    }
-
-    pub fn is_account_empty(io: &I, address: &Address) -> bool {
-        let balance = Self::get_balance(io, address);
-        let nonce = Self::get_nonce(io, address);
-        let code_len = Self::get_code_size(io, address);
-        balance.is_zero() && nonce.is_zero() && code_len == 0
-    }
-
-    /// Increments storage generation for a given address.
-    pub fn set_generation(io: &mut I, address: &Address, generation: u32) {
-        io.write_storage(
-            &address_to_key(KeyPrefix::Generation, address),
-            &generation.to_be_bytes(),
-        );
-    }
-
-    pub fn get_generation(io: &I, address: &Address) -> u32 {
-        io.read_storage(&address_to_key(KeyPrefix::Generation, address))
-            .map(|value| {
-                let mut bytes = [0u8; 4];
-                value.copy_to_slice(&mut bytes);
-                u32::from_be_bytes(bytes)
-            })
-            .unwrap_or(0)
-    }
-
-    /// Removes all storage for the given address.
-    fn remove_all_storage(io: &mut I, address: &Address, generation: u32) {
-        // FIXME: there is presently no way to prefix delete trie state.
-        // NOTE: There is not going to be a method on runtime for this.
-        //     You may need to store all keys in a list if you want to do this in a contract.
-        //     Maybe you can incentivize people to delete dead old keys. They can observe them from
-        //     external indexer node and then issue special cleaning transaction.
-        //     Either way you may have to store the nonce per storage address root. When the account
-        //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
-        //     can be deleted over time. That's how TurboGeth does storage.
-        Self::set_generation(io, address, generation + 1);
-    }
-
-    /// Removes an account.
-    fn remove_account(io: &mut I, address: &Address, generation: u32) {
-        Self::remove_nonce(io, address);
-        Self::remove_balance(io, address);
-        Self::remove_code(io, address);
-        Self::remove_all_storage(io, address, generation);
     }
 
     pub fn deploy_code_with_input(&mut self, input: Vec<u8>) -> EngineResult<SubmitResult> {
@@ -592,7 +445,7 @@ impl<I: IO + Copy + Default> Engine<I> {
         gas_limit: u64,
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(gas_limit);
+        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (exit_reason, result) = (
@@ -604,13 +457,13 @@ impl<I: IO + Copy + Default> Engine<I> {
         let status = match exit_reason.into_result(result.0.to_vec()) {
             Ok(status) => status,
             Err(e) => {
-                Engine::increment_nonce(&mut self.io, &origin);
+                increment_nonce(&mut self.io, &origin);
                 return Err(e.with_gas_used(used_gas));
             }
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = Self::filter_promises_from_logs(logs);
+        let logs = filter_promises_from_logs(logs);
 
         self.apply(values, Vec::<Log>::new(), true);
 
@@ -645,7 +498,7 @@ impl<I: IO + Copy + Default> Engine<I> {
         gas_limit: u64,
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(gas_limit);
+        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
@@ -654,25 +507,19 @@ impl<I: IO + Copy + Default> Engine<I> {
         let status = match exit_reason.into_result(result) {
             Ok(status) => status,
             Err(e) => {
-                Engine::increment_nonce(&mut self.io, &origin);
+                increment_nonce(&mut self.io, &origin);
                 return Err(e.with_gas_used(used_gas));
             }
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = Self::filter_promises_from_logs(logs);
+        let logs = filter_promises_from_logs(logs);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult::new(status, used_gas, logs))
-    }
-
-    pub fn increment_nonce(io: &mut I, address: &Address) {
-        let account_nonce = Self::get_nonce(io, address);
-        let new_nonce = account_nonce.saturating_add(U256::one());
-        Self::set_nonce(io, address, &new_nonce);
     }
 
     pub fn view_with_args(&self, args: ViewCallArgs) -> Result<TransactionStatus, EngineErrorKind> {
@@ -690,33 +537,35 @@ impl<I: IO + Copy + Default> Engine<I> {
         input: Vec<u8>,
         gas_limit: u64,
     ) -> Result<TransactionStatus, EngineErrorKind> {
-        let executor_params = StackExecutorParams::new(gas_limit);
+        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
         let mut executor = executor_params.make_executor(self);
         let (status, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
         status.into_result(result)
     }
 
-    pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
-        self.state
-            .relayers_evm_addresses
-            .insert_raw(account_id, evm_address.as_bytes());
+    fn relayer_key(account_id: &[u8]) -> Vec<u8> {
+        bytes_to_key(KeyPrefix::RelayerEvmAddressMap, account_id)
     }
 
-    #[allow(dead_code)]
+    pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
+        let key = Self::relayer_key(account_id);
+        self.io.write_storage(&key, evm_address.as_bytes());
+    }
+
     pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
-        self.state
-            .relayers_evm_addresses
-            .get_raw(account_id)
-            .map(|result| Address(result.as_slice().try_into().unwrap()))
+        let key = Self::relayer_key(account_id);
+        self.io
+            .read_storage(&key)
+            .map(|v| Address::from_slice(&v.to_vec()))
     }
 
     pub fn register_token(
         &mut self,
-        erc20_token: &[u8],
-        nep141_token: &[u8],
+        erc20_token: Address,
+        nep141_token: AccountId,
     ) -> Result<(), RegisterTokenError> {
-        match Self::get_erc20_from_nep141(self.io, nep141_token) {
+        match get_erc20_from_nep141(&self.io, &nep141_token) {
             Err(GetErc20FromNep141Error::Nep141NotFound) => (),
             Err(GetErc20FromNep141Error::InvalidNep141AccountId) => {
                 return Err(RegisterTokenError::InvalidNep141AccountId);
@@ -724,20 +573,10 @@ impl<I: IO + Copy + Default> Engine<I> {
             Ok(_) => return Err(RegisterTokenError::TokenAlreadyRegistered),
         }
 
-        Self::nep141_erc20_map(self.io).insert(nep141_token, erc20_token);
+        let erc20_token = ERC20Address(erc20_token);
+        let nep141_token = NEP141Account(nep141_token);
+        nep141_erc20_map(self.io).insert(&nep141_token, &erc20_token);
         Ok(())
-    }
-
-    pub fn get_erc20_from_nep141(
-        io: I,
-        nep141_account_id: &[u8],
-    ) -> Result<Vec<u8>, GetErc20FromNep141Error> {
-        AccountId::try_from(nep141_account_id)
-            .map_err(|_| GetErc20FromNep141Error::InvalidNep141AccountId)?;
-
-        Self::nep141_erc20_map(io)
-            .lookup_left(nep141_account_id)
-            .ok_or(GetErc20FromNep141Error::Nep141NotFound)
     }
 
     /// Transfers an amount from a given sender to a receiver, provided that
@@ -765,7 +604,13 @@ impl<I: IO + Copy + Default> Engine<I> {
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
-    pub fn receive_erc20_tokens(&mut self, args: &NEP141FtOnTransferArgs) {
+    pub fn receive_erc20_tokens(
+        &mut self,
+        token: &AccountId,
+        relayer_account_id: &AccountId,
+        args: &NEP141FtOnTransferArgs,
+        current_account_id: &AccountId,
+    ) {
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
 
@@ -796,10 +641,9 @@ impl<I: IO + Copy + Default> Engine<I> {
             (recipient, fee)
         };
 
-        let token = sdk::predecessor_account_id();
         let erc20_token = Address(unwrap_res_or_finish!(
             unwrap_res_or_finish!(
-                Self::get_erc20_from_nep141(self.io, &token),
+                get_erc20_from_nep141(&self.io, token),
                 output_on_fail,
                 self.io
             )
@@ -810,9 +654,8 @@ impl<I: IO + Copy + Default> Engine<I> {
         ));
 
         if fee != U256::from(0) {
-            let relayer_account_id = sdk::signer_account_id();
             let relayer_address = unwrap_res_or_finish!(
-                self.get_relayer(relayer_account_id.as_slice()).ok_or(()),
+                self.get_relayer(relayer_account_id.as_bytes()).ok_or(()),
                 output_on_fail,
                 self.io
             );
@@ -835,7 +678,7 @@ impl<I: IO + Copy + Default> Engine<I> {
             ethabi::Token::Uint(args.amount.into()),
         ]);
 
-        let erc20_admin_address = current_address();
+        let erc20_admin_address = current_address(current_account_id);
         unwrap_res_or_finish!(
             self.call(
                 erc20_admin_address,
@@ -886,76 +729,6 @@ impl<I: IO + Copy + Default> Engine<I> {
         // Everything succeed so return "0"
         self.io.return_output(b"\"0\"");
     }
-
-    pub fn nep141_erc20_map(
-        io: I,
-    ) -> BijectionMap<
-        I,
-        { KeyPrefix::Nep141Erc20Map as KeyPrefixU8 },
-        { KeyPrefix::Erc20Nep141Map as KeyPrefixU8 },
-    > {
-        BijectionMap { io }
-    }
-
-    fn filter_promises_from_logs<T: IntoIterator<Item = Log>>(logs: T) -> Vec<ResultLog> {
-        logs.into_iter()
-            .filter_map(|log| {
-                if log.address == ExitToNear::ADDRESS || log.address == ExitToEthereum::ADDRESS {
-                    if log.topics.is_empty() {
-                        if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
-                            match promise {
-                                PromiseArgs::Create(promise) => Self::schedule_promise(promise),
-                                PromiseArgs::Callback(promise) => {
-                                    let base_id = Self::schedule_promise(promise.base);
-                                    Self::schedule_promise_callback(base_id, promise.callback)
-                                }
-                            };
-                        }
-                        // do not pass on these "internal logs" to caller
-                        None
-                    } else {
-                        // The exit precompiles do produce externally consumable logs in
-                        // addition to the promises. The external logs have a non-empty
-                        // `topics` field.
-                        Some(log.into())
-                    }
-                } else {
-                    Some(log.into())
-                }
-            })
-            .collect()
-    }
-
-    fn schedule_promise(promise: PromiseCreateArgs) -> u64 {
-        sdk::log!(&crate::prelude::format!(
-            "call_contract {}.{}",
-            promise.target_account_id,
-            promise.method
-        ));
-        sdk::promise_create(
-            promise.target_account_id.as_bytes(),
-            promise.method.as_bytes(),
-            promise.args.as_slice(),
-            promise.attached_balance,
-            promise.attached_gas,
-        )
-    }
-
-    fn schedule_promise_callback(base_id: u64, promise: PromiseCreateArgs) -> u64 {
-        sdk::log!(&crate::prelude::format!(
-            "callback_call_contract {}.{}",
-            promise.target_account_id,
-            promise.method
-        ));
-        sdk::promise_then(
-            base_id,
-            promise.target_account_id.as_bytes(),
-            promise.method.as_bytes(),
-            promise.args.as_slice(),
-            promise.attached_balance,
-            promise.attached_gas,
-        )
-    }
 }
 
 /// There is one Aurora block per NEAR block height (note: when heights in NEAR are skipped
@@ -993,7 +766,293 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
     sdk::sha256(&data)
 }
 
-impl<I: IO + Default + Copy> evm::backend::Backend for Engine<I> {
+pub fn get_state<I: IO>(io: &I) -> Result<EngineState, EngineStateError> {
+    match io.read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
+        None => Err(EngineStateError::NotFound),
+        Some(bytes) => EngineState::try_from_slice(&bytes.to_vec())
+            .map_err(|_| EngineStateError::DeserializationFailed),
+    }
+}
+
+/// Saves state into the storage.
+pub fn set_state<I: IO>(io: &mut I, state: EngineState) {
+    io.write_storage(
+        &bytes_to_key(KeyPrefix::Config, STATE_KEY),
+        &state.try_to_vec().expect("ERR_SER"),
+    );
+}
+
+pub fn refund_unused_gas<I: IO>(
+    io: &mut I,
+    sender: &Address,
+    gas_used: u64,
+    gas_result: GasPaymentResult,
+    relayer: &Address,
+) -> Result<(), GasPaymentError> {
+    if gas_result.effective_gas_price.is_zero() {
+        return Ok(());
+    }
+
+    let gas_to_wei = |price: U256| {
+        U256::from(gas_used)
+            .checked_mul(price)
+            .map(Wei::new)
+            .ok_or(GasPaymentError::EthAmountOverflow)
+    };
+
+    let spent_amount = gas_to_wei(gas_result.effective_gas_price)?;
+    let reward_amount = gas_to_wei(gas_result.priority_fee_per_gas)?;
+
+    let refund = gas_result
+        .prepaid_amount
+        .checked_sub(spent_amount)
+        .ok_or(GasPaymentError::EthAmountOverflow)?;
+
+    add_balance(io, sender, refund)?;
+    add_balance(io, relayer, reward_amount)?;
+
+    Ok(())
+}
+
+pub fn set_code<I: IO>(io: &mut I, address: &Address, code: &[u8]) {
+    io.write_storage(&address_to_key(KeyPrefix::Code, address), code);
+}
+
+pub fn remove_code<I: IO>(io: &mut I, address: &Address) {
+    io.remove_storage(&address_to_key(KeyPrefix::Code, address));
+}
+
+pub fn get_code<I: IO>(io: &I, address: &Address) -> Vec<u8> {
+    io.read_storage(&address_to_key(KeyPrefix::Code, address))
+        .map(|s| s.to_vec())
+        .unwrap_or_else(Vec::new)
+}
+
+pub fn get_code_size<I: IO>(io: &I, address: &Address) -> usize {
+    io.read_storage_len(&address_to_key(KeyPrefix::Code, address))
+        .unwrap_or(0)
+}
+
+pub fn set_nonce<I: IO>(io: &mut I, address: &Address, nonce: &U256) {
+    io.write_storage(
+        &address_to_key(KeyPrefix::Nonce, address),
+        &u256_to_arr(nonce),
+    );
+}
+
+pub fn remove_nonce<I: IO>(io: &mut I, address: &Address) {
+    io.remove_storage(&address_to_key(KeyPrefix::Nonce, address));
+}
+
+/// Checks the nonce to ensure that the address matches the transaction
+/// nonce.
+#[inline]
+pub fn check_nonce<I: IO>(
+    io: &I,
+    address: &Address,
+    transaction_nonce: &U256,
+) -> Result<(), EngineErrorKind> {
+    let account_nonce = get_nonce(io, address);
+
+    if transaction_nonce != &account_nonce {
+        return Err(EngineErrorKind::IncorrectNonce);
+    }
+
+    Ok(())
+}
+
+pub fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
+    io.read_u256(&address_to_key(KeyPrefix::Nonce, address))
+        .unwrap_or_else(|_| U256::zero())
+}
+
+pub fn increment_nonce<I: IO>(io: &mut I, address: &Address) {
+    let account_nonce = get_nonce(io, address);
+    let new_nonce = account_nonce.saturating_add(U256::one());
+    set_nonce(io, address, &new_nonce);
+}
+
+pub fn nep141_erc20_map<I: IO>(io: I) -> BijectionMap<NEP141Account, ERC20Address, I> {
+    BijectionMap::new(KeyPrefix::Nep141Erc20Map, KeyPrefix::Erc20Nep141Map, io)
+}
+
+pub fn get_erc20_from_nep141<I: IO>(
+    io: &I,
+    nep141_account_id: &AccountId,
+) -> Result<Vec<u8>, GetErc20FromNep141Error> {
+    let key = bytes_to_key(KeyPrefix::Nep141Erc20Map, nep141_account_id.as_bytes());
+    io.read_storage(&key)
+        .map(|v| v.to_vec())
+        .ok_or(GetErc20FromNep141Error::Nep141NotFound)
+}
+
+pub fn add_balance<I: IO>(
+    io: &mut I,
+    address: &Address,
+    amount: Wei,
+) -> Result<(), BalanceOverflow> {
+    let current_balance = get_balance(io, address);
+    let new_balance = current_balance.checked_add(amount).ok_or(BalanceOverflow)?;
+    set_balance(io, address, &new_balance);
+    Ok(())
+}
+
+pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
+    io.write_storage(
+        &address_to_key(KeyPrefix::Balance, address),
+        &balance.to_bytes(),
+    );
+}
+
+pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
+    let balance = get_balance(io, address);
+    // Apply changes for eth-conenctor
+    EthConnectorContract::get_instance(*io).internal_remove_eth(address, &balance.raw());
+    io.remove_storage(&address_to_key(KeyPrefix::Balance, address));
+}
+
+pub fn get_balance<I: IO>(io: &I, address: &Address) -> Wei {
+    let raw = io
+        .read_u256(&address_to_key(KeyPrefix::Balance, address))
+        .unwrap_or_else(|_| U256::zero());
+    Wei::new(raw)
+}
+
+pub fn remove_storage<I: IO>(io: &mut I, address: &Address, key: &H256, generation: u32) {
+    io.remove_storage(storage_to_key(address, key, generation).as_ref());
+}
+
+pub fn set_storage<I: IO>(
+    io: &mut I,
+    address: &Address,
+    key: &H256,
+    value: &H256,
+    generation: u32,
+) {
+    io.write_storage(storage_to_key(address, key, generation).as_ref(), &value.0);
+}
+
+pub fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32) -> H256 {
+    io.read_storage(storage_to_key(address, key, generation).as_ref())
+        .and_then(|value| {
+            if value.len() == 32 {
+                let mut buf = [0u8; 32];
+                value.copy_to_slice(&mut buf);
+                Some(H256(buf))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(H256::default)
+}
+
+pub fn is_account_empty<I: IO>(io: &I, address: &Address) -> bool {
+    let balance = get_balance(io, address);
+    let nonce = get_nonce(io, address);
+    let code_len = get_code_size(io, address);
+    balance.is_zero() && nonce.is_zero() && code_len == 0
+}
+
+/// Increments storage generation for a given address.
+pub fn set_generation<I: IO>(io: &mut I, address: &Address, generation: u32) {
+    io.write_storage(
+        &address_to_key(KeyPrefix::Generation, address),
+        &generation.to_be_bytes(),
+    );
+}
+
+pub fn get_generation<I: IO>(io: &I, address: &Address) -> u32 {
+    io.read_storage(&address_to_key(KeyPrefix::Generation, address))
+        .map(|value| {
+            let mut bytes = [0u8; 4];
+            value.copy_to_slice(&mut bytes);
+            u32::from_be_bytes(bytes)
+        })
+        .unwrap_or(0)
+}
+
+/// Removes all storage for the given address.
+fn remove_all_storage<I: IO>(io: &mut I, address: &Address, generation: u32) {
+    // FIXME: there is presently no way to prefix delete trie state.
+    // NOTE: There is not going to be a method on runtime for this.
+    //     You may need to store all keys in a list if you want to do this in a contract.
+    //     Maybe you can incentivize people to delete dead old keys. They can observe them from
+    //     external indexer node and then issue special cleaning transaction.
+    //     Either way you may have to store the nonce per storage address root. When the account
+    //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
+    //     can be deleted over time. That's how TurboGeth does storage.
+    set_generation(io, address, generation + 1);
+}
+
+/// Removes an account.
+fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) {
+    remove_nonce(io, address);
+    remove_balance(io, address);
+    remove_code(io, address);
+    remove_all_storage(io, address, generation);
+}
+
+fn filter_promises_from_logs<T: IntoIterator<Item = Log>>(logs: T) -> Vec<ResultLog> {
+    logs.into_iter()
+        .filter_map(|log| {
+            if log.address == ExitToNear::ADDRESS || log.address == ExitToEthereum::ADDRESS {
+                if log.topics.is_empty() {
+                    if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
+                        match promise {
+                            PromiseArgs::Create(promise) => schedule_promise(promise),
+                            PromiseArgs::Callback(promise) => {
+                                let base_id = schedule_promise(promise.base);
+                                schedule_promise_callback(base_id, promise.callback)
+                            }
+                        };
+                    }
+                    // do not pass on these "internal logs" to caller
+                    None
+                } else {
+                    // The exit precompiles do produce externally consumable logs in
+                    // addition to the promises. The external logs have a non-empty
+                    // `topics` field.
+                    Some(log.into())
+                }
+            } else {
+                Some(log.into())
+            }
+        })
+        .collect()
+}
+
+fn schedule_promise(promise: PromiseCreateArgs) -> u64 {
+    sdk::log!(&crate::prelude::format!(
+        "call_contract {}.{}",
+        promise.target_account_id,
+        promise.method
+    ));
+    sdk::promise_create(
+        promise.target_account_id.as_bytes(),
+        promise.method.as_bytes(),
+        promise.args.as_slice(),
+        promise.attached_balance,
+        promise.attached_gas,
+    )
+}
+
+fn schedule_promise_callback(base_id: u64, promise: PromiseCreateArgs) -> u64 {
+    sdk::log!(&crate::prelude::format!(
+        "callback_call_contract {}.{}",
+        promise.target_account_id,
+        promise.method
+    ));
+    sdk::promise_then(
+        base_id,
+        promise.target_account_id.as_bytes(),
+        promise.method.as_bytes(),
+        promise.args.as_slice(),
+        promise.attached_balance,
+        promise.attached_gas,
+    )
+}
+
+impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
         self.gas_price
@@ -1022,17 +1081,14 @@ impl<I: IO + Default + Copy> evm::backend::Backend for Engine<I> {
     ///
     /// See: https://doc.aurora.dev/develop/compat/evm#blockhash
     fn block_hash(&self, number: U256) -> H256 {
-        let idx = U256::from(sdk::block_index());
+        let idx = U256::from(self.env.block_height());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
             // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
-            #[cfg(feature = "contract")]
-            {
-                let account_id = sdk::current_account_id();
-                compute_block_hash(self.state.chain_id, number.low_u64(), &account_id)
-            }
-
-            #[cfg(not(feature = "contract"))]
-            compute_block_hash(self.state.chain_id, number.low_u64(), b"aurora")
+            compute_block_hash(
+                self.state.chain_id,
+                number.low_u64(),
+                self.current_account_id.as_bytes(),
+            )
         } else {
             H256::zero()
         }
@@ -1040,7 +1096,7 @@ impl<I: IO + Default + Copy> evm::backend::Backend for Engine<I> {
 
     /// Returns the current block index number.
     fn block_number(&self) -> U256 {
-        U256::from(sdk::block_index())
+        U256::from(self.env.block_height())
     }
 
     /// Returns a mocked coinbase which is the EVM address for the Aurora
@@ -1056,7 +1112,7 @@ impl<I: IO + Default + Copy> evm::backend::Backend for Engine<I> {
 
     /// Returns the current block timestamp.
     fn block_timestamp(&self) -> U256 {
-        U256::from(sdk::block_timestamp())
+        U256::from(self.env.block_timestamp().secs())
     }
 
     /// Returns the current block difficulty.
@@ -1094,26 +1150,26 @@ impl<I: IO + Default + Copy> evm::backend::Backend for Engine<I> {
 
     /// Checks if an address exists.
     fn exists(&self, address: Address) -> bool {
-        !Engine::is_account_empty(&self.io, &address)
+        !is_account_empty(&self.io, &address)
     }
 
     /// Returns basic account information.
     fn basic(&self, address: Address) -> Basic {
         Basic {
-            nonce: Engine::get_nonce(&self.io, &address),
-            balance: Engine::get_balance(&self.io, &address).raw(),
+            nonce: get_nonce(&self.io, &address),
+            balance: get_balance(&self.io, &address).raw(),
         }
     }
 
     /// Returns the code of the contract from an address.
     fn code(&self, address: Address) -> Vec<u8> {
-        Engine::get_code(&self.io, &address)
+        get_code(&self.io, &address)
     }
 
     /// Get storage value of address at index.
     fn storage(&self, address: Address, index: H256) -> H256 {
-        let generation = Self::get_generation(&self.io, &address);
-        Engine::get_storage(&self.io, &address, &index, generation)
+        let generation = get_generation(&self.io, &address);
+        get_storage(&self.io, &address, &index, generation)
     }
 
     /// Get original storage value of address at index, if available.
@@ -1124,7 +1180,7 @@ impl<I: IO + Default + Copy> evm::backend::Backend for Engine<I> {
     }
 }
 
-impl<J: IO + Default + Copy> ApplyBackend for Engine<J> {
+impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,
@@ -1142,13 +1198,13 @@ impl<J: IO + Default + Copy> ApplyBackend for Engine<J> {
                     storage,
                     reset_storage,
                 } => {
-                    let generation = Self::get_generation(&self.io, &address);
-                    Engine::set_nonce(&mut self.io, &address, &basic.nonce);
-                    Engine::set_balance(&mut self.io, &address, &Wei::new(basic.balance));
+                    let generation = get_generation(&self.io, &address);
+                    set_nonce(&mut self.io, &address, &basic.nonce);
+                    set_balance(&mut self.io, &address, &Wei::new(basic.balance));
                     writes_counter += 2; // 1 for nonce, 1 for balance
 
                     if let Some(code) = code {
-                        Engine::set_code(&mut self.io, &address, &code);
+                        set_code(&mut self.io, &address, &code);
                         code_bytes_written = code.len();
                         sdk::log!(crate::prelude::format!(
                             "code_write_at_address {:?} {}",
@@ -1159,7 +1215,7 @@ impl<J: IO + Default + Copy> ApplyBackend for Engine<J> {
                     }
 
                     let next_generation = if reset_storage {
-                        Engine::remove_all_storage(&mut self.io, &address, generation);
+                        remove_all_storage(&mut self.io, &address, generation);
                         generation + 1
                     } else {
                         generation
@@ -1167,15 +1223,9 @@ impl<J: IO + Default + Copy> ApplyBackend for Engine<J> {
 
                     for (index, value) in storage {
                         if value == H256::default() {
-                            Engine::remove_storage(&mut self.io, &address, &index, next_generation)
+                            remove_storage(&mut self.io, &address, &index, next_generation)
                         } else {
-                            Engine::set_storage(
-                                &mut self.io,
-                                &address,
-                                &index,
-                                &value,
-                                next_generation,
-                            )
+                            set_storage(&mut self.io, &address, &index, &value, next_generation)
                         }
                         writes_counter += 1;
                     }
@@ -1186,16 +1236,16 @@ impl<J: IO + Default + Copy> ApplyBackend for Engine<J> {
                     // 3. we didn't already clear out the storage (because if we did then there is
                     //    nothing to do)
                     if delete_empty
-                        && Engine::is_account_empty(&self.io, &address)
+                        && is_account_empty(&self.io, &address)
                         && generation == next_generation
                     {
-                        Engine::remove_account(&mut self.io, &address, generation);
+                        remove_account(&mut self.io, &address, generation);
                         writes_counter += 1;
                     }
                 }
                 Apply::Delete { address } => {
-                    let generation = Self::get_generation(&self.io, &address);
-                    Engine::remove_account(&mut self.io, &address, generation);
+                    let generation = get_generation(&self.io, &address);
+                    remove_account(&mut self.io, &address, generation);
                     writes_counter += 1;
                 }
             }

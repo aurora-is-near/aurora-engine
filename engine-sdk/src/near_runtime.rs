@@ -1,3 +1,7 @@
+use crate::io::StorageIntermediate;
+use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::TryFrom;
+
 /// Wrapper type for indices in NEAR's register API.
 pub struct RegisterIndex(u64);
 
@@ -11,9 +15,21 @@ impl Runtime {
     const INPUT_REGISTER_ID: RegisterIndex = RegisterIndex(1);
     const WRITE_REGISTER_ID: RegisterIndex = RegisterIndex(2);
     const EVICT_REGISTER_ID: RegisterIndex = RegisterIndex(3);
+    const ENV_REGISTER_ID: RegisterIndex = RegisterIndex(4);
+
+    /// Assumes a valid account ID has been written to ENV_REGISTER_ID
+    /// by a previous call.
+    fn read_account_id() -> AccountId {
+        let bytes = Self::ENV_REGISTER_ID.to_vec();
+        match AccountId::try_from(bytes) {
+            Ok(account_id) => account_id,
+            // the environment must give us a valid Account ID.
+            Err(_) => unreachable!(),
+        }
+    }
 }
 
-impl crate::io::StorageIntermediate for RegisterIndex {
+impl StorageIntermediate for RegisterIndex {
     fn len(&self) -> usize {
         unsafe {
             let result = exports::register_len(self.0);
@@ -121,6 +137,46 @@ impl crate::io::IO for Runtime {
             } else {
                 None
             }
+        }
+    }
+}
+
+impl crate::env::Env for Runtime {
+    fn signer_account_id(&self) -> AccountId {
+        unsafe {
+            exports::signer_account_id(Self::ENV_REGISTER_ID.0);
+        }
+        Self::read_account_id()
+    }
+
+    fn current_account_id(&self) -> AccountId {
+        unsafe {
+            exports::current_account_id(Self::ENV_REGISTER_ID.0);
+        }
+        Self::read_account_id()
+    }
+
+    fn predecessor_account_id(&self) -> AccountId {
+        unsafe {
+            exports::predecessor_account_id(Self::ENV_REGISTER_ID.0);
+        }
+        Self::read_account_id()
+    }
+
+    fn block_height(&self) -> u64 {
+        unsafe { exports::block_index() }
+    }
+
+    fn block_timestamp(&self) -> crate::env::Timestamp {
+        let ns = unsafe { exports::block_timestamp() };
+        crate::env::Timestamp::new(ns)
+    }
+
+    fn attached_deposit(&self) -> u128 {
+        unsafe {
+            let data = [0u8; core::mem::size_of::<u128>()];
+            exports::attached_deposit(data.as_ptr() as u64);
+            u128::from_le_bytes(data)
         }
     }
 }
