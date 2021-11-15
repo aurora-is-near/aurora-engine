@@ -72,7 +72,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        CallArgsType, DeployErc20TokenArgs, FunctionCallArgs, FunctionCallArgsLegacy,
+        CallArgs, DeployErc20TokenArgs, FunctionCallArgs, FunctionCallArgsLegacy,
         GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
         NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs,
         SubmitResult, TransactionStatus, TransferCallCallArgs, ViewCallArgs,
@@ -209,11 +209,12 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn call() {
         let io = Runtime;
-        let args: Option<CallArgsType> = {
-            if let Ok(value) = io.read_input_borsh::<FunctionCallArgs>() {
-                Some(CallArgsType::New(value))
-            } else if let Ok(value) = io.read_input_borsh::<FunctionCallArgsLegacy>() {
-                Some(CallArgsType::Legacy(value))
+        let bytes = io.read_input();
+        let args: Option<CallArgs> = {
+            if let Ok(value) = bytes.to_value::<FunctionCallArgs>() {
+                Some(CallArgs::New(value))
+            } else if let Ok(value) = bytes.to_value::<FunctionCallArgsLegacy>() {
+                Some(CallArgs::Legacy(value))
             } else {
                 None
             }

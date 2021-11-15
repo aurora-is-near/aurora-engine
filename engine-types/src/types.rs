@@ -112,7 +112,7 @@ impl Add for Wei {
 /// Type casting from Wei compatible Borsh-encoded raw value into the Wei value, to attach an ETH balance to the transaction
 impl From<WeiU256> for Wei {
     fn from(value: WeiU256) -> Self {
-        Wei(value.into())
+        Wei(U256::from_big_endian(&value))
     }
 }
 

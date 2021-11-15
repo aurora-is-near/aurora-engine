@@ -149,12 +149,9 @@ pub struct FunctionCallArgsLegacy {
 /// Deserialized values from bytes to current or legacy Borsh-encoded parameters
 /// for passing to the engine `call` function, and to provide backward type compatibility
 #[derive(BorshSerialize, BorshDeserialize)]
-pub enum CallArgsType
-where
-    Self: Sized,
-{
+pub enum CallArgs {
     New(FunctionCallArgs),
-    Legacy(FunctionCallArgsLegacy)
+    Legacy(FunctionCallArgsLegacy),
 }
 
 /// Borsh-encoded parameters for the `view` function.

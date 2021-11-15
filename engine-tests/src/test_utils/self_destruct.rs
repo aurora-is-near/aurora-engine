@@ -1,5 +1,5 @@
 use crate::prelude::{
-    parameters::FunctionCallArgs, transaction::legacy::TransactionLegacy, Address, U256, WeiU256,
+    parameters::FunctionCallArgs, transaction::legacy::TransactionLegacy, Address, WeiU256, U256,
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use borsh::BorshSerialize;
