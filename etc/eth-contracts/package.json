@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "ERC20 token implementation on EVM mapped from Native NEP-141",
   "dependencies": {
-    "@openzeppelin/contracts": "^4.3.2"
+    "@openzeppelin/contracts": "^4.3.3"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.1",
