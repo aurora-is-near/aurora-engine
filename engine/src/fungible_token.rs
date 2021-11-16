@@ -4,10 +4,14 @@ use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    sdk, storage, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress, Gas,
-    PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec, Wei, U256,
+    sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress,
+    Gas, PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec, Wei,
+    U256,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::parameters::{
+    PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
+};
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
 const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
@@ -255,15 +259,15 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     pub fn ft_transfer_call(
         &mut self,
         sender_id: AccountId,
-        receiver_id: &AccountId,
+        receiver_id: AccountId,
         amount: Balance,
         memo: &Option<String>,
         msg: String,
-        current_account_id: &AccountId,
-    ) {
+        current_account_id: AccountId,
+    ) -> PromiseWithCallbackArgs {
         // Special case for Aurora transfer itself - we shouldn't transfer
-        if &sender_id != receiver_id {
-            self.internal_transfer_eth_on_near(&sender_id, receiver_id, amount, memo);
+        if sender_id != receiver_id {
+            self.internal_transfer_eth_on_near(&sender_id, &receiver_id, amount, memo);
         }
         let data1: String = NEP141FtOnTransferArgs {
             amount,
@@ -281,22 +285,24 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         .try_to_vec()
         .unwrap();
         // Initiating receiver's call and the callback
-        let promise0 = sdk::promise_create(
-            receiver_id.as_bytes(),
-            b"ft_on_transfer",
-            data1.as_bytes(),
-            NO_DEPOSIT,
-            GAS_FOR_FT_ON_TRANSFER,
-        );
-        let promise1 = sdk::promise_then(
-            promise0,
-            current_account_id.as_bytes(),
-            b"ft_resolve_transfer",
-            &data2[..],
-            NO_DEPOSIT,
-            GAS_FOR_RESOLVE_TRANSFER,
-        );
-        sdk::promise_return(promise1);
+        let ft_on_transfer_call = PromiseCreateArgs {
+            target_account_id: receiver_id,
+            method: "ft_on_transfer".to_string(),
+            args: data1.into_bytes(),
+            attached_balance: NO_DEPOSIT,
+            attached_gas: GAS_FOR_FT_ON_TRANSFER,
+        };
+        let ft_resolve_transfer_call = PromiseCreateArgs {
+            target_account_id: current_account_id,
+            method: "ft_resolve_transfer".to_string(),
+            args: data2,
+            attached_balance: NO_DEPOSIT,
+            attached_gas: GAS_FOR_RESOLVE_TRANSFER,
+        };
+        PromiseWithCallbackArgs {
+            base: ft_on_transfer_call,
+            callback: ft_resolve_transfer_call,
+        }
     }
 
     pub fn internal_ft_resolve_transfer(
@@ -379,19 +385,25 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 
     pub fn internal_storage_unregister(
         &mut self,
-        account_id: &AccountId,
+        account_id: AccountId,
         force: Option<bool>,
-    ) -> Option<Balance> {
+    ) -> Option<(Balance, PromiseBatchAction)> {
         let force = force.unwrap_or(false);
-        if let Some(balance) = self.accounts_get(account_id) {
+        if let Some(balance) = self.accounts_get(&account_id) {
             let balance = u128::try_from_slice(&balance[..]).unwrap();
             if balance == 0 || force {
-                self.accounts_remove(account_id);
+                self.accounts_remove(&account_id);
                 self.total_eth_supply_on_near -= balance;
-                let amount = self.storage_balance_bounds().min + 1;
-                let promise0 = sdk::promise_batch_create(account_id.as_bytes());
-                sdk::promise_batch_action_transfer(promise0, amount);
-                Some(balance)
+                let storage_deposit = self.storage_balance_of(&account_id);
+                let action = PromiseAction::Transfer {
+                    // The `+ 1` is to cover the 1 yoctoNEAR necessary to call this function in the first place.
+                    amount: storage_deposit.total + 1,
+                };
+                let promise = PromiseBatchAction {
+                    target_account_id: account_id,
+                    actions: vec![action],
+                };
+                Some((balance, promise))
             } else {
                 sdk::panic_utf8(b"ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE")
             }
@@ -433,16 +445,22 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     #[allow(unused_variables)]
     pub fn storage_deposit(
         &mut self,
-        predecessor_account_id: &AccountId,
+        predecessor_account_id: AccountId,
         account_id: &AccountId,
         amount: Balance,
         registration_only: Option<bool>,
-    ) -> StorageBalance {
-        if self.accounts_contains_key(account_id) {
+    ) -> (StorageBalance, Option<PromiseBatchAction>) {
+        let promise = if self.accounts_contains_key(account_id) {
             sdk::log!("The account is already registered, refunding the deposit");
             if amount > 0 {
-                let promise0 = sdk::promise_batch_create(predecessor_account_id.as_bytes());
-                sdk::promise_batch_action_transfer(promise0, amount);
+                let action = PromiseAction::Transfer { amount };
+                let promise = PromiseBatchAction {
+                    target_account_id: predecessor_account_id,
+                    actions: vec![action],
+                };
+                Some(promise)
+            } else {
+                None
             }
         } else {
             let min_balance = self.storage_balance_bounds().min;
@@ -453,24 +471,18 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             self.internal_register_account(account_id);
             let refund = amount - min_balance;
             if refund > 0 {
-                let promise0 = sdk::promise_batch_create(predecessor_account_id.as_bytes());
-                sdk::promise_batch_action_transfer(promise0, refund);
+                let action = PromiseAction::Transfer { amount: refund };
+                let promise = PromiseBatchAction {
+                    target_account_id: predecessor_account_id,
+                    actions: vec![action],
+                };
+                Some(promise)
+            } else {
+                None
             }
-        }
-        self.internal_storage_balance_of(account_id).unwrap()
-    }
-
-    #[allow(dead_code)]
-    pub fn storage_unregister(
-        &mut self,
-        attached_near: Balance,
-        account_id: &AccountId,
-        force: Option<bool>,
-    ) -> bool {
-        // assert_one_yocto
-        assert_eq!(attached_near, 1);
-        self.internal_storage_unregister(account_id, force)
-            .is_some()
+        };
+        let balance = self.internal_storage_balance_of(account_id).unwrap();
+        (balance, promise)
     }
 
     pub fn storage_withdraw(

@@ -1,5 +1,8 @@
 use crate::io::StorageIntermediate;
+use crate::promise::PromiseId;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
+use aurora_engine_types::types::PromiseResult;
 use aurora_engine_types::TryFrom;
 
 /// Wrapper type for indices in NEAR's register API.
@@ -16,6 +19,30 @@ impl Runtime {
     const WRITE_REGISTER_ID: RegisterIndex = RegisterIndex(2);
     const EVICT_REGISTER_ID: RegisterIndex = RegisterIndex(3);
     const ENV_REGISTER_ID: RegisterIndex = RegisterIndex(4);
+    const PROMISE_REGISTER_ID: RegisterIndex = RegisterIndex(5);
+
+    const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
+
+    /// Deploy code from given key in place of the current contract.
+    /// Not implemented in terms of higher level traits (eg IO) for efficiency reasons.
+    pub fn self_deploy(code_key: &[u8]) {
+        unsafe {
+            // Load current account id into register 0.
+            exports::current_account_id(0);
+            // Use register 0 as the destination for the promise.
+            let promise_id = exports::promise_batch_create(u64::MAX as _, 0);
+            // Remove code from storage and store it in register 1.
+            exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1);
+            exports::promise_batch_action_deploy_contract(promise_id, u64::MAX, 1);
+            Self::promise_batch_action_function_call(
+                promise_id,
+                b"state_migration",
+                &[],
+                0,
+                Self::GAS_FOR_STATE_MIGRATION,
+            )
+        }
+    }
 
     /// Assumes a valid account ID has been written to ENV_REGISTER_ID
     /// by a previous call.
@@ -25,6 +52,27 @@ impl Runtime {
             Ok(account_id) => account_id,
             // the environment must give us a valid Account ID.
             Err(_) => unreachable!(),
+        }
+    }
+
+    /// Convenience wrapper around `exports::promise_batch_action_function_call`
+    fn promise_batch_action_function_call(
+        promise_idx: u64,
+        method_name: &[u8],
+        arguments: &[u8],
+        amount: u128,
+        gas: u64,
+    ) {
+        unsafe {
+            exports::promise_batch_action_function_call(
+                promise_idx,
+                method_name.len() as _,
+                method_name.as_ptr() as _,
+                arguments.len() as _,
+                arguments.as_ptr() as _,
+                &amount as *const u128 as _,
+                gas,
+            )
         }
     }
 }
@@ -177,6 +225,128 @@ impl crate::env::Env for Runtime {
             let data = [0u8; core::mem::size_of::<u128>()];
             exports::attached_deposit(data.as_ptr() as u64);
             u128::from_le_bytes(data)
+        }
+    }
+}
+
+impl crate::promise::PromiseHandler for Runtime {
+    fn promise_results_count(&self) -> u64 {
+        unsafe { exports::promise_results_count() }
+    }
+
+    fn promise_result(&self, index: u64) -> Option<PromiseResult> {
+        unsafe {
+            match exports::promise_result(index, Self::PROMISE_REGISTER_ID.0) {
+                0 => Some(PromiseResult::NotReady),
+                1 => {
+                    let bytes = Self::PROMISE_REGISTER_ID.to_vec();
+                    Some(PromiseResult::Successful(bytes))
+                }
+                2 => Some(PromiseResult::Failed),
+                _ => None,
+            }
+        }
+    }
+
+    fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
+        let account_id = args.target_account_id.as_bytes();
+        let method_name = args.method.as_bytes();
+        let arguments = args.args.as_slice();
+        let amount = args.attached_balance;
+        let gas = args.attached_gas;
+
+        let id = unsafe {
+            exports::promise_create(
+                account_id.len() as _,
+                account_id.as_ptr() as _,
+                method_name.len() as _,
+                method_name.as_ptr() as _,
+                arguments.len() as _,
+                arguments.as_ptr() as _,
+                &amount as *const u128 as _,
+                gas,
+            )
+        };
+        PromiseId::new(id)
+    }
+
+    fn promise_attach_callback(
+        &mut self,
+        base: PromiseId,
+        callback: &PromiseCreateArgs,
+    ) -> PromiseId {
+        let account_id = callback.target_account_id.as_bytes();
+        let method_name = callback.method.as_bytes();
+        let arguments = callback.args.as_slice();
+        let amount = callback.attached_balance;
+        let gas = callback.attached_gas;
+
+        let id = unsafe {
+            exports::promise_then(
+                base.raw(),
+                account_id.len() as _,
+                account_id.as_ptr() as _,
+                method_name.len() as _,
+                method_name.as_ptr() as _,
+                arguments.len() as _,
+                arguments.as_ptr() as _,
+                &amount as *const u128 as _,
+                gas,
+            )
+        };
+
+        PromiseId::new(id)
+    }
+
+    fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
+        let account_id = args.target_account_id.as_bytes();
+
+        let id = unsafe {
+            exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _)
+        };
+
+        for action in args.actions.iter() {
+            match action {
+                PromiseAction::Transfer { amount } => unsafe {
+                    let amount = *amount;
+                    exports::promise_batch_action_transfer(id, &amount as *const u128 as _);
+                },
+                PromiseAction::DeployConotract { code } => unsafe {
+                    let code = code.as_slice();
+                    exports::promise_batch_action_deploy_contract(
+                        id,
+                        code.len() as _,
+                        code.as_ptr() as _,
+                    );
+                },
+                PromiseAction::FunctionCall {
+                    name,
+                    gas,
+                    attached_yocto,
+                    args,
+                } => unsafe {
+                    let method_name = name.as_bytes();
+                    let arguments = args.as_slice();
+                    let amount = *attached_yocto;
+                    exports::promise_batch_action_function_call(
+                        id,
+                        method_name.len() as _,
+                        method_name.as_ptr() as _,
+                        arguments.len() as _,
+                        arguments.as_ptr() as _,
+                        &amount as *const u128 as _,
+                        *gas,
+                    )
+                },
+            }
+        }
+
+        PromiseId::new(id)
+    }
+
+    fn promise_return(&mut self, promise: PromiseId) {
+        unsafe {
+            exports::promise_return(promise.raw());
         }
     }
 }
