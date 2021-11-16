@@ -503,7 +503,7 @@ mod tests {
 
     #[test]
     fn test_call_args_deserialize() {
-        let new_input = FunctionCallArgs{
+        let new_input = FunctionCallArgs {
             contract: [0u8; 20],
             value: WeiU256::default(),
             input: Vec::new(),
@@ -529,7 +529,7 @@ mod tests {
 
         // Parsing bytes in an old input format - raw data structure (not wrapped into call args enum) with legacy arguments,
         // made for backward compatibility.
- 
+
         // Using old input format (not wrapped into call args enum) - raw data structure with legacy arguments.
         let input_bytes = legacy_input.try_to_vec().unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);

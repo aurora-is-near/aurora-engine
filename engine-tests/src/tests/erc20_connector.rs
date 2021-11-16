@@ -391,7 +391,9 @@ mod sim_tests {
     use crate::test_utils::erc20::{ERC20Constructor, ERC20};
     use crate::test_utils::exit_precompile::TesterConstructor;
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
-    use aurora_engine::parameters::{DeployErc20TokenArgs, CallArgs, FunctionCallArgs, SubmitResult};
+    use aurora_engine::parameters::{
+        CallArgs, DeployErc20TokenArgs, FunctionCallArgs, SubmitResult,
+    };
     use borsh::BorshSerialize;
     use near_sdk_sim::UserAccount;
     use serde_json::json;
