@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use aurora_engine::engine::{Engine, EngineState};
+use aurora_engine::engine::{self, EngineState};
 use aurora_engine_sdk::near_runtime::Runtime;
 use aurora_engine_sdk::io::{IO, StorageIntermediate};
 use aurora_engine_types::storage;
@@ -18,7 +18,7 @@ struct NewFancyState {
 #[no_mangle]
 pub extern "C" fn state_migration() {
     let mut io = Runtime;
-    let old_state = match Engine::get_state(&io) {
+    let old_state = match engine::get_state(&io) {
         Ok(state) => state,
         Err(e) => aurora_engine_sdk::panic_utf8(e.as_ref()),
     };

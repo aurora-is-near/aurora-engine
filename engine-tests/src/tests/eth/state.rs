@@ -3,10 +3,10 @@
 use super::ethcore_builtin;
 use super::ethjson::{self, spec::ForkSpec};
 use super::utils::*;
+use crate::prelude::account_id::AccountId;
 use crate::prelude::{H160, H256, U256};
 use crate::test_utils::origin;
 use aurora_engine::engine::Engine;
-use aurora_engine::engine::StackExecutorParams;
 use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::near_runtime::Runtime;
 use evm::backend::{ApplyBackend, MemoryAccount, MemoryBackend, MemoryVicinity};
@@ -123,9 +123,10 @@ pub struct JsonPrecompile;
 impl JsonPrecompile {
     //pub fn precompile(spec: &ForkSpec) -> Option<BTreeMap<H160, PrecompileFn>> {
     pub fn precompile(spec: &ForkSpec) -> Precompiles {
+        let accoubt_id = AccountId::new("aurora").unwrap();
         match spec {
             ForkSpec::Istanbul => {
-                Precompiles::new_istanbul()
+                Precompiles::new_istanbul(accoubt_id)
                 /*let mut map = BTreeMap::new();
                 precompile_entry!(map, ISTANBUL_BUILTINS, 1);
                 precompile_entry!(map, ISTANBUL_BUILTINS, 2);
@@ -139,7 +140,7 @@ impl JsonPrecompile {
                 Some(map)*/
             }
             ForkSpec::Berlin => {
-                Precompiles::new_berlin()
+                Precompiles::new_berlin(accoubt_id)
                 /*let mut map = BTreeMap::new();
                 precompile_entry!(map, BERLIN_BUILTINS, 1);
                 precompile_entry!(map, BERLIN_BUILTINS, 2);
@@ -154,7 +155,7 @@ impl JsonPrecompile {
             }
             // precompiles for London and Berlin are the same
             ForkSpec::London => {
-                Precompiles::new_london()
+                Precompiles::new_london(accoubt_id)
                 //Self::precompile(&ForkSpec::Berlin)
             }
             _ => panic!("not supported"),
@@ -222,7 +223,7 @@ pub fn state_test(name: &str, test: Test) {
     child.join().unwrap();
 }
 
-fn init_engine() -> (Engine<Runtime>, StackExecutorParams) {
+/*fn init_engine() -> (Engine<Runtime>, StackExecutorParams) {
     let args = aurora_engine::parameters::NewCallArgs {
         chain_id: aurora_engine_types::types::u256_to_arr(&700.into()),
         owner_id: "owner".parse().unwrap(),
@@ -234,7 +235,7 @@ fn init_engine() -> (Engine<Runtime>, StackExecutorParams) {
     let engine = Engine::new_with_state(state, H160::from([0u8; 20]), io);
     let executor_params = StackExecutorParams::new(u64::MAX);
     (engine, executor_params)
-}
+}*/
 
 fn test_run(name: &str, test: Test) {
     for (spec, states) in &test.0.post_states {

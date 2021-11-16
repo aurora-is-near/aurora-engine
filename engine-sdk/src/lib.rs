@@ -6,6 +6,7 @@
 use crate::prelude::{vec, Address, PromiseResult, Vec, H256, STORAGE_PRICE_PER_BYTE};
 pub use types::keccak;
 
+pub mod env;
 pub mod error;
 pub mod io;
 pub mod near_runtime;
@@ -19,17 +20,6 @@ const ECRECOVER_SIGNATURE_LENGTH: u64 = 64;
 const ECRECOVER_MALLEABILITY_FLAG: u64 = 1;
 
 const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
-
-#[allow(dead_code)]
-pub fn block_timestamp() -> u64 {
-    // NEAR timestamp is in nanoseconds
-    let timestamp_ns = unsafe { exports::block_timestamp() };
-    timestamp_ns / 1_000_000_000 // convert to seconds for Ethereum compatibility
-}
-
-pub fn block_index() -> u64 {
-    unsafe { exports::block_index() }
-}
 
 #[allow(dead_code)]
 pub fn panic() {
@@ -47,35 +37,6 @@ pub fn panic_utf8(bytes: &[u8]) -> ! {
 pub fn log_utf8(bytes: &[u8]) {
     unsafe {
         exports::log_utf8(bytes.len() as u64, bytes.as_ptr() as u64);
-    }
-}
-
-pub fn predecessor_account_id() -> Vec<u8> {
-    unsafe {
-        exports::predecessor_account_id(1);
-        let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
-        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
-        bytes
-    }
-}
-
-#[allow(dead_code)]
-pub fn signer_account_id() -> Vec<u8> {
-    unsafe {
-        exports::signer_account_id(1);
-        let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
-        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
-        bytes
-    }
-}
-
-#[allow(dead_code)]
-pub fn signer_account_pk() -> Vec<u8> {
-    unsafe {
-        exports::signer_account_pk(1);
-        let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
-        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
-        bytes
     }
 }
 
@@ -127,16 +88,6 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
         } else {
             Err(ECRecoverErr)
         }
-    }
-}
-
-/// Returns account id of the current account.
-pub fn current_account_id() -> Vec<u8> {
-    unsafe {
-        exports::current_account_id(1);
-        let bytes: Vec<u8> = vec![0u8; exports::register_len(1) as usize];
-        exports::read_register(1, bytes.as_ptr() as *const u64 as u64);
-        bytes
     }
 }
 
@@ -245,26 +196,6 @@ pub fn promise_result(result_idx: u64) -> PromiseResult {
             _ => panic_utf8(b"ERR_PROMISE_RETURN_CODE"),
         }
     }
-}
-
-pub fn assert_private_call() {
-    assert_eq!(
-        predecessor_account_id(),
-        current_account_id(),
-        "ERR_PRIVATE_CALL"
-    );
-}
-
-pub fn attached_deposit() -> u128 {
-    unsafe {
-        let data = [0u8; core::mem::size_of::<u128>()];
-        exports::attached_deposit(data.as_ptr() as u64);
-        u128::from_le_bytes(data)
-    }
-}
-
-pub fn assert_one_yocto() {
-    assert_eq!(attached_deposit(), 1, "ERR_1YOCTO_ATTACH")
 }
 
 pub fn promise_batch_action_transfer(promise_index: u64, amount: u128) {
