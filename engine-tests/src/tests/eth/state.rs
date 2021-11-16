@@ -1,3 +1,5 @@
+#![allow(unused_imports, unused_macros, dead_code)]
+
 use super::ethcore_builtin;
 use super::ethjson::{self, spec::ForkSpec};
 use super::utils::*;
@@ -119,10 +121,12 @@ macro_rules! precompile_entry {
 pub struct JsonPrecompile;
 
 impl JsonPrecompile {
-    pub fn precompile(spec: &ForkSpec) -> Option<BTreeMap<H160, PrecompileFn>> {
+    //pub fn precompile(spec: &ForkSpec) -> Option<BTreeMap<H160, PrecompileFn>> {
+    pub fn precompile(spec: &ForkSpec) -> Precompiles {
         match spec {
             ForkSpec::Istanbul => {
-                let mut map = BTreeMap::new();
+                Precompiles::new_istanbul()
+                /*let mut map = BTreeMap::new();
                 precompile_entry!(map, ISTANBUL_BUILTINS, 1);
                 precompile_entry!(map, ISTANBUL_BUILTINS, 2);
                 precompile_entry!(map, ISTANBUL_BUILTINS, 3);
@@ -132,10 +136,11 @@ impl JsonPrecompile {
                 precompile_entry!(map, ISTANBUL_BUILTINS, 7);
                 precompile_entry!(map, ISTANBUL_BUILTINS, 8);
                 precompile_entry!(map, ISTANBUL_BUILTINS, 9);
-                Some(map)
+                Some(map)*/
             }
             ForkSpec::Berlin => {
-                let mut map = BTreeMap::new();
+                Precompiles::new_berlin()
+                /*let mut map = BTreeMap::new();
                 precompile_entry!(map, BERLIN_BUILTINS, 1);
                 precompile_entry!(map, BERLIN_BUILTINS, 2);
                 precompile_entry!(map, BERLIN_BUILTINS, 3);
@@ -145,11 +150,14 @@ impl JsonPrecompile {
                 precompile_entry!(map, BERLIN_BUILTINS, 7);
                 precompile_entry!(map, BERLIN_BUILTINS, 8);
                 precompile_entry!(map, BERLIN_BUILTINS, 9);
-                Some(map)
+                Some(map)*/
             }
             // precompiles for London and Berlin are the same
-            ForkSpec::London => Self::precompile(&ForkSpec::Berlin),
-            _ => None,
+            ForkSpec::London => {
+                Precompiles::new_london()
+                //Self::precompile(&ForkSpec::Berlin)
+            }
+            _ => panic!("not supported"),
         }
     }
 
@@ -254,6 +262,7 @@ fn test_run(name: &str, test: Test) {
 
         for (i, state) in states.iter().enumerate() {
             print!("Running {}:{:?}:{} ... ", name, spec, i);
+            flush();
 
             let transaction = test.0.transaction.select(&state.indexes);
             let mut backend = MemoryBackend::new(&vicinity, original_state.clone());
@@ -265,20 +274,19 @@ fn test_run(name: &str, test: Test) {
                 caller_balance,
                 &gasometer_config,
             ) {
-                /*let gas_limit: u64 = transaction.gas_limit.into();
-                let total_fee = vicinity.gas_price * gas_limit;
-                let (backend, executor_params) = init_engine();
-                let mut executor = executor_params.make_executor(&backend);
-                executor.state_mut().deposit(caller, total_fee);
-                executor.state_mut().withdraw(caller, total_fee).unwrap();
-                */
+                // let gas_limit: u64 = transaction.gas_limit.into();
+                // let total_fee = vicinity.gas_price * gas_limit;
+                // let (backend, executor_params) = init_engine();
+                // let mut executor = executor_params.make_executor(&backend);
+                // executor.state_mut().deposit(caller, total_fee);
+                // executor.state_mut().withdraw(caller, total_fee).unwrap();
+
                 let gas_limit: u64 = transaction.gas_limit.into();
                 let data: Vec<u8> = transaction.data.into();
                 let metadata =
                     StackSubstateMetadata::new(transaction.gas_limit.into(), &gasometer_config);
                 let executor_state = MemoryStackState::new(metadata, &backend);
-                //let precompile = JsonPrecompile::precompile(spec).unwrap();
-                let precompile = Precompiles::new_london();
+                let precompile = JsonPrecompile::precompile(spec);
                 let mut executor = StackExecutor::new_with_precompiles(
                     executor_state,
                     &gasometer_config,
@@ -391,285 +399,3 @@ fn st_precompiled_contracts() {
 fn st_precompiled_contracts2() {
     run("GeneralStateTests/stPreCompiledContracts2")
 }
-
-/*
-#[test]
-fn st_attack() {
-    run("GeneralStateTests/stAttackTest")
-}
-
-#[test]
-fn st_bad_opcode() {
-    run("GeneralStateTests/stBadOpcode")
-}
-
-#[test]
-fn st_bugs() {
-    run("GeneralStateTests/stBugs")
-}
-
-#[test]
-fn st_chain_id() {
-    run("GeneralStateTests/stChainId")
-}
-
-#[test]
-fn st_code_copy() {
-    run("GeneralStateTests/stCodeCopyTest")
-}
-
-#[test]
-fn st_code_size_limit() {
-    run("GeneralStateTests/stCodeSizeLimit")
-}
-
-#[test]
-#[ignore]
-fn st_create2() {
-    run("GeneralStateTests/stCreate2")
-}
-
-#[test]
-fn st_create() {
-    run("GeneralStateTests/stCreateTest")
-}
-
-#[test]
-fn st_eip150_single_code_gas_prices() {
-    run("GeneralStateTests/stEIP150singleCodeGasPrices")
-}
-
-#[test]
-fn st_eip150_specific() {
-    run("GeneralStateTests/stEIP150Specific")
-}
-
-#[test]
-fn st_eip158_specific() {
-    run("GeneralStateTests/stEIP158Specific")
-}
-
-#[test]
-fn st_example() {
-    run("GeneralStateTests/stExample")
-}
-
-#[test]
-fn st_ext_code_hash() {
-    run("GeneralStateTests/stExtCodeHash")
-}
-
-#[test]
-fn st_homestead_specific() {
-    run("GeneralStateTests/stHomesteadSpecific")
-}
-
-#[test]
-fn st_init_code() {
-    run("GeneralStateTests/stInitCodeTest")
-}
-
-#[test]
-fn st_log() {
-    run("GeneralStateTests/stLogTests")
-}
-
-#[test]
-fn st_mem_expanding_eip_150_calls() {
-    run("GeneralStateTests/stMemExpandingEIP150Calls")
-}
-
-#[test]
-fn st_memory_stress() {
-    run("GeneralStateTests/stMemoryStressTest")
-}
-
-#[test]
-fn st_memory() {
-    run("GeneralStateTests/stMemoryTest")
-}
-
-#[test]
-fn st_non_zero_calls() {
-    run("GeneralStateTests/stNonZeroCallsTest")
-}
-
-#[test]
-#[ignore]
-fn st_precompiled_contracts2() {
-    run("GeneralStateTests/stPreCompiledContracts2")
-}
-
-#[test]
-#[ignore]
-fn st_quadratic_complexity() {
-    run("GeneralStateTests/stQuadraticComplexityTest")
-}
-
-#[test]
-fn st_refund() {
-    run("GeneralStateTests/stRefundTest")
-}
-
-#[test]
-#[ignore]
-fn st_revert() {
-    run("GeneralStateTests/stRevertTest")
-}
-
-#[test]
-fn st_self_balance() {
-    run("GeneralStateTests/stSelfBalance")
-}
-
-#[test]
-fn st_shift() {
-    run("GeneralStateTests/stShift")
-}
-
-#[test]
-fn st_sload() {
-    run("GeneralStateTests/stSLoadTest")
-}
-
-#[test]
-#[ignore]
-fn st_special() {
-    run("GeneralStateTests/stSpecialTest")
-}
-
-// Some of the collison test in sstore conflicts with evm's internal
-// handlings. Those situations will never happen on a production chain (an empty
-// account with storage values), so we can safely ignore them.
-#[test]
-#[ignore]
-fn st_sstore() {
-    run("GeneralStateTests/stSStoreTest")
-}
-
-#[test]
-fn st_stack() {
-    run("GeneralStateTests/stStackTests")
-}
-
-#[test]
-#[ignore]
-fn st_static_call() {
-    run("GeneralStateTests/stStaticCall")
-}
-
-#[test]
-fn st_transaction() {
-    run("GeneralStateTests/stTransactionTest")
-}
-
-#[test]
-fn st_transition() {
-    run("GeneralStateTests/stTransitionTest")
-}
-
-#[test]
-fn st_wallet() {
-    run("GeneralStateTests/stWalletTest")
-}
-
-#[test]
-fn st_zero_calls_revert() {
-    run("GeneralStateTests/stZeroCallsRevert");
-}
-
-#[test]
-fn st_zero_calls() {
-    run("GeneralStateTests/stZeroCallsTest")
-}
-
-#[test]
-#[ignore]
-fn st_call_delegate_codes_call_code_homestead() {
-    run("GeneralStateTests/stCallDelegateCodesCallCodeHomestead")
-}
-
-#[test]
-#[ignore]
-fn st_call_delegate_codes_homestead() {
-    run("GeneralStateTests/stCallDelegateCodesHomestead")
-}
-
-#[test]
-#[ignore]
-fn st_changed_eip150() {
-    run("GeneralStateTests/stChangedEIP150")
-}
-
-#[test]
-#[ignore]
-fn st_random() {
-    run("GeneralStateTests/stRandom")
-}
-
-#[test]
-#[ignore]
-fn st_precompiled_contracts() {
-    run("GeneralStateTests/stPreCompiledContracts")
-}
-
-#[test]
-#[ignore]
-fn st_zero_knowledge() {
-    run("GeneralStateTests/stZeroKnowledge")
-}
-
-#[test]
-#[ignore]
-fn st_zero_knowledge2() {
-    run("GeneralStateTests/stZeroKnowledge2")
-}
-
-#[test]
-#[ignore]
-fn st_random2() {
-    run("GeneralStateTests/stRandom2")
-}
-
-#[test]
-#[ignore]
-fn st_recursive_create() {
-    run("GeneralStateTests/stRecursiveCreate")
-}
-
-#[test]
-#[ignore]
-fn st_return_data() {
-    run("GeneralStateTests/stReturnDataTest")
-}
-
-#[test]
-#[ignore]
-fn st_delegate_call_homestead() {
-    run("GeneralStateTests/stDelegatecallTestHomestead")
-}
-
-#[test]
-#[ignore]
-fn st_call_create_call_code() {
-    run("GeneralStateTests/stCallCreateCallCodeTest")
-}
-
-#[test]
-#[ignore]
-fn st_call_code() {
-    run("GeneralStateTests/stCallCodes")
-}
-
-#[test]
-#[ignore]
-fn st_system_operations() {
-    run("GeneralStateTests/stSystemOperationsTest")
-}
-
-#[test]
-#[ignore]
-fn st_solidity() {
-    run("GeneralStateTests/stSolidityTest")
-}
-*/
