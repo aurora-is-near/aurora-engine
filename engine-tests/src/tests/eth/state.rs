@@ -2,6 +2,11 @@ use super::ethcore_builtin;
 use super::ethjson::{self, spec::ForkSpec};
 use super::utils::*;
 use crate::prelude::{H160, H256, U256};
+use crate::test_utils::origin;
+use aurora_engine::engine::Engine;
+use aurora_engine::engine::StackExecutorParams;
+use aurora_engine_precompiles::Precompiles;
+use aurora_engine_sdk::near_runtime::Runtime;
 use evm::backend::{ApplyBackend, MemoryAccount, MemoryBackend, MemoryVicinity};
 use evm::executor::{
     MemoryStackState, PrecompileFailure, PrecompileFn, PrecompileOutput, StackExecutor,
@@ -209,6 +214,20 @@ pub fn state_test(name: &str, test: Test) {
     child.join().unwrap();
 }
 
+fn init_engine() -> (Engine<Runtime>, StackExecutorParams) {
+    let args = aurora_engine::parameters::NewCallArgs {
+        chain_id: aurora_engine_types::types::u256_to_arr(&700.into()),
+        owner_id: "owner".parse().unwrap(),
+        bridge_prover_id: "bridge.prover".parse().unwrap(),
+        upgrade_delay_blocks: 1,
+    };
+    let state: aurora_engine::engine::EngineState = args.into();
+    let io = Runtime;
+    let engine = Engine::new_with_state(state, H160::from([0u8; 20]), io);
+    let executor_params = StackExecutorParams::new(u64::MAX);
+    (engine, executor_params)
+}
+
 fn test_run(name: &str, test: Test) {
     for (spec, states) in &test.0.post_states {
         let (gasometer_config, delete_empty) = match spec {
@@ -246,12 +265,20 @@ fn test_run(name: &str, test: Test) {
                 caller_balance,
                 &gasometer_config,
             ) {
+                /*let gas_limit: u64 = transaction.gas_limit.into();
+                let total_fee = vicinity.gas_price * gas_limit;
+                let (backend, executor_params) = init_engine();
+                let mut executor = executor_params.make_executor(&backend);
+                executor.state_mut().deposit(caller, total_fee);
+                executor.state_mut().withdraw(caller, total_fee).unwrap();
+                */
                 let gas_limit: u64 = transaction.gas_limit.into();
                 let data: Vec<u8> = transaction.data.into();
                 let metadata =
                     StackSubstateMetadata::new(transaction.gas_limit.into(), &gasometer_config);
                 let executor_state = MemoryStackState::new(metadata, &backend);
-                let precompile = JsonPrecompile::precompile(spec).unwrap();
+                //let precompile = JsonPrecompile::precompile(spec).unwrap();
+                let precompile = Precompiles::new_london();
                 let mut executor = StackExecutor::new_with_precompiles(
                     executor_state,
                     &gasometer_config,
@@ -350,157 +377,19 @@ pub fn run(dir: &str) {
     }
 }
 
-/*use super::ethjson;
-use super::utils::*;
-use crate::prelude::{H160, H256, U256};
-use aurora_engine_precompiles::Precompiles;
-use evm::backend::ApplyBackend;
-use evm::backend::{MemoryAccount, MemoryBackend, MemoryVicinity};
-use evm::executor::{MemoryStackState, StackExecutor, StackSubstateMetadata};
-use evm::{Config, ExitError};
-use parity_crypto::publickey;
-use serde::Deserialize;
-use std::collections::{BTreeMap, HashMap};
-use std::io::BufReader;
-
-#[derive(Deserialize, Debug)]
-pub struct Test(ethjson::test_helpers::state::State);
-
-impl Test {
-    #[allow(dead_code)]
-    pub fn unwrap_to_pre_state(&self) -> BTreeMap<H160, MemoryAccount> {
-        unwrap_to_state(&self.0.pre_state)
-    }
-
-    #[allow(dead_code)]
-    pub fn unwrap_caller(&self) -> H160 {
-        let secret_key: H256 = self.0.transaction.secret.clone().unwrap().into();
-        let secret = publickey::Secret::import_key(&secret_key[..]).unwrap();
-        let public = publickey::KeyPair::from_secret(secret)
-            .unwrap()
-            .public()
-            .clone();
-        let sender = publickey::public_to_address(&public);
-        H160::from(sender.0)
-    }
-
-    #[allow(dead_code)]
-    pub fn unwrap_to_vicinity(&self) -> MemoryVicinity {
-        MemoryVicinity {
-            gas_price: self.0.transaction.gas_price.clone().into(),
-            origin: self.unwrap_caller(),
-            block_hashes: Vec::new(),
-            block_number: self.0.env.number.clone().into(),
-            block_coinbase: self.0.env.author.clone().into(),
-            block_timestamp: self.0.env.timestamp.clone().into(),
-            block_difficulty: self.0.env.difficulty.clone().into(),
-            block_gas_limit: self.0.env.gas_limit.clone().into(),
-            chain_id: U256::one(),
-        }
-    }
-}
-
-/// Matches the address given to Homestead precompiles.
-impl<'backend, 'config, B> evm::executor::Precompiles<MemoryStackState<'backend, 'config, B>>
-    for Precompiles
-{
-    fn run(
-        &self,
-        address: H160,
-        input: &[u8],
-        target_gas: Option<u64>,
-        context: &evm::Context,
-        _state: &mut MemoryStackState<B>,
-        is_static: bool,
-    ) -> Option<Result<evm::executor::PrecompileOutput, ExitError>> {
-        let target_gas = match target_gas {
-            Some(t) => t,
-            None => return Some(Err(ExitError::OutOfGas)),
-        };
-
-        let output = self
-            .get_fun(&address)
-            .map(|fun| (fun)(input, target_gas, context, is_static));
-
-        output.map(|res| res.map(Into::into))
-    }
-
-    fn addresses(&self) -> &[H160] {
-        &self.addresses
-    }
-}
-
-pub fn state_test(name: &str, eth_test: Test) {
-    print!("Running test {} ... ", name);
-    for (spec, states) in &eth_test.0.post_states {
-        let (gasometer_config, delete_empty) = match spec {
-            ethjson::spec::ForkSpec::Istanbul => (Config::istanbul(), true),
-            spec => {
-                println!("Skip spec {:?}", spec);
-                continue;
-            }
-        };
-
-        let original_state = eth_test.unwrap_to_pre_state();
-        let vicinity = eth_test.unwrap_to_vicinity();
-        let caller = eth_test.unwrap_caller();
-
-        for (i, state) in states.iter().enumerate() {
-            print!("Running {}:{:?}:{} ... ", name, spec, i);
-
-            let transaction = eth_test.0.transaction.select(&state.indexes);
-            let gas_limit: u64 = transaction.gas_limit.into();
-            let data: Vec<u8> = transaction.data.into();
-
-            let mut backend = MemoryBackend::new(&vicinity, original_state.clone());
-            let metadata = StackSubstateMetadata::new(gas_limit, &gasometer_config);
-            let executor_state = MemoryStackState::new(metadata, &backend);
-            let precompile = Precompiles::new_istanbul();
-
-            let total_fee = vicinity.gas_price * gas_limit;
-            let mut executor =
-                StackExecutor::new_with_precompile(executor_state, &gasometer_config, precompile);
-            executor.state_mut().withdraw(caller, total_fee).unwrap();
-
-            match transaction.to {
-                ethjson::maybe::MaybeEmpty::Some(to) => {
-                    let data = data;
-                    let value = transaction.value.into();
-
-                    let _reason = executor.transact_call(
-                        caller,
-                        to.clone().into(),
-                        value,
-                        data,
-                        gas_limit,
-                        vec![],
-                    );
-                }
-                ethjson::maybe::MaybeEmpty::None => {
-                    let code = data;
-                    let value = transaction.value.into();
-
-                    let _reason = executor.transact_create(caller, value, code, gas_limit, vec![]);
-                }
-            }
-            let actual_fee = executor.fee(vicinity.gas_price);
-            executor
-                .state_mut()
-                .deposit(vicinity.block_coinbase, actual_fee);
-            executor.state_mut().deposit(caller, total_fee - actual_fee);
-            let (values, logs) = executor.into_state().deconstruct();
-            backend.apply(values, logs, delete_empty);
-            assert_valid_hash(&state.hash.0, backend.state());
-
-            println!("passed");
-        }
-    }
-}
-*/
-
 #[test]
 fn st_args_zero_one_balance() {
     run("GeneralStateTests/stArgsZeroOneBalance")
+}
+
+#[test]
+fn st_precompiled_contracts() {
+    run("GeneralStateTests/stPreCompiledContracts")
+}
+
+#[test]
+fn st_precompiled_contracts2() {
+    run("GeneralStateTests/stPreCompiledContracts2")
 }
 
 /*

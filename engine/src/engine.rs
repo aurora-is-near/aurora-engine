@@ -260,20 +260,20 @@ impl AsRef<[u8]> for EngineStateError {
     }
 }
 
-struct StackExecutorParams {
+pub struct StackExecutorParams {
     precompiles: Precompiles,
     gas_limit: u64,
 }
 
 impl StackExecutorParams {
-    fn new(gas_limit: u64) -> Self {
+    pub fn new(gas_limit: u64) -> Self {
         Self {
             precompiles: Precompiles::new_london(),
             gas_limit,
         }
     }
 
-    fn make_executor<'a, I: IO + Default + Copy>(
+    pub fn make_executor<'a, I: IO + Default + Copy>(
         &'a self,
         engine: &'a Engine<I>,
     ) -> executor::StackExecutor<'static, 'a, executor::MemoryStackState<Engine<I>>, Precompiles>
