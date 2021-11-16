@@ -470,7 +470,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         Ok(SubmitResult::new(status, used_gas, logs))
     }
 
-    /// Call the EVM contract with arguments (attached ETH balance, input, gas limit, etc.)
+    /// Call the EVM contract with arguments
     pub fn call_with_args(&mut self, args: CallArgs) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         match args {

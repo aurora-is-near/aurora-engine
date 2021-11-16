@@ -72,11 +72,11 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        CallArgs, DeployErc20TokenArgs, FunctionCallArgs, FunctionCallArgsLegacy,
-        GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
-        NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs, ResolveTransferCallArgs,
-        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitResult,
-        TransactionStatus, TransferCallCallArgs, ViewCallArgs,
+        CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs,
+        IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs,
+        ResolveTransferCallArgs, SetContractDataCallArgs, StorageDepositCallArgs,
+        StorageWithdrawCallArgs, SubmitResult, TransactionStatus, TransferCallCallArgs,
+        ViewCallArgs,
     };
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -220,31 +220,19 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn call() {
         let io = Runtime;
-        let bytes = io.read_input();
-        let args: Option<CallArgs> = {
-            if let Ok(value) = bytes.to_value::<FunctionCallArgs>() {
-                Some(CallArgs::New(value))
-            } else if let Ok(value) = bytes.to_value::<FunctionCallArgsLegacy>() {
-                Some(CallArgs::Legacy(value))
-            } else {
-                None
-            }
-        };
+        let bytes = io.read_input().to_vec();
+        let args = CallArgs::deserialize(&bytes).sdk_expect("ERR_BORSH_DESERIALIZE");
         let current_account_id = io.current_account_id();
-        if let Some(args) = args {
-            let mut engine = Engine::new(
-                predecessor_address(&io.predecessor_account_id()),
-                current_account_id,
-                io,
-                &io,
-            )
-            .sdk_unwrap();
-            Engine::call_with_args(&mut engine, args)
-                .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-                .sdk_process();
-        } else {
-            sdk::panic_utf8("ERR_BORSH_DESERIALIZE".as_bytes());
-        }
+        let mut engine = Engine::new(
+            predecessor_address(&io.predecessor_account_id()),
+            current_account_id,
+            io,
+            &io,
+        )
+        .sdk_unwrap();
+        Engine::call_with_args(&mut engine, args)
+            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .sdk_process();
         // TODO: charge for storage
     }
 

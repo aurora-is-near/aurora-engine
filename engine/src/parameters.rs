@@ -154,6 +154,18 @@ pub enum CallArgs {
     Legacy(FunctionCallArgsLegacy),
 }
 
+impl CallArgs {
+    pub fn deserialize(bytes: &[u8]) -> Option<Self> {
+        if let Ok(value) = FunctionCallArgs::try_from_slice(bytes) {
+            Some(Self::New(value))
+        } else if let Ok(value) = FunctionCallArgsLegacy::try_from_slice(bytes) {
+            Some(Self::Legacy(value))
+        } else {
+            None
+        }
+    }
+}
+
 /// Borsh-encoded parameters for the `view` function.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
 pub struct ViewCallArgs {
