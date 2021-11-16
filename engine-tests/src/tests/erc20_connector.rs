@@ -1,7 +1,7 @@
 use crate::prelude::{Address, Balance, RawAddress, TryInto, Wei, WeiU256, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
-use aurora_engine::parameters::{FunctionCallArgs, SubmitResult};
+use aurora_engine::parameters::{CallArgs, FunctionCallArgs, SubmitResult};
 use aurora_engine::transaction::legacy::LegacyEthSignedTransaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
@@ -95,7 +95,7 @@ impl test_utils::AuroraRunner {
         self.make_call(
             "call",
             origin,
-            (FunctionCallArgs {
+            CallArgs::New(FunctionCallArgs {
                 contract,
                 value: WeiU256::default(),
                 input,
@@ -391,7 +391,7 @@ mod sim_tests {
     use crate::test_utils::erc20::{ERC20Constructor, ERC20};
     use crate::test_utils::exit_precompile::TesterConstructor;
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
-    use aurora_engine::parameters::{DeployErc20TokenArgs, FunctionCallArgs, SubmitResult};
+    use aurora_engine::parameters::{DeployErc20TokenArgs, CallArgs, FunctionCallArgs, SubmitResult};
     use borsh::BorshSerialize;
     use near_sdk_sim::UserAccount;
     use serde_json::json;
@@ -711,11 +711,11 @@ mod sim_tests {
                 ethabi::Token::Uint(amount.into()),
             ],
         );
-        let call_args = FunctionCallArgs {
+        let call_args = CallArgs::New(FunctionCallArgs {
             contract: erc20.0.address.0,
             value: WeiU256::default(),
             input,
-        };
+        });
         source
             .call(
                 aurora.contract.account_id(),
@@ -751,11 +751,11 @@ mod sim_tests {
             .assert_success();
 
         let mint_tx = erc20.mint(dest, amount.into(), 0.into());
-        let call_args = FunctionCallArgs {
+        let call_args = CallArgs::New(FunctionCallArgs {
             contract: erc20.0.address.0,
             value: WeiU256::default(),
             input: mint_tx.data,
-        };
+        });
         aurora
             .contract
             .call(
@@ -782,11 +782,11 @@ mod sim_tests {
 
     fn erc20_balance(erc20: &ERC20, address: Address, aurora: &AuroraAccount) -> U256 {
         let balance_tx = erc20.balance_of(address, 0.into());
-        let call_args = FunctionCallArgs {
+        let call_args = CallArgs::New(FunctionCallArgs {
             contract: erc20.0.address.0,
             value: WeiU256::default(),
             input: balance_tx.data,
-        };
+        });
         let result = aurora.call("call", &call_args.try_to_vec().unwrap());
         let submit_result: SubmitResult = result.unwrap_borsh();
         U256::from_big_endian(&test_utils::unwrap_success(submit_result))
