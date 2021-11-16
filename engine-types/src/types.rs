@@ -18,27 +18,26 @@ pub type WeiU256 = [u8; 32];
 pub const ERC20_MINT_SELECTOR: &[u8] = &[64, 193, 15, 25];
 
 #[derive(Debug)]
-pub enum ValidationError {
-    EthAddressFailedDecode,
-    WrongEthAddress,
+pub enum AddressValidationError {
+    FailedDecodeHex,
+    IncorrectLength,
 }
 
-impl AsRef<[u8]> for ValidationError {
+impl AsRef<[u8]> for AddressValidationError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::EthAddressFailedDecode => b"FAILED_DECODE_ETH_ADDRESS",
-            Self::WrongEthAddress => b"WRONG_ETH_ADDRESS",
+            Self::FailedDecodeHex => b"FAILED_DECODE_ETH_ADDRESS",
+            Self::IncorrectLength => b"ETH_WRONG_ADDRESS_LENGTH",
         }
     }
 }
 
 /// Validate Etherium address from string and return EthAddress
-pub fn validate_eth_address(address: String) -> Result<EthAddress, ValidationError> {
-    let data = hex::decode(address).map_err(|_| ValidationError::EthAddressFailedDecode)?;
+pub fn validate_eth_address(address: String) -> Result<EthAddress, AddressValidationError> {
+    let data = hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
     if data.len() != 20 {
-        return Err(ValidationError::WrongEthAddress);
+        return Err(AddressValidationError::IncorrectLength);
     }
-    assert_eq!(data.len(), 20, "ETH_WRONG_ADDRESS_LENGTH");
     let mut result = [0u8; 20];
     result.copy_from_slice(&data);
     Ok(result)

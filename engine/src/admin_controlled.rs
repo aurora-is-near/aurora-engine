@@ -16,8 +16,19 @@ pub trait AdminControlled {
         (self.get_paused() & flag) != 0 && !is_owner
     }
 
-    /// Asserts the passed paused flag is not set. Panics with "ERR_PAUSED" if the flag is set.
-    fn assert_not_paused(&self, flag: PausedMask, is_owner: bool) {
-        assert!(!self.is_paused(flag, is_owner), "{}", ERR_PAUSED);
+    /// Asserts the passed paused flag is not set. Returns `PausedError` if paused.
+    fn assert_not_paused(&self, flag: PausedMask, is_owner: bool) -> Result<(), PausedError> {
+        if self.is_paused(flag, is_owner) {
+            Err(PausedError)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub struct PausedError;
+impl AsRef<[u8]> for PausedError {
+    fn as_ref(&self) -> &[u8] {
+        ERR_PAUSED.as_bytes()
     }
 }

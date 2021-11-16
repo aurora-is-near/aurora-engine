@@ -4,7 +4,7 @@ use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     format, Balance, BorshDeserialize, BorshSerialize, EthAddress, RawAddress, RawH256, RawU256,
-    SdkUnwrap, String, ToString, TryFrom, Vec, WeiU256,
+    String, ToString, TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
 use evm::backend::Log;
@@ -364,14 +364,20 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
-impl From<JsonValue> for TransferCallCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            receiver_id: AccountId::try_from(v.string("receiver_id").sdk_unwrap()).sdk_unwrap(),
-            amount: v.u128("amount").sdk_unwrap(),
-            memo: v.string("memo").ok(),
-            msg: v.string("msg").sdk_unwrap(),
-        }
+impl TryFrom<JsonValue> for TransferCallCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, error::ParseTypeFromJsonError> {
+        let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
+        let amount = v.u128("amount")?;
+        let memo = v.string("memo").ok();
+        let msg = v.string("msg")?;
+        Ok(Self {
+            receiver_id,
+            amount,
+            memo,
+            msg,
+        })
     }
 }
 
@@ -381,11 +387,12 @@ pub struct StorageBalanceOfCallArgs {
     pub account_id: crate::prelude::account_id::AccountId,
 }
 
-impl From<JsonValue> for StorageBalanceOfCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            account_id: AccountId::try_from(v.string("account_id").sdk_unwrap()).sdk_unwrap(),
-        }
+impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, error::ParseTypeFromJsonError> {
+        let account_id = AccountId::try_from(v.string("account_id")?)?;
+        Ok(Self { account_id })
     }
 }
 
@@ -429,13 +436,15 @@ pub struct TransferCallArgs {
     pub memo: Option<String>,
 }
 
-impl From<JsonValue> for TransferCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            receiver_id: AccountId::try_from(v.string("receiver_id").sdk_unwrap()).sdk_unwrap(),
-            amount: v.u128("amount").sdk_unwrap(),
+impl TryFrom<JsonValue> for TransferCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
+        Ok(Self {
+            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
+            amount: v.u128("amount")?,
             memo: v.string("memo").ok(),
-        }
+        })
     }
 }
 
@@ -450,11 +459,13 @@ pub struct BalanceOfEthCallArgs {
     pub address: EthAddress,
 }
 
-impl From<JsonValue> for BalanceOfCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            account_id: AccountId::try_from(v.string("account_id").sdk_unwrap()).sdk_unwrap(),
-        }
+impl TryFrom<JsonValue> for BalanceOfCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
+        Ok(Self {
+            account_id: AccountId::try_from(v.string("account_id")?)?,
+        })
     }
 }
 
@@ -468,12 +479,42 @@ pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,
 }
 
-impl From<JsonValue> for ResolveTransferCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            sender_id: AccountId::try_from(v.string("sender_id").sdk_unwrap()).sdk_unwrap(),
-            receiver_id: AccountId::try_from(v.string("receiver_id").sdk_unwrap()).sdk_unwrap(),
-            amount: v.u128("amount").sdk_unwrap(),
+impl TryFrom<JsonValue> for ResolveTransferCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
+        Ok(Self {
+            sender_id: AccountId::try_from(v.string("sender_id")?)?,
+            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
+            amount: v.u128("amount")?,
+        })
+    }
+}
+
+pub mod error {
+    use crate::json::JsonError;
+    use aurora_engine_types::account_id::ParseAccountError;
+
+    pub enum ParseTypeFromJsonError {
+        Json(JsonError),
+        InvalidAccount(ParseAccountError),
+    }
+    impl From<JsonError> for ParseTypeFromJsonError {
+        fn from(e: JsonError) -> Self {
+            Self::Json(e)
+        }
+    }
+    impl From<ParseAccountError> for ParseTypeFromJsonError {
+        fn from(e: ParseAccountError) -> Self {
+            Self::InvalidAccount(e)
+        }
+    }
+    impl AsRef<[u8]> for ParseTypeFromJsonError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::Json(e) => e.as_ref(),
+                Self::InvalidAccount(e) => e.as_ref(),
+            }
         }
     }
 }

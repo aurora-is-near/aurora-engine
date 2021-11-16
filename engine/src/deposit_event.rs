@@ -15,13 +15,17 @@ pub struct EthEvent {
 #[allow(dead_code)]
 impl EthEvent {
     /// Get Ethereum event from `log_entry_data`
-    pub fn fetch_log_entry_data(name: &str, params: EventParams, data: &[u8]) -> Self {
+    pub fn fetch_log_entry_data(
+        name: &str,
+        params: EventParams,
+        data: &[u8],
+    ) -> Result<Self, error::DecodeError> {
         let event = Event {
             name: name.to_string(),
             inputs: params,
             anonymous: false,
         };
-        let log_entry: LogEntry = rlp::decode(data).expect("INVALID_RLP");
+        let log_entry: LogEntry = rlp::decode(data).map_err(|_| error::DecodeError::RlpFailed)?;
         let eth_custodian_address = log_entry.address.0;
         let topics = log_entry.topics.iter().map(|h| Hash::from(h.0)).collect();
 
@@ -29,12 +33,14 @@ impl EthEvent {
             topics,
             data: log_entry.data,
         };
-        let log = event.parse_log(raw_log).expect("Failed to parse event log");
+        let log = event
+            .parse_log(raw_log)
+            .map_err(|_| error::DecodeError::SchemaMismatch)?;
 
-        Self {
+        Ok(Self {
             eth_custodian_address,
             log,
-        }
+        })
     }
 }
 
@@ -76,31 +82,64 @@ impl DepositedEvent {
     }
 
     /// Parses raw Ethereum logs proof's entry data
-    pub fn from_log_entry_data(data: &[u8]) -> Self {
-        let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data);
+    pub fn from_log_entry_data(data: &[u8]) -> Result<Self, error::ParseError> {
+        let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data)
+            .map_err(error::ParseError::LogParseFailed)?;
         let sender = event.log.params[0]
             .value
             .clone()
             .into_address()
-            .expect("INVALID_SENDER")
+            .ok_or(error::ParseError::InvalidSender)?
             .0;
         let recipient: String = event.log.params[1].value.clone().to_string();
         let amount = event.log.params[2]
             .value
             .clone()
             .into_uint()
-            .expect("INVALID_AMOUNT");
+            .ok_or(error::ParseError::InvalidAmount)?;
         let fee = event.log.params[3]
             .value
             .clone()
             .into_uint()
-            .expect("INVALID_FEE");
-        Self {
+            .ok_or(error::ParseError::InvalidFee)?;
+        Ok(Self {
             eth_custodian_address: event.eth_custodian_address,
             sender,
             recipient,
             amount,
             fee,
+        })
+    }
+}
+
+pub mod error {
+    pub enum DecodeError {
+        RlpFailed,
+        SchemaMismatch,
+    }
+    impl AsRef<[u8]> for DecodeError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::RlpFailed => b"ERR_RLP_FAILED",
+                Self::SchemaMismatch => b"ERR_PARSE_DEPOSIT_EVENT",
+            }
+        }
+    }
+
+    pub enum ParseError {
+        LogParseFailed(DecodeError),
+        InvalidSender,
+        InvalidAmount,
+        InvalidFee,
+    }
+    impl AsRef<[u8]> for ParseError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::LogParseFailed(e) => e.as_ref(),
+                Self::InvalidSender => b"ERR_INVALID_SENDER",
+                Self::InvalidAmount => b"ERR_INVALID_AMOUNT",
+                Self::InvalidFee => b"ERR_INVALID_FEE",
+            }
         }
     }
 }

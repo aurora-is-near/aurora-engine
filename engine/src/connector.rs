@@ -1,20 +1,17 @@
 use crate::admin_controlled::{AdminControlled, PausedMask};
 use crate::deposit_event::DepositedEvent;
 use crate::engine::Engine;
-use crate::fungible_token::{FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
-use crate::json::parse_json;
+use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
     BalanceOfCallArgs, BalanceOfEthCallArgs, FinishDepositCallArgs, InitCallArgs,
     NEP141FtOnTransferArgs, PauseEthConnectorCallArgs, ResolveTransferCallArgs,
     SetContractDataCallArgs, StorageBalanceOfCallArgs, StorageDepositCallArgs,
     StorageWithdrawCallArgs, TransferCallArgs, TransferCallCallArgs, WithdrawResult,
 };
-use crate::prelude::sdk::types::{ExpectUtf8, SdkUnwrap};
 use crate::prelude::{
     format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
     BorshSerialize, EthAddress, EthConnectorStorageId, Gas, KeyPrefix, PromiseResult, String,
-    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, ERR_INVALID_ETH_ADDRESS, H160,
-    U256,
+    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160, U256,
 };
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
@@ -22,6 +19,7 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::parameters::{
     PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
 };
+use aurora_engine_types::types::AddressValidationError;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 pub const NO_DEPOSIT: Balance = 0;
@@ -68,45 +66,38 @@ pub struct OnTransferMessageData {
 impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn get_instance(io: I) -> Self {
         Self {
-            contract: Self::get_contract_data(&io, &EthConnectorStorageId::Contract),
-            ft: Self::get_contract_data::<FungibleToken>(
-                &io,
-                &EthConnectorStorageId::FungibleToken,
-            )
-            .ops(io),
-            paused_mask: Self::get_contract_data(&io, &EthConnectorStorageId::PausedMask),
+            contract: get_contract_data(&io, &EthConnectorStorageId::Contract),
+            ft: get_contract_data::<FungibleToken, I>(&io, &EthConnectorStorageId::FungibleToken)
+                .ops(io),
+            paused_mask: get_contract_data(&io, &EthConnectorStorageId::PausedMask),
             io,
         }
     }
 
-    fn get_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
-        crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
-    }
-
-    fn get_contract_data<T: BorshDeserialize>(io: &I, suffix: &EthConnectorStorageId) -> T {
-        io.read_storage(&Self::get_contract_key(suffix))
-            .expect("Failed read storage")
-            .to_value()
-            .unwrap()
-    }
-
     /// Init eth-connector contract specific data
-    pub fn init_contract(mut io: I, owner_id: AccountId, args: InitCallArgs) {
+    pub fn init_contract(
+        mut io: I,
+        owner_id: AccountId,
+        args: InitCallArgs,
+    ) -> Result<(), error::InitContractError> {
         // Check is it already initialized
-        assert!(
-            !io.storage_has_key(&Self::get_contract_key(&EthConnectorStorageId::Contract)),
-            "ERR_CONTRACT_INITIALIZED"
-        );
+        let contract_key_exists =
+            io.storage_has_key(&construct_contract_key(&EthConnectorStorageId::Contract));
+        if contract_key_exists {
+            return Err(error::InitContractError::AlreadyInitialized);
+        }
+
         sdk::log!("[init contract]");
 
-        let contract_data = Self::set_contract_data(
+        let contract_data = set_contract_data(
             &mut io,
             SetContractDataCallArgs {
                 prover_account: args.prover_account,
                 eth_custodian_address: args.eth_custodian_address,
                 metadata: args.metadata,
             },
-        );
+        )
+        .map_err(error::InitContractError::InvalidCustodianAddress)?;
 
         let mut ft = FungibleTokenOps::new(io);
         // Register FT account for current contract
@@ -114,7 +105,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         let paused_mask = UNPAUSE_ALL;
         io.write_borsh(
-            &Self::get_contract_key(&EthConnectorStorageId::PausedMask),
+            &construct_contract_key(&EthConnectorStorageId::PausedMask),
             &paused_mask,
         );
 
@@ -125,85 +116,82 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             io,
         }
         .save_ft_contract();
-    }
 
-    /// Sets the contract data and returns it back
-    pub fn set_contract_data(io: &mut I, args: SetContractDataCallArgs) -> EthConnector {
-        // Get initial contract arguments
-        let contract_data = EthConnector {
-            prover_account: args.prover_account,
-            eth_custodian_address: validate_eth_address(args.eth_custodian_address).sdk_unwrap(),
-        };
-        // Save eth-connector specific data
-        io.write_borsh(
-            &Self::get_contract_key(&EthConnectorStorageId::Contract),
-            &contract_data,
-        );
-
-        io.write_borsh(
-            &Self::get_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
-            &args.metadata,
-        );
-
-        contract_data
+        Ok(())
     }
 
     /// Parse event message data for tokens
-    fn parse_event_message(&self, message: &str) -> TokenMessageData {
+    fn parse_event_message(
+        &self,
+        message: &str,
+    ) -> Result<TokenMessageData, error::ParseEventMessageError> {
         let data: Vec<_> = message.split(':').collect();
-        assert!(data.len() < 3);
-        let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
+        if data.len() >= 3 {
+            return Err(error::ParseEventMessageError::TooManyParts);
+        }
+        let account_id = AccountId::try_from(data[0].as_bytes())
+            .map_err(|_| error::ParseEventMessageError::InvalidAccount)?;
         if data.len() == 1 {
-            TokenMessageData::Near(account_id)
+            Ok(TokenMessageData::Near(account_id))
         } else {
-            TokenMessageData::Eth {
+            Ok(TokenMessageData::Eth {
                 receiver_id: account_id,
                 message: data[1].into(),
-            }
+            })
         }
     }
 
     /// Get on-transfer data from message
-    fn parse_on_transfer_message(&self, message: &str) -> OnTransferMessageData {
+    fn parse_on_transfer_message(
+        &self,
+        message: &str,
+    ) -> Result<OnTransferMessageData, error::ParseOnTransferMessageError> {
         let data: Vec<_> = message.split(':').collect();
-        assert_eq!(data.len(), 2);
+        if data.len() != 2 {
+            return Err(error::ParseOnTransferMessageError::TooManyParts);
+        }
 
-        let msg = hex::decode(data[1]).expect(ERR_FAILED_PARSE);
+        let msg =
+            hex::decode(data[1]).map_err(|_| error::ParseOnTransferMessageError::InvalidHexData)?;
         let mut fee: [u8; 32] = Default::default();
-        assert_eq!(msg.len(), 52, "ERR_WRONG_MESSAGE_LENGTH");
+        if msg.len() != 52 {
+            return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
+        }
         fee.copy_from_slice(&msg[..32]);
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
         // Check account
-        let account_id = AccountId::try_from(data[0].as_bytes()).sdk_unwrap();
-        OnTransferMessageData {
+        let account_id = AccountId::try_from(data[0].as_bytes())
+            .map_err(|_| error::ParseOnTransferMessageError::InvalidAccount)?;
+        Ok(OnTransferMessageData {
             relayer: account_id,
             recipient,
             fee: U256::from_little_endian(&fee[..]),
-        }
+        })
     }
 
     /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
-    fn set_message_for_on_transfer(
+    fn prepare_message_for_on_transfer(
         &self,
         relayer_account_id: &AccountId,
         fee: U256,
         message: String,
-    ) -> String {
+    ) -> Result<String, AddressValidationError> {
         use byte_slice_cast::AsByteSlice;
 
         let mut data = fee.as_byte_slice().to_vec();
         let address = if message.len() == 42 {
             message
                 .strip_prefix("0x")
-                .expect(ERR_INVALID_ETH_ADDRESS)
+                .ok_or(AddressValidationError::FailedDecodeHex)?
                 .to_string()
         } else {
             message
         };
-        let address_bytes = hex::decode(address).expect(ERR_FAILED_PARSE);
+        let address_bytes =
+            hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
         data.extend(address_bytes);
-        [relayer_account_id.as_ref(), &hex::encode(data)].join(":")
+        Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
     }
 
     /// Deposit all types of tokens
@@ -212,16 +200,19 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         raw_proof: Vec<u8>,
         current_account_id: AccountId,
         predecessor_account_id: AccountId,
-    ) -> PromiseWithCallbackArgs {
+    ) -> Result<PromiseWithCallbackArgs, error::DepositError> {
         let is_owner = current_account_id == predecessor_account_id;
-        self.assert_not_paused(PAUSE_DEPOSIT, is_owner);
+        self.assert_not_paused(PAUSE_DEPOSIT, is_owner)
+            .map_err(|_| error::DepositError::Paused)?;
 
         sdk::log!("[Deposit tokens]");
 
         // Get incoming deposit arguments
-        let proof: Proof = Proof::try_from_slice(&raw_proof).expect(ERR_FAILED_PARSE);
+        let proof: Proof =
+            Proof::try_from_slice(&raw_proof).map_err(|_| error::DepositError::ProofParseFailed)?;
         // Fetch event data from Proof
-        let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data);
+        let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data)
+            .map_err(error::DepositError::EventParseFailed)?;
 
         sdk::log!(&format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
@@ -237,16 +228,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             hex::encode(&self.contract.eth_custodian_address),
         ));
 
-        assert_eq!(
-            event.eth_custodian_address, self.contract.eth_custodian_address,
-            "ERR_WRONG_EVENT_ADDRESS",
-        );
+        if event.eth_custodian_address != self.contract.eth_custodian_address {
+            return Err(error::DepositError::CustodianAddressMismatch);
+        }
 
-        assert!(
-            event.amount > event.fee,
-            "{}",
-            ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
-        );
+        if event.fee >= event.amount {
+            return Err(error::DepositError::InsufficientAmountForFee);
+        }
 
         // Verify proof data with cross-contract call to prover account
         sdk::log!(&format!(
@@ -268,7 +256,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         };
 
         // Finalize deposit
-        let data = match self.parse_event_message(&event.recipient) {
+        let data = match self.parse_event_message(&event.recipient)? {
             // Deposit to NEAR accounts
             TokenMessageData::Near(account_id) => FinishDepositCallArgs {
                 new_owner_id: account_id,
@@ -292,11 +280,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                     receiver_id,
                     amount: event.amount.as_u128(),
                     memo: None,
-                    msg: self.set_message_for_on_transfer(
-                        &predecessor_account_id,
-                        event.fee,
-                        message,
-                    ),
+                    msg: self
+                        .prepare_message_for_on_transfer(
+                            &predecessor_account_id,
+                            event.fee,
+                            message,
+                        )
+                        .map_err(error::DepositError::InvalidAddress)?,
                 }
                 .try_to_vec()
                 .unwrap();
@@ -322,10 +312,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             attached_balance: NO_DEPOSIT,
             attached_gas: GAS_FOR_FINISH_DEPOSIT,
         };
-        PromiseWithCallbackArgs {
+        Ok(PromiseWithCallbackArgs {
             base: verify_call,
             callback: finish_call,
-        }
+        })
     }
 
     /// Finish deposit (private method)
@@ -338,15 +328,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         current_account_id: AccountId,
         data: FinishDepositCallArgs,
-    ) -> Option<PromiseWithCallbackArgs> {
+    ) -> Result<Option<PromiseWithCallbackArgs>, error::FinishDepositError> {
         sdk::log!(&format!("Finish deposit with the amount: {}", data.amount));
 
         // Mint tokens to recipient minus fee
         if let Some(msg) = data.msg {
             // Mint - calculate new balances
-            self.mint_eth_on_near(data.new_owner_id, data.amount);
+            self.mint_eth_on_near(data.new_owner_id, data.amount)?;
             // Store proof only after `mint` calculations
-            self.record_proof(&data.proof_key);
+            self.record_proof(&data.proof_key)?;
             // Save new contract data
             self.save_ft_contract();
             let transfer_call_args = TransferCallCallArgs::try_from_slice(&msg).unwrap();
@@ -354,62 +344,83 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 predecessor_account_id,
                 current_account_id,
                 transfer_call_args,
-            );
-            Some(promise)
+            )?;
+            Ok(Some(promise))
         } else {
             // Mint - calculate new balances
-            self.mint_eth_on_near(data.new_owner_id.clone(), data.amount - data.fee);
-            self.mint_eth_on_near(data.relayer_id, data.fee);
+            self.mint_eth_on_near(data.new_owner_id.clone(), data.amount - data.fee)?;
+            self.mint_eth_on_near(data.relayer_id, data.fee)?;
             // Store proof only after `mint` calculations
-            self.record_proof(&data.proof_key);
+            self.record_proof(&data.proof_key)?;
             // Save new contract data
             self.save_ft_contract();
-            None
+            Ok(None)
         }
     }
 
     /// Internal ETH withdraw ETH logic
-    pub(crate) fn internal_remove_eth(&mut self, address: &Address, amount: &U256) {
-        self.burn_eth_on_aurora(address.0, amount.as_u128());
+    pub(crate) fn internal_remove_eth(
+        &mut self,
+        address: &Address,
+        amount: &U256,
+    ) -> Result<(), fungible_token::error::WithdrawError> {
+        self.burn_eth_on_aurora(address.0, amount.as_u128())?;
         self.save_ft_contract();
+        Ok(())
     }
 
     /// Record used proof as hash key
-    fn record_proof(&mut self, key: &str) {
+    fn record_proof(&mut self, key: &str) -> Result<(), error::ProofUsed> {
         sdk::log!(&format!("Record proof: {}", key));
 
-        assert!(!self.check_used_event(key), "ERR_PROOF_EXIST");
+        if self.check_used_event(key) {
+            return Err(error::ProofUsed);
+        }
+
         self.save_used_event(key);
+        Ok(())
     }
 
     ///  Mint nETH tokens
-    fn mint_eth_on_near(&mut self, owner_id: AccountId, amount: Balance) {
+    fn mint_eth_on_near(
+        &mut self,
+        owner_id: AccountId,
+        amount: Balance,
+    ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
 
-        if self.ft.accounts_get(&owner_id).is_none() {
+        if self.ft.get_account_eth_balance(&owner_id).is_none() {
             self.ft.accounts_insert(&owner_id, 0);
         }
-        self.ft.internal_deposit_eth_to_near(&owner_id, amount);
+        self.ft.internal_deposit_eth_to_near(&owner_id, amount)
     }
 
     ///  Mint ETH tokens
-    fn mint_eth_on_aurora(&mut self, owner_id: EthAddress, amount: Balance) {
+    fn mint_eth_on_aurora(
+        &mut self,
+        owner_id: EthAddress,
+        amount: Balance,
+    ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!(&format!(
             "Mint {} ETH tokens for: {}",
             amount,
             hex::encode(owner_id)
         ));
-        self.ft.internal_deposit_eth_to_aurora(owner_id, amount);
+        self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
     }
 
     /// Burn ETH tokens
-    fn burn_eth_on_aurora(&mut self, address: EthAddress, amount: Balance) {
+    fn burn_eth_on_aurora(
+        &mut self,
+        address: EthAddress,
+        amount: Balance,
+    ) -> Result<(), fungible_token::error::WithdrawError> {
         sdk::log!(&format!(
             "Burn {} ETH tokens for: {}",
             amount,
             hex::encode(address)
         ));
-        self.ft.internal_withdraw_eth_from_aurora(address, amount);
+        self.ft.internal_withdraw_eth_from_aurora(address, amount)
     }
 
     /// Withdraw nETH from NEAR accounts
@@ -419,21 +430,22 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         current_account_id: &AccountId,
         predecessor_account_id: &AccountId,
         args: WithdrawCallArgs,
-    ) -> WithdrawResult {
+    ) -> Result<WithdrawResult, error::WithdrawError> {
         let is_owner = current_account_id == predecessor_account_id;
-        self.assert_not_paused(PAUSE_WITHDRAW, is_owner);
+        self.assert_not_paused(PAUSE_WITHDRAW, is_owner)
+            .map_err(|_| error::WithdrawError::Paused)?;
 
         // Burn tokens to recipient
         self.ft
-            .internal_withdraw_eth_from_near(predecessor_account_id, args.amount);
+            .internal_withdraw_eth_from_near(predecessor_account_id, args.amount)?;
         // Save new contract data
         self.save_ft_contract();
 
-        WithdrawResult {
+        Ok(WithdrawResult {
             recipient_id: args.recipient_address,
             amount: args.amount,
             eth_custodian_address: self.contract.eth_custodian_address,
-        }
+        })
     }
 
     /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
@@ -453,11 +465,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return balance of nETH (ETH on Near)
-    pub fn ft_balance_of(&mut self) {
-        let args = BalanceOfCallArgs::from(
-            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-        );
-
+    pub fn ft_balance_of(&mut self, args: BalanceOfCallArgs) {
         let balance = self.ft.ft_balance_of(&args.account_id);
         sdk::log!(&format!(
             "Balance of nETH [{}]: {}",
@@ -469,8 +477,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
-    pub fn ft_balance_of_eth_on_aurora(&mut self) {
-        let args: BalanceOfEthCallArgs = self.io.read_input().to_value().expect(ERR_FAILED_PARSE);
+    pub fn ft_balance_of_eth_on_aurora(&mut self, args: BalanceOfEthCallArgs) {
         let balance = self
             .ft
             .internal_unwrap_balance_of_eth_on_aurora(args.address);
@@ -484,21 +491,23 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Transfer between NEAR accounts
-    pub fn ft_transfer(&mut self, predecessor_account_id: &AccountId) {
-        let args = TransferCallArgs::from(
-            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-        );
+    pub fn ft_transfer(
+        &mut self,
+        predecessor_account_id: &AccountId,
+        args: TransferCallArgs,
+    ) -> Result<(), fungible_token::error::TransferError> {
         self.ft.internal_transfer_eth_on_near(
             predecessor_account_id,
             &args.receiver_id,
             args.amount,
             &args.memo,
-        );
+        )?;
         self.save_ft_contract();
         sdk::log!(&format!(
             "Transfer amount {} to {} success with memo: {:?}",
             args.amount, args.receiver_id, args.memo
         ));
+        Ok(())
     }
 
     /// FT resolve transfer logic
@@ -531,20 +540,18 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         current_account_id: AccountId,
         args: TransferCallCallArgs,
-    ) -> PromiseWithCallbackArgs {
+    ) -> Result<PromiseWithCallbackArgs, error::FtTransferCallError> {
         sdk::log!(&format!(
             "Transfer call to {} amount {}",
             args.receiver_id, args.amount,
         ));
         // Verify message data before `ft_on_transfer` call to avoid verification panics
         if args.receiver_id == current_account_id {
-            let message_data = self.parse_on_transfer_message(&args.msg);
+            let message_data = self.parse_on_transfer_message(&args.msg)?;
             // Check is transfer amount > fee
-            assert!(
-                args.amount > message_data.fee.as_u128(),
-                "{}",
-                ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
-            );
+            if message_data.fee.as_u128() >= args.amount {
+                return Err(error::FtTransferCallError::InsufficientAmountForFee);
+            }
 
             // Additional check overflow before process `ft_on_transfer`
             // But don't check overflow for relayer
@@ -552,24 +559,33 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             let amount_for_check = self
                 .ft
                 .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
-            assert!(amount_for_check.checked_add(args.amount).is_some());
-
-            // It'll call only on Aurora contract
-            assert!(self
+            if amount_for_check.checked_add(args.amount).is_none() {
+                return Err(error::FtTransferCallError::Transfer(
+                    fungible_token::error::TransferError::BalanceOverflow,
+                ));
+            }
+            if self
                 .ft
                 .total_eth_supply_on_aurora
                 .checked_add(args.amount)
-                .is_some());
+                .is_none()
+            {
+                return Err(error::FtTransferCallError::Transfer(
+                    fungible_token::error::TransferError::TotalSupplyOverflow,
+                ));
+            }
         }
 
-        self.ft.ft_transfer_call(
-            predecessor_account_id,
-            args.receiver_id,
-            args.amount,
-            &args.memo,
-            args.msg,
-            current_account_id,
-        )
+        self.ft
+            .ft_transfer_call(
+                predecessor_account_id,
+                args.receiver_id,
+                args.amount,
+                &args.memo,
+                args.msg,
+                current_account_id,
+            )
+            .map_err(Into::into)
     }
 
     /// FT storage deposit logic
@@ -578,7 +594,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         amount: Balance,
         args: StorageDepositCallArgs,
-    ) -> Option<PromiseBatchAction> {
+    ) -> Result<Option<PromiseBatchAction>, fungible_token::error::StorageFundingError> {
         let account_id = args
             .account_id
             .unwrap_or_else(|| predecessor_account_id.clone());
@@ -587,10 +603,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             &account_id,
             amount,
             args.registration_only,
-        );
+        )?;
         self.save_ft_contract();
         self.io.return_output(&res.to_json_bytes());
-        maybe_promise
+        Ok(maybe_promise)
     }
 
     /// FT storage unregister
@@ -598,28 +614,35 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         &mut self,
         account_id: AccountId,
         force: Option<bool>,
-    ) -> Option<PromiseBatchAction> {
-        let res = self.ft.internal_storage_unregister(account_id, force);
-        if res.is_some() {
-            self.io.return_output(b"true");
-        } else {
-            self.io.return_output(b"false");
-        }
-        res.map(|(_, p)| p)
+    ) -> Result<Option<PromiseBatchAction>, fungible_token::error::StorageFundingError> {
+        let promise = match self.ft.internal_storage_unregister(account_id, force) {
+            Ok((_, p)) => {
+                self.io.return_output(b"true");
+                Some(p)
+            }
+            Err(fungible_token::error::StorageFundingError::NotRegistered) => {
+                self.io.return_output(b"false");
+                None
+            }
+            Err(other) => return Err(other),
+        };
+        Ok(promise)
     }
 
     /// FT storage withdraw
-    pub fn storage_withdraw(&mut self, account_id: &AccountId, args: StorageWithdrawCallArgs) {
-        let res = self.ft.storage_withdraw(account_id, args.amount);
+    pub fn storage_withdraw(
+        &mut self,
+        account_id: &AccountId,
+        args: StorageWithdrawCallArgs,
+    ) -> Result<(), fungible_token::error::StorageFundingError> {
+        let res = self.ft.storage_withdraw(account_id, args.amount)?;
         self.save_ft_contract();
         self.io.return_output(&res.to_json_bytes());
+        Ok(())
     }
 
     /// Get balance of storage
-    pub fn storage_balance_of(&mut self) {
-        let args = StorageBalanceOfCallArgs::from(
-            parse_json(&self.io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-        );
+    pub fn storage_balance_of(&mut self, args: StorageBalanceOfCallArgs) {
         self.io
             .return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
     }
@@ -629,10 +652,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         &mut self,
         engine: &Engine<'env, I, E>,
         args: &NEP141FtOnTransferArgs,
-    ) {
+    ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
         // Parse message with specific rules
-        let message_data = self.parse_on_transfer_message(&args.msg);
+        let message_data = self.parse_on_transfer_message(&args.msg)?;
 
         // Special case when predecessor_account_id is current_account_id
         let fee = message_data.fee.as_u128();
@@ -640,13 +663,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (fee, relayer) {
             (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
-                self.mint_eth_on_aurora(message_data.recipient, args.amount - fee);
-                self.mint_eth_on_aurora(evm_relayer_address, fee);
+                self.mint_eth_on_aurora(message_data.recipient, args.amount - fee)?;
+                self.mint_eth_on_aurora(evm_relayer_address, fee)?;
             }
-            _ => self.mint_eth_on_aurora(message_data.recipient, args.amount),
+            _ => self.mint_eth_on_aurora(message_data.recipient, args.amount)?,
         }
         self.save_ft_contract();
         self.io.return_output("\"0\"".as_bytes());
+        Ok(())
     }
 
     /// Get accounts counter for statistics.
@@ -659,14 +683,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Save eth-connector contract data
     fn save_ft_contract(&mut self) {
         self.io.write_borsh(
-            &Self::get_contract_key(&EthConnectorStorageId::FungibleToken),
+            &construct_contract_key(&EthConnectorStorageId::FungibleToken),
             &self.ft.data(),
         );
     }
 
     /// Generate key for used events from Prood
     fn used_event_key(&self, key: &str) -> Vec<u8> {
-        let mut v = Self::get_contract_key(&EthConnectorStorageId::UsedEvent).to_vec();
+        let mut v = construct_contract_key(&EthConnectorStorageId::UsedEvent).to_vec();
         v.extend_from_slice(key.as_bytes());
         v
     }
@@ -695,14 +719,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn set_paused_flags(&mut self, args: PauseEthConnectorCallArgs) {
         self.set_paused(args.paused_mask);
     }
-
-    /// Return metdata
-    pub fn get_metadata(io: &I) -> Option<FungibleTokenMetadata> {
-        io.read_storage(&Self::get_contract_key(
-            &EthConnectorStorageId::FungibleTokenMetadata,
-        ))
-        .and_then(|data| data.to_value().ok())
-    }
 }
 
 impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
@@ -713,8 +729,214 @@ impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
     fn set_paused(&mut self, paused_mask: PausedMask) {
         self.paused_mask = paused_mask;
         self.io.write_borsh(
-            &Self::get_contract_key(&EthConnectorStorageId::PausedMask),
+            &construct_contract_key(&EthConnectorStorageId::PausedMask),
             &self.paused_mask,
         );
+    }
+}
+
+fn construct_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
+    crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
+}
+
+fn get_contract_data<T: BorshDeserialize, I: IO>(io: &I, suffix: &EthConnectorStorageId) -> T {
+    io.read_storage(&construct_contract_key(suffix))
+        .expect("Failed read storage")
+        .to_value()
+        .unwrap()
+}
+
+/// Sets the contract data and returns it back
+pub fn set_contract_data<I: IO>(
+    io: &mut I,
+    args: SetContractDataCallArgs,
+) -> Result<EthConnector, AddressValidationError> {
+    // Get initial contract arguments
+    let contract_data = EthConnector {
+        prover_account: args.prover_account,
+        eth_custodian_address: validate_eth_address(args.eth_custodian_address)?,
+    };
+    // Save eth-connector specific data
+    io.write_borsh(
+        &construct_contract_key(&EthConnectorStorageId::Contract),
+        &contract_data,
+    );
+
+    io.write_borsh(
+        &construct_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
+        &args.metadata,
+    );
+
+    Ok(contract_data)
+}
+
+/// Return metdata
+pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
+    io.read_storage(&construct_contract_key(
+        &EthConnectorStorageId::FungibleTokenMetadata,
+    ))
+    .and_then(|data| data.to_value().ok())
+}
+
+pub mod error {
+    use aurora_engine_types::types::AddressValidationError;
+
+    use crate::{deposit_event, fungible_token};
+
+    const PROOF_EXIST: &[u8; 15] = b"ERR_PROOF_EXIST";
+    const INVALID_ACCOUNT: &[u8; 22] = b"ERR_INVALID_ACCOUNT_ID";
+
+    pub enum ParseEventMessageError {
+        TooManyParts,
+        InvalidAccount,
+    }
+    impl AsRef<[u8]> for ParseEventMessageError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TooManyParts => b"ERR_INVALID_EVENT_MESSAGE_FORMAT",
+                Self::InvalidAccount => INVALID_ACCOUNT,
+            }
+        }
+    }
+
+    pub enum DepositError {
+        Paused,
+        ProofParseFailed,
+        EventParseFailed(deposit_event::error::ParseError),
+        CustodianAddressMismatch,
+        InsufficientAmountForFee,
+        MessageParseFailed(ParseEventMessageError),
+        InvalidAddress(AddressValidationError),
+    }
+    impl From<ParseEventMessageError> for DepositError {
+        fn from(e: ParseEventMessageError) -> Self {
+            Self::MessageParseFailed(e)
+        }
+    }
+    impl AsRef<[u8]> for DepositError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::Paused => crate::admin_controlled::ERR_PAUSED.as_bytes(),
+                Self::ProofParseFailed => super::ERR_FAILED_PARSE.as_bytes(),
+                Self::EventParseFailed(e) => e.as_ref(),
+                Self::CustodianAddressMismatch => b"ERR_WRONG_EVENT_ADDRESS",
+                Self::InsufficientAmountForFee => super::ERR_NOT_ENOUGH_BALANCE_FOR_FEE.as_bytes(),
+                Self::MessageParseFailed(e) => e.as_ref(),
+                Self::InvalidAddress(e) => e.as_ref(),
+            }
+        }
+    }
+
+    pub enum FinishDepositError {
+        TransferCall(FtTransferCallError),
+        ProofUsed,
+    }
+    impl From<ProofUsed> for FinishDepositError {
+        fn from(_: ProofUsed) -> Self {
+            Self::ProofUsed
+        }
+    }
+    impl From<FtTransferCallError> for FinishDepositError {
+        fn from(e: FtTransferCallError) -> Self {
+            Self::TransferCall(e)
+        }
+    }
+    impl From<fungible_token::error::DepositError> for FinishDepositError {
+        fn from(e: fungible_token::error::DepositError) -> Self {
+            Self::TransferCall(FtTransferCallError::Transfer(e.into()))
+        }
+    }
+    impl AsRef<[u8]> for FinishDepositError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::ProofUsed => PROOF_EXIST,
+                Self::TransferCall(e) => e.as_ref(),
+            }
+        }
+    }
+
+    pub enum WithdrawError {
+        Paused,
+        FT(fungible_token::error::WithdrawError),
+    }
+    impl From<fungible_token::error::WithdrawError> for WithdrawError {
+        fn from(e: fungible_token::error::WithdrawError) -> Self {
+            Self::FT(e)
+        }
+    }
+    impl AsRef<[u8]> for WithdrawError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::Paused => crate::admin_controlled::ERR_PAUSED.as_bytes(),
+                Self::FT(e) => e.as_ref(),
+            }
+        }
+    }
+
+    pub enum ParseOnTransferMessageError {
+        TooManyParts,
+        InvalidHexData,
+        WrongMessageFormat,
+        InvalidAccount,
+    }
+    impl AsRef<[u8]> for ParseOnTransferMessageError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TooManyParts => b"ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT",
+                Self::InvalidHexData => b"ERR_INVALID_ON_TRANSFER_MESSAGE_HEX",
+                Self::WrongMessageFormat => b"ERR_INVALID_ON_TRANSFER_MESSAGE_DATA",
+                Self::InvalidAccount => INVALID_ACCOUNT,
+            }
+        }
+    }
+
+    pub enum FtTransferCallError {
+        MessageParseFailed(ParseOnTransferMessageError),
+        InsufficientAmountForFee,
+        Transfer(fungible_token::error::TransferError),
+    }
+    impl From<fungible_token::error::TransferError> for FtTransferCallError {
+        fn from(e: fungible_token::error::TransferError) -> Self {
+            Self::Transfer(e)
+        }
+    }
+    impl From<fungible_token::error::DepositError> for FtTransferCallError {
+        fn from(e: fungible_token::error::DepositError) -> Self {
+            Self::Transfer(e.into())
+        }
+    }
+    impl From<ParseOnTransferMessageError> for FtTransferCallError {
+        fn from(e: ParseOnTransferMessageError) -> Self {
+            Self::MessageParseFailed(e)
+        }
+    }
+    impl AsRef<[u8]> for FtTransferCallError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::MessageParseFailed(e) => e.as_ref(),
+                Self::InsufficientAmountForFee => super::ERR_NOT_ENOUGH_BALANCE_FOR_FEE.as_bytes(),
+                Self::Transfer(e) => e.as_ref(),
+            }
+        }
+    }
+
+    pub enum InitContractError {
+        AlreadyInitialized,
+        InvalidCustodianAddress(AddressValidationError),
+    }
+    impl AsRef<[u8]> for InitContractError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::AlreadyInitialized => b"ERR_CONTRACT_INITIALIZED",
+                Self::InvalidCustodianAddress(e) => e.as_ref(),
+            }
+        }
+    }
+
+    pub struct ProofUsed;
+    impl AsRef<[u8]> for ProofUsed {
+        fn as_ref(&self) -> &[u8] {
+            PROOF_EXIST
+        }
     }
 }

@@ -126,14 +126,6 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         }
     }
 
-    /// Balance of nETH (ETH on NEAR token)
-    pub fn internal_unwrap_balance_of_eth_on_near(&self, account_id: &AccountId) -> Balance {
-        match self.accounts_get(account_id) {
-            Some(balance) => u128::try_from_slice(&balance[..]).unwrap(),
-            None => sdk::panic_utf8(b"ERR_ACCOUNT_NOT_EXIST"),
-        }
-    }
-
     /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
         engine::get_balance(&self.io, &Address(address))
@@ -142,67 +134,83 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
-    pub fn internal_deposit_eth_to_near(&mut self, account_id: &AccountId, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of_eth_on_near(account_id);
-        if let Some(new_balance) = balance.checked_add(amount) {
-            self.accounts_insert(account_id, new_balance);
-            self.total_eth_supply_on_near = self
-                .total_eth_supply_on_near
-                .checked_add(amount)
-                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
-        } else {
-            sdk::panic_utf8(b"ERR_BALANCE_OVERFLOW");
-        }
+    pub fn internal_deposit_eth_to_near(
+        &mut self,
+        account_id: &AccountId,
+        amount: Balance,
+    ) -> Result<(), error::DepositError> {
+        let balance = self.get_account_eth_balance(account_id).unwrap_or(0);
+        let new_balance = balance
+            .checked_add(amount)
+            .ok_or(error::DepositError::BalanceOverflow)?;
+        self.accounts_insert(account_id, new_balance);
+        self.total_eth_supply_on_near = self
+            .total_eth_supply_on_near
+            .checked_add(amount)
+            .ok_or(error::DepositError::TotalSupplyOverflow)?;
+        Ok(())
     }
 
     /// Internal ETH deposit to Aurora
-    pub fn internal_deposit_eth_to_aurora(&mut self, address: EthAddress, amount: Balance) {
+    pub fn internal_deposit_eth_to_aurora(
+        &mut self,
+        address: EthAddress,
+        amount: Balance,
+    ) -> Result<(), error::DepositError> {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
-        if let Some(new_balance) = balance.checked_add(amount) {
-            engine::set_balance(
-                &mut self.io,
-                &Address(address),
-                &Wei::new(U256::from(new_balance)),
-            );
-            self.total_eth_supply_on_aurora = self
-                .total_eth_supply_on_aurora
-                .checked_add(amount)
-                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
-        } else {
-            sdk::panic_utf8(b"ERR_BALANCE_OVERFLOW");
-        }
+        let new_balance = balance
+            .checked_add(amount)
+            .ok_or(error::DepositError::BalanceOverflow)?;
+        engine::set_balance(
+            &mut self.io,
+            &Address(address),
+            &Wei::new(U256::from(new_balance)),
+        );
+        self.total_eth_supply_on_aurora = self
+            .total_eth_supply_on_aurora
+            .checked_add(amount)
+            .ok_or(error::DepositError::TotalSupplyOverflow)?;
+        Ok(())
     }
 
     /// Withdraw NEAR tokens
-    pub fn internal_withdraw_eth_from_near(&mut self, account_id: &AccountId, amount: Balance) {
-        let balance = self.internal_unwrap_balance_of_eth_on_near(account_id);
-        if let Some(new_balance) = balance.checked_sub(amount) {
-            self.accounts_insert(account_id, new_balance);
-            self.total_eth_supply_on_near = self
-                .total_eth_supply_on_near
-                .checked_sub(amount)
-                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
-        } else {
-            sdk::panic_utf8(b"ERR_NOT_ENOUGH_BALANCE");
-        }
+    pub fn internal_withdraw_eth_from_near(
+        &mut self,
+        account_id: &AccountId,
+        amount: Balance,
+    ) -> Result<(), error::WithdrawError> {
+        let balance = self.get_account_eth_balance(account_id).unwrap_or(0);
+        let new_balance = balance
+            .checked_sub(amount)
+            .ok_or(error::WithdrawError::InsufficientFunds)?;
+        self.accounts_insert(account_id, new_balance);
+        self.total_eth_supply_on_near = self
+            .total_eth_supply_on_near
+            .checked_sub(amount)
+            .ok_or(error::WithdrawError::TotalSupplyUnderflow)?;
+        Ok(())
     }
 
     /// Withdraw ETH tokens
-    pub fn internal_withdraw_eth_from_aurora(&mut self, address: EthAddress, amount: Balance) {
+    pub fn internal_withdraw_eth_from_aurora(
+        &mut self,
+        address: EthAddress,
+        amount: Balance,
+    ) -> Result<(), error::WithdrawError> {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
-        if let Some(new_balance) = balance.checked_sub(amount) {
-            engine::set_balance(
-                &mut self.io,
-                &Address(address),
-                &Wei::new(U256::from(new_balance)),
-            );
-            self.total_eth_supply_on_aurora = self
-                .total_eth_supply_on_aurora
-                .checked_sub(amount)
-                .expect("ERR_TOTAL_SUPPLY_OVERFLOW");
-        } else {
-            sdk::panic_utf8(b"ERR_NOT_ENOUGH_BALANCE");
-        }
+        let new_balance = balance
+            .checked_sub(amount)
+            .ok_or(error::WithdrawError::InsufficientFunds)?;
+        engine::set_balance(
+            &mut self.io,
+            &Address(address),
+            &Wei::new(U256::from(new_balance)),
+        );
+        self.total_eth_supply_on_aurora = self
+            .total_eth_supply_on_aurora
+            .checked_sub(amount)
+            .ok_or(error::WithdrawError::TotalSupplyUnderflow)?;
+        Ok(())
     }
 
     /// Transfer NEAR tokens
@@ -212,18 +220,19 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         receiver_id: &AccountId,
         amount: Balance,
         #[allow(unused_variables)] memo: &Option<String>,
-    ) {
-        assert_ne!(
-            sender_id, receiver_id,
-            "Sender and receiver should be different"
-        );
-        assert!(amount > 0, "The amount should be a positive number");
+    ) -> Result<(), error::TransferError> {
+        if sender_id == receiver_id {
+            return Err(error::TransferError::SelfTransfer);
+        }
+        if amount == 0 {
+            return Err(error::TransferError::ZeroAmount);
+        }
         if !self.accounts_contains_key(receiver_id) {
             // TODO: how does this interact with the storage deposit concept?
             self.internal_register_account(receiver_id)
         }
-        self.internal_withdraw_eth_from_near(sender_id, amount);
-        self.internal_deposit_eth_to_near(receiver_id, amount);
+        self.internal_withdraw_eth_from_near(sender_id, amount)?;
+        self.internal_deposit_eth_to_near(receiver_id, amount)?;
         sdk::log!(&crate::prelude::format!(
             "Transfer {} from {} to {}",
             amount,
@@ -234,6 +243,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         if let Some(memo) = memo {
             sdk::log(&crate::prelude::format!("Memo: {}", memo));
         }
+        Ok(())
     }
 
     pub fn internal_register_account(&mut self, account_id: &AccountId) {
@@ -249,11 +259,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     pub fn ft_balance_of(&self, account_id: &AccountId) -> u128 {
-        if let Some(data) = self.accounts_get(account_id) {
-            u128::try_from_slice(&data[..]).unwrap()
-        } else {
-            0
-        }
+        self.get_account_eth_balance(account_id).unwrap_or(0)
     }
 
     pub fn ft_transfer_call(
@@ -264,10 +270,10 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         memo: &Option<String>,
         msg: String,
         current_account_id: AccountId,
-    ) -> PromiseWithCallbackArgs {
+    ) -> Result<PromiseWithCallbackArgs, error::TransferError> {
         // Special case for Aurora transfer itself - we shouldn't transfer
         if sender_id != receiver_id {
-            self.internal_transfer_eth_on_near(&sender_id, &receiver_id, amount, memo);
+            self.internal_transfer_eth_on_near(&sender_id, &receiver_id, amount, memo)?;
         }
         let data1: String = NEP141FtOnTransferArgs {
             amount,
@@ -299,10 +305,10 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             attached_balance: NO_DEPOSIT,
             attached_gas: GAS_FOR_RESOLVE_TRANSFER,
         };
-        PromiseWithCallbackArgs {
+        Ok(PromiseWithCallbackArgs {
             base: ft_on_transfer_call,
             callback: ft_resolve_transfer_call,
-        }
+        })
     }
 
     pub fn internal_ft_resolve_transfer(
@@ -332,12 +338,12 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         };
 
         if unused_amount > 0 {
-            let receiver_balance = if let Some(receiver_balance) = self.accounts_get(receiver_id) {
-                u128::try_from_slice(&receiver_balance[..]).unwrap()
-            } else {
-                self.accounts_insert(receiver_id, 0);
-                0
-            };
+            let receiver_balance = self
+                .get_account_eth_balance(receiver_id)
+                .unwrap_or_else(|| {
+                    self.accounts_insert(receiver_id, 0);
+                    0
+                });
             if receiver_balance > 0 {
                 let refund_amount = if receiver_balance > unused_amount {
                     unused_amount
@@ -351,8 +357,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                     receiver_balance - refund_amount
                 ));
 
-                return if let Some(sender_balance) = self.accounts_get(sender_id) {
-                    let sender_balance = u128::try_from_slice(&sender_balance[..]).unwrap();
+                return if let Some(sender_balance) = self.get_account_eth_balance(sender_id) {
                     self.accounts_insert(sender_id, sender_balance + refund_amount);
                     sdk::log!(&crate::prelude::format!(
                         "Refund amount {} from {} to {}",
@@ -387,10 +392,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         &mut self,
         account_id: AccountId,
         force: Option<bool>,
-    ) -> Option<(Balance, PromiseBatchAction)> {
+    ) -> Result<(Balance, PromiseBatchAction), error::StorageFundingError> {
         let force = force.unwrap_or(false);
-        if let Some(balance) = self.accounts_get(&account_id) {
-            let balance = u128::try_from_slice(&balance[..]).unwrap();
+        if let Some(balance) = self.get_account_eth_balance(&account_id) {
             if balance == 0 || force {
                 self.accounts_remove(&account_id);
                 self.total_eth_supply_on_near -= balance;
@@ -403,16 +407,16 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                     target_account_id: account_id,
                     actions: vec![action],
                 };
-                Some((balance, promise))
+                Ok((balance, promise))
             } else {
-                sdk::panic_utf8(b"ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE")
+                Err(error::StorageFundingError::UnRegisterPositiveBalance)
             }
         } else {
             sdk::log!(&crate::prelude::format!(
                 "The account {} is not registered",
                 account_id
             ));
-            None
+            Err(error::StorageFundingError::NotRegistered)
         }
     }
 
@@ -449,7 +453,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         account_id: &AccountId,
         amount: Balance,
         registration_only: Option<bool>,
-    ) -> (StorageBalance, Option<PromiseBatchAction>) {
+    ) -> Result<(StorageBalance, Option<PromiseBatchAction>), error::StorageFundingError> {
         let promise = if self.accounts_contains_key(account_id) {
             sdk::log!("The account is already registered, refunding the deposit");
             if amount > 0 {
@@ -465,7 +469,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         } else {
             let min_balance = self.storage_balance_bounds().min;
             if amount < min_balance {
-                sdk::panic_utf8(b"ERR_ATTACHED_DEPOSIT_NOT_ENOUGH");
+                return Err(error::StorageFundingError::InsufficientDeposit);
             }
 
             self.internal_register_account(account_id);
@@ -482,23 +486,26 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             }
         };
         let balance = self.internal_storage_balance_of(account_id).unwrap();
-        (balance, promise)
+        Ok((balance, promise))
     }
 
     pub fn storage_withdraw(
         &mut self,
         account_id: &AccountId,
         amount: Option<u128>,
-    ) -> StorageBalance {
+    ) -> Result<StorageBalance, error::StorageFundingError> {
         if let Some(storage_balance) = self.internal_storage_balance_of(account_id) {
             match amount {
                 Some(amount) if amount > 0 => {
-                    sdk::panic_utf8(b"ERR_WRONG_AMOUNT");
+                    // The available balance is always zero because `StorageBalanceBounds::max` is
+                    // equal to `StorageBalanceBounds::min`. Therefore it is impossible to withdraw
+                    // a positive amount.
+                    Err(error::StorageFundingError::NoAvailableBalance)
                 }
-                _ => storage_balance,
+                _ => Ok(storage_balance),
             }
         } else {
-            sdk::panic_utf8(b"ERR_ACCOUNT_NOT_REGISTERED");
+            Err(error::StorageFundingError::NotRegistered)
         }
     }
 
@@ -533,10 +540,11 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         self.io.remove_storage(&Self::account_to_key(account_id));
     }
 
-    pub fn accounts_get(&self, account_id: &AccountId) -> Option<Vec<u8>> {
+    /// Balance of nETH (ETH on NEAR token)
+    pub fn get_account_eth_balance(&self, account_id: &AccountId) -> Option<Balance> {
         self.io
             .read_storage(&Self::account_to_key(account_id))
-            .map(|s| s.to_vec())
+            .and_then(|s| Balance::try_from_slice(&s.to_vec()).ok())
     }
 
     /// Fungible token key
@@ -555,5 +563,101 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             crate::prelude::storage::KeyPrefix::EthConnector,
             &[crate::prelude::EthConnectorStorageId::StatisticsAuroraAccountsCounter as u8],
         )
+    }
+}
+
+pub mod error {
+    const TOTAL_SUPPLY_OVERFLOW: &[u8; 25] = b"ERR_TOTAL_SUPPLY_OVERFLOW";
+    const BALANCE_OVERFLOW: &[u8; 20] = b"ERR_BALANCE_OVERFLOW";
+    const NOT_ENOUGH_BALANCE: &[u8; 22] = b"ERR_NOT_ENOUGH_BALANCE";
+    const TOTAL_SUPPLY_UNDERFLOW: &[u8; 26] = b"ERR_TOTAL_SUPPLY_UNDERFLOW";
+    const ZERO_AMOUNT: &[u8; 15] = b"ERR_ZERO_AMOUNT";
+    const SELF_TRANSFER: &[u8; 26] = b"ERR_SENDER_EQUALS_RECEIVER";
+
+    #[derive(Debug)]
+    pub enum DepositError {
+        TotalSupplyOverflow,
+        BalanceOverflow,
+    }
+    impl AsRef<[u8]> for DepositError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TotalSupplyOverflow => TOTAL_SUPPLY_OVERFLOW,
+                Self::BalanceOverflow => BALANCE_OVERFLOW,
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum WithdrawError {
+        TotalSupplyUnderflow,
+        InsufficientFunds,
+    }
+    impl AsRef<[u8]> for WithdrawError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TotalSupplyUnderflow => TOTAL_SUPPLY_UNDERFLOW,
+                Self::InsufficientFunds => NOT_ENOUGH_BALANCE,
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum TransferError {
+        TotalSupplyUnderflow,
+        TotalSupplyOverflow,
+        InsufficientFunds,
+        BalanceOverflow,
+        ZeroAmount,
+        SelfTransfer,
+    }
+    impl AsRef<[u8]> for TransferError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TotalSupplyUnderflow => TOTAL_SUPPLY_UNDERFLOW,
+                Self::TotalSupplyOverflow => TOTAL_SUPPLY_OVERFLOW,
+                Self::InsufficientFunds => NOT_ENOUGH_BALANCE,
+                Self::BalanceOverflow => BALANCE_OVERFLOW,
+                Self::ZeroAmount => ZERO_AMOUNT,
+                Self::SelfTransfer => SELF_TRANSFER,
+            }
+        }
+    }
+
+    impl From<WithdrawError> for TransferError {
+        fn from(err: WithdrawError) -> Self {
+            match err {
+                WithdrawError::InsufficientFunds => Self::InsufficientFunds,
+                WithdrawError::TotalSupplyUnderflow => Self::TotalSupplyUnderflow,
+            }
+        }
+    }
+    impl From<DepositError> for TransferError {
+        fn from(err: DepositError) -> Self {
+            match err {
+                DepositError::BalanceOverflow => Self::BalanceOverflow,
+                DepositError::TotalSupplyOverflow => Self::TotalSupplyOverflow,
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum StorageFundingError {
+        NotRegistered,
+        NoAvailableBalance,
+        InsufficientDeposit,
+        UnRegisterPositiveBalance,
+    }
+    impl AsRef<[u8]> for StorageFundingError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::NotRegistered => b"ERR_ACCOUNT_NOT_REGISTERED",
+                Self::NoAvailableBalance => b"ERR_NO_AVAILABLE_BALANCE",
+                Self::InsufficientDeposit => b"ERR_ATTACHED_DEPOSIT_NOT_ENOUGH",
+                Self::UnRegisterPositiveBalance => {
+                    b"ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE"
+                }
+            }
+        }
     }
 }

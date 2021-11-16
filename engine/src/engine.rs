@@ -946,8 +946,12 @@ pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
 
 pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
     let balance = get_balance(io, address);
-    // Apply changes for eth-conenctor
-    EthConnectorContract::get_instance(*io).internal_remove_eth(address, &balance.raw());
+    // Apply changes for eth-connector. The `unwrap` is safe here because (a) if the connector
+    // is implemented correctly then the total supply wll never underflow and (b) we are passing
+    // in the balance directly so there will always be enough balance.
+    EthConnectorContract::get_instance(*io)
+        .internal_remove_eth(address, &balance.raw())
+        .unwrap();
     io.remove_storage(&address_to_key(KeyPrefix::Balance, address));
 }
 
