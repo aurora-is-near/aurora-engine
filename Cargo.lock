@@ -139,7 +139,6 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
- "sha2 0.9.5",
  "sha3 0.9.1",
  "wee_alloc",
 ]
@@ -180,6 +179,7 @@ version = "1.0.0"
 dependencies = [
  "aurora-engine-types",
  "borsh 0.8.2",
+ "sha2 0.9.5",
  "sha3 0.9.1",
 ]
 

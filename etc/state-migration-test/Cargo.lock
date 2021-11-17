@@ -58,7 +58,6 @@ dependencies = [
  "ripemd160",
  "rjson",
  "rlp",
- "sha2",
  "sha3 0.9.1",
  "wee_alloc",
 ]
@@ -96,6 +95,7 @@ version = "1.0.0"
 dependencies = [
  "aurora-engine-types",
  "borsh",
+ "sha2",
  "sha3 0.9.1",
 ]
 

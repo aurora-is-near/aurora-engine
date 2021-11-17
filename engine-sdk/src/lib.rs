@@ -3,28 +3,31 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
 
-use crate::prelude::{Address, H256, STORAGE_PRICE_PER_BYTE};
+#[cfg(feature = "contract")]
+use crate::prelude::Address;
+use crate::prelude::{H256, STORAGE_PRICE_PER_BYTE};
 pub use types::keccak;
 
 pub mod env;
 pub mod error;
 pub mod io;
+#[cfg(feature = "contract")]
 pub mod near_runtime;
 mod prelude;
 pub mod promise;
 pub mod types;
 
+#[cfg(feature = "contract")]
 use near_runtime::exports;
 
+#[cfg(feature = "contract")]
 const ECRECOVER_MESSAGE_SIZE: u64 = 32;
+#[cfg(feature = "contract")]
 const ECRECOVER_SIGNATURE_LENGTH: u64 = 64;
+#[cfg(feature = "contract")]
 const ECRECOVER_MALLEABILITY_FLAG: u64 = 1;
 
-#[allow(dead_code)]
-pub fn panic() {
-    unsafe { exports::panic() }
-}
-
+#[cfg(feature = "contract")]
 pub fn panic_utf8(bytes: &[u8]) -> ! {
     unsafe {
         exports::panic_utf8(bytes.len() as u64, bytes.as_ptr() as u64);
@@ -32,7 +35,7 @@ pub fn panic_utf8(bytes: &[u8]) -> ! {
     unreachable!()
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "contract")]
 pub fn log_utf8(bytes: &[u8]) {
     unsafe {
         exports::log_utf8(bytes.len() as u64, bytes.as_ptr() as u64);
@@ -40,6 +43,7 @@ pub fn log_utf8(bytes: &[u8]) {
 }
 
 /// Calls environment sha256 on given input.
+#[cfg(feature = "contract")]
 pub fn sha256(input: &[u8]) -> H256 {
     unsafe {
         exports::sha256(input.len() as u64, input.as_ptr() as u64, 1);
@@ -49,7 +53,16 @@ pub fn sha256(input: &[u8]) -> H256 {
     }
 }
 
+#[cfg(not(feature = "contract"))]
+pub fn sha256(input: &[u8]) -> H256 {
+    use sha2::Digest;
+
+    let output = sha2::Sha256::digest(input);
+    H256(output.into())
+}
+
 /// Calls environment ripemd160 on given input.
+#[cfg(feature = "contract")]
 pub fn ripemd160(input: &[u8]) -> [u8; 20] {
     unsafe {
         const REGISTER_ID: u64 = 1;
@@ -61,6 +74,7 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
 }
 
 /// Recover address from message hash and signature.
+#[cfg(feature = "contract")]
 pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> {
     unsafe {
         let hash_ptr = hash.as_ptr() as u64;
@@ -90,9 +104,14 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
     }
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "contract")]
 pub fn log(data: &str) {
     log_utf8(data.as_bytes())
+}
+
+#[cfg(not(feature = "contract"))]
+pub fn log(_data: &str) {
+    // TODO: standalone logging
 }
 
 #[macro_export]
@@ -101,11 +120,6 @@ macro_rules! log {
         #[cfg(feature = "log")]
         $crate::log($e)
     };
-}
-
-#[allow(unused)]
-pub fn prepaid_gas() -> u64 {
-    unsafe { exports::prepaid_gas() }
 }
 
 pub fn storage_byte_cost() -> u128 {

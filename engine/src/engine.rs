@@ -794,15 +794,6 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
     data.extend_from_slice(account_id);
     data.extend_from_slice(&block_height.to_be_bytes());
 
-    #[cfg(not(feature = "contract"))]
-    {
-        use sha2::Digest;
-
-        let output = sha2::Sha256::digest(&data);
-        H256(output.into())
-    }
-
-    #[cfg(feature = "contract")]
     sdk::sha256(&data)
 }
 
