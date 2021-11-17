@@ -1,7 +1,7 @@
 use crate::prelude::{Address, Balance, RawAddress, TryInto, Wei, WeiU256, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
-use aurora_engine::parameters::{CallArgs, FunctionCallArgs, SubmitResult};
+use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
 use aurora_engine::transaction::legacy::LegacyEthSignedTransaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
@@ -95,7 +95,7 @@ impl test_utils::AuroraRunner {
         self.make_call(
             "call",
             origin,
-            CallArgs::New(FunctionCallArgs {
+            CallArgs::V2(FunctionCallArgsV2 {
                 contract,
                 value: WeiU256::default(),
                 input,
@@ -392,7 +392,7 @@ mod sim_tests {
     use crate::test_utils::exit_precompile::TesterConstructor;
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
     use aurora_engine::parameters::{
-        CallArgs, DeployErc20TokenArgs, FunctionCallArgs, SubmitResult,
+        CallArgs, DeployErc20TokenArgs, FunctionCallArgsV2, SubmitResult,
     };
     use borsh::BorshSerialize;
     use near_sdk_sim::UserAccount;
@@ -713,7 +713,7 @@ mod sim_tests {
                 ethabi::Token::Uint(amount.into()),
             ],
         );
-        let call_args = CallArgs::New(FunctionCallArgs {
+        let call_args = CallArgs::V2(FunctionCallArgsV2 {
             contract: erc20.0.address.0,
             value: WeiU256::default(),
             input,
@@ -753,7 +753,7 @@ mod sim_tests {
             .assert_success();
 
         let mint_tx = erc20.mint(dest, amount.into(), 0.into());
-        let call_args = CallArgs::New(FunctionCallArgs {
+        let call_args = CallArgs::V2(FunctionCallArgsV2 {
             contract: erc20.0.address.0,
             value: WeiU256::default(),
             input: mint_tx.data,
@@ -784,7 +784,7 @@ mod sim_tests {
 
     fn erc20_balance(erc20: &ERC20, address: Address, aurora: &AuroraAccount) -> U256 {
         let balance_tx = erc20.balance_of(address, 0.into());
-        let call_args = CallArgs::New(FunctionCallArgs {
+        let call_args = CallArgs::V2(FunctionCallArgsV2 {
             contract: erc20.0.address.0,
             value: WeiU256::default(),
             input: balance_tx.data,

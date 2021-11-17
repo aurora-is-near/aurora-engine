@@ -484,7 +484,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     ) -> EngineResult<SubmitResult> {
         let origin = self.origin();
         match args {
-            CallArgs::New(call_args) => {
+            CallArgs::V2(call_args) => {
                 let contract = Address(call_args.contract);
                 let value = call_args.value.into();
                 let input = call_args.input;
@@ -498,7 +498,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                     handler,
                 )
             }
-            CallArgs::Legacy(call_args) => {
+            CallArgs::V1(call_args) => {
                 let contract = Address(call_args.contract);
                 let value = Wei::zero();
                 let input = call_args.input;

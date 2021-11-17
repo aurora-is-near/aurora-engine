@@ -132,7 +132,7 @@ impl SubmitResult {
 
 /// Borsh-encoded parameters for the engine `call` function.
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
-pub struct FunctionCallArgs {
+pub struct FunctionCallArgsV2 {
     pub contract: RawAddress,
     /// Wei compatible Borsh-encoded value field to attach an ETH balance to the transaction
     pub value: WeiU256,
@@ -141,7 +141,7 @@ pub struct FunctionCallArgs {
 
 /// Legacy Borsh-encoded parameters for the engine `call` function, to provide backward type compatibility
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
-pub struct FunctionCallArgsLegacy {
+pub struct FunctionCallArgsV1 {
     pub contract: RawAddress,
     pub input: Vec<u8>,
 }
@@ -150,8 +150,8 @@ pub struct FunctionCallArgsLegacy {
 /// for passing to the engine `call` function, and to provide backward type compatibility
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
 pub enum CallArgs {
-    New(FunctionCallArgs),
-    Legacy(FunctionCallArgsLegacy),
+    V2(FunctionCallArgsV2),
+    V1(FunctionCallArgsV1),
 }
 
 impl CallArgs {
@@ -163,8 +163,8 @@ impl CallArgs {
         // Fallback, for handling old input format,
         // i.e. input, formed as a raw (not wrapped into call args enum) data structure with legacy arguments,
         // made for backward compatibility.
-        } else if let Ok(value) = FunctionCallArgsLegacy::try_from_slice(bytes) {
-            Some(Self::Legacy(value))
+        } else if let Ok(value) = FunctionCallArgsV1::try_from_slice(bytes) {
+            Some(Self::V1(value))
         // Dealing with unrecognized input should be handled and result as an exception in a call site.
         } else {
             None
@@ -503,12 +503,12 @@ mod tests {
 
     #[test]
     fn test_call_args_deserialize() {
-        let new_input = FunctionCallArgs {
+        let new_input = FunctionCallArgsV2 {
             contract: [0u8; 20],
             value: WeiU256::default(),
             input: Vec::new(),
         };
-        let legacy_input = FunctionCallArgsLegacy {
+        let legacy_input = FunctionCallArgsV1 {
             contract: [0u8; 20],
             input: Vec::new(),
         };
@@ -517,15 +517,15 @@ mod tests {
         // made for flexibility and extensibility.
 
         // Using new input format (wrapped into call args enum) and data structure with new argument (`value` field).
-        let input_bytes = CallArgs::New(new_input.clone()).try_to_vec().unwrap();
+        let input_bytes = CallArgs::V2(new_input.clone()).try_to_vec().unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::New(new_input.clone())));
+        assert_eq!(parsed_data, Some(CallArgs::V2(new_input.clone())));
 
         // Using new input format (wrapped into call args enum) and old data structure with legacy arguments,
         // this is allowed for compatibility reason.
-        let input_bytes = CallArgs::Legacy(legacy_input.clone()).try_to_vec().unwrap();
+        let input_bytes = CallArgs::V1(legacy_input.clone()).try_to_vec().unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::Legacy(legacy_input.clone())));
+        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
 
         // Parsing bytes in an old input format - raw data structure (not wrapped into call args enum) with legacy arguments,
         // made for backward compatibility.
@@ -533,7 +533,7 @@ mod tests {
         // Using old input format (not wrapped into call args enum) - raw data structure with legacy arguments.
         let input_bytes = legacy_input.try_to_vec().unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::Legacy(legacy_input.clone())));
+        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
 
         // Using old input format (not wrapped into call args enum) - raw data structure with new argument (`value` field).
         // Data structures with new arguments allowed only in new input format for future extensibility reason.
