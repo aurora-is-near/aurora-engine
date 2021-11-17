@@ -72,11 +72,11 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        DeployErc20TokenArgs, FunctionCallArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
-        StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitResult, TransactionStatus,
-        TransferCallCallArgs, ViewCallArgs,
+        CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs,
+        IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs,
+        ResolveTransferCallArgs, SetContractDataCallArgs, StorageDepositCallArgs,
+        StorageWithdrawCallArgs, SubmitResult, TransactionStatus, TransferCallCallArgs,
+        ViewCallArgs,
     };
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -222,7 +222,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn call() {
         let io = Runtime;
-        let args: FunctionCallArgs = io.read_input_borsh().sdk_unwrap();
+        let bytes = io.read_input().to_vec();
+        let args = CallArgs::deserialize(&bytes).sdk_expect("ERR_BORSH_DESERIALIZE");
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(
             predecessor_address(&io.predecessor_account_id()),

@@ -1,6 +1,4 @@
-use crate::parameters::{
-    FunctionCallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs,
-};
+use crate::parameters::{CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs};
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
@@ -478,23 +476,43 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         Ok(SubmitResult::new(status, used_gas, logs))
     }
 
+    /// Call the EVM contract with arguments
     pub fn call_with_args<P: PromiseHandler>(
         &mut self,
-        args: FunctionCallArgs,
+        args: CallArgs,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let origin = self.origin();
-        let contract = Address(args.contract);
-        let value = Wei::zero();
-        self.call(
-            origin,
-            contract,
-            value,
-            args.input,
-            u64::MAX,
-            Vec::new(),
-            handler,
-        )
+        match args {
+            CallArgs::V2(call_args) => {
+                let contract = Address(call_args.contract);
+                let value = call_args.value.into();
+                let input = call_args.input;
+                self.call(
+                    origin,
+                    contract,
+                    value,
+                    input,
+                    u64::MAX,
+                    Vec::new(),
+                    handler,
+                )
+            }
+            CallArgs::V1(call_args) => {
+                let contract = Address(call_args.contract);
+                let value = Wei::zero();
+                let input = call_args.input;
+                self.call(
+                    origin,
+                    contract,
+                    value,
+                    input,
+                    u64::MAX,
+                    Vec::new(),
+                    handler,
+                )
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]

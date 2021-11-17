@@ -4,7 +4,7 @@ use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     format, Balance, BorshDeserialize, BorshSerialize, EthAddress, RawAddress, RawH256, RawU256,
-    SdkUnwrap, String, ToString, TryFrom, Vec,
+    SdkUnwrap, String, ToString, TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
 use evm::backend::Log;
@@ -130,11 +130,46 @@ impl SubmitResult {
     }
 }
 
-/// Borsh-encoded parameters for the `call` function.
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct FunctionCallArgs {
+/// Borsh-encoded parameters for the engine `call` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
+pub struct FunctionCallArgsV2 {
+    pub contract: RawAddress,
+    /// Wei compatible Borsh-encoded value field to attach an ETH balance to the transaction
+    pub value: WeiU256,
+    pub input: Vec<u8>,
+}
+
+/// Legacy Borsh-encoded parameters for the engine `call` function, to provide backward type compatibility
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
+pub struct FunctionCallArgsV1 {
     pub contract: RawAddress,
     pub input: Vec<u8>,
+}
+
+/// Deserialized values from bytes to current or legacy Borsh-encoded parameters
+/// for passing to the engine `call` function, and to provide backward type compatibility
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
+pub enum CallArgs {
+    V2(FunctionCallArgsV2),
+    V1(FunctionCallArgsV1),
+}
+
+impl CallArgs {
+    pub fn deserialize(bytes: &[u8]) -> Option<Self> {
+        // For handling new input format (wrapped into call args enum) - for data structures with new arguments,
+        // made for flexibility and extensibility.
+        if let Ok(value) = Self::try_from_slice(bytes) {
+            Some(value)
+        // Fallback, for handling old input format,
+        // i.e. input, formed as a raw (not wrapped into call args enum) data structure with legacy arguments,
+        // made for backward compatibility.
+        } else if let Ok(value) = FunctionCallArgsV1::try_from_slice(bytes) {
+            Some(Self::V1(value))
+        // Dealing with unrecognized input should be handled and result as an exception in a call site.
+        } else {
+            None
+        }
+    }
 }
 
 /// Borsh-encoded parameters for the `view` function.
@@ -464,5 +499,48 @@ mod tests {
         let bytes = x.try_to_vec().unwrap();
         let res = ViewCallArgs::try_from_slice(&bytes).unwrap();
         assert_eq!(x, res);
+    }
+
+    #[test]
+    fn test_call_args_deserialize() {
+        let new_input = FunctionCallArgsV2 {
+            contract: [0u8; 20],
+            value: WeiU256::default(),
+            input: Vec::new(),
+        };
+        let legacy_input = FunctionCallArgsV1 {
+            contract: [0u8; 20],
+            input: Vec::new(),
+        };
+
+        // Parsing bytes in a new input format - data structures (wrapped into call args enum) with new arguments,
+        // made for flexibility and extensibility.
+
+        // Using new input format (wrapped into call args enum) and data structure with new argument (`value` field).
+        let input_bytes = CallArgs::V2(new_input.clone()).try_to_vec().unwrap();
+        let parsed_data = CallArgs::deserialize(&input_bytes);
+        assert_eq!(parsed_data, Some(CallArgs::V2(new_input.clone())));
+
+        // Using new input format (wrapped into call args enum) and old data structure with legacy arguments,
+        // this is allowed for compatibility reason.
+        let input_bytes = CallArgs::V1(legacy_input.clone()).try_to_vec().unwrap();
+        let parsed_data = CallArgs::deserialize(&input_bytes);
+        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
+
+        // Parsing bytes in an old input format - raw data structure (not wrapped into call args enum) with legacy arguments,
+        // made for backward compatibility.
+
+        // Using old input format (not wrapped into call args enum) - raw data structure with legacy arguments.
+        let input_bytes = legacy_input.try_to_vec().unwrap();
+        let parsed_data = CallArgs::deserialize(&input_bytes);
+        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
+
+        // Using old input format (not wrapped into call args enum) - raw data structure with new argument (`value` field).
+        // Data structures with new arguments allowed only in new input format for future extensibility reason.
+        // Raw data structure (old input format) allowed only with legacy arguments for backward compatibility reason.
+        // Unrecognized input should be handled and result as an exception in a call site.
+        let input_bytes = new_input.try_to_vec().unwrap();
+        let parsed_data = CallArgs::deserialize(&input_bytes);
+        assert_eq!(parsed_data, None);
     }
 }
