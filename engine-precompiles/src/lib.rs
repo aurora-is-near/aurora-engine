@@ -21,25 +21,27 @@ use crate::hash::{RIPEMD160, SHA256};
 use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{ExitToEthereum, ExitToNear};
+use crate::prelude::types::EthGas;
+use crate::prelude::Vec;
 use crate::secp256k1::ECRecover;
-use aurora_engine_types::{account_id::AccountId, Address, BTreeMap, Box};
+use aurora_engine_types::{account_id::AccountId, vec, Address, BTreeMap, Box};
 use evm::backend::Log;
 use evm::executor;
 use evm::{Context, ExitError, ExitSucceed};
 
 #[derive(Debug, Default)]
 pub struct PrecompileOutput {
-    pub cost: u64,
-    pub output: prelude::Vec<u8>,
-    pub logs: prelude::Vec<Log>,
+    pub cost: EthGas,
+    pub output: Vec<u8>,
+    pub logs: Vec<Log>,
 }
 
 impl PrecompileOutput {
-    pub fn without_logs(cost: u64, output: prelude::Vec<u8>) -> Self {
+    pub fn without_logs(cost: EthGas, output: Vec<u8>) -> Self {
         Self {
             cost,
             output,
-            logs: prelude::Vec::new(),
+            logs: Vec::new(),
         }
     }
 }
@@ -48,7 +50,8 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
     fn from(output: PrecompileOutput) -> Self {
         evm::executor::PrecompileOutput {
             exit_status: ExitSucceed::Returned,
-            cost: output.cost,
+            // This shouldn't fail, and is expected.
+            cost: output.cost.into_u64(),
             output: output.output,
             logs: output.logs,
         }
@@ -60,7 +63,7 @@ type EvmPrecompileResult = Result<evm::executor::PrecompileOutput, ExitError>;
 /// A precompiled function for use in the EVM.
 pub trait Precompile {
     /// The required gas in order to run the precompile function.
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError>
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError>
     where
         Self: Sized;
 
@@ -68,7 +71,7 @@ pub trait Precompile {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult;
@@ -109,7 +112,7 @@ impl executor::PrecompileSet for Precompiles {
         is_static: bool,
     ) -> Option<Result<executor::PrecompileOutput, executor::PrecompileFailure>> {
         self.0.get(&address).map(|p| {
-            p.run(input, gas_limit, context, is_static)
+            p.run(input, gas_limit.map(EthGas::new), context, is_static)
                 .map_err(|exit_status| executor::PrecompileFailure::Error { exit_status })
         })
     }
@@ -122,14 +125,14 @@ impl executor::PrecompileSet for Precompiles {
 impl Precompiles {
     #[allow(dead_code)]
     pub fn new_homestead(current_account_id: AccountId) -> Self {
-        let addresses = prelude::vec![
+        let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: prelude::Vec<Box<dyn Precompile>> = prelude::vec![
+        let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
@@ -143,7 +146,7 @@ impl Precompiles {
 
     #[allow(dead_code)]
     pub fn new_byzantium(current_account_id: AccountId) -> Self {
-        let addresses = prelude::vec![
+        let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
@@ -155,7 +158,7 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: prelude::Vec<Box<dyn Precompile>> = prelude::vec![
+        let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
@@ -173,7 +176,7 @@ impl Precompiles {
     }
 
     pub fn new_istanbul(current_account_id: AccountId) -> Self {
-        let addresses = prelude::vec![
+        let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
@@ -186,7 +189,7 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: prelude::Vec<Box<dyn Precompile>> = prelude::vec![
+        let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
@@ -205,7 +208,7 @@ impl Precompiles {
     }
 
     pub fn new_berlin(current_account_id: AccountId) -> Self {
-        let addresses = prelude::vec![
+        let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
@@ -218,7 +221,7 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
         ];
-        let fun: prelude::Vec<Box<dyn Precompile>> = prelude::vec![
+        let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),

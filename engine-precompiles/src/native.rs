@@ -13,6 +13,7 @@ use crate::prelude::{
     types,
 };
 
+use crate::prelude::types::EthGas;
 use crate::prelude::Address;
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
@@ -23,23 +24,23 @@ use evm::{Context, ExitError};
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 mod costs {
-    use crate::prelude::types::Gas;
+    use crate::prelude::types::EthGas;
 
     // TODO(#51): Determine the correct amount of gas
-    pub(super) const EXIT_TO_NEAR_GAS: Gas = 0;
+    pub(super) const EXIT_TO_NEAR_GAS: EthGas = EthGas::new(0);
 
     // TODO(#51): Determine the correct amount of gas
-    pub(super) const EXIT_TO_ETHEREUM_GAS: Gas = 0;
+    pub(super) const EXIT_TO_ETHEREUM_GAS: EthGas = EthGas::new(0);
 
     // TODO(#332): Determine the correct amount of gas
-    pub(super) const FT_TRANSFER_GAS: Gas = 100_000_000_000_000;
+    pub(super) const FT_TRANSFER_GAS: EthGas = EthGas::new(100_000_000_000_000);
 
     // TODO(#332): Determine the correct amount of gas
     #[cfg(feature = "error_refund")]
-    pub(super) const REFUND_ON_ERROR_GAS: Gas = 60_000_000_000_000;
+    pub(super) const REFUND_ON_ERROR_GAS: EthGas = EthGas::new(60_000_000_000_000);
 
     // TODO(#332): Determine the correct amount of gas
-    pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
+    pub(super) const WITHDRAWAL_GAS: EthGas = EthGas::new(100_000_000_000_000);
 }
 
 pub mod events {
@@ -220,7 +221,7 @@ fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
 }
 
 impl Precompile for ExitToNear {
-    fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
@@ -228,7 +229,7 @@ impl Precompile for ExitToNear {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -245,7 +246,7 @@ impl Precompile for ExitToNear {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
@@ -377,14 +378,14 @@ impl Precompile for ExitToNear {
             method: "refund_on_error".to_string(),
             args: refund_args.try_to_vec().unwrap(),
             attached_balance: 0,
-            attached_gas: costs::REFUND_ON_ERROR_GAS,
+            attached_gas: costs::REFUND_ON_ERROR_GAS.into_u64(),
         };
         let transfer_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
             method: "ft_transfer".to_string(),
             args: args.as_bytes().to_vec(),
             attached_balance: 1,
-            attached_gas: costs::FT_TRANSFER_GAS,
+            attached_gas: costs::FT_TRANSFER_GAS.into_u64(),
         };
 
         #[cfg(feature = "error_refund")]
@@ -433,7 +434,7 @@ impl ExitToEthereum {
 }
 
 impl Precompile for ExitToEthereum {
-    fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
@@ -441,7 +442,7 @@ impl Precompile for ExitToEthereum {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -458,7 +459,7 @@ impl Precompile for ExitToEthereum {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
@@ -569,7 +570,7 @@ impl Precompile for ExitToEthereum {
             method: "withdraw".to_string(),
             args: serialized_args,
             attached_balance: 1,
-            attached_gas: costs::WITHDRAWAL_GAS,
+            attached_gas: costs::WITHDRAWAL_GAS.into_u64(),
         };
 
         let promise = PromiseArgs::Create(withdraw_promise).try_to_vec().unwrap();

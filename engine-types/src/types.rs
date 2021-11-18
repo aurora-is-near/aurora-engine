@@ -1,15 +1,108 @@
-use super::{str, vec, Add, Address, String, Sub, Vec, U256};
+use crate::{str, vec, Add, Address, Display, Div, Mul, String, Sub, Vec, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
+
+use crate::fmt::Formatter;
 
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32]; // Big-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 pub type EthAddress = [u8; 20];
-pub type Gas = u64;
 pub type StorageUsage = u64;
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
 pub type WeiU256 = [u8; 32];
+
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+/// Near gas type which wraps an underlying u64.
+pub struct NearGas(u64);
+
+impl Display for NearGas {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl NearGas {
+    /// Constructs a new `NearGas` with a given u64 value.
+    pub const fn new(gas: u64) -> NearGas {
+        Self(gas)
+    }
+
+    /// Consumes `NearGas` and returns the underlying type.
+    pub fn into_u64(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+/// Ethereum gas type which wraps an underlying u64.
+pub struct EthGas(u64);
+
+impl Display for EthGas {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl EthGas {
+    /// Constructs a new `EthGas` with a given u64 value.
+    pub const fn new(gas: u64) -> EthGas {
+        Self(gas)
+    }
+
+    /// Consumes `EthGas` and returns the underlying type.
+    pub fn into_u64(self) -> u64 {
+        self.0
+    }
+}
+
+impl Add<EthGas> for EthGas {
+    type Output = EthGas;
+
+    fn add(self, rhs: EthGas) -> Self::Output {
+        EthGas(self.0 + rhs.0)
+    }
+}
+
+impl Div<usize> for EthGas {
+    type Output = EthGas;
+
+    fn div(self, rhs: usize) -> Self::Output {
+        EthGas(self.0 / rhs as u64)
+    }
+}
+
+impl Mul<EthGas> for u32 {
+    type Output = EthGas;
+
+    fn mul(self, rhs: EthGas) -> Self::Output {
+        EthGas(self as u64 * rhs.0)
+    }
+}
+
+impl Mul<u32> for EthGas {
+    type Output = EthGas;
+
+    fn mul(self, rhs: u32) -> Self::Output {
+        EthGas(self.0 * rhs as u64)
+    }
+}
+
+impl Mul<usize> for EthGas {
+    type Output = EthGas;
+
+    fn mul(self, rhs: usize) -> Self::Output {
+        EthGas(self.0 * rhs as u64)
+    }
+}
+
+impl Mul<EthGas> for u64 {
+    type Output = EthGas;
+
+    fn mul(self, rhs: EthGas) -> Self::Output {
+        EthGas(self * rhs.0)
+    }
+}
 
 /// Selector to call mint function in ERC 20 contract
 ///
@@ -44,7 +137,7 @@ pub fn validate_eth_address(address: String) -> Result<EthAddress, AddressValida
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Wei(U256);
 
 impl Wei {
@@ -54,7 +147,7 @@ impl Wei {
         Self(U256([0, 0, 0, 0]))
     }
 
-    pub fn new(amount: U256) -> Self {
+    pub const fn new(amount: U256) -> Self {
         Self(amount)
     }
 
@@ -83,28 +176,34 @@ impl Wei {
         self.0
     }
 
-    pub fn checked_sub(self, other: Self) -> Option<Self> {
-        self.0.checked_sub(other.0).map(Self)
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.checked_sub(rhs.0).map(Self)
     }
 
-    pub fn checked_add(self, other: Self) -> Option<Self> {
-        self.0.checked_add(other.0).map(Self)
-    }
-}
-
-impl Sub for Wei {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self::Output {
-        Self(self.0 - other.0)
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0).map(Self)
     }
 }
 
-impl Add for Wei {
-    type Output = Self;
+impl Display for Wei {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
-    fn add(self, other: Self) -> Self::Output {
-        Self(self.0 + other.0)
+impl Add<Self> for Wei {
+    type Output = Wei;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl Sub<Self> for Wei {
+    type Output = Wei;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
     }
 }
 

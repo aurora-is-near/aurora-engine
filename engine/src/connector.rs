@@ -10,7 +10,7 @@ use crate::parameters::{
 };
 use crate::prelude::{
     format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
-    BorshSerialize, EthAddress, EthConnectorStorageId, Gas, KeyPrefix, PromiseResult, String,
+    BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, String,
     ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160, U256,
 };
 use crate::proof::Proof;
@@ -23,9 +23,9 @@ use aurora_engine_types::types::AddressValidationError;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 pub const NO_DEPOSIT: Balance = 0;
-const GAS_FOR_FINISH_DEPOSIT: Gas = 50_000_000_000_000;
+const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 // Note: Is 40Tgas always enough?
-const GAS_FOR_VERIFY_LOG_ENTRY: Gas = 40_000_000_000_000;
+const GAS_FOR_VERIFY_LOG_ENTRY: NearGas = NearGas::new(40_000_000_000_000);
 
 pub const UNPAUSE_ALL: PausedMask = 0;
 pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
@@ -252,7 +252,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "verify_log_entry".to_string(),
             args: proof_to_verify,
             attached_balance: NO_DEPOSIT,
-            attached_gas: GAS_FOR_VERIFY_LOG_ENTRY,
+            attached_gas: GAS_FOR_VERIFY_LOG_ENTRY.into_u64(),
         };
 
         // Finalize deposit
@@ -310,7 +310,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "finish_deposit".to_string(),
             args: data,
             attached_balance: NO_DEPOSIT,
-            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+            attached_gas: GAS_FOR_FINISH_DEPOSIT.into_u64(),
         };
         Ok(PromiseWithCallbackArgs {
             base: verify_call,

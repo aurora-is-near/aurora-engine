@@ -1,17 +1,20 @@
 #[cfg(feature = "contract")]
 use crate::prelude::sdk;
+use crate::prelude::types::EthGas;
 use crate::prelude::{vec, Address};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
 mod costs {
-    pub(super) const SHA256_BASE: u64 = 60;
+    use crate::prelude::types::EthGas;
 
-    pub(super) const SHA256_PER_WORD: u64 = 12;
+    pub(super) const SHA256_BASE: EthGas = EthGas::new(60);
 
-    pub(super) const RIPEMD160_BASE: u64 = 600;
+    pub(super) const SHA256_PER_WORD: EthGas = EthGas::new(12);
 
-    pub(super) const RIPEMD160_PER_WORD: u64 = 120;
+    pub(super) const RIPEMD160_BASE: EthGas = EthGas::new(600);
+
+    pub(super) const RIPEMD160_PER_WORD: EthGas = EthGas::new(120);
 }
 
 mod consts {
@@ -28,7 +31,7 @@ impl SHA256 {
 }
 
 impl Precompile for SHA256 {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(
             (input.len() as u64 + consts::SHA256_WORD_LEN - 1) / consts::SHA256_WORD_LEN
                 * costs::SHA256_PER_WORD
@@ -43,7 +46,7 @@ impl Precompile for SHA256 {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -67,7 +70,7 @@ impl Precompile for SHA256 {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -100,7 +103,7 @@ impl RIPEMD160 {
 }
 
 impl Precompile for RIPEMD160 {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(
             (input.len() as u64 + consts::RIPEMD_WORD_LEN - 1) / consts::RIPEMD_WORD_LEN
                 * costs::RIPEMD160_PER_WORD
@@ -114,7 +117,7 @@ impl Precompile for RIPEMD160 {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -151,7 +154,7 @@ mod tests {
                 .unwrap();
 
         let res = SHA256
-            .run(input, Some(60), &new_context(), false)
+            .run(input, Some(EthGas::new(60)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -165,7 +168,7 @@ mod tests {
                 .unwrap();
 
         let res = RIPEMD160
-            .run(input, Some(600), &new_context(), false)
+            .run(input, Some(EthGas::new(600)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);

@@ -97,6 +97,9 @@ mod contract {
     };
     use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 
+    #[cfg(feature = "integration-test")]
+    use crate::prelude::NearGas;
+
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
     const GAS_OVERFLOW: &str = "ERR_GAS_OVERFLOW";
@@ -948,8 +951,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use evm::backend::ApplyBackend;
-        const GAS_FOR_VERIFY: u64 = 20_000_000_000_000;
-        const GAS_FOR_FINISH: u64 = 50_000_000_000_000;
+        const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
+        const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
 
         let mut io = Runtime;
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
@@ -983,14 +986,14 @@ mod contract {
             method: "verify_log_entry".to_string(),
             args: Vec::new(),
             attached_balance: 0,
-            attached_gas: GAS_FOR_VERIFY,
+            attached_gas: GAS_FOR_VERIFY.into_u64(),
         };
         let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
             target_account_id: aurora_account_id,
             method: "finish_deposit".to_string(),
             args: args.try_to_vec().unwrap(),
             attached_balance: 0,
-            attached_gas: GAS_FOR_FINISH,
+            attached_gas: GAS_FOR_FINISH.into_u64(),
         };
         io.promise_crate_with_callback(&aurora_engine_types::parameters::PromiseWithCallbackArgs {
             base: verify_call,

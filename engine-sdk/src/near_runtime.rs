@@ -1,4 +1,5 @@
 use crate::io::StorageIntermediate;
+use crate::prelude::NearGas;
 use crate::promise::PromiseId;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
@@ -21,7 +22,7 @@ impl Runtime {
     const ENV_REGISTER_ID: RegisterIndex = RegisterIndex(4);
     const PROMISE_REGISTER_ID: RegisterIndex = RegisterIndex(5);
 
-    const GAS_FOR_STATE_MIGRATION: u64 = 100_000_000_000_000;
+    const GAS_FOR_STATE_MIGRATION: NearGas = NearGas::new(100_000_000_000_000);
 
     /// Deploy code from given key in place of the current contract.
     /// Not implemented in terms of higher level traits (eg IO) for efficiency reasons.
@@ -39,7 +40,7 @@ impl Runtime {
                 b"state_migration",
                 &[],
                 0,
-                Self::GAS_FOR_STATE_MIGRATION,
+                Self::GAS_FOR_STATE_MIGRATION.into_u64(),
             )
         }
     }

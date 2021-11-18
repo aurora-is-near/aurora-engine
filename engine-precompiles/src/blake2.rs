@@ -1,12 +1,15 @@
 use evm::{Context, ExitError};
 
+use crate::prelude::types::EthGas;
 use crate::prelude::{mem, Address, Borrowed, TryInto};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 
 /// Blake2 costs.
 mod costs {
+    use crate::prelude::types::EthGas;
+
     /// Cost per round of Blake2 F.
-    pub(super) const F_ROUND: u64 = 1;
+    pub(super) const F_ROUND: EthGas = EthGas::new(1);
 }
 
 /// Blake2 constants.
@@ -21,11 +24,13 @@ impl Blake2F {
 }
 
 impl Precompile for Blake2F {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (int_bytes, _) = input.split_at(mem::size_of::<u32>());
-        Ok(u64::from(u32::from_be_bytes(
-            int_bytes.try_into().expect("cannot fail"),
-        )) * costs::F_ROUND)
+        let num_rounds = u32::from_be_bytes(
+            // Unwrap is fine here as it can not fail
+            int_bytes.try_into().unwrap(),
+        );
+        Ok(num_rounds * costs::F_ROUND)
     }
 
     /// The compression function of the blake2 algorithm.
@@ -41,7 +46,7 @@ impl Precompile for Blake2F {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -121,12 +126,12 @@ mod tests {
 
     fn test_blake2f_out_of_gas() -> EvmPrecompileResult {
         let input = hex::decode(INPUT).unwrap();
-        Blake2F.run(&input, Some(11), &new_context(), false)
+        Blake2F.run(&input, Some(EthGas::new(11)), &new_context(), false)
     }
 
     fn test_blake2f_empty() -> EvmPrecompileResult {
         let input = [0u8; 0];
-        Blake2F.run(&input, Some(0), &new_context(), false)
+        Blake2F.run(&input, Some(EthGas::new(0)), &new_context(), false)
     }
 
     fn test_blake2f_invalid_len_1() -> EvmPrecompileResult {
@@ -144,7 +149,7 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F.run(&input, Some(12), &new_context(), false)
+        Blake2F.run(&input, Some(EthGas::new(12)), &new_context(), false)
     }
 
     fn test_blake2f_invalid_len_2() -> EvmPrecompileResult {
@@ -162,7 +167,7 @@ mod tests {
             01",
         )
         .unwrap();
-        Blake2F.run(&input, Some(12), &new_context(), false)
+        Blake2F.run(&input, Some(EthGas::new(12)), &new_context(), false)
     }
 
     fn test_blake2f_invalid_flag() -> EvmPrecompileResult {
@@ -180,7 +185,7 @@ mod tests {
             02",
         )
         .unwrap();
-        Blake2F.run(&input, Some(12), &new_context(), false)
+        Blake2F.run(&input, Some(EthGas::new(12)), &new_context(), false)
     }
 
     fn test_blake2f_r_0() -> Vec<u8> {
@@ -199,7 +204,7 @@ mod tests {
         )
         .unwrap();
         Blake2F
-            .run(&input, Some(12), &new_context(), false)
+            .run(&input, Some(EthGas::new(12)), &new_context(), false)
             .unwrap()
             .output
     }
@@ -207,7 +212,7 @@ mod tests {
     fn test_blake2f_r_12() -> Vec<u8> {
         let input = hex::decode(INPUT).unwrap();
         Blake2F
-            .run(&input, Some(12), &new_context(), false)
+            .run(&input, Some(EthGas::new(12)), &new_context(), false)
             .unwrap()
             .output
     }
@@ -228,7 +233,7 @@ mod tests {
         )
         .unwrap();
         Blake2F
-            .run(&input, Some(12), &new_context(), false)
+            .run(&input, Some(EthGas::new(12)), &new_context(), false)
             .unwrap()
             .output
     }

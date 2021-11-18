@@ -29,35 +29,16 @@ mod v0 {
     };
     #[cfg(not(feature = "std"))]
     pub use core::{
-        cmp::Ordering,
-        convert::TryFrom,
-        convert::TryInto,
-        marker::PhantomData,
-        mem,
-        ops::{Add, Sub},
+        cmp::Ordering, convert::TryFrom, convert::TryInto, fmt::Display, marker::PhantomData, mem,
+        ops::Add, ops::Div, ops::Mul, ops::Sub,
     };
     pub use primitive_types::{H160, H256, U256};
     #[cfg(feature = "std")]
     pub use std::{
-        borrow::Cow,
-        borrow::Cow::Borrowed,
-        borrow::ToOwned,
-        boxed::Box,
-        cmp::Ordering,
-        collections::BTreeMap,
-        collections::HashMap,
-        convert::TryFrom,
-        convert::TryInto,
-        error::Error,
-        fmt, format,
-        marker::PhantomData,
-        mem,
-        ops::{Add, Sub},
-        str,
-        string::String,
-        string::ToString,
-        vec,
-        vec::Vec,
+        borrow::Cow, borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, cmp::Ordering,
+        collections::BTreeMap, collections::HashMap, convert::TryFrom, convert::TryInto,
+        error::Error, fmt, fmt::Display, format, marker::PhantomData, mem, ops::Add, ops::Div,
+        ops::Mul, ops::Sub, str, string::String, string::ToString, vec, vec::Vec,
     };
 }
 

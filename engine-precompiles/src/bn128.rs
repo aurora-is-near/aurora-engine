@@ -1,32 +1,35 @@
+use crate::prelude::types::EthGas;
 use crate::prelude::{Address, Borrowed, PhantomData, Vec};
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
 /// bn128 costs.
 mod costs {
+    use crate::prelude::types::EthGas;
+
     /// Cost of the Byzantium alt_bn128_add operation.
-    pub(super) const BYZANTIUM_ADD: u64 = 500;
+    pub(super) const BYZANTIUM_ADD: EthGas = EthGas::new(500);
 
     /// Cost of the Byzantium alt_bn128_mul operation.
-    pub(super) const BYZANTIUM_MUL: u64 = 40_000;
+    pub(super) const BYZANTIUM_MUL: EthGas = EthGas::new(40_000);
 
     /// Cost of the alt_bn128_pair per point.
-    pub(super) const BYZANTIUM_PAIR_PER_POINT: u64 = 80_000;
+    pub(super) const BYZANTIUM_PAIR_PER_POINT: EthGas = EthGas::new(80_000);
 
     /// Cost of the alt_bn128_pair operation.
-    pub(super) const BYZANTIUM_PAIR_BASE: u64 = 100_000;
+    pub(super) const BYZANTIUM_PAIR_BASE: EthGas = EthGas::new(100_000);
 
     /// Cost of the Istanbul alt_bn128_add operation.
-    pub(super) const ISTANBUL_ADD: u64 = 150;
+    pub(super) const ISTANBUL_ADD: EthGas = EthGas::new(150);
 
     /// Cost of the Istanbul alt_bn128_mul operation.
-    pub(super) const ISTANBUL_MUL: u64 = 6_000;
+    pub(super) const ISTANBUL_MUL: EthGas = EthGas::new(6_000);
 
     /// Cost of the Istanbul alt_bn128_pair per point.
-    pub(super) const ISTANBUL_PAIR_PER_POINT: u64 = 34_000;
+    pub(super) const ISTANBUL_PAIR_PER_POINT: EthGas = EthGas::new(34_000);
 
     /// Cost of the Istanbul alt_bn128_pair operation.
-    pub(super) const ISTANBUL_PAIR_BASE: u64 = 45_000;
+    pub(super) const ISTANBUL_PAIR_BASE: EthGas = EthGas::new(45_000);
 }
 
 /// bn128 constants.
@@ -97,7 +100,7 @@ impl<HF: HardFork> Bn128Add<HF> {
 }
 
 impl Precompile for Bn128Add<Byzantium> {
-    fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::BYZANTIUM_ADD)
     }
 
@@ -109,7 +112,7 @@ impl Precompile for Bn128Add<Byzantium> {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -126,7 +129,7 @@ impl Precompile for Bn128Add<Byzantium> {
 }
 
 impl Precompile for Bn128Add<Istanbul> {
-    fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::ISTANBUL_ADD)
     }
 
@@ -138,7 +141,7 @@ impl Precompile for Bn128Add<Istanbul> {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -189,7 +192,7 @@ impl<HF: HardFork> Bn128Mul<HF> {
 }
 
 impl Precompile for Bn128Mul<Byzantium> {
-    fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::BYZANTIUM_MUL)
     }
 
@@ -200,7 +203,7 @@ impl Precompile for Bn128Mul<Byzantium> {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -217,7 +220,7 @@ impl Precompile for Bn128Mul<Byzantium> {
 }
 
 impl Precompile for Bn128Mul<Istanbul> {
-    fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::ISTANBUL_MUL)
     }
 
@@ -228,7 +231,7 @@ impl Precompile for Bn128Mul<Istanbul> {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -349,9 +352,9 @@ impl<HF: HardFork> Bn128Pair<HF> {
 }
 
 impl Precompile for Bn128Pair<Byzantium> {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(
-            costs::BYZANTIUM_PAIR_PER_POINT * input.len() as u64 / consts::PAIR_ELEMENT_LEN as u64
+            costs::BYZANTIUM_PAIR_PER_POINT * input.len() / consts::PAIR_ELEMENT_LEN
                 + costs::BYZANTIUM_PAIR_BASE,
         )
     }
@@ -363,7 +366,7 @@ impl Precompile for Bn128Pair<Byzantium> {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -380,9 +383,9 @@ impl Precompile for Bn128Pair<Byzantium> {
 }
 
 impl Precompile for Bn128Pair<Istanbul> {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(
-            costs::ISTANBUL_PAIR_PER_POINT * input.len() as u64 / consts::PAIR_ELEMENT_LEN as u64
+            costs::ISTANBUL_PAIR_PER_POINT * input.len() / consts::PAIR_ELEMENT_LEN
                 + costs::ISTANBUL_PAIR_BASE,
         )
     }
@@ -394,7 +397,7 @@ impl Precompile for Bn128Pair<Istanbul> {
     fn run(
         &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -434,7 +437,7 @@ mod tests {
         .unwrap();
 
         let res = Bn128Add::<Byzantium>::new()
-            .run(&input, Some(500), &new_context(), false)
+            .run(&input, Some(EthGas::new(500)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -456,7 +459,7 @@ mod tests {
         .unwrap();
 
         let res = Bn128Add::<Byzantium>::new()
-            .run(&input, Some(500), &new_context(), false)
+            .run(&input, Some(EthGas::new(500)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -470,7 +473,8 @@ mod tests {
             0000000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = Bn128Add::<Byzantium>::new().run(&input, Some(499), &new_context(), false);
+        let res =
+            Bn128Add::<Byzantium>::new().run(&input, Some(EthGas::new(499)), &new_context(), false);
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -483,7 +487,7 @@ mod tests {
         .unwrap();
 
         let res = Bn128Add::<Byzantium>::new()
-            .run(&input, Some(500), &new_context(), false)
+            .run(&input, Some(EthGas::new(500)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -498,7 +502,8 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Add::<Byzantium>::new().run(&input, Some(500), &new_context(), false);
+        let res =
+            Bn128Add::<Byzantium>::new().run(&input, Some(EthGas::new(500)), &new_context(), false);
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -522,7 +527,7 @@ mod tests {
         .unwrap();
 
         let res = Bn128Mul::<Byzantium>::new()
-            .run(&input, Some(40_000), &new_context(), false)
+            .run(&input, Some(EthGas::new(40_000)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -535,7 +540,12 @@ mod tests {
             0200000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
-        let res = Bn128Mul::<Byzantium>::new().run(&input, Some(39_999), &new_context(), false);
+        let res = Bn128Mul::<Byzantium>::new().run(
+            &input,
+            Some(EthGas::new(39_999)),
+            &new_context(),
+            false,
+        );
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // zero multiplication test
@@ -554,7 +564,7 @@ mod tests {
         .unwrap();
 
         let res = Bn128Mul::<Byzantium>::new()
-            .run(&input, Some(40_000), &new_context(), false)
+            .run(&input, Some(EthGas::new(40_000)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -569,7 +579,7 @@ mod tests {
         .unwrap();
 
         let res = Bn128Mul::<Byzantium>::new()
-            .run(&input, Some(40_000), &new_context(), false)
+            .run(&input, Some(EthGas::new(40_000)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -583,7 +593,12 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Mul::<Byzantium>::new().run(&input, Some(40_000), &new_context(), false);
+        let res = Bn128Mul::<Byzantium>::new().run(
+            &input,
+            Some(EthGas::new(40_000)),
+            &new_context(),
+            false,
+        );
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
@@ -613,7 +628,7 @@ mod tests {
                 .unwrap();
 
         let res = Bn128Pair::<Byzantium>::new()
-            .run(&input, Some(260_000), &new_context(), false)
+            .run(&input, Some(EthGas::new(260_000)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -635,7 +650,12 @@ mod tests {
             12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
         )
         .unwrap();
-        let res = Bn128Pair::<Byzantium>::new().run(&input, Some(259_999), &new_context(), false);
+        let res = Bn128Pair::<Byzantium>::new().run(
+            &input,
+            Some(EthGas::new(259_999)),
+            &new_context(),
+            false,
+        );
         assert!(matches!(res, Err(ExitError::OutOfGas)));
 
         // no input test
@@ -645,7 +665,7 @@ mod tests {
                 .unwrap();
 
         let res = Bn128Pair::<Byzantium>::new()
-            .run(&input, Some(260_000), &new_context(), false)
+            .run(&input, Some(EthGas::new(260_000)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -662,7 +682,12 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::new().run(&input, Some(260_000), &new_context(), false);
+        let res = Bn128Pair::<Byzantium>::new().run(
+            &input,
+            Some(EthGas::new(260_000)),
+            &new_context(),
+            false,
+        );
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
@@ -678,7 +703,12 @@ mod tests {
         )
         .unwrap();
 
-        let res = Bn128Pair::<Byzantium>::new().run(&input, Some(260_000), &new_context(), false);
+        let res = Bn128Pair::<Byzantium>::new().run(
+            &input,
+            Some(EthGas::new(260_000)),
+            &new_context(),
+            false,
+        );
         assert!(matches!(
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN",)))

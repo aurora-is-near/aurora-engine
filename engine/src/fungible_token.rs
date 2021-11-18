@@ -5,16 +5,16 @@ use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, Storage
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress,
-    Gas, PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec, Wei,
-    U256,
+    NearGas, PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
+    Wei, U256,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::parameters::{
     PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
 };
 
-const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
-const GAS_FOR_FT_ON_TRANSFER: Gas = 10_000_000_000_000;
+const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
+const GAS_FOR_FT_ON_TRANSFER: NearGas = NearGas::new(10_000_000_000_000);
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
@@ -296,14 +296,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             method: "ft_on_transfer".to_string(),
             args: data1.into_bytes(),
             attached_balance: NO_DEPOSIT,
-            attached_gas: GAS_FOR_FT_ON_TRANSFER,
+            attached_gas: GAS_FOR_FT_ON_TRANSFER.into_u64(),
         };
         let ft_resolve_transfer_call = PromiseCreateArgs {
             target_account_id: current_account_id,
             method: "ft_resolve_transfer".to_string(),
             args: data2,
             attached_balance: NO_DEPOSIT,
-            attached_gas: GAS_FOR_RESOLVE_TRANSFER,
+            attached_gas: GAS_FOR_RESOLVE_TRANSFER.into_u64(),
         };
         Ok(PromiseWithCallbackArgs {
             base: ft_on_transfer_call,
