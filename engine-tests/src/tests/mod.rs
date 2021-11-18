@@ -9,6 +9,7 @@ mod meta_parsing;
 mod one_inch;
 mod sanity;
 mod self_destruct_state;
+mod standalone;
 mod standard_precompiles;
 mod state_migration;
 pub(crate) mod uniswap;

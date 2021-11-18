@@ -33,6 +33,7 @@ members = [
     "engine-precompiles",
     "engine-sdk",
     "engine-standalone",
+    "engine-standalone-storage",
     "engine-tests",
     "engine-types",
 ]

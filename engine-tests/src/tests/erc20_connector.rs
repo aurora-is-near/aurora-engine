@@ -262,6 +262,8 @@ fn test_mint_not_admin() {
 #[test]
 fn test_ft_on_transfer() {
     let mut runner = AuroraRunner::new();
+    // Standalone runner presently does not support ft_on_transfer
+    runner.standalone_runner = None;
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
     let token = runner.deploy_erc20_token(&nep141);
@@ -297,6 +299,8 @@ fn test_ft_on_transfer_fail() {
 #[test]
 fn test_relayer_charge_fee() {
     let mut runner = AuroraRunner::new();
+    // Standalone runner presently does not support ft_on_transfer
+    runner.standalone_runner = None;
     let amount = 10;
     let fee = 51;
     let nep141 = "tt.testnet".to_string();

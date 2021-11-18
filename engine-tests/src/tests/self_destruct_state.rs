@@ -35,8 +35,6 @@ fn test_self_destruct_reset_state() {
     assert_eq!(sd_contract_addr, sd_contract_addr1);
 
     let counter_value = sd.counter(&mut runner, &mut signer);
-    // TODO: Fix this test. Counter expected to be 0, since state should be restarted
-    //  after calling self destruct. But that is not happening now, and counter is still 1.
     assert_eq!(counter_value, Some(0));
 }
 

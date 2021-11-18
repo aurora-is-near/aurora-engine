@@ -195,6 +195,7 @@ dependencies = [
  "bstr",
  "byte-slice-cast",
  "criterion",
+ "engine-standalone-storage",
  "ethabi",
  "evm",
  "git2",
@@ -212,6 +213,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3 0.9.1",
+ "tempfile",
  "wasmer-near",
 ]
 
@@ -1192,9 +1194,23 @@ dependencies = [
  "aurora-engine",
  "aurora-engine-sdk",
  "aurora-engine-types",
+ "borsh 0.8.2",
+ "engine-standalone-storage",
  "evm-core",
- "hex",
  "libc",
+ "rocksdb",
+]
+
+[[package]]
+name = "engine-standalone-storage"
+version = "0.1.0"
+dependencies = [
+ "aurora-engine",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "borsh 0.8.2",
+ "evm-core",
+ "rocksdb",
 ]
 
 [[package]]
