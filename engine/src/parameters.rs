@@ -367,7 +367,7 @@ pub struct TransferCallCallArgs {
 impl TryFrom<JsonValue> for TransferCallCallArgs {
     type Error = error::ParseTypeFromJsonError;
 
-    fn try_from(v: JsonValue) -> Result<Self, error::ParseTypeFromJsonError> {
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
         let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
         let amount = v.u128("amount")?;
         let memo = v.string("memo").ok();
@@ -390,7 +390,7 @@ pub struct StorageBalanceOfCallArgs {
 impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
     type Error = error::ParseTypeFromJsonError;
 
-    fn try_from(v: JsonValue) -> Result<Self, error::ParseTypeFromJsonError> {
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
         let account_id = AccountId::try_from(v.string("account_id")?)?;
         Ok(Self { account_id })
     }

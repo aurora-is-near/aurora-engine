@@ -241,7 +241,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         ));
         #[cfg(feature = "log")]
         if let Some(memo) = memo {
-            sdk::log(&crate::prelude::format!("Memo: {}", memo));
+            sdk::log!(&crate::prelude::format!("Memo: {}", memo));
         }
         Ok(())
     }
