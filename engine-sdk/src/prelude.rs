@@ -1,3 +1,6 @@
-pub use aurora_engine_types::types::{NearGas, PromiseResult, STORAGE_PRICE_PER_BYTE};
-pub use aurora_engine_types::{vec, Address, Vec, H256};
-pub use borsh::{BorshDeserialize, BorshSerialize};
+mod v0 {
+    pub use aurora_engine_types::types::{NearGas, PromiseResult, STORAGE_PRICE_PER_BYTE};
+    pub use aurora_engine_types::{vec, Address, Vec, H256};
+    pub use borsh::{BorshDeserialize, BorshSerialize};
+}
+pub use v0::*;
