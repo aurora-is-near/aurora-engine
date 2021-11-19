@@ -14,11 +14,11 @@ use crate::parameters::{NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::{
-    address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, AccountId, Address,
+    address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
     BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, TryFrom, TryInto,
     Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
 };
-use crate::transaction::NormalizedEthTransaction;
+use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -60,15 +60,15 @@ pub struct EngineError {
     pub gas_used: u64,
 }
 
-impl AsRef<str> for EngineError {
-    fn as_ref(&self) -> &str {
-        self.kind.to_str()
+impl From<EngineErrorKind> for EngineError {
+    fn from(kind: EngineErrorKind) -> Self {
+        Self { kind, gas_used: 0 }
     }
 }
 
 impl AsRef<[u8]> for EngineError {
     fn as_ref(&self) -> &[u8] {
-        self.kind.to_str().as_bytes()
+        self.kind.as_bytes()
     }
 }
 
@@ -81,6 +81,13 @@ pub enum EngineErrorKind {
     EvmFatal(ExitFatal),
     /// Incorrect nonce.
     IncorrectNonce,
+    FailedTransactionParse(crate::transaction::ParseTransactionError),
+    InvalidChainId,
+    InvalidSignature,
+    IntrinsicGasNotMet,
+    MaxPriorityGasFeeTooLarge,
+    GasPayment(GasPaymentError),
+    GasOverflow,
 }
 
 impl EngineErrorKind {
@@ -91,40 +98,41 @@ impl EngineErrorKind {
         }
     }
 
-    pub fn to_str(&self) -> &str {
+    pub fn as_bytes(&self) -> &[u8] {
         use EngineErrorKind::*;
         match self {
-            EvmError(ExitError::StackUnderflow) => "ERR_STACK_UNDERFLOW",
-            EvmError(ExitError::StackOverflow) => "ERR_STACK_OVERFLOW",
-            EvmError(ExitError::InvalidJump) => "ERR_INVALID_JUMP",
-            EvmError(ExitError::InvalidRange) => "ERR_INVALID_RANGE",
-            EvmError(ExitError::DesignatedInvalid) => "ERR_DESIGNATED_INVALID",
-            EvmError(ExitError::CallTooDeep) => "ERR_CALL_TOO_DEEP",
-            EvmError(ExitError::CreateCollision) => "ERR_CREATE_COLLISION",
-            EvmError(ExitError::CreateContractLimit) => "ERR_CREATE_CONTRACT_LIMIT",
-            EvmError(ExitError::OutOfOffset) => "ERR_OUT_OF_OFFSET",
-            EvmError(ExitError::OutOfGas) => "ERR_OUT_OF_GAS",
-            EvmError(ExitError::OutOfFund) => "ERR_OUT_OF_FUND",
-            EvmError(ExitError::Other(m)) => m,
+            EvmError(ExitError::StackUnderflow) => b"ERR_STACK_UNDERFLOW",
+            EvmError(ExitError::StackOverflow) => b"ERR_STACK_OVERFLOW",
+            EvmError(ExitError::InvalidJump) => b"ERR_INVALID_JUMP",
+            EvmError(ExitError::InvalidRange) => b"ERR_INVALID_RANGE",
+            EvmError(ExitError::DesignatedInvalid) => b"ERR_DESIGNATED_INVALID",
+            EvmError(ExitError::CallTooDeep) => b"ERR_CALL_TOO_DEEP",
+            EvmError(ExitError::CreateCollision) => b"ERR_CREATE_COLLISION",
+            EvmError(ExitError::CreateContractLimit) => b"ERR_CREATE_CONTRACT_LIMIT",
+            EvmError(ExitError::OutOfOffset) => b"ERR_OUT_OF_OFFSET",
+            EvmError(ExitError::OutOfGas) => b"ERR_OUT_OF_GAS",
+            EvmError(ExitError::OutOfFund) => b"ERR_OUT_OF_FUND",
+            EvmError(ExitError::Other(m)) => m.as_bytes(),
             EvmError(_) => unreachable!(), // unused misc
-            EvmFatal(ExitFatal::NotSupported) => "ERR_NOT_SUPPORTED",
-            EvmFatal(ExitFatal::UnhandledInterrupt) => "ERR_UNHANDLED_INTERRUPT",
-            EvmFatal(ExitFatal::Other(m)) => m,
+            EvmFatal(ExitFatal::NotSupported) => b"ERR_NOT_SUPPORTED",
+            EvmFatal(ExitFatal::UnhandledInterrupt) => b"ERR_UNHANDLED_INTERRUPT",
+            EvmFatal(ExitFatal::Other(m)) => m.as_bytes(),
             EvmFatal(_) => unreachable!(), // unused misc
-            IncorrectNonce => "ERR_INCORRECT_NONCE",
+            IncorrectNonce => b"ERR_INCORRECT_NONCE",
+            FailedTransactionParse(e) => e.as_ref(),
+            InvalidChainId => b"ERR_INVALID_CHAIN_ID",
+            InvalidSignature => b"ERR_INVALID_ECDSA_SIGNATURE",
+            IntrinsicGasNotMet => b"ERR_INTRINSIC_GAS",
+            MaxPriorityGasFeeTooLarge => b"ERR_MAX_PRIORITY_FEE_GREATER",
+            GasPayment(e) => e.as_ref(),
+            GasOverflow => b"ERR_GAS_OVERFLOW",
         }
-    }
-}
-
-impl AsRef<str> for EngineErrorKind {
-    fn as_ref(&self) -> &str {
-        self.to_str()
     }
 }
 
 impl AsRef<[u8]> for EngineErrorKind {
     fn as_ref(&self) -> &[u8] {
-        self.to_str().as_bytes()
+        self.as_bytes()
     }
 }
 
@@ -163,6 +171,7 @@ impl ExitIntoResult for ExitReason {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct BalanceOverflow;
 
 impl AsRef<[u8]> for BalanceOverflow {
@@ -172,6 +181,7 @@ impl AsRef<[u8]> for BalanceOverflow {
 }
 
 /// Errors resulting from trying to pay for gas
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum GasPaymentError {
     /// Overflow adding ETH to an account balance (should never happen)
     BalanceOverflow(BalanceOverflow),
@@ -769,6 +779,112 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         // Everything succeed so return "0"
         self.io.return_output(b"\"0\"");
     }
+}
+
+pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
+    mut io: I,
+    env: &E,
+    transaction_bytes: &[u8],
+    state: EngineState,
+    current_account_id: AccountId,
+    relayer_address: Address,
+    handler: &mut P,
+) -> EngineResult<SubmitResult> {
+    let transaction: NormalizedEthTransaction = EthTransactionKind::try_from(transaction_bytes)
+        .map_err(EngineErrorKind::FailedTransactionParse)?
+        .into();
+
+    // Validate the chain ID, if provided inside the signature:
+    if let Some(chain_id) = transaction.chain_id {
+        if U256::from(chain_id) != U256::from(state.chain_id) {
+            return Err(EngineErrorKind::InvalidChainId.into());
+        }
+    }
+
+    // Retrieve the signer of the transaction:
+    let sender = transaction
+        .address
+        .ok_or(EngineErrorKind::InvalidSignature)?;
+
+    sdk::log!(crate::prelude::format!("signer_address {:?}", sender).as_str());
+
+    check_nonce(&io, &sender, &transaction.nonce)?;
+
+    // Check intrinsic gas is covered by transaction gas limit
+    match transaction.intrinsic_gas(crate::engine::CONFIG) {
+        None => {
+            return Err(EngineErrorKind::GasOverflow.into());
+        }
+        Some(intrinsic_gas) => {
+            if transaction.gas_limit < intrinsic_gas.into() {
+                return Err(EngineErrorKind::IntrinsicGasNotMet.into());
+            }
+        }
+    }
+
+    if transaction.max_priority_fee_per_gas > transaction.max_fee_per_gas {
+        return Err(EngineErrorKind::MaxPriorityGasFeeTooLarge.into());
+    }
+
+    let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
+    let prepaid_amount = match engine.charge_gas(&sender, &transaction) {
+        Ok(gas_result) => gas_result,
+        Err(GasPaymentError::OutOfFund) => {
+            increment_nonce(&mut io, &sender);
+            let result = SubmitResult::new(TransactionStatus::OutOfFund, 0, vec![]);
+            return Ok(result);
+        }
+        Err(err) => {
+            return Err(EngineErrorKind::GasPayment(err).into());
+        }
+    };
+    let gas_limit: u64 = transaction
+        .gas_limit
+        .try_into()
+        .map_err(|_| EngineErrorKind::GasOverflow)?;
+    let access_list = transaction
+        .access_list
+        .into_iter()
+        .map(|a| (a.address, a.storage_keys))
+        .collect();
+    let result = if let Some(receiver) = transaction.to {
+        engine.call(
+            sender,
+            receiver,
+            transaction.value,
+            transaction.data,
+            gas_limit,
+            access_list,
+            handler,
+        )
+        // TODO: charge for storage
+    } else {
+        // Execute a contract deployment:
+        engine.deploy_code(
+            sender,
+            transaction.value,
+            transaction.data,
+            gas_limit,
+            access_list,
+            handler,
+        )
+        // TODO: charge for storage
+    };
+
+    // Give refund
+    let gas_used = match &result {
+        Ok(submit_result) => submit_result.gas_used,
+        Err(engine_err) => engine_err.gas_used,
+    };
+    refund_unused_gas(&mut io, &sender, gas_used, prepaid_amount, &relayer_address).map_err(
+        |e| EngineError {
+            gas_used,
+            kind: EngineErrorKind::GasPayment(e),
+        },
+    )?;
+
+    // return result to user
+    result
 }
 
 /// There is one Aurora block per NEAR block height (note: when heights in NEAR are skipped

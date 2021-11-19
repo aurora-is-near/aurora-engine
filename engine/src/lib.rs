@@ -67,14 +67,14 @@ mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use crate::connector::{self, EthConnectorContract};
-    use crate::engine::{self, current_address, Engine, EngineState, GasPaymentError};
+    use crate::engine::{self, current_address, Engine, EngineState};
     use crate::fungible_token::FungibleTokenMetadata;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
-        StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitResult, TransactionStatus,
-        TransferCallCallArgs, ViewCallArgs,
+        StorageDepositCallArgs, StorageWithdrawCallArgs, TransactionStatus, TransferCallCallArgs,
+        ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -95,14 +95,12 @@ mod contract {
         sdk, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei,
         ERC20_MINT_SELECTOR, H160, H256, U256,
     };
-    use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
-    const GAS_OVERFLOW: &str = "ERR_GAS_OVERFLOW";
     const PROMISE_COUNT_ERR: &str = "ERR_PROMISE_COUNT";
 
     ///
@@ -245,101 +243,21 @@ mod contract {
     /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
     pub extern "C" fn submit() {
-        let mut io = Runtime;
+        let io = Runtime;
         let input = io.read_input().to_vec();
-
-        let transaction: NormalizedEthTransaction = EthTransactionKind::try_from(input.as_slice())
-            .sdk_unwrap()
-            .into();
-
-        let state = engine::get_state(&io).sdk_unwrap();
-
-        // Validate the chain ID, if provided inside the signature:
-        if let Some(chain_id) = transaction.chain_id {
-            if U256::from(chain_id) != U256::from(state.chain_id) {
-                sdk::panic_utf8(b"ERR_INVALID_CHAIN_ID");
-            }
-        }
-
-        // Retrieve the signer of the transaction:
-        let sender = transaction
-            .address
-            .sdk_expect("ERR_INVALID_ECDSA_SIGNATURE");
-
-        #[cfg(feature = "log")]
-        sdk::log(crate::prelude::format!("signer_address {:?}", sender).as_str());
-
-        engine::check_nonce(&io, &sender, &transaction.nonce).sdk_unwrap();
-
-        // Check intrinsic gas is covered by transaction gas limit
-        match transaction.intrinsic_gas(crate::engine::CONFIG) {
-            None => sdk::panic_utf8(GAS_OVERFLOW.as_bytes()),
-            Some(intrinsic_gas) => {
-                if transaction.gas_limit < intrinsic_gas.into() {
-                    sdk::panic_utf8(b"ERR_INTRINSIC_GAS")
-                }
-            }
-        }
-
-        if transaction.max_priority_fee_per_gas > transaction.max_fee_per_gas {
-            sdk::panic_utf8(b"ERR_MAX_PRIORITY_FEE_GREATER")
-        }
-
-        // Figure out what kind of a transaction this is, and execute it:
         let current_account_id = io.current_account_id();
-        let mut engine = Engine::new_with_state(state, sender, current_account_id, io, &io);
-        let prepaid_amount = match engine.charge_gas(&sender, &transaction) {
-            Ok(gas_result) => gas_result,
-            Err(GasPaymentError::OutOfFund) => {
-                engine::increment_nonce(&mut io, &sender);
-                let result = SubmitResult::new(TransactionStatus::OutOfFund, 0, vec![]);
-                io.return_output(&result.try_to_vec().unwrap());
-                return;
-            }
-            Err(err) => sdk::panic_utf8(err.as_ref()),
-        };
-        let gas_limit: u64 = transaction.gas_limit.try_into().sdk_expect(GAS_OVERFLOW);
-        let access_list = transaction
-            .access_list
-            .into_iter()
-            .map(|a| (a.address, a.storage_keys))
-            .collect();
-        let result = if let Some(receiver) = transaction.to {
-            Engine::call(
-                &mut engine,
-                sender,
-                receiver,
-                transaction.value,
-                transaction.data,
-                gas_limit,
-                access_list,
-                &mut Runtime,
-            )
-            // TODO: charge for storage
-        } else {
-            // Execute a contract deployment:
-            Engine::deploy_code(
-                &mut engine,
-                sender,
-                transaction.value,
-                transaction.data,
-                gas_limit,
-                access_list,
-                &mut Runtime,
-            )
-            // TODO: charge for storage
-        };
+        let state = engine::get_state(&io).sdk_unwrap();
+        let relayer_address = predecessor_address(&io.predecessor_account_id());
+        let result = engine::submit(
+            io,
+            &io,
+            &input,
+            state,
+            current_account_id,
+            relayer_address,
+            &mut Runtime,
+        );
 
-        // Give refund
-        let relayer = predecessor_address(&io.predecessor_account_id());
-        let gas_used = match &result {
-            Ok(submit_result) => submit_result.gas_used,
-            Err(engine_err) => engine_err.gas_used,
-        };
-        engine::refund_unused_gas(&mut io, &sender, gas_used, prepaid_amount, &relayer)
-            .sdk_unwrap();
-
-        // return result to user
         result
             .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
             .sdk_process();

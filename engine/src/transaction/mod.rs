@@ -136,6 +136,7 @@ impl NormalizedEthTransaction {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ParseTransactionError {
     UnknownTransactionType,
     // Per the EIP-2718 spec 0xff is a reserved value
