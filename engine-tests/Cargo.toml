@@ -44,7 +44,7 @@ git2 = "0.13"
 
 [features]
 meta-call = ["aurora-engine/meta-call"]
-mainnet-test = ["aurora-engine/mainnet-test"]
-testnet-test = ["aurora-engine/testnet-test"]
-betanet-test = ["aurora-engine/betanet-test"]
+mainnet-test = ["aurora-engine/mainnet-test", "meta-call"]
+testnet-test = ["aurora-engine/testnet-test", "meta-call"]
+betanet-test = ["aurora-engine/betanet-test", "meta-call"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
