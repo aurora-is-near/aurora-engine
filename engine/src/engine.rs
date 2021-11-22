@@ -19,6 +19,7 @@ use crate::prelude::{
     Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
 };
 use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
+use aurora_engine_precompiles::PrecompileConstructorContext;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -311,8 +312,13 @@ struct StackExecutorParams {
 
 impl StackExecutorParams {
     fn new(gas_limit: u64, current_account_id: AccountId) -> Self {
+        let random_seed = sdk::random_seed().to_fixed_bytes().to_vec();
+
         Self {
-            precompiles: Precompiles::new_london(current_account_id),
+            precompiles: Precompiles::new_london(PrecompileConstructorContext {
+                current_account_id,
+                random_seed,
+            }),
             gas_limit,
         }
     }

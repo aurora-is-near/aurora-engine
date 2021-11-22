@@ -41,6 +41,21 @@ pub fn log_utf8(bytes: &[u8]) {
         exports::log_utf8(bytes.len() as u64, bytes.as_ptr() as u64);
     }
 }
+/// Calls random seed produced by validators
+#[cfg(feature = "contract")]
+pub fn random_seed() -> H256 {
+    unsafe {
+        exports::random_seed(0);
+        let bytes = H256::zero();
+        exports::read_register(0, bytes.0.as_ptr() as *const u64 as u64);
+        bytes
+    }
+}
+
+#[cfg(not(feature = "contract"))]
+pub fn random_seed() -> H256 {
+    H256::zero()
+}
 
 /// Calls environment sha256 on given input.
 #[cfg(feature = "contract")]

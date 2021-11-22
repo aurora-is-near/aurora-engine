@@ -34,6 +34,7 @@ pub(crate) const SUBMIT: &str = "submit";
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
 pub(crate) mod one_inch;
+pub(crate) mod random;
 pub(crate) mod rust;
 pub(crate) mod self_destruct;
 pub(crate) mod solidity;
@@ -405,6 +406,11 @@ impl AuroraRunner {
             let bytes = maybe_outcome.unwrap().return_data.as_value().unwrap();
             Ok(bytes)
         }
+    }
+
+    pub fn with_random_seed(mut self, random_seed: Vec<u8>) -> Self {
+        self.context.random_seed = random_seed;
+        self
     }
 }
 
