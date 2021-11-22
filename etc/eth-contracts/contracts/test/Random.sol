@@ -6,7 +6,7 @@ contract Random {
         bytes32[1] memory value;
 
         assembly {
-            let ret := call(gas(), 0xf861511815955326b953fa97b6955a2f8020a4e9, 0, 0, 0, value, 32)
+            let ret := call(gas(), 0xc104f4840573bed437190daf5d2898c2bdf928ac, 0, 0, 0, value, 32)
         }
 
         return uint256(value[0]);

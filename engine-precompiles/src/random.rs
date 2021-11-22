@@ -11,26 +11,26 @@ mod costs {
     pub(super) const RANDOM_BYTES_GAS: EthGas = EthGas::new(0);
 }
 
-pub struct RandomBytes {
+pub struct RandomSeed {
     random_seed: Vec<u8>,
 }
 
-impl RandomBytes {
+impl RandomSeed {
     /// Random bytes precompile address
     /// This is a per-block entropy source which could then be used to create a random sequence.
     /// It will return the same seed if called multiple time in the same block.
     ///
-    /// Address: `0xf861511815955326b953fa97b6955a2f8020a4e9`
-    /// This address is computed as: `&keccak("randomBytes")[12..]`
+    /// Address: `0xc104f4840573bed437190daf5d2898c2bdf928ac`
+    /// This address is computed as: `&keccak("randomSeed")[12..]`
     pub const ADDRESS: Address =
-        super::make_address(0xf8615118, 0x15955326b953fa97b6955a2f8020a4e9);
+        super::make_address(0xc104f484, 0x0573bed437190daf5d2898c2bdf928ac);
 
     pub fn new(random_seed: Vec<u8>) -> Self {
         Self { random_seed }
     }
 }
 
-impl Precompile for RandomBytes {
+impl Precompile for RandomSeed {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::RANDOM_BYTES_GAS)
     }
@@ -56,13 +56,13 @@ impl Precompile for RandomBytes {
 #[cfg(test)]
 mod tests {
     use crate::prelude::sdk::types::near_account_to_evm_address;
-    use crate::random::RandomBytes;
+    use crate::random::RandomSeed;
 
     #[test]
     fn test_precompile_id() {
         assert_eq!(
-            RandomBytes::ADDRESS,
-            near_account_to_evm_address("randomBytes".as_bytes())
+            RandomSeed::ADDRESS,
+            near_account_to_evm_address("randomSeed".as_bytes())
         );
     }
 }

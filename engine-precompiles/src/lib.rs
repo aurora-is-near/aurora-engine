@@ -24,7 +24,7 @@ use crate::modexp::ModExp;
 use crate::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::types::EthGas;
 use crate::prelude::Vec;
-use crate::random::RandomBytes;
+use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
 use aurora_engine_types::{account_id::AccountId, vec, Address, BTreeMap, Box};
 use evm::backend::Log;
@@ -137,7 +137,7 @@ impl Precompiles {
             RIPEMD160::ADDRESS,
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
-            RandomBytes::ADDRESS,
+            RandomSeed::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -145,7 +145,7 @@ impl Precompiles {
             Box::new(RIPEMD160),
             Box::new(ExitToNear::new(ctx.current_account_id.clone())),
             Box::new(ExitToEthereum::new(ctx.current_account_id)),
-            Box::new(RandomBytes::new(ctx.random_seed)),
+            Box::new(RandomSeed::new(ctx.random_seed)),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
@@ -165,7 +165,7 @@ impl Precompiles {
             Bn128Pair::<Byzantium>::ADDRESS,
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
-            RandomBytes::ADDRESS,
+            RandomSeed::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -178,7 +178,7 @@ impl Precompiles {
             Box::new(Bn128Pair::<Byzantium>::new()),
             Box::new(ExitToNear::new(ctx.current_account_id.clone())),
             Box::new(ExitToEthereum::new(ctx.current_account_id)),
-            Box::new(RandomBytes::new(ctx.random_seed)),
+            Box::new(RandomSeed::new(ctx.random_seed)),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
@@ -198,7 +198,7 @@ impl Precompiles {
             Blake2F::ADDRESS,
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
-            RandomBytes::ADDRESS,
+            RandomSeed::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -212,7 +212,7 @@ impl Precompiles {
             Box::new(Blake2F),
             Box::new(ExitToNear::new(ctx.current_account_id.clone())),
             Box::new(ExitToEthereum::new(ctx.current_account_id)),
-            Box::new(RandomBytes::new(ctx.random_seed)),
+            Box::new(RandomSeed::new(ctx.random_seed)),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
@@ -232,7 +232,7 @@ impl Precompiles {
             Blake2F::ADDRESS,
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
-            RandomBytes::ADDRESS,
+            RandomSeed::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -246,7 +246,7 @@ impl Precompiles {
             Box::new(Blake2F),
             Box::new(ExitToNear::new(ctx.current_account_id.clone())),
             Box::new(ExitToEthereum::new(ctx.current_account_id)),
-            Box::new(RandomBytes::new(ctx.random_seed)),
+            Box::new(RandomSeed::new(ctx.random_seed)),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
