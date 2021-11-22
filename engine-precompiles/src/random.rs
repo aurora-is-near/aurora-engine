@@ -11,8 +11,6 @@ mod costs {
     pub(super) const RANDOM_BYTES_GAS: EthGas = EthGas::new(0);
 }
 
-const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
-
 pub struct RandomBytes {
     random_seed: Vec<u8>,
 }
