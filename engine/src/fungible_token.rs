@@ -1,4 +1,4 @@
-use crate::connector::NO_DEPOSIT;
+use crate::connector::ZERO_ATTACHED_BALANCE;
 use crate::engine;
 use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
@@ -295,14 +295,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             target_account_id: receiver_id,
             method: "ft_on_transfer".to_string(),
             args: data1.into_bytes(),
-            attached_balance: NO_DEPOSIT,
+            attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FT_ON_TRANSFER.into_u64(),
         };
         let ft_resolve_transfer_call = PromiseCreateArgs {
             target_account_id: current_account_id,
             method: "ft_resolve_transfer".to_string(),
             args: data2,
-            attached_balance: NO_DEPOSIT,
+            attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_RESOLVE_TRANSFER.into_u64(),
         };
         Ok(PromiseWithCallbackArgs {
@@ -579,6 +579,7 @@ pub mod error {
         TotalSupplyOverflow,
         BalanceOverflow,
     }
+
     impl AsRef<[u8]> for DepositError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -593,6 +594,7 @@ pub mod error {
         TotalSupplyUnderflow,
         InsufficientFunds,
     }
+
     impl AsRef<[u8]> for WithdrawError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -611,6 +613,7 @@ pub mod error {
         ZeroAmount,
         SelfTransfer,
     }
+
     impl AsRef<[u8]> for TransferError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -632,6 +635,7 @@ pub mod error {
             }
         }
     }
+
     impl From<DepositError> for TransferError {
         fn from(err: DepositError) -> Self {
             match err {
@@ -648,6 +652,7 @@ pub mod error {
         InsufficientDeposit,
         UnRegisterPositiveBalance,
     }
+
     impl AsRef<[u8]> for StorageFundingError {
         fn as_ref(&self) -> &[u8] {
             match self {

@@ -22,15 +22,27 @@ use aurora_engine_types::parameters::{
 use aurora_engine_types::types::AddressValidationError;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
-pub const NO_DEPOSIT: Balance = 0;
+/// Indicate zero attached balance for promise call
+pub const ZERO_ATTACHED_BALANCE: Balance = 0;
+/// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
 const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
+/// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
 // Note: Is 40Tgas always enough?
 const GAS_FOR_VERIFY_LOG_ENTRY: NearGas = NearGas::new(40_000_000_000_000);
 
+/// Admin control flow flag indicates that all control flow unpause (unblocked).
 pub const UNPAUSE_ALL: PausedMask = 0;
+/// Admin control flow flag indicates that the deposit is paused.
 pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
+/// Admin control flow flag indicates that withdrawal is paused.
 pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 
+/// Eth-connector contract data. It's stored in the storage.
+/// Contains:
+/// * connector specific data
+/// * Fungible token data
+/// * paused_mask - admin control flow data
+/// * io - I/O trait handler
 pub struct EthConnectorContract<I: IO> {
     contract: EthConnector,
     ft: FungibleTokenOps<I>,
@@ -38,7 +50,10 @@ pub struct EthConnectorContract<I: IO> {
     io: I,
 }
 
-/// eth-connector specific data
+/// Connector specific data. It always should contain `prover account` -
+/// it's NEAR account id. It used in the Deposit flow, to verify log entry
+/// form incoming proof.
+/// `eth_custodian_address` is Eth address, used in the Deposit and Withdraw logic.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnector {
     pub prover_account: AccountId,
@@ -251,7 +266,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: self.contract.prover_account.clone(),
             method: "verify_log_entry".to_string(),
             args: proof_to_verify,
-            attached_balance: NO_DEPOSIT,
+            attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_VERIFY_LOG_ENTRY.into_u64(),
         };
 
@@ -309,7 +324,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: current_account_id,
             method: "finish_deposit".to_string(),
             args: data,
-            attached_balance: NO_DEPOSIT,
+            attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FINISH_DEPOSIT.into_u64(),
         };
         Ok(PromiseWithCallbackArgs {
@@ -790,6 +805,7 @@ pub mod error {
         TooManyParts,
         InvalidAccount,
     }
+
     impl AsRef<[u8]> for ParseEventMessageError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -808,11 +824,13 @@ pub mod error {
         MessageParseFailed(ParseEventMessageError),
         InvalidAddress(AddressValidationError),
     }
+
     impl From<ParseEventMessageError> for DepositError {
         fn from(e: ParseEventMessageError) -> Self {
             Self::MessageParseFailed(e)
         }
     }
+
     impl AsRef<[u8]> for DepositError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -831,21 +849,25 @@ pub mod error {
         TransferCall(FtTransferCallError),
         ProofUsed,
     }
+
     impl From<ProofUsed> for FinishDepositError {
         fn from(_: ProofUsed) -> Self {
             Self::ProofUsed
         }
     }
+
     impl From<FtTransferCallError> for FinishDepositError {
         fn from(e: FtTransferCallError) -> Self {
             Self::TransferCall(e)
         }
     }
+
     impl From<fungible_token::error::DepositError> for FinishDepositError {
         fn from(e: fungible_token::error::DepositError) -> Self {
             Self::TransferCall(FtTransferCallError::Transfer(e.into()))
         }
     }
+
     impl AsRef<[u8]> for FinishDepositError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -859,11 +881,13 @@ pub mod error {
         Paused,
         FT(fungible_token::error::WithdrawError),
     }
+
     impl From<fungible_token::error::WithdrawError> for WithdrawError {
         fn from(e: fungible_token::error::WithdrawError) -> Self {
             Self::FT(e)
         }
     }
+
     impl AsRef<[u8]> for WithdrawError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -879,6 +903,7 @@ pub mod error {
         WrongMessageFormat,
         InvalidAccount,
     }
+
     impl AsRef<[u8]> for ParseOnTransferMessageError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -895,21 +920,25 @@ pub mod error {
         InsufficientAmountForFee,
         Transfer(fungible_token::error::TransferError),
     }
+
     impl From<fungible_token::error::TransferError> for FtTransferCallError {
         fn from(e: fungible_token::error::TransferError) -> Self {
             Self::Transfer(e)
         }
     }
+
     impl From<fungible_token::error::DepositError> for FtTransferCallError {
         fn from(e: fungible_token::error::DepositError) -> Self {
             Self::Transfer(e.into())
         }
     }
+
     impl From<ParseOnTransferMessageError> for FtTransferCallError {
         fn from(e: ParseOnTransferMessageError) -> Self {
             Self::MessageParseFailed(e)
         }
     }
+
     impl AsRef<[u8]> for FtTransferCallError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -924,6 +953,7 @@ pub mod error {
         AlreadyInitialized,
         InvalidCustodianAddress(AddressValidationError),
     }
+
     impl AsRef<[u8]> for InitContractError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -934,6 +964,7 @@ pub mod error {
     }
 
     pub struct ProofUsed;
+
     impl AsRef<[u8]> for ProofUsed {
         fn as_ref(&self) -> &[u8] {
             PROOF_EXIST
