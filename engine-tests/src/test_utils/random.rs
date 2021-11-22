@@ -45,11 +45,11 @@ pub(crate) struct Random {
 }
 
 impl Random {
-    pub fn random_256(&self, runner: &mut AuroraRunner, signer: &mut Signer) -> Option<U256> {
+    pub fn random_seed(&self, runner: &mut AuroraRunner, signer: &mut Signer) -> Option<U256> {
         let data = self
             .contract
             .abi
-            .function("randomU256")
+            .function("randomSeed")
             .unwrap()
             .encode_input(&[])
             .unwrap();

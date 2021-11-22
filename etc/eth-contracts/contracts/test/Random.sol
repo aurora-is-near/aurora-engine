@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 contract Random {
-    function randomU256() public returns (uint256) {
+    function randomSeed() public returns (uint256) {
         bytes32[1] memory value;
 
         assembly {

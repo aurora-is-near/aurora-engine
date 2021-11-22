@@ -19,6 +19,8 @@ pub struct RandomBytes {
 
 impl RandomBytes {
     /// Random bytes precompile address
+    /// This is a per-block entropy source which could then be used to create a random sequence.
+    /// It will return the same seed if called multiple time in the same block.
     ///
     /// Address: `0xf861511815955326b953fa97b6955a2f8020a4e9`
     /// This address is computed as: `&keccak("randomBytes")[12..]`

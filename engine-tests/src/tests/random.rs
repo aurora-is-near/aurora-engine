@@ -14,6 +14,6 @@ fn test_random_number_precompile() {
         .deploy_contract(&signer.secret_key, |ctr| ctr.deploy(nonce), random_ctr)
         .into();
 
-    let counter_value = random.random_256(&mut runner, &mut signer);
+    let counter_value = random.random_seed(&mut runner, &mut signer);
     assert_eq!(counter_value, Some(U256::from(random_seed.as_slice())));
 }
