@@ -226,11 +226,13 @@ impl AsRef<[u8]> for DeployErc20Error {
 }
 
 pub struct ERC20Address(Address);
+
 impl AsRef<[u8]> for ERC20Address {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
+
 impl TryFrom<Vec<u8>> for ERC20Address {
     type Error = AddressParseError;
 
@@ -242,7 +244,9 @@ impl TryFrom<Vec<u8>> for ERC20Address {
         }
     }
 }
+
 pub struct AddressParseError;
+
 impl AsRef<[u8]> for AddressParseError {
     fn as_ref(&self) -> &[u8] {
         b"ERR_PARSE_ADDRESS"
@@ -250,11 +254,13 @@ impl AsRef<[u8]> for AddressParseError {
 }
 
 pub struct NEP141Account(AccountId);
+
 impl AsRef<[u8]> for NEP141Account {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
+
 impl TryFrom<Vec<u8>> for NEP141Account {
     type Error = aurora_engine_types::account_id::ParseAccountError;
 
@@ -1140,7 +1146,7 @@ pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
     // Apply changes for eth-connector. The `unwrap` is safe here because (a) if the connector
     // is implemented correctly then the total supply wll never underflow and (b) we are passing
     // in the balance directly so there will always be enough balance.
-    EthConnectorContract::get_instance(*io)
+    EthConnectorContract::init_instance(*io)
         .internal_remove_eth(address, &balance.raw())
         .unwrap();
     io.remove_storage(&address_to_key(KeyPrefix::Balance, address));

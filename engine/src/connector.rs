@@ -51,27 +51,32 @@ pub struct EthConnectorContract<I: IO> {
 }
 
 /// Connector specific data. It always should contain `prover account` -
-/// it's NEAR account id. It used in the Deposit flow, to verify log entry
-/// form incoming proof.
-/// `eth_custodian_address` is Eth address, used in the Deposit and Withdraw logic.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnector {
+    /// It used in the Deposit flow, to verify log entry form incoming proof.
     pub prover_account: AccountId,
+    /// It is Eth address, used in the Deposit and Withdraw logic.
     pub eth_custodian_address: EthAddress,
 }
 
-/// Token message data
+/// Token message data used for Deposit flow.
+/// It contains two basic data structure: Near, Eth
+/// The message parsed from event `recipient` field - `log_entry_data`
+/// after fetching proof `log_entry_data`
 #[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub enum TokenMessageData {
+    /// Deposit no NEAR account
     Near(AccountId),
+    ///Deposit to Eth accounts fee is being minted in the `ft_on_transfer` callback method
     Eth {
         receiver_id: AccountId,
         message: String,
     },
 }
 
-/// On-transfer message
+/// On-transfer message. Used for `ft_transfer_call` and  `ft_on_transfer` functions.
+/// Message parsed from input args with `parse_on_transfer_message`.
 pub struct OnTransferMessageData {
     pub relayer: AccountId,
     pub recipient: EthAddress,
@@ -79,7 +84,10 @@ pub struct OnTransferMessageData {
 }
 
 impl<I: IO + Copy> EthConnectorContract<I> {
-    pub fn get_instance(io: I) -> Self {
+    /// Init Eth-connector contract instance.
+    /// Load contract data from storage and init I/O handler.
+    /// Used as single point of contract access for various contract actions
+    pub fn init_instance(io: I) -> Self {
         Self {
             contract: get_contract_data(&io, &EthConnectorStorageId::Contract),
             ft: get_contract_data::<FungibleToken, I>(&io, &EthConnectorStorageId::FungibleToken)
@@ -89,7 +97,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Init eth-connector contract specific data
+    /// Init eth-connector contract specific data.
+    /// Used only once for first time initialization.
+    /// Initialized contract data stored in the storage.
     pub fn init_contract(
         mut io: I,
         owner_id: AccountId,
@@ -135,7 +145,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
-    /// Parse event message data for tokens
+    /// Parse event message data for tokens. Data parsed form event `recipient` field.
+    /// Used for Deposit flow.
     fn parse_event_message(
         &self,
         message: &str,
