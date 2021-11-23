@@ -160,12 +160,12 @@ impl CallArgs {
         // made for flexibility and extensibility.
         if let Ok(value) = Self::try_from_slice(bytes) {
             Some(value)
-        // Fallback, for handling old input format,
-        // i.e. input, formed as a raw (not wrapped into call args enum) data structure with legacy arguments,
-        // made for backward compatibility.
+            // Fallback, for handling old input format,
+            // i.e. input, formed as a raw (not wrapped into call args enum) data structure with legacy arguments,
+            // made for backward compatibility.
         } else if let Ok(value) = FunctionCallArgsV1::try_from_slice(bytes) {
             Some(Self::V1(value))
-        // Dealing with unrecognized input should be handled and result as an exception in a call site.
+            // Dealing with unrecognized input should be handled and result as an exception in a call site.
         } else {
             None
         }
@@ -371,6 +371,7 @@ impl TryFrom<JsonValue> for TransferCallCallArgs {
         let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
         let amount = v.u128("amount")?;
         let memo = v.string("memo").ok();
+        // TODO: add validation for OnTransfer message
         let msg = v.string("msg")?;
         Ok(Self {
             receiver_id,
@@ -499,16 +500,19 @@ pub mod error {
         Json(JsonError),
         InvalidAccount(ParseAccountError),
     }
+
     impl From<JsonError> for ParseTypeFromJsonError {
         fn from(e: JsonError) -> Self {
             Self::Json(e)
         }
     }
+
     impl From<ParseAccountError> for ParseTypeFromJsonError {
         fn from(e: ParseAccountError) -> Self {
             Self::InvalidAccount(e)
         }
     }
+
     impl AsRef<[u8]> for ParseTypeFromJsonError {
         fn as_ref(&self) -> &[u8] {
             match self {

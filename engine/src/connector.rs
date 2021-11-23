@@ -80,6 +80,7 @@ pub enum TokenMessageData {
 pub struct OnTransferMessageData {
     pub relayer: AccountId,
     pub recipient: EthAddress,
+    // TODO: it's always u128. Introduce own type
     pub fee: U256,
 }
 
@@ -152,11 +153,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         message: &str,
     ) -> Result<TokenMessageData, error::ParseEventMessageError> {
         let data: Vec<_> = message.split(':').collect();
+        // Data array can contain 1 or 2 elements
         if data.len() >= 3 {
             return Err(error::ParseEventMessageError::TooManyParts);
         }
         let account_id = AccountId::try_from(data[0].as_bytes())
             .map_err(|_| error::ParseEventMessageError::InvalidAccount)?;
+        // TODO: validate data[1] as EthAddress. It can contain "0x" prefix - just remove it
+
+        // If data array contain only one element it should return NEAR account id
         if data.len() == 1 {
             Ok(TokenMessageData::Near(account_id))
         } else {
@@ -167,26 +172,37 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Get on-transfer data from message
+    /// Get on-transfer data from arguments message field.
+    /// Used for `ft_transfer_call` and `ft_on_transfer`
     fn parse_on_transfer_message(
         &self,
         message: &str,
     ) -> Result<OnTransferMessageData, error::ParseOnTransferMessageError> {
+        // Split message by separator
         let data: Vec<_> = message.split(':').collect();
+        // Message data array should contain 2 elements
         if data.len() != 2 {
             return Err(error::ParseOnTransferMessageError::TooManyParts);
         }
 
+        // Decode message array from 2-th element of data array
         let msg =
             hex::decode(data[1]).map_err(|_| error::ParseOnTransferMessageError::InvalidHexData)?;
-        let mut fee: [u8; 32] = Default::default();
+        // Length = fee[32] + eth_address[20] bytes
         if msg.len() != 52 {
             return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
         }
+
+        // Parse fee from message slice
+        // TODO: fee should have own type
+        let mut fee: [u8; 32] = Default::default();
         fee.copy_from_slice(&msg[..32]);
+
+        // Get recipient Eth address from message slice
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
-        // Check account
+
+        // Check relayer account id from 1-th data element
         let account_id = AccountId::try_from(data[0].as_bytes())
             .map_err(|_| error::ParseOnTransferMessageError::InvalidAccount)?;
         Ok(OnTransferMessageData {
@@ -200,12 +216,17 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     fn prepare_message_for_on_transfer(
         &self,
         relayer_account_id: &AccountId,
+        // TODO: u128
         fee: U256,
         message: String,
     ) -> Result<String, AddressValidationError> {
         use byte_slice_cast::AsByteSlice;
 
+        // TODO: fee as independent type
+        // TODO: change to: let data = x.to_le_bytes().to_vec(); // 16 bytes
         let mut data = fee.as_byte_slice().to_vec();
+
+        // Check message length.Ω
         let address = if message.len() == 42 {
             message
                 .strip_prefix("0x")
@@ -214,6 +235,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         } else {
             message
         };
+        // TODO: address length == 20 - validate it. Possible validate as EthAddress type
         let address_bytes =
             hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
         data.extend(address_bytes);
@@ -227,7 +249,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         current_account_id: AccountId,
         predecessor_account_id: AccountId,
     ) -> Result<PromiseWithCallbackArgs, error::DepositError> {
+        // Check is current account owner
         let is_owner = current_account_id == predecessor_account_id;
+        // Check is current flow paused. If it's owner account just skip it.
         self.assert_not_paused(PAUSE_DEPOSIT, is_owner)
             .map_err(|_| error::DepositError::Paused)?;
 
@@ -388,6 +412,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub(crate) fn internal_remove_eth(
         &mut self,
         address: &Address,
+        // TODO: change to u128 or custom type
         amount: &U256,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         self.burn_eth_on_aurora(address.0, amount.as_u128())?;
@@ -457,7 +482,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: &AccountId,
         args: WithdrawCallArgs,
     ) -> Result<WithdrawResult, error::WithdrawError> {
+        // Check is current account id is owner
         let is_owner = current_account_id == predecessor_account_id;
+        // Check is current flow paused. If it's owner just skip asserrion.
         self.assert_not_paused(PAUSE_WITHDRAW, is_owner)
             .map_err(|_| error::WithdrawError::Paused)?;
 
@@ -571,10 +598,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             "Transfer call to {} amount {}",
             args.receiver_id, args.amount,
         ));
+
+        // Early validating message to prevent error in promise
+        let message_data = self.parse_on_transfer_message(&args.msg)?;
+
         // Verify message data before `ft_on_transfer` call to avoid verification panics
         if args.receiver_id == current_account_id {
-            let message_data = self.parse_on_transfer_message(&args.msg)?;
+            //let message_data = self.parse_on_transfer_message(&args.msg)?;
             // Check is transfer amount > fee
+            // TODO: change fee type
             if message_data.fee.as_u128() >= args.amount {
                 return Err(error::FtTransferCallError::InsufficientAmountForFee);
             }

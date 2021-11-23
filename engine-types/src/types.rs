@@ -3,10 +3,14 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::fmt::Formatter;
 
+// TODO: introduce new Balance type for more strict typing
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
-pub type RawU256 = [u8; 32]; // Big-endian large integer type.
-pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
+pub type RawU256 = [u8; 32];
+// Big-endian large integer type.
+pub type RawH256 = [u8; 32];
+// Unformatted binary data of fixed length.
+// TODO: introduce new type. Add encode/decode/validation methods
 pub type EthAddress = [u8; 20];
 pub type StorageUsage = u64;
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
@@ -217,7 +221,8 @@ impl From<WeiU256> for Wei {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct U128(pub u128);
 
-pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
+pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000;
+// 1e19yN, 0.00001N
 pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
 pub const ERR_INVALID_ETH_ADDRESS: &str = "ERR_INVALID_ETH_ADDRESS";
 
@@ -314,6 +319,7 @@ impl<T> Stack<T> {
         self.stack
     }
 }
+
 pub fn str_from_slice(inp: &[u8]) -> &str {
     str::from_utf8(inp).unwrap()
 }
