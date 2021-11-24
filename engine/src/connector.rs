@@ -424,7 +424,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     fn record_proof(&mut self, key: &str) -> Result<(), error::ProofUsed> {
         sdk::log!(&format!("Record proof: {}", key));
 
-        if self.check_used_event(key) {
+        if self.is_used_event(key) {
             return Err(error::ProofUsed);
         }
 
@@ -599,11 +599,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             args.receiver_id, args.amount,
         ));
 
-        // Early validating message to prevent error in promise
-        let message_data = self.parse_on_transfer_message(&args.msg)?;
+        // TODO: Early validating message to prevent error in promise?
+        //let message_data = self.parse_on_transfer_message(&args.msg)?;
 
         // Verify message data before `ft_on_transfer` call to avoid verification panics
         if args.receiver_id == current_account_id {
+            let message_data = self.parse_on_transfer_message(&args.msg)?;
             //let message_data = self.parse_on_transfer_message(&args.msg)?;
             // Check is transfer amount > fee
             // TODO: change fee type
@@ -713,6 +714,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
         // Parse message with specific rules
+        // TODO: early validation?
         let message_data = self.parse_on_transfer_message(&args.msg)?;
 
         // Special case when predecessor_account_id is current_account_id
@@ -738,7 +740,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .return_output(&self.ft.get_accounts_counter().to_le_bytes());
     }
 
-    /// Save eth-connector contract data
+    /// Save eth-connector fungible toke contract data
     fn save_ft_contract(&mut self) {
         self.io.write_borsh(
             &construct_contract_key(&EthConnectorStorageId::FungibleToken),
@@ -746,7 +748,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         );
     }
 
-    /// Generate key for used events from Prood
+    /// Generate key for used events from Proof
     fn used_event_key(&self, key: &str) -> Vec<u8> {
         let mut v = construct_contract_key(&EthConnectorStorageId::UsedEvent).to_vec();
         v.extend_from_slice(key.as_bytes());
@@ -759,13 +761,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Check is event of proof already used
-    fn check_used_event(&self, key: &str) -> bool {
+    fn is_used_event(&self, key: &str) -> bool {
         self.io.storage_has_key(&self.used_event_key(key))
     }
 
     /// Checks whether the provided proof was already used
     pub fn is_used_proof(&self, proof: Proof) -> bool {
-        self.check_used_event(&proof.get_key())
+        self.is_used_event(&proof.get_key())
     }
 
     /// Get Eth connector paused flags
@@ -780,10 +782,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 }
 
 impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
+    /// Get current admin paused status
     fn get_paused(&self) -> PausedMask {
         self.paused_mask
     }
 
+    /// Set admin paused status
     fn set_paused(&mut self, paused_mask: PausedMask) {
         self.paused_mask = paused_mask;
         self.io.write_borsh(
