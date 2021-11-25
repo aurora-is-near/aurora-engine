@@ -10,6 +10,7 @@ mod one_inch;
 mod random;
 mod sanity;
 mod self_destruct_state;
+mod standalone;
 mod standard_precompiles;
 mod state_migration;
 pub(crate) mod uniswap;

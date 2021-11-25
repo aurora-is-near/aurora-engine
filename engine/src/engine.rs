@@ -10,13 +10,13 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 
-use crate::parameters::{NewCallArgs, TransactionStatus};
+use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, TryFrom, TryInto,
-    Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
+    BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, TryFrom,
+    TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
 };
 use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_precompiles::PrecompileConstructorContext;
@@ -205,6 +205,23 @@ impl AsRef<[u8]> for GasPaymentError {
 impl From<BalanceOverflow> for GasPaymentError {
     fn from(overflow: BalanceOverflow) -> Self {
         Self::BalanceOverflow(overflow)
+    }
+}
+
+pub enum DeployErc20Error {
+    State(EngineStateError),
+    Failed(TransactionStatus),
+    Engine(EngineError),
+    Register(RegisterTokenError),
+}
+impl AsRef<[u8]> for DeployErc20Error {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::State(e) => e.as_ref(),
+            Self::Failed(e) => e.as_ref(),
+            Self::Engine(e) => e.as_ref(),
+            Self::Register(e) => e.as_ref(),
+        }
     }
 }
 
@@ -975,6 +992,57 @@ pub fn refund_unused_gas<I: IO>(
     add_balance(io, relayer, reward_amount)?;
 
     Ok(())
+}
+
+/// Used to bridge NEP-141 tokens from NEAR to Aurora. On Aurora the NEP-141 becomes an ERC-20.
+pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
+    args: DeployErc20TokenArgs,
+    io: I,
+    env: &E,
+    handler: &mut P,
+) -> Result<Address, DeployErc20Error> {
+    let current_account_id = env.current_account_id();
+    let erc20_admin_address = current_address(&current_account_id);
+    let mut engine = Engine::new(
+        aurora_engine_sdk::types::near_account_to_evm_address(
+            env.predecessor_account_id().as_bytes(),
+        ),
+        current_account_id,
+        io,
+        env,
+    )
+    .map_err(DeployErc20Error::State)?;
+
+    #[cfg(feature = "error_refund")]
+    let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20V2.bin");
+    #[cfg(not(feature = "error_refund"))]
+    let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
+
+    let deploy_args = ethabi::encode(&[
+        ethabi::Token::String("Empty".to_string()),
+        ethabi::Token::String("EMPTY".to_string()),
+        ethabi::Token::Uint(ethabi::Uint::from(0)),
+        ethabi::Token::Address(erc20_admin_address),
+    ]);
+
+    let address = match Engine::deploy_code_with_input(
+        &mut engine,
+        (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec(),
+        handler,
+    ) {
+        Ok(result) => match result.status {
+            TransactionStatus::Succeed(ret) => Address(ret.as_slice().try_into().unwrap()),
+            other => return Err(DeployErc20Error::Failed(other)),
+        },
+        Err(e) => return Err(DeployErc20Error::Engine(e)),
+    };
+
+    sdk::log!(crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str());
+    engine
+        .register_token(address, args.nep141)
+        .map_err(DeployErc20Error::Register)?;
+
+    Ok(address)
 }
 
 pub fn set_code<I: IO>(io: &mut I, address: &Address, code: &[u8]) {

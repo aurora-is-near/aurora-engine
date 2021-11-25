@@ -30,6 +30,8 @@ pub fn origin() -> String {
 }
 
 pub(crate) const SUBMIT: &str = "submit";
+pub(crate) const CALL: &str = "call";
+pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
@@ -38,6 +40,7 @@ pub(crate) mod random;
 pub(crate) mod rust;
 pub(crate) mod self_destruct;
 pub(crate) mod solidity;
+pub(crate) mod standalone;
 pub(crate) mod standard_precompiles;
 pub(crate) mod uniswap;
 
@@ -78,6 +81,9 @@ pub(crate) struct AuroraRunner {
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
     pub previous_logs: Vec<String>,
+    // Use the standalone in parallel if set. This allows checking both
+    // implementations give the same results.
+    pub standalone_runner: Option<standalone::StandaloneRunner>,
 }
 
 /// Same as `AuroraRunner`, but consumes `self` on execution (thus preventing building on
@@ -191,6 +197,18 @@ impl AuroraRunner {
             self.context.storage_usage = outcome.storage_usage;
             self.previous_logs = outcome.logs.clone();
         }
+
+        if let Some(standalone_runner) = &mut self.standalone_runner {
+            if maybe_error.is_none()
+                && (method_name == SUBMIT || method_name == CALL || method_name == DEPLOY_ERC20)
+            {
+                standalone_runner
+                    .submit_raw(method_name, &self.context)
+                    .unwrap();
+                self.validate_standalone();
+            }
+        }
+
         (maybe_outcome, maybe_error)
     }
 
@@ -234,7 +252,7 @@ impl AuroraRunner {
         );
         let nonce_value = crate::prelude::u256_to_arr(&init_nonce);
 
-        if let Some(code) = code {
+        if let Some(code) = code.clone() {
             let code_key = crate::prelude::storage::address_to_key(
                 crate::prelude::storage::KeyPrefix::Code,
                 &address,
@@ -251,13 +269,45 @@ impl AuroraRunner {
                 .get(&ft_key)
                 .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
                 .unwrap_or_default();
-            current_ft.total_eth_supply_on_aurora += init_balance.raw().as_u128();
+            current_ft.total_eth_supply_on_near += init_balance.raw().as_u128();
             current_ft
         };
+
+        let aurora_balance_key = [
+            ft_key.as_slice(),
+            self.context.current_account_id.as_ref().as_bytes(),
+        ]
+        .concat();
+        let aurora_balance_value = {
+            let mut current_balance: u128 = trie
+                .get(&aurora_balance_key)
+                .map(|bytes| u128::try_from_slice(&bytes).unwrap())
+                .unwrap_or_default();
+            current_balance += init_balance.raw().as_u128();
+            current_balance
+        };
+
+        let proof_key = crate::prelude::storage::bytes_to_key(
+            crate::prelude::storage::KeyPrefix::EthConnector,
+            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent as u8],
+        );
 
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         trie.insert(ft_key, ft_value.try_to_vec().unwrap());
+        trie.insert(proof_key, vec![0]);
+        trie.insert(
+            aurora_balance_key,
+            aurora_balance_value.try_to_vec().unwrap(),
+        );
+
+        if let Some(standalone_runner) = &mut self.standalone_runner {
+            standalone_runner.env.block_height = self.context.block_index;
+            standalone_runner.mint_account(address, init_balance, init_nonce, code);
+            self.validate_standalone();
+        }
+
+        self.context.block_index += 1;
     }
 
     pub fn submit_with_signer<F: FnOnce(U256) -> TransactionLegacy>(
@@ -412,6 +462,25 @@ impl AuroraRunner {
         self.context.random_seed = random_seed.as_bytes().to_vec();
         self
     }
+
+    fn validate_standalone(&self) {
+        if let Some(standalone_runner) = &self.standalone_runner {
+            let standalone_state = standalone_runner.get_current_state();
+            // The number of keys in standalone_state may be larger because values are never deleted
+            // (they are replaced with a Deleted identifier instead; this is important for replaying transactions).
+            assert!(self.ext.fake_trie.len() <= standalone_state.iter().count());
+            for (key, value) in standalone_state.iter() {
+                let trie_value = self.ext.fake_trie.get(key).map(|v| v.as_slice());
+                let standalone_value = value.value();
+                if trie_value != standalone_value {
+                    panic!(
+                        "Standalone mismatch at {:?}.\nStandlaone: {:?}\nWasm      : {:?}",
+                        key, standalone_value, trie_value
+                    );
+                }
+            }
+        }
+    }
 }
 
 impl Default for AuroraRunner {
@@ -456,6 +525,7 @@ impl Default for AuroraRunner {
             fees_config: RuntimeFeesConfig::test(),
             current_protocol_version: u32::MAX,
             previous_logs: Default::default(),
+            standalone_runner: None,
         }
     }
 }
@@ -510,6 +580,12 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
         runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
 
     assert!(maybe_error.is_none());
+
+    let mut standalone_runner = standalone::StandaloneRunner::default();
+    standalone_runner.init_evm();
+
+    runner.standalone_runner = Some(standalone_runner);
+    runner.validate_standalone();
 
     runner
 }

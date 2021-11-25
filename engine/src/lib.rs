@@ -73,8 +73,7 @@ mod contract {
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
-        StorageDepositCallArgs, StorageWithdrawCallArgs, TransactionStatus, TransferCallCallArgs,
-        ViewCallArgs,
+        StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -93,7 +92,7 @@ mod contract {
     use crate::prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
     use crate::prelude::{
         sdk, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei,
-        ERC20_MINT_SELECTOR, H160, H256, U256,
+        ERC20_MINT_SELECTOR, H256, U256,
     };
 
     #[cfg(feature = "integration-test")]
@@ -359,42 +358,8 @@ mod contract {
         // Id of the NEP141 token in Near
         let args: DeployErc20TokenArgs = io.read_input_borsh().sdk_unwrap();
 
-        let current_account_id = io.current_account_id();
-        let erc20_admin_address = current_address(&current_account_id);
-        let mut engine = Engine::new(
-            predecessor_address(&io.predecessor_account_id()),
-            current_account_id,
-            io,
-            &io,
-        )
-        .sdk_unwrap();
+        let address = engine::deploy_erc20_token(args, io, &io, &mut Runtime).sdk_unwrap();
 
-        #[cfg(feature = "error_refund")]
-        let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20V2.bin");
-        #[cfg(not(feature = "error_refund"))]
-        let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
-
-        let deploy_args = ethabi::encode(&[
-            ethabi::Token::String("Empty".to_string()),
-            ethabi::Token::String("EMPTY".to_string()),
-            ethabi::Token::Uint(ethabi::Uint::from(0)),
-            ethabi::Token::Address(erc20_admin_address),
-        ]);
-
-        let address = match Engine::deploy_code_with_input(
-            &mut engine,
-            (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec(),
-            &mut Runtime,
-        ) {
-            Ok(result) => match result.status {
-                TransactionStatus::Succeed(ret) => H160(ret.as_slice().try_into().unwrap()),
-                other => sdk::panic_utf8(other.as_ref()),
-            },
-            Err(e) => sdk::panic_utf8(e.as_ref()),
-        };
-
-        sdk::log!(crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str());
-        engine.register_token(address, args.nep141).sdk_unwrap();
         io.return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
 
         // TODO: charge for storage

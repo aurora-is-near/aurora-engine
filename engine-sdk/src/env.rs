@@ -63,6 +63,7 @@ pub trait Env {
 
 /// Fully in-memory implementation of the blockchain environment with
 /// fixed values for all the fields.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Fixed {
     pub signer_account_id: AccountId,
     pub current_account_id: AccountId,
