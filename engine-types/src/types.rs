@@ -1,5 +1,4 @@
 use crate::{str, vec, Add, Address, Display, Div, Mul, String, Sub, Vec, U256};
-use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::fmt::Formatter;
 
@@ -8,9 +7,8 @@ pub type Balance = u128;
 pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32];
 // Big-endian large integer type.
-pub type RawH256 = [u8; 32];
-// Unformatted binary data of fixed length.
-// TODO: introduce new type. Add encode/decode/validation methods
+pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
+                             // TODO: introduce new type. Add encode/decode/validation methods
 pub type EthAddress = [u8; 20];
 pub type StorageUsage = u64;
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
@@ -105,6 +103,112 @@ impl Mul<EthGas> for u64 {
 
     fn mul(self, rhs: EthGas) -> Self::Output {
         EthGas(self * rhs.0)
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+/// Engine `fee` type which wraps an underlying u128.
+pub struct Fee(u128);
+
+impl Display for Fee {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Fee {
+    /// Constructs a new `Fee` with a given u128 value.
+    pub const fn new(fee: u128) -> Fee {
+        Self(fee)
+    }
+
+    /// Consumes `Fee` and returns the underlying type.
+    pub fn into_u128(self) -> u128 {
+        self.0
+    }
+}
+
+impl Add<Fee> for Fee {
+    type Output = Fee;
+
+    fn add(self, rhs: Fee) -> Self::Output {
+        Fee(self.0 + rhs.0)
+    }
+}
+
+impl Add<Fee> for u128 {
+    type Output = Fee;
+
+    fn add(self, rhs: Fee) -> Self::Output {
+        Fee(self + rhs.0)
+    }
+}
+
+impl Add<u128> for Fee {
+    type Output = Fee;
+
+    fn add(self, rhs: u128) -> Self::Output {
+        Fee(self.0 + rhs)
+    }
+}
+
+impl Mul<Fee> for Fee {
+    type Output = Fee;
+
+    fn mul(self, rhs: Fee) -> Self::Output {
+        Fee(self.0 * rhs.0)
+    }
+}
+
+impl Mul<Fee> for u128 {
+    type Output = Fee;
+
+    fn mul(self, rhs: Fee) -> Self::Output {
+        Fee(self * rhs.0)
+    }
+}
+
+impl Mul<u128> for Fee {
+    type Output = Fee;
+
+    fn mul(self, rhs: u128) -> Self::Output {
+        Fee(self.0 * rhs)
+    }
+}
+
+impl Div<Fee> for Fee {
+    type Output = Fee;
+
+    fn div(self, rhs: Fee) -> Self::Output {
+        Fee(self.0 / rhs.0)
+    }
+}
+
+impl Div<Fee> for u128 {
+    type Output = Fee;
+
+    fn div(self, rhs: Fee) -> Self::Output {
+        Fee(self / rhs.0)
+    }
+}
+
+impl Div<u128> for Fee {
+    type Output = Fee;
+
+    fn div(self, rhs: u128) -> Self::Output {
+        Fee(self.0 / rhs)
+    }
+}
+
+impl From<u128> for Fee {
+    fn from(fee: u128) -> Self {
+        Self(fee)
+    }
+}
+
+impl From<Fee> for u128 {
+    fn from(fee: Fee) -> Self {
+        fee.0
     }
 }
 
@@ -217,9 +321,6 @@ impl From<WeiU256> for Wei {
         Wei(U256::from_big_endian(&value))
     }
 }
-
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct U128(pub u128);
 
 pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000;
 // 1e19yN, 0.00001N
@@ -425,5 +526,45 @@ mod tests {
         let eth_amount: u64 = rand::random();
         let wei_amount = U256::from(eth_amount) * U256::from(10).pow(18.into());
         assert_eq!(Wei::from_eth(eth_amount.into()), Some(Wei::new(wei_amount)));
+    }
+
+    #[test]
+    fn test_fee_add() {
+        let fee = Fee::new(100);
+        assert_eq!(200u128 + fee, Fee::new(300));
+        assert_eq!(fee + fee, Fee::new(200));
+        assert_eq!(fee + 200u128, Fee::new(300));
+        assert_eq!(fee.add(200), Fee::new(300));
+        assert_eq!(200.add(fee), Fee::new(300));
+    }
+
+    #[test]
+    fn test_fee_mul() {
+        let fee = Fee::new(100);
+        assert_eq!(3u128 * fee, Fee::new(300));
+        assert_eq!(fee * fee, Fee::new(10000));
+        assert_eq!(fee * 3u128, Fee::new(300));
+        assert_eq!(fee.mul(3), Fee::new(300));
+        assert_eq!(3.mul(fee), Fee::new(300));
+    }
+
+    #[test]
+    fn test_fee_div() {
+        let fee = Fee::new(100);
+        let fee2 = Fee::new(10);
+        assert_eq!(1000u128 / fee, Fee::new(10));
+        assert_eq!(fee / fee2, Fee::new(10));
+        assert_eq!(fee / 10u128, Fee::new(10));
+        assert_eq!(fee.div(10), Fee::new(10));
+        assert_eq!(1000.div(fee), Fee::new(10));
+    }
+
+    #[test]
+    fn test_fee_from() {
+        let fee = Fee::new(100);
+        let fee2 = Fee::from(100u128);
+        assert_eq!(fee, fee2);
+        let res: u128 = fee.into();
+        assert_eq!(res, 100);
     }
 }
