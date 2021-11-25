@@ -1,6 +1,5 @@
 use crate::tests::mocks::{promise, storage};
 use aurora_engine::engine;
-use aurora_engine_sdk::env::Env;
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::{account_id::AccountId, Address, H256, U256};
 use std::sync::RwLock;
@@ -41,7 +40,6 @@ fn test_deploy_code() {
         evm_deploy(&code_to_deploy),
         u64::MAX,
         Vec::new(),
-        env.random_seed(),
         &mut handler,
     );
 
