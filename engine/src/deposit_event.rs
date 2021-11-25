@@ -28,7 +28,7 @@ pub enum TokenMessageData {
 impl TokenMessageData {
     /// Parse event message data for tokens. Data parsed form event `recipient` field.
     /// Used for Deposit flow.
-    fn parse_event_message(
+    pub fn parse_event_message(
         message: &str,
     ) -> Result<TokenMessageData, error::ParseEventMessageError> {
         let data: Vec<_> = message.split(':').collect();
@@ -188,6 +188,7 @@ pub mod error {
         }
     }
 
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum ParseEventMessageError {
         TooManyParts,
         InvalidAccount,

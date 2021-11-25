@@ -161,7 +161,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         // Get recipient Eth address from message slice
         let mut recipient: EthAddress = Default::default();
-        recipient.copy_from_slice(&msg[32..52]);
+        recipient.copy_from_slice(&msg[16..36]);
 
         Ok(OnTransferMessageData {
             relayer: account_id,
