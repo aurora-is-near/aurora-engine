@@ -4,7 +4,7 @@ use crate::promise::PromiseId;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::types::PromiseResult;
-use aurora_engine_types::TryFrom;
+use aurora_engine_types::{TryFrom, H256};
 
 /// Wrapper type for indices in NEAR's register API.
 pub struct RegisterIndex(u64);
@@ -226,6 +226,15 @@ impl crate::env::Env for Runtime {
             let data = [0u8; core::mem::size_of::<u128>()];
             exports::attached_deposit(data.as_ptr() as u64);
             u128::from_le_bytes(data)
+        }
+    }
+
+    fn random_seed(&self) -> H256 {
+        unsafe {
+            exports::random_seed(0);
+            let bytes = H256::zero();
+            exports::read_register(0, bytes.0.as_ptr() as *const u64 as u64);
+            bytes
         }
     }
 }

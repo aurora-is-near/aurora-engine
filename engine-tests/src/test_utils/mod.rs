@@ -408,8 +408,8 @@ impl AuroraRunner {
         }
     }
 
-    pub fn with_random_seed(mut self, random_seed: Vec<u8>) -> Self {
-        self.context.random_seed = random_seed;
+    pub fn with_random_seed(mut self, random_seed: H256) -> Self {
+        self.context.random_seed = random_seed.as_bytes().to_vec();
         self
     }
 }

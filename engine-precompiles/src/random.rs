@@ -1,6 +1,6 @@
 use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::EthGas;
-use crate::prelude::{Address, Vec};
+use crate::prelude::{Address, H256};
 use crate::PrecompileOutput;
 use evm::{Context, ExitError};
 
@@ -12,7 +12,7 @@ mod costs {
 }
 
 pub struct RandomSeed {
-    random_seed: Vec<u8>,
+    random_seed: H256,
 }
 
 impl RandomSeed {
@@ -25,7 +25,7 @@ impl RandomSeed {
     pub const ADDRESS: Address =
         super::make_address(0xc104f484, 0x0573bed437190daf5d2898c2bdf928ac);
 
-    pub fn new(random_seed: Vec<u8>) -> Self {
+    pub fn new(random_seed: H256) -> Self {
         Self { random_seed }
     }
 }
@@ -49,7 +49,7 @@ impl Precompile for RandomSeed {
             }
         }
 
-        Ok(PrecompileOutput::without_logs(cost, self.random_seed.clone()).into())
+        Ok(PrecompileOutput::without_logs(cost, self.random_seed.as_bytes().to_vec()).into())
     }
 }
 

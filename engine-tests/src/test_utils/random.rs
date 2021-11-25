@@ -1,6 +1,7 @@
 use crate::prelude::U256;
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use aurora_engine::transaction::legacy::TransactionLegacy;
+use aurora_engine_types::H256;
 use ethabi::Constructor;
 
 const DEFAULT_GAS: u64 = 1_000_000_000;
@@ -45,7 +46,7 @@ pub(crate) struct Random {
 }
 
 impl Random {
-    pub fn random_seed(&self, runner: &mut AuroraRunner, signer: &mut Signer) -> Option<U256> {
+    pub fn random_seed(&self, runner: &mut AuroraRunner, signer: &mut Signer) -> H256 {
         let data = self
             .contract
             .abi
@@ -66,11 +67,9 @@ impl Random {
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
         let result = test_utils::unwrap_success(result);
 
-        if result.len() == 32 {
-            Some(U256::from(result.as_slice()))
-        } else {
-            None
-        }
+        let mut random_seed = [0; 32];
+        random_seed.copy_from_slice(result.as_slice());
+        H256::from(random_seed)
     }
 }
 

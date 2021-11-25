@@ -23,7 +23,7 @@ use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::types::EthGas;
-use crate::prelude::Vec;
+use crate::prelude::{Vec, H256};
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
 use aurora_engine_types::{account_id::AccountId, vec, Address, BTreeMap, Box};
@@ -125,7 +125,7 @@ impl executor::PrecompileSet for Precompiles {
 
 pub struct PrecompileConstructorContext {
     pub current_account_id: AccountId,
-    pub random_seed: Vec<u8>,
+    pub random_seed: H256,
 }
 
 impl Precompiles {

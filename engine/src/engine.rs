@@ -311,9 +311,7 @@ struct StackExecutorParams {
 }
 
 impl StackExecutorParams {
-    fn new(gas_limit: u64, current_account_id: AccountId) -> Self {
-        let random_seed = sdk::random_seed().to_fixed_bytes().to_vec();
-
+    fn new(gas_limit: u64, current_account_id: AccountId, random_seed: H256) -> Self {
         Self {
             precompiles: Precompiles::new_london(PrecompileConstructorContext {
                 current_account_id,
@@ -467,7 +465,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
+        let executor_params = StackExecutorParams::new(
+            gas_limit,
+            self.current_account_id.clone(),
+            self.env.random_seed(),
+        );
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (exit_reason, result) = (
@@ -542,7 +544,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
+        let executor_params = StackExecutorParams::new(
+            gas_limit,
+            self.current_account_id.clone(),
+            self.env.random_seed(),
+        );
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
@@ -581,7 +587,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         input: Vec<u8>,
         gas_limit: u64,
     ) -> Result<TransactionStatus, EngineErrorKind> {
-        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
+        let executor_params = StackExecutorParams::new(
+            gas_limit,
+            self.current_account_id.clone(),
+            self.env.random_seed(),
+        );
         let mut executor = executor_params.make_executor(self);
         let (status, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
