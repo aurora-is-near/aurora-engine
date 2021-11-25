@@ -7,6 +7,7 @@ use crate::prelude::{
     String, ToString, TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
+use aurora_engine_types::types::Fee;
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -323,7 +324,7 @@ pub struct FinishDepositCallArgs {
     pub amount: Balance,
     pub proof_key: String,
     pub relayer_id: AccountId,
-    pub fee: Balance,
+    pub fee: Fee,
     pub msg: Option<Vec<u8>>,
 }
 
@@ -371,7 +372,7 @@ impl TryFrom<JsonValue> for TransferCallCallArgs {
         let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
         let amount = v.u128("amount")?;
         let memo = v.string("memo").ok();
-        // TODO: add validation for OnTransfer message
+        // TODO: should we add early validation for OnTransfer message here?
         let msg = v.string("msg")?;
         Ok(Self {
             receiver_id,

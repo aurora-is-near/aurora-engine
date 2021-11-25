@@ -1,10 +1,56 @@
 use crate::log_entry::LogEntry;
-use crate::prelude::{vec, EthAddress, String, ToString, Vec, U256};
+use crate::prelude::account_id::AccountId;
+use crate::prelude::{
+    vec, Balance, BorshDeserialize, BorshSerialize, EthAddress, Fee, String, ToString, Vec,
+};
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
 pub const DEPOSITED_EVENT: &str = "Deposited";
 
 pub type EventParams = Vec<EventParam>;
+
+/// Token message data used for Deposit flow.
+/// It contains two basic data structure: Near, Eth
+/// The message parsed from event `recipient` field - `log_entry_data`
+/// after fetching proof `log_entry_data`
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub enum TokenMessageData {
+    /// Deposit no NEAR account
+    Near(AccountId),
+    ///Deposit to Eth accounts fee is being minted in the `ft_on_transfer` callback method
+    Eth {
+        receiver_id: AccountId,
+        message: String,
+    },
+}
+
+impl TokenMessageData {
+    /// Parse event message data for tokens. Data parsed form event `recipient` field.
+    /// Used for Deposit flow.
+    fn parse_event_message(
+        message: &str,
+    ) -> Result<TokenMessageData, error::ParseEventMessageError> {
+        let data: Vec<_> = message.split(':').collect();
+        // Data array can contain 1 or 2 elements
+        if data.len() >= 3 {
+            return Err(error::ParseEventMessageError::TooManyParts);
+        }
+        let account_id = AccountId::try_from(data[0].as_bytes())
+            .map_err(|_| error::ParseEventMessageError::InvalidAccount)?;
+        // TODO: validate data[1] as EthAddress. It can contain "0x" prefix - just remove it
+
+        // If data array contain only one element it should return NEAR account id
+        if data.len() == 1 {
+            Ok(TokenMessageData::Near(account_id))
+        } else {
+            Ok(TokenMessageData::Eth {
+                receiver_id: account_id,
+                message: data[1].into(),
+            })
+        }
+    }
+}
 
 /// Ethereum event
 pub struct EthEvent {
@@ -49,9 +95,9 @@ impl EthEvent {
 pub struct DepositedEvent {
     pub eth_custodian_address: EthAddress,
     pub sender: EthAddress,
-    pub recipient: String,
-    pub amount: U256,
-    pub fee: U256,
+    pub token_message_data: String,
+    pub amount: Balance,
+    pub fee: Fee,
 }
 
 impl DepositedEvent {
@@ -91,17 +137,22 @@ impl DepositedEvent {
             .into_address()
             .ok_or(error::ParseError::InvalidSender)?
             .0;
-        let recipient: String = event.log.params[1].value.clone().to_string();
+        // TODO: change it
+        let event_message_data: String = event.log.params[1].value.clone().to_string();
+        // parse_event_message
         let amount = event.log.params[2]
             .value
             .clone()
             .into_uint()
-            .ok_or(error::ParseError::InvalidAmount)?;
-        let fee = event.log.params[3]
+            .ok_or(error::ParseError::InvalidAmount)?
+            .as_u128();
+        let fee: Fee = event.log.params[3]
             .value
             .clone()
             .into_uint()
-            .ok_or(error::ParseError::InvalidFee)?;
+            .ok_or(error::ParseError::InvalidFee)?
+            .as_u128()
+            .into();
         Ok(Self {
             eth_custodian_address: event.eth_custodian_address,
             sender,
@@ -126,11 +177,32 @@ pub mod error {
         }
     }
 
+    pub enum ParseEventMessageError {
+        TooManyParts,
+        InvalidAccount,
+    }
+
+    impl AsRef<[u8]> for ParseEventMessageError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TooManyParts => b"ERR_INVALID_EVENT_MESSAGE_FORMAT",
+                Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
+            }
+        }
+    }
+
+    impl From<ParseEventMessageError> for ParseError {
+        fn from(e: ParseEventMessageError) -> Self {
+            Self::MessageParseFailed(e)
+        }
+    }
+
     pub enum ParseError {
         LogParseFailed(DecodeError),
         InvalidSender,
         InvalidAmount,
         InvalidFee,
+        MessageParseFailed(ParseEventMessageError),
     }
     impl AsRef<[u8]> for ParseError {
         fn as_ref(&self) -> &[u8] {
@@ -139,6 +211,7 @@ pub mod error {
                 Self::InvalidSender => b"ERR_INVALID_SENDER",
                 Self::InvalidAmount => b"ERR_INVALID_AMOUNT",
                 Self::InvalidFee => b"ERR_INVALID_FEE",
+                Self::MessageParseFailed(e) => e.as_ref(),
             }
         }
     }

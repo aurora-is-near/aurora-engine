@@ -402,7 +402,6 @@ pub struct Engine<'env, I: IO, E: Env> {
     env: &'env E,
 }
 
-// TODO: upgrade to Berlin HF
 pub(crate) const CONFIG: &Config = &Config::london();
 
 /// Key for storing the state of the engine.

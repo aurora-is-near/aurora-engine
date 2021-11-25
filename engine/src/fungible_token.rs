@@ -227,8 +227,12 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         if amount == 0 {
             return Err(error::TransferError::ZeroAmount);
         }
+
+        // Check is account receiver_id exist
         if !self.accounts_contains_key(receiver_id) {
-            // TODO: how does this interact with the storage deposit concept?
+            // Register receiver_id account with 0 balance. We need it because
+            // when we retire to get the balance of `receiver_id` it will fail
+            // if it does not exist.
             self.internal_register_account(receiver_id)
         }
         self.internal_withdraw_eth_from_near(sender_id, amount)?;
