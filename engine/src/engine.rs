@@ -19,6 +19,7 @@ use crate::prelude::{
     TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
 };
 use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
+use aurora_engine_precompiles::PrecompileConstructorContext;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -327,9 +328,12 @@ struct StackExecutorParams {
 }
 
 impl StackExecutorParams {
-    fn new(gas_limit: u64, current_account_id: AccountId) -> Self {
+    fn new(gas_limit: u64, current_account_id: AccountId, random_seed: H256) -> Self {
         Self {
-            precompiles: Precompiles::new_london(current_account_id),
+            precompiles: Precompiles::new_london(PrecompileConstructorContext {
+                current_account_id,
+                random_seed,
+            }),
             gas_limit,
         }
     }
@@ -478,7 +482,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
+        let executor_params = StackExecutorParams::new(
+            gas_limit,
+            self.current_account_id.clone(),
+            self.env.random_seed(),
+        );
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy { caller: origin });
         let (exit_reason, result) = (
@@ -553,7 +561,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
+        let executor_params = StackExecutorParams::new(
+            gas_limit,
+            self.current_account_id.clone(),
+            self.env.random_seed(),
+        );
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
@@ -592,7 +604,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         input: Vec<u8>,
         gas_limit: u64,
     ) -> Result<TransactionStatus, EngineErrorKind> {
-        let executor_params = StackExecutorParams::new(gas_limit, self.current_account_id.clone());
+        let executor_params = StackExecutorParams::new(
+            gas_limit,
+            self.current_account_id.clone(),
+            self.env.random_seed(),
+        );
         let mut executor = executor_params.make_executor(self);
         let (status, result) =
             executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());

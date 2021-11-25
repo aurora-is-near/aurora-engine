@@ -1,4 +1,5 @@
 use crate::error::{OneYoctoAttachError, PrivateCallError};
+use crate::prelude::H256;
 use aurora_engine_types::account_id::AccountId;
 
 /// Timestamp represented by the number of nanoseconds since the Unix Epoch.
@@ -40,6 +41,8 @@ pub trait Env {
     fn block_timestamp(&self) -> Timestamp;
     /// Amount of NEAR attached to current call
     fn attached_deposit(&self) -> u128;
+    /// Random seed generated for the current block
+    fn random_seed(&self) -> H256;
 
     fn assert_private_call(&self) -> Result<(), PrivateCallError> {
         if self.predecessor_account_id() == self.current_account_id() {
@@ -68,6 +71,7 @@ pub struct Fixed {
     pub block_height: u64,
     pub block_timestamp: Timestamp,
     pub attached_deposit: u128,
+    pub random_seed: H256,
 }
 
 impl Env for Fixed {
@@ -93,5 +97,9 @@ impl Env for Fixed {
 
     fn attached_deposit(&self) -> u128 {
         self.attached_deposit
+    }
+
+    fn random_seed(&self) -> H256 {
+        self.random_seed
     }
 }

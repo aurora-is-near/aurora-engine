@@ -7,6 +7,7 @@ mod eth_connector;
 #[cfg(feature = "meta-call")]
 mod meta_parsing;
 mod one_inch;
+mod random;
 mod sanity;
 mod self_destruct_state;
 mod standalone;
