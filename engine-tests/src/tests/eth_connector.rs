@@ -11,7 +11,6 @@ use aurora_engine::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use byte_slice_cast::AsByteSlice;
 use near_sdk::test_utils::accounts;
 use near_sdk_sim::transaction::ExecutionStatus;
 use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};

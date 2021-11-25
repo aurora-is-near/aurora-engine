@@ -1,5 +1,5 @@
 use crate::admin_controlled::{AdminControlled, PausedMask};
-use crate::deposit_event::DepositedEvent;
+use crate::deposit_event::{DepositedEvent, TokenMessageData};
 use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
@@ -142,31 +142,31 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             return Err(error::ParseOnTransferMessageError::TooManyParts);
         }
 
+        // Check relayer account id from 1-th data element
+        let account_id = AccountId::try_from(data[0].as_bytes())
+            .map_err(|_| error::ParseOnTransferMessageError::InvalidAccount)?;
+
         // Decode message array from 2-th element of data array
         let msg =
             hex::decode(data[1]).map_err(|_| error::ParseOnTransferMessageError::InvalidHexData)?;
-        // Length = fee[32] + eth_address[20] bytes
-        // TODO: change fee lenth to 16 - u128
-        if msg.len() != 52 {
+        // Length = fee[16] + eth_address[20] bytes
+        if msg.len() != 36 {
             return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
         }
 
-        // Parse fee from message slice
-        // TODO: fee should have own type
-        let mut fee: [u8; 32] = Default::default();
-        fee.copy_from_slice(&msg[..32]);
+        // Parse fee from message slice. It should contain 16 bytes
+        let mut raw_fee: [u8; 16] = Default::default();
+        raw_fee.copy_from_slice(&msg[..16]);
+        let fee: Fee = u128::from_be_bytes(raw_fee).into();
 
         // Get recipient Eth address from message slice
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
 
-        // Check relayer account id from 1-th data element
-        let account_id = AccountId::try_from(data[0].as_bytes())
-            .map_err(|_| error::ParseOnTransferMessageError::InvalidAccount)?;
         Ok(OnTransferMessageData {
             relayer: account_id,
             recipient,
-            fee: U256::from_little_endian(&fee[..]),
+            fee,
         })
     }
 
@@ -177,12 +177,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         fee: Fee,
         message: String,
     ) -> Result<String, AddressValidationError> {
-        // TODO: remove + remove crate
-        //use byte_slice_cast::AsByteSlice;
-
-        // TODO: fee as independent type
-        // TODO: change to: let data = x.to_le_bytes().to_vec(); // 16 bytes
-        let mut data = fee.as_byte_slice().to_vec();
+        // First data section should contain fee data
+        let mut data = fee.into_u128().to_be_bytes().to_vec();
 
         // Check message length.Ω
         let address = if message.len() == 42 {
@@ -193,10 +189,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         } else {
             message
         };
-        // TODO: address length == 20 - validate it. Possible validate as EthAddress type
-        let address_bytes =
-            hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
+        let address_bytes = validate_eth_address(address)?;
+        // Second data section should contain Eth address
         data.extend(address_bytes);
+        // Add `:` separator between relayer_id and data message
         Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
     }
 
@@ -225,9 +221,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         sdk::log!(&format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
             hex::encode(event.sender),
-            event.recipient,
-            event.amount.as_u128(),
-            event.fee.as_u128()
+            event.token_message_data.get_recipient(),
+            event.amount,
+            event.fee
         ));
 
         sdk::log!(&format!(
@@ -240,7 +236,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             return Err(error::DepositError::CustodianAddressMismatch);
         }
 
-        if event.fee >= event.amount {
+        if event.fee.into_u128() >= event.amount {
             return Err(error::DepositError::InsufficientAmountForFee);
         }
 
@@ -264,7 +260,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         };
 
         // Finalize deposit
-        let data = match self.parse_event_message(&event.recipient)? {
+        let data = match event.token_message_data {
             // Deposit to NEAR accounts
             TokenMessageData::Near(account_id) => FinishDepositCallArgs {
                 new_owner_id: account_id,
@@ -305,7 +301,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                     amount: event.amount,
                     proof_key: proof.get_key(),
                     relayer_id: predecessor_account_id,
-                    fee: event.fee.as_u128(),
+                    fee: event.fee,
                     msg: Some(transfer_data),
                 }
                 .try_to_vec()
@@ -356,8 +352,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             Ok(Some(promise))
         } else {
             // Mint - calculate new balances
-            self.mint_eth_on_near(data.new_owner_id.clone(), data.amount - data.fee)?;
-            self.mint_eth_on_near(data.relayer_id, data.fee)?;
+            self.mint_eth_on_near(
+                data.new_owner_id.clone(),
+                data.amount - data.fee.into_u128(),
+            )?;
+            self.mint_eth_on_near(data.relayer_id, data.fee.into_u128())?;
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key)?;
             // Save new contract data

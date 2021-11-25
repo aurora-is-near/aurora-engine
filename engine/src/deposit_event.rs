@@ -1,7 +1,7 @@
 use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    vec, Balance, BorshDeserialize, BorshSerialize, EthAddress, Fee, String, ToString, Vec,
+    vec, Balance, BorshDeserialize, BorshSerialize, EthAddress, Fee, String, ToString, TryFrom, Vec,
 };
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
@@ -50,6 +50,16 @@ impl TokenMessageData {
             })
         }
     }
+
+    pub fn get_recipient(&self) -> String {
+        match self {
+            Self::Near(acc) => acc.to_string(),
+            Self::Eth {
+                receiver_id,
+                message: _,
+            } => receiver_id.to_string(),
+        }
+    }
 }
 
 /// Ethereum event
@@ -91,11 +101,10 @@ impl EthEvent {
 }
 
 /// Data that was emitted by Deposited event.
-#[derive(Debug, PartialEq)]
 pub struct DepositedEvent {
     pub eth_custodian_address: EthAddress,
     pub sender: EthAddress,
-    pub token_message_data: String,
+    pub token_message_data: TokenMessageData,
     pub amount: Balance,
     pub fee: Fee,
 }
@@ -137,9 +146,11 @@ impl DepositedEvent {
             .into_address()
             .ok_or(error::ParseError::InvalidSender)?
             .0;
-        // TODO: change it
-        let event_message_data: String = event.log.params[1].value.clone().to_string();
+
         // parse_event_message
+        let event_message_data: String = event.log.params[1].value.clone().to_string();
+        let token_message_data = TokenMessageData::parse_event_message(&event_message_data)?;
+
         let amount = event.log.params[2]
             .value
             .clone()
@@ -156,7 +167,7 @@ impl DepositedEvent {
         Ok(Self {
             eth_custodian_address: event.eth_custodian_address,
             sender,
-            recipient,
+            token_message_data,
             amount,
             fee,
         })

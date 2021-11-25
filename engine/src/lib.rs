@@ -862,7 +862,7 @@ mod contract {
             amount: balance.low_u128(),
             proof_key: crate::prelude::String::new(),
             relayer_id: aurora_account_id.clone(),
-            fee: 0,
+            fee: 0.into(),
             msg: None,
         };
         let verify_call = aurora_engine_types::parameters::PromiseCreateArgs {

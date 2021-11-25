@@ -1,4 +1,5 @@
 use crate::{str, vec, Add, Address, Display, Div, Mul, String, Sub, Vec, U256};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::fmt::Formatter;
 
@@ -106,7 +107,9 @@ impl Mul<EthGas> for u64 {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(
+    Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
+)]
 /// Engine `fee` type which wraps an underlying u128.
 pub struct Fee(u128);
 
@@ -233,7 +236,7 @@ impl AsRef<[u8]> for AddressValidationError {
     }
 }
 
-/// Validate Etherium address from string and return EthAddress
+/// Validate Ethereum address from string and return Result data EthAddress or Error data
 pub fn validate_eth_address(address: String) -> Result<EthAddress, AddressValidationError> {
     let data = hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
     if data.len() != 20 {
