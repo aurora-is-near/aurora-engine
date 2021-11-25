@@ -4,7 +4,7 @@ use aurora_engine::parameters::{FinishDepositCallArgs, InitCallArgs, NewCallArgs
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
-use engine_standalone_storage::Storage;
+use engine_standalone_storage::{BlockMetadata, Storage};
 
 use crate::test_utils;
 
@@ -19,8 +19,12 @@ pub fn compute_block_hash(block_height: u64) -> H256 {
 
 pub fn insert_block(storage: &mut Storage, block_height: u64) {
     let block_hash = compute_block_hash(block_height);
+    let block_metadata = BlockMetadata {
+        timestamp: aurora_engine_sdk::env::Timestamp::new(0),
+        random_seed: H256::zero(),
+    };
     storage
-        .set_block_hash_for_height(block_hash, block_height)
+        .set_block_data(block_hash, block_height, block_metadata)
         .unwrap();
 }
 

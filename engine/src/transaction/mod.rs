@@ -39,6 +39,26 @@ impl TryFrom<&[u8]> for EthTransactionKind {
     }
 }
 
+impl From<EthTransactionKind> for Vec<u8> {
+    fn from(tx: EthTransactionKind) -> Self {
+        let mut stream = rlp::RlpStream::new();
+        match tx {
+            EthTransactionKind::Legacy(tx) => {
+                stream.append(&tx);
+            }
+            EthTransactionKind::Eip1559(tx) => {
+                stream.append(&eip_1559::TYPE_BYTE);
+                stream.append(&tx);
+            }
+            EthTransactionKind::Eip2930(tx) => {
+                stream.append(&eip_2930::TYPE_BYTE);
+                stream.append(&tx);
+            }
+        }
+        stream.out().to_vec()
+    }
+}
+
 /// A normalized Ethereum transaction which can be created from older
 /// transactions.
 pub struct NormalizedEthTransaction {
