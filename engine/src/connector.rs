@@ -11,7 +11,7 @@ use crate::parameters::{
 use crate::prelude::{
     format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
     BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, String,
-    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160, U256,
+    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
 };
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
@@ -369,10 +369,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub(crate) fn internal_remove_eth(
         &mut self,
         address: &Address,
-        // TODO: change to u128 or custom type
-        amount: &U256,
+        amount: Balance,
     ) -> Result<(), fungible_token::error::WithdrawError> {
-        self.burn_eth_on_aurora(address.0, amount.as_u128())?;
+        self.burn_eth_on_aurora(address.0, amount)?;
         self.save_ft_contract();
         Ok(())
     }

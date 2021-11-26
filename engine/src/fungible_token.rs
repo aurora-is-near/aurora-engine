@@ -386,7 +386,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         promise_result: PromiseResult,
         sender_id: &AccountId,
         receiver_id: &AccountId,
-        amount: u128,
+        amount: Balance,
     ) -> u128 {
         self.internal_ft_resolve_transfer(promise_result, sender_id, receiver_id, amount)
             .0

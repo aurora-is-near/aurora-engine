@@ -294,6 +294,10 @@ impl Wei {
     pub fn checked_add(self, rhs: Self) -> Option<Self> {
         self.0.checked_add(rhs.0).map(Self)
     }
+
+    pub fn into_u128(self) -> u128 {
+        self.0.as_u128()
+    }
 }
 
 impl Display for Wei {
