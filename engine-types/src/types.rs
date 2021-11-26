@@ -9,7 +9,8 @@ pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32];
 // Big-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
-                             // TODO: introduce new type. Add encode/decode/validation methods
+
+// TODO: introduce new type. Add encode/decode/validation methods
 pub type EthAddress = [u8; 20];
 pub type StorageUsage = u64;
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction

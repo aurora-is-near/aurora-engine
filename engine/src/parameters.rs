@@ -372,7 +372,6 @@ impl TryFrom<JsonValue> for TransferCallCallArgs {
         let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
         let amount = v.u128("amount")?;
         let memo = v.string("memo").ok();
-        // TODO: should we add early validation for OnTransfer message here?
         let msg = v.string("msg")?;
         Ok(Self {
             receiver_id,
