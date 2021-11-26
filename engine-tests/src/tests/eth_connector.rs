@@ -1,12 +1,10 @@
 use crate::prelude::EthAddress;
 use crate::prelude::WithdrawCallArgs;
-use crate::prelude::U256;
 use crate::test_utils::str_to_account_id;
 use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
 use aurora_engine::connector::{
     ERR_NOT_ENOUGH_BALANCE_FOR_FEE, PAUSE_DEPOSIT, PAUSE_WITHDRAW, UNPAUSE_ALL,
 };
-use aurora_engine::deposit_event::TokenMessageData;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
