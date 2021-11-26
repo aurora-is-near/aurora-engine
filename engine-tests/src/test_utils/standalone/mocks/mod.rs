@@ -94,7 +94,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
         amount: balance.raw().low_u128(),
         proof_key: String::new(),
         relayer_id: aurora_account_id.clone(),
-        fee: 0,
+        fee: 0.into(),
         msg: None,
     };
 
@@ -105,7 +105,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     );
     io.remove_storage(&proof_key);
 
-    aurora_engine::connector::EthConnectorContract::get_instance(io)
+    aurora_engine::connector::EthConnectorContract::init_instance(io)
         .finish_deposit(
             aurora_account_id.clone(),
             aurora_account_id.clone(),
