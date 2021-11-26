@@ -1,8 +1,11 @@
 use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    vec, Balance, BorshDeserialize, BorshSerialize, EthAddress, Fee, String, ToString, TryFrom, Vec,
+    validate_eth_address, vec, AddressValidationError, Balance, BorshDeserialize, BorshSerialize,
+    EthAddress, Fee, String, ToString, TryFrom, Vec,
 };
+
+use crate::deposit_event::error::ParseEventMessageError;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
 pub const DEPOSITED_EVENT: &str = "Deposited";
@@ -28,8 +31,12 @@ pub enum TokenMessageData {
 impl TokenMessageData {
     /// Parse event message data for tokens. Data parsed form event `recipient` field.
     /// Used for Deposit flow.
-    pub fn parse_event_message(
+    /// For Eth logic flow message validated and prepared for  `ft_on_transfer` logic.
+    /// It mean validating Eth address correctness and preparing message for
+    /// parsing for `ft_on_transfer` message parsing with correct and validated data.
+    pub fn parse_event_message_and_prepare_token_message_data(
         message: &str,
+        fee: Fee,
     ) -> Result<TokenMessageData, error::ParseEventMessageError> {
         let data: Vec<_> = message.split(':').collect();
         // Data array can contain 1 or 2 elements
@@ -38,19 +45,22 @@ impl TokenMessageData {
         }
         let account_id = AccountId::try_from(data[0].as_bytes())
             .map_err(|_| error::ParseEventMessageError::InvalidAccount)?;
-        // TODO: validate data[1] as EthAddress. It can contain "0x" prefix - just remove it
 
         // If data array contain only one element it should return NEAR account id
         if data.len() == 1 {
             Ok(TokenMessageData::Near(account_id))
         } else {
+            let raw_message = data[1].into();
+            let message = Self::prepare_message_for_on_transfer(&account_id, fee, raw_message)?;
+
             Ok(TokenMessageData::Eth {
                 receiver_id: account_id,
-                message: data[1].into(),
+                message,
             })
         }
     }
 
+    // Get recipient account id from Eth part of Token message data
     pub fn get_recipient(&self) -> String {
         match self {
             Self::Near(acc) => acc.to_string(),
@@ -59,6 +69,34 @@ impl TokenMessageData {
                 message: _,
             } => receiver_id.to_string(),
         }
+    }
+
+    /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
+    fn prepare_message_for_on_transfer(
+        relayer_account_id: &AccountId,
+        fee: Fee,
+        message: String,
+    ) -> Result<String, ParseEventMessageError> {
+        // First data section should contain fee data
+        let mut data = fee.into_u128().to_be_bytes().to_vec();
+
+        // Check message length.Ω
+        let address = if message.len() == 42 {
+            message
+                .strip_prefix("0x")
+                .ok_or(ParseEventMessageError::EthAddressValidationError(
+                    AddressValidationError::FailedDecodeHex,
+                ))?
+                .to_string()
+        } else {
+            message
+        };
+        let address_bytes = validate_eth_address(address)
+            .map_err(ParseEventMessageError::EthAddressValidationError)?;
+        // Second data section should contain Eth address
+        data.extend(address_bytes);
+        // Add `:` separator between relayer_id and data message
+        Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
     }
 }
 
@@ -149,7 +187,6 @@ impl DepositedEvent {
 
         // parse_event_message
         let event_message_data: String = event.log.params[1].value.clone().to_string();
-        let token_message_data = TokenMessageData::parse_event_message(&event_message_data)?;
 
         let amount = event.log.params[2]
             .value
@@ -164,6 +201,13 @@ impl DepositedEvent {
             .ok_or(error::ParseError::InvalidFee)?
             .as_u128()
             .into();
+
+        let token_message_data =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(
+                &event_message_data,
+                fee,
+            )?;
+
         Ok(Self {
             eth_custodian_address: event.eth_custodian_address,
             sender,
@@ -175,6 +219,8 @@ impl DepositedEvent {
 }
 
 pub mod error {
+    use super::*;
+
     pub enum DecodeError {
         RlpFailed,
         SchemaMismatch,
@@ -192,6 +238,7 @@ pub mod error {
     pub enum ParseEventMessageError {
         TooManyParts,
         InvalidAccount,
+        EthAddressValidationError(AddressValidationError),
     }
 
     impl AsRef<[u8]> for ParseEventMessageError {
@@ -199,6 +246,7 @@ pub mod error {
             match self {
                 Self::TooManyParts => b"ERR_INVALID_EVENT_MESSAGE_FORMAT",
                 Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
+                Self::EthAddressValidationError(e) => e.as_ref(),
             }
         }
     }

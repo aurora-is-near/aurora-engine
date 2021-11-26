@@ -10,8 +10,8 @@ use crate::parameters::{
 };
 use crate::prelude::{
     format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
-    BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, String,
-    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
+    BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString,
+    TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
 };
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
@@ -170,32 +170,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         })
     }
 
-    /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
-    fn prepare_message_for_on_transfer(
-        &self,
-        relayer_account_id: &AccountId,
-        fee: Fee,
-        message: String,
-    ) -> Result<String, AddressValidationError> {
-        // First data section should contain fee data
-        let mut data = fee.into_u128().to_be_bytes().to_vec();
-
-        // Check message length.Ω
-        let address = if message.len() == 42 {
-            message
-                .strip_prefix("0x")
-                .ok_or(AddressValidationError::FailedDecodeHex)?
-                .to_string()
-        } else {
-            message
-        };
-        let address_bytes = validate_eth_address(address)?;
-        // Second data section should contain Eth address
-        data.extend(address_bytes);
-        // Add `:` separator between relayer_id and data message
-        Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
-    }
-
     /// Deposit all types of tokens
     pub fn deposit(
         &self,
@@ -284,13 +258,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                     receiver_id,
                     amount: event.amount,
                     memo: None,
-                    msg: self
-                        .prepare_message_for_on_transfer(
-                            &predecessor_account_id,
-                            event.fee,
-                            message,
-                        )
-                        .map_err(error::DepositError::InvalidAddress)?,
+                    msg: message,
                 }
                 .try_to_vec()
                 .unwrap();
