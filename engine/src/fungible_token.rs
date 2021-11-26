@@ -5,13 +5,11 @@ use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, Storage
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress,
-    NearGas, PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
+    NearGas, PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult,
+    PromiseWithCallbackArgs, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
     Wei, U256,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::parameters::{
-    PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
-};
 
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
 const GAS_FOR_FT_ON_TRANSFER: NearGas = NearGas::new(10_000_000_000_000);
@@ -52,6 +50,24 @@ pub struct FungibleTokenOps<I: IO> {
     io: I,
 }
 
+/// Fungible token Reference hash type.
+/// Used for FungibleTokenMetadata
+#[derive(BorshDeserialize, BorshSerialize, Clone)]
+pub struct FungibleReferenceHash([u8; 32]);
+
+impl FungibleReferenceHash {
+    /// Encode to base64-encoded string
+    pub fn encode(&self) -> String {
+        base64::encode(self)
+    }
+}
+
+impl AsRef<[u8]> for FungibleReferenceHash {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
 pub struct FungibleTokenMetadata {
     pub spec: String,
@@ -59,7 +75,7 @@ pub struct FungibleTokenMetadata {
     pub symbol: String,
     pub icon: Option<String>,
     pub reference: Option<String>,
-    pub reference_hash: Option<[u8; 32]>,
+    pub reference_hash: Option<FungibleReferenceHash>,
     pub decimals: u8,
 }
 
@@ -101,7 +117,7 @@ impl From<FungibleTokenMetadata> for JsonValue {
             "reference_hash".to_string(),
             metadata
                 .reference_hash
-                .map(|hash| JsonValue::String(base64::encode(hash)))
+                .map(|hash| JsonValue::String(hash.encode()))
                 .unwrap_or(JsonValue::Null),
         );
         kvs.insert(
@@ -128,9 +144,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 
     /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
-        engine::get_balance(&self.io, &Address(address))
-            .raw()
-            .as_u128()
+        engine::get_balance(&self.io, &Address(address)).into_u128()
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
@@ -254,15 +268,15 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         self.accounts_insert(account_id, 0)
     }
 
-    pub fn ft_total_eth_supply_on_near(&self) -> u128 {
+    pub fn ft_total_eth_supply_on_near(&self) -> Balance {
         self.total_eth_supply_on_near
     }
 
-    pub fn ft_total_eth_supply_on_aurora(&self) -> u128 {
+    pub fn ft_total_eth_supply_on_aurora(&self) -> Balance {
         self.total_eth_supply_on_aurora
     }
 
-    pub fn ft_balance_of(&self, account_id: &AccountId) -> u128 {
+    pub fn ft_balance_of(&self, account_id: &AccountId) -> Balance {
         self.get_account_eth_balance(account_id).unwrap_or(0)
     }
 
@@ -321,7 +335,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         sender_id: &AccountId,
         receiver_id: &AccountId,
         amount: Balance,
-    ) -> (u128, u128) {
+    ) -> (Balance, Balance) {
         // Get the unused amount from the `ft_on_transfer` call result.
         let unused_amount = match promise_result {
             PromiseResult::NotReady => unreachable!(),
@@ -387,7 +401,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         sender_id: &AccountId,
         receiver_id: &AccountId,
         amount: Balance,
-    ) -> u128 {
+    ) -> Balance {
         self.internal_ft_resolve_transfer(promise_result, sender_id, receiver_id, amount)
             .0
     }

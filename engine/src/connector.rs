@@ -512,6 +512,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// FT transfer call from sender account (invoker account) to receiver
     /// We starting early checking for message data to avoid `ft_on_transfer` call panics
     /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
+    /// We allow empty messages for cases when `receiver_id =! current_account_id`
     pub fn ft_transfer_call(
         &mut self,
         predecessor_account_id: AccountId,
@@ -523,10 +524,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             args.receiver_id, args.amount,
         ));
 
-        // TODO: Early validating message to prevent error in promise?
-        //let message_data = self.parse_on_transfer_message(&args.msg)?;
-
         // Verify message data before `ft_on_transfer` call to avoid verification panics
+        // It's allowed empty message if `receiver_id =! current_account_id`
         if args.receiver_id == current_account_id {
             let message_data = self.parse_on_transfer_message(&args.msg)?;
             // Check is transfer amount > fee
