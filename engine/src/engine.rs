@@ -208,6 +208,7 @@ impl From<BalanceOverflow> for GasPaymentError {
     }
 }
 
+#[derive(Debug)]
 pub enum DeployErc20Error {
     State(EngineStateError),
     Failed(TransactionStatus),

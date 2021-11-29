@@ -113,6 +113,7 @@ impl DepositedEvent {
 }
 
 pub mod error {
+    #[derive(Debug)]
     pub enum DecodeError {
         RlpFailed,
         SchemaMismatch,
@@ -126,6 +127,7 @@ pub mod error {
         }
     }
 
+    #[derive(Debug)]
     pub enum ParseError {
         LogParseFailed(DecodeError),
         InvalidSender,

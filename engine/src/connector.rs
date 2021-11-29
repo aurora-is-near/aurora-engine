@@ -786,6 +786,7 @@ pub mod error {
     const PROOF_EXIST: &[u8; 15] = b"ERR_PROOF_EXIST";
     const INVALID_ACCOUNT: &[u8; 22] = b"ERR_INVALID_ACCOUNT_ID";
 
+    #[derive(Debug)]
     pub enum ParseEventMessageError {
         TooManyParts,
         InvalidAccount,
@@ -799,6 +800,7 @@ pub mod error {
         }
     }
 
+    #[derive(Debug)]
     pub enum DepositError {
         Paused,
         ProofParseFailed,
@@ -827,6 +829,7 @@ pub mod error {
         }
     }
 
+    #[derive(Debug)]
     pub enum FinishDepositError {
         TransferCall(FtTransferCallError),
         ProofUsed,
@@ -873,6 +876,7 @@ pub mod error {
         }
     }
 
+    #[derive(Debug)]
     pub enum ParseOnTransferMessageError {
         TooManyParts,
         InvalidHexData,
@@ -890,6 +894,7 @@ pub mod error {
         }
     }
 
+    #[derive(Debug)]
     pub enum FtTransferCallError {
         MessageParseFailed(ParseOnTransferMessageError),
         InsufficientAmountForFee,

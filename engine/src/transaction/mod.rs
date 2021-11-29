@@ -9,7 +9,7 @@ use aurora_engine_types::types::Wei;
 use eip_2930::AccessTuple;
 
 /// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum EthTransactionKind {
     Legacy(legacy::LegacyEthSignedTransaction),
     Eip2930(eip_2930::SignedTransaction2930),
