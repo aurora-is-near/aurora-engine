@@ -10,6 +10,8 @@ use aurora_engine::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
+use byte_slice_cast::AsByteSlice;
+use ethabi::ethereum_types::U256;
 use near_sdk::test_utils::accounts;
 use near_sdk_sim::transaction::ExecutionStatus;
 use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
@@ -408,7 +410,7 @@ fn test_ft_transfer_call_eth() {
 
     let transfer_amount = 50;
     let fee: u128 = 30;
-    let mut msg = fee.to_be_bytes().to_vec();
+    let mut msg = U256::from(fee).as_byte_slice().to_vec();
     msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
 
     let message = [CONTRACT_ACC, hex::encode(msg).as_str()].join(":");
@@ -716,7 +718,7 @@ fn test_ft_transfer_call_without_relayer() {
 
     let transfer_amount = 50;
     let fee: u128 = 30;
-    let mut msg = fee.to_be_bytes().to_vec();
+    let mut msg = U256::from(fee).as_byte_slice().to_vec();
     msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
     let relayer_id = "relayer.root";
     let message = [relayer_id, hex::encode(msg).as_str()].join(":");

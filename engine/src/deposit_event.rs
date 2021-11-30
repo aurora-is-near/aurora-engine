@@ -77,8 +77,13 @@ impl TokenMessageData {
         fee: Fee,
         message: String,
     ) -> Result<String, ParseEventMessageError> {
-        // First data section should contain fee data
-        let mut data = fee.into_u128().to_be_bytes().to_vec();
+        use crate::prelude::U256;
+        use byte_slice_cast::AsByteSlice;
+
+        // The first data section should contain fee data.
+        // Pay attention, that for compatibility reasons we used U256 type
+        // it means 32 bytes for fee data
+        let mut data = U256::from(fee.into_u128()).as_byte_slice().to_vec();
 
         // Check message length.
         let address = if message.len() == 42 {

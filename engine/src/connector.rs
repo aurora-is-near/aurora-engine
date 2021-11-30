@@ -135,6 +135,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         &self,
         message: &str,
     ) -> Result<OnTransferMessageData, error::ParseOnTransferMessageError> {
+        use crate::prelude::{TryInto, U256};
+
         // Split message by separator
         let data: Vec<_> = message.split(':').collect();
         // Message data array should contain 2 elements
@@ -149,19 +151,24 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         // Decode message array from 2-th element of data array
         let msg =
             hex::decode(data[1]).map_err(|_| error::ParseOnTransferMessageError::InvalidHexData)?;
-        // Length = fee[16] + eth_address[20] bytes
-        if msg.len() != 36 {
+        // Length = fee[32] + eth_address[20] bytes
+        if msg.len() != 52 {
             return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
         }
 
-        // Parse fee from message slice. It should contain 16 bytes
-        let mut raw_fee: [u8; 16] = Default::default();
-        raw_fee.copy_from_slice(&msg[..16]);
-        let fee: Fee = u128::from_be_bytes(raw_fee).into();
+        // Parse fee from message slice. It should contain 32 bytes
+        // But after that in will be parse to u128
+        // That logic for compatability.
+        let mut raw_fee: [u8; 32] = Default::default();
+        raw_fee.copy_from_slice(&msg[..32]);
+        let fee_u128: u128 = U256::from_little_endian(&raw_fee)
+            .try_into()
+            .map_err(|_| error::ParseOnTransferMessageError::OverflowNumber)?;
+        let fee: Fee = fee_u128.into();
 
         // Get recipient Eth address from message slice
         let mut recipient: EthAddress = Default::default();
-        recipient.copy_from_slice(&msg[16..36]);
+        recipient.copy_from_slice(&msg[32..52]);
 
         Ok(OnTransferMessageData {
             relayer: account_id,
@@ -846,6 +853,7 @@ pub mod error {
         InvalidHexData,
         WrongMessageFormat,
         InvalidAccount,
+        OverflowNumber,
     }
 
     impl AsRef<[u8]> for ParseOnTransferMessageError {
@@ -855,6 +863,7 @@ pub mod error {
                 Self::InvalidHexData => b"ERR_INVALID_ON_TRANSFER_MESSAGE_HEX",
                 Self::WrongMessageFormat => b"ERR_INVALID_ON_TRANSFER_MESSAGE_DATA",
                 Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
+                Self::OverflowNumber => b"ERR_OVERFLOW_NUMBER",
             }
         }
     }
