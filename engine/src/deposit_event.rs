@@ -2,7 +2,7 @@ use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     validate_eth_address, vec, AddressValidationError, Balance, BorshDeserialize, BorshSerialize,
-    EthAddress, Fee, String, ToString, TryFrom, Vec,
+    EthAddress, Fee, String, ToString, TryFrom, TryInto, Vec,
 };
 
 use crate::deposit_event::error::ParseEventMessageError;
@@ -80,7 +80,7 @@ impl TokenMessageData {
         // First data section should contain fee data
         let mut data = fee.into_u128().to_be_bytes().to_vec();
 
-        // Check message length.Ω
+        // Check message length.
         let address = if message.len() == 42 {
             message
                 .strip_prefix("0x")
@@ -188,19 +188,21 @@ impl DepositedEvent {
         // parse_event_message
         let event_message_data: String = event.log.params[1].value.clone().to_string();
 
-        let amount = event.log.params[2]
+        let amount: u128 = event.log.params[2]
             .value
             .clone()
             .into_uint()
             .ok_or(error::ParseError::InvalidAmount)?
-            .as_u128();
-        let fee: Fee = event.log.params[3]
+            .try_into()
+            .map_err(|_| error::ParseError::OverflowNumber)?;
+        let raw_fee: u128 = event.log.params[3]
             .value
             .clone()
             .into_uint()
             .ok_or(error::ParseError::InvalidFee)?
-            .as_u128()
-            .into();
+            .try_into()
+            .map_err(|_| error::ParseError::OverflowNumber)?;
+        let fee: Fee = raw_fee.into();
 
         let token_message_data =
             TokenMessageData::parse_event_message_and_prepare_token_message_data(
@@ -263,6 +265,7 @@ pub mod error {
         InvalidAmount,
         InvalidFee,
         MessageParseFailed(ParseEventMessageError),
+        OverflowNumber,
     }
     impl AsRef<[u8]> for ParseError {
         fn as_ref(&self) -> &[u8] {
@@ -272,6 +275,7 @@ pub mod error {
                 Self::InvalidAmount => b"ERR_INVALID_AMOUNT",
                 Self::InvalidFee => b"ERR_INVALID_FEE",
                 Self::MessageParseFailed(e) => e.as_ref(),
+                Self::OverflowNumber => b"ERR_OVERFLOW_NUMBER",
             }
         }
     }
