@@ -496,7 +496,7 @@ impl Precompile for ExitToEthereum {
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {
                         recipient_address,
-                        amount: context.apparent_value.as_u128(),
+                        amount: context.apparent_value.as_u128().into(),
                     }
                     .try_to_vec()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
