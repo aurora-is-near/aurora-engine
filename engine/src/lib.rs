@@ -549,7 +549,7 @@ mod contract {
         let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
         let owner_id = io.current_account_id();
 
-        EthConnectorContract::init_contract(io, owner_id, args).sdk_unwrap();
+        EthConnectorContract::create_contract(io, owner_id, args).sdk_unwrap();
     }
 
     #[no_mangle]

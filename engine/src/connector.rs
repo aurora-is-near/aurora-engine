@@ -81,10 +81,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Init eth-connector contract specific data.
+    /// Create contract data - init eth-connector contract specific data.
     /// Used only once for first time initialization.
     /// Initialized contract data stored in the storage.
-    pub fn init_contract(
+    pub fn create_contract(
         mut io: I,
         owner_id: AccountId,
         args: InitCallArgs,

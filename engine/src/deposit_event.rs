@@ -61,13 +61,13 @@ impl TokenMessageData {
     }
 
     // Get recipient account id from Eth part of Token message data
-    pub fn get_recipient(&self) -> String {
+    pub fn get_recipient(&self) -> AccountId {
         match self {
-            Self::Near(acc) => acc.to_string(),
+            Self::Near(acc) => acc.clone(),
             Self::Eth {
                 receiver_id,
                 message: _,
-            } => receiver_id.to_string(),
+            } => receiver_id.clone(),
         }
     }
 
