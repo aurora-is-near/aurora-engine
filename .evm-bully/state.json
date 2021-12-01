@@ -5,8 +5,8 @@
         "evm-bully": "2664b80c28111697993046663564b8a1054ed1dd"
     },
     "progress": {
-        "goerli": "goerli-block-11142-tx-0.tar.gz",
+        "goerli": "goerli-block-24853-tx-0.tar.gz",
         "rinkeby": "rinkeby-block-55-tx-0.tar.gz",
-        "ropsten": "ropsten-block-11-tx-3.tar.gz"
+        "ropsten": "rinkeby-block-34300-tx-0.tar.gz"
     }
 }
