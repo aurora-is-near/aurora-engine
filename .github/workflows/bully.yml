@@ -53,7 +53,7 @@ jobs:
         run: ./.evm-bully/scripts/run_bully.sh ${{ matrix.net }}
       - name: Print breakpoint
         if: ${{ always() }}
-        run: cat $(find ./.evm-bully/workdir -name breakpoint.json.json | head -1) || true
+        run: cat $(find ./.evm-bully/workdir -name breakpoint.json | head -1) || true
       - name: Print error message
         if: ${{ always() }}
         run: cat $(find ./.evm-bully/workdir -name errormsg.json | head -1) || true
