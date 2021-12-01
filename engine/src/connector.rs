@@ -1,5 +1,5 @@
 use crate::admin_controlled::{AdminControlled, PausedMask};
-use crate::deposit_event::{DepositedEvent, TokenMessageData};
+use crate::deposit_event::{DepositedEvent, OnTransferMessageData, TokenMessageData};
 use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
@@ -11,15 +11,14 @@ use crate::parameters::{
 use crate::prelude::{
     format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
     BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString,
-    TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
+    Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
+};
+use crate::prelude::{
+    AddressValidationError, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
 };
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::parameters::{
-    PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
-};
-use aurora_engine_types::types::{AddressValidationError, Fee};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -57,14 +56,6 @@ pub struct EthConnector {
     pub prover_account: AccountId,
     /// It is Eth address, used in the Deposit and Withdraw logic.
     pub eth_custodian_address: EthAddress,
-}
-
-/// On-transfer message. Used for `ft_transfer_call` and  `ft_on_transfer` functions.
-/// Message parsed from input args with `parse_on_transfer_message`.
-pub struct OnTransferMessageData {
-    pub relayer: AccountId,
-    pub recipient: EthAddress,
-    pub fee: Fee,
 }
 
 impl<I: IO + Copy> EthConnectorContract<I> {
@@ -127,54 +118,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         .save_ft_contract();
 
         Ok(())
-    }
-
-    /// Get on-transfer data from arguments message field.
-    /// Used for `ft_transfer_call` and `ft_on_transfer`
-    fn parse_on_transfer_message(
-        &self,
-        message: &str,
-    ) -> Result<OnTransferMessageData, error::ParseOnTransferMessageError> {
-        use crate::prelude::{TryInto, U256};
-
-        // Split message by separator
-        let data: Vec<_> = message.split(':').collect();
-        // Message data array should contain 2 elements
-        if data.len() != 2 {
-            return Err(error::ParseOnTransferMessageError::TooManyParts);
-        }
-
-        // Check relayer account id from 1-th data element
-        let account_id = AccountId::try_from(data[0].as_bytes())
-            .map_err(|_| error::ParseOnTransferMessageError::InvalidAccount)?;
-
-        // Decode message array from 2-th element of data array
-        let msg =
-            hex::decode(data[1]).map_err(|_| error::ParseOnTransferMessageError::InvalidHexData)?;
-        // Length = fee[32] + eth_address[20] bytes
-        if msg.len() != 52 {
-            return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
-        }
-
-        // Parse fee from message slice. It should contain 32 bytes
-        // But after that in will be parse to u128
-        // That logic for compatability.
-        let mut raw_fee: [u8; 32] = Default::default();
-        raw_fee.copy_from_slice(&msg[..32]);
-        let fee_u128: u128 = U256::from_little_endian(&raw_fee)
-            .try_into()
-            .map_err(|_| error::ParseOnTransferMessageError::OverflowNumber)?;
-        let fee: Fee = fee_u128.into();
-
-        // Get recipient Eth address from message slice
-        let mut recipient: EthAddress = Default::default();
-        recipient.copy_from_slice(&msg[32..52]);
-
-        Ok(OnTransferMessageData {
-            relayer: account_id,
-            recipient,
-            fee,
-        })
     }
 
     /// Deposit all types of tokens
@@ -265,7 +208,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                     receiver_id,
                     amount: event.amount,
                     memo: None,
-                    msg: message,
+                    msg: message.encode(),
                 }
                 .try_to_vec()
                 .unwrap();
@@ -534,7 +477,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         // Verify message data before `ft_on_transfer` call to avoid verification panics
         // It's allowed empty message if `receiver_id =! current_account_id`
         if args.receiver_id == current_account_id {
-            let message_data = self.parse_on_transfer_message(&args.msg)?;
+            let message_data = OnTransferMessageData::parse_on_transfer_message(&args.msg)
+                .map_err(error::FtTransferCallError::MessageParseFailed)?;
             // Check is transfer amount > fee
             if message_data.fee.into_u128() >= args.amount {
                 return Err(error::FtTransferCallError::InsufficientAmountForFee);
@@ -642,7 +586,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
         // Parse message with specific rules
-        let message_data = self.parse_on_transfer_message(&args.msg)?;
+        let message_data = OnTransferMessageData::parse_on_transfer_message(&args.msg)
+            .map_err(error::FtTransferCallError::MessageParseFailed)?;
 
         // Special case when predecessor_account_id is current_account_id
         let fee = message_data.fee.into_u128();
@@ -770,6 +715,7 @@ pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
 pub mod error {
     use aurora_engine_types::types::AddressValidationError;
 
+    use crate::deposit_event::error::ParseOnTransferMessageError;
     use crate::{deposit_event, fungible_token};
 
     const PROOF_EXIST: &[u8; 15] = b"ERR_PROOF_EXIST";
@@ -844,26 +790,6 @@ pub mod error {
             match self {
                 Self::Paused => crate::admin_controlled::ERR_PAUSED.as_bytes(),
                 Self::FT(e) => e.as_ref(),
-            }
-        }
-    }
-
-    pub enum ParseOnTransferMessageError {
-        TooManyParts,
-        InvalidHexData,
-        WrongMessageFormat,
-        InvalidAccount,
-        OverflowNumber,
-    }
-
-    impl AsRef<[u8]> for ParseOnTransferMessageError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::TooManyParts => b"ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT",
-                Self::InvalidHexData => b"ERR_INVALID_ON_TRANSFER_MESSAGE_HEX",
-                Self::WrongMessageFormat => b"ERR_INVALID_ON_TRANSFER_MESSAGE_DATA",
-                Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
-                Self::OverflowNumber => b"ERR_OVERFLOW_NUMBER",
             }
         }
     }

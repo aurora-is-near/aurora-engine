@@ -1,16 +1,120 @@
+use crate::deposit_event::error::ParseEventMessageError;
 use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     validate_eth_address, vec, AddressValidationError, Balance, BorshDeserialize, BorshSerialize,
-    EthAddress, Fee, String, ToString, TryFrom, TryInto, Vec,
+    EthAddress, Fee, String, ToString, TryFrom, TryInto, Vec, U256,
 };
-
-use crate::deposit_event::error::ParseEventMessageError;
+use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
 pub const DEPOSITED_EVENT: &str = "Deposited";
 
 pub type EventParams = Vec<EventParam>;
+
+/// On-transfer message. Used for `ft_transfer_call` and  `ft_on_transfer` functions.
+/// Message parsed from input args with `parse_on_transfer_message`.
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct OnTransferMessageData {
+    pub relayer: AccountId,
+    pub recipient: EthAddress,
+    pub fee: Fee,
+}
+
+impl OnTransferMessageData {
+    /// Get on-transfer data from arguments message field.
+    /// Used for `ft_transfer_call` and `ft_on_transfer`
+    pub fn parse_on_transfer_message(
+        message: &str,
+    ) -> Result<Self, error::ParseOnTransferMessageError> {
+        // Split message by separator
+        let data: Vec<_> = message.split(':').collect();
+        // Message data array should contain 2 elements
+        if data.len() != 2 {
+            return Err(error::ParseOnTransferMessageError::TooManyParts);
+        }
+
+        // Check relayer account id from 1-th data element
+        let account_id = AccountId::try_from(data[0].as_bytes())
+            .map_err(|_| error::ParseOnTransferMessageError::InvalidAccount)?;
+
+        // Decode message array from 2-th element of data array
+        let msg =
+            hex::decode(data[1]).map_err(|_| error::ParseOnTransferMessageError::InvalidHexData)?;
+        // Length = fee[32] + eth_address[20] bytes
+        if msg.len() != 52 {
+            return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
+        }
+
+        // Parse fee from message slice. It should contain 32 bytes
+        // But after that in will be parse to u128
+        // That logic for compatability.
+        let mut raw_fee: [u8; 32] = Default::default();
+        raw_fee.copy_from_slice(&msg[..32]);
+        let fee_u128: u128 = U256::from_little_endian(&raw_fee)
+            .try_into()
+            .map_err(|_| error::ParseOnTransferMessageError::OverflowNumber)?;
+        let fee: Fee = fee_u128.into();
+
+        // Get recipient Eth address from message slice
+        let mut recipient: EthAddress = Default::default();
+        recipient.copy_from_slice(&msg[32..52]);
+
+        Ok(OnTransferMessageData {
+            relayer: account_id,
+            recipient,
+            fee,
+        })
+    }
+
+    /// Encode to String with specific rules
+    pub fn encode(&self) -> String {
+        // The first data section should contain fee data.
+        // Pay attention, that for compatibility reasons we used U256 type
+        // it means 32 bytes for fee data
+        let mut data = U256::from(self.fee.into_u128()).as_byte_slice().to_vec();
+        // Second data section should contain Eth address
+        data.extend(self.recipient);
+        // Add `:` separator between relayer_id and data message
+        [self.relayer.as_ref(), &hex::encode(data)].join(":")
+    }
+
+    /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
+    pub fn prepare_message_for_on_transfer(
+        relayer_account_id: &AccountId,
+        fee: Fee,
+        recipient: String,
+    ) -> Result<Self, ParseEventMessageError> {
+        // The first data section should contain fee data.
+        // Pay attention, that for compatibility reasons we used U256 type
+        // it means 32 bytes for fee data
+        let mut data = U256::from(fee.into_u128()).as_byte_slice().to_vec();
+
+        // Check message length.
+        let address = if recipient.len() == 42 {
+            recipient
+                .strip_prefix("0x")
+                .ok_or(ParseEventMessageError::EthAddressValidationError(
+                    AddressValidationError::FailedDecodeHex,
+                ))?
+                .to_string()
+        } else {
+            recipient
+        };
+        let recipient_address = validate_eth_address(address)
+            .map_err(ParseEventMessageError::EthAddressValidationError)?;
+        // Second data section should contain Eth address
+        data.extend(recipient_address);
+        // Add `:` separator between relayer_id and data message
+        //Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
+        Ok(Self {
+            relayer: relayer_account_id.clone(),
+            recipient: recipient_address,
+            fee,
+        })
+    }
+}
 
 /// Token message data used for Deposit flow.
 /// It contains two basic data structure: Near, Eth
@@ -24,7 +128,7 @@ pub enum TokenMessageData {
     ///Deposit to Eth accounts fee is being minted in the `ft_on_transfer` callback method
     Eth {
         receiver_id: AccountId,
-        message: String,
+        message: OnTransferMessageData,
     },
 }
 
@@ -51,7 +155,11 @@ impl TokenMessageData {
             Ok(TokenMessageData::Near(account_id))
         } else {
             let raw_message = data[1].into();
-            let message = Self::prepare_message_for_on_transfer(&account_id, fee, raw_message)?;
+            let message = OnTransferMessageData::prepare_message_for_on_transfer(
+                &account_id,
+                fee,
+                raw_message,
+            )?;
 
             Ok(TokenMessageData::Eth {
                 receiver_id: account_id,
@@ -69,39 +177,6 @@ impl TokenMessageData {
                 message: _,
             } => receiver_id.clone(),
         }
-    }
-
-    /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
-    fn prepare_message_for_on_transfer(
-        relayer_account_id: &AccountId,
-        fee: Fee,
-        message: String,
-    ) -> Result<String, ParseEventMessageError> {
-        use crate::prelude::U256;
-        use byte_slice_cast::AsByteSlice;
-
-        // The first data section should contain fee data.
-        // Pay attention, that for compatibility reasons we used U256 type
-        // it means 32 bytes for fee data
-        let mut data = U256::from(fee.into_u128()).as_byte_slice().to_vec();
-
-        // Check message length.
-        let address = if message.len() == 42 {
-            message
-                .strip_prefix("0x")
-                .ok_or(ParseEventMessageError::EthAddressValidationError(
-                    AddressValidationError::FailedDecodeHex,
-                ))?
-                .to_string()
-        } else {
-            message
-        };
-        let address_bytes = validate_eth_address(address)
-            .map_err(ParseEventMessageError::EthAddressValidationError)?;
-        // Second data section should contain Eth address
-        data.extend(address_bytes);
-        // Add `:` separator between relayer_id and data message
-        Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
     }
 }
 
@@ -246,6 +321,7 @@ pub mod error {
         TooManyParts,
         InvalidAccount,
         EthAddressValidationError(AddressValidationError),
+        ParseMessageError(ParseOnTransferMessageError),
     }
 
     impl AsRef<[u8]> for ParseEventMessageError {
@@ -254,6 +330,7 @@ pub mod error {
                 Self::TooManyParts => b"ERR_INVALID_EVENT_MESSAGE_FORMAT",
                 Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
                 Self::EthAddressValidationError(e) => e.as_ref(),
+                Self::ParseMessageError(e) => e.as_ref(),
             }
         }
     }
@@ -280,6 +357,27 @@ pub mod error {
                 Self::InvalidAmount => b"ERR_INVALID_AMOUNT",
                 Self::InvalidFee => b"ERR_INVALID_FEE",
                 Self::MessageParseFailed(e) => e.as_ref(),
+                Self::OverflowNumber => b"ERR_OVERFLOW_NUMBER",
+            }
+        }
+    }
+
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+    pub enum ParseOnTransferMessageError {
+        TooManyParts,
+        InvalidHexData,
+        WrongMessageFormat,
+        InvalidAccount,
+        OverflowNumber,
+    }
+
+    impl AsRef<[u8]> for ParseOnTransferMessageError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TooManyParts => b"ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT",
+                Self::InvalidHexData => b"ERR_INVALID_ON_TRANSFER_MESSAGE_HEX",
+                Self::WrongMessageFormat => b"ERR_INVALID_ON_TRANSFER_MESSAGE_DATA",
+                Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
                 Self::OverflowNumber => b"ERR_OVERFLOW_NUMBER",
             }
         }
