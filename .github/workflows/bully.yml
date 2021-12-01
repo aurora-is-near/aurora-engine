@@ -52,6 +52,7 @@ jobs:
       - name: Run evm-bully
         run: ./.evm-bully/scripts/run_bully.sh ${{ matrix.net }}
       - name: Print error message
+        if: ${{ always() }}
         run: cat $(find . -name errormsg.json | head -1) || true
       - name: Upload breakpoint archive
         if: ${{ always() }}

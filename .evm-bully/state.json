@@ -1,7 +1,7 @@
 {
     "version-lock": {
         "aurora-cli": "7f7c2d29c5114db2b6530a6c0fa09b2068f217df",
-        "nearcore": "efd0f237a3a8bbaac3e64ed3b8e378e5bc40660d",
+        "nearcore": "4d95d9968df6a1f4629e594409765086ef9a4dce",
         "evm-bully": "2664b80c28111697993046663564b8a1054ed1dd"
     },
     "progress": {
