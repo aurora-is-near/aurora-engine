@@ -9,6 +9,7 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
+use aurora_engine_types::types::Fee;
 use borsh::{BorshDeserialize, BorshSerialize};
 use byte_slice_cast::AsByteSlice;
 use ethabi::ethereum_types::U256;
@@ -590,10 +591,10 @@ fn test_ft_transfer_call_without_message() {
     let balance = total_eth_supply_on_aurora(&master_account, CONTRACT_ACC);
     assert_eq!(balance, 0);
 }
-// TODO: Fix it
-/*
+
 #[test]
 fn test_deposit_with_0x_prefix() {
+    use aurora_engine::deposit_event::TokenMessageData;
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
 
     let eth_custodian_address: [u8; 20] = {
@@ -604,23 +605,22 @@ fn test_deposit_with_0x_prefix() {
     };
     let recipient_address = [10u8; 20];
     let deposit_amount = 17;
+    let recipient_address_encoded = hex::encode(&recipient_address);
 
     // Note the 0x prefix before the deposit address.
-    let message = [
-        CONTRACT_ACC,
-        ":",
-        "0x",
-        hex::encode(&recipient_address).as_str(),
-    ]
-    .concat();
-    let token_message_data = TokenMessageData::parse_event_message(&message).unwrap();
+    let message = [CONTRACT_ACC, ":", "0x", &recipient_address_encoded].concat();
+    let fee: Fee = 0.into();
+    let token_message_data =
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+            .unwrap();
+    //let message_data = TokenMessageData::prepare_message_for_on_transfer()
 
     let deposit_event = aurora_engine::deposit_event::DepositedEvent {
         eth_custodian_address,
         sender: [0u8; 20],
         token_message_data,
         amount: deposit_amount,
-        fee: 0.into(),
+        fee,
     };
 
     let event_schema = ethabi::Event {
@@ -636,9 +636,9 @@ fn test_deposit_with_0x_prefix() {
             crate::prelude::H256::zero(),
         ],
         data: ethabi::encode(&[
-            ethabi::Token::String(deposit_event.recipient),
-            ethabi::Token::Uint(deposit_event.amount),
-            ethabi::Token::Uint(deposit_event.fee),
+            ethabi::Token::String(message),
+            ethabi::Token::Uint(U256::from(deposit_event.amount)),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.into_u128())),
         ]),
     };
     let proof = Proof {
@@ -661,11 +661,11 @@ fn test_deposit_with_0x_prefix() {
     res.assert_success();
 
     let aurora_balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(aurora_balance, deposit_amount.low_u128());
+    assert_eq!(aurora_balance, deposit_amount);
     let address_balance = get_eth_balance(&master_account, recipient_address, CONTRACT_ACC);
-    assert_eq!(address_balance, deposit_amount.low_u128());
+    assert_eq!(address_balance, deposit_amount);
 }
-*/
+
 #[test]
 fn test_deposit_with_same_proof() {
     let (_master_account, contract) = init(CUSTODIAN_ADDRESS);
