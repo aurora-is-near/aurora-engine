@@ -1,0 +1,94 @@
+use crate::fmt::Formatter;
+use crate::{Add, Display, Sub, U256};
+
+/// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
+pub type WeiU256 = [u8; 32];
+
+/// Newtype to distinguish balances (denominated in Wei) from other U256 types.
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Wei(U256);
+
+impl Wei {
+    const ETH_TO_WEI: U256 = U256([1_000_000_000_000_000_000, 0, 0, 0]);
+
+    pub const fn zero() -> Self {
+        Self(U256([0, 0, 0, 0]))
+    }
+
+    pub const fn new(amount: U256) -> Self {
+        Self(amount)
+    }
+
+    // Purposely not implementing `From<u64>` because I want the call site to always
+    // say `Wei::<something>`. If `From` is implemented then the caller might write
+    // `amount.into()` without thinking too hard about the units. Explicitly writing
+    // `Wei` reminds the developer to think about whether the amount they enter is really
+    // in units of `Wei` or not.
+    pub const fn new_u64(amount: u64) -> Self {
+        Self(U256([amount, 0, 0, 0]))
+    }
+
+    pub fn from_eth(amount: U256) -> Option<Self> {
+        amount.checked_mul(Self::ETH_TO_WEI).map(Self)
+    }
+
+    pub fn to_bytes(self) -> [u8; 32] {
+        u256_to_arr(&self.0)
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
+
+    pub fn raw(self) -> U256 {
+        self.0
+    }
+
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.checked_sub(rhs.0).map(Self)
+    }
+
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0).map(Self)
+    }
+
+    pub fn into_u128(self) -> u128 {
+        self.0.as_u128()
+    }
+}
+
+impl Display for Wei {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Add<Self> for Wei {
+    type Output = Wei;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl Sub<Self> for Wei {
+    type Output = Wei;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+/// Type casting from Wei compatible Borsh-encoded raw value into the Wei value, to attach an ETH balance to the transaction
+impl From<WeiU256> for Wei {
+    fn from(value: WeiU256) -> Self {
+        Wei(U256::from_big_endian(&value))
+    }
+}
+
+#[allow(dead_code)]
+pub fn u256_to_arr(value: &U256) -> [u8; 32] {
+    let mut result = [0u8; 32];
+    value.to_big_endian(&mut result);
+    result
+}
