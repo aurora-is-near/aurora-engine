@@ -144,7 +144,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 
     /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
-        engine::get_balance(&self.io, &Address(address)).into_u128()
+        engine::get_balance(&self.io, &Address(address)).try_into_u128()
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)

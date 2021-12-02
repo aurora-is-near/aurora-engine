@@ -296,8 +296,13 @@ impl Wei {
         self.0.checked_add(rhs.0).map(Self)
     }
 
-    pub fn into_u128(self) -> u128 {
-        self.0.as_u128()
+    /// Try convert U256 to u128 with checking overflow.
+    /// NOTICE: Error can contain only overflow
+    pub fn try_into_u128(self) -> Result<u128, error::ConvertNumberError> {
+        use crate::TryInto;
+        self.0
+            .try_into()
+            .map_err(|_| error::ConvertNumberError::Overflow)
     }
 }
 
@@ -431,6 +436,30 @@ impl<T> Stack<T> {
 
 pub fn str_from_slice(inp: &[u8]) -> &str {
     str::from_utf8(inp).unwrap()
+}
+
+pub mod error {
+    use crate::fmt;
+
+    #[derive(Eq, Hash, Clone, Debug, PartialEq)]
+    pub enum ConvertNumberError {
+        Overflow,
+    }
+
+    impl AsRef<[u8]> for ConvertNumberError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::Overflow => b"ERR_NUMBER_OVERFLOW",
+            }
+        }
+    }
+
+    impl fmt::Display for ConvertNumberError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
+            write!(f, "{}", msg)
+        }
+    }
 }
 
 #[cfg(test)]
