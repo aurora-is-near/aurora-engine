@@ -218,7 +218,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     ) -> Result<(), error::WithdrawError> {
         let balance = self
             .internal_unwrap_balance_of_eth_on_aurora(address)
-            .map_err(|_| error::WithdrawError::InsufficientFunds)?;
+            .map_err(error::WithdrawError::BalanceOverflow)?;
         let new_balance = balance
             .checked_sub(amount)
             .ok_or(error::WithdrawError::InsufficientFunds)?;
@@ -592,6 +592,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 }
 
 pub mod error {
+    use crate::prelude::types::error::BalanceOverflowError;
+
     const TOTAL_SUPPLY_OVERFLOW: &[u8; 25] = b"ERR_TOTAL_SUPPLY_OVERFLOW";
     const BALANCE_OVERFLOW: &[u8; 20] = b"ERR_BALANCE_OVERFLOW";
     const NOT_ENOUGH_BALANCE: &[u8; 22] = b"ERR_NOT_ENOUGH_BALANCE";
@@ -618,7 +620,7 @@ pub mod error {
     pub enum WithdrawError {
         TotalSupplyUnderflow,
         InsufficientFunds,
-        BalanceOverflow,
+        BalanceOverflow(BalanceOverflowError),
     }
 
     impl AsRef<[u8]> for WithdrawError {
@@ -626,7 +628,7 @@ pub mod error {
             match self {
                 Self::TotalSupplyUnderflow => TOTAL_SUPPLY_UNDERFLOW,
                 Self::InsufficientFunds => NOT_ENOUGH_BALANCE,
-                Self::BalanceOverflow => BALANCE_OVERFLOW,
+                Self::BalanceOverflow(e) => e.as_ref(),
             }
         }
     }
@@ -659,7 +661,7 @@ pub mod error {
             match err {
                 WithdrawError::InsufficientFunds => Self::InsufficientFunds,
                 WithdrawError::TotalSupplyUnderflow => Self::TotalSupplyUnderflow,
-                WithdrawError::BalanceOverflow => Self::BalanceOverflow,
+                WithdrawError::BalanceOverflow(_) => Self::BalanceOverflow,
             }
         }
     }
