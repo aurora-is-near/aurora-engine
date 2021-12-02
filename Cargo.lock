@@ -196,8 +196,11 @@ dependencies = [
  "byte-slice-cast",
  "criterion",
  "engine-standalone-storage",
+ "engine-standalone-tracing",
  "ethabi",
  "evm",
+ "evm-gasometer",
+ "evm-runtime",
  "git2",
  "hex",
  "libsecp256k1",
@@ -1196,6 +1199,7 @@ dependencies = [
  "aurora-engine-types",
  "borsh 0.8.2",
  "engine-standalone-storage",
+ "engine-standalone-tracing",
  "evm-core",
  "libc",
  "rocksdb",
@@ -1211,6 +1215,19 @@ dependencies = [
  "borsh 0.8.2",
  "evm-core",
  "rocksdb",
+]
+
+[[package]]
+name = "engine-standalone-tracing"
+version = "0.1.0"
+dependencies = [
+ "aurora-engine",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "evm",
+ "evm-core",
+ "evm-gasometer",
+ "evm-runtime",
 ]
 
 [[package]]

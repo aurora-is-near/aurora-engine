@@ -11,6 +11,7 @@ use crate::test_utils;
 pub mod block;
 pub mod promise;
 pub mod storage;
+pub mod tracing;
 
 pub fn compute_block_hash(block_height: u64) -> H256 {
     aurora_engine::engine::compute_block_hash([0u8; 32], block_height, b"aurora")

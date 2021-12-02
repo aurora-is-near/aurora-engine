@@ -1,4 +1,4 @@
-use crate::trace::{TraceLog, TransactionTrace};
+use engine_standalone_tracing::{TraceLog, TransactionTrace};
 use libc::{c_uchar, c_uint, c_ushort, size_t, uintmax_t};
 use std::ffi::CString;
 
