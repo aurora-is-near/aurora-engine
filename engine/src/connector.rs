@@ -404,10 +404,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
-    pub fn ft_balance_of_eth_on_aurora(&mut self, args: BalanceOfEthCallArgs) {
+    pub fn ft_balance_of_eth_on_aurora(
+        &mut self,
+        args: BalanceOfEthCallArgs,
+    ) -> Result<(), crate::prelude::types::error::BalanceOverflowError> {
         let balance = self
             .ft
-            .internal_unwrap_balance_of_eth_on_aurora(args.address);
+            .internal_unwrap_balance_of_eth_on_aurora(args.address)?;
         sdk::log!(&format!(
             "Balance of ETH [{}]: {}",
             hex::encode(args.address),
@@ -415,6 +418,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         ));
         self.io
             .return_output(format!("\"{}\"", balance.to_string()).as_bytes());
+        Ok(())
     }
 
     /// Transfer between NEAR accounts
@@ -489,7 +493,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Note: It can't overflow because the total supply doesn't change during transfer.
             let amount_for_check = self
                 .ft
-                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
+                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient)
+                .map_err(error::FtTransferCallError::BalanceOverflow)?;
             if amount_for_check.checked_add(args.amount).is_none() {
                 return Err(error::FtTransferCallError::Transfer(
                     fungible_token::error::TransferError::BalanceOverflow,
@@ -713,7 +718,7 @@ pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
 }
 
 pub mod error {
-    use aurora_engine_types::types::AddressValidationError;
+    use crate::prelude::types::{error::BalanceOverflowError, AddressValidationError};
 
     use crate::deposit_event::error::ParseOnTransferMessageError;
     use crate::{deposit_event, fungible_token};
@@ -795,6 +800,7 @@ pub mod error {
     }
 
     pub enum FtTransferCallError {
+        BalanceOverflow(BalanceOverflowError),
         MessageParseFailed(ParseOnTransferMessageError),
         InsufficientAmountForFee,
         Transfer(fungible_token::error::TransferError),
@@ -824,6 +830,7 @@ pub mod error {
                 Self::MessageParseFailed(e) => e.as_ref(),
                 Self::InsufficientAmountForFee => super::ERR_NOT_ENOUGH_BALANCE_FOR_FEE.as_bytes(),
                 Self::Transfer(e) => e.as_ref(),
+                Self::BalanceOverflow(e) => e.as_ref(),
             }
         }
     }

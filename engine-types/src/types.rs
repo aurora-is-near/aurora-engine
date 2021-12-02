@@ -298,11 +298,11 @@ impl Wei {
 
     /// Try convert U256 to u128 with checking overflow.
     /// NOTICE: Error can contain only overflow
-    pub fn try_into_u128(self) -> Result<u128, error::ConvertNumberError> {
+    pub fn try_into_u128(self) -> Result<u128, error::BalanceOverflowError> {
         use crate::TryInto;
         self.0
             .try_into()
-            .map_err(|_| error::ConvertNumberError::Overflow)
+            .map_err(|_| error::BalanceOverflowError::Overflow)
     }
 }
 
@@ -439,22 +439,22 @@ pub fn str_from_slice(inp: &[u8]) -> &str {
 }
 
 pub mod error {
-    use crate::fmt;
+    use crate::{fmt, String};
 
     #[derive(Eq, Hash, Clone, Debug, PartialEq)]
-    pub enum ConvertNumberError {
+    pub enum BalanceOverflowError {
         Overflow,
     }
 
-    impl AsRef<[u8]> for ConvertNumberError {
+    impl AsRef<[u8]> for BalanceOverflowError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::Overflow => b"ERR_NUMBER_OVERFLOW",
+                Self::Overflow => b"ERR_BALANCE_OVERFLOW",
             }
         }
     }
 
-    impl fmt::Display for ConvertNumberError {
+    impl fmt::Display for BalanceOverflowError {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
             write!(f, "{}", msg)

@@ -142,8 +142,11 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         }
     }
 
-    /// Balance of ETH (ETH on Aurora)
-    pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
+    /// Balance of ETH (ETH on Aurora)###
+    pub fn internal_unwrap_balance_of_eth_on_aurora(
+        &self,
+        address: EthAddress,
+    ) -> Result<Balance, crate::prelude::types::error::BalanceOverflowError> {
         engine::get_balance(&self.io, &Address(address)).try_into_u128()
     }
 
@@ -171,7 +174,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         address: EthAddress,
         amount: Balance,
     ) -> Result<(), error::DepositError> {
-        let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
+        let balance = self
+            .internal_unwrap_balance_of_eth_on_aurora(address)
+            .map_err(|_| error::DepositError::BalanceOverflow)?;
         let new_balance = balance
             .checked_add(amount)
             .ok_or(error::DepositError::BalanceOverflow)?;
@@ -211,7 +216,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         address: EthAddress,
         amount: Balance,
     ) -> Result<(), error::WithdrawError> {
-        let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
+        let balance = self
+            .internal_unwrap_balance_of_eth_on_aurora(address)
+            .map_err(|_| error::WithdrawError::InsufficientFunds)?;
         let new_balance = balance
             .checked_sub(amount)
             .ok_or(error::WithdrawError::InsufficientFunds)?;
@@ -611,6 +618,7 @@ pub mod error {
     pub enum WithdrawError {
         TotalSupplyUnderflow,
         InsufficientFunds,
+        BalanceOverflow,
     }
 
     impl AsRef<[u8]> for WithdrawError {
@@ -618,6 +626,7 @@ pub mod error {
             match self {
                 Self::TotalSupplyUnderflow => TOTAL_SUPPLY_UNDERFLOW,
                 Self::InsufficientFunds => NOT_ENOUGH_BALANCE,
+                Self::BalanceOverflow => BALANCE_OVERFLOW,
             }
         }
     }
@@ -650,6 +659,7 @@ pub mod error {
             match err {
                 WithdrawError::InsufficientFunds => Self::InsufficientFunds,
                 WithdrawError::TotalSupplyUnderflow => Self::TotalSupplyUnderflow,
+                WithdrawError::BalanceOverflow => Self::BalanceOverflow,
             }
         }
     }

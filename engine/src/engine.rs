@@ -1140,8 +1140,11 @@ pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
     );
 }
 
-pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
-    let balance = get_balance(io, address).try_into_u128();
+pub fn remove_balance<I: IO + Copy>(
+    io: &mut I,
+    address: &Address,
+) -> Result<(), crate::prelude::types::error::BalanceOverflowError> {
+    let balance = get_balance(io, address).try_into_u128()?;
     // Apply changes for eth-connector. The `unwrap` is safe here because (a) if the connector
     // is implemented correctly then the total supply wll never underflow and (b) we are passing
     // in the balance directly so there will always be enough balance.
@@ -1149,6 +1152,7 @@ pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
         .internal_remove_eth(address, balance)
         .unwrap();
     io.remove_storage(&address_to_key(KeyPrefix::Balance, address));
+    Ok(())
 }
 
 pub fn get_balance<I: IO>(io: &I, address: &Address) -> Wei {
@@ -1225,11 +1229,16 @@ fn remove_all_storage<I: IO>(io: &mut I, address: &Address, generation: u32) {
 }
 
 /// Removes an account.
-fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) {
+fn remove_account<I: IO + Copy>(
+    io: &mut I,
+    address: &Address,
+    generation: u32,
+) -> Result<(), crate::prelude::error::BalanceOverflowError> {
     remove_nonce(io, address);
-    remove_balance(io, address);
+    remove_balance(io, address)?;
     remove_code(io, address);
     remove_all_storage(io, address, generation);
+    Ok(())
 }
 
 fn filter_promises_from_logs<T, P>(handler: &mut P, logs: T) -> Vec<ResultLog>
@@ -1474,13 +1483,15 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
                         && is_account_empty(&self.io, &address)
                         && generation == next_generation
                     {
-                        remove_account(&mut self.io, &address, generation);
+                        // TODO: can we guarantee unwrap without panic
+                        remove_account(&mut self.io, &address, generation).unwrap();
                         writes_counter += 1;
                     }
                 }
                 Apply::Delete { address } => {
                     let generation = get_generation(&self.io, &address);
-                    remove_account(&mut self.io, &address, generation);
+                    // TODO: can we guarantee unwrap without panic
+                    remove_account(&mut self.io, &address, generation).unwrap();
                     writes_counter += 1;
                 }
             }

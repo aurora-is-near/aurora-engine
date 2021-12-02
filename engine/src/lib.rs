@@ -663,7 +663,9 @@ mod contract {
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
         let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
-        EthConnectorContract::init_instance(io).ft_balance_of_eth_on_aurora(args);
+        EthConnectorContract::init_instance(io)
+            .ft_balance_of_eth_on_aurora(args)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
