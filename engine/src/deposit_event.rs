@@ -16,13 +16,13 @@ pub type EventParams = Vec<EventParam>;
 /// Message parsed from input args with `parse_on_transfer_message`.
 #[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
-pub struct OnTransferMessageData {
+pub struct FtTransferMessageData {
     pub relayer: AccountId,
     pub recipient: EthAddress,
     pub fee: Fee,
 }
 
-impl OnTransferMessageData {
+impl FtTransferMessageData {
     /// Get on-transfer data from arguments message field.
     /// Used for `ft_transfer_call` and `ft_on_transfer`
     pub fn parse_on_transfer_message(
@@ -61,7 +61,7 @@ impl OnTransferMessageData {
         let mut recipient: EthAddress = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
 
-        Ok(OnTransferMessageData {
+        Ok(FtTransferMessageData {
             relayer: account_id,
             recipient,
             fee,
@@ -128,7 +128,7 @@ pub enum TokenMessageData {
     ///Deposit to Eth accounts fee is being minted in the `ft_on_transfer` callback method
     Eth {
         receiver_id: AccountId,
-        message: OnTransferMessageData,
+        message: FtTransferMessageData,
     },
 }
 
@@ -155,7 +155,7 @@ impl TokenMessageData {
             Ok(TokenMessageData::Near(account_id))
         } else {
             let raw_message = data[1].into();
-            let message = OnTransferMessageData::prepare_message_for_on_transfer(
+            let message = FtTransferMessageData::prepare_message_for_on_transfer(
                 &account_id,
                 fee,
                 raw_message,

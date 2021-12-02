@@ -1,5 +1,5 @@
 use crate::admin_controlled::{AdminControlled, PausedMask};
-use crate::deposit_event::{DepositedEvent, OnTransferMessageData, TokenMessageData};
+use crate::deposit_event::{DepositedEvent, FtTransferMessageData, TokenMessageData};
 use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
@@ -477,7 +477,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         // Verify message data before `ft_on_transfer` call to avoid verification panics
         // It's allowed empty message if `receiver_id =! current_account_id`
         if args.receiver_id == current_account_id {
-            let message_data = OnTransferMessageData::parse_on_transfer_message(&args.msg)
+            let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
                 .map_err(error::FtTransferCallError::MessageParseFailed)?;
             // Check is transfer amount > fee
             if message_data.fee.into_u128() >= args.amount {
@@ -586,7 +586,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
         // Parse message with specific rules
-        let message_data = OnTransferMessageData::parse_on_transfer_message(&args.msg)
+        let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
             .map_err(error::FtTransferCallError::MessageParseFailed)?;
 
         // Special case when predecessor_account_id is current_account_id
