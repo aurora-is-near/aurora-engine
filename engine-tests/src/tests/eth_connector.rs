@@ -613,7 +613,6 @@ fn test_deposit_with_0x_prefix() {
     let token_message_data =
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
             .unwrap();
-    //let message_data = TokenMessageData::prepare_message_for_on_transfer()
 
     let deposit_event = aurora_engine::deposit_event::DepositedEvent {
         eth_custodian_address,

@@ -210,12 +210,6 @@ impl From<u128> for Fee {
     }
 }
 
-impl From<Fee> for u128 {
-    fn from(fee: Fee) -> Self {
-        fee.0
-    }
-}
-
 /// Selector to call mint function in ERC 20 contract
 ///
 /// keccak("mint(address,uint256)".as_bytes())[..4];
@@ -300,9 +294,7 @@ impl Wei {
     /// NOTICE: Error can contain only overflow
     pub fn try_into_u128(self) -> Result<u128, error::BalanceOverflowError> {
         use crate::TryInto;
-        self.0
-            .try_into()
-            .map_err(|_| error::BalanceOverflowError::Overflow)
+        self.0.try_into().map_err(|_| error::BalanceOverflowError)
     }
 }
 
@@ -442,15 +434,11 @@ pub mod error {
     use crate::{fmt, String};
 
     #[derive(Eq, Hash, Clone, Debug, PartialEq)]
-    pub enum BalanceOverflowError {
-        Overflow,
-    }
+    pub struct BalanceOverflowError;
 
     impl AsRef<[u8]> for BalanceOverflowError {
         fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::Overflow => b"ERR_BALANCE_OVERFLOW",
-            }
+            b"ERR_BALANCE_OVERFLOW"
         }
     }
 
@@ -601,7 +589,7 @@ mod tests {
         let fee = Fee::new(100);
         let fee2 = Fee::from(100u128);
         assert_eq!(fee, fee2);
-        let res: u128 = fee.into();
+        let res: u128 = fee.into_u128();
         assert_eq!(res, 100);
     }
 }
