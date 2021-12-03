@@ -142,7 +142,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         }
     }
 
-    /// Balance of ETH (ETH on Aurora)###
+    /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(
         &self,
         address: EthAddress,
