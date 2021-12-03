@@ -56,7 +56,7 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E) {
         metadata: FungibleTokenMetadata::default(),
     };
 
-    aurora_engine::connector::EthConnectorContract::init_contract(
+    aurora_engine::connector::EthConnectorContract::create_contract(
         io,
         env.current_account_id(),
         connector_args,

@@ -549,7 +549,7 @@ mod contract {
         let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
         let owner_id = io.current_account_id();
 
-        EthConnectorContract::init_contract(io, owner_id, args).sdk_unwrap();
+        EthConnectorContract::create_contract(io, owner_id, args).sdk_unwrap();
     }
 
     #[no_mangle]
@@ -663,7 +663,9 @@ mod contract {
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
         let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
-        EthConnectorContract::init_instance(io).ft_balance_of_eth_on_aurora(args);
+        EthConnectorContract::init_instance(io)
+            .ft_balance_of_eth_on_aurora(args)
+            .sdk_unwrap();
     }
 
     #[no_mangle]

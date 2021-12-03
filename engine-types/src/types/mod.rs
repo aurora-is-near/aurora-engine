@@ -149,6 +149,30 @@ pub fn str_from_slice(inp: &[u8]) -> &str {
     str::from_utf8(inp).unwrap()
 }
 
+pub mod error {
+    use crate::{fmt, String};
+
+    #[derive(Eq, Hash, Clone, Debug, PartialEq)]
+    pub enum BalanceOverflowError {
+        Overflow,
+    }
+
+    impl AsRef<[u8]> for BalanceOverflowError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::Overflow => b"ERR_BALANCE_OVERFLOW",
+            }
+        }
+    }
+
+    impl fmt::Display for BalanceOverflowError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
+            write!(f, "{}", msg)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,58 +261,5 @@ mod tests {
         stack.push(7); // [$, 1, 2, 6, $, 7]
 
         assert_eq!(stack.into_vec(), vec![1, 2, 6, 7]);
-    }
-
-    #[test]
-    fn test_wei_from_u64() {
-        let x: u64 = rand::random();
-        assert_eq!(Wei::new_u64(x).raw().as_u64(), x);
-    }
-
-    #[test]
-    fn test_wei_from_eth() {
-        let eth_amount: u64 = rand::random();
-        let wei_amount = U256::from(eth_amount) * U256::from(10).pow(18.into());
-        assert_eq!(Wei::from_eth(eth_amount.into()), Some(Wei::new(wei_amount)));
-    }
-
-    #[test]
-    fn test_fee_add() {
-        let fee = Fee::new(100);
-        assert_eq!(200u128 + fee, Fee::new(300));
-        assert_eq!(fee + fee, Fee::new(200));
-        assert_eq!(fee + 200u128, Fee::new(300));
-        assert_eq!(fee.add(200), Fee::new(300));
-        assert_eq!(200.add(fee), Fee::new(300));
-    }
-
-    #[test]
-    fn test_fee_mul() {
-        let fee = Fee::new(100);
-        assert_eq!(3u128 * fee, Fee::new(300));
-        assert_eq!(fee * fee, Fee::new(10000));
-        assert_eq!(fee * 3u128, Fee::new(300));
-        assert_eq!(fee.mul(3), Fee::new(300));
-        assert_eq!(3.mul(fee), Fee::new(300));
-    }
-
-    #[test]
-    fn test_fee_div() {
-        let fee = Fee::new(100);
-        let fee2 = Fee::new(10);
-        assert_eq!(1000u128 / fee, Fee::new(10));
-        assert_eq!(fee / fee2, Fee::new(10));
-        assert_eq!(fee / 10u128, Fee::new(10));
-        assert_eq!(fee.div(10), Fee::new(10));
-        assert_eq!(1000.div(fee), Fee::new(10));
-    }
-
-    #[test]
-    fn test_fee_from() {
-        let fee = Fee::new(100);
-        let fee2 = Fee::from(100u128);
-        assert_eq!(fee, fee2);
-        let res: u128 = fee.into();
-        assert_eq!(res, 100);
     }
 }

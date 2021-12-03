@@ -52,8 +52,13 @@ impl Wei {
         self.0.checked_add(rhs.0).map(Self)
     }
 
-    pub fn into_u128(self) -> u128 {
-        self.0.as_u128()
+    /// Try convert U256 to u128 with checking overflow.
+    /// NOTICE: Error can contain only overflow
+    pub fn try_into_u128(self) -> Result<u128, error::BalanceOverflowError> {
+        use crate::TryInto;
+        self.0
+            .try_into()
+            .map_err(|_| error::BalanceOverflowError::Overflow)
     }
 }
 
@@ -91,4 +96,22 @@ pub fn u256_to_arr(value: &U256) -> [u8; 32] {
     let mut result = [0u8; 32];
     value.to_big_endian(&mut result);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    #[test]
+    fn test_wei_from_eth() {
+        let eth_amount: u64 = rand::random();
+        let wei_amount = U256::from(eth_amount) * U256::from(10).pow(18.into());
+        assert_eq!(Wei::from_eth(eth_amount.into()), Some(Wei::new(wei_amount)));
+    }
+
+    #[test]
+    fn test_wei_from_u64() {
+        let x: u64 = rand::random();
+        assert_eq!(Wei::new_u64(x).raw().as_u64(), x);
+    }
 }

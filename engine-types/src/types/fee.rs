@@ -109,3 +109,48 @@ impl From<Fee> for u128 {
         fee.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    #[test]
+    fn test_fee_add() {
+        let fee = Fee::new(100);
+        assert_eq!(200u128 + fee, Fee::new(300));
+        assert_eq!(fee + fee, Fee::new(200));
+        assert_eq!(fee + 200u128, Fee::new(300));
+        assert_eq!(fee.add(200), Fee::new(300));
+        assert_eq!(200.add(fee), Fee::new(300));
+    }
+
+    #[test]
+    fn test_fee_mul() {
+        let fee = Fee::new(100);
+        assert_eq!(3u128 * fee, Fee::new(300));
+        assert_eq!(fee * fee, Fee::new(10000));
+        assert_eq!(fee * 3u128, Fee::new(300));
+        assert_eq!(fee.mul(3), Fee::new(300));
+        assert_eq!(3.mul(fee), Fee::new(300));
+    }
+
+    #[test]
+    fn test_fee_div() {
+        let fee = Fee::new(100);
+        let fee2 = Fee::new(10);
+        assert_eq!(1000u128 / fee, Fee::new(10));
+        assert_eq!(fee / fee2, Fee::new(10));
+        assert_eq!(fee / 10u128, Fee::new(10));
+        assert_eq!(fee.div(10), Fee::new(10));
+        assert_eq!(1000.div(fee), Fee::new(10));
+    }
+
+    #[test]
+    fn test_fee_from() {
+        let fee = Fee::new(100);
+        let fee2 = Fee::from(100u128);
+        assert_eq!(fee, fee2);
+        let res: u128 = fee.into();
+        assert_eq!(res, 100);
+    }
+}
