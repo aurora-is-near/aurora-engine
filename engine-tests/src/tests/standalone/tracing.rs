@@ -37,80 +37,32 @@ fn test_evm_tracing() {
         value: Wei::zero(),
         data: hex::decode(CONTRACT_INPUT).unwrap(),
     };
-    let mut listener = standalone::mocks::tracing::Listener::default();
+    let mut listener = engine_standalone_tracing::sputnik::TransactionTraceBuilder::default();
     let result = sputnik::traced_call(&mut listener, || {
         runner.submit_transaction(&signer.secret_key, tx).unwrap()
     });
     assert!(result.status.is_ok());
 
     // Check trace
-    let positions: Vec<u8> = listener
-        .events
+    let trace = listener.finish();
+    let positions: Vec<u8> = trace
+        .logs()
+        .0
         .iter()
-        .filter_map(|e| {
-            if e.starts_with("Step ") {
-                Some(parse_numer_in_parentheses("position:", e))
-            } else {
-                None
-            }
-        })
+        .map(|l| l.program_counter.into_u32() as u8)
         .collect();
     assert_eq!(positions.as_slice(), &EXPECTED_POSITIONS);
 
-    let costs: Vec<u32> = listener
-        .events
+    let costs: Vec<u32> = trace
+        .logs()
+        .0
         .iter()
-        .filter_map(|e| {
-            if e.starts_with("RecordCost") {
-                Some(parse_field("cost:", e).parse().unwrap())
-            } else if e.starts_with("RecordDynamicCost") {
-                let gas_cost: u32 = parse_field("gas_cost:", e).parse().unwrap();
-                let memory_gas: u32 = parse_field("memory_gas:", e).parse().unwrap();
-                Some(gas_cost + memory_gas)
-            } else {
-                None
-            }
-        })
-        .skip(1) // The first cost is for the transaction itself; not included in geth trace
+        .map(|l| l.gas_cost.into_u64() as u32)
         .collect();
     assert_eq!(costs.as_slice(), &EXPECTED_COSTS);
 
-    let op_codes: Vec<u8> = listener
-        .events
-        .iter()
-        .filter_map(|e| {
-            if e.starts_with("Step ") {
-                Some(parse_numer_in_parentheses("opcode:", e))
-            } else {
-                None
-            }
-        })
-        .collect();
+    let op_codes: Vec<u8> = trace.logs().0.iter().map(|l| l.opcode.0).collect();
     assert_eq!(op_codes.as_slice(), &EXPECTED_OP_CODES);
-}
-
-fn parse_field<'a>(name: &'static str, data: &'a str) -> &'a str {
-    data.split(name)
-        .skip(1)
-        .next()
-        .unwrap()
-        .trim()
-        .split(',')
-        .next()
-        .unwrap()
-}
-
-fn parse_numer_in_parentheses(name: &'static str, data: &str) -> u8 {
-    let token = parse_field(name, data);
-    let number = token
-        .split('(')
-        .skip(1)
-        .next()
-        .unwrap()
-        .split(')')
-        .next()
-        .unwrap();
-    number.parse().unwrap()
 }
 
 const CONTRACT_CODE: &str = "60606040525b60008054600160a060020a03191633600160a060020a0316179055346001555b5b61011e806100356000396000f3006060604052361560465763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166383197ef08114604a5780638da5cb5b14605c575b5b5b005b3415605457600080fd5b60466095565b005b3415606657600080fd5b606c60d6565b60405173ffffffffffffffffffffffffffffffffffffffff909116815260200160405180910390f35b6000543373ffffffffffffffffffffffffffffffffffffffff9081169116141560d35760005473ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60005473ffffffffffffffffffffffffffffffffffffffff16815600a165627a7a7230582080eeb07bf95bf0cca20d03576cbb3a25de3bd0d1275c173d370dcc90ce23158d0029";

@@ -1,9 +1,13 @@
+use aurora_engine_types::types::EthGas;
+use evm::{Capture, Opcode};
 use std::cell::RefCell;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-// TODO: implement evm* tracing traits for `crate::trace::Logs`, and tie this `traced_call` function to the FFI.
-#[allow(dead_code)]
+use crate::types::{
+    LogStorageKey, LogStorageValue, Logs, ProgramCounter, TraceLog, TransactionTrace,
+};
+
 /// Capture all events from SputnikVM emitted from within the given closure using the given listener.
 pub fn traced_call<T, R, F>(listener: &mut T, f: F) -> R
 where
@@ -22,6 +26,165 @@ where
             evm::tracing::using(&mut evm_listener, f)
         })
     })
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TransactionTraceBuilder {
+    logs: Vec<TraceLog>,
+    current: TraceLog,
+    gas_used: EthGas,
+    failed: bool,
+    output: Vec<u8>,
+}
+
+impl TransactionTraceBuilder {
+    pub fn finish(self) -> TransactionTrace {
+        TransactionTrace::new(self.gas_used, self.failed, self.output, Logs(self.logs))
+    }
+}
+
+impl evm_gasometer::tracing::EventListener for TransactionTraceBuilder {
+    fn event(&mut self, event: evm_gasometer::tracing::Event) {
+        use evm_gasometer::tracing::Event;
+        match event {
+            Event::RecordCost { cost, snapshot: _ } => {
+                self.current.gas_cost = EthGas::new(cost);
+            }
+            Event::RecordDynamicCost {
+                gas_cost,
+                memory_gas,
+                gas_refund: _,
+                snapshot: _,
+            } => {
+                self.current.gas_cost = EthGas::new(gas_cost + memory_gas);
+            }
+            Event::RecordRefund {
+                refund: _,
+                snapshot,
+            } => {
+                // This one seems to show up at the end of a transaction, so it
+                // can be used to set the total gas used.
+                if let Some(snapshot) = snapshot {
+                    self.gas_used = EthGas::new(snapshot.used_gas);
+                }
+            }
+            Event::RecordTransaction { .. } => (), // not useful
+            Event::RecordStipend { .. } => (),     // not useful
+        }
+    }
+}
+
+impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
+    fn event(&mut self, event: evm_runtime::tracing::Event) {
+        use evm_runtime::tracing::Event;
+        match event {
+            Event::Step {
+                context: _,
+                opcode,
+                position,
+                stack,
+                memory,
+            } => {
+                self.current.opcode = opcode;
+                if let Ok(pc) = position {
+                    self.current.program_counter = ProgramCounter(*pc as u32);
+                }
+                self.current.stack = stack.data().as_slice().into();
+                self.current.memory = memory.data().as_slice().into();
+            }
+
+            Event::StepResult {
+                result,
+                return_value,
+            } => {
+                match result {
+                    Ok(_) => {
+                        // Step completed, push current log into the record
+                        self.logs.push(self.current.clone());
+                    }
+                    Err(Capture::Exit(reason)) => {
+                        // Step completed, push current log into the record
+                        self.logs.push(self.current.clone());
+                        // Current sub-call completed, reduce depth by 1
+                        self.current.depth.decrement();
+
+                        // if the depth is 0 then the transaction is complete
+                        if self.current.depth.is_zero() {
+                            if !return_value.is_empty() {
+                                self.output = return_value.to_vec();
+                            }
+                            if !reason.is_succeed() {
+                                self.failed = true;
+                            }
+                        }
+                    }
+                    Err(Capture::Trap(opcode)) => {
+                        // "Trap" here means that there is some opcode which has special
+                        // handling logic outside the core `step` function. This means the
+                        // `StepResult` does not necessarily indicate the current log
+                        // is finished yet. In particular, `SLoad` and `SStore` events come
+                        // _after_ the `StepResult`, but still correspond to the current step.
+                        if opcode == &Opcode::SLOAD || opcode == &Opcode::SSTORE {
+                            // will push the log after processing `SLOAD` / `SSTORE` events
+                        } else {
+                            self.logs.push(self.current.clone());
+                        }
+                    }
+                }
+            }
+
+            Event::SLoad {
+                address: _,
+                index,
+                value,
+            } => {
+                self.current
+                    .storage
+                    .insert(LogStorageKey(index.0), LogStorageValue(value.0));
+                self.logs.push(self.current.clone());
+            }
+
+            Event::SStore {
+                address: _,
+                index,
+                value,
+            } => {
+                self.current
+                    .storage
+                    .insert(LogStorageKey(index.0), LogStorageValue(value.0));
+                self.logs.push(self.current.clone());
+            }
+        }
+    }
+}
+
+impl evm::tracing::EventListener for TransactionTraceBuilder {
+    fn event(&mut self, event: evm::tracing::Event) {
+        use evm::tracing::Event;
+        match event {
+            Event::Call { .. } => {
+                self.current.depth.increment();
+            }
+            Event::Create { .. } => {
+                self.current.depth.increment();
+            }
+            Event::Suicide { .. } => (), // TODO: ???
+            Event::Exit {
+                reason: _,
+                return_value,
+            } => {
+                if !self.current.depth.is_zero() {
+                    // If the depth is not zero then an error must have occurred to
+                    // exit early.
+                    self.failed = true;
+                    self.output = return_value.to_vec();
+                }
+            }
+            Event::TransactCall { .. } => (), // no useful information
+            Event::TransactCreate { .. } => (), // no useful information
+            Event::TransactCreate2 { .. } => (), // no useful information
+        }
+    }
 }
 
 /// This structure is intentionally private to this module as it is memory unsafe (contains a raw pointer).

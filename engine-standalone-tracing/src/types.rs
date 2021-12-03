@@ -1,10 +1,10 @@
 use aurora_engine_types::types::EthGas;
-use aurora_engine_types::BTreeMap;
+use aurora_engine_types::{BTreeMap, H256};
 use evm_core::Opcode;
 use std::ops::Index;
 
 /// Depth of a log.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Depth(u32);
 
 impl Depth {
@@ -12,10 +12,22 @@ impl Depth {
     pub fn into_u32(self) -> u32 {
         self.0
     }
+
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
+
+    pub fn decrement(&mut self) {
+        self.0 -= 1;
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0
+    }
 }
 
 /// A trace log memory.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LogMemory(Vec<[u8; 32]>);
 
 impl LogMemory {
@@ -36,8 +48,23 @@ impl LogMemory {
     }
 }
 
+impl From<&[u8]> for LogMemory {
+    fn from(bytes: &[u8]) -> Self {
+        let mut result = Vec::with_capacity(bytes.len() / 32);
+        let mut buf = [0u8; 32];
+        for (i, b) in bytes.iter().enumerate() {
+            let j = i % 32;
+            buf[j] = *b;
+            if j == 31 {
+                result.push(buf)
+            }
+        }
+        Self(result)
+    }
+}
+
 /// The stack of the log.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LogStack(Vec<[u8; 32]>);
 
 impl LogStack {
@@ -58,8 +85,15 @@ impl LogStack {
     }
 }
 
+impl From<&[H256]> for LogStack {
+    fn from(stack: &[H256]) -> Self {
+        let vec = stack.iter().map(|bytes| bytes.0).collect();
+        Self(vec)
+    }
+}
+
 /// A trace log program counter.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub struct ProgramCounter(pub u32);
 
 impl ProgramCounter {
@@ -70,8 +104,8 @@ impl ProgramCounter {
 }
 
 /// A storage key for the `LogStorage`.
-#[derive(Debug, Clone)]
-pub struct LogStorageKey([u8; 32]);
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LogStorageKey(pub [u8; 32]);
 
 impl LogStorageKey {
     /// Performs the conversion into a 32 byte word.
@@ -81,8 +115,8 @@ impl LogStorageKey {
 }
 
 /// A storage value for the `LogStorage`.
-#[derive(Debug, Clone)]
-pub struct LogStorageValue([u8; 32]);
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LogStorageValue(pub [u8; 32]);
 
 impl LogStorageValue {
     /// Performs the conversion into a 32 byte word.
@@ -92,8 +126,14 @@ impl LogStorageValue {
 }
 
 /// A map for `LogStorageKeys` to `LogStorageValue`s.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LogStorage(BTreeMap<LogStorageKey, LogStorageValue>);
+
+impl LogStorage {
+    pub fn insert(&mut self, key: LogStorageKey, value: LogStorageValue) {
+        self.0.insert(key, value);
+    }
+}
 
 impl IntoIterator for LogStorage {
     type Item = (LogStorageKey, LogStorageValue);
@@ -105,77 +145,46 @@ impl IntoIterator for LogStorage {
 }
 
 /// The trace log of an execution on the EVM.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceLog {
     /// The depth of the log.
-    depth: Depth,
+    pub depth: Depth,
     /// Any errors that may have occurred during execution.
-    error: Option<String>,
+    pub error: Option<String>,
     /// Gas used to execute the transaction.
-    gas: EthGas,
+    pub gas: EthGas,
     /// Gas cost for the transaction.
-    gas_cost: EthGas,
+    pub gas_cost: EthGas,
     /// The bounded memory.
-    memory: LogMemory,
+    pub memory: LogMemory,
     /// The opcode as a byte.
-    opcode: Opcode,
+    pub opcode: Opcode,
     /// The current program counter of the transaction.
-    program_counter: ProgramCounter,
+    pub program_counter: ProgramCounter,
     /// The local stack.
-    stack: LogStack,
+    pub stack: LogStack,
     /// The storage of the execution.
-    storage: LogStorage,
+    pub storage: LogStorage,
 }
 
-impl TraceLog {
-    /// Returns the depth of the log.
-    pub fn depth(&self) -> Depth {
-        self.depth
-    }
-
-    /// Returns a potential error, if any in the execution.
-    pub fn error(&self) -> Option<&String> {
-        self.error.as_ref()
-    }
-
-    /// Returns the gas consumed.
-    pub fn gas(&self) -> EthGas {
-        self.gas
-    }
-
-    /// Returns the gas cost of the execution.
-    pub fn gas_cost(&self) -> EthGas {
-        self.gas_cost
-    }
-
-    /// Returns the memory of the log.
-    pub fn memory(&self) -> &LogMemory {
-        &self.memory
-    }
-
-    /// Returns the opcode for the execution of the log.
-    pub fn opcode(&self) -> Opcode {
-        self.opcode
-    }
-
-    /// Returns the program counter for the log.
-    pub fn program_counter(&self) -> ProgramCounter {
-        self.program_counter
-    }
-
-    /// Returns the stack of the log.
-    pub fn stack(&self) -> &LogStack {
-        &self.stack
-    }
-
-    /// Returns the storage of the log.
-    pub fn storage(&self) -> &LogStorage {
-        &self.storage
+impl Default for TraceLog {
+    fn default() -> Self {
+        Self {
+            depth: Default::default(),
+            error: Default::default(),
+            gas: Default::default(),
+            gas_cost: Default::default(),
+            memory: Default::default(),
+            opcode: Opcode::STOP,
+            program_counter: Default::default(),
+            stack: Default::default(),
+            storage: Default::default(),
+        }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Logs(Vec<TraceLog>);
+#[derive(Debug, Clone, Default)]
+pub struct Logs(pub Vec<TraceLog>);
 
 impl Logs {
     /// Returns the number of logs.
@@ -208,21 +217,33 @@ impl IntoIterator for Logs {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TransactionTrace {
     /// The total gas cost of the transaction.
     gas: EthGas,
-    /// The result of the operation.
-    result: String,
+    /// Flag indicating if the operation exited with an error.
+    failed: bool,
+    /// Bytes returned from the execution
+    return_value: Vec<u8>,
     /// The collection of traces.
-    logs: Logs,
+    struct_logs: Logs,
 }
 
 impl TransactionTrace {
     /// Constructs a new TransactionTrace with a given gas, return, and logs.
     #[allow(dead_code)]
-    pub fn new(gas: EthGas, result: String, logs: Logs) -> TransactionTrace {
-        Self { gas, result, logs }
+    pub fn new(
+        gas: EthGas,
+        failed: bool,
+        return_value: Vec<u8>,
+        struct_logs: Logs,
+    ) -> TransactionTrace {
+        Self {
+            gas,
+            failed,
+            return_value,
+            struct_logs,
+        }
     }
 
     /// Returns the EthGas associated with this transaction as a reference.
@@ -230,20 +251,20 @@ impl TransactionTrace {
         self.gas
     }
 
-    /// Returns the return as a str reference.
-    pub fn result(&self) -> &str {
-        self.result.as_str()
+    /// Returns the output bytes of the transaction as a slice.
+    pub fn result(&self) -> &[u8] {
+        self.return_value.as_slice()
     }
 
     /// Returns a reference to the logs.
     pub fn logs(&self) -> &Logs {
-        &self.logs
+        &self.struct_logs
     }
 }
 
 /// Consumes a `TransactionTrace` and provides the ability to step through each
 /// execution of the transaction.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct StepTransactionTrace {
     /// The under-laying transaction trace.
     inner: TransactionTrace,
@@ -268,11 +289,11 @@ impl StepTransactionTrace {
     /// `None`.
     #[allow(dead_code)]
     pub fn step(&mut self) -> Option<&TraceLog> {
-        if self.step > self.inner.logs.len() {
+        if self.step > self.inner.struct_logs.len() {
             None
         } else {
             self.step += 1;
-            Some(&self.inner.logs[self.step])
+            Some(&self.inner.struct_logs[self.step])
         }
     }
 }

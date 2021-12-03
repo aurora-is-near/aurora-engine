@@ -42,25 +42,25 @@ pub struct CTraceLog {
 
 impl From<TraceLog> for CTraceLog {
     fn from(log: TraceLog) -> Self {
-        let error = match log.error() {
+        let error = match &log.error {
             Some(err) => CString::new(err.to_string()),
             None => CString::new(""),
         }
         .expect("CString::new failed");
         let (memory_ptr, memory_len) = {
-            let len = log.memory().len();
-            let memory = log.memory().clone();
+            let len = log.memory.len();
+            let memory = log.memory.clone();
 
             (memory.into_raw().as_ptr(), len)
         };
         let (stack_ptr, stack_len) = {
-            let len = log.stack().len();
-            let stack = log.stack().clone();
+            let len = log.stack.len();
+            let stack = log.stack.clone();
 
             (stack.into_raw().as_ptr(), len)
         };
         let (storage_ptr, storage_len) = {
-            let storage_map = log.storage().clone();
+            let storage_map = log.storage.clone();
             let storage: Vec<([u8; 32], [u8; 32])> = storage_map
                 .into_iter()
                 .map(|(key, value)| (key.into_raw(), value.into_raw()))
@@ -70,14 +70,14 @@ impl From<TraceLog> for CTraceLog {
         };
 
         Self {
-            depth: log.depth().into_u32(),
+            depth: log.depth.into_u32(),
             error,
-            gas: log.gas().into_u64(),
-            gas_cost: log.gas_cost().into_u64(),
+            gas: log.gas.into_u64(),
+            gas_cost: log.gas_cost.into_u64(),
             memory_ptr,
             memory_len,
-            opcode: log.opcode().as_u8(),
-            program_counter: log.program_counter().into_u32(),
+            opcode: log.opcode.as_u8(),
+            program_counter: log.program_counter.into_u32(),
             stack_ptr,
             stack_len,
             storage_ptr,
