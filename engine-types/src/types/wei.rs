@@ -1,4 +1,5 @@
 use crate::fmt::Formatter;
+use crate::types::balance::error;
 use crate::{Add, Display, Sub, U256};
 
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
@@ -56,9 +57,7 @@ impl Wei {
     /// NOTICE: Error can contain only overflow
     pub fn try_into_u128(self) -> Result<u128, error::BalanceOverflowError> {
         use crate::TryInto;
-        self.0
-            .try_into()
-            .map_err(|_| error::BalanceOverflowError::Overflow)
+        self.0.try_into().map_err(|_| error::BalanceOverflowError)
     }
 }
 

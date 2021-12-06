@@ -11,13 +11,11 @@ pub use fee::*;
 pub use gas::*;
 pub use wei::*;
 
-//pub type Balance = u128;
 pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32];
 // Big-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 
-// TODO: introduce new type. Add encode/decode/validation methods
 pub type EthAddress = [u8; 20];
 pub type StorageUsage = u64;
 
@@ -147,30 +145,6 @@ impl<T> Stack<T> {
 
 pub fn str_from_slice(inp: &[u8]) -> &str {
     str::from_utf8(inp).unwrap()
-}
-
-pub mod error {
-    use crate::{fmt, String};
-
-    #[derive(Eq, Hash, Clone, Debug, PartialEq)]
-    pub enum BalanceOverflowError {
-        Overflow,
-    }
-
-    impl AsRef<[u8]> for BalanceOverflowError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::Overflow => b"ERR_BALANCE_OVERFLOW",
-            }
-        }
-    }
-
-    impl fmt::Display for BalanceOverflowError {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
-            write!(f, "{}", msg)
-        }
-    }
 }
 
 #[cfg(test)]

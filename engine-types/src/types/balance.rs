@@ -133,3 +133,23 @@ impl From<Balance> for u128 {
         amount.0
     }
 }
+
+pub mod error {
+    use crate::{fmt, String};
+
+    #[derive(Eq, Hash, Clone, Debug, PartialEq)]
+    pub struct BalanceOverflowError;
+
+    impl AsRef<[u8]> for BalanceOverflowError {
+        fn as_ref(&self) -> &[u8] {
+            b"ERR_BALANCE_OVERFLOW"
+        }
+    }
+
+    impl fmt::Display for BalanceOverflowError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
+            write!(f, "{}", msg)
+        }
+    }
+}
