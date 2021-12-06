@@ -3,11 +3,12 @@ use crate::engine;
 use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
+use crate::prelude::wei::Wei;
 use crate::prelude::{
     sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress,
     NearGas, PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult,
     PromiseWithCallbackArgs, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
-    Wei, U256,
+    ZERO_BALANCE,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
@@ -156,7 +157,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         account_id: &AccountId,
         amount: Balance,
     ) -> Result<(), error::DepositError> {
-        let balance = self.get_account_eth_balance(account_id).unwrap_or(0);
+        let balance = self
+            .get_account_eth_balance(account_id)
+            .unwrap_or(ZERO_BALANCE);
         let new_balance = balance
             .checked_add(amount)
             .ok_or(error::DepositError::BalanceOverflow)?;
@@ -180,11 +183,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let new_balance = balance
             .checked_add(amount)
             .ok_or(error::DepositError::BalanceOverflow)?;
-        engine::set_balance(
-            &mut self.io,
-            &Address(address),
-            &Wei::new(U256::from(new_balance)),
-        );
+        engine::set_balance(&mut self.io, &Address(address), &Wei::from(new_balance));
         self.total_eth_supply_on_aurora = self
             .total_eth_supply_on_aurora
             .checked_add(amount)
@@ -198,7 +197,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         account_id: &AccountId,
         amount: Balance,
     ) -> Result<(), error::WithdrawError> {
-        let balance = self.get_account_eth_balance(account_id).unwrap_or(0);
+        let balance = self
+            .get_account_eth_balance(account_id)
+            .unwrap_or(ZERO_BALANCE);
         let new_balance = balance
             .checked_sub(amount)
             .ok_or(error::WithdrawError::InsufficientFunds)?;
@@ -222,11 +223,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let new_balance = balance
             .checked_sub(amount)
             .ok_or(error::WithdrawError::InsufficientFunds)?;
-        engine::set_balance(
-            &mut self.io,
-            &Address(address),
-            &Wei::new(U256::from(new_balance)),
-        );
+        engine::set_balance(&mut self.io, &Address(address), &Wei::from(new_balance));
         self.total_eth_supply_on_aurora = self
             .total_eth_supply_on_aurora
             .checked_sub(amount)
@@ -245,7 +242,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         if sender_id == receiver_id {
             return Err(error::TransferError::SelfTransfer);
         }
-        if amount == 0 {
+        if amount == ZERO_BALANCE {
             return Err(error::TransferError::ZeroAmount);
         }
 
@@ -272,7 +269,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     pub fn internal_register_account(&mut self, account_id: &AccountId) {
-        self.accounts_insert(account_id, 0)
+        self.accounts_insert(account_id, ZERO_BALANCE)
     }
 
     pub fn ft_total_eth_supply_on_near(&self) -> Balance {
@@ -284,7 +281,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     pub fn ft_balance_of(&self, account_id: &AccountId) -> Balance {
-        self.get_account_eth_balance(account_id).unwrap_or(0)
+        self.get_account_eth_balance(account_id)
+            .unwrap_or(ZERO_BALANCE)
     }
 
     pub fn ft_transfer_call(
@@ -320,14 +318,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             target_account_id: receiver_id,
             method: "ft_on_transfer".to_string(),
             args: data1.into_bytes(),
-            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_balance: ZERO_ATTACHED_BALANCE.into_u128(),
             attached_gas: GAS_FOR_FT_ON_TRANSFER.into_u64(),
         };
         let ft_resolve_transfer_call = PromiseCreateArgs {
             target_account_id: current_account_id,
             method: "ft_resolve_transfer".to_string(),
             args: data2,
-            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_balance: ZERO_ATTACHED_BALANCE.into_u128(),
             attached_gas: GAS_FOR_RESOLVE_TRANSFER.into_u64(),
         };
         Ok(PromiseWithCallbackArgs {
@@ -344,12 +342,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         amount: Balance,
     ) -> (Balance, Balance) {
         // Get the unused amount from the `ft_on_transfer` call result.
-        let unused_amount = match promise_result {
+        let raw_unused_amount = match promise_result {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(value) => {
-                if let Some(unused_amount) =
+                if let Some(raw_unused_amount) =
                     parse_json(value.as_slice()).and_then(|x| (&x).try_into().ok())
                 {
+                    let raw_unused_amount: u64 = raw_unused_amount;
+                    let unused_amount = Balance::from(raw_unused_amount);
                     if amount > unused_amount {
                         unused_amount
                     } else {
@@ -361,15 +361,16 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             }
             PromiseResult::Failed => amount,
         };
+        let unused_amount = Balance::from(raw_unused_amount);
 
-        if unused_amount > 0 {
+        if unused_amount > ZERO_BALANCE {
             let receiver_balance = self
                 .get_account_eth_balance(receiver_id)
                 .unwrap_or_else(|| {
-                    self.accounts_insert(receiver_id, 0);
-                    0
+                    self.accounts_insert(receiver_id, ZERO_BALANCE);
+                    ZERO_BALANCE
                 });
-            if receiver_balance > 0 {
+            if receiver_balance > ZERO_BALANCE {
                 let refund_amount = if receiver_balance > unused_amount {
                     unused_amount
                 } else {
@@ -390,7 +391,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                         receiver_id,
                         sender_id
                     ));
-                    (amount - refund_amount, 0)
+                    (amount - refund_amount, ZERO_BALANCE)
                 } else {
                     // Sender's account was deleted, so we need to burn tokens.
                     self.total_eth_supply_on_near -= refund_amount;
@@ -399,7 +400,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                 };
             }
         }
-        (amount, 0)
+        (amount, ZERO_BALANCE)
     }
 
     pub fn ft_resolve_transfer(
@@ -420,13 +421,13 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     ) -> Result<(Balance, PromiseBatchAction), error::StorageFundingError> {
         let force = force.unwrap_or(false);
         if let Some(balance) = self.get_account_eth_balance(&account_id) {
-            if balance == 0 || force {
+            if balance == ZERO_BALANCE || force {
                 self.accounts_remove(&account_id);
                 self.total_eth_supply_on_near -= balance;
                 let storage_deposit = self.storage_balance_of(&account_id);
                 let action = PromiseAction::Transfer {
                     // The `+ 1` is to cover the 1 yoctoNEAR necessary to call this function in the first place.
-                    amount: storage_deposit.total + 1,
+                    amount: (storage_deposit.total + Balance::new(1)).into_u128(),
                 };
                 let promise = PromiseBatchAction {
                     target_account_id: account_id,
@@ -447,7 +448,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 
     pub fn storage_balance_bounds(&self) -> StorageBalanceBounds {
         let required_storage_balance =
-            Balance::from(self.account_storage_usage) * sdk::storage_byte_cost();
+            Balance::from(self.account_storage_usage) * Balance::from(sdk::storage_byte_cost());
         StorageBalanceBounds {
             min: required_storage_balance,
             max: Some(required_storage_balance),
@@ -458,7 +459,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         if self.accounts_contains_key(account_id) {
             Some(StorageBalance {
                 total: self.storage_balance_bounds().min,
-                available: 0,
+                available: ZERO_BALANCE,
             })
         } else {
             None
@@ -481,8 +482,10 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     ) -> Result<(StorageBalance, Option<PromiseBatchAction>), error::StorageFundingError> {
         let promise = if self.accounts_contains_key(account_id) {
             sdk::log!("The account is already registered, refunding the deposit");
-            if amount > 0 {
-                let action = PromiseAction::Transfer { amount };
+            if amount > ZERO_BALANCE {
+                let action = PromiseAction::Transfer {
+                    amount: amount.into_u128(),
+                };
                 let promise = PromiseBatchAction {
                     target_account_id: predecessor_account_id,
                     actions: vec![action],
@@ -499,8 +502,10 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 
             self.internal_register_account(account_id);
             let refund = amount - min_balance;
-            if refund > 0 {
-                let action = PromiseAction::Transfer { amount: refund };
+            if refund > ZERO_BALANCE {
+                let action = PromiseAction::Transfer {
+                    amount: refund.into_u128(),
+                };
                 let promise = PromiseBatchAction {
                     target_account_id: predecessor_account_id,
                     actions: vec![action],

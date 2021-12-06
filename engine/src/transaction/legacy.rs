@@ -1,5 +1,6 @@
 use crate::prelude::precompiles::secp256k1::ecrecover;
-use crate::prelude::{sdk, Address, Vec, Wei, U256};
+use crate::prelude::wei::Wei;
+use crate::prelude::{sdk, Address, Vec, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 #[derive(Debug, Eq, PartialEq, Clone)]

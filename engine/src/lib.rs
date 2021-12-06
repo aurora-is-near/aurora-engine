@@ -89,10 +89,10 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
+    use crate::prelude::wei::Wei;
     use crate::prelude::{
-        sdk, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei,
-        ERC20_MINT_SELECTOR, H256, U256,
+        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec,
+        ERC20_MINT_SELECTOR, ERR_FAILED_PARSE, H256, U256,
     };
 
     #[cfg(feature = "integration-test")]

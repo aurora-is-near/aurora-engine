@@ -1,6 +1,9 @@
 use crate::fmt::Formatter;
 use crate::{Add, Display, Div, Mul, Sub};
 use borsh::{BorshDeserialize, BorshSerialize};
+use std::ops::SubAssign;
+
+pub const ZERO_BALANCE: Balance = Balance::new(0);
 
 #[derive(
     Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
@@ -20,6 +23,14 @@ impl Balance {
         Self(amount)
     }
 
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.checked_sub(rhs.0).map(Self)
+    }
+
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0).map(Self)
+    }
+
     /// Consumes `Fee` and returns the underlying type.
     pub fn into_u128(self) -> u128 {
         self.0
@@ -34,22 +45,6 @@ impl Add<Balance> for Balance {
     }
 }
 
-impl Add<Balance> for u128 {
-    type Output = Balance;
-
-    fn add(self, rhs: Balance) -> Self::Output {
-        Balance(self + rhs.0)
-    }
-}
-
-impl Add<u128> for Balance {
-    type Output = Balance;
-
-    fn add(self, rhs: u128) -> Self::Output {
-        Balance(self.0 + rhs)
-    }
-}
-
 impl Sub<Balance> for Balance {
     type Output = Balance;
 
@@ -58,19 +53,9 @@ impl Sub<Balance> for Balance {
     }
 }
 
-impl Sub<Balance> for u128 {
-    type Output = Balance;
-
-    fn sub(self, rhs: Balance) -> Self::Output {
-        Balance(self - rhs.0)
-    }
-}
-
-impl Sub<u128> for Balance {
-    type Output = Balance;
-
-    fn sub(self, rhs: u128) -> Self::Output {
-        Balance(self.0 - rhs)
+impl SubAssign<Balance> for Balance {
+    fn sub_assign(&mut self, rhs: Balance) {
+        *self = *self - rhs;
     }
 }
 
@@ -82,43 +67,11 @@ impl Mul<Balance> for Balance {
     }
 }
 
-impl Mul<Balance> for u128 {
-    type Output = Balance;
-
-    fn mul(self, rhs: Balance) -> Self::Output {
-        Balance(self * rhs.0)
-    }
-}
-
-impl Mul<u128> for Balance {
-    type Output = Balance;
-
-    fn mul(self, rhs: u128) -> Self::Output {
-        Balance(self.0 * rhs)
-    }
-}
-
 impl Div<Balance> for Balance {
     type Output = Balance;
 
     fn div(self, rhs: Balance) -> Self::Output {
         Balance(self.0 / rhs.0)
-    }
-}
-
-impl Div<Balance> for u128 {
-    type Output = Balance;
-
-    fn div(self, rhs: Balance) -> Self::Output {
-        Balance(self / rhs.0)
-    }
-}
-
-impl Div<u128> for Balance {
-    type Output = Balance;
-
-    fn div(self, rhs: u128) -> Self::Output {
-        Balance(self.0 / rhs)
     }
 }
 
@@ -128,9 +81,9 @@ impl From<u128> for Balance {
     }
 }
 
-impl From<Balance> for u128 {
-    fn from(amount: Balance) -> Self {
-        amount.0
+impl From<u64> for Balance {
+    fn from(amount: u64) -> Self {
+        Self(amount as u128)
     }
 }
 

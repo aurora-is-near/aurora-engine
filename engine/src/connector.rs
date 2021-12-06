@@ -19,10 +19,11 @@ use crate::prelude::{
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::types::ZERO_BALANCE;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
-pub const ZERO_ATTACHED_BALANCE: Balance = 0.into();
+pub const ZERO_ATTACHED_BALANCE: Balance = ZERO_BALANCE;
 /// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
 const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 /// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
