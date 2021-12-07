@@ -1,5 +1,5 @@
 use crate::fmt::Formatter;
-use crate::{Add, Display, Div, Mul, Sub, SubAssign};
+use crate::{Add, Display, Mul, Sub, SubAssign};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
@@ -63,14 +63,6 @@ impl Mul<Balance> for Balance {
 
     fn mul(self, rhs: Balance) -> Self::Output {
         Balance(self.0 * rhs.0)
-    }
-}
-
-impl Div<Balance> for Balance {
-    type Output = Balance;
-
-    fn div(self, rhs: Balance) -> Self::Output {
-        Balance(self.0 / rhs.0)
     }
 }
 
