@@ -449,7 +449,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 
     pub fn storage_balance_bounds(&self) -> StorageBalanceBounds {
         let required_storage_balance =
-            Balance::from(self.account_storage_usage) * Balance::from(sdk::storage_byte_cost());
+            Balance::from(self.account_storage_usage as u128 * sdk::storage_byte_cost());
         StorageBalanceBounds {
             min: required_storage_balance,
             max: Some(required_storage_balance),
