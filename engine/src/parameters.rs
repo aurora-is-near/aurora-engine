@@ -183,7 +183,7 @@ pub struct ViewCallArgs {
 }
 
 /// Borsh-encoded parameters for `deploy_erc20_token` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
 pub struct DeployErc20TokenArgs {
     pub nep141: AccountId,
 }
@@ -234,6 +234,7 @@ pub struct BeginBlockArgs {
 
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
+#[derive(Debug, Clone)]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
     pub amount: Balance,

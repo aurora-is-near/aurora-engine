@@ -51,7 +51,7 @@ pub struct PromiseBatchAction {
 }
 
 /// withdraw NEAR eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct WithdrawCallArgs {
     pub recipient_address: EthAddress,
     pub amount: Balance,

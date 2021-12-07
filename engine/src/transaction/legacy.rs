@@ -60,7 +60,7 @@ impl TransactionLegacy {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LegacyEthSignedTransaction {
     /// The unsigned transaction data
     pub transaction: TransactionLegacy,

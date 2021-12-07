@@ -4,13 +4,17 @@ use aurora_engine::parameters::{FinishDepositCallArgs, InitCallArgs, NewCallArgs
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
-use engine_standalone_storage::Storage;
+use engine_standalone_storage::{BlockMetadata, Storage};
 
 use crate::test_utils;
 
 pub mod block;
 pub mod promise;
 pub mod storage;
+pub mod tracing;
+
+pub const ETH_CUSTODIAN_ADDRESS: Address =
+    aurora_engine_precompiles::make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
 
 pub fn compute_block_hash(block_height: u64) -> H256 {
     aurora_engine::engine::compute_block_hash([0u8; 32], block_height, b"aurora")
@@ -18,8 +22,12 @@ pub fn compute_block_hash(block_height: u64) -> H256 {
 
 pub fn insert_block(storage: &mut Storage, block_height: u64) {
     let block_hash = compute_block_hash(block_height);
+    let block_metadata = BlockMetadata {
+        timestamp: aurora_engine_sdk::env::Timestamp::new(0),
+        random_seed: H256::zero(),
+    };
     storage
-        .set_block_hash_for_height(block_hash, block_height)
+        .set_block_data(block_hash, block_height, block_metadata)
         .unwrap();
 }
 
@@ -52,7 +60,7 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E) {
 
     let connector_args = InitCallArgs {
         prover_account: test_utils::str_to_account_id("prover.near"),
-        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+        eth_custodian_address: hex::encode(&ETH_CUSTODIAN_ADDRESS),
         metadata: FungibleTokenMetadata::default(),
     };
 

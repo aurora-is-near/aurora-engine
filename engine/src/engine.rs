@@ -208,6 +208,7 @@ impl From<BalanceOverflow> for GasPaymentError {
     }
 }
 
+#[derive(Debug)]
 pub enum DeployErc20Error {
     State(EngineStateError),
     Failed(TransactionStatus),
@@ -368,7 +369,7 @@ pub struct GasPaymentResult {
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
-#[derive(BorshSerialize, BorshDeserialize, Default)]
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
 pub struct EngineState {
     /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],
