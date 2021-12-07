@@ -726,6 +726,7 @@ pub mod error {
 
     const PROOF_EXIST: &[u8; 15] = b"ERR_PROOF_EXIST";
 
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum DepositError {
         Paused,
         ProofParseFailed,
@@ -748,6 +749,7 @@ pub mod error {
         }
     }
 
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum FinishDepositError {
         TransferCall(FtTransferCallError),
         ProofUsed,
@@ -800,6 +802,7 @@ pub mod error {
         }
     }
 
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum FtTransferCallError {
         BalanceOverflow(BalanceOverflowError),
         MessageParseFailed(ParseOnTransferMessageError),

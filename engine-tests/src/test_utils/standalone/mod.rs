@@ -5,7 +5,7 @@ use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_types::{types::wei::Wei, Address, H256, U256};
 use borsh::BorshDeserialize;
 use engine_standalone_storage::engine_state;
-use engine_standalone_storage::{Diff, Storage};
+use engine_standalone_storage::{BlockMetadata, Diff, Storage};
 use secp256k1::SecretKey;
 use tempfile::TempDir;
 
@@ -186,6 +186,13 @@ impl StandaloneRunner {
         engine::get_nonce(&io, address)
     }
 
+    pub fn get_code(&mut self, address: &Address) -> Vec<u8> {
+        let io = self
+            .storage
+            .access_engine_storage_at_position(self.env.block_height + 1, 0, &[]);
+        engine::get_code(&io, address)
+    }
+
     pub fn close(self) {
         drop(self.storage);
         self.storage_dir.close().unwrap();
@@ -198,8 +205,12 @@ impl StandaloneRunner {
         transaction_hash: H256,
     ) -> TransactionIO<'db> {
         let block_hash = mocks::compute_block_hash(env.block_height);
+        let block_metadata = BlockMetadata {
+            timestamp: env.block_timestamp,
+            random_seed: env.random_seed,
+        };
         storage
-            .set_block_hash_for_height(block_hash, env.block_height)
+            .set_block_data(block_hash, env.block_height, block_metadata)
             .unwrap();
         let io =
             storage.access_engine_storage_at_position(env.block_height, transaction_position, &[]);

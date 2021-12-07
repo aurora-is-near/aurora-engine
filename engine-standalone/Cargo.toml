@@ -11,12 +11,13 @@ publish = false
 autobenches = false
 
 [dependencies]
-aurora-engine = { path = "../engine", default-features = false, features = ["std"] }
+aurora-engine = { path = "../engine", default-features = false, features = ["std", "tracing"] }
 aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
 engine-standalone-storage = { path = "../engine-standalone-storage", default-features = false }
+engine-standalone-tracing = { path = "../engine-standalone-tracing", default-features = false }
 borsh = { version = "0.8.2" }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false, features = ["std"] }
 libc = "0.2"
 rocksdb = "0.16.0"
 

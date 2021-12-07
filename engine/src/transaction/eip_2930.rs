@@ -72,7 +72,7 @@ impl Transaction2930 {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct SignedTransaction2930 {
     pub transaction: Transaction2930,
     /// The parity (0 for even, 1 for odd) of the y-value of a secp256k1 signature.

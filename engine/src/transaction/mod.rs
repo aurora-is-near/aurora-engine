@@ -8,7 +8,7 @@ pub mod eip_2930;
 pub mod legacy;
 
 /// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum EthTransactionKind {
     Legacy(legacy::LegacyEthSignedTransaction),
     Eip2930(eip_2930::SignedTransaction2930),
@@ -35,6 +35,26 @@ impl TryFrom<&[u8]> for EthTransactionKind {
             let legacy = legacy::LegacyEthSignedTransaction::decode(&Rlp::new(bytes))?;
             Ok(Self::Legacy(legacy))
         }
+    }
+}
+
+impl From<EthTransactionKind> for Vec<u8> {
+    fn from(tx: EthTransactionKind) -> Self {
+        let mut stream = rlp::RlpStream::new();
+        match tx {
+            EthTransactionKind::Legacy(tx) => {
+                stream.append(&tx);
+            }
+            EthTransactionKind::Eip1559(tx) => {
+                stream.append(&eip_1559::TYPE_BYTE);
+                stream.append(&tx);
+            }
+            EthTransactionKind::Eip2930(tx) => {
+                stream.append(&eip_2930::TYPE_BYTE);
+                stream.append(&tx);
+            }
+        }
+        stream.out().to_vec()
     }
 }
 

@@ -34,6 +34,7 @@ members = [
     "engine-sdk",
     "engine-standalone",
     "engine-standalone-storage",
+    "engine-standalone-tracing",
     "engine-tests",
     "engine-types",
 ]

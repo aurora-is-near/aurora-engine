@@ -304,6 +304,7 @@ impl DepositedEvent {
 pub mod error {
     use super::*;
 
+    #[derive(Debug)]
     pub enum DecodeError {
         RlpFailed,
         SchemaMismatch,
@@ -342,6 +343,7 @@ pub mod error {
         }
     }
 
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum ParseError {
         LogParseFailed(DecodeError),
         InvalidSender,

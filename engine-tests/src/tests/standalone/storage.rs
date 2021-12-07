@@ -1,5 +1,7 @@
 use aurora_engine::engine;
+use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{types::wei::Wei, Address, H256, U256};
+use engine_standalone_storage::BlockMetadata;
 
 use crate::test_utils::standalone::{mocks, storage::create_db};
 use crate::test_utils::{self, Signer};
@@ -170,10 +172,14 @@ fn test_block_index() {
 
     let block_hash = H256([3u8; 32]);
     let block_height = 17u64;
+    let block_metadata = BlockMetadata {
+        timestamp: Timestamp::new(23_000),
+        random_seed: H256([91u8; 32]),
+    };
 
     // write block hash / height association
     storage
-        .set_block_hash_for_height(block_hash, block_height)
+        .set_block_data(block_hash, block_height, block_metadata.clone())
         .unwrap();
     // read it back
     assert_eq!(
@@ -183,6 +189,10 @@ fn test_block_index() {
     assert_eq!(
         block_height,
         storage.get_block_height_by_hash(block_hash).unwrap()
+    );
+    assert_eq!(
+        block_metadata,
+        storage.get_block_metadata(block_hash).unwrap()
     );
 
     // block hash / height that do not exist are errors
@@ -195,6 +205,10 @@ fn test_block_index() {
         other => panic!("Unexpected response: {:?}", other),
     }
     match storage.get_block_height_by_hash(missing_block_hash) {
+        Err(engine_standalone_storage::Error::BlockNotFound(h)) if h == missing_block_hash => (), // ok
+        other => panic!("Unexpected response: {:?}", other),
+    }
+    match storage.get_block_metadata(missing_block_hash) {
         Err(engine_standalone_storage::Error::BlockNotFound(h)) if h == missing_block_hash => (), // ok
         other => panic!("Unexpected response: {:?}", other),
     }
