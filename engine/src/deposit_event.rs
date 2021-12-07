@@ -268,21 +268,22 @@ impl DepositedEvent {
         // parse_event_message
         let event_message_data: String = event.log.params[1].value.clone().to_string();
 
-        let amount: u128 = event.log.params[2]
+        let amount = event.log.params[2]
             .value
             .clone()
             .into_uint()
             .ok_or(error::ParseError::InvalidAmount)?
             .try_into()
+            .map(Balance::new)
             .map_err(|_| error::ParseError::OverflowNumber)?;
-        let raw_fee: u128 = event.log.params[3]
+        let fee = event.log.params[3]
             .value
             .clone()
             .into_uint()
             .ok_or(error::ParseError::InvalidFee)?
             .try_into()
+            .map(Fee::new)
             .map_err(|_| error::ParseError::OverflowNumber)?;
-        let fee: Fee = raw_fee.into();
 
         let token_message_data =
             TokenMessageData::parse_event_message_and_prepare_token_message_data(
