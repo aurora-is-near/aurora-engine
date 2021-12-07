@@ -5,7 +5,7 @@ use aurora_engine::parameters::{FinishDepositCallArgs, InitCallArgs, NewCallArgs
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::types::Balance;
-use aurora_engine_types::{account_id::AccountId, types::wei::Wei, Address, H256, U256};
+use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
 
 pub mod block;

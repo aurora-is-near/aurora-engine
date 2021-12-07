@@ -1,5 +1,5 @@
 use crate::prelude::precompiles::secp256k1::ecrecover;
-use crate::prelude::wei::Wei;
+use crate::prelude::Wei;
 use crate::prelude::{Vec, U256};
 use crate::transaction::eip_2930::AccessTuple;
 use ethabi::Address;

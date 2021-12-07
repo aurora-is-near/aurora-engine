@@ -1,4 +1,4 @@
-use aurora_engine_types::{types::wei::Wei, Address, U256};
+use aurora_engine_types::{types::Wei, Address, U256};
 use engine_standalone_tracing::sputnik;
 
 use crate::test_utils::{self, standalone};

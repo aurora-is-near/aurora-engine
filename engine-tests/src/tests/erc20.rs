@@ -1,4 +1,4 @@
-use crate::prelude::wei::Wei;
+use crate::prelude::Wei;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{
     self,

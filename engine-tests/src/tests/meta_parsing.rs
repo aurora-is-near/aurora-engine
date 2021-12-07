@@ -2,7 +2,7 @@ use {
     crate::prelude::meta_parsing::{near_erc712_domain, parse_meta_call, prepare_meta_call_args},
     crate::prelude::parameters::MetaCallArgs,
     crate::prelude::sdk::keccak,
-    crate::prelude::{u256_to_arr, wei::Wei, Address, BorshSerialize, InternalMetaCallArgs, U256},
+    crate::prelude::{u256_to_arr, Address, BorshSerialize, InternalMetaCallArgs, Wei, U256},
     near_crypto::{InMemorySigner, KeyType, PublicKey, Signature, Signer},
 };
 

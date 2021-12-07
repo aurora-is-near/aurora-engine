@@ -1,4 +1,4 @@
-use crate::prelude::{wei::Wei, Address, Balance, RawAddress, TryInto, WeiU256, U256};
+use crate::prelude::{Address, Balance, RawAddress, TryInto, Wei, WeiU256, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
@@ -390,7 +390,7 @@ fn test_transfer_erc20_token() {
 // Note: `AuroraRunner` is not suitable for these tests because
 // it does not execute promises; but `near-sdk-sim` does.
 mod sim_tests {
-    use crate::prelude::{types::wei::Wei, Address, WeiU256, U256};
+    use crate::prelude::{types::Wei, Address, WeiU256, U256};
     use crate::test_utils;
     use crate::test_utils::erc20::{ERC20Constructor, ERC20};
     use crate::test_utils::exit_precompile::TesterConstructor;

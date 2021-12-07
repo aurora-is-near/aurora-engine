@@ -1,4 +1,4 @@
-use crate::prelude::wei::Wei;
+use crate::prelude::Wei;
 use crate::test_utils::{
     self,
     standard_precompiles::{PrecompilesConstructor, PrecompilesContract},

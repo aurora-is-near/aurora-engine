@@ -3,7 +3,7 @@ use crate::engine;
 use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
-use crate::prelude::wei::Wei;
+use crate::prelude::Wei;
 use crate::prelude::{
     sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress,
     NearGas, PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult,

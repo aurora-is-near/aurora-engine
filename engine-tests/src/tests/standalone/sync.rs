@@ -1,7 +1,7 @@
 use aurora_engine::deposit_event::TokenMessageData;
 use aurora_engine_sdk::env::{Env, Timestamp};
 use aurora_engine_types::types::{Balance, Fee};
-use aurora_engine_types::{account_id::AccountId, types::wei::Wei, Address, H256, U256};
+use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
 use borsh::BorshSerialize;
 use engine_standalone_storage::sync;
 

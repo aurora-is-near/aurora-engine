@@ -13,7 +13,7 @@ use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::precompiles::Precompiles;
-use crate::prelude::wei::Wei;
+use crate::prelude::Wei;
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
     Balance, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString,

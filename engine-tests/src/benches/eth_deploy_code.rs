@@ -1,7 +1,7 @@
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
 use secp256k1::SecretKey;
 
-use crate::prelude::types::wei::Wei;
+use crate::prelude::types::Wei;
 use crate::test_utils::{
     address_from_secret_key, create_deploy_transaction, deploy_evm, sign_transaction, SUBMIT,
 };

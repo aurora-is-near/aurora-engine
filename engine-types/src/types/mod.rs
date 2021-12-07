@@ -1,4 +1,3 @@
-use crate::types::wei::Wei;
 use crate::{str, vec, Address, String, Vec, U256};
 
 pub mod balance;

@@ -1,4 +1,4 @@
-use crate::prelude::wei::Wei;
+use crate::prelude::Wei;
 use crate::prelude::{H256, U256};
 use crate::test_utils;
 use aurora_engine::transaction::eip_2930::{self, AccessTuple, Transaction2930};

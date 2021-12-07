@@ -89,7 +89,7 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::wei::Wei;
+    use crate::prelude::Wei;
     use crate::prelude::{
         sdk, u256_to_arr, vec, Address, Balance, PromiseResult, ToString, TryFrom, TryInto, Vec,
         ERC20_MINT_SELECTOR, ERR_FAILED_PARSE, H256, U256,
