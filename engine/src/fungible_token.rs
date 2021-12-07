@@ -148,7 +148,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         &self,
         address: EthAddress,
     ) -> Result<Balance, crate::prelude::types::error::BalanceOverflowError> {
-        engine::get_balance(&self.io, &Address(address)).try_into_u128()
+        engine::get_balance(&self.io, &Address(address))
+            .try_into_u128()
+            .map(Balance::new)
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
@@ -342,14 +344,15 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         amount: Balance,
     ) -> (Balance, Balance) {
         // Get the unused amount from the `ft_on_transfer` call result.
-        let raw_unused_amount = match promise_result {
+        let raw_unused_amount: u64 = match promise_result {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(value) => {
                 if let Some(raw_unused_amount) =
                     parse_json(value.as_slice()).and_then(|x| (&x).try_into().ok())
                 {
-                    let raw_unused_amount: u64 = raw_unused_amount;
-                    let unused_amount = Balance::from(raw_unused_amount);
+                    let unused_amount = raw_unused_amount;
+                    let amount = amount.into_u128() as u64;
+                    // let unused_amount = Balance::from(raw_unused_amount);
                     if amount > unused_amount {
                         unused_amount
                     } else {
@@ -359,7 +362,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                     amount
                 }
             }
-            PromiseResult::Failed => amount,
+            PromiseResult::Failed => amount.into_u128() as u64,
         };
         let unused_amount = Balance::from(raw_unused_amount);
 
