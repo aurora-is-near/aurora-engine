@@ -463,6 +463,8 @@ impl Precompile for ExitToEthereum {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
+        use crate::prelude::types::Balance;
+
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);
@@ -496,7 +498,7 @@ impl Precompile for ExitToEthereum {
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {
                         recipient_address,
-                        amount: context.apparent_value.as_u128().into(),
+                        amount: Balance::new(context.apparent_value.as_u128()),
                     }
                     .try_to_vec()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
