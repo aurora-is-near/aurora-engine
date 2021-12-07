@@ -1,5 +1,5 @@
 use aurora_engine::engine;
-use aurora_engine_types::{types::Wei, Address, H256, U256};
+use aurora_engine_types::{types::wei::Wei, Address, H256, U256};
 
 use crate::test_utils::standalone::{mocks, storage::create_db};
 use crate::test_utils::{self, Signer};
@@ -222,7 +222,7 @@ fn test_transaction_index() {
             aurora_engine_types::storage::KeyPrefix::Balance,
             &[1u8; 20],
         );
-        let value = aurora_engine_types::types::Wei::new_u64(159)
+        let value = aurora_engine_types::types::wei::Wei::new_u64(159)
             .to_bytes()
             .to_vec();
         tmp.modify(key, value);

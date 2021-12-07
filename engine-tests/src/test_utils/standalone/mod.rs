@@ -2,7 +2,7 @@ use aurora_engine::engine;
 use aurora_engine::parameters::{CallArgs, DeployErc20TokenArgs, SubmitResult, TransactionStatus};
 use aurora_engine::transaction::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_sdk::env::{self, Env};
-use aurora_engine_types::{types::Wei, Address, H256, U256};
+use aurora_engine_types::{types::wei::Wei, Address, H256, U256};
 use borsh::BorshDeserialize;
 use engine_standalone_storage::engine_state;
 use engine_standalone_storage::{Diff, Storage};

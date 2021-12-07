@@ -1,7 +1,6 @@
 use crate::fmt::Formatter;
-use crate::{Add, Display, Div, Mul, Sub};
+use crate::{Add, Display, Div, Mul, Sub, SubAssign};
 use borsh::{BorshDeserialize, BorshSerialize};
-use std::ops::SubAssign;
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
 

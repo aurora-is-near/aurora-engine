@@ -844,12 +844,15 @@ mod contract {
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
         let address = Address(args.0);
         let nonce = U256::from(args.1);
-        let balance = U256::from(args.2);
+        let balance = Balance::from(args.2);
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {
             address,
-            basic: evm::backend::Basic { balance, nonce },
+            basic: evm::backend::Basic {
+                balance: U256::from(balance.into_u128()),
+                nonce,
+            },
             code: None,
             storage: core::iter::empty(),
             reset_storage: false,
@@ -861,7 +864,7 @@ mod contract {
         let aurora_account_id = io.current_account_id();
         let args = crate::parameters::FinishDepositCallArgs {
             new_owner_id: aurora_account_id.clone(),
-            amount: balance.low_u128(),
+            amount: balance,
             proof_key: crate::prelude::String::new(),
             relayer_id: aurora_account_id.clone(),
             fee: 0.into(),

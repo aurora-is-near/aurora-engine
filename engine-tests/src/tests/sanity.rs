@@ -1,5 +1,5 @@
+use crate::prelude::{wei::Wei, ERC20_MINT_SELECTOR};
 use crate::prelude::{Address, U256};
-use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::test_utils;
 use crate::tests::state_migration;
 use aurora_engine::fungible_token::FungibleTokenMetadata;

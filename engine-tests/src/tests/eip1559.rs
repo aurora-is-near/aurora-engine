@@ -1,4 +1,4 @@
-use crate::prelude::Wei;
+use crate::prelude::wei::Wei;
 use crate::prelude::{H256, U256};
 use crate::test_utils;
 use aurora_engine::parameters::SubmitResult;

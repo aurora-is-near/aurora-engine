@@ -2,7 +2,7 @@ use crate::prelude::U256;
 use criterion::{BatchSize, BenchmarkId, Criterion};
 use secp256k1::SecretKey;
 
-use crate::prelude::types::Wei;
+use crate::prelude::types::wei::Wei;
 use crate::test_utils::standard_precompiles::{PrecompilesConstructor, PrecompilesContract};
 use crate::test_utils::{address_from_secret_key, deploy_evm, sign_transaction, SUBMIT};
 

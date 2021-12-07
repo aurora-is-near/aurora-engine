@@ -1,5 +1,5 @@
 use crate::prelude::parameters::SubmitResult;
-use crate::prelude::{Wei, U256};
+use crate::prelude::{wei::Wei, U256};
 use crate::test_utils::one_inch::liquidity_protocol;
 use crate::test_utils::{self, assert_gas_bound};
 use borsh::BorshDeserialize;

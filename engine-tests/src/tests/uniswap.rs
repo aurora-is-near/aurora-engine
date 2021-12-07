@@ -8,7 +8,7 @@ use crate::test_utils::{
     },
     AuroraRunner, ExecutionProfile, Signer,
 };
-use aurora_engine_types::types::Wei;
+use aurora_engine_types::types::wei::Wei;
 use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1000;

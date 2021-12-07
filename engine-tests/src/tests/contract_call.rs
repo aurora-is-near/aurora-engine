@@ -1,4 +1,4 @@
-use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
+use crate::prelude::{parameters::SubmitResult, vec, wei::Wei, Address, H256, U256};
 use crate::test_utils::{origin, AuroraRunner, Signer};
 
 use crate::test_utils;

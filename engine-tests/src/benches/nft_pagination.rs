@@ -1,4 +1,4 @@
-use crate::prelude::types::Wei;
+use crate::prelude::types::wei::Wei;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{self, solidity};
 use aurora_engine::transaction::legacy::TransactionLegacy;

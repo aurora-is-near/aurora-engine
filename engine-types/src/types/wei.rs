@@ -106,7 +106,7 @@ pub fn u256_to_arr(value: &U256) -> [u8; 32] {
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use super::*;
 
     #[test]
     fn test_wei_from_eth() {

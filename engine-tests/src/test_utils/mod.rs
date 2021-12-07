@@ -1,4 +1,5 @@
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::types::Balance;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
@@ -20,7 +21,7 @@ use crate::prelude::transaction::{
     eip_2930::{self, SignedTransaction2930, Transaction2930},
     legacy::{LegacyEthSignedTransaction, TransactionLegacy},
 };
-use crate::prelude::{sdk, Address, Wei, H256, U256};
+use crate::prelude::{sdk, wei::Wei, Address, H256, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
@@ -215,7 +216,7 @@ impl AuroraRunner {
     pub fn create_address(
         &mut self,
         address: Address,
-        init_balance: crate::prelude::Wei,
+        init_balance: crate::prelude::wei::Wei,
         init_nonce: U256,
     ) {
         self.internal_create_address(address, init_balance, init_nonce, None)
@@ -224,7 +225,7 @@ impl AuroraRunner {
     pub fn create_address_with_code(
         &mut self,
         address: Address,
-        init_balance: crate::prelude::Wei,
+        init_balance: crate::prelude::wei::Wei,
         init_nonce: U256,
         code: Vec<u8>,
     ) {
@@ -234,7 +235,7 @@ impl AuroraRunner {
     fn internal_create_address(
         &mut self,
         address: Address,
-        init_balance: crate::prelude::Wei,
+        init_balance: crate::prelude::wei::Wei,
         init_nonce: U256,
         code: Option<Vec<u8>>,
     ) {
@@ -269,7 +270,8 @@ impl AuroraRunner {
                 .get(&ft_key)
                 .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
                 .unwrap_or_default();
-            current_ft.total_eth_supply_on_near += init_balance.raw().as_u128();
+            current_ft.total_eth_supply_on_near =
+                current_ft.total_eth_supply_on_near + Balance::new(init_balance.raw().as_u128());
             current_ft
         };
 
@@ -633,7 +635,7 @@ pub(crate) fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) ->
 
 pub(crate) fn create_eth_transaction(
     to: Option<Address>,
-    value: crate::prelude::Wei,
+    value: crate::prelude::wei::Wei,
     data: Vec<u8>,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
@@ -746,7 +748,7 @@ pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
 pub(crate) fn validate_address_balance_and_nonce(
     runner: &AuroraRunner,
     address: Address,
-    expected_balance: crate::prelude::Wei,
+    expected_balance: crate::prelude::wei::Wei,
     expected_nonce: U256,
 ) {
     assert_eq!(runner.get_balance(address), expected_balance, "balance");

@@ -1,4 +1,4 @@
-use crate::prelude::{Address, Balance, RawAddress, TryInto, Wei, WeiU256, U256};
+use crate::prelude::{wei::Wei, Address, Balance, RawAddress, TryInto, WeiU256, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
@@ -267,7 +267,7 @@ fn test_ft_on_transfer() {
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
     let token = runner.deploy_erc20_token(&nep141);
-    let amount = 10;
+    let amount = Balance::new(10);
     let recipient = runner.create_account().address;
 
     let balance = runner.balance_of(token, recipient, origin());
@@ -278,7 +278,7 @@ fn test_ft_on_transfer() {
     assert_eq!(res, "\"0\"");
 
     let balance = runner.balance_of(token, recipient, origin());
-    assert_eq!(balance, U256::from(amount));
+    assert_eq!(balance, U256::from(amount.into_u128()));
 }
 
 #[test]
@@ -286,7 +286,7 @@ fn test_ft_on_transfer_fail() {
     let mut runner = AuroraRunner::new();
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
-    let amount = 10;
+    let amount = Balance::new(10);
 
     let recipient = runner.create_account().address;
 
@@ -301,7 +301,7 @@ fn test_relayer_charge_fee() {
     let mut runner = AuroraRunner::new();
     // Standalone runner presently does not support ft_on_transfer
     runner.standalone_runner = None;
-    let amount = 10;
+    let amount = Balance::new(10);
     let fee = 51;
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
@@ -339,7 +339,7 @@ fn test_relayer_charge_fee() {
     assert_eq!(relayer_balance, Wei::new_u64(fee));
 
     let balance = runner.balance_of(token, recipient, origin());
-    assert_eq!(balance, U256::from(amount));
+    assert_eq!(balance, U256::from(amount.into_u128()));
 }
 
 #[test]
@@ -390,7 +390,7 @@ fn test_transfer_erc20_token() {
 // Note: `AuroraRunner` is not suitable for these tests because
 // it does not execute promises; but `near-sdk-sim` does.
 mod sim_tests {
-    use crate::prelude::{types::Wei, Address, WeiU256, U256};
+    use crate::prelude::{types::wei::Wei, Address, WeiU256, U256};
     use crate::test_utils;
     use crate::test_utils::erc20::{ERC20Constructor, ERC20};
     use crate::test_utils::exit_precompile::TesterConstructor;
