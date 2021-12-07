@@ -161,7 +161,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             return Err(error::DepositError::CustodianAddressMismatch);
         }
 
-        if event.fee.into_u128() >= event.amount {
+        if Balance::new(event.fee.into_u128()) >= event.amount {
             return Err(error::DepositError::InsufficientAmountForFee);
         }
 
@@ -180,7 +180,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: self.contract.prover_account.clone(),
             method: "verify_log_entry".to_string(),
             args: proof_to_verify,
-            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_balance: ZERO_ATTACHED_BALANCE.into_u128(),
             attached_gas: GAS_FOR_VERIFY_LOG_ENTRY.into_u64(),
         };
 
@@ -232,7 +232,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: current_account_id,
             method: "finish_deposit".to_string(),
             args: data,
-            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_balance: ZERO_ATTACHED_BALANCE.into_u128(),
             attached_gas: GAS_FOR_FINISH_DEPOSIT.into_u64(),
         };
         Ok(PromiseWithCallbackArgs {
@@ -273,9 +273,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Mint - calculate new balances
             self.mint_eth_on_near(
                 data.new_owner_id.clone(),
-                data.amount - data.fee.into_u128(),
+                data.amount - Balance::new(data.fee.into_u128()),
             )?;
-            self.mint_eth_on_near(data.relayer_id, data.fee.into_u128())?;
+            self.mint_eth_on_near(data.relayer_id, Balance::new(data.fee.into_u128()))?;
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key)?;
             // Save new contract data
@@ -316,7 +316,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         sdk::log!(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
 
         if self.ft.get_account_eth_balance(&owner_id).is_none() {
-            self.ft.accounts_insert(&owner_id, 0);
+            self.ft.accounts_insert(&owner_id, ZERO_BALANCE);
         }
         self.ft.internal_deposit_eth_to_near(&owner_id, amount)
     }
@@ -485,7 +485,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
                 .map_err(error::FtTransferCallError::MessageParseFailed)?;
             // Check is transfer amount > fee
-            if message_data.fee.into_u128() >= args.amount {
+            if message_data.fee.into_u128() >= args.amount.into_u128() {
                 return Err(error::FtTransferCallError::InsufficientAmountForFee);
             }
 
@@ -596,11 +596,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .map_err(error::FtTransferCallError::MessageParseFailed)?;
 
         // Special case when predecessor_account_id is current_account_id
-        let fee = message_data.fee.into_u128();
+        let fee = Balance::new(message_data.fee.into_u128());
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (fee, relayer) {
-            (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
+            (fee, Some(H160(evm_relayer_address))) if fee > ZERO_BALANCE => {
                 self.mint_eth_on_aurora(message_data.recipient, args.amount - fee)?;
                 self.mint_eth_on_aurora(evm_relayer_address, fee)?;
             }
