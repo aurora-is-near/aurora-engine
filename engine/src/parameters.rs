@@ -247,7 +247,7 @@ impl TryFrom<JsonValue> for NEP141FtOnTransferArgs {
         Ok(Self {
             sender_id: AccountId::try_from(value.string("sender_id")?)
                 .map_err(|_| JsonError::InvalidString)?,
-            amount: value.u128("amount")?,
+            amount: Balance::new(value.u128("amount")?),
             msg: value.string("msg")?,
         })
     }
@@ -370,7 +370,7 @@ impl TryFrom<JsonValue> for TransferCallCallArgs {
 
     fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
         let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
-        let amount = v.u128("amount")?;
+        let amount = Balance::new(v.u128("amount")?);
         let memo = v.string("memo").ok();
         let msg = v.string("msg")?;
         Ok(Self {
@@ -443,7 +443,7 @@ impl TryFrom<JsonValue> for TransferCallArgs {
     fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
         Ok(Self {
             receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: v.u128("amount")?,
+            amount: Balance::new(v.u128("amount")?),
             memo: v.string("memo").ok(),
         })
     }
@@ -487,7 +487,7 @@ impl TryFrom<JsonValue> for ResolveTransferCallArgs {
         Ok(Self {
             sender_id: AccountId::try_from(v.string("sender_id")?)?,
             receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: v.u128("amount")?,
+            amount: Balance::new(v.u128("amount")?),
         })
     }
 }

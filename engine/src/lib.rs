@@ -77,11 +77,11 @@ mod contract {
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
+    use crate::prelude::account_id::AccountId;
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::Runtime;
     use aurora_engine_sdk::promise::PromiseHandler;
-    use aurora_engine_types::account_id::AccountId;
 
     use crate::json::parse_json;
     use crate::prelude::parameters::RefundCallArgs;
@@ -91,7 +91,7 @@ mod contract {
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::wei::Wei;
     use crate::prelude::{
-        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec,
+        sdk, u256_to_arr, vec, Address, Balance, PromiseResult, ToString, TryFrom, TryInto, Vec,
         ERC20_MINT_SELECTOR, ERR_FAILED_PARSE, H256, U256,
     };
 
@@ -722,7 +722,7 @@ mod contract {
         let mut io = Runtime;
         let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
         let predecessor_account_id = io.predecessor_account_id();
-        let amount = io.attached_deposit();
+        let amount = Balance::new(io.attached_deposit());
         let maybe_promise = EthConnectorContract::init_instance(io)
             .storage_deposit(predecessor_account_id, amount, args)
             .sdk_unwrap();
