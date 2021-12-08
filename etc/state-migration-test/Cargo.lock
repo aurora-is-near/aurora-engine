@@ -72,7 +72,6 @@ dependencies = [
  "base64",
  "blake2",
  "borsh",
- "byte-slice-cast",
  "ethabi",
  "evm",
  "evm-core",

@@ -7,6 +7,7 @@ use crate::prelude::{
     String, ToString, TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
+use aurora_engine_types::types::Fee;
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -160,12 +161,12 @@ impl CallArgs {
         // made for flexibility and extensibility.
         if let Ok(value) = Self::try_from_slice(bytes) {
             Some(value)
-        // Fallback, for handling old input format,
-        // i.e. input, formed as a raw (not wrapped into call args enum) data structure with legacy arguments,
-        // made for backward compatibility.
+            // Fallback, for handling old input format,
+            // i.e. input, formed as a raw (not wrapped into call args enum) data structure with legacy arguments,
+            // made for backward compatibility.
         } else if let Ok(value) = FunctionCallArgsV1::try_from_slice(bytes) {
             Some(Self::V1(value))
-        // Dealing with unrecognized input should be handled and result as an exception in a call site.
+            // Dealing with unrecognized input should be handled and result as an exception in a call site.
         } else {
             None
         }
@@ -324,7 +325,7 @@ pub struct FinishDepositCallArgs {
     pub amount: Balance,
     pub proof_key: String,
     pub relayer_id: AccountId,
-    pub fee: Balance,
+    pub fee: Fee,
     pub msg: Option<Vec<u8>>,
 }
 
@@ -500,16 +501,19 @@ pub mod error {
         Json(JsonError),
         InvalidAccount(ParseAccountError),
     }
+
     impl From<JsonError> for ParseTypeFromJsonError {
         fn from(e: JsonError) -> Self {
             Self::Json(e)
         }
     }
+
     impl From<ParseAccountError> for ParseTypeFromJsonError {
         fn from(e: ParseAccountError) -> Self {
             Self::InvalidAccount(e)
         }
     }
+
     impl AsRef<[u8]> for ParseTypeFromJsonError {
         fn as_ref(&self) -> &[u8] {
             match self {

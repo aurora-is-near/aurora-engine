@@ -218,7 +218,7 @@ mod test {
                 .unwrap();
             let mut io = storage.access_engine_storage_at_position(block_height, 0, &[]);
             engine::set_state(&mut io, engine_state.clone());
-            connector::EthConnectorContract::init_contract(
+            connector::EthConnectorContract::create_contract(
                 io,
                 engine_state.owner_id.clone(),
                 parameters::InitCallArgs {

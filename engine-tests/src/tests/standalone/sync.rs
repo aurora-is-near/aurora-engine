@@ -1,4 +1,6 @@
+use aurora_engine::deposit_event::TokenMessageData;
 use aurora_engine_sdk::env::{Env, Timestamp};
+use aurora_engine_types::types::Fee;
 use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
 use borsh::BorshSerialize;
 use engine_standalone_storage::sync;
@@ -331,12 +333,19 @@ fn test_consume_submit_message() {
 
 fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine::proof::Proof {
     let eth_custodian_address = test_utils::standalone::mocks::ETH_CUSTODIAN_ADDRESS;
+
+    let fee = Fee::new(0);
+    let message = ["aurora", ":", hex::encode(&recipient_address).as_str()].concat();
+    let token_message_data: TokenMessageData =
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+            .unwrap();
+
     let deposit_event = aurora_engine::deposit_event::DepositedEvent {
         eth_custodian_address: eth_custodian_address.0,
         sender: [0u8; 20],
-        recipient: ["aurora", ":", hex::encode(&recipient_address).as_str()].concat(),
-        amount: deposit_amount.raw(),
-        fee: U256::zero(),
+        token_message_data,
+        amount: deposit_amount.raw().as_u128(),
+        fee,
     };
 
     let event_schema = ethabi::Event {
@@ -352,9 +361,9 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
             crate::prelude::H256::zero(),
         ],
         data: ethabi::encode(&[
-            ethabi::Token::String(deposit_event.recipient),
-            ethabi::Token::Uint(deposit_event.amount),
-            ethabi::Token::Uint(deposit_event.fee),
+            ethabi::Token::String(message),
+            ethabi::Token::Uint(U256::from(deposit_event.amount)),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.into_u128())),
         ]),
     };
     aurora_engine::proof::Proof {

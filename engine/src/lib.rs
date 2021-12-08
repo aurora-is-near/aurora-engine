@@ -336,7 +336,7 @@ mod contract {
             .sdk_unwrap();
 
         if predecessor_account_id == current_account_id {
-            EthConnectorContract::get_instance(io)
+            EthConnectorContract::init_instance(io)
                 .ft_on_transfer(&engine, &args)
                 .sdk_unwrap();
         } else {
@@ -439,6 +439,7 @@ mod contract {
             }
         }
     }
+
     ///
     /// NONMUTATIVE METHODS
     ///
@@ -548,7 +549,7 @@ mod contract {
         let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
         let owner_id = io.current_account_id();
 
-        EthConnectorContract::init_contract(io, owner_id, args).sdk_unwrap();
+        EthConnectorContract::create_contract(io, owner_id, args).sdk_unwrap();
     }
 
     #[no_mangle]
@@ -568,7 +569,7 @@ mod contract {
         let args = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let result = EthConnectorContract::get_instance(io)
+        let result = EthConnectorContract::init_instance(io)
             .withdraw_eth_from_near(&current_account_id, &predecessor_account_id, args)
             .sdk_unwrap();
         let result_bytes = result.try_to_vec().sdk_expect("ERR_SERIALIZE");
@@ -581,7 +582,7 @@ mod contract {
         let raw_proof = io.read_input().to_vec();
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let promise_args = EthConnectorContract::get_instance(io)
+        let promise_args = EthConnectorContract::init_instance(io)
             .deposit(raw_proof, current_account_id, predecessor_account_id)
             .sdk_unwrap();
         let promise_id = io.promise_crate_with_callback(&promise_args);
@@ -610,7 +611,7 @@ mod contract {
         let data = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let maybe_promise_args = EthConnectorContract::get_instance(io)
+        let maybe_promise_args = EthConnectorContract::init_instance(io)
             .finish_deposit(predecessor_account_id, current_account_id, data)
             .sdk_unwrap();
 
@@ -625,7 +626,7 @@ mod contract {
         let mut io = Runtime;
         let args: IsUsedProofCallArgs = io.read_input_borsh().sdk_unwrap();
 
-        let is_used_proof = EthConnectorContract::get_instance(io).is_used_proof(args.proof);
+        let is_used_proof = EthConnectorContract::init_instance(io).is_used_proof(args.proof);
         let res = is_used_proof.try_to_vec().unwrap();
         io.return_output(&res[..]);
     }
@@ -633,19 +634,19 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_total_supply() {
         let io = Runtime;
-        EthConnectorContract::get_instance(io).ft_total_eth_supply_on_near();
+        EthConnectorContract::init_instance(io).ft_total_eth_supply_on_near();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_near() {
         let io = Runtime;
-        EthConnectorContract::get_instance(io).ft_total_eth_supply_on_near();
+        EthConnectorContract::init_instance(io).ft_total_eth_supply_on_near();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_aurora() {
         let io = Runtime;
-        EthConnectorContract::get_instance(io).ft_total_eth_supply_on_aurora();
+        EthConnectorContract::init_instance(io).ft_total_eth_supply_on_aurora();
     }
 
     #[no_mangle]
@@ -655,14 +656,16 @@ mod contract {
             parse_json(&io.read_input().to_vec()).sdk_unwrap(),
         )
         .sdk_unwrap();
-        EthConnectorContract::get_instance(io).ft_balance_of(args);
+        EthConnectorContract::init_instance(io).ft_balance_of(args);
     }
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
         let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
-        EthConnectorContract::get_instance(io).ft_balance_of_eth_on_aurora(args);
+        EthConnectorContract::init_instance(io)
+            .ft_balance_of_eth_on_aurora(args)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
@@ -674,7 +677,7 @@ mod contract {
             parse_json(&io.read_input().to_vec()).sdk_unwrap(),
         )
         .sdk_unwrap();
-        EthConnectorContract::get_instance(io)
+        EthConnectorContract::init_instance(io)
             .ft_transfer(&predecessor_account_id, args)
             .sdk_unwrap();
     }
@@ -691,7 +694,7 @@ mod contract {
         let args: ResolveTransferCallArgs = io.read_input().to_value().sdk_unwrap();
         let promise_result = io.promise_result(0).sdk_unwrap();
 
-        EthConnectorContract::get_instance(io).ft_resolve_transfer(args, promise_result);
+        EthConnectorContract::init_instance(io).ft_resolve_transfer(args, promise_result);
     }
 
     #[no_mangle]
@@ -707,7 +710,7 @@ mod contract {
         .sdk_unwrap();
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let promise_args = EthConnectorContract::get_instance(io)
+        let promise_args = EthConnectorContract::init_instance(io)
             .ft_transfer_call(predecessor_account_id, current_account_id, args)
             .sdk_unwrap();
         let promise_id = io.promise_crate_with_callback(&promise_args);
@@ -720,7 +723,7 @@ mod contract {
         let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
         let predecessor_account_id = io.predecessor_account_id();
         let amount = io.attached_deposit();
-        let maybe_promise = EthConnectorContract::get_instance(io)
+        let maybe_promise = EthConnectorContract::init_instance(io)
             .storage_deposit(predecessor_account_id, amount, args)
             .sdk_unwrap();
         if let Some(promise) = maybe_promise {
@@ -734,7 +737,7 @@ mod contract {
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
         let force = parse_json(&io.read_input().to_vec()).and_then(|args| args.bool("force").ok());
-        let maybe_promise = EthConnectorContract::get_instance(io)
+        let maybe_promise = EthConnectorContract::init_instance(io)
             .storage_unregister(predecessor_account_id, force)
             .sdk_unwrap();
         if let Some(promise) = maybe_promise {
@@ -749,7 +752,7 @@ mod contract {
         let args =
             StorageWithdrawCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
         let predecessor_account_id = io.predecessor_account_id();
-        EthConnectorContract::get_instance(io)
+        EthConnectorContract::init_instance(io)
             .storage_withdraw(&predecessor_account_id, args)
             .sdk_unwrap()
     }
@@ -761,13 +764,13 @@ mod contract {
             parse_json(&io.read_input().to_vec()).sdk_unwrap(),
         )
         .sdk_unwrap();
-        EthConnectorContract::get_instance(io).storage_balance_of(args)
+        EthConnectorContract::init_instance(io).storage_balance_of(args)
     }
 
     #[no_mangle]
     pub extern "C" fn get_paused_flags() {
         let mut io = Runtime;
-        let paused_flags = EthConnectorContract::get_instance(io).get_paused_flags();
+        let paused_flags = EthConnectorContract::init_instance(io).get_paused_flags();
         let data = paused_flags.try_to_vec().expect(ERR_FAILED_PARSE);
         io.return_output(&data[..]);
     }
@@ -778,13 +781,13 @@ mod contract {
         io.assert_private_call().sdk_unwrap();
 
         let args: PauseEthConnectorCallArgs = io.read_input_borsh().sdk_unwrap();
-        EthConnectorContract::get_instance(io).set_paused_flags(args);
+        EthConnectorContract::init_instance(io).set_paused_flags(args);
     }
 
     #[no_mangle]
     pub extern "C" fn get_accounts_counter() {
         let io = Runtime;
-        EthConnectorContract::get_instance(io).get_accounts_counter();
+        EthConnectorContract::init_instance(io).get_accounts_counter();
     }
 
     #[no_mangle]
@@ -861,7 +864,7 @@ mod contract {
             amount: balance.low_u128(),
             proof_key: crate::prelude::String::new(),
             relayer_id: aurora_account_id.clone(),
-            fee: 0,
+            fee: 0.into(),
             msg: None,
         };
         let verify_call = aurora_engine_types::parameters::PromiseCreateArgs {

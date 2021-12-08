@@ -107,7 +107,7 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                         engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
                     if env.predecessor_account_id == env.current_account_id {
-                        connector::EthConnectorContract::get_instance(io)
+                        connector::EthConnectorContract::init_instance(io)
                             .ft_on_transfer(&engine, &args)?;
                     } else {
                         engine.receive_erc20_tokens(
@@ -123,7 +123,7 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                 }
 
                 TransactionKind::Deposit(raw_proof) => {
-                    let mut connector_contract = connector::EthConnectorContract::get_instance(io);
+                    let mut connector_contract = connector::EthConnectorContract::init_instance(io);
                     let promise_args = connector_contract.deposit(
                         raw_proof,
                         env.current_account_id(),

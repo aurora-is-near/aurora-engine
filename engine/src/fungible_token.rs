@@ -1,17 +1,15 @@
-use crate::connector::NO_DEPOSIT;
+use crate::connector::ZERO_ATTACHED_BALANCE;
 use crate::engine;
 use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress,
-    NearGas, PromiseResult, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
+    NearGas, PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult,
+    PromiseWithCallbackArgs, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
     Wei, U256,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::parameters::{
-    PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
-};
 
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
 const GAS_FOR_FT_ON_TRANSFER: NearGas = NearGas::new(10_000_000_000_000);
@@ -52,6 +50,24 @@ pub struct FungibleTokenOps<I: IO> {
     io: I,
 }
 
+/// Fungible token Reference hash type.
+/// Used for FungibleTokenMetadata
+#[derive(BorshDeserialize, BorshSerialize, Clone)]
+pub struct FungibleReferenceHash([u8; 32]);
+
+impl FungibleReferenceHash {
+    /// Encode to base64-encoded string
+    pub fn encode(&self) -> String {
+        base64::encode(self)
+    }
+}
+
+impl AsRef<[u8]> for FungibleReferenceHash {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
 pub struct FungibleTokenMetadata {
     pub spec: String,
@@ -59,7 +75,7 @@ pub struct FungibleTokenMetadata {
     pub symbol: String,
     pub icon: Option<String>,
     pub reference: Option<String>,
-    pub reference_hash: Option<[u8; 32]>,
+    pub reference_hash: Option<FungibleReferenceHash>,
     pub decimals: u8,
 }
 
@@ -101,7 +117,7 @@ impl From<FungibleTokenMetadata> for JsonValue {
             "reference_hash".to_string(),
             metadata
                 .reference_hash
-                .map(|hash| JsonValue::String(base64::encode(hash)))
+                .map(|hash| JsonValue::String(hash.encode()))
                 .unwrap_or(JsonValue::Null),
         );
         kvs.insert(
@@ -127,10 +143,11 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     /// Balance of ETH (ETH on Aurora)
-    pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Balance {
-        engine::get_balance(&self.io, &Address(address))
-            .raw()
-            .as_u128()
+    pub fn internal_unwrap_balance_of_eth_on_aurora(
+        &self,
+        address: EthAddress,
+    ) -> Result<Balance, crate::prelude::types::error::BalanceOverflowError> {
+        engine::get_balance(&self.io, &Address(address)).try_into_u128()
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
@@ -157,7 +174,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         address: EthAddress,
         amount: Balance,
     ) -> Result<(), error::DepositError> {
-        let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
+        let balance = self
+            .internal_unwrap_balance_of_eth_on_aurora(address)
+            .map_err(|_| error::DepositError::BalanceOverflow)?;
         let new_balance = balance
             .checked_add(amount)
             .ok_or(error::DepositError::BalanceOverflow)?;
@@ -197,7 +216,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         address: EthAddress,
         amount: Balance,
     ) -> Result<(), error::WithdrawError> {
-        let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
+        let balance = self
+            .internal_unwrap_balance_of_eth_on_aurora(address)
+            .map_err(error::WithdrawError::BalanceOverflow)?;
         let new_balance = balance
             .checked_sub(amount)
             .ok_or(error::WithdrawError::InsufficientFunds)?;
@@ -227,8 +248,12 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         if amount == 0 {
             return Err(error::TransferError::ZeroAmount);
         }
+
+        // Check is account receiver_id exist
         if !self.accounts_contains_key(receiver_id) {
-            // TODO: how does this interact with the storage deposit concept?
+            // Register receiver_id account with 0 balance. We need it because
+            // when we retire to get the balance of `receiver_id` it will fail
+            // if it does not exist.
             self.internal_register_account(receiver_id)
         }
         self.internal_withdraw_eth_from_near(sender_id, amount)?;
@@ -250,15 +275,15 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         self.accounts_insert(account_id, 0)
     }
 
-    pub fn ft_total_eth_supply_on_near(&self) -> u128 {
+    pub fn ft_total_eth_supply_on_near(&self) -> Balance {
         self.total_eth_supply_on_near
     }
 
-    pub fn ft_total_eth_supply_on_aurora(&self) -> u128 {
+    pub fn ft_total_eth_supply_on_aurora(&self) -> Balance {
         self.total_eth_supply_on_aurora
     }
 
-    pub fn ft_balance_of(&self, account_id: &AccountId) -> u128 {
+    pub fn ft_balance_of(&self, account_id: &AccountId) -> Balance {
         self.get_account_eth_balance(account_id).unwrap_or(0)
     }
 
@@ -295,14 +320,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             target_account_id: receiver_id,
             method: "ft_on_transfer".to_string(),
             args: data1.into_bytes(),
-            attached_balance: NO_DEPOSIT,
+            attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FT_ON_TRANSFER.into_u64(),
         };
         let ft_resolve_transfer_call = PromiseCreateArgs {
             target_account_id: current_account_id,
             method: "ft_resolve_transfer".to_string(),
             args: data2,
-            attached_balance: NO_DEPOSIT,
+            attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_RESOLVE_TRANSFER.into_u64(),
         };
         Ok(PromiseWithCallbackArgs {
@@ -317,7 +342,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         sender_id: &AccountId,
         receiver_id: &AccountId,
         amount: Balance,
-    ) -> (u128, u128) {
+    ) -> (Balance, Balance) {
         // Get the unused amount from the `ft_on_transfer` call result.
         let unused_amount = match promise_result {
             PromiseResult::NotReady => unreachable!(),
@@ -382,8 +407,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         promise_result: PromiseResult,
         sender_id: &AccountId,
         receiver_id: &AccountId,
-        amount: u128,
-    ) -> u128 {
+        amount: Balance,
+    ) -> Balance {
         self.internal_ft_resolve_transfer(promise_result, sender_id, receiver_id, amount)
             .0
     }
@@ -567,6 +592,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 }
 
 pub mod error {
+    use crate::prelude::types::error::BalanceOverflowError;
+
     const TOTAL_SUPPLY_OVERFLOW: &[u8; 25] = b"ERR_TOTAL_SUPPLY_OVERFLOW";
     const BALANCE_OVERFLOW: &[u8; 20] = b"ERR_BALANCE_OVERFLOW";
     const NOT_ENOUGH_BALANCE: &[u8; 22] = b"ERR_NOT_ENOUGH_BALANCE";
@@ -579,6 +606,7 @@ pub mod error {
         TotalSupplyOverflow,
         BalanceOverflow,
     }
+
     impl AsRef<[u8]> for DepositError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -592,12 +620,15 @@ pub mod error {
     pub enum WithdrawError {
         TotalSupplyUnderflow,
         InsufficientFunds,
+        BalanceOverflow(BalanceOverflowError),
     }
+
     impl AsRef<[u8]> for WithdrawError {
         fn as_ref(&self) -> &[u8] {
             match self {
                 Self::TotalSupplyUnderflow => TOTAL_SUPPLY_UNDERFLOW,
                 Self::InsufficientFunds => NOT_ENOUGH_BALANCE,
+                Self::BalanceOverflow(e) => e.as_ref(),
             }
         }
     }
@@ -611,6 +642,7 @@ pub mod error {
         ZeroAmount,
         SelfTransfer,
     }
+
     impl AsRef<[u8]> for TransferError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -629,9 +661,11 @@ pub mod error {
             match err {
                 WithdrawError::InsufficientFunds => Self::InsufficientFunds,
                 WithdrawError::TotalSupplyUnderflow => Self::TotalSupplyUnderflow,
+                WithdrawError::BalanceOverflow(_) => Self::BalanceOverflow,
             }
         }
     }
+
     impl From<DepositError> for TransferError {
         fn from(err: DepositError) -> Self {
             match err {
@@ -648,6 +682,7 @@ pub mod error {
         InsufficientDeposit,
         UnRegisterPositiveBalance,
     }
+
     impl AsRef<[u8]> for StorageFundingError {
         fn as_ref(&self) -> &[u8] {
             match self {

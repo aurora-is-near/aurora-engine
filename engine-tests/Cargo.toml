@@ -20,7 +20,6 @@ aurora-engine-precompiles = { path = "../engine-precompiles", default-features =
 engine-standalone-storage = { path = "../engine-standalone-storage", default-features = false }
 engine-standalone-tracing = { path = "../engine-standalone-tracing", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
-byte-slice-cast = { version = "1.0", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false, features = ["std", "tracing"] }
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false, features = ["std", "tracing"] }
@@ -30,6 +29,7 @@ rlp = { version = "0.5.0", default-features = false }
 [dev-dependencies]
 base64 = "0.13.0"
 bstr = "0.2"
+byte-slice-cast = { version = "1.0", default-features = false }
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

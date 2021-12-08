@@ -3,10 +3,14 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::fmt::Formatter;
 
+// TODO: introduce new Balance type for more strict typing
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
-pub type RawU256 = [u8; 32]; // Big-endian large integer type.
+pub type RawU256 = [u8; 32];
+// Big-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
+
+// TODO: introduce new type. Add encode/decode/validation methods
 pub type EthAddress = [u8; 20];
 pub type StorageUsage = u64;
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
@@ -104,6 +108,44 @@ impl Mul<EthGas> for u64 {
     }
 }
 
+#[derive(
+    Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
+)]
+/// Engine `fee` type which wraps an underlying u128.
+pub struct Fee(u128);
+
+impl Display for Fee {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Fee {
+    /// Constructs a new `Fee` with a given u128 value.
+    pub const fn new(fee: u128) -> Fee {
+        Self(fee)
+    }
+
+    /// Consumes `Fee` and returns the underlying type.
+    pub fn into_u128(self) -> u128 {
+        self.0
+    }
+}
+
+impl Add<Fee> for Fee {
+    type Output = Fee;
+
+    fn add(self, rhs: Fee) -> Self::Output {
+        Fee(self.0 + rhs.0)
+    }
+}
+
+impl From<u128> for Fee {
+    fn from(fee: u128) -> Self {
+        Self(fee)
+    }
+}
+
 /// Selector to call mint function in ERC 20 contract
 ///
 /// keccak("mint(address,uint256)".as_bytes())[..4];
@@ -125,7 +167,7 @@ impl AsRef<[u8]> for AddressValidationError {
     }
 }
 
-/// Validate Etherium address from string and return EthAddress
+/// Validate Ethereum address from string and return Result data EthAddress or Error data
 pub fn validate_eth_address(address: String) -> Result<EthAddress, AddressValidationError> {
     let data = hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
     if data.len() != 20 {
@@ -183,6 +225,13 @@ impl Wei {
     pub fn checked_add(self, rhs: Self) -> Option<Self> {
         self.0.checked_add(rhs.0).map(Self)
     }
+
+    /// Try convert U256 to u128 with checking overflow.
+    /// NOTICE: Error can contain only overflow
+    pub fn try_into_u128(self) -> Result<u128, error::BalanceOverflowError> {
+        use crate::TryInto;
+        self.0.try_into().map_err(|_| error::BalanceOverflowError)
+    }
 }
 
 impl Display for Wei {
@@ -214,10 +263,8 @@ impl From<WeiU256> for Wei {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct U128(pub u128);
-
-pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
+pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000;
+// 1e19yN, 0.00001N
 pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
 pub const ERR_INVALID_ETH_ADDRESS: &str = "ERR_INVALID_ETH_ADDRESS";
 
@@ -314,8 +361,29 @@ impl<T> Stack<T> {
         self.stack
     }
 }
+
 pub fn str_from_slice(inp: &[u8]) -> &str {
     str::from_utf8(inp).unwrap()
+}
+
+pub mod error {
+    use crate::{fmt, String};
+
+    #[derive(Eq, Hash, Clone, Debug, PartialEq)]
+    pub struct BalanceOverflowError;
+
+    impl AsRef<[u8]> for BalanceOverflowError {
+        fn as_ref(&self) -> &[u8] {
+            b"ERR_BALANCE_OVERFLOW"
+        }
+    }
+
+    impl fmt::Display for BalanceOverflowError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
+            write!(f, "{}", msg)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -419,5 +487,21 @@ mod tests {
         let eth_amount: u64 = rand::random();
         let wei_amount = U256::from(eth_amount) * U256::from(10).pow(18.into());
         assert_eq!(Wei::from_eth(eth_amount.into()), Some(Wei::new(wei_amount)));
+    }
+
+    #[test]
+    fn test_fee_add() {
+        let fee = Fee::new(100);
+        assert_eq!(fee + fee, Fee::new(200));
+        assert_eq!(fee.add(200.into()), Fee::new(300));
+    }
+
+    #[test]
+    fn test_fee_from() {
+        let fee = Fee::new(100);
+        let fee2 = Fee::from(100u128);
+        assert_eq!(fee, fee2);
+        let res: u128 = fee.into_u128();
+        assert_eq!(res, 100);
     }
 }

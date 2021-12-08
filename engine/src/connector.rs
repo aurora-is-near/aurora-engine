@@ -1,5 +1,5 @@
 use crate::admin_controlled::{AdminControlled, PausedMask};
-use crate::deposit_event::DepositedEvent;
+use crate::deposit_event::{DepositedEvent, FtTransferMessageData, TokenMessageData};
 use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
@@ -10,27 +10,38 @@ use crate::parameters::{
 };
 use crate::prelude::{
     format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
-    BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, String,
-    ToString, TryFrom, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160, U256,
+    BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString,
+    Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
+};
+use crate::prelude::{
+    AddressValidationError, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
 };
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::parameters::{
-    PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
-};
-use aurora_engine_types::types::AddressValidationError;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
-pub const NO_DEPOSIT: Balance = 0;
+/// Indicate zero attached balance for promise call
+pub const ZERO_ATTACHED_BALANCE: Balance = 0;
+/// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
 const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
+/// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
 // Note: Is 40Tgas always enough?
 const GAS_FOR_VERIFY_LOG_ENTRY: NearGas = NearGas::new(40_000_000_000_000);
 
+/// Admin control flow flag indicates that all control flow unpause (unblocked).
 pub const UNPAUSE_ALL: PausedMask = 0;
+/// Admin control flow flag indicates that the deposit is paused.
 pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
+/// Admin control flow flag indicates that withdrawal is paused.
 pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 
+/// Eth-connector contract data. It's stored in the storage.
+/// Contains:
+/// * connector specific data
+/// * Fungible token data
+/// * paused_mask - admin control flow data
+/// * io - I/O trait handler
 pub struct EthConnectorContract<I: IO> {
     contract: EthConnector,
     ft: FungibleTokenOps<I>,
@@ -38,33 +49,20 @@ pub struct EthConnectorContract<I: IO> {
     io: I,
 }
 
-/// eth-connector specific data
+/// Connector specific data. It always should contain `prover account` -
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnector {
+    /// It used in the Deposit flow, to verify log entry form incoming proof.
     pub prover_account: AccountId,
+    /// It is Eth address, used in the Deposit and Withdraw logic.
     pub eth_custodian_address: EthAddress,
 }
 
-/// Token message data
-#[derive(BorshSerialize, BorshDeserialize)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
-pub enum TokenMessageData {
-    Near(AccountId),
-    Eth {
-        receiver_id: AccountId,
-        message: String,
-    },
-}
-
-/// On-transfer message
-pub struct OnTransferMessageData {
-    pub relayer: AccountId,
-    pub recipient: EthAddress,
-    pub fee: U256,
-}
-
 impl<I: IO + Copy> EthConnectorContract<I> {
-    pub fn get_instance(io: I) -> Self {
+    /// Init Eth-connector contract instance.
+    /// Load contract data from storage and init I/O handler.
+    /// Used as single point of contract access for various contract actions
+    pub fn init_instance(io: I) -> Self {
         Self {
             contract: get_contract_data(&io, &EthConnectorStorageId::Contract),
             ft: get_contract_data::<FungibleToken, I>(&io, &EthConnectorStorageId::FungibleToken)
@@ -74,8 +72,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Init eth-connector contract specific data
-    pub fn init_contract(
+    /// Create contract data - init eth-connector contract specific data.
+    /// Used only once for first time initialization.
+    /// Initialized contract data stored in the storage.
+    pub fn create_contract(
         mut io: I,
         owner_id: AccountId,
         args: InitCallArgs,
@@ -120,80 +120,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
-    /// Parse event message data for tokens
-    fn parse_event_message(
-        &self,
-        message: &str,
-    ) -> Result<TokenMessageData, error::ParseEventMessageError> {
-        let data: Vec<_> = message.split(':').collect();
-        if data.len() >= 3 {
-            return Err(error::ParseEventMessageError::TooManyParts);
-        }
-        let account_id = AccountId::try_from(data[0].as_bytes())
-            .map_err(|_| error::ParseEventMessageError::InvalidAccount)?;
-        if data.len() == 1 {
-            Ok(TokenMessageData::Near(account_id))
-        } else {
-            Ok(TokenMessageData::Eth {
-                receiver_id: account_id,
-                message: data[1].into(),
-            })
-        }
-    }
-
-    /// Get on-transfer data from message
-    fn parse_on_transfer_message(
-        &self,
-        message: &str,
-    ) -> Result<OnTransferMessageData, error::ParseOnTransferMessageError> {
-        let data: Vec<_> = message.split(':').collect();
-        if data.len() != 2 {
-            return Err(error::ParseOnTransferMessageError::TooManyParts);
-        }
-
-        let msg =
-            hex::decode(data[1]).map_err(|_| error::ParseOnTransferMessageError::InvalidHexData)?;
-        let mut fee: [u8; 32] = Default::default();
-        if msg.len() != 52 {
-            return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
-        }
-        fee.copy_from_slice(&msg[..32]);
-        let mut recipient: EthAddress = Default::default();
-        recipient.copy_from_slice(&msg[32..52]);
-        // Check account
-        let account_id = AccountId::try_from(data[0].as_bytes())
-            .map_err(|_| error::ParseOnTransferMessageError::InvalidAccount)?;
-        Ok(OnTransferMessageData {
-            relayer: account_id,
-            recipient,
-            fee: U256::from_little_endian(&fee[..]),
-        })
-    }
-
-    /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
-    fn prepare_message_for_on_transfer(
-        &self,
-        relayer_account_id: &AccountId,
-        fee: U256,
-        message: String,
-    ) -> Result<String, AddressValidationError> {
-        use byte_slice_cast::AsByteSlice;
-
-        let mut data = fee.as_byte_slice().to_vec();
-        let address = if message.len() == 42 {
-            message
-                .strip_prefix("0x")
-                .ok_or(AddressValidationError::FailedDecodeHex)?
-                .to_string()
-        } else {
-            message
-        };
-        let address_bytes =
-            hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
-        data.extend(address_bytes);
-        Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
-    }
-
     /// Deposit all types of tokens
     pub fn deposit(
         &self,
@@ -201,7 +127,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         current_account_id: AccountId,
         predecessor_account_id: AccountId,
     ) -> Result<PromiseWithCallbackArgs, error::DepositError> {
+        // Check is current account owner
         let is_owner = current_account_id == predecessor_account_id;
+        // Check is current flow paused. If it's owner account just skip it.
         self.assert_not_paused(PAUSE_DEPOSIT, is_owner)
             .map_err(|_| error::DepositError::Paused)?;
 
@@ -217,9 +145,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         sdk::log!(&format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
             hex::encode(event.sender),
-            event.recipient,
-            event.amount.as_u128(),
-            event.fee.as_u128()
+            event.token_message_data.get_recipient(),
+            event.amount,
+            event.fee
         ));
 
         sdk::log!(&format!(
@@ -232,7 +160,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             return Err(error::DepositError::CustodianAddressMismatch);
         }
 
-        if event.fee >= event.amount {
+        if event.fee.into_u128() >= event.amount {
             return Err(error::DepositError::InsufficientAmountForFee);
         }
 
@@ -251,19 +179,19 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: self.contract.prover_account.clone(),
             method: "verify_log_entry".to_string(),
             args: proof_to_verify,
-            attached_balance: NO_DEPOSIT,
+            attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_VERIFY_LOG_ENTRY.into_u64(),
         };
 
         // Finalize deposit
-        let data = match self.parse_event_message(&event.recipient)? {
+        let data = match event.token_message_data {
             // Deposit to NEAR accounts
             TokenMessageData::Near(account_id) => FinishDepositCallArgs {
                 new_owner_id: account_id,
-                amount: event.amount.as_u128(),
+                amount: event.amount,
                 proof_key: proof.get_key(),
                 relayer_id: predecessor_account_id,
-                fee: event.fee.as_u128(),
+                fee: event.fee,
                 msg: None,
             }
             .try_to_vec()
@@ -278,15 +206,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 // address - is NEAR account
                 let transfer_data = TransferCallCallArgs {
                     receiver_id,
-                    amount: event.amount.as_u128(),
+                    amount: event.amount,
                     memo: None,
-                    msg: self
-                        .prepare_message_for_on_transfer(
-                            &predecessor_account_id,
-                            event.fee,
-                            message,
-                        )
-                        .map_err(error::DepositError::InvalidAddress)?,
+                    msg: message.encode(),
                 }
                 .try_to_vec()
                 .unwrap();
@@ -294,10 +216,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 // Send to self - current account id
                 FinishDepositCallArgs {
                     new_owner_id: current_account_id.clone(),
-                    amount: event.amount.as_u128(),
+                    amount: event.amount,
                     proof_key: proof.get_key(),
                     relayer_id: predecessor_account_id,
-                    fee: event.fee.as_u128(),
+                    fee: event.fee,
                     msg: Some(transfer_data),
                 }
                 .try_to_vec()
@@ -309,7 +231,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: current_account_id,
             method: "finish_deposit".to_string(),
             args: data,
-            attached_balance: NO_DEPOSIT,
+            attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FINISH_DEPOSIT.into_u64(),
         };
         Ok(PromiseWithCallbackArgs {
@@ -348,8 +270,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             Ok(Some(promise))
         } else {
             // Mint - calculate new balances
-            self.mint_eth_on_near(data.new_owner_id.clone(), data.amount - data.fee)?;
-            self.mint_eth_on_near(data.relayer_id, data.fee)?;
+            self.mint_eth_on_near(
+                data.new_owner_id.clone(),
+                data.amount - data.fee.into_u128(),
+            )?;
+            self.mint_eth_on_near(data.relayer_id, data.fee.into_u128())?;
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key)?;
             // Save new contract data
@@ -362,9 +287,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub(crate) fn internal_remove_eth(
         &mut self,
         address: &Address,
-        amount: &U256,
+        amount: Balance,
     ) -> Result<(), fungible_token::error::WithdrawError> {
-        self.burn_eth_on_aurora(address.0, amount.as_u128())?;
+        self.burn_eth_on_aurora(address.0, amount)?;
         self.save_ft_contract();
         Ok(())
     }
@@ -373,7 +298,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     fn record_proof(&mut self, key: &str) -> Result<(), error::ProofUsed> {
         sdk::log!(&format!("Record proof: {}", key));
 
-        if self.check_used_event(key) {
+        if self.is_used_event(key) {
             return Err(error::ProofUsed);
         }
 
@@ -431,7 +356,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: &AccountId,
         args: WithdrawCallArgs,
     ) -> Result<WithdrawResult, error::WithdrawError> {
+        // Check is current account id is owner
         let is_owner = current_account_id == predecessor_account_id;
+        // Check is current flow paused. If it's owner just skip asserrion.
         self.assert_not_paused(PAUSE_WITHDRAW, is_owner)
             .map_err(|_| error::WithdrawError::Paused)?;
 
@@ -477,10 +404,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
-    pub fn ft_balance_of_eth_on_aurora(&mut self, args: BalanceOfEthCallArgs) {
+    pub fn ft_balance_of_eth_on_aurora(
+        &mut self,
+        args: BalanceOfEthCallArgs,
+    ) -> Result<(), crate::prelude::types::error::BalanceOverflowError> {
         let balance = self
             .ft
-            .internal_unwrap_balance_of_eth_on_aurora(args.address);
+            .internal_unwrap_balance_of_eth_on_aurora(args.address)?;
         sdk::log!(&format!(
             "Balance of ETH [{}]: {}",
             hex::encode(args.address),
@@ -488,6 +418,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         ));
         self.io
             .return_output(format!("\"{}\"", balance.to_string()).as_bytes());
+        Ok(())
     }
 
     /// Transfer between NEAR accounts
@@ -535,6 +466,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// FT transfer call from sender account (invoker account) to receiver
     /// We starting early checking for message data to avoid `ft_on_transfer` call panics
     /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
+    /// We allow empty messages for cases when `receiver_id =! current_account_id`
     pub fn ft_transfer_call(
         &mut self,
         predecessor_account_id: AccountId,
@@ -545,11 +477,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             "Transfer call to {} amount {}",
             args.receiver_id, args.amount,
         ));
+
         // Verify message data before `ft_on_transfer` call to avoid verification panics
+        // It's allowed empty message if `receiver_id =! current_account_id`
         if args.receiver_id == current_account_id {
-            let message_data = self.parse_on_transfer_message(&args.msg)?;
+            let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
+                .map_err(error::FtTransferCallError::MessageParseFailed)?;
             // Check is transfer amount > fee
-            if message_data.fee.as_u128() >= args.amount {
+            if message_data.fee.into_u128() >= args.amount {
                 return Err(error::FtTransferCallError::InsufficientAmountForFee);
             }
 
@@ -558,7 +493,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Note: It can't overflow because the total supply doesn't change during transfer.
             let amount_for_check = self
                 .ft
-                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
+                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient)
+                .map_err(error::FtTransferCallError::BalanceOverflow)?;
             if amount_for_check.checked_add(args.amount).is_none() {
                 return Err(error::FtTransferCallError::Transfer(
                     fungible_token::error::TransferError::BalanceOverflow,
@@ -655,10 +591,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
         // Parse message with specific rules
-        let message_data = self.parse_on_transfer_message(&args.msg)?;
+        let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
+            .map_err(error::FtTransferCallError::MessageParseFailed)?;
 
         // Special case when predecessor_account_id is current_account_id
-        let fee = message_data.fee.as_u128();
+        let fee = message_data.fee.into_u128();
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (fee, relayer) {
@@ -680,7 +617,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .return_output(&self.ft.get_accounts_counter().to_le_bytes());
     }
 
-    /// Save eth-connector contract data
+    /// Save eth-connector fungible token contract data
     fn save_ft_contract(&mut self) {
         self.io.write_borsh(
             &construct_contract_key(&EthConnectorStorageId::FungibleToken),
@@ -688,7 +625,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         );
     }
 
-    /// Generate key for used events from Prood
+    /// Generate key for used events from Proof
     fn used_event_key(&self, key: &str) -> Vec<u8> {
         let mut v = construct_contract_key(&EthConnectorStorageId::UsedEvent).to_vec();
         v.extend_from_slice(key.as_bytes());
@@ -701,13 +638,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Check is event of proof already used
-    fn check_used_event(&self, key: &str) -> bool {
+    fn is_used_event(&self, key: &str) -> bool {
         self.io.storage_has_key(&self.used_event_key(key))
     }
 
     /// Checks whether the provided proof was already used
     pub fn is_used_proof(&self, proof: Proof) -> bool {
-        self.check_used_event(&proof.get_key())
+        self.is_used_event(&proof.get_key())
     }
 
     /// Get Eth connector paused flags
@@ -722,10 +659,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 }
 
 impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
+    /// Get current admin paused status
     fn get_paused(&self) -> PausedMask {
         self.paused_mask
     }
 
+    /// Set admin paused status
     fn set_paused(&mut self, paused_mask: PausedMask) {
         self.paused_mask = paused_mask;
         self.io.write_borsh(
@@ -779,42 +718,23 @@ pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
 }
 
 pub mod error {
-    use aurora_engine_types::types::AddressValidationError;
+    use crate::prelude::types::{error::BalanceOverflowError, AddressValidationError};
 
+    use crate::deposit_event::error::ParseOnTransferMessageError;
     use crate::{deposit_event, fungible_token};
 
     const PROOF_EXIST: &[u8; 15] = b"ERR_PROOF_EXIST";
-    const INVALID_ACCOUNT: &[u8; 22] = b"ERR_INVALID_ACCOUNT_ID";
 
-    #[derive(Debug)]
-    pub enum ParseEventMessageError {
-        TooManyParts,
-        InvalidAccount,
-    }
-    impl AsRef<[u8]> for ParseEventMessageError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::TooManyParts => b"ERR_INVALID_EVENT_MESSAGE_FORMAT",
-                Self::InvalidAccount => INVALID_ACCOUNT,
-            }
-        }
-    }
-
-    #[derive(Debug)]
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum DepositError {
         Paused,
         ProofParseFailed,
         EventParseFailed(deposit_event::error::ParseError),
         CustodianAddressMismatch,
         InsufficientAmountForFee,
-        MessageParseFailed(ParseEventMessageError),
         InvalidAddress(AddressValidationError),
     }
-    impl From<ParseEventMessageError> for DepositError {
-        fn from(e: ParseEventMessageError) -> Self {
-            Self::MessageParseFailed(e)
-        }
-    }
+
     impl AsRef<[u8]> for DepositError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -823,32 +743,35 @@ pub mod error {
                 Self::EventParseFailed(e) => e.as_ref(),
                 Self::CustodianAddressMismatch => b"ERR_WRONG_EVENT_ADDRESS",
                 Self::InsufficientAmountForFee => super::ERR_NOT_ENOUGH_BALANCE_FOR_FEE.as_bytes(),
-                Self::MessageParseFailed(e) => e.as_ref(),
                 Self::InvalidAddress(e) => e.as_ref(),
             }
         }
     }
 
-    #[derive(Debug)]
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum FinishDepositError {
         TransferCall(FtTransferCallError),
         ProofUsed,
     }
+
     impl From<ProofUsed> for FinishDepositError {
         fn from(_: ProofUsed) -> Self {
             Self::ProofUsed
         }
     }
+
     impl From<FtTransferCallError> for FinishDepositError {
         fn from(e: FtTransferCallError) -> Self {
             Self::TransferCall(e)
         }
     }
+
     impl From<fungible_token::error::DepositError> for FinishDepositError {
         fn from(e: fungible_token::error::DepositError) -> Self {
             Self::TransferCall(FtTransferCallError::Transfer(e.into()))
         }
     }
+
     impl AsRef<[u8]> for FinishDepositError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -862,11 +785,13 @@ pub mod error {
         Paused,
         FT(fungible_token::error::WithdrawError),
     }
+
     impl From<fungible_token::error::WithdrawError> for WithdrawError {
         fn from(e: fungible_token::error::WithdrawError) -> Self {
             Self::FT(e)
         }
     }
+
     impl AsRef<[u8]> for WithdrawError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -876,51 +801,39 @@ pub mod error {
         }
     }
 
-    #[derive(Debug)]
-    pub enum ParseOnTransferMessageError {
-        TooManyParts,
-        InvalidHexData,
-        WrongMessageFormat,
-        InvalidAccount,
-    }
-    impl AsRef<[u8]> for ParseOnTransferMessageError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::TooManyParts => b"ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT",
-                Self::InvalidHexData => b"ERR_INVALID_ON_TRANSFER_MESSAGE_HEX",
-                Self::WrongMessageFormat => b"ERR_INVALID_ON_TRANSFER_MESSAGE_DATA",
-                Self::InvalidAccount => INVALID_ACCOUNT,
-            }
-        }
-    }
-
-    #[derive(Debug)]
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum FtTransferCallError {
+        BalanceOverflow(BalanceOverflowError),
         MessageParseFailed(ParseOnTransferMessageError),
         InsufficientAmountForFee,
         Transfer(fungible_token::error::TransferError),
     }
+
     impl From<fungible_token::error::TransferError> for FtTransferCallError {
         fn from(e: fungible_token::error::TransferError) -> Self {
             Self::Transfer(e)
         }
     }
+
     impl From<fungible_token::error::DepositError> for FtTransferCallError {
         fn from(e: fungible_token::error::DepositError) -> Self {
             Self::Transfer(e.into())
         }
     }
+
     impl From<ParseOnTransferMessageError> for FtTransferCallError {
         fn from(e: ParseOnTransferMessageError) -> Self {
             Self::MessageParseFailed(e)
         }
     }
+
     impl AsRef<[u8]> for FtTransferCallError {
         fn as_ref(&self) -> &[u8] {
             match self {
                 Self::MessageParseFailed(e) => e.as_ref(),
                 Self::InsufficientAmountForFee => super::ERR_NOT_ENOUGH_BALANCE_FOR_FEE.as_bytes(),
                 Self::Transfer(e) => e.as_ref(),
+                Self::BalanceOverflow(e) => e.as_ref(),
             }
         }
     }
@@ -929,6 +842,7 @@ pub mod error {
         AlreadyInitialized,
         InvalidCustodianAddress(AddressValidationError),
     }
+
     impl AsRef<[u8]> for InitContractError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -939,6 +853,7 @@ pub mod error {
     }
 
     pub struct ProofUsed;
+
     impl AsRef<[u8]> for ProofUsed {
         fn as_ref(&self) -> &[u8] {
             PROOF_EXIST
