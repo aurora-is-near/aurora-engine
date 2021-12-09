@@ -43,6 +43,8 @@ pub trait Env {
     fn attached_deposit(&self) -> u128;
     /// Random seed generated for the current block
     fn random_seed(&self) -> H256;
+    /// Prepaid NEAR Gas
+    fn prepaid_gas(&self) -> u64;
 
     fn assert_private_call(&self) -> Result<(), PrivateCallError> {
         if self.predecessor_account_id() == self.current_account_id() {
@@ -72,6 +74,7 @@ pub struct Fixed {
     pub block_timestamp: Timestamp,
     pub attached_deposit: u128,
     pub random_seed: H256,
+    pub prepaid_gas: u64,
 }
 
 impl Env for Fixed {
@@ -101,5 +104,9 @@ impl Env for Fixed {
 
     fn random_seed(&self) -> H256 {
         self.random_seed
+    }
+
+    fn prepaid_gas(&self) -> u64 {
+        self.prepaid_gas
     }
 }

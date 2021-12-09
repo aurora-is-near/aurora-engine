@@ -46,6 +46,8 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                 block_timestamp: block_metadata.timestamp,
                 attached_deposit: transaction_message.attached_near,
                 random_seed: block_metadata.random_seed,
+                // TODO: fix it?
+                prepaid_gas: 0,
             };
             let io =
                 storage.access_engine_storage_at_position(block_height, transaction_position, &[]);

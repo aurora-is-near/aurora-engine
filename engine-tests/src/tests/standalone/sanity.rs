@@ -30,6 +30,7 @@ fn test_deploy_code() {
         block_timestamp: aurora_engine_sdk::env::Timestamp::new(0),
         attached_deposit: 0,
         random_seed: H256::zero(),
+        prepaid_gas: 0,
     };
     let mut handler = promise::PromiseTracker::default();
     let mut engine = engine::Engine::new_with_state(state, origin, owner_id, io, &env);

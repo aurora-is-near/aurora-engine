@@ -125,6 +125,7 @@ impl StandaloneRunner {
         env.predecessor_account_id = ctx.predecessor_account_id.as_ref().parse().unwrap();
         env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
+        env.prepaid_gas = ctx.prepaid_gas;
 
         let storage = &mut self.storage;
         if method_name == test_utils::SUBMIT {

@@ -237,6 +237,10 @@ impl crate::env::Env for Runtime {
             bytes
         }
     }
+
+    fn prepaid_gas(&self) -> u64 {
+        unsafe { exports::prepaid_gas() }
+    }
 }
 
 impl crate::promise::PromiseHandler for Runtime {

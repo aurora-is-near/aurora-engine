@@ -81,6 +81,7 @@ where
         block_timestamp: env::Timestamp::new(0),
         attached_deposit: 0,
         random_seed: H256::zero(),
+        prepaid_gas: 0,
     };
     let mut handler = crate::promise::Noop;
 
