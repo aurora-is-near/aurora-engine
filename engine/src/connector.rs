@@ -250,6 +250,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         current_account_id: AccountId,
         data: FinishDepositCallArgs,
+        gas: NearGas,
     ) -> Result<Option<PromiseWithCallbackArgs>, error::FinishDepositError> {
         sdk::log!(&format!("Finish deposit with the amount: {}", data.amount));
 
@@ -266,6 +267,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 predecessor_account_id,
                 current_account_id,
                 transfer_call_args,
+                gas,
             )?;
             Ok(Some(promise))
         } else {
@@ -472,6 +474,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         current_account_id: AccountId,
         args: TransferCallCallArgs,
+        gas: NearGas,
     ) -> Result<PromiseWithCallbackArgs, error::FtTransferCallError> {
         sdk::log!(&format!(
             "Transfer call to {} amount {}",
@@ -520,6 +523,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 &args.memo,
                 args.msg,
                 current_account_id,
+                gas,
             )
             .map_err(Into::into)
     }

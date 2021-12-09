@@ -3,8 +3,10 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{FinishDepositCallArgs, InitCallArgs, NewCallArgs};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
+use near_sdk_sim::DEFAULT_GAS;
 
 use crate::test_utils;
 
@@ -44,7 +46,7 @@ pub fn default_env(block_height: u64) -> aurora_engine_sdk::env::Fixed {
         block_timestamp: aurora_engine_sdk::env::Timestamp::new(0),
         attached_deposit: 0,
         random_seed: H256::zero(),
-        prepaid_gas: 0,
+        prepaid_gas: NearGas::new(0),
     }
 }
 
@@ -119,6 +121,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
             aurora_account_id.clone(),
             aurora_account_id.clone(),
             deposit_args,
+            NearGas::new(DEFAULT_GAS),
         )
         .map_err(unsafe_to_string)
         .unwrap();

@@ -20,6 +20,14 @@ pub type WeiU256 = [u8; 32];
 /// Near gas type which wraps an underlying u64.
 pub struct NearGas(u64);
 
+impl Sub<NearGas> for NearGas {
+    type Output = NearGas;
+
+    fn sub(self, rhs: NearGas) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
 impl Display for NearGas {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
         self.0.fmt(f)

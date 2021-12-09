@@ -238,8 +238,8 @@ impl crate::env::Env for Runtime {
         }
     }
 
-    fn prepaid_gas(&self) -> u64 {
-        unsafe { exports::prepaid_gas() }
+    fn prepaid_gas(&self) -> NearGas {
+        NearGas::new(unsafe { exports::prepaid_gas() })
     }
 }
 
@@ -392,7 +392,7 @@ pub(crate) mod exports {
         fn account_balance(balance_ptr: u64);
         pub(crate) fn attached_deposit(balance_ptr: u64);
         pub(crate) fn prepaid_gas() -> u64;
-        fn used_gas() -> u64;
+        pub(crate) fn used_gas() -> u64;
         // ############
         // # Math API #
         // ############

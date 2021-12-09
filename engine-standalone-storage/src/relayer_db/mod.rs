@@ -2,6 +2,7 @@ use aurora_engine::engine;
 use aurora_engine::transaction::EthTransactionKind;
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::H256;
 use postgres::fallible_iterator::FallibleIterator;
 
@@ -81,7 +82,7 @@ where
         block_timestamp: env::Timestamp::new(0),
         attached_deposit: 0,
         random_seed: H256::zero(),
-        prepaid_gas: 0,
+        prepaid_gas: NearGas::new(0),
     };
     let mut handler = crate::promise::Noop;
 
