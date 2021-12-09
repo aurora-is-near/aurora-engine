@@ -16,12 +16,10 @@ Network | Contract ID         | Chain ID   | Version
 ------- | ------------------- | ---------- | ------
 Mainnet | [`aurora`][Mainnet] | 1313161554 | 2.2.0
 Testnet | [`aurora`][Testnet] | 1313161555 | 2.2.0
-Betanet | [`aurora`][Betanet] | 1313161556 | 2.2.0
 Local   | `aurora.test.near`  | 1313161556 | 2.2.0
 
 [Mainnet]: https://explorer.near.org/accounts/aurora
 [Testnet]: https://explorer.testnet.near.org/accounts/aurora
-[Betanet]: https://explorer.betanet.near.org/accounts/aurora
 
 ## Prerequisites
 
@@ -55,12 +53,10 @@ rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
 make release  # produces mainnet-release.wasm (300+ KiB)
 make -B mainnet  # produces Mainnet build
 make -B testnet  # produces Testnet build
-make -B betanet  # produces Betanet build
 
 make debug    # produces mainnet-debug.wasm (1+ MiB), which includes symbols
 make -B mainnet-debug # produces Mainnet debug build
 make -B testnet-debug # produces Testnet debug build
-make -B betanet-debug #produces Betanet debug build
 ```
 
 ### Running unit & integration tests
