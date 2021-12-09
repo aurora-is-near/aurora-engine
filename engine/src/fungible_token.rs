@@ -298,7 +298,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         memo: &Option<String>,
         msg: String,
         current_account_id: AccountId,
-        gas: NearGas,
+        prepaid_gas: NearGas,
     ) -> Result<PromiseWithCallbackArgs, error::TransferError> {
         // Special case for Aurora transfer itself - we shouldn't transfer
         if sender_id != receiver_id {
