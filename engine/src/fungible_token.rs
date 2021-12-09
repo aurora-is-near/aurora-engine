@@ -11,8 +11,10 @@ use crate::prelude::{
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
+/// Gas for `resolve_transfer`: 5 TGas
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
-const GAS_FOR_FT_ON_TRANSFER: NearGas = NearGas::new(10_000_000_000_000);
+/// Gas for `ft_on_transfer` transfer: 25 TGas + GAS_FOR_RESOLVE_TRANSFER
+const GAS_FOR_FT_ON_TRANSFER: NearGas = NearGas::new(30_000_000_000_000);
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
