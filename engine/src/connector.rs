@@ -267,7 +267,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 predecessor_account_id,
                 current_account_id,
                 transfer_call_args,
-                gas,
+                prepaid_gas,
             )?;
             Ok(Some(promise))
         } else {
@@ -523,7 +523,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 &args.memo,
                 args.msg,
                 current_account_id,
-                gas,
+                prepaid_gas,
             )
             .map_err(Into::into)
     }

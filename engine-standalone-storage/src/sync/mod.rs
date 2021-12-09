@@ -1,6 +1,5 @@
 use aurora_engine::{connector, engine, parameters};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
-use aurora_engine_types::types::NearGas;
 use aurora_engine_types::TryFrom;
 use borsh::BorshDeserialize;
 

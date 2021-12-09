@@ -325,7 +325,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             method: "ft_on_transfer".to_string(),
             args: data1.into_bytes(),
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: (gas - GAS_FOR_FT_TRANSFER_CALL - GAS_FOR_RESOLVE_TRANSFER).into_u64(),
+            attached_gas: (prepaid_gas - GAS_FOR_FT_TRANSFER_CALL - GAS_FOR_RESOLVE_TRANSFER)
+                .into_u64(),
         };
         let ft_resolve_transfer_call = PromiseCreateArgs {
             target_account_id: current_account_id,
