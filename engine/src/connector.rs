@@ -474,7 +474,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         current_account_id: AccountId,
         args: TransferCallCallArgs,
-        gas: NearGas,
+        prepaid_gas: NearGas,
     ) -> Result<PromiseWithCallbackArgs, error::FtTransferCallError> {
         sdk::log!(&format!(
             "Transfer call to {} amount {}",
