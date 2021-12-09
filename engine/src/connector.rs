@@ -23,7 +23,7 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
 pub const ZERO_ATTACHED_BALANCE: Balance = 0;
-//// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
+/// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
 pub const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 /// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
 // Note: Is 40Tgas always enough?
