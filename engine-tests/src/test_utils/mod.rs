@@ -43,6 +43,7 @@ pub(crate) mod solidity;
 pub(crate) mod standalone;
 pub(crate) mod standard_precompiles;
 pub(crate) mod uniswap;
+pub(crate) mod weth;
 
 pub(crate) struct Signer {
     pub nonce: u64,

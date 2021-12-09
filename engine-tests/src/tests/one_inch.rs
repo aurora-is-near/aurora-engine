@@ -58,7 +58,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
-    assert_gas_bound(profile.all_gas(), 79); // less than 79 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 82); // less than 82 NEAR Tgas used
 
     // Same here
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
@@ -73,7 +73,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_gas_bound(profile.all_gas(), 88); // less than 88 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 90); // less than 90 NEAR Tgas used
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
@@ -84,7 +84,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
-    assert_gas_bound(profile.all_gas(), 68); // less than 68 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 69); // less than 69 NEAR Tgas used
 }
 
 #[test]

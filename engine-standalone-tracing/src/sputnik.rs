@@ -32,6 +32,7 @@ where
 pub struct TransactionTraceBuilder {
     logs: Vec<TraceLog>,
     current: TraceLog,
+    current_memory_gas: u64,
     gas_used: EthGas,
     failed: bool,
     output: Vec<u8>,
@@ -56,7 +57,17 @@ impl evm_gasometer::tracing::EventListener for TransactionTraceBuilder {
                 gas_refund: _,
                 snapshot: _,
             } => {
-                self.current.gas_cost = EthGas::new(gas_cost + memory_gas);
+                // In SputnikVM memory gas is cumulative (ie this event always shows the total) gas
+                // spent on memory up to this point. But geth traces simply show how much gas each step
+                // took, regardless of how that gas was used. So if this step caused an increase to the
+                // memory gas then we need to record that.
+                let memory_cost_diff = if memory_gas > self.current_memory_gas {
+                    memory_gas - self.current_memory_gas
+                } else {
+                    0
+                };
+                self.current_memory_gas = memory_gas;
+                self.current.gas_cost = EthGas::new(gas_cost + memory_cost_diff);
             }
             Event::RecordRefund {
                 refund: _,

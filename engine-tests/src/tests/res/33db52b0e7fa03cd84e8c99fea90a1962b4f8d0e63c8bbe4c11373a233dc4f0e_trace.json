@@ -1,0 +1,1145 @@
+[
+    {
+        "depth": 1,
+        "gas": 6874,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 0,
+        "step": 1
+    },
+    {
+        "depth": 1,
+        "gas": 6871,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 2,
+        "step": 2
+    },
+    {
+        "depth": 1,
+        "gas": 6868,
+        "gas_cost": 12,
+        "op": 82,
+        "opcode_name": "MSTORE",
+        "pc": 4,
+        "step": 3
+    },
+    {
+        "depth": 1,
+        "gas": 6856,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 5,
+        "step": 4
+    },
+    {
+        "depth": 1,
+        "gas": 6853,
+        "gas_cost": 2,
+        "op": 54,
+        "opcode_name": "CALLDATASIZE",
+        "pc": 7,
+        "step": 5
+    },
+    {
+        "depth": 1,
+        "gas": 6851,
+        "gas_cost": 3,
+        "op": 16,
+        "opcode_name": "LT",
+        "pc": 8,
+        "step": 6
+    },
+    {
+        "depth": 1,
+        "gas": 6848,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 9,
+        "step": 7
+    },
+    {
+        "depth": 1,
+        "gas": 6845,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 12,
+        "step": 8
+    },
+    {
+        "depth": 1,
+        "gas": 6835,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 13,
+        "step": 9
+    },
+    {
+        "depth": 1,
+        "gas": 6832,
+        "gas_cost": 3,
+        "op": 53,
+        "opcode_name": "CALLDATALOAD",
+        "pc": 15,
+        "step": 10
+    },
+    {
+        "depth": 1,
+        "gas": 6829,
+        "gas_cost": 3,
+        "op": 124,
+        "opcode_name": "PUSH29",
+        "pc": 16,
+        "step": 11
+    },
+    {
+        "depth": 1,
+        "gas": 6826,
+        "gas_cost": 3,
+        "op": 144,
+        "opcode_name": "SWAP1",
+        "pc": 46,
+        "step": 12
+    },
+    {
+        "depth": 1,
+        "gas": 6823,
+        "gas_cost": 5,
+        "op": 4,
+        "opcode_name": "DIV",
+        "pc": 47,
+        "step": 13
+    },
+    {
+        "depth": 1,
+        "gas": 6818,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 48,
+        "step": 14
+    },
+    {
+        "depth": 1,
+        "gas": 6815,
+        "gas_cost": 3,
+        "op": 22,
+        "opcode_name": "AND",
+        "pc": 53,
+        "step": 15
+    },
+    {
+        "depth": 1,
+        "gas": 6812,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 54,
+        "step": 16
+    },
+    {
+        "depth": 1,
+        "gas": 6809,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 55,
+        "step": 17
+    },
+    {
+        "depth": 1,
+        "gas": 6806,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 60,
+        "step": 18
+    },
+    {
+        "depth": 1,
+        "gas": 6803,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 61,
+        "step": 19
+    },
+    {
+        "depth": 1,
+        "gas": 6800,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 64,
+        "step": 20
+    },
+    {
+        "depth": 1,
+        "gas": 6790,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 65,
+        "step": 21
+    },
+    {
+        "depth": 1,
+        "gas": 6787,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 66,
+        "step": 22
+    },
+    {
+        "depth": 1,
+        "gas": 6784,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 71,
+        "step": 23
+    },
+    {
+        "depth": 1,
+        "gas": 6781,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 72,
+        "step": 24
+    },
+    {
+        "depth": 1,
+        "gas": 6778,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 75,
+        "step": 25
+    },
+    {
+        "depth": 1,
+        "gas": 6768,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 76,
+        "step": 26
+    },
+    {
+        "depth": 1,
+        "gas": 6765,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 77,
+        "step": 27
+    },
+    {
+        "depth": 1,
+        "gas": 6762,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 82,
+        "step": 28
+    },
+    {
+        "depth": 1,
+        "gas": 6759,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 83,
+        "step": 29
+    },
+    {
+        "depth": 1,
+        "gas": 6756,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 86,
+        "step": 30
+    },
+    {
+        "depth": 1,
+        "gas": 6746,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 87,
+        "step": 31
+    },
+    {
+        "depth": 1,
+        "gas": 6743,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 88,
+        "step": 32
+    },
+    {
+        "depth": 1,
+        "gas": 6740,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 93,
+        "step": 33
+    },
+    {
+        "depth": 1,
+        "gas": 6737,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 94,
+        "step": 34
+    },
+    {
+        "depth": 1,
+        "gas": 6734,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 97,
+        "step": 35
+    },
+    {
+        "depth": 1,
+        "gas": 6724,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 98,
+        "step": 36
+    },
+    {
+        "depth": 1,
+        "gas": 6721,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 99,
+        "step": 37
+    },
+    {
+        "depth": 1,
+        "gas": 6718,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 104,
+        "step": 38
+    },
+    {
+        "depth": 1,
+        "gas": 6715,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 105,
+        "step": 39
+    },
+    {
+        "depth": 1,
+        "gas": 6712,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 108,
+        "step": 40
+    },
+    {
+        "depth": 1,
+        "gas": 6702,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 109,
+        "step": 41
+    },
+    {
+        "depth": 1,
+        "gas": 6699,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 110,
+        "step": 42
+    },
+    {
+        "depth": 1,
+        "gas": 6696,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 115,
+        "step": 43
+    },
+    {
+        "depth": 1,
+        "gas": 6693,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 116,
+        "step": 44
+    },
+    {
+        "depth": 1,
+        "gas": 6690,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 119,
+        "step": 45
+    },
+    {
+        "depth": 1,
+        "gas": 6680,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 120,
+        "step": 46
+    },
+    {
+        "depth": 1,
+        "gas": 6677,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 121,
+        "step": 47
+    },
+    {
+        "depth": 1,
+        "gas": 6674,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 126,
+        "step": 48
+    },
+    {
+        "depth": 1,
+        "gas": 6671,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 127,
+        "step": 49
+    },
+    {
+        "depth": 1,
+        "gas": 6668,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 130,
+        "step": 50
+    },
+    {
+        "depth": 1,
+        "gas": 6658,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 131,
+        "step": 51
+    },
+    {
+        "depth": 1,
+        "gas": 6655,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 132,
+        "step": 52
+    },
+    {
+        "depth": 1,
+        "gas": 6652,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 137,
+        "step": 53
+    },
+    {
+        "depth": 1,
+        "gas": 6649,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 138,
+        "step": 54
+    },
+    {
+        "depth": 1,
+        "gas": 6646,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 141,
+        "step": 55
+    },
+    {
+        "depth": 1,
+        "gas": 6636,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 142,
+        "step": 56
+    },
+    {
+        "depth": 1,
+        "gas": 6633,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 143,
+        "step": 57
+    },
+    {
+        "depth": 1,
+        "gas": 6630,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 148,
+        "step": 58
+    },
+    {
+        "depth": 1,
+        "gas": 6627,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 149,
+        "step": 59
+    },
+    {
+        "depth": 1,
+        "gas": 6624,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 152,
+        "step": 60
+    },
+    {
+        "depth": 1,
+        "gas": 6614,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 153,
+        "step": 61
+    },
+    {
+        "depth": 1,
+        "gas": 6611,
+        "gas_cost": 3,
+        "op": 99,
+        "opcode_name": "PUSH4",
+        "pc": 154,
+        "step": 62
+    },
+    {
+        "depth": 1,
+        "gas": 6608,
+        "gas_cost": 3,
+        "op": 20,
+        "opcode_name": "EQ",
+        "pc": 159,
+        "step": 63
+    },
+    {
+        "depth": 1,
+        "gas": 6605,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 160,
+        "step": 64
+    },
+    {
+        "depth": 1,
+        "gas": 6602,
+        "gas_cost": 10,
+        "op": 87,
+        "opcode_name": "JUMPI",
+        "pc": 163,
+        "step": 65
+    },
+    {
+        "depth": 1,
+        "gas": 6592,
+        "gas_cost": 1,
+        "op": 91,
+        "opcode_name": "JUMPDEST",
+        "pc": 970,
+        "step": 66
+    },
+    {
+        "depth": 1,
+        "gas": 6591,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 971,
+        "step": 67
+    },
+    {
+        "depth": 1,
+        "gas": 6588,
+        "gas_cost": 3,
+        "op": 97,
+        "opcode_name": "PUSH2",
+        "pc": 974,
+        "step": 68
+    },
+    {
+        "depth": 1,
+        "gas": 6585,
+        "gas_cost": 8,
+        "op": 86,
+        "opcode_name": "JUMP",
+        "pc": 977,
+        "step": 69
+    },
+    {
+        "depth": 1,
+        "gas": 6577,
+        "gas_cost": 1,
+        "op": 91,
+        "opcode_name": "JUMPDEST",
+        "pc": 1088,
+        "step": 70
+    },
+    {
+        "depth": 1,
+        "gas": 6576,
+        "gas_cost": 2,
+        "op": 52,
+        "opcode_name": "CALLVALUE",
+        "pc": 1089,
+        "step": 71
+    },
+    {
+        "depth": 1,
+        "gas": 6574,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 1090,
+        "step": 72
+    },
+    {
+        "depth": 1,
+        "gas": 6571,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 1092,
+        "step": 73
+    },
+    {
+        "depth": 1,
+        "gas": 6568,
+        "gas_cost": 2,
+        "op": 51,
+        "opcode_name": "CALLER",
+        "pc": 1094,
+        "step": 74
+    },
+    {
+        "depth": 1,
+        "gas": 6566,
+        "gas_cost": 3,
+        "op": 115,
+        "opcode_name": "PUSH20",
+        "pc": 1095,
+        "step": 75
+    },
+    {
+        "depth": 1,
+        "gas": 6563,
+        "gas_cost": 3,
+        "op": 22,
+        "opcode_name": "AND",
+        "pc": 1116,
+        "step": 76
+    },
+    {
+        "depth": 1,
+        "gas": 6560,
+        "gas_cost": 3,
+        "op": 115,
+        "opcode_name": "PUSH20",
+        "pc": 1117,
+        "step": 77
+    },
+    {
+        "depth": 1,
+        "gas": 6557,
+        "gas_cost": 3,
+        "op": 22,
+        "opcode_name": "AND",
+        "pc": 1138,
+        "step": 78
+    },
+    {
+        "depth": 1,
+        "gas": 6554,
+        "gas_cost": 3,
+        "op": 129,
+        "opcode_name": "DUP2",
+        "pc": 1139,
+        "step": 79
+    },
+    {
+        "depth": 1,
+        "gas": 6551,
+        "gas_cost": 3,
+        "op": 82,
+        "opcode_name": "MSTORE",
+        "pc": 1140,
+        "step": 80
+    },
+    {
+        "depth": 1,
+        "gas": 6548,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 1141,
+        "step": 81
+    },
+    {
+        "depth": 1,
+        "gas": 6545,
+        "gas_cost": 3,
+        "op": 1,
+        "opcode_name": "ADD",
+        "pc": 1143,
+        "step": 82
+    },
+    {
+        "depth": 1,
+        "gas": 6542,
+        "gas_cost": 3,
+        "op": 144,
+        "opcode_name": "SWAP1",
+        "pc": 1144,
+        "step": 83
+    },
+    {
+        "depth": 1,
+        "gas": 6539,
+        "gas_cost": 3,
+        "op": 129,
+        "opcode_name": "DUP2",
+        "pc": 1145,
+        "step": 84
+    },
+    {
+        "depth": 1,
+        "gas": 6536,
+        "gas_cost": 3,
+        "op": 82,
+        "opcode_name": "MSTORE",
+        "pc": 1146,
+        "step": 85
+    },
+    {
+        "depth": 1,
+        "gas": 6533,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 1147,
+        "step": 86
+    },
+    {
+        "depth": 1,
+        "gas": 6530,
+        "gas_cost": 3,
+        "op": 1,
+        "opcode_name": "ADD",
+        "pc": 1149,
+        "step": 87
+    },
+    {
+        "depth": 1,
+        "gas": 6527,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 1150,
+        "step": 88
+    },
+    {
+        "depth": 1,
+        "gas": 6524,
+        "gas_cost": 42,
+        "op": 32,
+        "opcode_name": "SHA3",
+        "pc": 1152,
+        "step": 89
+    },
+    {
+        "depth": 1,
+        "gas": 6482,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 1153,
+        "step": 90
+    },
+    {
+        "depth": 1,
+        "gas": 6479,
+        "gas_cost": 3,
+        "op": 130,
+        "opcode_name": "DUP3",
+        "pc": 1155,
+        "step": 91
+    },
+    {
+        "depth": 1,
+        "gas": 6476,
+        "gas_cost": 3,
+        "op": 130,
+        "opcode_name": "DUP3",
+        "pc": 1156,
+        "step": 92
+    },
+    {
+        "depth": 1,
+        "gas": 6473,
+        "gas_cost": 2100,
+        "op": 84,
+        "opcode_name": "SLOAD",
+        "pc": 1157,
+        "step": 93
+    },
+    {
+        "depth": 1,
+        "gas": 4373,
+        "gas_cost": 3,
+        "op": 1,
+        "opcode_name": "ADD",
+        "pc": 1158,
+        "step": 94
+    },
+    {
+        "depth": 1,
+        "gas": 4370,
+        "gas_cost": 3,
+        "op": 146,
+        "opcode_name": "SWAP3",
+        "pc": 1159,
+        "step": 95
+    },
+    {
+        "depth": 1,
+        "gas": 4367,
+        "gas_cost": 2,
+        "op": 80,
+        "opcode_name": "POP",
+        "pc": 1160,
+        "step": 96
+    },
+    {
+        "depth": 1,
+        "gas": 4365,
+        "gas_cost": 2,
+        "op": 80,
+        "opcode_name": "POP",
+        "pc": 1161,
+        "step": 97
+    },
+    {
+        "depth": 1,
+        "gas": 4363,
+        "gas_cost": 3,
+        "op": 129,
+        "opcode_name": "DUP2",
+        "pc": 1162,
+        "step": 98
+    },
+    {
+        "depth": 1,
+        "gas": 4360,
+        "gas_cost": 3,
+        "op": 144,
+        "opcode_name": "SWAP1",
+        "pc": 1163,
+        "step": 99
+    },
+    {
+        "depth": 1,
+        "gas": 4357,
+        "gas_cost": 2900,
+        "op": 85,
+        "opcode_name": "SSTORE",
+        "pc": 1164,
+        "step": 100
+    },
+    {
+        "depth": 1,
+        "gas": 1457,
+        "gas_cost": 2,
+        "op": 80,
+        "opcode_name": "POP",
+        "pc": 1165,
+        "step": 101
+    },
+    {
+        "depth": 1,
+        "gas": 1455,
+        "gas_cost": 2,
+        "op": 51,
+        "opcode_name": "CALLER",
+        "pc": 1166,
+        "step": 102
+    },
+    {
+        "depth": 1,
+        "gas": 1453,
+        "gas_cost": 3,
+        "op": 115,
+        "opcode_name": "PUSH20",
+        "pc": 1167,
+        "step": 103
+    },
+    {
+        "depth": 1,
+        "gas": 1450,
+        "gas_cost": 3,
+        "op": 22,
+        "opcode_name": "AND",
+        "pc": 1188,
+        "step": 104
+    },
+    {
+        "depth": 1,
+        "gas": 1447,
+        "gas_cost": 3,
+        "op": 127,
+        "opcode_name": "PUSH32",
+        "pc": 1189,
+        "step": 105
+    },
+    {
+        "depth": 1,
+        "gas": 1444,
+        "gas_cost": 2,
+        "op": 52,
+        "opcode_name": "CALLVALUE",
+        "pc": 1222,
+        "step": 106
+    },
+    {
+        "depth": 1,
+        "gas": 1442,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 1223,
+        "step": 107
+    },
+    {
+        "depth": 1,
+        "gas": 1439,
+        "gas_cost": 3,
+        "op": 81,
+        "opcode_name": "MLOAD",
+        "pc": 1225,
+        "step": 108
+    },
+    {
+        "depth": 1,
+        "gas": 1436,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 1226,
+        "step": 109
+    },
+    {
+        "depth": 1,
+        "gas": 1433,
+        "gas_cost": 3,
+        "op": 130,
+        "opcode_name": "DUP3",
+        "pc": 1227,
+        "step": 110
+    },
+    {
+        "depth": 1,
+        "gas": 1430,
+        "gas_cost": 3,
+        "op": 129,
+        "opcode_name": "DUP2",
+        "pc": 1228,
+        "step": 111
+    },
+    {
+        "depth": 1,
+        "gas": 1427,
+        "gas_cost": 6,
+        "op": 82,
+        "opcode_name": "MSTORE",
+        "pc": 1229,
+        "step": 112
+    },
+    {
+        "depth": 1,
+        "gas": 1421,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 1230,
+        "step": 113
+    },
+    {
+        "depth": 1,
+        "gas": 1418,
+        "gas_cost": 3,
+        "op": 1,
+        "opcode_name": "ADD",
+        "pc": 1232,
+        "step": 114
+    },
+    {
+        "depth": 1,
+        "gas": 1415,
+        "gas_cost": 3,
+        "op": 145,
+        "opcode_name": "SWAP2",
+        "pc": 1233,
+        "step": 115
+    },
+    {
+        "depth": 1,
+        "gas": 1412,
+        "gas_cost": 2,
+        "op": 80,
+        "opcode_name": "POP",
+        "pc": 1234,
+        "step": 116
+    },
+    {
+        "depth": 1,
+        "gas": 1410,
+        "gas_cost": 2,
+        "op": 80,
+        "opcode_name": "POP",
+        "pc": 1235,
+        "step": 117
+    },
+    {
+        "depth": 1,
+        "gas": 1408,
+        "gas_cost": 3,
+        "op": 96,
+        "opcode_name": "PUSH1",
+        "pc": 1236,
+        "step": 118
+    },
+    {
+        "depth": 1,
+        "gas": 1405,
+        "gas_cost": 3,
+        "op": 81,
+        "opcode_name": "MLOAD",
+        "pc": 1238,
+        "step": 119
+    },
+    {
+        "depth": 1,
+        "gas": 1402,
+        "gas_cost": 3,
+        "op": 128,
+        "opcode_name": "DUP1",
+        "pc": 1239,
+        "step": 120
+    },
+    {
+        "depth": 1,
+        "gas": 1399,
+        "gas_cost": 3,
+        "op": 145,
+        "opcode_name": "SWAP2",
+        "pc": 1240,
+        "step": 121
+    },
+    {
+        "depth": 1,
+        "gas": 1396,
+        "gas_cost": 3,
+        "op": 3,
+        "opcode_name": "SUB",
+        "pc": 1241,
+        "step": 122
+    },
+    {
+        "depth": 1,
+        "gas": 1393,
+        "gas_cost": 3,
+        "op": 144,
+        "opcode_name": "SWAP1",
+        "pc": 1242,
+        "step": 123
+    },
+    {
+        "depth": 1,
+        "gas": 1390,
+        "gas_cost": 1381,
+        "op": 162,
+        "opcode_name": "LOG2",
+        "pc": 1243,
+        "step": 124
+    },
+    {
+        "depth": 1,
+        "gas": 9,
+        "gas_cost": 8,
+        "op": 86,
+        "opcode_name": "JUMP",
+        "pc": 1244,
+        "step": 125
+    },
+    {
+        "depth": 1,
+        "gas": 1,
+        "gas_cost": 1,
+        "op": 91,
+        "opcode_name": "JUMPDEST",
+        "pc": 978,
+        "step": 126
+    },
+    {
+        "depth": 1,
+        "gas": 0,
+        "gas_cost": 0,
+        "op": 0,
+        "opcode_name": "STOP",
+        "pc": 979,
+        "step": 127
+    }
+]
