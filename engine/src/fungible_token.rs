@@ -14,7 +14,7 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 /// Gas for `resolve_transfer`: 5 TGas
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
 /// Gas for `ft_on_transfer`
-const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(25_000_000_000_000);
+const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(35_000_000_000_000);
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {

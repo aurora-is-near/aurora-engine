@@ -2,7 +2,6 @@ use aurora_engine::engine;
 use aurora_engine::transaction::EthTransactionKind;
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::types::NearGas;
 use aurora_engine_types::H256;
 use postgres::fallible_iterator::FallibleIterator;
 
