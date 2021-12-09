@@ -5,6 +5,7 @@ use crate::prelude::{
     parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
     sdk,
     storage::{bytes_to_key, KeyPrefix},
+    types::Yocto,
     vec, BorshSerialize, Cow, String, ToString, TryFrom, TryInto, Vec, H160, U256,
 };
 #[cfg(all(feature = "error_refund", feature = "contract"))]
@@ -13,7 +14,7 @@ use crate::prelude::{
     types,
 };
 
-use crate::prelude::types::{EthGas, Yocto};
+use crate::prelude::types::EthGas;
 use crate::prelude::Address;
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
