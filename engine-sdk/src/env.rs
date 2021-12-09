@@ -2,6 +2,8 @@ use crate::error::{OneYoctoAttachError, PrivateCallError};
 use crate::prelude::{NearGas, H256};
 use aurora_engine_types::account_id::AccountId;
 
+pub const DEFAULT_PREPAID_GAS: NearGas = NearGas::new(300_000_000_000_000);
+
 /// Timestamp represented by the number of nanoseconds since the Unix Epoch.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Timestamp(u64);

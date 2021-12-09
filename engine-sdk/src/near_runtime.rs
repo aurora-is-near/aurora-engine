@@ -392,7 +392,7 @@ pub(crate) mod exports {
         fn account_balance(balance_ptr: u64);
         pub(crate) fn attached_deposit(balance_ptr: u64);
         pub(crate) fn prepaid_gas() -> u64;
-        pub(crate) fn used_gas() -> u64;
+        fn used_gas() -> u64;
         // ############
         // # Math API #
         // ############

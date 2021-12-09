@@ -1,5 +1,5 @@
 use aurora_engine::{connector, engine, parameters};
-use aurora_engine_sdk::env::{self, Env};
+use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::types::NearGas;
 use aurora_engine_types::TryFrom;
 use borsh::BorshDeserialize;
@@ -47,8 +47,7 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                 block_timestamp: block_metadata.timestamp,
                 attached_deposit: transaction_message.attached_near,
                 random_seed: block_metadata.random_seed,
-                // TODO: fix it?
-                prepaid_gas: NearGas::new(300_000_000_000_000),
+                prepaid_gas: DEFAULT_PREPAID_GAS,
             };
             let io =
                 storage.access_engine_storage_at_position(block_height, transaction_position, &[]);
