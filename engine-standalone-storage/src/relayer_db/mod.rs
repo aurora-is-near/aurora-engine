@@ -1,6 +1,6 @@
 use aurora_engine::engine;
 use aurora_engine::transaction::EthTransactionKind;
-use aurora_engine_sdk::env::{self, Env};
+use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::NearGas;
 use aurora_engine_types::H256;
@@ -82,7 +82,7 @@ where
         block_timestamp: env::Timestamp::new(0),
         attached_deposit: 0,
         random_seed: H256::zero(),
-        prepaid_gas: NearGas::new(0),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     };
     let mut handler = crate::promise::Noop;
 
