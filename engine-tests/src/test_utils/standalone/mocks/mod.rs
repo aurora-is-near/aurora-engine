@@ -46,7 +46,7 @@ pub fn default_env(block_height: u64) -> aurora_engine_sdk::env::Fixed {
         block_timestamp: aurora_engine_sdk::env::Timestamp::new(0),
         attached_deposit: 0,
         random_seed: H256::zero(),
-        prepaid_gas: NearGas::new(0),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     }
 }
 
