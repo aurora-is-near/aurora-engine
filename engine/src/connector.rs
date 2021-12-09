@@ -11,7 +11,7 @@ use crate::parameters::{
 use crate::prelude::{
     format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
     BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString,
-    Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
+    Vec, WithdrawCallArgs, Yocto, ERR_FAILED_PARSE, H160,
 };
 use crate::prelude::{
     AddressValidationError, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
@@ -23,7 +23,7 @@ use aurora_engine_types::types::ZERO_BALANCE;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
-pub const ZERO_ATTACHED_BALANCE: Balance = ZERO_BALANCE;
+pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
 /// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
 const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 /// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
@@ -180,8 +180,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: self.contract.prover_account.clone(),
             method: "verify_log_entry".to_string(),
             args: proof_to_verify,
-            attached_balance: ZERO_ATTACHED_BALANCE.into_u128(),
-            attached_gas: GAS_FOR_VERIFY_LOG_ENTRY.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_VERIFY_LOG_ENTRY,
         };
 
         // Finalize deposit
@@ -232,8 +232,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: current_account_id,
             method: "finish_deposit".to_string(),
             args: data,
-            attached_balance: ZERO_ATTACHED_BALANCE.into_u128(),
-            attached_gas: GAS_FOR_FINISH_DEPOSIT.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FINISH_DEPOSIT,
         };
         Ok(PromiseWithCallbackArgs {
             base: verify_call,

@@ -16,8 +16,8 @@ pub struct PromiseCreateArgs {
     pub target_account_id: AccountId,
     pub method: String,
     pub args: Vec<u8>,
-    pub attached_balance: u128,
-    pub attached_gas: u64,
+    pub attached_balance: Yocto,
+    pub attached_gas: NearGas,
 }
 
 #[must_use]

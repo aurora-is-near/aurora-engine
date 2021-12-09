@@ -874,15 +874,15 @@ mod contract {
             target_account_id: aurora_account_id.clone(),
             method: "verify_log_entry".to_string(),
             args: Vec::new(),
-            attached_balance: 0,
-            attached_gas: GAS_FOR_VERIFY.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_VERIFY,
         };
         let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
             target_account_id: aurora_account_id,
             method: "finish_deposit".to_string(),
             args: args.try_to_vec().unwrap(),
-            attached_balance: 0,
-            attached_gas: GAS_FOR_FINISH.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FINISH,
         };
         io.promise_crate_with_callback(&aurora_engine_types::parameters::PromiseWithCallbackArgs {
             base: verify_call,

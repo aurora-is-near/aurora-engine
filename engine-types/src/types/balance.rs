@@ -70,6 +70,31 @@ impl From<u64> for Balance {
     }
 }
 
+#[derive(
+    Default, BorshSerialize, BorshDeserialize, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd,
+)]
+/// Near Yocto type which wraps an underlying u128.
+/// 1 NEAR = 10^24 yoctoNEAR
+pub struct Yocto(u128);
+
+impl Display for Yocto {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Yocto {
+    /// Constructs a new `Yocto NEAR` with a given u128 value.
+    pub const fn new(yocto: u128) -> Yocto {
+        Self(yocto)
+    }
+
+    /// Consumes `Yocto NEAR` and returns the underlying type.
+    pub fn into_u128(self) -> u128 {
+        self.0
+    }
+}
+
 pub mod error {
     use crate::{fmt, String};
 

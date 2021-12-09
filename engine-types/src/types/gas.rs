@@ -1,7 +1,10 @@
 use crate::fmt::Formatter;
 use crate::{Add, Display, Div, Mul};
+use borsh::{BorshDeserialize, BorshSerialize};
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(
+    Default, BorshSerialize, BorshDeserialize, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd,
+)]
 /// Near gas type which wraps an underlying u64.
 pub struct NearGas(u64);
 

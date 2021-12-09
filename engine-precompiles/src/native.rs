@@ -13,7 +13,7 @@ use crate::prelude::{
     types,
 };
 
-use crate::prelude::types::EthGas;
+use crate::prelude::types::{EthGas, Yocto};
 use crate::prelude::Address;
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
@@ -24,7 +24,7 @@ use evm::{Context, ExitError};
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 mod costs {
-    use crate::prelude::types::EthGas;
+    use crate::prelude::types::{EthGas, NearGas};
 
     // TODO(#51): Determine the correct amount of gas
     pub(super) const EXIT_TO_NEAR_GAS: EthGas = EthGas::new(0);
@@ -33,14 +33,14 @@ mod costs {
     pub(super) const EXIT_TO_ETHEREUM_GAS: EthGas = EthGas::new(0);
 
     // TODO(#332): Determine the correct amount of gas
-    pub(super) const FT_TRANSFER_GAS: EthGas = EthGas::new(100_000_000_000_000);
+    pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(100_000_000_000_000);
 
     // TODO(#332): Determine the correct amount of gas
     #[cfg(feature = "error_refund")]
-    pub(super) const REFUND_ON_ERROR_GAS: EthGas = EthGas::new(60_000_000_000_000);
+    pub(super) const REFUND_ON_ERROR_GAS: NearGas = NearGas::new(60_000_000_000_000);
 
     // TODO(#332): Determine the correct amount of gas
-    pub(super) const WITHDRAWAL_GAS: EthGas = EthGas::new(100_000_000_000_000);
+    pub(super) const WITHDRAWAL_GAS: NearGas = NearGas::new(100_000_000_000_000);
 }
 
 pub mod events {
@@ -377,15 +377,15 @@ impl Precompile for ExitToNear {
             target_account_id: refund_on_error_target,
             method: "refund_on_error".to_string(),
             args: refund_args.try_to_vec().unwrap(),
-            attached_balance: 0,
-            attached_gas: costs::REFUND_ON_ERROR_GAS.into_u64(),
+            attached_balance: Yocto::new(0),
+            attached_gas: costs::REFUND_ON_ERROR_GAS,
         };
         let transfer_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
             method: "ft_transfer".to_string(),
             args: args.as_bytes().to_vec(),
-            attached_balance: 1,
-            attached_gas: costs::FT_TRANSFER_GAS.into_u64(),
+            attached_balance: Yocto::new(1),
+            attached_gas: costs::FT_TRANSFER_GAS,
         };
 
         #[cfg(feature = "error_refund")]
@@ -571,8 +571,8 @@ impl Precompile for ExitToEthereum {
             target_account_id: nep141_address,
             method: "withdraw".to_string(),
             args: serialized_args,
-            attached_balance: 1,
-            attached_gas: costs::WITHDRAWAL_GAS.into_u64(),
+            attached_balance: Yocto::new(1),
+            attached_gas: costs::WITHDRAWAL_GAS,
         };
 
         let promise = PromiseArgs::Create(withdraw_promise).try_to_vec().unwrap();

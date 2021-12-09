@@ -320,15 +320,15 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             target_account_id: receiver_id,
             method: "ft_on_transfer".to_string(),
             args: data1.into_bytes(),
-            attached_balance: ZERO_ATTACHED_BALANCE.into_u128(),
-            attached_gas: GAS_FOR_FT_ON_TRANSFER.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FT_ON_TRANSFER,
         };
         let ft_resolve_transfer_call = PromiseCreateArgs {
             target_account_id: current_account_id,
             method: "ft_resolve_transfer".to_string(),
             args: data2,
-            attached_balance: ZERO_ATTACHED_BALANCE.into_u128(),
-            attached_gas: GAS_FOR_RESOLVE_TRANSFER.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_RESOLVE_TRANSFER,
         };
         Ok(PromiseWithCallbackArgs {
             base: ft_on_transfer_call,
