@@ -326,11 +326,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         owner_id: EthAddress,
         amount: Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
-        sdk::log!(&format!(
+        /*sdk::log!(&format!(
             "Mint {} ETH tokens for: {}",
             amount,
             hex::encode(owner_id)
-        ));
+        ));*/
         self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
     }
 
