@@ -1142,9 +1142,7 @@ pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
 }
 
 pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
-    // The `unwrap` is safe here because if the connector
-    // is implemented correctly then the "Eth on Aurora" wll never underflow.
-    let balance = get_balance(io, address).try_into_u128().unwrap();
+    let balance = get_balance(io, address);
     // Apply changes for eth-connector. The `unwrap` is safe here because (a) if the connector
     // is implemented correctly then the total supply wll never underflow and (b) we are passing
     // in the balance directly so there will always be enough balance.
@@ -1412,9 +1410,11 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
 
     /// Get original storage value of address at index, if available.
     ///
-    /// Currently, this returns `None` for now.
-    fn original_storage(&self, _address: Address, _index: H256) -> Option<H256> {
-        None
+    /// Since SputnikVM collects storage changes in memory until the transaction is over,
+    /// the "original storage" will always be the same as the storage because no values
+    /// are written to storage until after the transaction is complete.
+    fn original_storage(&self, address: Address, index: H256) -> Option<H256> {
+        Some(self.storage(address, index))
     }
 }
 

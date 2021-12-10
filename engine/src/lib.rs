@@ -518,13 +518,15 @@ mod contract {
         let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
         engine::set_state(&mut io, state);
+        let mut connector = EthConnectorContract::init_instance(io);
         // set genesis block balances
         for account_balance in args.genesis_alloc {
-            engine::set_balance(
-                &mut io,
-                &Address(account_balance.address),
-                &crate::prelude::types::Wei::new(U256::from(account_balance.balance)),
-            )
+            connector
+                .mint_eth_on_aurora(
+                    account_balance.address,
+                    crate::prelude::types::Wei::new(U256::from(account_balance.balance)),
+                )
+                .sdk_unwrap();
         }
         // return new chain ID
         io.return_output(&engine::get_state(&io).sdk_unwrap().chain_id)

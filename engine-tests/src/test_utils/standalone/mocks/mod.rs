@@ -47,8 +47,7 @@ pub fn default_env(block_height: u64) -> aurora_engine_sdk::env::Fixed {
     }
 }
 
-pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E) {
-    let chain_id = test_utils::AuroraRunner::default().chain_id;
+pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
     let new_args = NewCallArgs {
         chain_id: aurora_engine_types::types::u256_to_arr(&U256::from(chain_id)),
         owner_id: env.current_account_id(),

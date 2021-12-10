@@ -25,4 +25,3 @@ rocksdb = "0.16.0"
 default = []
 mainnet = []
 testnet = []
-betanet = []

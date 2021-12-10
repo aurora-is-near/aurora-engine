@@ -25,11 +25,16 @@ pub struct StandaloneRunner {
 
 impl StandaloneRunner {
     pub fn init_evm(&mut self) {
+        self.init_evm_with_chain_id(self.chain_id)
+    }
+
+    pub fn init_evm_with_chain_id(&mut self, chain_id: u64) {
+        self.chain_id = chain_id;
         let storage = &mut self.storage;
         let env = &mut self.env;
         env.block_height += 1;
         let io = Self::get_engine_io(storage, env, 0, H256([0u8; 32]));
-        mocks::init_evm(io.engine_io, env);
+        mocks::init_evm(io.engine_io, env, chain_id);
         io.finish().commit(storage, &mut self.cumulative_diff);
     }
 
@@ -71,6 +76,24 @@ impl StandaloneRunner {
         env.block_height += 1;
         let signed_tx = test_utils::sign_transaction(transaction, Some(self.chain_id), account);
         let transaction_bytes = rlp::encode(&signed_tx).to_vec();
+
+        Self::internal_submit_transaction(
+            &transaction_bytes,
+            0,
+            storage,
+            env,
+            &mut self.cumulative_diff,
+        )
+    }
+
+    pub fn submit_raw_transaction_bytes(
+        &mut self,
+        transaction_bytes: &[u8],
+    ) -> Result<SubmitResult, engine::EngineError> {
+        self.env.predecessor_account_id = "some-account.near".parse().unwrap();
+        let storage = &mut self.storage;
+        let env = &mut self.env;
+        env.block_height += 1;
 
         Self::internal_submit_transaction(
             &transaction_bytes,

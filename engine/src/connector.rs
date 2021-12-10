@@ -11,7 +11,7 @@ use crate::parameters::{
 use crate::prelude::{
     format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
     BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString,
-    Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
+    Vec, Wei, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
 };
 use crate::prelude::{
     AddressValidationError, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
@@ -287,7 +287,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub(crate) fn internal_remove_eth(
         &mut self,
         address: &Address,
-        amount: Balance,
+        amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         self.burn_eth_on_aurora(address.0, amount)?;
         self.save_ft_contract();
@@ -321,10 +321,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     ///  Mint ETH tokens
-    fn mint_eth_on_aurora(
+    pub(crate) fn mint_eth_on_aurora(
         &mut self,
         owner_id: EthAddress,
-        amount: Balance,
+        amount: Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!(&format!(
             "Mint {} ETH tokens for: {}",
@@ -338,7 +338,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     fn burn_eth_on_aurora(
         &mut self,
         address: EthAddress,
-        amount: Balance,
+        amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         sdk::log!(&format!(
             "Burn {} ETH tokens for: {}",
@@ -385,7 +385,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
     pub fn ft_total_eth_supply_on_aurora(&mut self) {
-        let total_supply = self.ft.ft_total_eth_supply_on_aurora();
+        let total_supply = self.ft.ft_total_eth_supply_on_aurora().raw();
         sdk::log!(&format!("Total ETH supply on Aurora: {}", total_supply));
         self.io
             .return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
@@ -410,7 +410,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<(), crate::prelude::types::error::BalanceOverflowError> {
         let balance = self
             .ft
-            .internal_unwrap_balance_of_eth_on_aurora(args.address)?;
+            .internal_unwrap_balance_of_eth_on_aurora(args.address);
         sdk::log!(&format!(
             "Balance of ETH [{}]: {}",
             hex::encode(args.address),
@@ -491,11 +491,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Additional check overflow before process `ft_on_transfer`
             // But don't check overflow for relayer
             // Note: It can't overflow because the total supply doesn't change during transfer.
+            let amount = Wei::new(args.amount.into());
             let amount_for_check = self
                 .ft
-                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient)
-                .map_err(error::FtTransferCallError::BalanceOverflow)?;
-            if amount_for_check.checked_add(args.amount).is_none() {
+                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
+            if amount_for_check.checked_add(amount).is_none() {
                 return Err(error::FtTransferCallError::Transfer(
                     fungible_token::error::TransferError::BalanceOverflow,
                 ));
@@ -503,7 +503,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             if self
                 .ft
                 .total_eth_supply_on_aurora
-                .checked_add(args.amount)
+                .checked_add(amount)
                 .is_none()
             {
                 return Err(error::FtTransferCallError::Transfer(
@@ -600,10 +600,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (fee, relayer) {
             (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
-                self.mint_eth_on_aurora(message_data.recipient, args.amount - fee)?;
-                self.mint_eth_on_aurora(evm_relayer_address, fee)?;
+                let fee = Wei::new(fee.into());
+                let recipient_amount = Wei::new(args.amount.into()) - fee;
+                self.mint_eth_on_aurora(message_data.recipient, recipient_amount)?;
+                self.mint_eth_on_aurora(evm_relayer_address, fee)?
             }
-            _ => self.mint_eth_on_aurora(message_data.recipient, args.amount)?,
+            _ => self.mint_eth_on_aurora(message_data.recipient, Wei::new(args.amount.into()))?,
         }
         self.save_ft_contract();
         self.io.return_output("\"0\"".as_bytes());

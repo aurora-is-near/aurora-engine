@@ -10,7 +10,7 @@ name: Tests
 jobs:
 
   test:
-    name: Test suite (mainnet, testnet, betanet)
+    name: Test suite (mainnet, testnet)
     runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
@@ -30,11 +30,6 @@ jobs:
         run: ls -la target/wasm32-unknown-unknown/release && ls -la
       - run: cargo test --features testnet-test
 
-      - run: make betanet-test-build
-      - name: List directories
-        run: ls -la target/wasm32-unknown-unknown/release && ls -la
-      - run: cargo test --features betanet-test
- 
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry sccache yarn_cache

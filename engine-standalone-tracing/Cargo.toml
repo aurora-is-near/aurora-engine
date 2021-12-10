@@ -26,4 +26,3 @@ evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", defau
 default = []
 mainnet = []
 testnet = []
-betanet = []
