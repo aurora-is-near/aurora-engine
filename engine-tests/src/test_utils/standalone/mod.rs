@@ -2,6 +2,7 @@ use aurora_engine::engine;
 use aurora_engine::parameters::{CallArgs, DeployErc20TokenArgs, SubmitResult, TransactionStatus};
 use aurora_engine::transaction::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_sdk::env::{self, Env};
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{types::Wei, Address, H256, U256};
 use borsh::BorshDeserialize;
 use engine_standalone_storage::engine_state;
@@ -148,6 +149,7 @@ impl StandaloneRunner {
         env.predecessor_account_id = ctx.predecessor_account_id.as_ref().parse().unwrap();
         env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
+        env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
 
         let storage = &mut self.storage;
         if method_name == test_utils::SUBMIT {

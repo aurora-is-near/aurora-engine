@@ -11,8 +11,10 @@ use crate::prelude::{
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
+/// Gas for `resolve_transfer`: 5 TGas
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
-const GAS_FOR_FT_ON_TRANSFER: NearGas = NearGas::new(10_000_000_000_000);
+/// Gas for `ft_on_transfer`
+const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(35_000_000_000_000);
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
@@ -287,6 +289,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         self.get_account_eth_balance(account_id).unwrap_or(0)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn ft_transfer_call(
         &mut self,
         sender_id: AccountId,
@@ -295,6 +298,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         memo: &Option<String>,
         msg: String,
         current_account_id: AccountId,
+        prepaid_gas: NearGas,
     ) -> Result<PromiseWithCallbackArgs, error::TransferError> {
         // Special case for Aurora transfer itself - we shouldn't transfer
         if sender_id != receiver_id {
@@ -321,7 +325,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             method: "ft_on_transfer".to_string(),
             args: data1.into_bytes(),
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_FT_ON_TRANSFER.into_u64(),
+            attached_gas: (prepaid_gas - GAS_FOR_FT_TRANSFER_CALL - GAS_FOR_RESOLVE_TRANSFER)
+                .into_u64(),
         };
         let ft_resolve_transfer_call = PromiseCreateArgs {
             target_account_id: current_account_id,
