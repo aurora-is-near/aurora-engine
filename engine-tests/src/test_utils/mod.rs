@@ -16,10 +16,11 @@ use crate::prelude::parameters::{
     InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs,
 };
 use crate::prelude::transaction::{
-    access_list::{self, AccessListEthSignedTransaction, AccessListEthTransaction},
-    LegacyEthSignedTransaction, LegacyEthTransaction,
+    eip_1559::{self, SignedTransaction1559, Transaction1559},
+    eip_2930::{self, SignedTransaction2930, Transaction2930},
+    legacy::{LegacyEthSignedTransaction, TransactionLegacy},
 };
-use crate::prelude::{sdk, Address, Wei, U256};
+use crate::prelude::{sdk, Address, Wei, H256, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
@@ -29,15 +30,20 @@ pub fn origin() -> String {
 }
 
 pub(crate) const SUBMIT: &str = "submit";
+pub(crate) const CALL: &str = "call";
+pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
 pub(crate) mod one_inch;
+pub(crate) mod random;
 pub(crate) mod rust;
 pub(crate) mod self_destruct;
 pub(crate) mod solidity;
+pub(crate) mod standalone;
 pub(crate) mod standard_precompiles;
 pub(crate) mod uniswap;
+pub(crate) mod weth;
 
 pub(crate) struct Signer {
     pub nonce: u64,
@@ -76,6 +82,9 @@ pub(crate) struct AuroraRunner {
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
     pub previous_logs: Vec<String>,
+    // Use the standalone in parallel if set. This allows checking both
+    // implementations give the same results.
+    pub standalone_runner: Option<standalone::StandaloneRunner>,
 }
 
 /// Same as `AuroraRunner`, but consumes `self` on execution (thus preventing building on
@@ -189,6 +198,18 @@ impl AuroraRunner {
             self.context.storage_usage = outcome.storage_usage;
             self.previous_logs = outcome.logs.clone();
         }
+
+        if let Some(standalone_runner) = &mut self.standalone_runner {
+            if maybe_error.is_none()
+                && (method_name == SUBMIT || method_name == CALL || method_name == DEPLOY_ERC20)
+            {
+                standalone_runner
+                    .submit_raw(method_name, &self.context)
+                    .unwrap();
+                self.validate_standalone();
+            }
+        }
+
         (maybe_outcome, maybe_error)
     }
 
@@ -197,6 +218,26 @@ impl AuroraRunner {
         address: Address,
         init_balance: crate::prelude::Wei,
         init_nonce: U256,
+    ) {
+        self.internal_create_address(address, init_balance, init_nonce, None)
+    }
+
+    pub fn create_address_with_code(
+        &mut self,
+        address: Address,
+        init_balance: crate::prelude::Wei,
+        init_nonce: U256,
+        code: Vec<u8>,
+    ) {
+        self.internal_create_address(address, init_balance, init_nonce, Some(code))
+    }
+
+    fn internal_create_address(
+        &mut self,
+        address: Address,
+        init_balance: crate::prelude::Wei,
+        init_nonce: U256,
+        code: Option<Vec<u8>>,
     ) {
         let trie = &mut self.ext.fake_trie;
 
@@ -212,6 +253,14 @@ impl AuroraRunner {
         );
         let nonce_value = crate::prelude::u256_to_arr(&init_nonce);
 
+        if let Some(code) = code.clone() {
+            let code_key = crate::prelude::storage::address_to_key(
+                crate::prelude::storage::KeyPrefix::Code,
+                &address,
+            );
+            trie.insert(code_key.to_vec(), code);
+        }
+
         let ft_key = crate::prelude::storage::bytes_to_key(
             crate::prelude::storage::KeyPrefix::EthConnector,
             &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
@@ -221,16 +270,48 @@ impl AuroraRunner {
                 .get(&ft_key)
                 .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
                 .unwrap_or_default();
-            current_ft.total_eth_supply_on_aurora += init_balance.raw().as_u128();
+            current_ft.total_eth_supply_on_near += init_balance.raw().as_u128();
             current_ft
         };
+
+        let aurora_balance_key = [
+            ft_key.as_slice(),
+            self.context.current_account_id.as_ref().as_bytes(),
+        ]
+        .concat();
+        let aurora_balance_value = {
+            let mut current_balance: u128 = trie
+                .get(&aurora_balance_key)
+                .map(|bytes| u128::try_from_slice(&bytes).unwrap())
+                .unwrap_or_default();
+            current_balance += init_balance.raw().as_u128();
+            current_balance
+        };
+
+        let proof_key = crate::prelude::storage::bytes_to_key(
+            crate::prelude::storage::KeyPrefix::EthConnector,
+            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent as u8],
+        );
 
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         trie.insert(ft_key, ft_value.try_to_vec().unwrap());
+        trie.insert(proof_key, vec![0]);
+        trie.insert(
+            aurora_balance_key,
+            aurora_balance_value.try_to_vec().unwrap(),
+        );
+
+        if let Some(standalone_runner) = &mut self.standalone_runner {
+            standalone_runner.env.block_height = self.context.block_index;
+            standalone_runner.mint_account(address, init_balance, init_nonce, code);
+            self.validate_standalone();
+        }
+
+        self.context.block_index += 1;
     }
 
-    pub fn submit_with_signer<F: FnOnce(U256) -> LegacyEthTransaction>(
+    pub fn submit_with_signer<F: FnOnce(U256) -> TransactionLegacy>(
         &mut self,
         signer: &mut Signer,
         make_tx: F,
@@ -239,7 +320,7 @@ impl AuroraRunner {
             .map(|(result, _)| result)
     }
 
-    pub fn submit_with_signer_profiled<F: FnOnce(U256) -> LegacyEthTransaction>(
+    pub fn submit_with_signer_profiled<F: FnOnce(U256) -> TransactionLegacy>(
         &mut self,
         signer: &mut Signer,
         make_tx: F,
@@ -252,7 +333,7 @@ impl AuroraRunner {
     pub fn submit_transaction(
         &mut self,
         account: &SecretKey,
-        transaction: LegacyEthTransaction,
+        transaction: TransactionLegacy,
     ) -> Result<SubmitResult, VMError> {
         self.submit_transaction_profiled(account, transaction)
             .map(|(result, _)| result)
@@ -261,7 +342,7 @@ impl AuroraRunner {
     pub fn submit_transaction_profiled(
         &mut self,
         account: &SecretKey,
-        transaction: LegacyEthTransaction,
+        transaction: TransactionLegacy,
     ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
         let calling_account_id = "some-account.near";
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
@@ -280,7 +361,7 @@ impl AuroraRunner {
         }
     }
 
-    pub fn deploy_contract<F: FnOnce(&T) -> LegacyEthTransaction, T: Into<ContractConstructor>>(
+    pub fn deploy_contract<F: FnOnce(&T) -> TransactionLegacy, T: Into<ContractConstructor>>(
         &mut self,
         account: &SecretKey,
         constructor_tx: F,
@@ -336,6 +417,21 @@ impl AuroraRunner {
         self.getter_method_call("get_code", address)
     }
 
+    pub fn get_storage(&self, address: Address, key: H256) -> H256 {
+        let input = aurora_engine::parameters::GetStorageAtArgs {
+            address: address.0,
+            key: key.0,
+        };
+        let (outcome, maybe_error) =
+            self.one_shot()
+                .call("get_storage_at", "getter", input.try_to_vec().unwrap());
+        assert!(maybe_error.is_none());
+        let output = outcome.unwrap().return_data.as_value().unwrap();
+        let mut result = [0u8; 32];
+        result.copy_from_slice(&output);
+        H256(result)
+    }
+
     fn u256_getter_method_call(&self, method_name: &str, address: Address) -> U256 {
         let bytes = self.getter_method_call(method_name, address);
         U256::from_big_endian(&bytes)
@@ -362,6 +458,30 @@ impl AuroraRunner {
             Ok(bytes)
         }
     }
+
+    pub fn with_random_seed(mut self, random_seed: H256) -> Self {
+        self.context.random_seed = random_seed.as_bytes().to_vec();
+        self
+    }
+
+    fn validate_standalone(&self) {
+        if let Some(standalone_runner) = &self.standalone_runner {
+            let standalone_state = standalone_runner.get_current_state();
+            // The number of keys in standalone_state may be larger because values are never deleted
+            // (they are replaced with a Deleted identifier instead; this is important for replaying transactions).
+            assert!(self.ext.fake_trie.len() <= standalone_state.iter().count());
+            for (key, value) in standalone_state.iter() {
+                let trie_value = self.ext.fake_trie.get(key).map(|v| v.as_slice());
+                let standalone_value = value.value();
+                if trie_value != standalone_value {
+                    panic!(
+                        "Standalone mismatch at {:?}.\nStandlaone: {:?}\nWasm      : {:?}",
+                        key, standalone_value, trie_value
+                    );
+                }
+            }
+        }
+    }
 }
 
 impl Default for AuroraRunner {
@@ -372,7 +492,7 @@ impl Default for AuroraRunner {
         } else if cfg!(feature = "testnet-test") {
             std::fs::read("../testnet-test.wasm").unwrap()
         } else {
-            std::fs::read("../betanet-test.wasm").unwrap()
+            panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
         };
         let mut wasm_config = VMConfig::default();
         // See https://github.com/near/nearcore/pull/4979/
@@ -380,7 +500,7 @@ impl Default for AuroraRunner {
 
         Self {
             aurora_account_id: aurora_account_id.clone(),
-            chain_id: 1313161556, // NEAR betanet
+            chain_id: 1313161556, // NEAR localnet,
             code: ContractCode::new(evm_wasm_bytes, None),
             cache: Default::default(),
             ext: Default::default(),
@@ -406,6 +526,7 @@ impl Default for AuroraRunner {
             fees_config: RuntimeFeesConfig::test(),
             current_protocol_version: u32::MAX,
             previous_logs: Default::default(),
+            standalone_runner: None,
         }
     }
 }
@@ -461,28 +582,27 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
 
     assert!(maybe_error.is_none());
 
+    let mut standalone_runner = standalone::StandaloneRunner::default();
+    standalone_runner.init_evm();
+
+    runner.standalone_runner = Some(standalone_runner);
+    runner.validate_standalone();
+
     runner
 }
 
-pub(crate) fn transfer(
-    to: Address,
-    amount: crate::prelude::Wei,
-    nonce: U256,
-) -> LegacyEthTransaction {
-    LegacyEthTransaction {
+pub(crate) fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
+    TransactionLegacy {
         nonce,
         gas_price: Default::default(),
-        gas: u64::MAX.into(),
+        gas_limit: u64::MAX.into(),
         to: Some(to),
         value: amount,
         data: Vec::new(),
     }
 }
 
-pub(crate) fn create_deploy_transaction(
-    contract_bytes: Vec<u8>,
-    nonce: U256,
-) -> LegacyEthTransaction {
+pub(crate) fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> TransactionLegacy {
     let len = contract_bytes.len();
     if len > u16::MAX as usize {
         panic!("Cannot deploy a contract with that many bytes!");
@@ -502,10 +622,10 @@ pub(crate) fn create_deploy_transaction(
         .chain(contract_bytes.into_iter())
         .collect();
 
-    LegacyEthTransaction {
+    TransactionLegacy {
         nonce,
         gas_price: Default::default(),
-        gas: u64::MAX.into(),
+        gas_limit: u64::MAX.into(),
         to: None,
         value: Wei::zero(),
         data,
@@ -520,10 +640,10 @@ pub(crate) fn create_eth_transaction(
     secret_key: &SecretKey,
 ) -> LegacyEthSignedTransaction {
     // nonce, gas_price and gas are not used by EVM contract currently
-    let tx = LegacyEthTransaction {
+    let tx = TransactionLegacy {
         nonce: Default::default(),
         gas_price: Default::default(),
-        gas: u64::MAX.into(),
+        gas_limit: u64::MAX.into(),
         to,
         value,
         data,
@@ -531,7 +651,7 @@ pub(crate) fn create_eth_transaction(
     sign_transaction(tx, chain_id, secret_key)
 }
 
-pub(crate) fn as_view_call(tx: LegacyEthTransaction, sender: Address) -> ViewCallArgs {
+pub(crate) fn as_view_call(tx: TransactionLegacy, sender: Address) -> ViewCallArgs {
     ViewCallArgs {
         sender: sender.0,
         address: tx.to.unwrap().0,
@@ -541,7 +661,7 @@ pub(crate) fn as_view_call(tx: LegacyEthTransaction, sender: Address) -> ViewCal
 }
 
 pub(crate) fn sign_transaction(
-    tx: LegacyEthTransaction,
+    tx: TransactionLegacy,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
 ) -> LegacyEthSignedTransaction {
@@ -566,11 +686,11 @@ pub(crate) fn sign_transaction(
 }
 
 pub(crate) fn sign_access_list_transaction(
-    tx: AccessListEthTransaction,
+    tx: Transaction2930,
     secret_key: &SecretKey,
-) -> AccessListEthSignedTransaction {
+) -> SignedTransaction2930 {
     let mut rlp_stream = RlpStream::new();
-    rlp_stream.append(&access_list::TYPE_BYTE);
+    rlp_stream.append(&eip_2930::TYPE_BYTE);
     tx.rlp_append_unsigned(&mut rlp_stream);
     let message_hash = sdk::keccak(rlp_stream.as_raw());
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
@@ -579,8 +699,30 @@ pub(crate) fn sign_access_list_transaction(
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());
 
-    AccessListEthSignedTransaction {
-        transaction_data: tx,
+    SignedTransaction2930 {
+        transaction: tx,
+        parity: recovery_id.serialize(),
+        r,
+        s,
+    }
+}
+
+pub(crate) fn sign_eip_1559_transaction(
+    tx: Transaction1559,
+    secret_key: &SecretKey,
+) -> SignedTransaction1559 {
+    let mut rlp_stream = RlpStream::new();
+    rlp_stream.append(&eip_1559::TYPE_BYTE);
+    tx.rlp_append_unsigned(&mut rlp_stream);
+    let message_hash = sdk::keccak(rlp_stream.as_raw());
+    let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
+
+    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let r = U256::from_big_endian(&signature.r.b32());
+    let s = U256::from_big_endian(&signature.s.b32());
+
+    SignedTransaction1559 {
+        transaction: tx,
         parity: recovery_id.serialize(),
         r,
         s,

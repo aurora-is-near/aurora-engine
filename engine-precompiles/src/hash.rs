@@ -1,17 +1,20 @@
 #[cfg(feature = "contract")]
 use crate::prelude::sdk;
+use crate::prelude::types::EthGas;
 use crate::prelude::{vec, Address};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
 mod costs {
-    pub(super) const SHA256_BASE: u64 = 60;
+    use crate::prelude::types::EthGas;
 
-    pub(super) const SHA256_PER_WORD: u64 = 12;
+    pub(super) const SHA256_BASE: EthGas = EthGas::new(60);
 
-    pub(super) const RIPEMD160_BASE: u64 = 600;
+    pub(super) const SHA256_PER_WORD: EthGas = EthGas::new(12);
 
-    pub(super) const RIPEMD160_PER_WORD: u64 = 120;
+    pub(super) const RIPEMD160_BASE: EthGas = EthGas::new(600);
+
+    pub(super) const RIPEMD160_PER_WORD: EthGas = EthGas::new(120);
 }
 
 mod consts {
@@ -28,7 +31,7 @@ impl SHA256 {
 }
 
 impl Precompile for SHA256 {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(
             (input.len() as u64 + consts::SHA256_WORD_LEN - 1) / consts::SHA256_WORD_LEN
                 * costs::SHA256_PER_WORD
@@ -41,8 +44,9 @@ impl Precompile for SHA256 {
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(not(feature = "contract"))]
     fn run(
+        &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -64,8 +68,9 @@ impl Precompile for SHA256 {
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
     #[cfg(feature = "contract")]
     fn run(
+        &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -98,7 +103,7 @@ impl RIPEMD160 {
 }
 
 impl Precompile for RIPEMD160 {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(
             (input.len() as u64 + consts::RIPEMD_WORD_LEN - 1) / consts::RIPEMD_WORD_LEN
                 * costs::RIPEMD160_PER_WORD
@@ -110,8 +115,9 @@ impl Precompile for RIPEMD160 {
     /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000003
     fn run(
+        &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -147,7 +153,8 @@ mod tests {
             hex::decode("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
                 .unwrap();
 
-        let res = SHA256::run(input, Some(60), &new_context(), false)
+        let res = SHA256
+            .run(input, Some(EthGas::new(60)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);
@@ -160,7 +167,8 @@ mod tests {
             hex::decode("0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31")
                 .unwrap();
 
-        let res = RIPEMD160::run(input, Some(600), &new_context(), false)
+        let res = RIPEMD160
+            .run(input, Some(EthGas::new(600)), &new_context(), false)
             .unwrap()
             .output;
         assert_eq!(res, expected);

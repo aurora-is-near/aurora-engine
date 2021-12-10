@@ -1,5 +1,5 @@
 use crate::prelude::{
-    parameters::SubmitResult, transaction::LegacyEthTransaction, Address, Wei, U256,
+    parameters::SubmitResult, transaction::legacy::TransactionLegacy, Address, Wei, U256,
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 
@@ -11,13 +11,20 @@ pub const DEST_ADDRESS: Address =
     aurora_engine_precompiles::make_address(0xe0f5206b, 0xbd039e7b0592d8918820024e2a7437b9);
 
 impl TesterConstructor {
+    #[cfg(feature = "error_refund")]
+    pub fn load() -> Self {
+        Self(solidity::ContractConstructor::compile_from_extended_json(
+            "../etc/eth-contracts/artifacts/contracts/test/TesterV2.sol/TesterV2.json",
+        ))
+    }
+    #[cfg(not(feature = "error_refund"))]
     pub fn load() -> Self {
         Self(solidity::ContractConstructor::compile_from_extended_json(
             "../etc/eth-contracts/artifacts/contracts/test/Tester.sol/Tester.json",
         ))
     }
 
-    pub fn deploy(&self, nonce: u64, token: Address) -> LegacyEthTransaction {
+    pub fn deploy(&self, nonce: u64, token: Address) -> TransactionLegacy {
         let data = self
             .0
             .abi
@@ -26,10 +33,10 @@ impl TesterConstructor {
             .encode_input(self.0.code.clone(), &[ethabi::Token::Address(token)])
             .unwrap();
 
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce: nonce.into(),
             gas_price: Default::default(),
-            gas: U256::from(DEPLOY_CONTRACT_GAS),
+            gas_limit: U256::from(DEPLOY_CONTRACT_GAS),
             to: None,
             value: Default::default(),
             data,
@@ -70,10 +77,10 @@ impl Tester {
             .encode_input(params)
             .unwrap();
 
-        let tx = LegacyEthTransaction {
+        let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: Default::default(),
-            gas: U256::from(DEPLOY_CONTRACT_GAS),
+            gas_limit: U256::from(DEPLOY_CONTRACT_GAS),
             to: Some(self.contract.address),
             value,
             data,

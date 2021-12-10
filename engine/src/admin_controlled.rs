@@ -1,15 +1,8 @@
-use crate::prelude::sdk;
-
 pub type PausedMask = u8;
 
 pub const ERR_PAUSED: &str = "ERR_PAUSED";
 
 pub trait AdminControlled {
-    /// Returns true if the current account is owner
-    fn is_owner(&self) -> bool {
-        sdk::current_account_id() == sdk::predecessor_account_id()
-    }
-
     /// Return the current mask representing all paused events.
     fn get_paused(&self) -> PausedMask;
 
@@ -19,12 +12,23 @@ pub trait AdminControlled {
     fn set_paused(&mut self, paused: PausedMask);
 
     /// Return if the contract is paused for the current flag and user
-    fn is_paused(&self, flag: PausedMask) -> bool {
-        (self.get_paused() & flag) != 0 && !self.is_owner()
+    fn is_paused(&self, flag: PausedMask, is_owner: bool) -> bool {
+        (self.get_paused() & flag) != 0 && !is_owner
     }
 
-    /// Asserts the passed paused flag is not set. Panics with "ERR_PAUSED" if the flag is set.
-    fn assert_not_paused(&self, flag: PausedMask) {
-        assert!(!self.is_paused(flag), "{}", ERR_PAUSED);
+    /// Asserts the passed paused flag is not set. Returns `PausedError` if paused.
+    fn assert_not_paused(&self, flag: PausedMask, is_owner: bool) -> Result<(), PausedError> {
+        if self.is_paused(flag, is_owner) {
+            Err(PausedError)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub struct PausedError;
+impl AsRef<[u8]> for PausedError {
+    fn as_ref(&self) -> &[u8] {
+        ERR_PAUSED.as_bytes()
     }
 }

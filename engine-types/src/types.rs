@@ -1,13 +1,158 @@
-use super::{str, vec, Add, Address, String, Sub, Vec, U256};
+use crate::{str, vec, Add, Address, Display, Div, Mul, String, Sub, Vec, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
 
+use crate::fmt::Formatter;
+
+// TODO: introduce new Balance type for more strict typing
 pub type Balance = u128;
 pub type RawAddress = [u8; 20];
-pub type RawU256 = [u8; 32]; // Big-endian large integer type.
+pub type RawU256 = [u8; 32];
+// Big-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
+
+// TODO: introduce new type. Add encode/decode/validation methods
 pub type EthAddress = [u8; 20];
-pub type Gas = u64;
 pub type StorageUsage = u64;
+/// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
+pub type WeiU256 = [u8; 32];
+
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+/// Near gas type which wraps an underlying u64.
+pub struct NearGas(u64);
+
+impl Sub<NearGas> for NearGas {
+    type Output = NearGas;
+
+    fn sub(self, rhs: NearGas) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl Display for NearGas {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl NearGas {
+    /// Constructs a new `NearGas` with a given u64 value.
+    pub const fn new(gas: u64) -> NearGas {
+        Self(gas)
+    }
+
+    /// Consumes `NearGas` and returns the underlying type.
+    pub fn into_u64(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+/// Ethereum gas type which wraps an underlying u64.
+pub struct EthGas(u64);
+
+impl Display for EthGas {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl EthGas {
+    /// Constructs a new `EthGas` with a given u64 value.
+    pub const fn new(gas: u64) -> EthGas {
+        Self(gas)
+    }
+
+    /// Consumes `EthGas` and returns the underlying type.
+    pub fn into_u64(self) -> u64 {
+        self.0
+    }
+}
+
+impl Add<EthGas> for EthGas {
+    type Output = EthGas;
+
+    fn add(self, rhs: EthGas) -> Self::Output {
+        EthGas(self.0 + rhs.0)
+    }
+}
+
+impl Div<usize> for EthGas {
+    type Output = EthGas;
+
+    fn div(self, rhs: usize) -> Self::Output {
+        EthGas(self.0 / rhs as u64)
+    }
+}
+
+impl Mul<EthGas> for u32 {
+    type Output = EthGas;
+
+    fn mul(self, rhs: EthGas) -> Self::Output {
+        EthGas(self as u64 * rhs.0)
+    }
+}
+
+impl Mul<u32> for EthGas {
+    type Output = EthGas;
+
+    fn mul(self, rhs: u32) -> Self::Output {
+        EthGas(self.0 * rhs as u64)
+    }
+}
+
+impl Mul<usize> for EthGas {
+    type Output = EthGas;
+
+    fn mul(self, rhs: usize) -> Self::Output {
+        EthGas(self.0 * rhs as u64)
+    }
+}
+
+impl Mul<EthGas> for u64 {
+    type Output = EthGas;
+
+    fn mul(self, rhs: EthGas) -> Self::Output {
+        EthGas(self * rhs.0)
+    }
+}
+
+#[derive(
+    Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
+)]
+/// Engine `fee` type which wraps an underlying u128.
+pub struct Fee(u128);
+
+impl Display for Fee {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Fee {
+    /// Constructs a new `Fee` with a given u128 value.
+    pub const fn new(fee: u128) -> Fee {
+        Self(fee)
+    }
+
+    /// Consumes `Fee` and returns the underlying type.
+    pub fn into_u128(self) -> u128 {
+        self.0
+    }
+}
+
+impl Add<Fee> for Fee {
+    type Output = Fee;
+
+    fn add(self, rhs: Fee) -> Self::Output {
+        Fee(self.0 + rhs.0)
+    }
+}
+
+impl From<u128> for Fee {
+    fn from(fee: u128) -> Self {
+        Self(fee)
+    }
+}
 
 /// Selector to call mint function in ERC 20 contract
 ///
@@ -16,35 +161,35 @@ pub type StorageUsage = u64;
 pub const ERC20_MINT_SELECTOR: &[u8] = &[64, 193, 15, 25];
 
 #[derive(Debug)]
-pub enum ValidationError {
-    EthAddressFailedDecode,
-    WrongEthAddress,
+pub enum AddressValidationError {
+    FailedDecodeHex,
+    IncorrectLength,
 }
 
-impl AsRef<[u8]> for ValidationError {
+impl AsRef<[u8]> for AddressValidationError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::EthAddressFailedDecode => b"FAILED_DECODE_ETH_ADDRESS",
-            Self::WrongEthAddress => b"WRONG_ETH_ADDRESS",
+            Self::FailedDecodeHex => b"FAILED_DECODE_ETH_ADDRESS",
+            Self::IncorrectLength => b"ETH_WRONG_ADDRESS_LENGTH",
         }
     }
 }
 
-/// Validate Etherium address from string and return EthAddress
-pub fn validate_eth_address(address: String) -> Result<EthAddress, ValidationError> {
-    let data = hex::decode(address).map_err(|_| ValidationError::EthAddressFailedDecode)?;
+/// Validate Ethereum address from string and return Result data EthAddress or Error data
+pub fn validate_eth_address(address: String) -> Result<EthAddress, AddressValidationError> {
+    let data = hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
     if data.len() != 20 {
-        return Err(ValidationError::WrongEthAddress);
+        return Err(AddressValidationError::IncorrectLength);
     }
-    assert_eq!(data.len(), 20, "ETH_WRONG_ADDRESS_LENGTH");
     let mut result = [0u8; 20];
     result.copy_from_slice(&data);
     Ok(result)
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Default)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Wei(U256);
+
 impl Wei {
     const ETH_TO_WEI: U256 = U256([1_000_000_000_000_000_000, 0, 0, 0]);
 
@@ -52,7 +197,7 @@ impl Wei {
         Self(U256([0, 0, 0, 0]))
     }
 
-    pub fn new(amount: U256) -> Self {
+    pub const fn new(amount: U256) -> Self {
         Self(amount)
     }
 
@@ -81,33 +226,53 @@ impl Wei {
         self.0
     }
 
-    pub fn checked_sub(self, other: Self) -> Option<Self> {
-        self.0.checked_sub(other.0).map(Self)
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.checked_sub(rhs.0).map(Self)
     }
 
-    pub fn checked_add(self, other: Self) -> Option<Self> {
-        self.0.checked_add(other.0).map(Self)
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0).map(Self)
     }
-}
-impl Sub for Wei {
-    type Output = Self;
 
-    fn sub(self, other: Self) -> Self::Output {
-        Self(self.0 - other.0)
-    }
-}
-impl Add for Wei {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self::Output {
-        Self(self.0 + other.0)
+    /// Try convert U256 to u128 with checking overflow.
+    /// NOTICE: Error can contain only overflow
+    pub fn try_into_u128(self) -> Result<u128, error::BalanceOverflowError> {
+        use crate::TryInto;
+        self.0.try_into().map_err(|_| error::BalanceOverflowError)
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct U128(pub u128);
+impl Display for Wei {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
-pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
+impl Add<Self> for Wei {
+    type Output = Wei;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl Sub<Self> for Wei {
+    type Output = Wei;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+/// Type casting from Wei compatible Borsh-encoded raw value into the Wei value, to attach an ETH balance to the transaction
+impl From<WeiU256> for Wei {
+    fn from(value: WeiU256) -> Self {
+        Wei(U256::from_big_endian(&value))
+    }
+}
+
+pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000;
+// 1e19yN, 0.00001N
 pub const ERR_FAILED_PARSE: &str = "ERR_FAILED_PARSE";
 pub const ERR_INVALID_ETH_ADDRESS: &str = "ERR_INVALID_ETH_ADDRESS";
 
@@ -129,6 +294,7 @@ pub struct StorageBalanceBounds {
 }
 
 /// promise results structure
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromiseResult {
     NotReady,
     Successful(Vec<u8>),
@@ -203,8 +369,29 @@ impl<T> Stack<T> {
         self.stack
     }
 }
+
 pub fn str_from_slice(inp: &[u8]) -> &str {
     str::from_utf8(inp).unwrap()
+}
+
+pub mod error {
+    use crate::{fmt, String};
+
+    #[derive(Eq, Hash, Clone, Debug, PartialEq)]
+    pub struct BalanceOverflowError;
+
+    impl AsRef<[u8]> for BalanceOverflowError {
+        fn as_ref(&self) -> &[u8] {
+            b"ERR_BALANCE_OVERFLOW"
+        }
+    }
+
+    impl fmt::Display for BalanceOverflowError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
+            write!(f, "{}", msg)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -308,5 +495,21 @@ mod tests {
         let eth_amount: u64 = rand::random();
         let wei_amount = U256::from(eth_amount) * U256::from(10).pow(18.into());
         assert_eq!(Wei::from_eth(eth_amount.into()), Some(Wei::new(wei_amount)));
+    }
+
+    #[test]
+    fn test_fee_add() {
+        let fee = Fee::new(100);
+        assert_eq!(fee + fee, Fee::new(200));
+        assert_eq!(fee.add(200.into()), Fee::new(300));
+    }
+
+    #[test]
+    fn test_fee_from() {
+        let fee = Fee::new(100);
+        let fee2 = Fee::from(100u128);
+        assert_eq!(fee, fee2);
+        let res: u128 = fee.into_u128();
+        assert_eq!(res, 100);
     }
 }

@@ -1,7 +1,7 @@
 use crate::prelude::types::Wei;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{self, solidity};
-use aurora_engine::transaction::LegacyEthTransaction;
+use aurora_engine::transaction::legacy::TransactionLegacy;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -130,7 +130,7 @@ impl MarketPlace {
         data: String,
         price: Wei,
         nonce: U256,
-    ) -> LegacyEthTransaction {
+    ) -> TransactionLegacy {
         self.0.call_method_with_args(
             "minar",
             &[
@@ -147,7 +147,7 @@ impl MarketPlace {
         tokens_per_page: usize,
         page_index: usize,
         nonce: U256,
-    ) -> LegacyEthTransaction {
+    ) -> TransactionLegacy {
         self.0.call_method_with_args(
             "obtenerPaginav2",
             &[

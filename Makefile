@@ -9,9 +9,9 @@ ifeq ($(evm-bully),yes)
   ADDITIONAL_FEATURES := $(ADDITIONAL_FEATURES),evm_bully
 endif
 
-# TODO: This isn't updating the `FEATURES` for some reason. Disabled to prevent accidental compilation of the same binary.
-# all: mainnet testnet betanet
-# all-debug: mainnet-debug testnet-debug betanet-debug
+ifeq ($(error-refund),yes)
+  ADDITIONAL_FEATURES := $(ADDITIONAL_FEATURES),error_refund
+endif
 
 release: mainnet
 debug: mainnet-debug
@@ -31,11 +31,6 @@ testnet: testnet-release.wasm
 testnet-release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
-betanet: FEATURES=betanet
-betanet: betanet-release.wasm
-betanet-release.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
-	cp $< $@
-
 mainnet-debug: FEATURES=mainnet
 mainnet-debug: mainnet-debug.wasm
 mainnet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
@@ -46,32 +41,20 @@ testnet-debug: testnet-debug.wasm
 testnet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 	cp $< $@
 
-betanet-debug: FEATURES=betanet
-betanet-debug: betanet-debug.wasm
-betanet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
-	cp $< $@
-
 # test builds depend on release since `tests/test_upgrade.rs` includes `mainnet-release.wasm`
 
 test-mainnet: mainnet-test-build
-	$(CARGO) test --features mainnet-test
+	$(CARGO) test --features mainnet-test$(ADDITIONAL_FEATURES)
 mainnet-test-build: FEATURES=mainnet,integration-test,meta-call
 mainnet-test-build: mainnet-test.wasm
 mainnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
 test-testnet: testnet-test-build
-	$(CARGO) test --features testnet-test
+	$(CARGO) test --features testnet-test$(ADDITIONAL_FEATURES)
 testnet-test-build: FEATURES=testnet,integration-test,meta-call
 testnet-test-build: testnet-test.wasm
 testnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
-	cp $< $@
-
-test-betanet: betanet-test-build
-	$(CARGO) test --features betanet-test
-betanet-test-build: FEATURES=betanet,integration-test,meta-call
-betanet-test-build: betanet-test.wasm
-betanet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
 target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
@@ -79,6 +62,7 @@ target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock 
 		--target wasm32-unknown-unknown \
 		--release \
 		--verbose \
+		-p aurora-engine \
 		--no-default-features \
 		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps
@@ -86,6 +70,7 @@ target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock 
 target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
 	$(CARGO) build \
 		--target wasm32-unknown-unknown \
+		-p aurora-engine \
 		--no-default-features \
 		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps
@@ -116,7 +101,6 @@ clean:
 .PHONY: release debug check test deploy
 .PHONY: mainnet mainnet-debug test-mainnet mainnet-test-build
 .PHONY: testnet testnet-debug test-testnet testnet-test-build
-.PHONY: betanet betanet-debug test-betanet betanet-test-build
 .PHONY: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 .PHONY: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 .PHONY: check-format check-clippy test-sol format clean

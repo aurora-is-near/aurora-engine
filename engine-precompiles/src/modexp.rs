@@ -1,6 +1,7 @@
 use crate::prelude::{Address, PhantomData, Vec, U256};
 use crate::{Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput};
 
+use crate::prelude::types::EthGas;
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
@@ -8,6 +9,10 @@ pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
     pub(super) const ADDRESS: Address = super::make_address(0, 5);
+
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
 }
 
 impl<HF: HardFork> ModExp<HF> {
@@ -90,7 +95,7 @@ impl ModExp<Byzantium> {
 }
 
 impl Precompile for ModExp<Byzantium> {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
         let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
@@ -98,14 +103,15 @@ impl Precompile for ModExp<Byzantium> {
         // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
         let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
 
-        Ok(saturating_round(gas))
+        Ok(EthGas::new(saturating_round(gas)))
     }
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
     /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
     fn run(
+        &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -131,7 +137,7 @@ impl ModExp<Berlin> {
 }
 
 impl Precompile for ModExp<Berlin> {
-    fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
         let mul = Self::mul_complexity(base_len, mod_len);
@@ -139,12 +145,13 @@ impl Precompile for ModExp<Berlin> {
         // mul * iter_count bounded by 2^189 (so no overflow)
         let gas = mul * iter_count / U256::from(3);
 
-        Ok(core::cmp::max(200, saturating_round(gas)))
+        Ok(EthGas::new(core::cmp::max(200, saturating_round(gas))))
     }
 
     fn run(
+        &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -363,14 +370,46 @@ mod tests {
         }
     ];
 
-    const BYZANTIUM_GAS: [u64; 18] = [
-        13_056, 13_056, 13_056, 204, 204, 3_276, 665, 665, 10_649, 1_894, 1_894, 30_310, 5_580,
-        5_580, 89_292, 17_868, 17_868, 285_900,
+    const BYZANTIUM_GAS: [EthGas; 18] = [
+        EthGas::new(13_056),
+        EthGas::new(13_056),
+        EthGas::new(13_056),
+        EthGas::new(204),
+        EthGas::new(204),
+        EthGas::new(3_276),
+        EthGas::new(665),
+        EthGas::new(665),
+        EthGas::new(10_649),
+        EthGas::new(1_894),
+        EthGas::new(1_894),
+        EthGas::new(30_310),
+        EthGas::new(5_580),
+        EthGas::new(5_580),
+        EthGas::new(89_292),
+        EthGas::new(17_868),
+        EthGas::new(17_868),
+        EthGas::new(285_900),
     ];
 
-    const BERLIN_GAS: [u64; 18] = [
-        1_360, 1_360, 1_360, 200, 200, 341, 200, 200, 1_365, 341, 341, 5_461, 1_365, 1_365, 21_845,
-        5_461, 5_461, 87_381,
+    const BERLIN_GAS: [EthGas; 18] = [
+        EthGas::new(1_360),
+        EthGas::new(1_360),
+        EthGas::new(1_360),
+        EthGas::new(200),
+        EthGas::new(200),
+        EthGas::new(341),
+        EthGas::new(200),
+        EthGas::new(200),
+        EthGas::new(1_365),
+        EthGas::new(341),
+        EthGas::new(341),
+        EthGas::new(5_461),
+        EthGas::new(1_365),
+        EthGas::new(1_365),
+        EthGas::new(21_845),
+        EthGas::new(5_461),
+        EthGas::new(5_461),
+        EthGas::new(87_381),
     ];
 
     #[test]
@@ -378,7 +417,8 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(&test.input).unwrap();
 
-            let res = ModExp::<Byzantium>::run(&input, Some(*test_gas), &new_context(), false)
+            let res = ModExp::<Byzantium>::new()
+                .run(&input, Some(*test_gas), &new_context(), false)
                 .unwrap()
                 .output;
             let expected = hex::decode(&test.expected).unwrap();
@@ -446,7 +486,9 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_empty_input() {
-        let res = ModExp::<Berlin>::run(&[], Some(100_000), &new_context(), false).unwrap();
+        let res = ModExp::<Berlin>::new()
+            .run(&[], Some(EthGas::new(100_000)), &new_context(), false)
+            .unwrap();
         let expected: Vec<u8> = Vec::new();
         assert_eq!(res.output, expected)
     }

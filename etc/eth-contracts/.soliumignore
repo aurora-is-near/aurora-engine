@@ -3,6 +3,7 @@ node_modules
 # solium fails to run linter in Tester.sol
 # see issue for more details: https://github.com/duaraghav8/Ethlint/issues/293
 contracts/test/Tester.sol
+contracts/test/TesterV2.sol
 
 # solium fails to run linter in Tester.sol
 # see issue for more details: https://github.com/duaraghav8/Ethlint/issues/294

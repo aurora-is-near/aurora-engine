@@ -30,10 +30,13 @@ opt-level = 3
 [workspace]
 members = [
     "engine",
-    "engine-types",
-    "engine-sdk",
     "engine-precompiles",
-    "engine-tests"
+    "engine-sdk",
+    "engine-standalone",
+    "engine-standalone-storage",
+    "engine-standalone-tracing",
+    "engine-tests",
+    "engine-types",
 ]
 exclude = [
     "etc/state-migration-test",

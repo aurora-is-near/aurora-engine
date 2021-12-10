@@ -1,110 +1,162 @@
-use crate::prelude::{Address, TryFrom, Vec, U256};
+use crate::prelude::{vec, Address, TryFrom, Vec, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 
-pub mod access_list;
-pub(crate) mod legacy;
+pub mod eip_1559;
+pub mod eip_2930;
+pub mod legacy;
 
-use access_list::AccessTuple;
-pub use legacy::{LegacyEthSignedTransaction, LegacyEthTransaction};
+use aurora_engine_types::types::Wei;
+use eip_2930::AccessTuple;
 
 /// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
-#[derive(Eq, PartialEq)]
-pub enum EthTransaction {
-    Legacy(LegacyEthSignedTransaction),
-    AccessList(access_list::AccessListEthSignedTransaction),
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum EthTransactionKind {
+    Legacy(legacy::LegacyEthSignedTransaction),
+    Eip2930(eip_2930::SignedTransaction2930),
+    Eip1559(eip_1559::SignedTransaction1559),
 }
 
-impl EthTransaction {
-    pub fn chain_id(&self) -> Option<u64> {
-        match self {
-            Self::Legacy(tx) => tx.chain_id(),
-            Self::AccessList(tx) => Some(tx.transaction_data.chain_id),
-        }
-    }
-
-    pub fn sender(&self) -> Option<Address> {
-        match self {
-            Self::Legacy(tx) => tx.sender(),
-            Self::AccessList(tx) => tx.sender(),
-        }
-    }
-
-    pub fn nonce(&self) -> &U256 {
-        match self {
-            Self::Legacy(tx) => &tx.transaction.nonce,
-            Self::AccessList(tx) => &tx.transaction_data.nonce,
-        }
-    }
-
-    pub fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
-        match self {
-            Self::Legacy(tx) => tx.transaction.intrinsic_gas(config),
-            Self::AccessList(tx) => tx.transaction_data.intrinsic_gas(config),
-        }
-    }
-
-    pub fn gas_limit(&self) -> U256 {
-        match self {
-            Self::Legacy(tx) => tx.transaction.gas,
-            Self::AccessList(tx) => tx.transaction_data.gas_limit,
-        }
-    }
-
-    pub fn gas_price(&self) -> U256 {
-        match self {
-            Self::Legacy(tx) => tx.transaction.gas_price,
-            Self::AccessList(tx) => tx.transaction_data.gas_price,
-        }
-    }
-
-    pub fn destructure(
-        self,
-    ) -> (
-        crate::prelude::Wei,
-        Option<u64>,
-        Vec<u8>,
-        Option<Address>,
-        Vec<AccessTuple>,
-    ) {
-        use crate::prelude::TryInto;
-        match self {
-            Self::Legacy(tx) => {
-                let tx = tx.transaction;
-                (tx.value, tx.gas.try_into().ok(), tx.data, tx.to, Vec::new())
-            }
-            Self::AccessList(tx) => {
-                let tx = tx.transaction_data;
-                (
-                    tx.value,
-                    tx.gas_limit.try_into().ok(),
-                    tx.data,
-                    tx.to,
-                    tx.access_list,
-                )
-            }
-        }
-    }
-}
-
-impl TryFrom<&[u8]> for EthTransaction {
+impl TryFrom<&[u8]> for EthTransactionKind {
     type Error = ParseTransactionError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes[0] == access_list::TYPE_BYTE {
-            let access_list_tx =
-                access_list::AccessListEthSignedTransaction::decode(&Rlp::new(&bytes[1..]))?;
-            Ok(Self::AccessList(access_list_tx))
+        if bytes[0] == eip_2930::TYPE_BYTE {
+            Ok(Self::Eip2930(eip_2930::SignedTransaction2930::decode(
+                &Rlp::new(&bytes[1..]),
+            )?))
+        } else if bytes[0] == eip_1559::TYPE_BYTE {
+            Ok(Self::Eip1559(eip_1559::SignedTransaction1559::decode(
+                &Rlp::new(&bytes[1..]),
+            )?))
         } else if bytes[0] <= 0x7f {
             Err(ParseTransactionError::UnknownTransactionType)
         } else if bytes[0] == 0xff {
             Err(ParseTransactionError::ReservedSentinel)
         } else {
-            let legacy = LegacyEthSignedTransaction::decode(&Rlp::new(bytes))?;
+            let legacy = legacy::LegacyEthSignedTransaction::decode(&Rlp::new(bytes))?;
             Ok(Self::Legacy(legacy))
         }
     }
 }
 
+impl From<EthTransactionKind> for Vec<u8> {
+    fn from(tx: EthTransactionKind) -> Self {
+        let mut stream = rlp::RlpStream::new();
+        match tx {
+            EthTransactionKind::Legacy(tx) => {
+                stream.append(&tx);
+            }
+            EthTransactionKind::Eip1559(tx) => {
+                stream.append(&eip_1559::TYPE_BYTE);
+                stream.append(&tx);
+            }
+            EthTransactionKind::Eip2930(tx) => {
+                stream.append(&eip_2930::TYPE_BYTE);
+                stream.append(&tx);
+            }
+        }
+        stream.out().to_vec()
+    }
+}
+
+/// A normalized Ethereum transaction which can be created from older
+/// transactions.
+pub struct NormalizedEthTransaction {
+    pub address: Option<Address>,
+    pub chain_id: Option<u64>,
+    pub nonce: U256,
+    pub gas_limit: U256,
+    pub max_priority_fee_per_gas: U256,
+    pub max_fee_per_gas: U256,
+    pub to: Option<Address>,
+    pub value: Wei,
+    pub data: Vec<u8>,
+    pub access_list: Vec<AccessTuple>,
+}
+
+impl From<EthTransactionKind> for NormalizedEthTransaction {
+    fn from(kind: EthTransactionKind) -> Self {
+        use EthTransactionKind::*;
+        match kind {
+            Legacy(tx) => Self {
+                address: tx.sender(),
+                chain_id: tx.chain_id(),
+                nonce: tx.transaction.nonce,
+                gas_limit: tx.transaction.gas_limit,
+                max_priority_fee_per_gas: tx.transaction.gas_price,
+                max_fee_per_gas: tx.transaction.gas_price,
+                to: tx.transaction.to,
+                value: tx.transaction.value,
+                data: tx.transaction.data,
+                access_list: vec![],
+            },
+            Eip2930(tx) => Self {
+                address: tx.sender(),
+                chain_id: Some(tx.transaction.chain_id),
+                nonce: tx.transaction.nonce,
+                gas_limit: tx.transaction.gas_limit,
+                max_priority_fee_per_gas: tx.transaction.gas_price,
+                max_fee_per_gas: tx.transaction.gas_price,
+                to: tx.transaction.to,
+                value: tx.transaction.value,
+                data: tx.transaction.data,
+                access_list: tx.transaction.access_list,
+            },
+            Eip1559(tx) => Self {
+                address: tx.sender(),
+                chain_id: Some(tx.transaction.chain_id),
+                nonce: tx.transaction.nonce,
+                gas_limit: tx.transaction.gas_limit,
+                max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
+                max_fee_per_gas: tx.transaction.max_fee_per_gas,
+                to: tx.transaction.to,
+                value: tx.transaction.value,
+                data: tx.transaction.data,
+                access_list: tx.transaction.access_list,
+            },
+        }
+    }
+}
+
+impl NormalizedEthTransaction {
+    pub fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
+        let is_contract_creation = self.to.is_none();
+
+        let base_gas = if is_contract_creation {
+            config.gas_transaction_create
+        } else {
+            config.gas_transaction_call
+        };
+
+        let num_zero_bytes = self.data.iter().filter(|b| **b == 0).count();
+        let num_non_zero_bytes = self.data.len() - num_zero_bytes;
+
+        let gas_zero_bytes = config
+            .gas_transaction_zero_data
+            .checked_mul(num_zero_bytes as u64)?;
+        let gas_non_zero_bytes = config
+            .gas_transaction_non_zero_data
+            .checked_mul(num_non_zero_bytes as u64)?;
+
+        let gas_access_list_address = config
+            .gas_access_list_address
+            .checked_mul(self.access_list.len() as u64)?;
+        let gas_access_list_storage = config.gas_access_list_storage_key.checked_mul(
+            self.access_list
+                .iter()
+                .map(|a| a.storage_keys.len() as u64)
+                .sum(),
+        )?;
+
+        base_gas
+            .checked_add(gas_zero_bytes)
+            .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
+            .and_then(|gas| gas.checked_add(gas_access_list_address))
+            .and_then(|gas| gas.checked_add(gas_access_list_storage))
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ParseTransactionError {
     UnknownTransactionType,
     // Per the EIP-2718 spec 0xff is a reserved value
@@ -144,45 +196,6 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
             Ok(Some(v))
         }
     }
-}
-
-fn intrinsic_gas(
-    is_contract_creation: bool,
-    data: &[u8],
-    access_list: &[access_list::AccessTuple],
-    config: &evm::Config,
-) -> Option<u64> {
-    let base_gas = if is_contract_creation {
-        config.gas_transaction_create
-    } else {
-        config.gas_transaction_call
-    };
-
-    let num_zero_bytes = data.iter().filter(|b| **b == 0).count();
-    let num_non_zero_bytes = data.len() - num_zero_bytes;
-
-    let gas_zero_bytes = config
-        .gas_transaction_zero_data
-        .checked_mul(num_zero_bytes as u64)?;
-    let gas_non_zero_bytes = config
-        .gas_transaction_non_zero_data
-        .checked_mul(num_non_zero_bytes as u64)?;
-
-    let gas_access_list_address = config
-        .gas_access_list_address
-        .checked_mul(access_list.len() as u64)?;
-    let gas_access_list_storage = config.gas_access_list_storage_key.checked_mul(
-        access_list
-            .iter()
-            .map(|a| a.storage_keys.len() as u64)
-            .sum(),
-    )?;
-
-    base_gas
-        .checked_add(gas_zero_bytes)
-        .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
-        .and_then(|gas| gas.checked_add(gas_access_list_address))
-        .and_then(|gas| gas.checked_add(gas_access_list_storage))
 }
 
 fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {

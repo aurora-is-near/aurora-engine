@@ -52,8 +52,8 @@ fn withdraw() {
     let token = Address(token);
 
     let test_data = vec![
-        (true, "Call contract: tt.testnet.ft_transfer"),
-        (false, "Call contract: tt.testnet.withdraw"),
+        (true, "call_contract tt.testnet.ft_transfer"),
+        (false, "call_contract tt.testnet.withdraw"),
     ];
 
     for (is_to_near, expected) in test_data {
@@ -119,8 +119,8 @@ fn withdraw_and_fail() {
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
-        (true, "Call contract: tt.testnet.ft_transfer"),
-        (false, "Call contract: tt.testnet.withdraw"),
+        (true, "call_contract tt.testnet.ft_transfer"),
+        (false, "call_contract tt.testnet.withdraw"),
     ];
 
     for (flag, not_expected) in test_data {
@@ -138,8 +138,8 @@ fn try_withdraw_and_avoid_fail() {
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
-        (true, "Call contract: tt.testnet.ft_transfer"),
-        (false, "Call contract: tt.testnet.withdraw"),
+        (true, "call_contract tt.testnet.ft_transfer"),
+        (false, "call_contract tt.testnet.withdraw"),
     ];
 
     for (flag, not_expected) in test_data {
@@ -157,8 +157,8 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
-        (true, "Call contract: tt.testnet.ft_transfer"),
-        (false, "Call contract: tt.testnet.withdraw"),
+        (true, "call_contract tt.testnet.ft_transfer"),
+        (false, "call_contract tt.testnet.withdraw"),
     ];
 
     for (flag, expected) in test_data {

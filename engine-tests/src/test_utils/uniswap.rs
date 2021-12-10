@@ -1,6 +1,6 @@
 use crate::prelude::{Address, U256};
 use crate::test_utils::solidity;
-use aurora_engine::transaction::LegacyEthTransaction;
+use aurora_engine::transaction::legacy::TransactionLegacy;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -73,7 +73,7 @@ impl FactoryConstructor {
         Self(load_constructor(artifact_path))
     }
 
-    pub fn deploy(&self, nonce: U256) -> LegacyEthTransaction {
+    pub fn deploy(&self, nonce: U256) -> TransactionLegacy {
         self.0.deploy_without_args(nonce)
     }
 }
@@ -103,7 +103,7 @@ impl PositionManagerConstructor {
         wrapped_eth: Address,
         token_descriptor: Address,
         nonce: U256,
-    ) -> LegacyEthTransaction {
+    ) -> TransactionLegacy {
         let data = self
             .0
             .abi
@@ -118,10 +118,10 @@ impl PositionManagerConstructor {
                 ],
             )
             .unwrap();
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce,
             gas_price: Default::default(),
-            gas: u64::MAX.into(),
+            gas_limit: u64::MAX.into(),
             to: None,
             value: Default::default(),
             data,
@@ -136,7 +136,7 @@ impl Factory {
         token_b: Address,
         fee: U256,
         nonce: U256,
-    ) -> LegacyEthTransaction {
+    ) -> TransactionLegacy {
         let data = self
             .0
             .abi
@@ -149,10 +149,10 @@ impl Factory {
             ])
             .unwrap();
 
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce,
             gas_price: Default::default(),
-            gas: u64::MAX.into(),
+            gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
             value: Default::default(),
             data,
@@ -183,7 +183,7 @@ impl Pool {
         })
     }
 
-    pub fn initialize(&self, price: U256, nonce: U256) -> LegacyEthTransaction {
+    pub fn initialize(&self, price: U256, nonce: U256) -> TransactionLegacy {
         let data = self
             .0
             .abi
@@ -192,10 +192,10 @@ impl Pool {
             .encode_input(&[ethabi::Token::Uint(price)])
             .unwrap();
 
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce,
             gas_price: Default::default(),
-            gas: u64::MAX.into(),
+            gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
             value: Default::default(),
             data,
@@ -204,7 +204,7 @@ impl Pool {
 }
 
 impl PositionManager {
-    pub fn mint(&self, params: MintParams, nonce: U256) -> LegacyEthTransaction {
+    pub fn mint(&self, params: MintParams, nonce: U256) -> TransactionLegacy {
         let tick_lower = Self::i64_to_u256(params.tick_lower);
         let tick_upper = Self::i64_to_u256(params.tick_upper);
         let data = self
@@ -227,10 +227,10 @@ impl PositionManager {
             ])])
             .unwrap();
 
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce,
             gas_price: Default::default(),
-            gas: u64::MAX.into(),
+            gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
             value: Default::default(),
             data,
@@ -267,12 +267,7 @@ impl SwapRouterConstructor {
         Self(load_constructor(artifact_path))
     }
 
-    pub fn deploy(
-        &self,
-        factory: Address,
-        wrapped_eth: Address,
-        nonce: U256,
-    ) -> LegacyEthTransaction {
+    pub fn deploy(&self, factory: Address, wrapped_eth: Address, nonce: U256) -> TransactionLegacy {
         let data = self
             .0
             .abi
@@ -286,10 +281,10 @@ impl SwapRouterConstructor {
                 ],
             )
             .unwrap();
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce,
             gas_price: Default::default(),
-            gas: u64::MAX.into(),
+            gas_limit: u64::MAX.into(),
             to: None,
             value: Default::default(),
             data,
@@ -313,7 +308,7 @@ impl SwapRouter {
         &self,
         params: ExactOutputSingleParams,
         nonce: U256,
-    ) -> LegacyEthTransaction {
+    ) -> TransactionLegacy {
         let data = self
             .0
             .abi
@@ -331,10 +326,10 @@ impl SwapRouter {
             ])])
             .unwrap();
 
-        LegacyEthTransaction {
+        TransactionLegacy {
             nonce,
             gas_price: Default::default(),
-            gas: u64::MAX.into(),
+            gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
             value: Default::default(),
             data,

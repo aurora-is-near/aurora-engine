@@ -1,6 +1,5 @@
 use crate::prelude::EthAddress;
 use crate::prelude::WithdrawCallArgs;
-use crate::prelude::U256;
 use crate::test_utils::str_to_account_id;
 use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
 use aurora_engine::connector::{
@@ -10,8 +9,10 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
+use aurora_engine_types::types::Fee;
 use borsh::{BorshDeserialize, BorshSerialize};
 use byte_slice_cast::AsByteSlice;
+use ethabi::ethereum_types::U256;
 use near_sdk::test_utils::accounts;
 use near_sdk_sim::transaction::ExecutionStatus;
 use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
@@ -409,9 +410,10 @@ fn test_ft_transfer_call_eth() {
     res.assert_success();
 
     let transfer_amount = 50;
-    let fee = 30;
+    let fee: u128 = 30;
     let mut msg = U256::from(fee).as_byte_slice().to_vec();
     msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
+
     let message = [CONTRACT_ACC, hex::encode(msg).as_str()].join(":");
     let res = contract.call(
         CONTRACT_ACC.parse().unwrap(),
@@ -592,6 +594,7 @@ fn test_ft_transfer_call_without_message() {
 
 #[test]
 fn test_deposit_with_0x_prefix() {
+    use aurora_engine::deposit_event::TokenMessageData;
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
 
     let eth_custodian_address: [u8; 20] = {
@@ -601,20 +604,22 @@ fn test_deposit_with_0x_prefix() {
         buf
     };
     let recipient_address = [10u8; 20];
-    let deposit_amount = U256::from(17);
+    let deposit_amount = 17;
+    let recipient_address_encoded = hex::encode(&recipient_address);
+
+    // Note the 0x prefix before the deposit address.
+    let message = [CONTRACT_ACC, ":", "0x", &recipient_address_encoded].concat();
+    let fee: Fee = 0.into();
+    let token_message_data =
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+            .unwrap();
+
     let deposit_event = aurora_engine::deposit_event::DepositedEvent {
         eth_custodian_address,
         sender: [0u8; 20],
-        // Note the 0x prefix before the deposit address.
-        recipient: [
-            CONTRACT_ACC,
-            ":",
-            "0x",
-            hex::encode(&recipient_address).as_str(),
-        ]
-        .concat(),
+        token_message_data,
         amount: deposit_amount,
-        fee: U256::zero(),
+        fee,
     };
 
     let event_schema = ethabi::Event {
@@ -630,9 +635,9 @@ fn test_deposit_with_0x_prefix() {
             crate::prelude::H256::zero(),
         ],
         data: ethabi::encode(&[
-            ethabi::Token::String(deposit_event.recipient),
-            ethabi::Token::Uint(deposit_event.amount),
-            ethabi::Token::Uint(deposit_event.fee),
+            ethabi::Token::String(message),
+            ethabi::Token::Uint(U256::from(deposit_event.amount)),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.into_u128())),
         ]),
     };
     let proof = Proof {
@@ -655,9 +660,9 @@ fn test_deposit_with_0x_prefix() {
     res.assert_success();
 
     let aurora_balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(aurora_balance, deposit_amount.low_u128());
+    assert_eq!(aurora_balance, deposit_amount);
     let address_balance = get_eth_balance(&master_account, recipient_address, CONTRACT_ACC);
-    assert_eq!(address_balance, deposit_amount.low_u128());
+    assert_eq!(address_balance, deposit_amount);
 }
 
 #[test]
@@ -711,7 +716,7 @@ fn test_ft_transfer_call_without_relayer() {
     assert_eq!(balance, DEPOSITED_FEE);
 
     let transfer_amount = 50;
-    let fee = 30;
+    let fee: u128 = 30;
     let mut msg = U256::from(fee).as_byte_slice().to_vec();
     msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
     let relayer_id = "relayer.root";
@@ -767,8 +772,8 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
     call_deposit_eth_to_near(&contract, CONTRACT_ACC);
 
     let transfer_amount = 10;
-    let fee = transfer_amount + 10;
-    let mut msg = U256::from(fee).as_byte_slice().to_vec();
+    let fee: u128 = transfer_amount + 10;
+    let mut msg = fee.to_be_bytes().to_vec();
     msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
     let relayer_id = "relayer.root";
     let message = [relayer_id, hex::encode(msg).as_str()].join(":");

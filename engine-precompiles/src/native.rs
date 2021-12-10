@@ -2,14 +2,21 @@ use super::{EvmPrecompileResult, Precompile};
 #[cfg(feature = "contract")]
 use crate::prelude::{
     format,
-    parameters::{PromiseCreateArgs, WithdrawCallArgs},
+    parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
     sdk,
     storage::{bytes_to_key, KeyPrefix},
-    vec, AccountId, BorshSerialize, Cow, String, ToString, TryFrom, TryInto, Vec, H160, U256,
+    vec, BorshSerialize, Cow, String, ToString, TryFrom, TryInto, Vec, H160, U256,
+};
+#[cfg(all(feature = "error_refund", feature = "contract"))]
+use crate::prelude::{
+    parameters::{PromiseWithCallbackArgs, RefundCallArgs},
+    types,
 };
 
+use crate::prelude::types::EthGas;
 use crate::prelude::Address;
 use crate::PrecompileOutput;
+use aurora_engine_types::account_id::AccountId;
 #[cfg(feature = "contract")]
 use evm::backend::Log;
 use evm::{Context, ExitError};
@@ -17,19 +24,23 @@ use evm::{Context, ExitError};
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
 mod costs {
-    use crate::prelude::types::Gas;
+    use crate::prelude::types::EthGas;
 
     // TODO(#51): Determine the correct amount of gas
-    pub(super) const EXIT_TO_NEAR_GAS: Gas = 0;
+    pub(super) const EXIT_TO_NEAR_GAS: EthGas = EthGas::new(0);
 
     // TODO(#51): Determine the correct amount of gas
-    pub(super) const EXIT_TO_ETHEREUM_GAS: Gas = 0;
+    pub(super) const EXIT_TO_ETHEREUM_GAS: EthGas = EthGas::new(0);
 
-    // TODO(#51): Determine the correct amount of gas
-    pub(super) const FT_TRANSFER_GAS: Gas = 100_000_000_000_000;
+    // TODO(#332): Determine the correct amount of gas
+    pub(super) const FT_TRANSFER_GAS: EthGas = EthGas::new(100_000_000_000_000);
 
-    // TODO(#51): Determine the correct amount of gas
-    pub(super) const WITHDRAWAL_GAS: Gas = 100_000_000_000_000;
+    // TODO(#332): Determine the correct amount of gas
+    #[cfg(feature = "error_refund")]
+    pub(super) const REFUND_ON_ERROR_GAS: EthGas = EthGas::new(60_000_000_000_000);
+
+    // TODO(#332): Determine the correct amount of gas
+    pub(super) const WITHDRAWAL_GAS: EthGas = EthGas::new(100_000_000_000_000);
 }
 
 pub mod events {
@@ -179,7 +190,10 @@ pub mod events {
     }
 }
 
-pub struct ExitToNear; //TransferEthToNear
+//TransferEthToNear
+pub struct ExitToNear {
+    current_account_id: AccountId,
+}
 
 impl ExitToNear {
     /// Exit to NEAR precompile address
@@ -188,26 +202,34 @@ impl ExitToNear {
     /// This address is computed as: `&keccak("exitToNear")[12..]`
     pub const ADDRESS: Address =
         super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
+
+    pub fn new(current_account_id: AccountId) -> Self {
+        Self { current_account_id }
+    }
 }
 
 #[cfg(feature = "contract")]
 fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
+    use sdk::io::{StorageIntermediate, IO};
     AccountId::try_from(
-        &sdk::read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
-            .expect(ERR_TARGET_TOKEN_NOT_FOUND)[..],
+        sdk::near_runtime::Runtime
+            .read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
+            .map(|s| s.to_vec())
+            .expect(ERR_TARGET_TOKEN_NOT_FOUND),
     )
     .unwrap()
 }
 
 impl Precompile for ExitToNear {
-    fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
     #[cfg(not(feature = "contract"))]
     fn run(
+        &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -222,11 +244,22 @@ impl Precompile for ExitToNear {
 
     #[cfg(feature = "contract")]
     fn run(
+        &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
+        #[cfg(feature = "error_refund")]
+        fn parse_input(input: &[u8]) -> (Address, &[u8]) {
+            let refund_address = Address::from_slice(&input[1..21]);
+            (refund_address, &input[21..])
+        }
+        #[cfg(not(feature = "error_refund"))]
+        fn parse_input(input: &[u8]) -> &[u8] {
+            &input[1..]
+        }
+
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);
@@ -241,9 +274,14 @@ impl Precompile for ExitToNear {
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
-        let mut input = input;
         let flag = input[0];
-        input = &input[1..];
+        #[cfg(feature = "error_refund")]
+        let (refund_address, mut input) = parse_input(input);
+        #[cfg(not(feature = "error_refund"))]
+        let mut input = parse_input(input);
+        let current_account_id = self.current_account_id.clone();
+        #[cfg(feature = "error_refund")]
+        let refund_on_error_target = current_account_id.clone();
 
         let (nep141_address, args, exit_event) = match flag {
             0x0 => {
@@ -254,7 +292,7 @@ impl Precompile for ExitToNear {
 
                 if let Ok(dest_account) = AccountId::try_from(input) {
                     (
-                        AccountId::try_from(sdk::current_account_id()).unwrap(),
+                        current_account_id,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
@@ -322,19 +360,46 @@ impl Precompile for ExitToNear {
             _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
         };
 
-        let promise: Vec<u8> = PromiseCreateArgs {
+        #[cfg(feature = "error_refund")]
+        let erc20_address = if flag == 0 {
+            None
+        } else {
+            Some(exit_event.erc20_address.0)
+        };
+        #[cfg(feature = "error_refund")]
+        let refund_args = RefundCallArgs {
+            recipient_address: refund_address.0,
+            erc20_address,
+            amount: types::u256_to_arr(&exit_event.amount),
+        };
+        #[cfg(feature = "error_refund")]
+        let refund_promise = PromiseCreateArgs {
+            target_account_id: refund_on_error_target,
+            method: "refund_on_error".to_string(),
+            args: refund_args.try_to_vec().unwrap(),
+            attached_balance: 0,
+            attached_gas: costs::REFUND_ON_ERROR_GAS.into_u64(),
+        };
+        let transfer_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
             method: "ft_transfer".to_string(),
             args: args.as_bytes().to_vec(),
             attached_balance: 1,
-            attached_gas: costs::FT_TRANSFER_GAS,
-        }
-        .try_to_vec()
-        .unwrap();
+            attached_gas: costs::FT_TRANSFER_GAS.into_u64(),
+        };
+
+        #[cfg(feature = "error_refund")]
+        let promise = PromiseArgs::Callback(PromiseWithCallbackArgs {
+            base: transfer_promise,
+            callback: refund_promise,
+        });
+        #[cfg(not(feature = "error_refund"))]
+        let promise = PromiseArgs::Create(transfer_promise);
+
         let promise_log = Log {
             address: Self::ADDRESS,
             topics: Vec::new(),
-            data: promise,
+            data: promise.try_to_vec().unwrap(),
         };
         let exit_event_log = exit_event.encode();
         let exit_event_log = Log {
@@ -351,7 +416,9 @@ impl Precompile for ExitToNear {
     }
 }
 
-pub struct ExitToEthereum;
+pub struct ExitToEthereum {
+    current_account_id: AccountId,
+}
 
 impl ExitToEthereum {
     /// Exit to Ethereum precompile address
@@ -360,17 +427,22 @@ impl ExitToEthereum {
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
     pub const ADDRESS: Address =
         super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
+
+    pub fn new(current_account_id: AccountId) -> Self {
+        Self { current_account_id }
+    }
 }
 
 impl Precompile for ExitToEthereum {
-    fn required_gas(_input: &[u8]) -> Result<u64, ExitError> {
+    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
     #[cfg(not(feature = "contract"))]
     fn run(
+        &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
@@ -385,8 +457,9 @@ impl Precompile for ExitToEthereum {
 
     #[cfg(feature = "contract")]
     fn run(
+        &self,
         input: &[u8],
-        target_gas: Option<u64>,
+        target_gas: Option<EthGas>,
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
@@ -418,7 +491,7 @@ impl Precompile for ExitToEthereum {
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
                 (
-                    AccountId::try_from(sdk::current_account_id()).unwrap(),
+                    self.current_account_id.clone(),
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {
@@ -492,15 +565,15 @@ impl Precompile for ExitToEthereum {
             }
         };
 
-        let promise = PromiseCreateArgs {
+        let withdraw_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
             method: "withdraw".to_string(),
             args: serialized_args,
             attached_balance: 1,
-            attached_gas: costs::WITHDRAWAL_GAS,
-        }
-        .try_to_vec()
-        .unwrap();
+            attached_gas: costs::WITHDRAWAL_GAS.into_u64(),
+        };
+
+        let promise = PromiseArgs::Create(withdraw_promise).try_to_vec().unwrap();
         let promise_log = Log {
             address: Self::ADDRESS,
             topics: Vec::new(),

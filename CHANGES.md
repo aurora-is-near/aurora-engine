@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2021-12-10
+
+### Added
+
+- A precompile which exposes NEAR's random number generator was added by [@mfornet] as requested by 
+[@birchmd]. ([#368] [#297])
+- London hard fork support was added by [@birchmd]. ([#244])
+
+### Changes
+
+- The gas limit for `deposit` and `ft_on_transfer` were changed as they were not attaching enough
+gas, as changed by [@mrLSD]. ([#389])
+
+### Fixes
+
+- There was an issue with the original storage not actually being stored. Unfortunately, previous 
+transactions can't be updated with this change. This has been fixed by [@birchmd]. ([#390])
+- Call arguments were intended to have a value attached to them to make it equivalent to an ETH
+call. This was fixed in a backwards compatible manner by [@andrcmdr], as reported by [@birchmd].
+([#351] [#309])
+
+### Removed
+
+- Betanet support was dropped and will no longer be supported by [@joshuajbouw]. ([#388])
+
+[#390]: https://github.com/aurora-is-near/aurora-engine/pull/390
+[#389]: https://github.com/aurora-is-near/aurora-engine/pull/389
+[#388]: https://github.com/aurora-is-near/aurora-engine/pull/388
+[#368]: https://github.com/aurora-is-near/aurora-engine/pull/368
+[#351]: https://github.com/aurora-is-near/aurora-engine/pull/351
+[#311]: https://github.com/aurora-is-near/aurora-engine/pull/311 
+[#309]: https://github.com/aurora-is-near/aurora-engine/issues/309
+[#297]: https://github.com/aurora-is-near/aurora-engine/issues/297
+[#244]: https://github.com/aurora-is-near/aurora-engine/pull/244 
+
 ## [2.2.0] - 2021-11-09
 
 ### Added
@@ -145,7 +180,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...master
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.3.0...master
+[2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0 
 [2.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.1.0...2.2.0
 [2.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.2...2.1.0
 [2.0.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.1...2.0.2
@@ -167,7 +203,9 @@ struct SubmitResult {
 [1.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/aurora-is-near/aurora-engine/tree/1.0.0
 
-[@mrLSD]: https://github.com/mrLSD
+[@andrcmdr]: https://github.com/andrcmdr
 [@birchmd]: https://github.com/birchmd
 [@joshuajbouw]: https://github.com/joshuajbouw
+[@mfornet]: https://github.com/mfornet
+[@mrLSD]: https://github.com/mrLSD
 [@sept-en]: https://github.com/sept-en

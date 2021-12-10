@@ -4,9 +4,10 @@ use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     format, Balance, BorshDeserialize, BorshSerialize, EthAddress, RawAddress, RawH256, RawU256,
-    SdkUnwrap, String, ToString, TryFrom, Vec,
+    String, ToString, TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
+use aurora_engine_types::types::Fee;
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -130,11 +131,46 @@ impl SubmitResult {
     }
 }
 
-/// Borsh-encoded parameters for the `call` function.
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct FunctionCallArgs {
+/// Borsh-encoded parameters for the engine `call` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
+pub struct FunctionCallArgsV2 {
+    pub contract: RawAddress,
+    /// Wei compatible Borsh-encoded value field to attach an ETH balance to the transaction
+    pub value: WeiU256,
+    pub input: Vec<u8>,
+}
+
+/// Legacy Borsh-encoded parameters for the engine `call` function, to provide backward type compatibility
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
+pub struct FunctionCallArgsV1 {
     pub contract: RawAddress,
     pub input: Vec<u8>,
+}
+
+/// Deserialized values from bytes to current or legacy Borsh-encoded parameters
+/// for passing to the engine `call` function, and to provide backward type compatibility
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
+pub enum CallArgs {
+    V2(FunctionCallArgsV2),
+    V1(FunctionCallArgsV1),
+}
+
+impl CallArgs {
+    pub fn deserialize(bytes: &[u8]) -> Option<Self> {
+        // For handling new input format (wrapped into call args enum) - for data structures with new arguments,
+        // made for flexibility and extensibility.
+        if let Ok(value) = Self::try_from_slice(bytes) {
+            Some(value)
+            // Fallback, for handling old input format,
+            // i.e. input, formed as a raw (not wrapped into call args enum) data structure with legacy arguments,
+            // made for backward compatibility.
+        } else if let Ok(value) = FunctionCallArgsV1::try_from_slice(bytes) {
+            Some(Self::V1(value))
+            // Dealing with unrecognized input should be handled and result as an exception in a call site.
+        } else {
+            None
+        }
+    }
 }
 
 /// Borsh-encoded parameters for the `view` function.
@@ -147,7 +183,7 @@ pub struct ViewCallArgs {
 }
 
 /// Borsh-encoded parameters for `deploy_erc20_token` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
 pub struct DeployErc20TokenArgs {
     pub nep141: AccountId,
 }
@@ -198,6 +234,7 @@ pub struct BeginBlockArgs {
 
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
+#[derive(Debug, Clone)]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
     pub amount: Balance,
@@ -288,7 +325,7 @@ pub struct FinishDepositCallArgs {
     pub amount: Balance,
     pub proof_key: String,
     pub relayer_id: AccountId,
-    pub fee: Balance,
+    pub fee: Fee,
     pub msg: Option<Vec<u8>>,
 }
 
@@ -329,14 +366,20 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
-impl From<JsonValue> for TransferCallCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            receiver_id: AccountId::try_from(v.string("receiver_id").sdk_unwrap()).sdk_unwrap(),
-            amount: v.u128("amount").sdk_unwrap(),
-            memo: v.string("memo").ok(),
-            msg: v.string("msg").sdk_unwrap(),
-        }
+impl TryFrom<JsonValue> for TransferCallCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
+        let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
+        let amount = v.u128("amount")?;
+        let memo = v.string("memo").ok();
+        let msg = v.string("msg")?;
+        Ok(Self {
+            receiver_id,
+            amount,
+            memo,
+            msg,
+        })
     }
 }
 
@@ -346,11 +389,12 @@ pub struct StorageBalanceOfCallArgs {
     pub account_id: crate::prelude::account_id::AccountId,
 }
 
-impl From<JsonValue> for StorageBalanceOfCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            account_id: AccountId::try_from(v.string("account_id").sdk_unwrap()).sdk_unwrap(),
-        }
+impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
+        let account_id = AccountId::try_from(v.string("account_id")?)?;
+        Ok(Self { account_id })
     }
 }
 
@@ -394,13 +438,15 @@ pub struct TransferCallArgs {
     pub memo: Option<String>,
 }
 
-impl From<JsonValue> for TransferCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            receiver_id: AccountId::try_from(v.string("receiver_id").sdk_unwrap()).sdk_unwrap(),
-            amount: v.u128("amount").sdk_unwrap(),
+impl TryFrom<JsonValue> for TransferCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
+        Ok(Self {
+            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
+            amount: v.u128("amount")?,
             memo: v.string("memo").ok(),
-        }
+        })
     }
 }
 
@@ -415,11 +461,13 @@ pub struct BalanceOfEthCallArgs {
     pub address: EthAddress,
 }
 
-impl From<JsonValue> for BalanceOfCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            account_id: AccountId::try_from(v.string("account_id").sdk_unwrap()).sdk_unwrap(),
-        }
+impl TryFrom<JsonValue> for BalanceOfCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
+        Ok(Self {
+            account_id: AccountId::try_from(v.string("account_id")?)?,
+        })
     }
 }
 
@@ -433,12 +481,45 @@ pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,
 }
 
-impl From<JsonValue> for ResolveTransferCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            sender_id: AccountId::try_from(v.string("sender_id").sdk_unwrap()).sdk_unwrap(),
-            receiver_id: AccountId::try_from(v.string("receiver_id").sdk_unwrap()).sdk_unwrap(),
-            amount: v.u128("amount").sdk_unwrap(),
+impl TryFrom<JsonValue> for ResolveTransferCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
+        Ok(Self {
+            sender_id: AccountId::try_from(v.string("sender_id")?)?,
+            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
+            amount: v.u128("amount")?,
+        })
+    }
+}
+
+pub mod error {
+    use crate::json::JsonError;
+    use aurora_engine_types::account_id::ParseAccountError;
+
+    pub enum ParseTypeFromJsonError {
+        Json(JsonError),
+        InvalidAccount(ParseAccountError),
+    }
+
+    impl From<JsonError> for ParseTypeFromJsonError {
+        fn from(e: JsonError) -> Self {
+            Self::Json(e)
+        }
+    }
+
+    impl From<ParseAccountError> for ParseTypeFromJsonError {
+        fn from(e: ParseAccountError) -> Self {
+            Self::InvalidAccount(e)
+        }
+    }
+
+    impl AsRef<[u8]> for ParseTypeFromJsonError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::Json(e) => e.as_ref(),
+                Self::InvalidAccount(e) => e.as_ref(),
+            }
         }
     }
 }
@@ -464,5 +545,48 @@ mod tests {
         let bytes = x.try_to_vec().unwrap();
         let res = ViewCallArgs::try_from_slice(&bytes).unwrap();
         assert_eq!(x, res);
+    }
+
+    #[test]
+    fn test_call_args_deserialize() {
+        let new_input = FunctionCallArgsV2 {
+            contract: [0u8; 20],
+            value: WeiU256::default(),
+            input: Vec::new(),
+        };
+        let legacy_input = FunctionCallArgsV1 {
+            contract: [0u8; 20],
+            input: Vec::new(),
+        };
+
+        // Parsing bytes in a new input format - data structures (wrapped into call args enum) with new arguments,
+        // made for flexibility and extensibility.
+
+        // Using new input format (wrapped into call args enum) and data structure with new argument (`value` field).
+        let input_bytes = CallArgs::V2(new_input.clone()).try_to_vec().unwrap();
+        let parsed_data = CallArgs::deserialize(&input_bytes);
+        assert_eq!(parsed_data, Some(CallArgs::V2(new_input.clone())));
+
+        // Using new input format (wrapped into call args enum) and old data structure with legacy arguments,
+        // this is allowed for compatibility reason.
+        let input_bytes = CallArgs::V1(legacy_input.clone()).try_to_vec().unwrap();
+        let parsed_data = CallArgs::deserialize(&input_bytes);
+        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
+
+        // Parsing bytes in an old input format - raw data structure (not wrapped into call args enum) with legacy arguments,
+        // made for backward compatibility.
+
+        // Using old input format (not wrapped into call args enum) - raw data structure with legacy arguments.
+        let input_bytes = legacy_input.try_to_vec().unwrap();
+        let parsed_data = CallArgs::deserialize(&input_bytes);
+        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
+
+        // Using old input format (not wrapped into call args enum) - raw data structure with new argument (`value` field).
+        // Data structures with new arguments allowed only in new input format for future extensibility reason.
+        // Raw data structure (old input format) allowed only with legacy arguments for backward compatibility reason.
+        // Unrecognized input should be handled and result as an exception in a call site.
+        let input_bytes = new_input.try_to_vec().unwrap();
+        let parsed_data = CallArgs::deserialize(&input_bytes);
+        assert_eq!(parsed_data, None);
     }
 }
