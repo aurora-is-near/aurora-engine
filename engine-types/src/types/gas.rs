@@ -1,5 +1,5 @@
 use crate::fmt::Formatter;
-use crate::{Add, Display, Div, Mul};
+use crate::{Add, Display, Div, Mul, Sub};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(
@@ -11,6 +11,14 @@ pub struct NearGas(u64);
 impl Display for NearGas {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+impl Sub<NearGas> for NearGas {
+    type Output = NearGas;
+
+    fn sub(self, rhs: NearGas) -> Self::Output {
+        Self(self.0 - rhs.0)
     }
 }
 

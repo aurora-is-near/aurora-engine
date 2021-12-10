@@ -25,7 +25,7 @@ pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE
 /// Indicate zero attached balance for promise call
 pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
 /// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
-const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
+pub const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 /// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
 // Note: Is 40Tgas always enough?
 const GAS_FOR_VERIFY_LOG_ENTRY: NearGas = NearGas::new(40_000_000_000_000);
@@ -251,6 +251,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         current_account_id: AccountId,
         data: FinishDepositCallArgs,
+        prepaid_gas: NearGas,
     ) -> Result<Option<PromiseWithCallbackArgs>, error::FinishDepositError> {
         sdk::log!(&format!("Finish deposit with the amount: {}", data.amount));
 
@@ -267,6 +268,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 predecessor_account_id,
                 current_account_id,
                 transfer_call_args,
+                prepaid_gas,
             )?;
             Ok(Some(promise))
         } else {
@@ -473,6 +475,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: AccountId,
         current_account_id: AccountId,
         args: TransferCallCallArgs,
+        prepaid_gas: NearGas,
     ) -> Result<PromiseWithCallbackArgs, error::FtTransferCallError> {
         sdk::log!(&format!(
             "Transfer call to {} amount {}",
@@ -521,6 +524,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 &args.memo,
                 args.msg,
                 current_account_id,
+                prepaid_gas,
             )
             .map_err(Into::into)
     }

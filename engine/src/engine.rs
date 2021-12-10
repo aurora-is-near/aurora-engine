@@ -1413,9 +1413,11 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
 
     /// Get original storage value of address at index, if available.
     ///
-    /// Currently, this returns `None` for now.
-    fn original_storage(&self, _address: Address, _index: H256) -> Option<H256> {
-        None
+    /// Since SputnikVM collects storage changes in memory until the transaction is over,
+    /// the "original storage" will always be the same as the storage because no values
+    /// are written to storage until after the transaction is complete.
+    fn original_storage(&self, address: Address, index: H256) -> Option<H256> {
+        Some(self.storage(address, index))
     }
 }
 

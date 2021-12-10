@@ -612,7 +612,12 @@ mod contract {
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
         let maybe_promise_args = EthConnectorContract::init_instance(io)
-            .finish_deposit(predecessor_account_id, current_account_id, data)
+            .finish_deposit(
+                predecessor_account_id,
+                current_account_id,
+                data,
+                io.prepaid_gas(),
+            )
             .sdk_unwrap();
 
         if let Some(promise_args) = maybe_promise_args {
@@ -711,7 +716,12 @@ mod contract {
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
         let promise_args = EthConnectorContract::init_instance(io)
-            .ft_transfer_call(predecessor_account_id, current_account_id, args)
+            .ft_transfer_call(
+                predecessor_account_id,
+                current_account_id,
+                args,
+                io.prepaid_gas(),
+            )
             .sdk_unwrap();
         let promise_id = io.promise_crate_with_callback(&promise_args);
         io.promise_return(promise_id);

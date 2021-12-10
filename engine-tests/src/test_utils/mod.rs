@@ -44,6 +44,7 @@ pub(crate) mod solidity;
 pub(crate) mod standalone;
 pub(crate) mod standard_precompiles;
 pub(crate) mod uniswap;
+pub(crate) mod weth;
 
 pub(crate) struct Signer {
     pub nonce: u64,
@@ -493,7 +494,7 @@ impl Default for AuroraRunner {
         } else if cfg!(feature = "testnet-test") {
             std::fs::read("../testnet-test.wasm").unwrap()
         } else {
-            std::fs::read("../betanet-test.wasm").unwrap()
+            panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
         };
         let mut wasm_config = VMConfig::default();
         // See https://github.com/near/nearcore/pull/4979/
@@ -501,7 +502,7 @@ impl Default for AuroraRunner {
 
         Self {
             aurora_account_id: aurora_account_id.clone(),
-            chain_id: 1313161556, // NEAR betanet
+            chain_id: 1313161556, // NEAR localnet,
             code: ContractCode::new(evm_wasm_bytes, None),
             cache: Default::default(),
             ext: Default::default(),

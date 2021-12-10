@@ -2,11 +2,12 @@ use crate::test_utils;
 use aurora_engine::engine;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{FinishDepositCallArgs, InitCallArgs, NewCallArgs};
-use aurora_engine_sdk::env::Env;
+use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::Balance;
+use aurora_engine_types::types::{Balance, NearGas};
 use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
+use near_sdk_sim::DEFAULT_GAS;
 
 pub mod block;
 pub mod promise;
@@ -44,11 +45,11 @@ pub fn default_env(block_height: u64) -> aurora_engine_sdk::env::Fixed {
         block_timestamp: aurora_engine_sdk::env::Timestamp::new(0),
         attached_deposit: 0,
         random_seed: H256::zero(),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     }
 }
 
-pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E) {
-    let chain_id = test_utils::AuroraRunner::default().chain_id;
+pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
     let new_args = NewCallArgs {
         chain_id: aurora_engine_types::types::u256_to_arr(&U256::from(chain_id)),
         owner_id: env.current_account_id(),
@@ -118,6 +119,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
             aurora_account_id.clone(),
             aurora_account_id.clone(),
             deposit_args,
+            NearGas::new(DEFAULT_GAS),
         )
         .map_err(unsafe_to_string)
         .unwrap();

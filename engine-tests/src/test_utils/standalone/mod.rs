@@ -2,6 +2,7 @@ use aurora_engine::engine;
 use aurora_engine::parameters::{CallArgs, DeployErc20TokenArgs, SubmitResult, TransactionStatus};
 use aurora_engine::transaction::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_sdk::env::{self, Env};
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{types::Wei, Address, H256, U256};
 use borsh::BorshDeserialize;
 use engine_standalone_storage::engine_state;
@@ -25,11 +26,16 @@ pub struct StandaloneRunner {
 
 impl StandaloneRunner {
     pub fn init_evm(&mut self) {
+        self.init_evm_with_chain_id(self.chain_id)
+    }
+
+    pub fn init_evm_with_chain_id(&mut self, chain_id: u64) {
+        self.chain_id = chain_id;
         let storage = &mut self.storage;
         let env = &mut self.env;
         env.block_height += 1;
         let io = Self::get_engine_io(storage, env, 0, H256([0u8; 32]));
-        mocks::init_evm(io.engine_io, env);
+        mocks::init_evm(io.engine_io, env, chain_id);
         io.finish().commit(storage, &mut self.cumulative_diff);
     }
 
@@ -71,6 +77,24 @@ impl StandaloneRunner {
         env.block_height += 1;
         let signed_tx = test_utils::sign_transaction(transaction, Some(self.chain_id), account);
         let transaction_bytes = rlp::encode(&signed_tx).to_vec();
+
+        Self::internal_submit_transaction(
+            &transaction_bytes,
+            0,
+            storage,
+            env,
+            &mut self.cumulative_diff,
+        )
+    }
+
+    pub fn submit_raw_transaction_bytes(
+        &mut self,
+        transaction_bytes: &[u8],
+    ) -> Result<SubmitResult, engine::EngineError> {
+        self.env.predecessor_account_id = "some-account.near".parse().unwrap();
+        let storage = &mut self.storage;
+        let env = &mut self.env;
+        env.block_height += 1;
 
         Self::internal_submit_transaction(
             &transaction_bytes,
@@ -125,6 +149,7 @@ impl StandaloneRunner {
         env.predecessor_account_id = ctx.predecessor_account_id.as_ref().parse().unwrap();
         env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
+        env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
 
         let storage = &mut self.storage;
         if method_name == test_utils::SUBMIT {

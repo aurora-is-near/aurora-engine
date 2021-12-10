@@ -52,5 +52,4 @@ tempfile = "3.2.0"
 meta-call = ["aurora-engine/meta-call"]
 mainnet-test = ["aurora-engine/mainnet-test", "meta-call"]
 testnet-test = ["aurora-engine/testnet-test", "meta-call"]
-betanet-test = ["aurora-engine/betanet-test", "meta-call"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
