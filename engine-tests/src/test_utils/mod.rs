@@ -1,5 +1,5 @@
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::types::Balance;
+use aurora_engine_types::types::{Balance, NEP141Wei};
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
@@ -272,7 +272,7 @@ impl AuroraRunner {
                 .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
                 .unwrap_or_default();
             current_ft.total_eth_supply_on_near =
-                current_ft.total_eth_supply_on_near + Balance::new(init_balance.raw().as_u128());
+                current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
             current_ft
         };
 

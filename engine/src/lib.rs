@@ -90,9 +90,8 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::Wei;
     use crate::prelude::{
-        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec,
+        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei,
         ERC20_MINT_SELECTOR, ERR_FAILED_PARSE, H256, U256,
     };
 
@@ -848,6 +847,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use crate::connector::ZERO_ATTACHED_BALANCE;
+        use crate::prelude::NEP141Wei;
         use evm::backend::ApplyBackend;
         const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
         const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
@@ -856,7 +856,7 @@ mod contract {
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
         let address = Address(args.0);
         let nonce = U256::from(args.1);
-        let balance = NEP141Wei::from(args.2);
+        let balance = NEP141Wei::new(args.2 as u128);
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {
