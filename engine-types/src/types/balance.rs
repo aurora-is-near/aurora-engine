@@ -1,11 +1,9 @@
 use crate::fmt::Formatter;
-use crate::types::{NEP141Wei, Wei};
 use crate::{Add, Display, Sub, SubAssign};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
-pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
-pub const ZERO_WEI: Wei = Wei::new_u64(0);
+pub const ZERO_YOCTO: Yocto = Yocto::new(0);
 
 #[derive(
     Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
@@ -47,18 +45,18 @@ impl Balance {
 }
 
 impl Add<Balance> for Balance {
-    type Output = Balance;
+    type Output = Self;
 
-    fn add(self, rhs: Balance) -> Self::Output {
-        Balance(self.0 + rhs.0)
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
     }
 }
 
 impl Sub<Balance> for Balance {
-    type Output = Balance;
+    type Output = Self;
 
-    fn sub(self, rhs: Balance) -> Self::Output {
-        Balance(self.0 - rhs.0)
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
     }
 }
 
@@ -102,6 +100,22 @@ impl Yocto {
     /// Consumes `Yocto NEAR` and returns the underlying type.
     pub fn into_u128(self) -> u128 {
         self.0
+    }
+}
+
+impl Add<Yocto> for Yocto {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl Sub<Yocto> for Yocto {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
     }
 }
 

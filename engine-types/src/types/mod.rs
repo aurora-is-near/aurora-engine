@@ -68,8 +68,8 @@ pub struct InternalMetaCallArgs {
 }
 
 pub struct StorageBalanceBounds {
-    pub min: Balance,
-    pub max: Option<Balance>,
+    pub min: Yocto,
+    pub max: Option<Yocto>,
 }
 
 /// promise results structure

@@ -3,6 +3,10 @@ use crate::types::balance::error;
 use crate::types::{Balance, Fee};
 use crate::{Add, Display, Sub, U256};
 use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
+use std::ops::SubAssign;
+
+pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
+pub const ZERO_WEI: Wei = Wei::new_u64(0);
 
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
 pub type WeiU256 = [u8; 32];
@@ -44,6 +48,20 @@ impl Sub<NEP141Wei> for NEP141Wei {
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self(self.0 - rhs.0)
+    }
+}
+
+impl Add<NEP141Wei> for NEP141Wei {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl SubAssign<NEP141Wei> for NEP141Wei {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
     }
 }
 

@@ -9,9 +9,9 @@ use crate::parameters::{
     StorageWithdrawCallArgs, TransferCallArgs, TransferCallCallArgs, WithdrawResult,
 };
 use crate::prelude::{
-    format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
-    BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString,
-    Vec, WithdrawCallArgs, Yocto, ERR_FAILED_PARSE, H160,
+    format, sdk, str, validate_eth_address, AccountId, Address, BorshDeserialize, BorshSerialize,
+    EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString, Vec,
+    WithdrawCallArgs, Yocto, ERR_FAILED_PARSE, H160,
 };
 use crate::prelude::{
     AddressValidationError, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
@@ -19,7 +19,7 @@ use crate::prelude::{
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::types::{NEP141Wei, Wei, ZERO_BALANCE, ZERO_WEI};
+use aurora_engine_types::types::{NEP141Wei, Wei, ZERO_NEP141_WEI, ZERO_WEI};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -318,7 +318,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         sdk::log!(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
 
         if self.ft.get_account_eth_balance(&owner_id).is_none() {
-            self.ft.accounts_insert(&owner_id, ZERO_BALANCE);
+            self.ft.accounts_insert(&owner_id, ZERO_NEP141_WEI);
         }
         self.ft.internal_deposit_eth_to_near(&owner_id, amount)
     }
@@ -413,7 +413,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<(), crate::prelude::types::error::BalanceOverflowError> {
         let balance = self
             .ft
-            .internal_unwrap_balance_of_eth_on_aurora(args.address)?;
+            .internal_unwrap_balance_of_eth_on_aurora(args.address);
         sdk::log!(&format!(
             "Balance of ETH [{}]: {}",
             hex::encode(args.address),
@@ -497,8 +497,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Note: It can't overflow because the total supply doesn't change during transfer.
             let amount_for_check = self
                 .ft
-                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient)
-                .map_err(error::FtTransferCallError::BalanceOverflow)?;
+                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
             if amount_for_check
                 .checked_add(Wei::from(args.amount))
                 .is_none()
@@ -536,7 +535,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn storage_deposit(
         &mut self,
         predecessor_account_id: AccountId,
-        amount: Balance,
+        amount: Yocto,
         args: StorageDepositCallArgs,
     ) -> Result<Option<PromiseBatchAction>, fungible_token::error::StorageFundingError> {
         let account_id = args

@@ -237,6 +237,8 @@ pub struct BeginBlockArgs {
 #[derive(Debug, Clone)]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
+    /// Balance can be for Eth on Near and for Eth to Aurora
+    /// We use common `Balance` type without concrete specification.
     pub amount: Balance,
     pub msg: String,
 }
@@ -294,8 +296,8 @@ pub struct WithdrawResult {
 /// Fungible token storage balance
 #[derive(Default)]
 pub struct StorageBalance {
-    pub total: NEP141Wei,
-    pub available: NEP141Wei,
+    pub total: Yocto,
+    pub available: Yocto,
 }
 
 impl StorageBalance {
