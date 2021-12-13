@@ -7,7 +7,7 @@ use crate::prelude::{
     String, ToString, TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
-use aurora_engine_types::types::Fee;
+use aurora_engine_types::types::{Fee, NEP141Wei};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -248,7 +248,7 @@ impl TryFrom<JsonValue> for NEP141FtOnTransferArgs {
         Ok(Self {
             sender_id: AccountId::try_from(value.string("sender_id")?)
                 .map_err(|_| JsonError::InvalidString)?,
-            amount: Balance::new(value.u128("amount")?),
+            amount: NEP141Wei::new(value.u128("amount")?),
             msg: value.string("msg")?,
         })
     }
@@ -286,7 +286,7 @@ pub struct IsUsedProofCallArgs {
 #[derive(BorshSerialize)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(BorshDeserialize))]
 pub struct WithdrawResult {
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub recipient_id: RawAddress,
     pub eth_custodian_address: RawAddress,
 }
@@ -294,8 +294,8 @@ pub struct WithdrawResult {
 /// Fungible token storage balance
 #[derive(Default)]
 pub struct StorageBalance {
-    pub total: Balance,
-    pub available: Balance,
+    pub total: NEP141Wei,
+    pub available: NEP141Wei,
 }
 
 impl StorageBalance {
@@ -314,7 +314,7 @@ impl StorageBalance {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct ResolveTransferCallArgs {
     pub sender_id: AccountId,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub receiver_id: AccountId,
 }
 
@@ -322,7 +322,7 @@ pub struct ResolveTransferCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FinishDepositCallArgs {
     pub new_owner_id: AccountId,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub proof_key: String,
     pub relayer_id: AccountId,
     pub fee: Fee,
@@ -340,7 +340,7 @@ pub struct DepositEthCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FinishDepositEthCallArgs {
     pub new_owner_id: EthAddress,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub fee: Balance,
     pub relayer_eth_account: AccountId,
     pub proof: Proof,
@@ -361,7 +361,7 @@ pub type SetContractDataCallArgs = InitCallArgs;
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct TransferCallCallArgs {
     pub receiver_id: AccountId,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub memo: Option<String>,
     pub msg: String,
 }
@@ -371,7 +371,7 @@ impl TryFrom<JsonValue> for TransferCallCallArgs {
 
     fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
         let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
-        let amount = Balance::new(v.u128("amount")?);
+        let amount = NEP141Wei::new(v.u128("amount")?);
         let memo = v.string("memo").ok();
         let msg = v.string("msg")?;
         Ok(Self {
@@ -419,7 +419,7 @@ impl From<JsonValue> for StorageDepositCallArgs {
 /// storage_withdraw eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StorageWithdrawCallArgs {
-    pub amount: Option<u128>,
+    pub amount: Option<NEP141Wei>,
 }
 
 impl From<JsonValue> for StorageWithdrawCallArgs {
@@ -434,7 +434,7 @@ impl From<JsonValue> for StorageWithdrawCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct TransferCallArgs {
     pub receiver_id: AccountId,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub memo: Option<String>,
 }
 
@@ -444,7 +444,7 @@ impl TryFrom<JsonValue> for TransferCallArgs {
     fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
         Ok(Self {
             receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: Balance::new(v.u128("amount")?),
+            amount: NEP141Wei::new(v.u128("amount")?),
             memo: v.string("memo").ok(),
         })
     }
@@ -488,7 +488,7 @@ impl TryFrom<JsonValue> for ResolveTransferCallArgs {
         Ok(Self {
             sender_id: AccountId::try_from(v.string("sender_id")?)?,
             receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: Balance::new(v.u128("amount")?),
+            amount: NEP141Wei::new(v.u128("amount")?),
         })
     }
 }

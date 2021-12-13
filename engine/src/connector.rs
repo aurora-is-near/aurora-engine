@@ -19,7 +19,7 @@ use crate::prelude::{
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::types::ZERO_BALANCE;
+use aurora_engine_types::types::{NEP141Wei, Wei, ZERO_BALANCE};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -161,7 +161,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             return Err(error::DepositError::CustodianAddressMismatch);
         }
 
-        if Balance::new(event.fee.into_u128()) >= event.amount {
+        if NEP141Wei::new(event.fee.into_u128()) >= event.amount {
             return Err(error::DepositError::InsufficientAmountForFee);
         }
 
@@ -275,9 +275,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Mint - calculate new balances
             self.mint_eth_on_near(
                 data.new_owner_id.clone(),
-                data.amount - Balance::new(data.fee.into_u128()),
+                data.amount - NEP141Wei::new(data.fee.into_u128()),
             )?;
-            self.mint_eth_on_near(data.relayer_id, Balance::new(data.fee.into_u128()))?;
+            self.mint_eth_on_near(data.relayer_id, NEP141Wei::new(data.fee.into_u128()))?;
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key)?;
             // Save new contract data
@@ -290,7 +290,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub(crate) fn internal_remove_eth(
         &mut self,
         address: &Address,
-        amount: Balance,
+        amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         self.burn_eth_on_aurora(address.0, amount)?;
         self.save_ft_contract();
@@ -313,7 +313,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     fn mint_eth_on_near(
         &mut self,
         owner_id: AccountId,
-        amount: Balance,
+        amount: NEP141FtOnTransferArgs,
     ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
 
@@ -327,7 +327,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     fn mint_eth_on_aurora(
         &mut self,
         owner_id: EthAddress,
-        amount: Balance,
+        amount: Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!(&format!(
             "Mint {} ETH tokens for: {}",
@@ -341,7 +341,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     fn burn_eth_on_aurora(
         &mut self,
         address: EthAddress,
-        amount: Balance,
+        amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         sdk::log!(&format!(
             "Burn {} ETH tokens for: {}",
@@ -600,12 +600,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .map_err(error::FtTransferCallError::MessageParseFailed)?;
 
         // Special case when predecessor_account_id is current_account_id
-        let fee = Balance::new(message_data.fee.into_u128());
+        let wei_fee = Wei::new(message_data.fee.into_u128());
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (fee, relayer) {
-            (fee, Some(H160(evm_relayer_address))) if fee > ZERO_BALANCE => {
-                self.mint_eth_on_aurora(message_data.recipient, args.amount - fee)?;
+            (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
+                self.mint_eth_on_aurora(message_data.recipient, Wei::from(args.amount) - fee)?;
                 self.mint_eth_on_aurora(evm_relayer_address, fee)?;
             }
             _ => self.mint_eth_on_aurora(message_data.recipient, args.amount)?,

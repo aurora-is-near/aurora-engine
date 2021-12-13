@@ -11,6 +11,7 @@ use crate::prelude::{
     ZERO_BALANCE,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::types::{NEP141Wei, ZERO_NEP141_WEI};
 
 /// Gas for `resolve_transfer`: 5 TGas
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
@@ -20,10 +21,10 @@ const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(35_000_000_000_000);
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct FungibleToken {
     /// Total ETH supply on Near (nETH as NEP-141 token)
-    pub total_eth_supply_on_near: Balance,
+    pub total_eth_supply_on_near: NEP141Wei,
 
     /// Total ETH supply on Aurora (ETH in Aurora EVM)
-    pub total_eth_supply_on_aurora: Balance,
+    pub total_eth_supply_on_aurora: Wei,
 
     /// The storage size in bytes for one account.
     pub account_storage_usage: StorageUsage,
@@ -42,10 +43,10 @@ impl FungibleToken {
 
 pub struct FungibleTokenOps<I: IO> {
     /// Total ETH supply on Near (nETH as NEP-141 token)
-    pub total_eth_supply_on_near: Balance,
+    pub total_eth_supply_on_near: NEP141Wei,
 
     /// Total ETH supply on Aurora (ETH in Aurora EVM)
-    pub total_eth_supply_on_aurora: Balance,
+    pub total_eth_supply_on_aurora: Wei,
 
     /// The storage size in bytes for one account.
     pub account_storage_usage: StorageUsage,
@@ -149,17 +150,17 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     pub fn internal_unwrap_balance_of_eth_on_aurora(
         &self,
         address: EthAddress,
-    ) -> Result<Balance, crate::prelude::types::error::BalanceOverflowError> {
+    ) -> Result<Wei, crate::prelude::types::error::BalanceOverflowError> {
         engine::get_balance(&self.io, &Address(address))
             .try_into_u128()
-            .map(Balance::new)
+            .map(NEP141Wei::new)
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
     pub fn internal_deposit_eth_to_near(
         &mut self,
         account_id: &AccountId,
-        amount: Balance,
+        amount: NEP141Wei,
     ) -> Result<(), error::DepositError> {
         let balance = self
             .get_account_eth_balance(account_id)
@@ -179,7 +180,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     pub fn internal_deposit_eth_to_aurora(
         &mut self,
         address: EthAddress,
-        amount: Balance,
+        amount: Wei,
     ) -> Result<(), error::DepositError> {
         let balance = self
             .internal_unwrap_balance_of_eth_on_aurora(address)
@@ -199,7 +200,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     pub fn internal_withdraw_eth_from_near(
         &mut self,
         account_id: &AccountId,
-        amount: Balance,
+        amount: NEP141Wei,
     ) -> Result<(), error::WithdrawError> {
         let balance = self
             .get_account_eth_balance(account_id)
@@ -219,7 +220,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     pub fn internal_withdraw_eth_from_aurora(
         &mut self,
         address: EthAddress,
-        amount: Balance,
+        amount: Wei,
     ) -> Result<(), error::WithdrawError> {
         let balance = self
             .internal_unwrap_balance_of_eth_on_aurora(address)
@@ -240,13 +241,13 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         &mut self,
         sender_id: &AccountId,
         receiver_id: &AccountId,
-        amount: Balance,
+        amount: NEP141Wei,
         #[allow(unused_variables)] memo: &Option<String>,
     ) -> Result<(), error::TransferError> {
         if sender_id == receiver_id {
             return Err(error::TransferError::SelfTransfer);
         }
-        if amount == ZERO_BALANCE {
+        if amount == ZERO_NEP141_WEI {
             return Err(error::TransferError::ZeroAmount);
         }
 
@@ -276,17 +277,17 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         self.accounts_insert(account_id, ZERO_BALANCE)
     }
 
-    pub fn ft_total_eth_supply_on_near(&self) -> Balance {
+    pub fn ft_total_eth_supply_on_near(&self) -> NEP141Wei {
         self.total_eth_supply_on_near
     }
 
-    pub fn ft_total_eth_supply_on_aurora(&self) -> Balance {
+    pub fn ft_total_eth_supply_on_aurora(&self) -> Wei {
         self.total_eth_supply_on_aurora
     }
 
-    pub fn ft_balance_of(&self, account_id: &AccountId) -> Balance {
+    pub fn ft_balance_of(&self, account_id: &AccountId) -> NEP141Wei {
         self.get_account_eth_balance(account_id)
-            .unwrap_or(ZERO_BALANCE)
+            .unwrap_or(ZERO_NEP141_WEI)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -345,8 +346,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         promise_result: PromiseResult,
         sender_id: &AccountId,
         receiver_id: &AccountId,
-        amount: Balance,
-    ) -> (Balance, Balance) {
+        amount: NEP141Wei,
+    ) -> (NEP141Wei, NEP141Wei) {
         // Get the unused amount from the `ft_on_transfer` call result.
         let unused_amount = match promise_result {
             PromiseResult::NotReady => unreachable!(),
@@ -354,7 +355,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                 if let Some(raw_unused_amount) =
                     parse_json(value.as_slice()).and_then(|x| (&x).try_into().ok())
                 {
-                    let unused_amount = Balance::new(raw_unused_amount);
+                    let unused_amount = NEP141Wei::new(raw_unused_amount);
                     // let unused_amount = Balance::from(raw_unused_amount);
                     if amount > unused_amount {
                         unused_amount
@@ -373,7 +374,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                 .get_account_eth_balance(receiver_id)
                 .unwrap_or_else(|| {
                     self.accounts_insert(receiver_id, ZERO_BALANCE);
-                    ZERO_BALANCE
+                    ZERO_NEP141_WEI
                 });
             if receiver_balance > ZERO_BALANCE {
                 let refund_amount = if receiver_balance > unused_amount {
@@ -576,7 +577,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     /// Balance of nETH (ETH on NEAR token)
-    pub fn get_account_eth_balance(&self, account_id: &AccountId) -> Option<Balance> {
+    pub fn get_account_eth_balance(&self, account_id: &AccountId) -> Option<NEP141Wei> {
         self.io
             .read_storage(&Self::account_to_key(account_id))
             .and_then(|s| Balance::try_from_slice(&s.to_vec()).ok())

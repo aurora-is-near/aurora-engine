@@ -82,6 +82,7 @@ mod contract {
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::Runtime;
     use aurora_engine_sdk::promise::PromiseHandler;
+    use aurora_engine_types::types::NEP141Wei;
 
     use crate::json::parse_json;
     use crate::prelude::parameters::RefundCallArgs;
@@ -855,7 +856,7 @@ mod contract {
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
         let address = Address(args.0);
         let nonce = U256::from(args.1);
-        let balance = Balance::from(args.2);
+        let balance = NEP141Wei::from(args.2);
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {

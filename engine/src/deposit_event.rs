@@ -5,6 +5,7 @@ use crate::prelude::{
     validate_eth_address, vec, AddressValidationError, Balance, BorshDeserialize, BorshSerialize,
     EthAddress, Fee, String, ToString, TryFrom, TryInto, Vec, U256,
 };
+use aurora_engine_types::types::NEP141Wei;
 use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
@@ -223,7 +224,7 @@ pub struct DepositedEvent {
     pub eth_custodian_address: EthAddress,
     pub sender: EthAddress,
     pub token_message_data: TokenMessageData,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub fee: Fee,
 }
 
@@ -274,7 +275,7 @@ impl DepositedEvent {
             .into_uint()
             .ok_or(error::ParseError::InvalidAmount)?
             .try_into()
-            .map(Balance::new)
+            .map(NEP141Wei::new)
             .map_err(|_| error::ParseError::OverflowNumber)?;
         let fee = event.log.params[3]
             .value

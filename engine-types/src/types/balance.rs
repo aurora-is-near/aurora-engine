@@ -1,8 +1,10 @@
 use crate::fmt::Formatter;
+use crate::types::NEP141Wei;
 use crate::{Add, Display, Sub, SubAssign};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
+pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
 
 #[derive(
     Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,

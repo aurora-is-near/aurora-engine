@@ -14,7 +14,7 @@ use crate::prelude::{
     types,
 };
 
-use crate::prelude::types::EthGas;
+use crate::prelude::types::{EthGas, NEP141Wei};
 use crate::prelude::Address;
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
@@ -499,7 +499,7 @@ impl Precompile for ExitToEthereum {
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {
                         recipient_address,
-                        amount: Balance::new(context.apparent_value.as_u128()),
+                        amount: NEP141Wei::new(context.apparent_value.as_u128()),
                     }
                     .try_to_vec()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
