@@ -14,7 +14,7 @@ use crate::prelude::{
     types,
 };
 
-use crate::prelude::types::{EthGas, NEP141Wei};
+use crate::prelude::types::EthGas;
 use crate::prelude::Address;
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
@@ -464,6 +464,7 @@ impl Precompile for ExitToEthereum {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
+        use crate::prelude::types::NEP141Wei;
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);

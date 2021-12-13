@@ -4,7 +4,7 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{FinishDepositCallArgs, InitCallArgs, NewCallArgs};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::{Balance, NEP141Wei, NearGas};
+use aurora_engine_types::types::{NEP141Wei, NearGas};
 use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
 use near_sdk_sim::DEFAULT_GAS;

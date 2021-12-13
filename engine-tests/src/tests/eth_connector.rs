@@ -9,7 +9,7 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
-use aurora_engine_types::types::{Balance, Fee, NEP141Wei};
+use aurora_engine_types::types::{Fee, NEP141Wei};
 use borsh::{BorshDeserialize, BorshSerialize};
 use byte_slice_cast::AsByteSlice;
 use ethabi::ethereum_types::U256;

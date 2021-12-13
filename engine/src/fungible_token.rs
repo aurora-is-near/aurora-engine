@@ -23,7 +23,9 @@ pub struct FungibleToken {
     pub total_eth_supply_on_near: NEP141Wei,
 
     /// Total ETH supply on Aurora (ETH in Aurora EVM)
-    pub total_eth_supply_on_aurora: Wei,
+    /// NOTE: For compatibility reasons, we do not use  `Wei` (32 bytes)
+    /// buy `NEP141Wei` (16 bytes)
+    pub total_eth_supply_on_aurora: NEP141Wei,
 
     /// The storage size in bytes for one account.
     pub account_storage_usage: StorageUsage,
@@ -33,7 +35,7 @@ impl FungibleToken {
     pub fn ops<I: IO>(self, io: I) -> FungibleTokenOps<I> {
         FungibleTokenOps {
             total_eth_supply_on_near: self.total_eth_supply_on_near,
-            total_eth_supply_on_aurora: self.total_eth_supply_on_aurora,
+            total_eth_supply_on_aurora: Wei::from(self.total_eth_supply_on_aurora),
             account_storage_usage: self.account_storage_usage,
             io,
         }
@@ -140,7 +142,11 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     pub fn data(&self) -> FungibleToken {
         FungibleToken {
             total_eth_supply_on_near: self.total_eth_supply_on_near,
-            total_eth_supply_on_aurora: self.total_eth_supply_on_aurora,
+            // TODO: both types should be same
+            // ut must never panic
+            total_eth_supply_on_aurora: NEP141Wei::new(
+                self.total_eth_supply_on_aurora.try_into_u128().unwrap(),
+            ),
             account_storage_usage: self.account_storage_usage,
         }
     }
