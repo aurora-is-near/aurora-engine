@@ -1,5 +1,5 @@
 use crate::fmt::Formatter;
-use crate::{Add, Display, Sub, SubAssign};
+use crate::{Add, Display, Sub};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
@@ -26,55 +26,9 @@ impl Balance {
         Self(amount)
     }
 
-    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
-        self.0.checked_sub(rhs.0).map(Self)
-    }
-
-    pub fn checked_add(self, rhs: Self) -> Option<Self> {
-        self.0.checked_add(rhs.0).map(Self)
-    }
-
     /// Consumes `Balance` and returns the underlying type.
     pub fn into_u128(self) -> u128 {
         self.0
-    }
-
-    pub fn as_u128(&self) -> u128 {
-        self.0
-    }
-}
-
-impl Add<Balance> for Balance {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self(self.0 + rhs.0)
-    }
-}
-
-impl Sub<Balance> for Balance {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self(self.0 - rhs.0)
-    }
-}
-
-impl SubAssign<Balance> for Balance {
-    fn sub_assign(&mut self, rhs: Balance) {
-        *self = *self - rhs;
-    }
-}
-
-impl From<u128> for Balance {
-    fn from(amount: u128) -> Self {
-        Self(amount)
-    }
-}
-
-impl From<u64> for Balance {
-    fn from(amount: u64) -> Self {
-        Self(amount as u128)
     }
 }
 
