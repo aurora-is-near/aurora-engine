@@ -33,7 +33,7 @@ impl Balance {
         self.0.checked_add(rhs.0).map(Self)
     }
 
-    /// Consumes `Fee` and returns the underlying type.
+    /// Consumes `Balance` and returns the underlying type.
     pub fn into_u128(self) -> u128 {
         self.0
     }
