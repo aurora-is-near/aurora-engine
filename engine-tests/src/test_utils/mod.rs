@@ -1,5 +1,5 @@
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::types::{Balance, NEP141Wei};
+use aurora_engine_types::types::NEP141Wei;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;

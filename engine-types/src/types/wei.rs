@@ -209,4 +209,23 @@ mod tests {
         let x: u64 = rand::random();
         assert_eq!(Wei::new_u64(x).raw().as_u64(), x);
     }
+
+    #[test]
+    fn test_wei_serializer() {
+        // borsh serialize
+        let serialized = Wei::new(U256::from(100)).try_to_vec().unwrap();
+        assert_eq!(serialized.len(), 32);
+
+        let balance = Wei::try_from_slice(&serialized).unwrap();
+        assert_eq!(balance, Wei::new(U256::from(100)));
+    }
+
+    #[test]
+    fn test_wei_serialized_len() {
+        let mut serialized = [0u8; 30];
+        serialized[28] = 0xA;
+        let wei = Wei::try_from_slice(&serialized);
+        let w: Wei = wei.unwrap();
+        assert_eq!(w.try_into_u128().unwrap(), 2560);
+    }
 }
