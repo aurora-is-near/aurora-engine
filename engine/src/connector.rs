@@ -603,7 +603,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let wei_fee = Wei::new(message_data.fee.into_u128());
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
-        match (fee, relayer) {
+        match (wei_fee, relayer) {
             (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
                 self.mint_eth_on_aurora(message_data.recipient, Wei::from(args.amount) - fee)?;
                 self.mint_eth_on_aurora(evm_relayer_address, fee)?;

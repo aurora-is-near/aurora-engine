@@ -2,13 +2,42 @@ use crate::fmt::Formatter;
 use crate::types::balance::error;
 use crate::types::Balance;
 use crate::{Add, Display, Sub, U256};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
 pub type WeiU256 = [u8; 32];
 
 // Type representing the NEP-141 balances of the eth-connector (ie Wei amounts that have been bridged to Near)
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(
+    Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
+)]
 pub struct NEP141Wei(u128);
+
+impl Display for NEP141Wei {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl NEP141Wei {
+    /// Constructs a new `Fee` with a given u128 value.
+    pub const fn new(amount: u128) -> Self {
+        Self(amount)
+    }
+
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.checked_sub(rhs.0).map(Self)
+    }
+
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0).map(Self)
+    }
+
+    /// Consumes `Balance` and returns the underlying type.
+    pub fn into_u128(self) -> u128 {
+        self.0
+    }
+}
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]

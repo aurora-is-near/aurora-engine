@@ -464,8 +464,6 @@ impl Precompile for ExitToEthereum {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        use crate::prelude::types::Balance;
-
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);

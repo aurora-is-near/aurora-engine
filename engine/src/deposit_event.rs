@@ -2,10 +2,9 @@ use crate::deposit_event::error::ParseEventMessageError;
 use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    validate_eth_address, vec, AddressValidationError, Balance, BorshDeserialize, BorshSerialize,
-    EthAddress, Fee, String, ToString, TryFrom, TryInto, Vec, U256,
+    validate_eth_address, vec, AddressValidationError, BorshDeserialize, BorshSerialize,
+    EthAddress, Fee, NEP141Wei, String, ToString, TryFrom, TryInto, Vec, U256,
 };
-use aurora_engine_types::types::NEP141Wei;
 use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 

@@ -82,7 +82,6 @@ mod contract {
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::Runtime;
     use aurora_engine_sdk::promise::PromiseHandler;
-    use aurora_engine_types::types::NEP141Wei;
 
     use crate::json::parse_json;
     use crate::prelude::parameters::RefundCallArgs;
