@@ -7,7 +7,10 @@ pub const ZERO_BALANCE: Balance = Balance::new(0);
 #[derive(
     Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
 )]
-/// Engine `balance` type which wraps an underlying u128.
+/// A generic type for 128-bit balances, especially for NEP-141 tokens. This generic type should not be used
+/// to represent NEAR balances (`Yocto` is designed for this purpose) or for eth-connector balances (`NEP141Wei`
+/// is designed for this purpose). The reason we have specific types for NEAR and eth-connector is because of the
+/// significant role they play in our system; therefore we do not want to mix them up with generic token balances.
 pub struct Balance(u128);
 
 impl Display for Balance {
