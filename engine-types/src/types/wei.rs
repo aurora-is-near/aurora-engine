@@ -6,7 +6,7 @@ use crate::{Add, Display, Sub, U256};
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
 pub type WeiU256 = [u8; 32];
 
-// the NEP-141 balance for the quantity on NEAR in the EVM (Wei)
+// Type representing the NEP-141 balances of the eth-connector (ie Wei amounts that have been bridged to Near)
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct NEP141Wei(u128);
 
