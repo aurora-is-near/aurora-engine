@@ -1,10 +1,11 @@
 use crate::fmt::Formatter;
-use crate::types::NEP141Wei;
+use crate::types::{NEP141Wei, Wei};
 use crate::{Add, Display, Sub, SubAssign};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
+pub const ZERO_WEI: Wei = Wei::new_u64(0);
 
 #[derive(
     Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
@@ -22,7 +23,7 @@ impl Display for Balance {
 }
 
 impl Balance {
-    /// Constructs a new `Fee` with a given u128 value.
+    /// Constructs a new `Balance` with a given u128 value.
     pub const fn new(amount: u128) -> Balance {
         Self(amount)
     }
@@ -37,6 +38,10 @@ impl Balance {
 
     /// Consumes `Balance` and returns the underlying type.
     pub fn into_u128(self) -> u128 {
+        self.0
+    }
+
+    pub fn as_u128(&self) -> u128 {
         self.0
     }
 }

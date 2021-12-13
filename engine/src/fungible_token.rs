@@ -11,7 +11,7 @@ use crate::prelude::{
     ZERO_BALANCE,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::types::{NEP141Wei, ZERO_NEP141_WEI};
+use aurora_engine_types::types::{NEP141Wei, Yocto, ZERO_NEP141_WEI};
 
 /// Gas for `resolve_transfer`: 5 TGas
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
@@ -295,7 +295,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         &mut self,
         sender_id: AccountId,
         receiver_id: AccountId,
-        amount: Balance,
+        amount: NEP141Wei,
         memo: &Option<String>,
         msg: String,
         current_account_id: AccountId,
@@ -414,7 +414,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         promise_result: PromiseResult,
         sender_id: &AccountId,
         receiver_id: &AccountId,
-        amount: Balance,
+        amount: NEP141Wei,
     ) -> Balance {
         self.internal_ft_resolve_transfer(promise_result, sender_id, receiver_id, amount)
             .0
@@ -528,7 +528,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     pub fn storage_withdraw(
         &mut self,
         account_id: &AccountId,
-        amount: Option<u128>,
+        amount: Option<Yocto>,
     ) -> Result<StorageBalance, error::StorageFundingError> {
         if let Some(storage_balance) = self.internal_storage_balance_of(account_id) {
             match amount {

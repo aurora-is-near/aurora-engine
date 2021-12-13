@@ -1,8 +1,8 @@
 use crate::fmt::Formatter;
 use crate::types::balance::error;
-use crate::types::Balance;
+use crate::types::{Balance, Fee};
 use crate::{Add, Display, Sub, U256};
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
 
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
 pub type WeiU256 = [u8; 32];
@@ -20,7 +20,7 @@ impl Display for NEP141Wei {
 }
 
 impl NEP141Wei {
-    /// Constructs a new `Fee` with a given u128 value.
+    /// Constructs a new `NEP141Wei` with a given u128 value.
     pub const fn new(amount: u128) -> Self {
         Self(amount)
     }
@@ -33,9 +33,17 @@ impl NEP141Wei {
         self.0.checked_add(rhs.0).map(Self)
     }
 
-    /// Consumes `Balance` and returns the underlying type.
+    /// Consumes `NEP141Wei` and returns the underlying type.
     pub fn into_u128(self) -> u128 {
         self.0
+    }
+}
+
+impl Sub<NEP141Wei> for NEP141Wei {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
     }
 }
 
@@ -95,6 +103,25 @@ impl Wei {
     }
 }
 
+impl BorshSerialize for Wei {
+    fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
+        let mut buf = [0u8; 32];
+        self.0.to_big_endian(&mut buf);
+        writer.write_all(&buf)
+    }
+}
+
+impl BorshDeserialize for Wei {
+    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
+        Ok(Wei::new(U256::from_big_endian(buf)))
+    }
+
+    fn try_from_slice(v: &[u8]) -> io::Result<Self> {
+        let mut v_mut = v;
+        Self::deserialize(&mut v_mut)
+    }
+}
+
 impl Display for Wei {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
         self.0.fmt(f)
@@ -124,8 +151,20 @@ impl From<WeiU256> for Wei {
     }
 }
 
+impl From<Fee> for Wei {
+    fn from(value: Fee) -> Self {
+        Wei(U256::from(value.into_u128()))
+    }
+}
+
 impl From<Balance> for Wei {
     fn from(value: Balance) -> Self {
+        Wei(U256::from(value.into_u128()))
+    }
+}
+
+impl From<NEP141Wei> for Wei {
+    fn from(value: NEP141Wei) -> Self {
         Wei(U256::from(value.into_u128()))
     }
 }

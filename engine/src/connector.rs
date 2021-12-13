@@ -19,7 +19,7 @@ use crate::prelude::{
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::types::{NEP141Wei, Wei, ZERO_BALANCE};
+use aurora_engine_types::types::{NEP141Wei, Wei, ZERO_BALANCE, ZERO_WEI};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -313,7 +313,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     fn mint_eth_on_near(
         &mut self,
         owner_id: AccountId,
-        amount: NEP141FtOnTransferArgs,
+        amount: NEP141Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
 
@@ -499,7 +499,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 .ft
                 .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient)
                 .map_err(error::FtTransferCallError::BalanceOverflow)?;
-            if amount_for_check.checked_add(args.amount).is_none() {
+            if amount_for_check
+                .checked_add(Wei::from(args.amount))
+                .is_none()
+            {
                 return Err(error::FtTransferCallError::Transfer(
                     fungible_token::error::TransferError::BalanceOverflow,
                 ));
@@ -507,7 +510,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             if self
                 .ft
                 .total_eth_supply_on_aurora
-                .checked_add(args.amount)
+                .checked_add(Wei::from(args.amount))
                 .is_none()
             {
                 return Err(error::FtTransferCallError::Transfer(
@@ -600,15 +603,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .map_err(error::FtTransferCallError::MessageParseFailed)?;
 
         // Special case when predecessor_account_id is current_account_id
-        let wei_fee = Wei::new(message_data.fee.into_u128());
+        let wei_fee = Wei::from(message_data.fee);
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (wei_fee, relayer) {
-            (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
+            (fee, Some(H160(evm_relayer_address))) if fee > ZERO_WEI => {
                 self.mint_eth_on_aurora(message_data.recipient, Wei::from(args.amount) - fee)?;
                 self.mint_eth_on_aurora(evm_relayer_address, fee)?;
             }
-            _ => self.mint_eth_on_aurora(message_data.recipient, args.amount)?,
+            _ => self.mint_eth_on_aurora(message_data.recipient, Wei::from(args.amount))?,
         }
         self.save_ft_contract();
         self.io.return_output("\"0\"".as_bytes());

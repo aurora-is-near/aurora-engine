@@ -7,7 +7,7 @@ use crate::prelude::{
     String, ToString, TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
-use aurora_engine_types::types::{Fee, NEP141Wei};
+use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -248,7 +248,7 @@ impl TryFrom<JsonValue> for NEP141FtOnTransferArgs {
         Ok(Self {
             sender_id: AccountId::try_from(value.string("sender_id")?)
                 .map_err(|_| JsonError::InvalidString)?,
-            amount: NEP141Wei::new(value.u128("amount")?),
+            amount: Balance::new(value.u128("amount")?),
             msg: value.string("msg")?,
         })
     }
@@ -419,13 +419,13 @@ impl From<JsonValue> for StorageDepositCallArgs {
 /// storage_withdraw eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StorageWithdrawCallArgs {
-    pub amount: Option<NEP141Wei>,
+    pub amount: Option<Yocto>,
 }
 
 impl From<JsonValue> for StorageWithdrawCallArgs {
     fn from(v: JsonValue) -> Self {
         Self {
-            amount: v.u128("amount").ok(),
+            amount: v.u128("amount").map(Yocto::new).ok(),
         }
     }
 }
