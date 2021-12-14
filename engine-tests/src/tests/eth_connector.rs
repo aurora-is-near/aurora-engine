@@ -609,7 +609,7 @@ fn test_deposit_with_0x_prefix() {
 
     // Note the 0x prefix before the deposit address.
     let message = [CONTRACT_ACC, ":", "0x", &recipient_address_encoded].concat();
-    let fee: Fee = Fee::new(0);
+    let fee: Fee = Fee::new(NEP141Wei::new(0));
     let token_message_data =
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
             .unwrap();

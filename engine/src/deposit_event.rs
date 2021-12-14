@@ -282,7 +282,7 @@ impl DepositedEvent {
             .into_uint()
             .ok_or(error::ParseError::InvalidFee)?
             .try_into()
-            .map(Fee::new)
+            .map(|v| Fee::new(NEP141Wei::new(v)))
             .map_err(|_| error::ParseError::OverflowNumber)?;
 
         let token_message_data =

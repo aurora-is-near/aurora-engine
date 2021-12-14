@@ -334,7 +334,7 @@ fn test_consume_submit_message() {
 fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine::proof::Proof {
     let eth_custodian_address = test_utils::standalone::mocks::ETH_CUSTODIAN_ADDRESS;
 
-    let fee = Fee::new(0);
+    let fee = Fee::new(NEP141Wei::new(0));
     let message = ["aurora", ":", hex::encode(&recipient_address).as_str()].concat();
     let token_message_data: TokenMessageData =
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
