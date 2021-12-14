@@ -20,6 +20,7 @@ use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::types::{NEP141Wei, Wei, ZERO_NEP141_WEI, ZERO_WEI};
+use primitive_types::U256;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -607,10 +608,16 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (wei_fee, relayer) {
             (fee, Some(H160(evm_relayer_address))) if fee > ZERO_WEI => {
-                self.mint_eth_on_aurora(message_data.recipient, Wei::from(args.amount) - fee)?;
+                self.mint_eth_on_aurora(
+                    message_data.recipient,
+                    Wei::new(U256::from(args.amount.as_u128())) - fee,
+                )?;
                 self.mint_eth_on_aurora(evm_relayer_address, fee)?;
             }
-            _ => self.mint_eth_on_aurora(message_data.recipient, Wei::from(args.amount))?,
+            _ => self.mint_eth_on_aurora(
+                message_data.recipient,
+                Wei::new(U256::from(args.amount.as_u128())),
+            )?,
         }
         self.save_ft_contract();
         self.io.return_output("\"0\"".as_bytes());

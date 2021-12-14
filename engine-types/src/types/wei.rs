@@ -1,8 +1,8 @@
 use crate::fmt::Formatter;
 use crate::types::balance::error;
-use crate::types::{Balance, Fee};
+use crate::types::Fee;
 use crate::{Add, Display, Sub, SubAssign, U256};
-use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
 pub const ZERO_WEI: Wei = Wei::new_u64(0);
@@ -120,25 +120,6 @@ impl Wei {
     }
 }
 
-impl BorshSerialize for Wei {
-    fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
-        let mut buf = [0u8; 32];
-        self.0.to_big_endian(&mut buf);
-        writer.write_all(&buf)
-    }
-}
-
-impl BorshDeserialize for Wei {
-    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        Ok(Wei::new(U256::from_big_endian(buf)))
-    }
-
-    fn try_from_slice(v: &[u8]) -> io::Result<Self> {
-        let mut v_mut = v;
-        Self::deserialize(&mut v_mut)
-    }
-}
-
 impl Display for Wei {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
         self.0.fmt(f)
@@ -174,12 +155,6 @@ impl From<Fee> for Wei {
     }
 }
 
-impl From<Balance> for Wei {
-    fn from(value: Balance) -> Self {
-        Wei(U256::from(value.as_u128()))
-    }
-}
-
 impl From<NEP141Wei> for Wei {
     fn from(value: NEP141Wei) -> Self {
         Wei(U256::from(value.as_u128()))
@@ -208,24 +183,5 @@ mod tests {
     fn test_wei_from_u64() {
         let x: u64 = rand::random();
         assert_eq!(Wei::new_u64(x).raw().as_u64(), x);
-    }
-
-    #[test]
-    fn test_wei_serializer() {
-        // borsh serialize
-        let serialized = Wei::new(U256::from(100)).try_to_vec().unwrap();
-        assert_eq!(serialized.len(), 32);
-
-        let balance = Wei::try_from_slice(&serialized).unwrap();
-        assert_eq!(balance, Wei::new(U256::from(100)));
-    }
-
-    #[test]
-    fn test_wei_serialized_len() {
-        let mut serialized = [0u8; 30];
-        serialized[28] = 0xA;
-        let wei = Wei::try_from_slice(&serialized);
-        let w: Wei = wei.unwrap();
-        assert_eq!(w.try_into_u128().unwrap(), 2560);
     }
 }

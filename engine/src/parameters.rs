@@ -238,7 +238,7 @@ pub struct BeginBlockArgs {
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
     /// Balance can be for Eth on Near and for Eth to Aurora
-    /// We use common `Balance` type without concrete specification.
+    /// `ft_on_transfer` can be called with arbitrary NEP-141 tokens attached, therefore we do not specify a particular type Wei.
     pub amount: Balance,
     pub msg: String,
 }
