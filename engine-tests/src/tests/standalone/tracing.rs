@@ -210,11 +210,6 @@ fn check_transaction_trace<P: AsRef<Path>>(trace: TransactionTrace, expected_tra
         assert_eq!(log.depth.into_u32(), step.depth, "Depths should match");
         assert_eq!(log.opcode.as_u8(), step.op, "opcodes should match");
         assert_eq!(
-            log.gas.into_u64(),
-            step.gas,
-            "remaining gas values should match"
-        );
-        assert_eq!(
             log.gas_cost.into_u64(),
             step.gas_cost,
             "gas costs should match"
