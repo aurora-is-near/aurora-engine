@@ -1,8 +1,9 @@
-use crate::{String, H160};
+use crate::{String, TryFrom, TryInto, H160};
 use borsh::maybestd::io;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Base Eth Address type
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Address(H160);
 
 impl Address {
@@ -20,6 +21,22 @@ impl Address {
     pub fn encode(&self) -> String {
         hex::encode(self.0.as_bytes())
     }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+
+    pub fn from_slice(raw_addr: &[u8]) -> Self {
+        Self::new(H160::from_slice(raw_addr))
+    }
+}
+
+impl TryFrom<&[u8]> for Address {
+    type Error = ();
+
+    fn try_from(raw_addr: &[u8]) -> Result<Self, Self::Error> {
+        Ok(Self::try_from_slice(raw_addr))
+    }
 }
 
 impl BorshSerialize for Address {
@@ -30,7 +47,7 @@ impl BorshSerialize for Address {
 
 impl BorshDeserialize for Address {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        Ok(Self(H160::from_slice(buf)))
+        Ok(Self(H160::try_from(buf)))
     }
 
     fn try_from_slice(v: &[u8]) -> io::Result<Self> {
@@ -77,4 +94,8 @@ mod tests {
         let serialized_addr = [0u8; 21];
         let _ = Address::try_from_slice(&serialized_addr);
     }
+}
+
+pub mod error {
+    pub struct Err;
 }

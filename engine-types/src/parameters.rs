@@ -1,5 +1,6 @@
 use crate::account_id::*;
 use crate::types::*;
+use crate::types_new::Address;
 use crate::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -53,7 +54,7 @@ pub struct PromiseBatchAction {
 /// withdraw NEAR eth-connector call args
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct WithdrawCallArgs {
-    pub recipient_address: EthAddress,
+    pub recipient_address: Address,
     pub amount: Balance,
 }
 

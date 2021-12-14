@@ -1,4 +1,4 @@
-use crate::prelude::{Address, PhantomData, Vec, U256};
+use crate::prelude::{types_new::Address, PhantomData, Vec, U256};
 use crate::{Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput};
 
 use crate::prelude::types::EthGas;

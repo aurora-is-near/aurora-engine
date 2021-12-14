@@ -1,5 +1,5 @@
 use crate::prelude::types::EthGas;
-use crate::prelude::Address;
+use crate::prelude::types_new::Address;
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 

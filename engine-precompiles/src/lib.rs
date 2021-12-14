@@ -26,7 +26,7 @@ use crate::prelude::types::EthGas;
 use crate::prelude::{Vec, H256};
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
-use aurora_engine_types::{account_id::AccountId, vec, Address, BTreeMap, Box};
+use aurora_engine_types::{account_id::AccountId, types_new::Address, vec, BTreeMap, Box};
 use evm::backend::Log;
 use evm::executor;
 use evm::{Context, ExitError, ExitSucceed};
@@ -106,20 +106,20 @@ pub struct Precompiles(pub prelude::BTreeMap<Address, Box<dyn Precompile>>);
 impl executor::PrecompileSet for Precompiles {
     fn execute(
         &self,
-        address: prelude::Address,
+        address: prelude::H160,
         input: &[u8],
         gas_limit: Option<u64>,
         context: &Context,
         is_static: bool,
     ) -> Option<Result<executor::PrecompileOutput, executor::PrecompileFailure>> {
-        self.0.get(&address).map(|p| {
+        self.0.get(&Address::new(address)).map(|p| {
             p.run(input, gas_limit.map(EthGas::new), context, is_static)
                 .map_err(|exit_status| executor::PrecompileFailure::Error { exit_status })
         })
     }
 
-    fn is_precompile(&self, address: prelude::Address) -> bool {
-        self.0.contains_key(&address)
+    fn is_precompile(&self, address: prelude::H160) -> bool {
+        self.0.contains_key(&Address::new(address))
     }
 }
 
@@ -262,10 +262,10 @@ impl Precompiles {
 /// const fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
-pub const fn make_address(x: u32, y: u128) -> prelude::Address {
+pub const fn make_address(x: u32, y: u128) -> prelude::types_new::Address {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
-    prelude::Address([
+    prelude::types_new::Address::from_slice(&[
         x_bytes[0],
         x_bytes[1],
         x_bytes[2],
