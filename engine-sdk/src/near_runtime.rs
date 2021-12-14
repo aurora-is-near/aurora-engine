@@ -40,7 +40,7 @@ impl Runtime {
                 b"state_migration",
                 &[],
                 0,
-                Self::GAS_FOR_STATE_MIGRATION.into_u64(),
+                Self::GAS_FOR_STATE_MIGRATION.as_u64(),
             )
         }
     }
@@ -266,8 +266,8 @@ impl crate::promise::PromiseHandler for Runtime {
         let account_id = args.target_account_id.as_bytes();
         let method_name = args.method.as_bytes();
         let arguments = args.args.as_slice();
-        let amount = args.attached_balance;
-        let gas = args.attached_gas;
+        let amount = args.attached_balance.as_u128();
+        let gas = args.attached_gas.as_u64();
 
         let id = unsafe {
             exports::promise_create(
@@ -292,8 +292,8 @@ impl crate::promise::PromiseHandler for Runtime {
         let account_id = callback.target_account_id.as_bytes();
         let method_name = callback.method.as_bytes();
         let arguments = callback.args.as_slice();
-        let amount = callback.attached_balance;
-        let gas = callback.attached_gas;
+        let amount = callback.attached_balance.as_u128();
+        let gas = callback.attached_gas.as_u64();
 
         let id = unsafe {
             exports::promise_then(

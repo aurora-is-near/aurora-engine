@@ -2,8 +2,8 @@ use crate::deposit_event::error::ParseEventMessageError;
 use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    validate_eth_address, vec, AddressValidationError, Balance, BorshDeserialize, BorshSerialize,
-    EthAddress, Fee, String, ToString, TryFrom, TryInto, Vec, U256,
+    validate_eth_address, vec, AddressValidationError, BorshDeserialize, BorshSerialize,
+    EthAddress, Fee, NEP141Wei, String, ToString, TryFrom, TryInto, Vec, U256,
 };
 use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
@@ -73,7 +73,7 @@ impl FtTransferMessageData {
         // The first data section should contain fee data.
         // Pay attention, that for compatibility reasons we used U256 type
         // it means 32 bytes for fee data
-        let mut data = U256::from(self.fee.into_u128()).as_byte_slice().to_vec();
+        let mut data = U256::from(self.fee.as_u128()).as_byte_slice().to_vec();
         // Second data section should contain Eth address
         data.extend(self.recipient);
         // Add `:` separator between relayer_id and data message
@@ -89,7 +89,7 @@ impl FtTransferMessageData {
         // The first data section should contain fee data.
         // Pay attention, that for compatibility reasons we used U256 type
         // it means 32 bytes for fee data
-        let mut data = U256::from(fee.into_u128()).as_byte_slice().to_vec();
+        let mut data = U256::from(fee.as_u128()).as_byte_slice().to_vec();
 
         // Check message length.
         let address = if recipient.len() == 42 {
@@ -223,7 +223,7 @@ pub struct DepositedEvent {
     pub eth_custodian_address: EthAddress,
     pub sender: EthAddress,
     pub token_message_data: TokenMessageData,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub fee: Fee,
 }
 
@@ -268,21 +268,22 @@ impl DepositedEvent {
         // parse_event_message
         let event_message_data: String = event.log.params[1].value.clone().to_string();
 
-        let amount: u128 = event.log.params[2]
+        let amount = event.log.params[2]
             .value
             .clone()
             .into_uint()
             .ok_or(error::ParseError::InvalidAmount)?
             .try_into()
+            .map(NEP141Wei::new)
             .map_err(|_| error::ParseError::OverflowNumber)?;
-        let raw_fee: u128 = event.log.params[3]
+        let fee = event.log.params[3]
             .value
             .clone()
             .into_uint()
             .ok_or(error::ParseError::InvalidFee)?
             .try_into()
+            .map(Fee::new)
             .map_err(|_| error::ParseError::OverflowNumber)?;
-        let fee: Fee = raw_fee.into();
 
         let token_message_data =
             TokenMessageData::parse_event_message_and_prepare_token_message_data(

@@ -1,6 +1,6 @@
 use aurora_engine::deposit_event::TokenMessageData;
 use aurora_engine_sdk::env::{Env, Timestamp};
-use aurora_engine_types::types::Fee;
+use aurora_engine_types::types::{Balance, Fee, NEP141Wei};
 use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
 use borsh::BorshSerialize;
 use engine_standalone_storage::sync;
@@ -155,7 +155,7 @@ fn test_consume_deploy_erc20_message() {
 
     let args = aurora_engine::parameters::NEP141FtOnTransferArgs {
         sender_id: "mr_money_bags.near".parse().unwrap(),
-        amount: mint_amount,
+        amount: Balance::new(mint_amount),
         msg: hex::encode(dest_address.as_bytes()),
     };
     let transaction_message = sync::types::TransactionMessage {
@@ -205,7 +205,7 @@ fn test_consume_ft_on_transfer_message() {
     // Mint ETH on Aurora per the bridge workflow
     let args = aurora_engine::parameters::NEP141FtOnTransferArgs {
         sender_id: "mr_money_bags.near".parse().unwrap(),
-        amount: mint_amount,
+        amount: Balance::new(mint_amount),
         msg: [
             "relayer.near",
             ":",
@@ -344,7 +344,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         eth_custodian_address: eth_custodian_address.0,
         sender: [0u8; 20],
         token_message_data,
-        amount: deposit_amount.raw().as_u128(),
+        amount: NEP141Wei::new(deposit_amount.raw().as_u128()),
         fee,
     };
 
@@ -362,8 +362,8 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(U256::from(deposit_event.amount)),
-            ethabi::Token::Uint(U256::from(deposit_event.fee.into_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
         ]),
     };
     aurora_engine::proof::Proof {

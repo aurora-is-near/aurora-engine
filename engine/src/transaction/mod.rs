@@ -1,12 +1,11 @@
+use crate::prelude::Wei;
 use crate::prelude::{vec, Address, TryFrom, Vec, U256};
+use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 
 pub mod eip_1559;
 pub mod eip_2930;
 pub mod legacy;
-
-use aurora_engine_types::types::Wei;
-use eip_2930::AccessTuple;
 
 /// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
 #[derive(Debug, Eq, PartialEq, Clone)]

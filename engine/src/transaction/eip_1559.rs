@@ -1,7 +1,7 @@
 use crate::prelude::precompiles::secp256k1::ecrecover;
+use crate::prelude::Wei;
 use crate::prelude::{Vec, U256};
 use crate::transaction::eip_2930::AccessTuple;
-use aurora_engine_types::types::Wei;
 use ethabi::Address;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 

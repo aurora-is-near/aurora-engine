@@ -16,8 +16,8 @@ pub struct PromiseCreateArgs {
     pub target_account_id: AccountId,
     pub method: String,
     pub args: Vec<u8>,
-    pub attached_balance: u128,
-    pub attached_gas: u64,
+    pub attached_balance: Yocto,
+    pub attached_gas: NearGas,
 }
 
 #[must_use]
@@ -54,7 +54,7 @@ pub struct PromiseBatchAction {
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct WithdrawCallArgs {
     pub recipient_address: EthAddress,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
 }
 
 /// withdraw NEAR eth-connector call args
