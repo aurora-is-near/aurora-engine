@@ -429,7 +429,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                 let storage_deposit = self.storage_balance_of(&account_id);
                 let action = PromiseAction::Transfer {
                     // The `+ 1` is to cover the 1 yoctoNEAR necessary to call this function in the first place.
-                    amount: (storage_deposit.total + Yocto::new(1)).as_u128(),
+                    amount: storage_deposit.total + Yocto::new(1),
                 };
                 let promise = PromiseBatchAction {
                     target_account_id: account_id,
@@ -485,9 +485,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let promise = if self.accounts_contains_key(account_id) {
             sdk::log!("The account is already registered, refunding the deposit");
             if amount > ZERO_YOCTO {
-                let action = PromiseAction::Transfer {
-                    amount: amount.as_u128(),
-                };
+                let action = PromiseAction::Transfer { amount };
                 let promise = PromiseBatchAction {
                     target_account_id: predecessor_account_id,
                     actions: vec![action],
@@ -505,9 +503,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             self.internal_register_account(account_id);
             let refund = amount - min_balance;
             if refund > ZERO_YOCTO {
-                let action = PromiseAction::Transfer {
-                    amount: refund.as_u128(),
-                };
+                let action = PromiseAction::Transfer { amount: refund };
                 let promise = PromiseBatchAction {
                     target_account_id: predecessor_account_id,
                     actions: vec![action],

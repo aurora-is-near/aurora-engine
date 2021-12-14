@@ -30,7 +30,7 @@ pub struct PromiseWithCallbackArgs {
 #[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
 pub enum PromiseAction {
     Transfer {
-        amount: u128,
+        amount: Yocto,
     },
     DeployConotract {
         code: Vec<u8>,
@@ -38,8 +38,8 @@ pub enum PromiseAction {
     FunctionCall {
         name: String,
         args: Vec<u8>,
-        attached_yocto: u128,
-        gas: u64,
+        attached_yocto: Yocto,
+        gas: NearGas,
     },
 }
 

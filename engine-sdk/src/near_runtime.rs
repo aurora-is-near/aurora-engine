@@ -322,7 +322,7 @@ impl crate::promise::PromiseHandler for Runtime {
         for action in args.actions.iter() {
             match action {
                 PromiseAction::Transfer { amount } => unsafe {
-                    let amount = *amount;
+                    let amount = amount.as_u128();
                     exports::promise_batch_action_transfer(id, &amount as *const u128 as _);
                 },
                 PromiseAction::DeployConotract { code } => unsafe {
@@ -341,7 +341,7 @@ impl crate::promise::PromiseHandler for Runtime {
                 } => unsafe {
                     let method_name = name.as_bytes();
                     let arguments = args.as_slice();
-                    let amount = *attached_yocto;
+                    let amount = attached_yocto.as_u128();
                     exports::promise_batch_action_function_call(
                         id,
                         method_name.len() as _,
@@ -349,7 +349,7 @@ impl crate::promise::PromiseHandler for Runtime {
                         arguments.len() as _,
                         arguments.as_ptr() as _,
                         &amount as *const u128 as _,
-                        *gas,
+                        gas.as_u64(),
                     )
                 },
             }
