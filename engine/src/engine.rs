@@ -763,7 +763,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let selector = ERC20_MINT_SELECTOR;
         let tail = ethabi::encode(&[
             ethabi::Token::Address(recipient),
-            ethabi::Token::Uint(U256::from(args.amount.into_u128())),
+            ethabi::Token::Uint(U256::from(args.amount.as_u128())),
         ]);
 
         let erc20_admin_address = current_address(current_account_id);

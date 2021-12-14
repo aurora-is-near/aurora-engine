@@ -73,7 +73,7 @@ impl FtTransferMessageData {
         // The first data section should contain fee data.
         // Pay attention, that for compatibility reasons we used U256 type
         // it means 32 bytes for fee data
-        let mut data = U256::from(self.fee.into_u128()).as_byte_slice().to_vec();
+        let mut data = U256::from(self.fee.as_u128()).as_byte_slice().to_vec();
         // Second data section should contain Eth address
         data.extend(self.recipient);
         // Add `:` separator between relayer_id and data message
@@ -89,7 +89,7 @@ impl FtTransferMessageData {
         // The first data section should contain fee data.
         // Pay attention, that for compatibility reasons we used U256 type
         // it means 32 bytes for fee data
-        let mut data = U256::from(fee.into_u128()).as_byte_slice().to_vec();
+        let mut data = U256::from(fee.as_u128()).as_byte_slice().to_vec();
 
         // Check message length.
         let address = if recipient.len() == 42 {

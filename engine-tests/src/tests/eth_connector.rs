@@ -336,13 +336,13 @@ fn test_withdraw_eth_from_near() {
     }
 
     let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE - withdraw_amount.into_u128());
+    assert_eq!(balance, DEPOSITED_FEE - withdraw_amount.as_u128());
 
     let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount.into_u128());
+    assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount.as_u128());
 }
 
 #[test]
@@ -636,8 +636,8 @@ fn test_deposit_with_0x_prefix() {
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(U256::from(deposit_event.amount.into_u128())),
-            ethabi::Token::Uint(U256::from(deposit_event.fee.into_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
         ]),
     };
     let proof = Proof {

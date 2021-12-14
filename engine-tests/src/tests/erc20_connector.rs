@@ -278,7 +278,7 @@ fn test_ft_on_transfer() {
     assert_eq!(res, "\"0\"");
 
     let balance = runner.balance_of(token, recipient, origin());
-    assert_eq!(balance, U256::from(amount.into_u128()));
+    assert_eq!(balance, U256::from(amount.as_u128()));
 }
 
 #[test]
@@ -339,7 +339,7 @@ fn test_relayer_charge_fee() {
     assert_eq!(relayer_balance, Wei::new_u64(fee));
 
     let balance = runner.balance_of(token, recipient, origin());
-    assert_eq!(balance, U256::from(amount.into_u128()));
+    assert_eq!(balance, U256::from(amount.as_u128()));
 }
 
 #[test]

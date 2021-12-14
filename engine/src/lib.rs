@@ -862,7 +862,7 @@ mod contract {
         let state_change = evm::backend::Apply::Modify {
             address,
             basic: evm::backend::Basic {
-                balance: U256::from(balance.into_u128()),
+                balance: U256::from(balance.as_u128()),
                 nonce,
             },
             code: None,

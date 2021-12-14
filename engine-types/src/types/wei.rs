@@ -37,7 +37,7 @@ impl NEP141Wei {
     }
 
     /// Consumes `NEP141Wei` and returns the underlying type.
-    pub fn into_u128(self) -> u128 {
+    pub fn as_u128(self) -> u128 {
         self.0
     }
 }
@@ -170,19 +170,19 @@ impl From<WeiU256> for Wei {
 
 impl From<Fee> for Wei {
     fn from(value: Fee) -> Self {
-        Wei(U256::from(value.into_u128()))
+        Wei(U256::from(value.as_u128()))
     }
 }
 
 impl From<Balance> for Wei {
     fn from(value: Balance) -> Self {
-        Wei(U256::from(value.into_u128()))
+        Wei(U256::from(value.as_u128()))
     }
 }
 
 impl From<NEP141Wei> for Wei {
     fn from(value: NEP141Wei) -> Self {
-        Wei(U256::from(value.into_u128()))
+        Wei(U256::from(value.as_u128()))
     }
 }
 

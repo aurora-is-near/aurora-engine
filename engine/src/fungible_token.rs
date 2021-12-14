@@ -302,7 +302,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             self.internal_transfer_eth_on_near(&sender_id, &receiver_id, amount, memo)?;
         }
         let data1: String = NEP141FtOnTransferArgs {
-            amount: Balance::new(amount.into_u128()),
+            amount: Balance::new(amount.as_u128()),
             msg,
             sender_id: sender_id.clone(),
         }
@@ -429,7 +429,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                 let storage_deposit = self.storage_balance_of(&account_id);
                 let action = PromiseAction::Transfer {
                     // The `+ 1` is to cover the 1 yoctoNEAR necessary to call this function in the first place.
-                    amount: (storage_deposit.total + Yocto::new(1)).into_u128(),
+                    amount: (storage_deposit.total + Yocto::new(1)).as_u128(),
                 };
                 let promise = PromiseBatchAction {
                     target_account_id: account_id,
@@ -486,7 +486,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             sdk::log!("The account is already registered, refunding the deposit");
             if amount > ZERO_YOCTO {
                 let action = PromiseAction::Transfer {
-                    amount: amount.into_u128(),
+                    amount: amount.as_u128(),
                 };
                 let promise = PromiseBatchAction {
                     target_account_id: predecessor_account_id,
@@ -506,7 +506,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             let refund = amount - min_balance;
             if refund > ZERO_YOCTO {
                 let action = PromiseAction::Transfer {
-                    amount: refund.into_u128(),
+                    amount: refund.as_u128(),
                 };
                 let promise = PromiseBatchAction {
                     target_account_id: predecessor_account_id,

@@ -362,8 +362,8 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(U256::from(deposit_event.amount.into_u128())),
-            ethabi::Token::Uint(U256::from(deposit_event.fee.into_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
         ]),
     };
     aurora_engine::proof::Proof {

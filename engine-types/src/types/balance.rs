@@ -27,7 +27,7 @@ impl Balance {
     }
 
     /// Consumes `Balance` and returns the underlying type.
-    pub fn into_u128(self) -> u128 {
+    pub fn as_u128(self) -> u128 {
         self.0
     }
 }
@@ -52,7 +52,7 @@ impl Yocto {
     }
 
     /// Consumes `Yocto NEAR` and returns the underlying type.
-    pub fn into_u128(self) -> u128 {
+    pub fn as_u128(self) -> u128 {
         self.0
     }
 }

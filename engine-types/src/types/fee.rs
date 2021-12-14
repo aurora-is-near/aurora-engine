@@ -21,7 +21,7 @@ impl Fee {
     }
 
     /// Consumes `Fee` and returns the underlying type.
-    pub fn into_u128(self) -> u128 {
+    pub fn as_u128(self) -> u128 {
         self.0
     }
 }
@@ -56,7 +56,7 @@ mod tests {
         let fee = Fee::new(100);
         let fee2 = Fee::from(100u128);
         assert_eq!(fee, fee2);
-        let res: u128 = fee.into_u128();
+        let res: u128 = fee.as_u128();
         assert_eq!(res, 100);
     }
 }

@@ -72,8 +72,8 @@ impl From<TraceLog> for CTraceLog {
         Self {
             depth: log.depth.into_u32(),
             error,
-            gas: log.gas.into_u64(),
-            gas_cost: log.gas_cost.into_u64(),
+            gas: log.gas.as_u64(),
+            gas_cost: log.gas_cost.as_u64(),
             memory_ptr,
             memory_len,
             opcode: log.opcode.as_u8(),
@@ -108,7 +108,7 @@ impl From<TransactionTrace> for CTransactionTrace {
         };
 
         Self {
-            gas: trace.gas().into_u64(),
+            gas: trace.gas().as_u64(),
             result: CString::new(trace.result()).expect("CString::new failed"),
             logs_ptr,
             logs_len,

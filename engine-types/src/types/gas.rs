@@ -29,7 +29,7 @@ impl NearGas {
     }
 
     /// Consumes `NearGas` and returns the underlying type.
-    pub fn into_u64(self) -> u64 {
+    pub fn as_u64(self) -> u64 {
         self.0
     }
 }
@@ -51,7 +51,7 @@ impl EthGas {
     }
 
     /// Consumes `EthGas` and returns the underlying type.
-    pub fn into_u64(self) -> u64 {
+    pub fn as_u64(self) -> u64 {
         self.0
     }
 }

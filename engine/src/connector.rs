@@ -161,7 +161,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             return Err(error::DepositError::CustodianAddressMismatch);
         }
 
-        if NEP141Wei::new(event.fee.into_u128()) >= event.amount {
+        if NEP141Wei::new(event.fee.as_u128()) >= event.amount {
             return Err(error::DepositError::InsufficientAmountForFee);
         }
 
@@ -275,9 +275,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Mint - calculate new balances
             self.mint_eth_on_near(
                 data.new_owner_id.clone(),
-                data.amount - NEP141Wei::new(data.fee.into_u128()),
+                data.amount - NEP141Wei::new(data.fee.as_u128()),
             )?;
-            self.mint_eth_on_near(data.relayer_id, NEP141Wei::new(data.fee.into_u128()))?;
+            self.mint_eth_on_near(data.relayer_id, NEP141Wei::new(data.fee.as_u128()))?;
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key)?;
             // Save new contract data
@@ -488,7 +488,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
                 .map_err(error::FtTransferCallError::MessageParseFailed)?;
             // Check is transfer amount > fee
-            if message_data.fee.into_u128() >= args.amount.into_u128() {
+            if message_data.fee.as_u128() >= args.amount.as_u128() {
                 return Err(error::FtTransferCallError::InsufficientAmountForFee);
             }
 
