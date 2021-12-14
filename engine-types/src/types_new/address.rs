@@ -1,10 +1,14 @@
-use crate::{String, TryFrom, TryInto, H160};
+use crate::{String, TryFrom, H160};
 use borsh::maybestd::io;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Base Eth Address type
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Address(H160);
+
+pub const fn AddressConst(addr: H160) -> Address {
+    Address(addr)
+}
 
 impl Address {
     /// Construct Address from H160
@@ -32,10 +36,10 @@ impl Address {
 }
 
 impl TryFrom<&[u8]> for Address {
-    type Error = ();
+    type Error = error::AddressLengthError;
 
     fn try_from(raw_addr: &[u8]) -> Result<Self, Self::Error> {
-        Ok(Self::try_from_slice(raw_addr))
+        Self::try_from_slice(raw_addr).map_err(|_| error::AddressLengthError)
     }
 }
 
@@ -47,7 +51,14 @@ impl BorshSerialize for Address {
 
 impl BorshDeserialize for Address {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        Ok(Self(H160::try_from(buf)))
+        if buf.len() != 20 {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("{}", error::AddressLengthError),
+            ));
+        }
+        // Guaranty no panics. The length checked early
+        Ok(Self(H160::from_slice(buf)))
     }
 
     fn try_from_slice(v: &[u8]) -> io::Result<Self> {
@@ -97,5 +108,21 @@ mod tests {
 }
 
 pub mod error {
-    pub struct Err;
+    use crate::{fmt, String};
+
+    #[derive(Eq, Hash, Clone, Debug, PartialEq)]
+    pub struct AddressLengthError;
+
+    impl AsRef<[u8]> for AddressLengthError {
+        fn as_ref(&self) -> &[u8] {
+            b"ERR_WRONG_ADDRESS_LENGTH"
+        }
+    }
+
+    impl fmt::Display for AddressLengthError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
+            write!(f, "{}", msg)
+        }
+    }
 }
