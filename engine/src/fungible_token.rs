@@ -4,8 +4,8 @@ use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress,
-    NearGas, PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult,
+    sdk, storage, types_new::Address, vec, BTreeMap, Balance, BorshDeserialize, BorshSerialize,
+    EthAddress, NearGas, PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult,
     PromiseWithCallbackArgs, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
     Wei, U256,
 };
@@ -149,7 +149,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         &self,
         address: EthAddress,
     ) -> Result<Balance, crate::prelude::types::error::BalanceOverflowError> {
-        engine::get_balance(&self.io, &Address(address)).try_into_u128()
+        engine::get_balance(&self.io, &Address::from_slice(address)).try_into_u128()
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
@@ -184,7 +184,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             .ok_or(error::DepositError::BalanceOverflow)?;
         engine::set_balance(
             &mut self.io,
-            &Address(address),
+            &Address::from_slice(address),
             &Wei::new(U256::from(new_balance)),
         );
         self.total_eth_supply_on_aurora = self
@@ -226,7 +226,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             .ok_or(error::WithdrawError::InsufficientFunds)?;
         engine::set_balance(
             &mut self.io,
-            &Address(address),
+            &Address::from_slice(address),
             &Wei::new(U256::from(new_balance)),
         );
         self.total_eth_supply_on_aurora = self

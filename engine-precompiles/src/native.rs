@@ -44,7 +44,8 @@ mod costs {
 }
 
 pub mod events {
-    use crate::prelude::{types_new::Address, vec, String, ToString, H256, U256};
+    use crate::prelude::{types_new::Address, vec, String, ToString, H160, H256, U256};
+    use aurora_engine_types::types_new::AddressConst;
 
     /// Derived from event signature (see tests::test_exit_signatures)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
@@ -61,7 +62,7 @@ pub mod events {
     /// which ERC-20 token is being withdrawn. However, ETH is not an ERC-20 token
     /// So we need to have some other address to fill this field. This constant is
     /// used for this purpose.
-    pub const ETH_ADDRESS: Address = Address::from_slice(&[0; 20]);
+    pub const ETH_ADDRESS: Address = AddressConst(H160([0; 20]));
 
     /// ExitToNear(
     ///    Address indexed sender,
@@ -487,7 +488,7 @@ impl Precompile for ExitToEthereum {
                 //
                 // Input slice format:
                 //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
-                let recipient_address = input
+                let recipient_address: Address = input
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
                 (
@@ -495,7 +496,7 @@ impl Precompile for ExitToEthereum {
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {
-                        recipient_address,
+                        recipient_address: recipient_address.clone(),
                         amount: context.apparent_value.as_u128(),
                     }
                     .try_to_vec()

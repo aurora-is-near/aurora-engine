@@ -91,8 +91,8 @@ mod contract {
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
     use crate::prelude::{
-        sdk, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei,
-        ERC20_MINT_SELECTOR, H256, U256,
+        sdk, vec, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H256,
+        U256,
     };
 
     #[cfg(feature = "integration-test")]

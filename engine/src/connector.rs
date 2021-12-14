@@ -8,10 +8,11 @@ use crate::parameters::{
     SetContractDataCallArgs, StorageBalanceOfCallArgs, StorageDepositCallArgs,
     StorageWithdrawCallArgs, TransferCallArgs, TransferCallCallArgs, WithdrawResult,
 };
+use crate::prelude::types_new::Address;
 use crate::prelude::{
-    format, sdk, str, validate_eth_address, AccountId, Address, Balance, BorshDeserialize,
-    BorshSerialize, EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString,
-    Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
+    format, sdk, str, validate_eth_address, AccountId, Balance, BorshDeserialize, BorshSerialize,
+    EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString, Vec,
+    WithdrawCallArgs, ERR_FAILED_PARSE, H160,
 };
 use crate::prelude::{
     AddressValidationError, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,

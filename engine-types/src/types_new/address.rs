@@ -6,6 +6,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Address(H160);
 
+#[allow(non_snake_case, dead_code)]
 pub const fn AddressConst(addr: H160) -> Address {
     Address(addr)
 }
