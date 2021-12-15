@@ -1,4 +1,5 @@
 use crate::prelude::{vec, TryFrom, Vec, U256};
+use primitive_types::H160;
 use rlp::{Decodable, DecoderError, Rlp};
 
 pub mod eip_1559;
@@ -104,7 +105,7 @@ impl From<EthTransactionKind> for NormalizedEthTransaction {
                 access_list: tx.transaction.access_list,
             },
             Eip1559(tx) => Self {
-                address: tx.sender(),
+                address: tx.sender().map(|v| Address::from_slice(v.as_bytes())),
                 chain_id: Some(tx.transaction.chain_id),
                 nonce: tx.transaction.nonce,
                 gas_limit: tx.transaction.gas_limit,
@@ -190,12 +191,12 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
             Err(rlp::DecoderError::RlpExpectedToBeData)
         }
     } else {
-        let addr: ethabi::Address = value.as_val()?;
-        let v = Address::from_slice(addr.as_bytes());
-        if v == Address::zero() {
+        let v: H160 = value.as_val()?;
+        let addr = Address::new(v);
+        if addr == Address::zero() {
             Ok(None)
         } else {
-            Ok(Some(v))
+            Ok(Some(addr))
         }
     }
 }

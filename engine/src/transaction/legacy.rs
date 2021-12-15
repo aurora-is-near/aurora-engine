@@ -27,7 +27,7 @@ impl TransactionLegacy {
         s.append(&self.gas_limit);
         match self.to.as_ref() {
             None => s.append(&""),
-            Some(address) => s.append(address),
+            Some(address) => s.append(&address.raw()),
         };
         s.append(&self.value.raw());
         s.append(&self.data);
@@ -107,7 +107,7 @@ impl Encodable for LegacyEthSignedTransaction {
         s.append(&self.transaction.gas_limit);
         match self.transaction.to.as_ref() {
             None => s.append(&""),
-            Some(address) => s.append(address),
+            Some(address) => s.append(&address.raw()),
         };
         s.append(&self.transaction.value.raw());
         s.append(&self.transaction.data);

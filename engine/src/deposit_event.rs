@@ -59,8 +59,7 @@ impl FtTransferMessageData {
         let fee: Fee = fee_u128.into();
 
         // Get recipient Eth address from message slice
-        let mut recipient: Address = Default::default();
-        recipient.copy_from_slice(&msg[32..52]);
+        let recipient = Address::from_slice(&msg[32..52]);
 
         Ok(FtTransferMessageData {
             relayer: account_id,
@@ -76,7 +75,7 @@ impl FtTransferMessageData {
         // it means 32 bytes for fee data
         let mut data = U256::from(self.fee.into_u128()).as_byte_slice().to_vec();
         // Second data section should contain Eth address
-        data.extend(self.recipient);
+        data.extend(self.recipient.as_bytes());
         // Add `:` separator between relayer_id and data message
         [self.relayer.as_ref(), &hex::encode(data)].join(":")
     }
@@ -106,7 +105,7 @@ impl FtTransferMessageData {
         let recipient_address =
             Address::decode(address).map_err(ParseEventMessageError::EthAddressValidationError)?;
         // Second data section should contain Eth address
-        data.extend(recipient_address);
+        data.extend(recipient_address.as_bytes());
         // Add `:` separator between relayer_id and data message
         //Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
         Ok(Self {
@@ -201,7 +200,7 @@ impl EthEvent {
             anonymous: false,
         };
         let log_entry: LogEntry = rlp::decode(data).map_err(|_| error::DecodeError::RlpFailed)?;
-        let eth_custodian_address = log_entry.address.0;
+        let eth_custodian_address = Address::from_slice(&log_entry.address.0);
         let topics = log_entry.topics.iter().map(|h| Hash::from(h.0)).collect();
 
         let raw_log = RawLog {
@@ -259,12 +258,13 @@ impl DepositedEvent {
     pub fn from_log_entry_data(data: &[u8]) -> Result<Self, error::ParseError> {
         let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data)
             .map_err(error::ParseError::LogParseFailed)?;
-        let sender = event.log.params[0]
+        let raw_sender = event.log.params[0]
             .value
             .clone()
             .into_address()
             .ok_or(error::ParseError::InvalidSender)?
             .0;
+        let sender = Address::from_slice(&raw_sender);
 
         // parse_event_message
         let event_message_data: String = event.log.params[1].value.clone().to_string();

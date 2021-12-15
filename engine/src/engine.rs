@@ -476,7 +476,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         input: Vec<u8>,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let origin = self.origin();
+        let origin = Address::new(self.origin());
         let value = Wei::zero();
         self.deploy_code(origin, value, input, u64::MAX, Vec::new(), handler)
     }
@@ -487,7 +487,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
-        access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
+        access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let executor_params = StackExecutorParams::new(
@@ -496,9 +496,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
         );
         let mut executor = executor_params.make_executor(self);
-        let address = executor.create_address(CreateScheme::Legacy { caller: origin });
+        let address = executor.create_address(CreateScheme::Legacy {
+            caller: origin.raw(),
+        });
         let (exit_reason, result) = (
-            executor.transact_create(origin, value.raw(), input, gas_limit, access_list),
+            executor.transact_create(origin.raw(), value.raw(), input, gas_limit, access_list),
             address,
         );
 

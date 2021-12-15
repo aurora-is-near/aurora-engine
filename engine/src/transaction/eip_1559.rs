@@ -2,6 +2,8 @@ use crate::prelude::precompiles::secp256k1::ecrecover;
 use crate::prelude::{Vec, U256};
 use crate::transaction::eip_2930::AccessTuple;
 use aurora_engine_types::types::Wei;
+use aurora_engine_types::types_new::Address;
+use aurora_engine_types::H160;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 /// Type indicator (per EIP-1559)
@@ -18,7 +20,7 @@ pub struct Transaction1559 {
     pub max_priority_fee_per_gas: U256,
     pub max_fee_per_gas: U256,
     pub gas_limit: U256,
-    pub to: Option<ethabi::Address>,
+    pub to: Option<Address>,
     pub value: Wei,
     pub data: Vec<u8>,
     pub access_list: Vec<AccessTuple>,
@@ -44,7 +46,7 @@ impl Transaction1559 {
         s.append(&self.gas_limit);
         match self.to.as_ref() {
             None => s.append(&""),
-            Some(address) => s.append(address),
+            Some(address) => s.append(&address.raw()),
         };
         s.append(&self.value.raw());
         s.append(&self.data);
@@ -79,6 +81,7 @@ impl SignedTransaction1559 {
             message_hash,
             &super::vrs_to_arr(self.parity, self.r, self.s),
         )
+        .map(|v| H160::from_slice(v.as_bytes()))
         .ok()
     }
 }

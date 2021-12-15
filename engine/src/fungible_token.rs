@@ -147,9 +147,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(
         &self,
-        address: Address,
+        address: &Address,
     ) -> Result<Balance, crate::prelude::types::error::BalanceOverflowError> {
-        engine::get_balance(&self.io, &Address::from_slice(address)).try_into_u128()
+        engine::get_balance(&self.io, &address).try_into_u128()
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
@@ -211,7 +211,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     /// Withdraw ETH tokens
     pub fn internal_withdraw_eth_from_aurora(
         &mut self,
-        address: Address,
+        address: &Address,
         amount: Balance,
     ) -> Result<(), error::WithdrawError> {
         let balance = self

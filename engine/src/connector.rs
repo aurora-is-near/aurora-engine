@@ -11,7 +11,7 @@ use crate::parameters::{
 use crate::prelude::{
     format, sdk, str, types_new::Address, AccountId, Balance, BorshDeserialize, BorshSerialize,
     EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString, Vec, WithdrawCallArgs,
-    ERR_FAILED_PARSE, H160,
+    ERR_FAILED_PARSE,
 };
 use crate::prelude::{PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs};
 use crate::proof::Proof;
@@ -290,7 +290,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         address: &Address,
         amount: Balance,
     ) -> Result<(), fungible_token::error::WithdrawError> {
-        self.burn_eth_on_aurora(address.0, amount)?;
+        self.burn_eth_on_aurora(address, amount)?;
         self.save_ft_contract();
         Ok(())
     }
@@ -338,7 +338,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Burn ETH tokens
     fn burn_eth_on_aurora(
         &mut self,
-        address: Address,
+        address: &Address,
         amount: Balance,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         sdk::log!(&format!(
@@ -411,7 +411,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<(), crate::prelude::types::error::BalanceOverflowError> {
         let balance = self
             .ft
-            .internal_unwrap_balance_of_eth_on_aurora(args.address)?;
+            .internal_unwrap_balance_of_eth_on_aurora(&args.address)?;
         sdk::log!(&format!(
             "Balance of ETH [{}]: {}",
             hex::encode(args.address),
@@ -495,7 +495,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Note: It can't overflow because the total supply doesn't change during transfer.
             let amount_for_check = self
                 .ft
-                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient)
+                .internal_unwrap_balance_of_eth_on_aurora(&message_data.recipient)
                 .map_err(error::FtTransferCallError::BalanceOverflow)?;
             if amount_for_check.checked_add(args.amount).is_none() {
                 return Err(error::FtTransferCallError::Transfer(
@@ -602,7 +602,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (fee, relayer) {
-            (fee, Some(H160(evm_relayer_address))) if fee > 0 => {
+            (fee, Some(evm_relayer_address)) if fee > 0 => {
                 self.mint_eth_on_aurora(message_data.recipient, args.amount - fee)?;
                 self.mint_eth_on_aurora(evm_relayer_address, fee)?;
             }

@@ -287,8 +287,8 @@ pub struct IsUsedProofCallArgs {
 #[cfg_attr(not(target_arch = "wasm32"), derive(BorshDeserialize))]
 pub struct WithdrawResult {
     pub amount: Balance,
-    pub recipient_id: RawAddress,
-    pub eth_custodian_address: RawAddress,
+    pub recipient_id: Address,
+    pub eth_custodian_address: Address,
 }
 
 /// Fungible token storage balance
