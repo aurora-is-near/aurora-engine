@@ -3,8 +3,8 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    format, Balance, BorshDeserialize, BorshSerialize, EthAddress, RawAddress, RawH256, RawU256,
-    String, ToString, TryFrom, Vec, WeiU256,
+    format, types_new::Address, Balance, BorshDeserialize, BorshSerialize, RawAddress, RawH256,
+    RawU256, String, ToString, TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
 use aurora_engine_types::types::Fee;
@@ -272,7 +272,7 @@ pub struct DepositCallArgs {
     /// Proof data
     pub proof: Proof,
     /// Optional relayer address
-    pub relayer_eth_account: Option<EthAddress>,
+    pub relayer_eth_account: Option<Address>,
 }
 
 /// Eth-connector isUsedProof arguments
@@ -333,13 +333,13 @@ pub struct FinishDepositCallArgs {
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
 pub struct DepositEthCallArgs {
     pub proof: Proof,
-    pub relayer_eth_account: EthAddress,
+    pub relayer_eth_account: Address,
 }
 
 /// Finish deposit NEAR eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FinishDepositEthCallArgs {
-    pub new_owner_id: EthAddress,
+    pub new_owner_id: Address,
     pub amount: Balance,
     pub fee: Balance,
     pub relayer_eth_account: AccountId,
@@ -458,7 +458,7 @@ pub struct BalanceOfCallArgs {
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct BalanceOfEthCallArgs {
-    pub address: EthAddress,
+    pub address: Address,
 }
 
 impl TryFrom<JsonValue> for BalanceOfCallArgs {
@@ -473,7 +473,7 @@ impl TryFrom<JsonValue> for BalanceOfCallArgs {
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RegisterRelayerCallArgs {
-    pub address: EthAddress,
+    pub address: Address,
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]

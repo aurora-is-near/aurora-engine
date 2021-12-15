@@ -2,8 +2,8 @@ use crate::deposit_event::error::ParseEventMessageError;
 use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    validate_eth_address, vec, AddressValidationError, Balance, BorshDeserialize, BorshSerialize,
-    EthAddress, Fee, String, ToString, TryFrom, TryInto, Vec, U256,
+    types_new::Address, validate_eth_address, vec, AddressValidationError, Balance,
+    BorshDeserialize, BorshSerialize, Fee, String, ToString, TryFrom, TryInto, Vec, U256,
 };
 use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
@@ -18,7 +18,7 @@ pub type EventParams = Vec<EventParam>;
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub struct FtTransferMessageData {
     pub relayer: AccountId,
-    pub recipient: EthAddress,
+    pub recipient: Address,
     pub fee: Fee,
 }
 
@@ -58,7 +58,7 @@ impl FtTransferMessageData {
         let fee: Fee = fee_u128.into();
 
         // Get recipient Eth address from message slice
-        let mut recipient: EthAddress = Default::default();
+        let mut recipient: Address = Default::default();
         recipient.copy_from_slice(&msg[32..52]);
 
         Ok(FtTransferMessageData {
@@ -182,7 +182,7 @@ impl TokenMessageData {
 
 /// Ethereum event
 pub struct EthEvent {
-    pub eth_custodian_address: EthAddress,
+    pub eth_custodian_address: Address,
     pub log: Log,
 }
 
@@ -220,8 +220,8 @@ impl EthEvent {
 
 /// Data that was emitted by Deposited event.
 pub struct DepositedEvent {
-    pub eth_custodian_address: EthAddress,
-    pub sender: EthAddress,
+    pub eth_custodian_address: Address,
+    pub sender: Address,
     pub token_message_data: TokenMessageData,
     pub amount: Balance,
     pub fee: Fee,

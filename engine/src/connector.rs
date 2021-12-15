@@ -10,9 +10,9 @@ use crate::parameters::{
 };
 use crate::prelude::types_new::Address;
 use crate::prelude::{
-    format, sdk, str, validate_eth_address, AccountId, Balance, BorshDeserialize, BorshSerialize,
-    EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString, Vec,
-    WithdrawCallArgs, ERR_FAILED_PARSE, H160,
+    format, sdk, str, types_new::Address, validate_eth_address, AccountId, Balance,
+    BorshDeserialize, BorshSerialize, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult,
+    ToString, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
 };
 use crate::prelude::{
     AddressValidationError, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
@@ -56,7 +56,7 @@ pub struct EthConnector {
     /// It used in the Deposit flow, to verify log entry form incoming proof.
     pub prover_account: AccountId,
     /// It is Eth address, used in the Deposit and Withdraw logic.
-    pub eth_custodian_address: EthAddress,
+    pub eth_custodian_address: Address,
 }
 
 impl<I: IO + Copy> EthConnectorContract<I> {
@@ -326,7 +326,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ///  Mint ETH tokens
     fn mint_eth_on_aurora(
         &mut self,
-        owner_id: EthAddress,
+        owner_id: Address,
         amount: Balance,
     ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!(&format!(
@@ -340,7 +340,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Burn ETH tokens
     fn burn_eth_on_aurora(
         &mut self,
-        address: EthAddress,
+        address: Address,
         amount: Balance,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         sdk::log!(&format!(

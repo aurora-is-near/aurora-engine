@@ -9,9 +9,6 @@ pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32];
 // Big-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
-
-// TODO: introduce new type. Add encode/decode/validation methods
-pub type EthAddress = [u8; 20];
 pub type StorageUsage = u64;
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
 pub type WeiU256 = [u8; 32];
@@ -176,7 +173,7 @@ impl AsRef<[u8]> for AddressValidationError {
 }
 
 /// Validate Ethereum address from string and return Result data EthAddress or Error data
-pub fn validate_eth_address(address: String) -> Result<EthAddress, AddressValidationError> {
+pub fn validate_eth_address(address: String) -> Result<Address, AddressValidationError> {
     let data = hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
     if data.len() != 20 {
         return Err(AddressValidationError::IncorrectLength);

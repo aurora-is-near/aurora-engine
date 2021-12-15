@@ -1,4 +1,4 @@
-use crate::prelude::EthAddress;
+use crate::prelude::types_new::Address;
 use crate::prelude::WithdrawCallArgs;
 use crate::test_utils::str_to_account_id;
 use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
@@ -98,7 +98,7 @@ fn init_contract(
     contract_account
 }
 
-fn validate_eth_address(address: &str) -> EthAddress {
+fn validate_eth_address(address: &str) -> Address {
     let data = hex::decode(address).unwrap();
     assert_eq!(data.len(), 20);
     let mut result = [0u8; 20];
@@ -192,10 +192,10 @@ fn get_eth_on_near_balance(master_account: &UserAccount, acc: &str, contract: &s
     val.parse().unwrap()
 }
 
-fn get_eth_balance(master_account: &UserAccount, address: EthAddress, contract: &str) -> u128 {
+fn get_eth_balance(master_account: &UserAccount, address: Address, contract: &str) -> u128 {
     #[derive(BorshSerialize, BorshDeserialize)]
     pub struct BalanceOfEthCallArgs {
-        pub address: EthAddress,
+        pub address: Address,
     }
 
     let balance = master_account.view(

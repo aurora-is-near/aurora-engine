@@ -5,7 +5,7 @@ use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, Storage
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     sdk, storage, types_new::Address, vec, BTreeMap, Balance, BorshDeserialize, BorshSerialize,
-    EthAddress, NearGas, PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult,
+    NearGas, PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult,
     PromiseWithCallbackArgs, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
     Wei, U256,
 };
@@ -147,7 +147,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     /// Balance of ETH (ETH on Aurora)
     pub fn internal_unwrap_balance_of_eth_on_aurora(
         &self,
-        address: EthAddress,
+        address: Address,
     ) -> Result<Balance, crate::prelude::types::error::BalanceOverflowError> {
         engine::get_balance(&self.io, &Address::from_slice(address)).try_into_u128()
     }
@@ -173,7 +173,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     /// Internal ETH deposit to Aurora
     pub fn internal_deposit_eth_to_aurora(
         &mut self,
-        address: EthAddress,
+        address: Address,
         amount: Balance,
     ) -> Result<(), error::DepositError> {
         let balance = self
@@ -182,11 +182,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let new_balance = balance
             .checked_add(amount)
             .ok_or(error::DepositError::BalanceOverflow)?;
-        engine::set_balance(
-            &mut self.io,
-            &Address::from_slice(address),
-            &Wei::new(U256::from(new_balance)),
-        );
+        engine::set_balance(&mut self.io, &address, &Wei::new(U256::from(new_balance)));
         self.total_eth_supply_on_aurora = self
             .total_eth_supply_on_aurora
             .checked_add(amount)
@@ -215,7 +211,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     /// Withdraw ETH tokens
     pub fn internal_withdraw_eth_from_aurora(
         &mut self,
-        address: EthAddress,
+        address: Address,
         amount: Balance,
     ) -> Result<(), error::WithdrawError> {
         let balance = self
@@ -224,11 +220,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let new_balance = balance
             .checked_sub(amount)
             .ok_or(error::WithdrawError::InsufficientFunds)?;
-        engine::set_balance(
-            &mut self.io,
-            &Address::from_slice(address),
-            &Wei::new(U256::from(new_balance)),
-        );
+        engine::set_balance(&mut self.io, &address, &Wei::new(U256::from(new_balance)));
         self.total_eth_supply_on_aurora = self
             .total_eth_supply_on_aurora
             .checked_sub(amount)

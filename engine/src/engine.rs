@@ -21,6 +21,7 @@ use crate::prelude::{
 };
 use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_precompiles::PrecompileConstructorContext;
+use aurora_engine_types::types_new::AddressConst;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -527,7 +528,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let origin = self.origin();
         match args {
             CallArgs::V2(call_args) => {
-                let contract = Address::from_slice(call_args.contract);
+                let contract = AddressConst(H160(call_args.contract));
                 let value = call_args.value.into();
                 let input = call_args.input;
                 self.call(
@@ -541,7 +542,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 )
             }
             CallArgs::V1(call_args) => {
-                let contract = Address::from_slice(call_args.contract);
+                let contract = AddressConst(H160(call_args.contract));
                 let value = Wei::zero();
                 let input = call_args.input;
                 self.call(
@@ -710,11 +711,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             let mut message = args.msg.as_bytes();
             assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
 
-            let recipient = Address::from_slice(unwrap_res_or_finish!(
+            let recipient = AddressConst(H160(unwrap_res_or_finish!(
                 hex::decode(&message[..40]).unwrap().as_slice().try_into(),
                 output_on_fail,
                 self.io
-            ));
+            )));
             message = &message[40..];
 
             let fee = if message.is_empty() {
@@ -729,7 +730,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             (recipient, fee)
         };
 
-        let erc20_token = Address::from_slice(unwrap_res_or_finish!(
+        let erc20_token = Address(H160(unwrap_res_or_finish!(
             unwrap_res_or_finish!(
                 get_erc20_from_nep141(&self.io, token),
                 output_on_fail,
@@ -739,7 +740,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             .try_into(),
             output_on_fail,
             self.io
-        ));
+        )));
 
         if fee != U256::from(0) {
             let relayer_address = unwrap_res_or_finish!(
@@ -1039,7 +1040,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     ) {
         Ok(result) => match result.status {
             TransactionStatus::Succeed(ret) => {
-                Address::from_slice(ret.as_slice().try_into().unwrap())
+                AddressConst(H160(ret.as_slice().try_into().unwrap()))
             }
             other => return Err(DeployErc20Error::Failed(other)),
         },

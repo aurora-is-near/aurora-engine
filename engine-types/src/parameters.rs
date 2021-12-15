@@ -61,7 +61,7 @@ pub struct WithdrawCallArgs {
 /// withdraw NEAR eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RefundCallArgs {
-    pub recipient_address: EthAddress,
-    pub erc20_address: Option<EthAddress>,
+    pub recipient_address: Address,
+    pub erc20_address: Option<Address>,
     pub amount: RawU256,
 }
