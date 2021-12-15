@@ -45,7 +45,7 @@ mod costs {
 
 pub mod events {
     use crate::prelude::{types_new::Address, vec, String, ToString, H160, H256, U256};
-    use aurora_engine_types::types_new::AddressConst;
+    use aurora_engine_types::types_new::ADDRESS;
 
     /// Derived from event signature (see tests::test_exit_signatures)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
@@ -62,7 +62,7 @@ pub mod events {
     /// which ERC-20 token is being withdrawn. However, ETH is not an ERC-20 token
     /// So we need to have some other address to fill this field. This constant is
     /// used for this purpose.
-    pub const ETH_ADDRESS: Address = AddressConst(H160([0; 20]));
+    pub const ETH_ADDRESS: Address = ADDRESS(H160([0; 20]));
 
     /// ExitToNear(
     ///    Address indexed sender,

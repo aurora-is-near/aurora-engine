@@ -7,7 +7,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 pub struct Address(H160);
 
 #[allow(non_snake_case, dead_code)]
-pub const fn AddressConst(addr: H160) -> Address {
+pub const fn ADDRESS(addr: H160) -> Address {
     Address(addr)
 }
 
@@ -27,6 +27,16 @@ impl Address {
         hex::encode(self.0.as_bytes())
     }
 
+    pub fn decode(address: String) -> Result<Address, error::AddressError> {
+        let data = hex::decode(address).map_err(|_| error::AddressError::FailedDecodeHex)?;
+        if data.len() != 20 {
+            return Err(error::AddressError::IncorrectLength);
+        }
+        let mut result = [0u8; 20];
+        result.copy_from_slice(&data);
+        Ok(Address::new(H160(result)))
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         self.0.as_bytes()
     }
@@ -34,13 +44,17 @@ impl Address {
     pub fn from_slice(raw_addr: &[u8]) -> Self {
         Self::new(H160::from_slice(raw_addr))
     }
+
+    pub const fn zero() -> Self {
+        ADDRESS(H160([0u8; 20]))
+    }
 }
 
 impl TryFrom<&[u8]> for Address {
-    type Error = error::AddressLengthError;
+    type Error = error::AddressError;
 
     fn try_from(raw_addr: &[u8]) -> Result<Self, Self::Error> {
-        Self::try_from_slice(raw_addr).map_err(|_| error::AddressLengthError)
+        Self::try_from_slice(raw_addr).map_err(|_| error::AddressError::IncorrectLength)
     }
 }
 
@@ -55,7 +69,7 @@ impl BorshDeserialize for Address {
         if buf.len() != 20 {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                format!("{}", error::AddressLengthError),
+                format!("{}", error::AddressError::IncorrectLength),
             ));
         }
         // Guaranty no panics. The length checked early
@@ -65,6 +79,12 @@ impl BorshDeserialize for Address {
     fn try_from_slice(v: &[u8]) -> io::Result<Self> {
         let mut v_mut = v;
         Self::deserialize(&mut v_mut)
+    }
+}
+
+impl Default for Address {
+    fn default() -> Self {
+        Address::zero()
     }
 }
 
@@ -112,15 +132,21 @@ pub mod error {
     use crate::{fmt, String};
 
     #[derive(Eq, Hash, Clone, Debug, PartialEq)]
-    pub struct AddressLengthError;
+    pub enum AddressError {
+        FailedDecodeHex,
+        IncorrectLength,
+    }
 
-    impl AsRef<[u8]> for AddressLengthError {
+    impl AsRef<[u8]> for AddressError {
         fn as_ref(&self) -> &[u8] {
-            b"ERR_WRONG_ADDRESS_LENGTH"
+            match self {
+                Self::FailedDecodeHex => b"FAILED_DECODE_ETH_ADDRESS",
+                Self::IncorrectLength => b"ETH_WRONG_ADDRESS_LENGTH",
+            }
         }
     }
 
-    impl fmt::Display for AddressLengthError {
+    impl fmt::Display for AddressError {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
             write!(f, "{}", msg)

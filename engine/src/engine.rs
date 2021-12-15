@@ -21,7 +21,7 @@ use crate::prelude::{
 };
 use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_precompiles::PrecompileConstructorContext;
-use aurora_engine_types::types_new::AddressConst;
+use aurora_engine_types::types_new::ADDRESS;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -528,7 +528,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let origin = self.origin();
         match args {
             CallArgs::V2(call_args) => {
-                let contract = AddressConst(H160(call_args.contract));
+                let contract = ADDRESS(H160(call_args.contract));
                 let value = call_args.value.into();
                 let input = call_args.input;
                 self.call(
@@ -542,7 +542,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 )
             }
             CallArgs::V1(call_args) => {
-                let contract = AddressConst(H160(call_args.contract));
+                let contract = ADDRESS(H160(call_args.contract));
                 let value = Wei::zero();
                 let input = call_args.input;
                 self.call(
@@ -711,7 +711,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             let mut message = args.msg.as_bytes();
             assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
 
-            let recipient = AddressConst(H160(unwrap_res_or_finish!(
+            let recipient = ADDRESS(H160(unwrap_res_or_finish!(
                 hex::decode(&message[..40]).unwrap().as_slice().try_into(),
                 output_on_fail,
                 self.io
@@ -730,7 +730,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             (recipient, fee)
         };
 
-        let erc20_token = Address(H160(unwrap_res_or_finish!(
+        let erc20_token = ADDRESS(H160(unwrap_res_or_finish!(
             unwrap_res_or_finish!(
                 get_erc20_from_nep141(&self.io, token),
                 output_on_fail,
@@ -1039,9 +1039,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
         handler,
     ) {
         Ok(result) => match result.status {
-            TransactionStatus::Succeed(ret) => {
-                AddressConst(H160(ret.as_slice().try_into().unwrap()))
-            }
+            TransactionStatus::Succeed(ret) => ADDRESS(H160(ret.as_slice().try_into().unwrap())),
             other => return Err(DeployErc20Error::Failed(other)),
         },
         Err(e) => return Err(DeployErc20Error::Engine(e)),

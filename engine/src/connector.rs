@@ -8,18 +8,16 @@ use crate::parameters::{
     SetContractDataCallArgs, StorageBalanceOfCallArgs, StorageDepositCallArgs,
     StorageWithdrawCallArgs, TransferCallArgs, TransferCallCallArgs, WithdrawResult,
 };
-use crate::prelude::types_new::Address;
 use crate::prelude::{
-    format, sdk, str, types_new::Address, validate_eth_address, AccountId, Balance,
-    BorshDeserialize, BorshSerialize, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult,
-    ToString, Vec, WithdrawCallArgs, ERR_FAILED_PARSE, H160,
+    format, sdk, str, types_new::Address, AccountId, Balance, BorshDeserialize, BorshSerialize,
+    EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString, Vec, WithdrawCallArgs,
+    ERR_FAILED_PARSE, H160,
 };
-use crate::prelude::{
-    AddressValidationError, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
-};
+use crate::prelude::{PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs};
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::types_new::address::error::AddressError;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -694,11 +692,11 @@ fn get_contract_data<T: BorshDeserialize, I: IO>(io: &I, suffix: &EthConnectorSt
 pub fn set_contract_data<I: IO>(
     io: &mut I,
     args: SetContractDataCallArgs,
-) -> Result<EthConnector, AddressValidationError> {
+) -> Result<EthConnector, AddressError> {
     // Get initial contract arguments
     let contract_data = EthConnector {
         prover_account: args.prover_account,
-        eth_custodian_address: validate_eth_address(args.eth_custodian_address)?,
+        eth_custodian_address: Address::decode(args.eth_custodian_address)?,
     };
     // Save eth-connector specific data
     io.write_borsh(
@@ -723,7 +721,8 @@ pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
 }
 
 pub mod error {
-    use crate::prelude::types::{error::BalanceOverflowError, AddressValidationError};
+    use crate::prelude::types::error::BalanceOverflowError;
+    use aurora_engine_types::types_new::address::error::AddressError;
 
     use crate::deposit_event::error::ParseOnTransferMessageError;
     use crate::{deposit_event, fungible_token};
@@ -737,7 +736,7 @@ pub mod error {
         EventParseFailed(deposit_event::error::ParseError),
         CustodianAddressMismatch,
         InsufficientAmountForFee,
-        InvalidAddress(AddressValidationError),
+        InvalidAddress(AddressError),
     }
 
     impl AsRef<[u8]> for DepositError {
@@ -845,7 +844,7 @@ pub mod error {
 
     pub enum InitContractError {
         AlreadyInitialized,
-        InvalidCustodianAddress(AddressValidationError),
+        InvalidCustodianAddress(AddressError),
     }
 
     impl AsRef<[u8]> for InitContractError {

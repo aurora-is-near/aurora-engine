@@ -157,32 +157,6 @@ impl From<u128> for Fee {
 #[allow(dead_code)]
 pub const ERC20_MINT_SELECTOR: &[u8] = &[64, 193, 15, 25];
 
-#[derive(Debug)]
-pub enum AddressValidationError {
-    FailedDecodeHex,
-    IncorrectLength,
-}
-
-impl AsRef<[u8]> for AddressValidationError {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::FailedDecodeHex => b"FAILED_DECODE_ETH_ADDRESS",
-            Self::IncorrectLength => b"ETH_WRONG_ADDRESS_LENGTH",
-        }
-    }
-}
-
-/// Validate Ethereum address from string and return Result data EthAddress or Error data
-pub fn validate_eth_address(address: String) -> Result<Address, AddressValidationError> {
-    let data = hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
-    if data.len() != 20 {
-        return Err(AddressValidationError::IncorrectLength);
-    }
-    let mut result = [0u8; 20];
-    result.copy_from_slice(&data);
-    Ok(result)
-}
-
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Wei(U256);

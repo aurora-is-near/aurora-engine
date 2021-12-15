@@ -190,7 +190,8 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
             Err(rlp::DecoderError::RlpExpectedToBeData)
         }
     } else {
-        let v: Address = value.as_val()?;
+        let addr: ethabi::Address = value.as_val()?;
+        let v = Address::from_slice(addr.as_bytes());
         if v == Address::zero() {
             Ok(None)
         } else {

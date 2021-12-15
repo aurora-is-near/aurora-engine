@@ -2,7 +2,6 @@ use crate::prelude::precompiles::secp256k1::ecrecover;
 use crate::prelude::{Vec, U256};
 use crate::transaction::eip_2930::AccessTuple;
 use aurora_engine_types::types::Wei;
-use ethabi::Address;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 /// Type indicator (per EIP-1559)
@@ -19,7 +18,7 @@ pub struct Transaction1559 {
     pub max_priority_fee_per_gas: U256,
     pub max_fee_per_gas: U256,
     pub gas_limit: U256,
-    pub to: Option<Address>,
+    pub to: Option<ethabi::Address>,
     pub value: Wei,
     pub data: Vec<u8>,
     pub access_list: Vec<AccessTuple>,
@@ -71,7 +70,7 @@ pub struct SignedTransaction1559 {
 }
 
 impl SignedTransaction1559 {
-    pub fn sender(&self) -> Option<Address> {
+    pub fn sender(&self) -> Option<ethabi::Address> {
         let mut rlp_stream = RlpStream::new();
         rlp_stream.append(&TYPE_BYTE);
         self.transaction.rlp_append_unsigned(&mut rlp_stream);

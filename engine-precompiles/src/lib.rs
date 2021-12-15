@@ -265,7 +265,7 @@ impl Precompiles {
 pub const fn make_address(x: u32, y: u128) -> prelude::types_new::Address {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
-    prelude::types_new::AddressConst(H160([
+    prelude::types_new::ADDRESS(H160([
         x_bytes[0],
         x_bytes[1],
         x_bytes[2],

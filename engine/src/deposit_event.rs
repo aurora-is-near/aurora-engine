@@ -2,9 +2,10 @@ use crate::deposit_event::error::ParseEventMessageError;
 use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    types_new::Address, validate_eth_address, vec, AddressValidationError, Balance,
-    BorshDeserialize, BorshSerialize, Fee, String, ToString, TryFrom, TryInto, Vec, U256,
+    types_new::Address, vec, Balance, BorshDeserialize, BorshSerialize, Fee, String, ToString,
+    TryFrom, TryInto, Vec, U256,
 };
+use aurora_engine_types::types_new::address::error::AddressError;
 use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
@@ -96,14 +97,14 @@ impl FtTransferMessageData {
             recipient
                 .strip_prefix("0x")
                 .ok_or(ParseEventMessageError::EthAddressValidationError(
-                    AddressValidationError::FailedDecodeHex,
+                    AddressError::FailedDecodeHex,
                 ))?
                 .to_string()
         } else {
             recipient
         };
-        let recipient_address = validate_eth_address(address)
-            .map_err(ParseEventMessageError::EthAddressValidationError)?;
+        let recipient_address =
+            Address::decode(address).map_err(ParseEventMessageError::EthAddressValidationError)?;
         // Second data section should contain Eth address
         data.extend(recipient_address);
         // Add `:` separator between relayer_id and data message
@@ -321,7 +322,7 @@ pub mod error {
     pub enum ParseEventMessageError {
         TooManyParts,
         InvalidAccount,
-        EthAddressValidationError(AddressValidationError),
+        EthAddressValidationError(AddressError),
         ParseMessageError(ParseOnTransferMessageError),
     }
 

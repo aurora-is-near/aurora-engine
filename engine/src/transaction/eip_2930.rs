@@ -1,6 +1,5 @@
 use crate::prelude::precompiles::secp256k1::ecrecover;
 use crate::prelude::{sdk, Vec, Wei, H256, U256};
-use aurora_engine_types::types_new::Address;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 /// Type indicator (per EIP-2718) for access list transactions
