@@ -496,7 +496,7 @@ impl Precompile for ExitToEthereum {
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {
-                        recipient_address: recipient_address.clone(),
+                        recipient_address,
                         amount: context.apparent_value.as_u128(),
                     }
                     .try_to_vec()

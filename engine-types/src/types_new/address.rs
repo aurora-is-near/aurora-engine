@@ -3,7 +3,7 @@ use borsh::maybestd::io;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Base Eth Address type
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Address(H160);
 
 #[allow(non_snake_case, dead_code)]

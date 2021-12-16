@@ -1,6 +1,7 @@
 use crate::prelude::precompiles::secp256k1::ecrecover;
 use crate::prelude::{sdk, Vec, Wei, H256, U256};
 use aurora_engine_types::types_new::Address;
+use aurora_engine_types::H160;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 /// Type indicator (per EIP-2718) for access list transactions
@@ -8,7 +9,7 @@ pub const TYPE_BYTE: u8 = 0x01;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct AccessTuple {
-    pub address: ethabi::Address,
+    pub address: H160,
     pub storage_keys: Vec<H256>,
 }
 

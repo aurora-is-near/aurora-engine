@@ -77,11 +77,11 @@ mod contract {
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
+    use crate::prelude::account_id::AccountId;
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::Runtime;
     use aurora_engine_sdk::promise::PromiseHandler;
-    use aurora_engine_types::account_id::AccountId;
 
     use crate::json::parse_json;
     use crate::prelude::parameters::RefundCallArgs;
@@ -91,8 +91,8 @@ mod contract {
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
     use crate::prelude::{
-        sdk, vec, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H256,
-        U256,
+        sdk, types_new::Address, vec, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei,
+        ERC20_MINT_SELECTOR, H256, U256,
     };
 
     #[cfg(feature = "integration-test")]
@@ -282,8 +282,8 @@ mod contract {
         let mut engine =
             Engine::new_with_state(state, meta_call_args.sender, current_account_id, io, &io);
         let result = engine.call(
-            meta_call_args.sender,
-            meta_call_args.contract_address,
+            &meta_call_args.sender,
+            &meta_call_args.contract_address,
             meta_call_args.value,
             meta_call_args.input,
             u64::MAX, // TODO: is there a gas limit with meta calls?
@@ -403,7 +403,7 @@ mod contract {
 
                     engine
                         .call(
-                            erc20_admin_address,
+                            &erc20_admin_address,
                             erc20_address,
                             Wei::zero(),
                             [selector, mint_args.as_slice()].concat(),
@@ -418,16 +418,19 @@ mod contract {
                     let exit_address = aurora_engine_precompiles::native::ExitToNear::ADDRESS;
                     let mut engine =
                         Engine::new(exit_address, current_account_id, io, &io).sdk_unwrap();
-                    let refund_address = Address(args.recipient_address);
+                    let refund_address = args.recipient_address;
                     let amount = Wei::new(U256::from_big_endian(&args.amount));
                     engine
                         .call(
-                            exit_address,
-                            refund_address,
+                            &exit_address,
+                            &refund_address,
                             amount,
                             Vec::new(),
                             u64::MAX,
-                            vec![(exit_address, Vec::new()), (refund_address, Vec::new())],
+                            vec![
+                                (exit_address.raw(), Vec::new()),
+                                (refund_address.raw(), Vec::new()),
+                            ],
                             &mut Runtime,
                         )
                         .sdk_unwrap()

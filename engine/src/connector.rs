@@ -372,7 +372,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(WithdrawResult {
             recipient_id: args.recipient_address,
             amount: args.amount,
-            eth_custodian_address: self.contract.eth_custodian_address,
+            eth_custodian_address: self.contract.eth_custodian_address.clone(),
         })
     }
 

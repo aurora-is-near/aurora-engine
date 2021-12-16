@@ -177,7 +177,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         amount: Balance,
     ) -> Result<(), error::DepositError> {
         let balance = self
-            .internal_unwrap_balance_of_eth_on_aurora(address)
+            .internal_unwrap_balance_of_eth_on_aurora(&address)
             .map_err(|_| error::DepositError::BalanceOverflow)?;
         let new_balance = balance
             .checked_add(amount)
