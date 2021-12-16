@@ -107,21 +107,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_wrong_address_19() {
         let serialized_addr = [0u8; 19];
         let addr = Address::try_from_slice(&serialized_addr);
-        assert!(addr.is_err());
-
-        let serialized_addr = [0u8; 21];
-        let _ = Address::try_from_slice(&serialized_addr);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_wrong_address_21() {
-        let serialized_addr = [0u8; 21];
-        let _ = Address::try_from_slice(&serialized_addr);
+        assert_eq!(
+            addr.unwrap_err().to_string(),
+            error::AddressError::IncorrectLength.to_string()
+        );
     }
 }
 
