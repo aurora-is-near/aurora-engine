@@ -66,19 +66,16 @@ impl BorshSerialize for Address {
 
 impl BorshDeserialize for Address {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() != 20 {
+        if buf.len() < 20 {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
                 format!("{}", error::AddressError::IncorrectLength),
             ));
         }
         // Guaranty no panics. The length checked early
-        Ok(Self(H160::from_slice(buf)))
-    }
-
-    fn try_from_slice(v: &[u8]) -> io::Result<Self> {
-        let mut v_mut = v;
-        Self::deserialize(&mut v_mut)
+        let address = Self(H160::from_slice(&buf[..20]));
+        *buf = &buf[20..];
+        Ok(address)
     }
 }
 
