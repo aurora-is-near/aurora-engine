@@ -309,7 +309,10 @@ mod contract {
             &io,
         )
         .sdk_unwrap();
-        engine.register_relayer(predecessor_account_id.as_bytes(), Address(relayer_address));
+        engine.register_relayer(
+            predecessor_account_id.as_bytes(),
+            Address::from_slice(&relayer_address),
+        );
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.
@@ -391,20 +394,20 @@ mod contract {
                     let erc20_admin_address = current_address(&current_account_id);
                     let mut engine =
                         Engine::new(erc20_admin_address, current_account_id, io, &io).sdk_unwrap();
-                    let erc20_address = Address(erc20_address);
-                    let refund_address = Address(args.recipient_address);
+                    let erc20_address = erc20_address;
+                    let refund_address = args.recipient_address;
                     let amount = U256::from_big_endian(&args.amount);
 
                     let selector = ERC20_MINT_SELECTOR;
                     let mint_args = ethabi::encode(&[
-                        ethabi::Token::Address(refund_address),
+                        ethabi::Token::Address(refund_address.raw()),
                         ethabi::Token::Uint(amount),
                     ]);
 
                     engine
                         .call(
                             &erc20_admin_address,
-                            erc20_address,
+                            &erc20_address,
                             Wei::zero(),
                             [selector, mint_args.as_slice()].concat(),
                             u64::MAX,
@@ -479,7 +482,7 @@ mod contract {
     pub extern "C" fn get_code() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
-        let code = engine::get_code(&io, &Address(address));
+        let code = engine::get_code(&io, &Address::from_slice(&address));
         io.return_output(&code)
     }
 
@@ -487,7 +490,7 @@ mod contract {
     pub extern "C" fn get_balance() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
-        let balance = engine::get_balance(&io, &Address(address));
+        let balance = engine::get_balance(&io, &Address::from_slice(&address));
         io.return_output(&balance.to_bytes())
     }
 
@@ -495,7 +498,7 @@ mod contract {
     pub extern "C" fn get_nonce() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
-        let nonce = engine::get_nonce(&io, &Address(address));
+        let nonce = engine::get_nonce(&io, &Address::from_slice(&address));
         io.return_output(&u256_to_arr(&nonce))
     }
 
@@ -503,9 +506,9 @@ mod contract {
     pub extern "C" fn get_storage_at() {
         let mut io = Runtime;
         let args: GetStorageAtArgs = io.read_input_borsh().sdk_unwrap();
-        let address = Address(args.address);
+        let address = args.address;
         let generation = engine::get_generation(&io, &address);
-        let value = engine::get_storage(&io, &Address(args.address), &H256(args.key), generation);
+        let value = engine::get_storage(&io, &args.address, &H256(args.key), generation);
         io.return_output(&value.0)
     }
 

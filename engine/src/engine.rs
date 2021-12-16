@@ -590,7 +590,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let status = match exit_reason.into_result(result) {
             Ok(status) => status,
             Err(e) => {
-                increment_nonce(&mut self.io, &origin);
+                increment_nonce(&mut self.io, origin);
                 return Err(e.with_gas_used(used_gas));
             }
         };
@@ -765,7 +765,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 
             unwrap_res_or_finish!(
                 self.transfer(
-                    recipient.clone(),
+                    recipient,
                     relayer_address,
                     Wei::new_u64(fee.as_u64()),
                     u64::MAX,

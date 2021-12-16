@@ -149,7 +149,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         &self,
         address: &Address,
     ) -> Result<Balance, crate::prelude::types::error::BalanceOverflowError> {
-        engine::get_balance(&self.io, &address).try_into_u128()
+        engine::get_balance(&self.io, address).try_into_u128()
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
@@ -220,7 +220,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let new_balance = balance
             .checked_sub(amount)
             .ok_or(error::WithdrawError::InsufficientFunds)?;
-        engine::set_balance(&mut self.io, &address, &Wei::new(U256::from(new_balance)));
+        engine::set_balance(&mut self.io, address, &Wei::new(U256::from(new_balance)));
         self.total_eth_supply_on_aurora = self
             .total_eth_supply_on_aurora
             .checked_sub(amount)

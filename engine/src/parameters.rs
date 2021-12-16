@@ -194,7 +194,7 @@ pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgs;
 /// Borsh-encoded parameters for the `get_storage_at` function.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct GetStorageAtArgs {
-    pub address: RawAddress,
+    pub address: Address,
     pub key: RawH256,
 }
 
