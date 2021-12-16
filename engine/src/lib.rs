@@ -522,7 +522,7 @@ mod contract {
         for account_balance in args.genesis_alloc {
             engine::set_balance(
                 &mut io,
-                &Address(account_balance.address),
+                &account_balance.address,
                 &crate::prelude::types::Wei::new(U256::from(account_balance.balance)),
             )
         }
