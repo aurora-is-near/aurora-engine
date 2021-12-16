@@ -179,26 +179,26 @@
 #debug_assert_with_mut_call
 #disallowed_methods
 #disallowed_types
-#empty_line_after_outer_attr
-#equatable_if_let
-#fallible_impl_from
+empty_line_after_outer_attr = true
+equatable_if_let = true
+fallible_impl_from = true
 #future_not_send
 #imprecise_flops
-#index_refutable_slice
+index_refutable_slice = true
 #missing_const_for_fn
 #mutex_integer
 #non_send_fields_in_send_ty
 #nonstandard_macro_braces
-#option_if_let_else
+option_if_let_else = true
 #path_buf_push_overwrite
-#redundant_pub_crate
-#string_lit_as_bytes
+redundant_pub_crate = true
+string_lit_as_bytes = true
 #suboptimal_flops
 #suspicious_operation_groupings
 #trailing_empty_array
 #trivial_regex
-#use_self
-#useless_let_if_seq
+use_self = true
+useless_let_if_seq = true
 #useless_transmute
 
 # === pedantic ===
