@@ -2,7 +2,8 @@ use crate::test_utils::standalone::mocks::{promise, storage};
 use aurora_engine::engine;
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
 use aurora_engine_types::types::Wei;
-use aurora_engine_types::{account_id::AccountId, types_new::Address, H256, U256};
+use aurora_engine_types::types_new::ADDRESS;
+use aurora_engine_types::{account_id::AccountId, types_new::Address, H160, H256, U256};
 use std::sync::RwLock;
 
 #[test]
@@ -20,7 +21,7 @@ fn test_deploy_code() {
         bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
     };
-    let origin = Address([0u8; 20]);
+    let origin = ADDRESS(H160([0u8; 20]));
     let storage = RwLock::new(storage::Storage::default());
     let io = storage::StoragePointer(&storage);
     let env = aurora_engine_sdk::env::Fixed {

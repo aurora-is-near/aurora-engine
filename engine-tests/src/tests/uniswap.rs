@@ -9,6 +9,8 @@ use crate::test_utils::{
     AuroraRunner, ExecutionProfile, Signer,
 };
 use aurora_engine_types::types::Wei;
+use aurora_engine_types::types_new::ADDRESS;
+use aurora_engine_types::H160;
 use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1000;
@@ -96,7 +98,7 @@ impl UniswapTestContext {
                 c.deploy(
                     factory.0.address,
                     weth_address,
-                    Address([0; 20]),
+                    ADDRESS(H160([0; 20])),
                     nonce.into(),
                 )
             },
@@ -147,9 +149,8 @@ impl UniswapTestContext {
             .unwrap();
         assert!(result.status.is_ok(), "Failed to create pool");
 
-        let mut address = [0u8; 20];
-        address.copy_from_slice(&test_utils::unwrap_success(result)[12..]);
-        let pool = Pool::from_address(Address(address));
+        let address = Address::from_slice(&test_utils::unwrap_success(result)[12..]);
+        let pool = Pool::from_address(address);
 
         // 2^96 corresponds to a price ratio of 1
         let result = self
@@ -232,7 +233,8 @@ impl UniswapTestContext {
             token_in: token_in.0.address,
             token_out: token_out.0.address,
             fee: POOL_FEE,
-            recipient: Address([0; 20]),
+
+            recipient: ADDRESS(H160([0; 20])),
             deadline: U256::MAX,
             amount_out,
             amount_in_max: U256::from(100) * amount_out,

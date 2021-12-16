@@ -134,7 +134,7 @@ impl MarketPlace {
         self.0.call_method_with_args(
             "minar",
             &[
-                ethabi::Token::Address(recipient),
+                ethabi::Token::Address(recipient.raw()),
                 ethabi::Token::String(data),
                 ethabi::Token::Uint(price.raw()),
             ],

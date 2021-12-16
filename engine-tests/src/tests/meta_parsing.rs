@@ -67,9 +67,7 @@ fn public_key_to_address(public_key: PublicKey) -> Address {
         PublicKey::SECP256K1(pubkey) => {
             let pk: [u8; 64] = pubkey.into();
             let bytes = keccak(&pk.to_vec());
-            let mut result = Address::zero();
-            result.as_bytes_mut().copy_from_slice(&bytes[12..]);
-            result
+            Address::from_slice(&bytes[12..])
         }
     }
 }

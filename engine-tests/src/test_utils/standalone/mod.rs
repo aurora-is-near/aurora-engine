@@ -50,7 +50,7 @@ impl StandaloneRunner {
         let env = &mut self.env;
         let transaction_hash = {
             let bytes = [
-                address.as_ref(),
+                address.raw().as_ref(),
                 &balance.to_bytes(),
                 &aurora_engine_types::types::u256_to_arr(&nonce),
             ]
@@ -184,7 +184,7 @@ impl StandaloneRunner {
                 .unwrap();
             io.finish().commit(storage, &mut self.cumulative_diff);
             Ok(SubmitResult::new(
-                TransactionStatus::Succeed(address.as_ref().to_vec()),
+                TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
                 0,
                 Vec::new(),
             ))

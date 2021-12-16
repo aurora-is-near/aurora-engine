@@ -1,5 +1,6 @@
 use crate::test_utils::standalone;
-use aurora_engine_types::{types_new::Address, U256};
+use aurora_engine_types::types_new::ADDRESS;
+use aurora_engine_types::{types_new::Address, H160, U256};
 use engine_standalone_storage::json_snapshot;
 
 const NONCE_PREFIX: [u8; 2] = [0x07, 0x01];
@@ -40,5 +41,5 @@ fn test_consume_snapshot() {
 fn address_from_key(key: &[u8]) -> Address {
     let mut result = [0u8; 20];
     result.copy_from_slice(&key[2..22]);
-    Address(result)
+    ADDRESS(H160(result))
 }

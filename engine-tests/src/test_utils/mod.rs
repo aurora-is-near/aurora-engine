@@ -1,3 +1,4 @@
+use aurora_engine::parameters::ViewCallArgs;
 use aurora_engine_types::account_id::AccountId;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::config::VMConfig;
@@ -12,9 +13,7 @@ use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::prelude::parameters::{
-    InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs,
-};
+use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transaction::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -653,8 +652,8 @@ pub(crate) fn create_eth_transaction(
 
 pub(crate) fn as_view_call(tx: TransactionLegacy, sender: Address) -> ViewCallArgs {
     ViewCallArgs {
-        sender: sender.0,
-        address: tx.to.unwrap().0,
+        sender,
+        address: tx.to.unwrap(),
         amount: tx.value.to_bytes(),
         input: tx.data,
     }

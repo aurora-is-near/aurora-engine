@@ -1,7 +1,10 @@
 use aurora_engine::deposit_event::TokenMessageData;
 use aurora_engine_sdk::env::{Env, Timestamp};
 use aurora_engine_types::types::Fee;
-use aurora_engine_types::{account_id::AccountId, types::Wei, types_new::Address, H256, U256};
+use aurora_engine_types::types_new::ADDRESS;
+use aurora_engine_types::{
+    account_id::AccountId, types::Wei, types_new::Address, H160, H256, U256,
+};
 use borsh::BorshSerialize;
 use engine_standalone_storage::sync;
 
@@ -40,7 +43,7 @@ fn test_consume_block_message() {
 fn test_consume_deposit_message() {
     let (mut runner, block_message) = initialize();
 
-    let recipient_address = Address([22u8; 20]);
+    let recipient_address = ADDRESS(H160([22u8; 20]));
     let deposit_amount = Wei::new_u64(123_456_789);
     let proof = mock_proof(recipient_address, deposit_amount);
 
@@ -119,7 +122,7 @@ fn test_consume_deploy_erc20_message() {
 
     let token: AccountId = "some_nep141.near".parse().unwrap();
     let mint_amount: u128 = 555_555;
-    let dest_address = Address([170u8; 20]);
+    let dest_address = ADDRESS(H160([170u8; 20]));
 
     let args = aurora_engine::parameters::DeployErc20TokenArgs {
         nep141: token.clone(),
@@ -200,7 +203,7 @@ fn test_consume_ft_on_transfer_message() {
 
     let mint_amount = 8_675_309;
     let fee = Wei::zero();
-    let dest_address = Address([221u8; 20]);
+    let dest_address = ADDRESS(H160([221u8; 20]));
 
     // Mint ETH on Aurora per the bridge workflow
     let args = aurora_engine::parameters::NEP141FtOnTransferArgs {
@@ -245,7 +248,7 @@ fn test_consume_call_message() {
     let initial_balance = Wei::new_u64(800_000);
     let transfer_amount = Wei::new_u64(115_321);
     let caller_address = aurora_engine_sdk::types::near_account_to_evm_address(caller.as_bytes());
-    let recipient_address = Address([1u8; 20]);
+    let recipient_address = ADDRESS(H160([1u8; 20]));
     runner.mint_account(caller_address, initial_balance, U256::zero(), None);
 
     runner.env.block_height += 1;
@@ -290,7 +293,7 @@ fn test_consume_submit_message() {
     let initial_balance = Wei::new_u64(800_000);
     let transfer_amount = Wei::new_u64(115_321);
     let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
-    let recipient_address = Address([1u8; 20]);
+    let recipient_address = ADDRESS(H160([1u8; 20]));
     runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);
 
     runner.env.block_height += 1;
@@ -335,14 +338,14 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
     let eth_custodian_address = test_utils::standalone::mocks::ETH_CUSTODIAN_ADDRESS;
 
     let fee = Fee::new(0);
-    let message = ["aurora", ":", hex::encode(&recipient_address).as_str()].concat();
+    let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
     let token_message_data: TokenMessageData =
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
             .unwrap();
 
     let deposit_event = aurora_engine::deposit_event::DepositedEvent {
         eth_custodian_address,
-        sender: [0u8; 20],
+        sender: ADDRESS(H160([0u8; 20])),
         token_message_data,
         amount: deposit_amount.raw().as_u128(),
         fee,
@@ -354,7 +357,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         anonymous: false,
     };
     let log_entry = aurora_engine::log_entry::LogEntry {
-        address: eth_custodian_address,
+        address: eth_custodian_address.raw(),
         topics: vec![
             event_schema.signature(),
             // the sender is not important

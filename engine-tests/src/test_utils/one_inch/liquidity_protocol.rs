@@ -63,9 +63,9 @@ impl<'a> Helper<'a> {
                 constructor.deploy_with_args(
                     nonce,
                     &[
-                        ethabi::Token::Address(signer_address),
-                        ethabi::Token::Address(pool_deployer.0.address),
-                        ethabi::Token::Address(signer_address),
+                        ethabi::Token::Address(signer_address.raw()),
+                        ethabi::Token::Address(pool_deployer.0.address.raw()),
+                        ethabi::Token::Address(signer_address.raw()),
                     ],
                 )
             })
@@ -94,8 +94,8 @@ impl<'a> Helper<'a> {
                 pool_factory.0.call_method_with_args(
                     "deploy",
                     &[
-                        ethabi::Token::Address(token_a),
-                        ethabi::Token::Address(token_b),
+                        ethabi::Token::Address(token_a.raw()),
+                        ethabi::Token::Address(token_b.raw()),
                     ],
                     nonce,
                 )
@@ -178,11 +178,11 @@ impl<'a> Helper<'a> {
             pool,
             "swap",
             &[
-                ethabi::Token::Address(args.src_token),
-                ethabi::Token::Address(args.dst_token),
+                ethabi::Token::Address(args.src_token.raw()),
+                ethabi::Token::Address(args.dst_token.raw()),
                 ethabi::Token::Uint(args.amount),
                 ethabi::Token::Uint(args.min_amount),
-                ethabi::Token::Address(args.referral),
+                ethabi::Token::Address(args.referral.raw()),
             ],
         )
     }

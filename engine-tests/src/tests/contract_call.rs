@@ -88,17 +88,17 @@ fn withdraw() {
             let address = Address::from_slice(&address);
             ethabi::LogParam {
                 name: "dest".to_string(),
-                value: ethabi::Token::Address(address),
+                value: ethabi::Token::Address(address.raw()),
             }
         };
         let expected_event = vec![
             ethabi::LogParam {
                 name: "sender".to_string(),
-                value: ethabi::Token::Address(token),
+                value: ethabi::Token::Address(token.raw()),
             },
             ethabi::LogParam {
                 name: "erc20_address".to_string(),
-                value: ethabi::Token::Address(token),
+                value: ethabi::Token::Address(token.raw()),
             },
             dest,
             ethabi::LogParam {
@@ -187,11 +187,13 @@ fn withdraw_eth() {
     let mut expected_event = vec![
         ethabi::LogParam {
             name: "sender".to_string(),
-            value: ethabi::Token::Address(tester.contract.address),
+            value: ethabi::Token::Address(tester.contract.address.raw()),
         },
         ethabi::LogParam {
             name: "erc20_address".to_string(),
-            value: ethabi::Token::Address(aurora_engine_precompiles::native::events::ETH_ADDRESS),
+            value: ethabi::Token::Address(
+                aurora_engine_precompiles::native::events::ETH_ADDRESS.raw(),
+            ),
         },
         ethabi::LogParam {
             name: "dest".to_string(),
@@ -214,7 +216,7 @@ fn withdraw_eth() {
         .unwrap();
     expected_event[2] = ethabi::LogParam {
         name: "dest".to_string(),
-        value: ethabi::Token::Address(DEST_ADDRESS),
+        value: ethabi::Token::Address(DEST_ADDRESS.raw()),
     };
     expected_event[3] = ethabi::LogParam {
         name: "amount".to_string(),

@@ -398,6 +398,7 @@ mod sim_tests {
     use aurora_engine::parameters::{
         CallArgs, DeployErc20TokenArgs, FunctionCallArgsV2, SubmitResult,
     };
+    use aurora_engine_types::types_new::Address;
     use borsh::BorshSerialize;
     use near_sdk_sim::UserAccount;
     use serde_json::json;
