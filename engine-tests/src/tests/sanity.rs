@@ -680,7 +680,7 @@ fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, 
     let signer = test_utils::Signer::random();
     let address = test_utils::address_from_secret_key(&signer.secret_key);
 
-    let args = (address.0, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
+    let args = (address, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
     aurora
         .call("mint_account", &args.try_to_vec().unwrap())
         .assert_success();
@@ -703,7 +703,7 @@ fn query_address_sim(
     method: &str,
     aurora: &state_migration::AuroraAccount,
 ) -> U256 {
-    let x = aurora.call(method, &address.0);
+    let x = aurora.call(method, address);
     match &x.outcome().status {
         near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
         other => panic!("Unexpected outcome: {:?}", other),

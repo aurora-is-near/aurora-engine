@@ -365,11 +365,11 @@ impl Precompile for ExitToNear {
         let erc20_address = if flag == 0 {
             None
         } else {
-            Some(exit_event.erc20_address.0)
+            Some(exit_event.erc20_address)
         };
         #[cfg(feature = "error_refund")]
         let refund_args = RefundCallArgs {
-            recipient_address: refund_address.0,
+            recipient_address: refund_address,
             erc20_address,
             amount: types::u256_to_arr(&exit_event.amount),
         };

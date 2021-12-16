@@ -454,13 +454,7 @@ mod contract {
         let mut io = Runtime;
         let args: ViewCallArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
-        let engine = Engine::new(
-            Address::from_slice(&args.sender),
-            current_account_id,
-            io,
-            &io,
-        )
-        .sdk_unwrap();
+        let engine = Engine::new(args.sender, current_account_id, io, &io).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args).sdk_unwrap();
         io.return_output(&result.try_to_vec().sdk_expect("ERR_SERIALIZE"));
     }
@@ -858,13 +852,13 @@ mod contract {
 
         let mut io = Runtime;
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
-        let address = Address(args.0);
+        let address = Address::from_slice(&args.0);
         let nonce = U256::from(args.1);
         let balance = U256::from(args.2);
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {
-            address,
+            address: address.raw(),
             basic: evm::backend::Basic { balance, nonce },
             code: None,
             storage: core::iter::empty(),

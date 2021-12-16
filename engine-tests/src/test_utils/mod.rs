@@ -419,7 +419,7 @@ impl AuroraRunner {
 
     pub fn get_storage(&self, address: Address, key: H256) -> H256 {
         let input = aurora_engine::parameters::GetStorageAtArgs {
-            address: address.0,
+            address,
             key: key.0,
         };
         let (outcome, maybe_error) =

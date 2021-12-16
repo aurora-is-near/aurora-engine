@@ -1,4 +1,4 @@
-use crate::{String, TryFrom, H160};
+use crate::{format, String, TryFrom, H160};
 use borsh::maybestd::io;
 use borsh::{BorshDeserialize, BorshSerialize};
 

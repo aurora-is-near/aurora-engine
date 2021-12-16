@@ -143,7 +143,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         sdk::log!(&format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
-            hex::encode(event.sender),
+            event.sender.encode(),
             event.token_message_data.get_recipient(),
             event.amount,
             event.fee
@@ -151,8 +151,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         sdk::log!(&format!(
             "Event's address {}, custodian address {}",
-            hex::encode(&event.eth_custodian_address),
-            hex::encode(&self.contract.eth_custodian_address),
+            event.eth_custodian_address.encode(),
+            self.contract.eth_custodian_address.encode(),
         ));
 
         if event.eth_custodian_address != self.contract.eth_custodian_address {
@@ -330,7 +330,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         sdk::log!(&format!(
             "Mint {} ETH tokens for: {}",
             amount,
-            hex::encode(owner_id)
+            owner_id.encode()
         ));
         self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
     }
@@ -344,7 +344,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         sdk::log!(&format!(
             "Burn {} ETH tokens for: {}",
             amount,
-            hex::encode(address)
+            address.encode()
         ));
         self.ft.internal_withdraw_eth_from_aurora(address, amount)
     }
@@ -414,7 +414,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .internal_unwrap_balance_of_eth_on_aurora(&args.address)?;
         sdk::log!(&format!(
             "Balance of ETH [{}]: {}",
-            hex::encode(args.address),
+            args.address.encode(),
             balance
         ));
         self.io

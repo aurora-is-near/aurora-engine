@@ -603,7 +603,7 @@ mod sim_tests {
         aurora
             .call(
                 "mint_account",
-                &(signer_address.0, signer.nonce, INITIAL_ETH_BALANCE)
+                &(signer_address, signer.nonce, INITIAL_ETH_BALANCE)
                     .try_to_vec()
                     .unwrap(),
             )
@@ -651,7 +651,7 @@ mod sim_tests {
         aurora
             .call(
                 "mint_account",
-                &(ft_owner_address.0, 0u64, INITIAL_ETH_BALANCE)
+                &(ft_owner_address, 0u64, INITIAL_ETH_BALANCE)
                     .try_to_vec()
                     .unwrap(),
             )
@@ -718,7 +718,7 @@ mod sim_tests {
             ],
         );
         let call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: erc20.0.address.0,
+            contract: erc20.0.address,
             value: WeiU256::default(),
             input,
         });
@@ -758,7 +758,7 @@ mod sim_tests {
 
         let mint_tx = erc20.mint(dest, amount.into(), 0.into());
         let call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: erc20.0.address.0,
+            contract: erc20.0.address,
             value: WeiU256::default(),
             input: mint_tx.data,
         });
@@ -789,7 +789,7 @@ mod sim_tests {
     fn erc20_balance(erc20: &ERC20, address: Address, aurora: &AuroraAccount) -> U256 {
         let balance_tx = erc20.balance_of(address, 0.into());
         let call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: erc20.0.address.0,
+            contract: erc20.0.address,
             value: WeiU256::default(),
             input: balance_tx.data,
         });

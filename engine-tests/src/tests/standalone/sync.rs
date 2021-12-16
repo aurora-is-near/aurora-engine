@@ -97,11 +97,11 @@ fn test_consume_deploy_message() {
             position: 0,
         })
         .unwrap();
-    let mut deployed_address = Address([0u8; 20]);
+    let mut deployed_address = Address::zero();
     for (key, value) in diff.iter() {
         match value.value() {
             Some(bytes) if bytes == code.as_slice() => {
-                deployed_address.0.copy_from_slice(&key[2..22]);
+                deployed_address = Address::from_slice(&key[2..22]);
                 break;
             }
             _ => continue,
@@ -341,7 +341,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
             .unwrap();
 
     let deposit_event = aurora_engine::deposit_event::DepositedEvent {
-        eth_custodian_address: eth_custodian_address.0,
+        eth_custodian_address,
         sender: [0u8; 20],
         token_message_data,
         amount: deposit_amount.raw().as_u128(),
@@ -382,7 +382,7 @@ fn simple_transfer_args(
     transfer_amount: Wei,
 ) -> aurora_engine::parameters::CallArgs {
     aurora_engine::parameters::CallArgs::V2(aurora_engine::parameters::FunctionCallArgsV2 {
-        contract: dest_address.0,
+        contract: dest_address,
         value: transfer_amount.to_bytes(),
         input: Vec::new(),
     })

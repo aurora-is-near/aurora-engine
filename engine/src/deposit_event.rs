@@ -200,7 +200,7 @@ impl EthEvent {
             anonymous: false,
         };
         let log_entry: LogEntry = rlp::decode(data).map_err(|_| error::DecodeError::RlpFailed)?;
-        let eth_custodian_address = Address::from_slice(&log_entry.address.0);
+        let eth_custodian_address = Address::new(log_entry.address);
         let topics = log_entry.topics.iter().map(|h| Hash::from(h.0)).collect();
 
         let raw_log = RawLog {
