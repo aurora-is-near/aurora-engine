@@ -330,7 +330,9 @@ const fn make_h256(x: u128, y: u128) -> prelude::H256 {
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::H160;
     use crate::{prelude, Byzantium, Istanbul};
+    use prelude::types_new::{Address, ADDRESS};
     use rand::Rng;
 
     #[test]
@@ -354,25 +356,25 @@ mod tests {
 
         let mut rng = rand::thread_rng();
         for _ in 0..u8::MAX {
-            let address: prelude::Address = prelude::Address(rng.gen());
+            let address = ADDRESS(H160(rng.gen()));
             let (x, y) = split_address(address);
             assert_eq!(address, super::make_address(x, y))
         }
     }
 
-    fn u8_to_address(x: u8) -> prelude::Address {
+    fn u8_to_address(x: u8) -> Address {
         let mut bytes = [0u8; 20];
         bytes[19] = x;
-        prelude::Address(bytes)
+        ADDRESS(H160(bytes))
     }
 
     // Inverse function of `super::make_address`.
-    fn split_address(a: prelude::Address) -> (u32, u128) {
+    fn split_address(a: Address) -> (u32, u128) {
         let mut x_bytes = [0u8; 4];
         let mut y_bytes = [0u8; 16];
 
-        x_bytes.copy_from_slice(&a[0..4]);
-        y_bytes.copy_from_slice(&a[4..20]);
+        x_bytes.copy_from_slice(&a.raw()[0..4]);
+        y_bytes.copy_from_slice(&a.raw()[4..20]);
 
         (u32::from_be_bytes(x_bytes), u128::from_be_bytes(y_bytes))
     }

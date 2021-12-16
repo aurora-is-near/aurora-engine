@@ -1,4 +1,4 @@
-use crate::prelude::{Address, U256};
+use crate::prelude::{types_new::Address, U256};
 use crate::test_utils::{
     self,
     erc20::{ERC20Constructor, ERC20},

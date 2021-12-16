@@ -1,5 +1,5 @@
 use aurora_engine::transaction::legacy::TransactionLegacy;
-use aurora_engine_types::{types::Wei, Address, U256};
+use aurora_engine_types::{types::Wei, types_new::Address, U256};
 
 use crate::test_utils::solidity;
 

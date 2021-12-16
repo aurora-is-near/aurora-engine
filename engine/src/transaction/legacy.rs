@@ -200,8 +200,6 @@ mod tests {
 
     fn address_from_arr(arr: &[u8]) -> Address {
         assert_eq!(arr.len(), 20);
-        let mut address = [0u8; 20];
-        address.copy_from_slice(&arr);
-        Address::from(address)
+        Address::from_slice(arr)
     }
 }

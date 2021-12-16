@@ -1,5 +1,5 @@
 use crate::prelude::{
-    parameters::SubmitResult, transaction::legacy::TransactionLegacy, Address, Wei, U256,
+    parameters::SubmitResult, transaction::legacy::TransactionLegacy, types_new::Address, Wei, U256,
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 

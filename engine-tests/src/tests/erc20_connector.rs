@@ -1,4 +1,4 @@
-use crate::prelude::{Address, Balance, RawAddress, TryInto, Wei, WeiU256, U256};
+use crate::prelude::{types_new::Address, Balance, TryInto, Wei, WeiU256, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
@@ -61,7 +61,7 @@ fn create_ethereum_address() -> Address {
 
 pub struct EthereumAddress {
     pub secret_key: SecretKey,
-    pub address: RawAddress,
+    pub address: Address,
 }
 
 impl test_utils::AuroraRunner {
@@ -91,7 +91,7 @@ impl test_utils::AuroraRunner {
         CallResult { outcome, error }
     }
 
-    pub fn evm_call(&mut self, contract: RawAddress, input: Vec<u8>, origin: String) -> CallResult {
+    pub fn evm_call(&mut self, contract: Address, input: Vec<u8>, origin: String) -> CallResult {
         self.make_call(
             "call",
             origin,
@@ -109,7 +109,7 @@ impl test_utils::AuroraRunner {
         self.make_call("submit", origin, rlp::encode(&input).to_vec())
     }
 
-    pub fn deploy_erc20_token(&mut self, nep141: &String) -> RawAddress {
+    pub fn deploy_erc20_token(&mut self, nep141: &String) -> Address {
         let result = self.make_call("deploy_erc20_token", origin(), nep141.try_to_vec().unwrap());
 
         result.check_ok();
@@ -131,7 +131,7 @@ impl test_utils::AuroraRunner {
         }
     }
 
-    pub fn balance_of(&mut self, token: RawAddress, target: RawAddress, origin: String) -> U256 {
+    pub fn balance_of(&mut self, token: Address, target: Address, origin: String) -> U256 {
         let input = build_input("balanceOf(address)", &[Token::Address(target.into())]);
         let result = self.evm_call(token, input, origin);
         result.check_ok();
@@ -141,8 +141,8 @@ impl test_utils::AuroraRunner {
 
     pub fn mint(
         &mut self,
-        token: RawAddress,
-        target: RawAddress,
+        token: Address,
+        target: Address,
         amount: u64,
         origin: String,
     ) -> CallResult {
@@ -159,7 +159,7 @@ impl test_utils::AuroraRunner {
     }
 
     #[allow(dead_code)]
-    pub fn admin(&mut self, token: RawAddress, origin: String) -> CallResult {
+    pub fn admin(&mut self, token: Address, origin: String) -> CallResult {
         let input = build_input("admin()", &[]);
         let result = self.evm_call(token, input, origin);
         result.check_ok();
@@ -168,9 +168,9 @@ impl test_utils::AuroraRunner {
 
     pub fn transfer_erc20(
         &mut self,
-        token: RawAddress,
+        token: Address,
         sender: SecretKey,
-        receiver: RawAddress,
+        receiver: Address,
         amount: u64,
         origin: String,
     ) -> CallResult {
@@ -390,7 +390,7 @@ fn test_transfer_erc20_token() {
 // Note: `AuroraRunner` is not suitable for these tests because
 // it does not execute promises; but `near-sdk-sim` does.
 mod sim_tests {
-    use crate::prelude::{types::Wei, Address, WeiU256, U256};
+    use crate::prelude::{types::Wei, WeiU256, U256};
     use crate::test_utils;
     use crate::test_utils::erc20::{ERC20Constructor, ERC20};
     use crate::test_utils::exit_precompile::TesterConstructor;

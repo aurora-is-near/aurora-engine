@@ -1,5 +1,5 @@
 use crate::prelude::parameters::SubmitResult;
-use crate::prelude::{Address, U256};
+use crate::prelude::{types_new::Address, U256};
 use crate::test_utils::{self, solidity, ExecutionProfile};
 use std::path::PathBuf;
 use std::sync::Once;

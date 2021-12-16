@@ -5,7 +5,6 @@ use crate::fmt::Formatter;
 
 // TODO: introduce new Balance type for more strict typing
 pub type Balance = u128;
-pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32];
 // Big-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.

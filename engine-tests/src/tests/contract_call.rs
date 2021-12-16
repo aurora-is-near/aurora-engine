@@ -1,10 +1,10 @@
-use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
+use crate::prelude::{parameters::SubmitResult, types_new::Address, vec, Wei, H256, U256};
 use crate::test_utils::{origin, AuroraRunner, Signer};
 
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS};
 
-fn setup_test() -> (AuroraRunner, Signer, [u8; 20], Tester) {
+fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
     let mut signer = test_utils::Signer::random();
@@ -49,7 +49,6 @@ fn hello_world_solidity() {
 #[test]
 fn withdraw() {
     let (mut runner, mut signer, token, tester) = setup_test();
-    let token = Address(token);
 
     let test_data = vec![
         (true, "call_contract tt.testnet.ft_transfer"),

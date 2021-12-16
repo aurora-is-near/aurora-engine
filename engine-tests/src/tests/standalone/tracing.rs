@@ -1,5 +1,5 @@
 use aurora_engine_sdk::env::Env;
-use aurora_engine_types::{types::Wei, Address, H256, U256};
+use aurora_engine_types::{types::Wei, types_new::Address, H256, U256};
 use engine_standalone_tracing::{sputnik, types::TransactionTrace};
 use serde::Deserialize;
 use std::path::Path;

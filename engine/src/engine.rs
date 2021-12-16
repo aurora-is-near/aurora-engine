@@ -530,7 +530,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let origin = Address::new(self.origin());
         match args {
             CallArgs::V2(call_args) => {
-                let contract = ADDRESS(H160(call_args.contract));
+                let contract = ADDRESS(call_args.contract.raw());
                 let value = call_args.value.into();
                 let input = call_args.input;
                 self.call(
@@ -544,7 +544,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 )
             }
             CallArgs::V1(call_args) => {
-                let contract = ADDRESS(H160(call_args.contract));
+                let contract = ADDRESS(call_args.contract.raw());
                 let value = Wei::zero();
                 let input = call_args.input;
                 self.call(
@@ -606,16 +606,16 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     }
 
     pub fn view_with_args(&self, args: ViewCallArgs) -> Result<TransactionStatus, EngineErrorKind> {
-        let origin = Address::from_slice(&args.sender);
-        let contract = Address::from_slice(&args.address);
+        let origin = &args.sender;
+        let contract = &args.address;
         let value = U256::from_big_endian(&args.amount);
         self.view(origin, contract, Wei::new(value), args.input, u64::MAX)
     }
 
     pub fn view(
         &self,
-        origin: Address,
-        contract: Address,
+        origin: &Address,
+        contract: &Address,
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
