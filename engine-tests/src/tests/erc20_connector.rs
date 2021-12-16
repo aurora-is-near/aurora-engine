@@ -114,10 +114,11 @@ impl test_utils::AuroraRunner {
 
         result.check_ok();
 
-        Vec::<u8>::try_from_slice(result.value().as_slice())
+        let raw_address: [u8; 20] = Vec::<u8>::try_from_slice(result.value().as_slice())
             .unwrap()
             .try_into()
-            .unwrap()
+            .unwrap();
+        Address::from_slice(&raw_address)
     }
 
     pub fn create_account(&mut self) -> EthereumAddress {
@@ -132,7 +133,7 @@ impl test_utils::AuroraRunner {
     }
 
     pub fn balance_of(&mut self, token: Address, target: Address, origin: String) -> U256 {
-        let input = build_input("balanceOf(address)", &[Token::Address(target.into())]);
+        let input = build_input("balanceOf(address)", &[Token::Address(target.raw())]);
         let result = self.evm_call(token, input, origin);
         result.check_ok();
         let output = test_utils::unwrap_success(result.submit_result());
@@ -149,7 +150,7 @@ impl test_utils::AuroraRunner {
         let input = build_input(
             "mint(address,uint256)",
             &[
-                Token::Address(target.into()),
+                Token::Address(target.raw()),
                 Token::Uint(U256::from(amount).into()),
             ],
         );
@@ -178,7 +179,7 @@ impl test_utils::AuroraRunner {
         let input = build_input(
             "transfer(address,uint256)",
             &[
-                Token::Address(receiver.into()),
+                Token::Address(receiver.raw()),
                 Token::Uint(U256::from(amount)),
             ],
         );
@@ -222,7 +223,7 @@ impl test_utils::AuroraRunner {
         self.make_call(
             "register_relayer",
             relayer_account_id,
-            relayer_address.as_fixed_bytes().try_to_vec().unwrap(),
+            relayer_address.try_to_vec().unwrap(),
         )
     }
 }
@@ -273,7 +274,7 @@ fn test_ft_on_transfer() {
     let balance = runner.balance_of(token, recipient, origin());
     assert_eq!(balance, U256::from(0));
 
-    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, hex::encode(recipient));
+    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, recipient.encode());
     // Transaction should succeed so return amount is 0
     assert_eq!(res, "\"0\"");
 
@@ -290,7 +291,7 @@ fn test_ft_on_transfer_fail() {
 
     let recipient = runner.create_account().address;
 
-    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, hex::encode(recipient));
+    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, recipient.encode());
 
     // Transaction should fail so it must return everything
     assert_eq!(res, format!("\"{}\"", amount.to_string()));
@@ -327,7 +328,7 @@ fn test_relayer_charge_fee() {
         alice.clone(),
         alice,
         amount,
-        hex::encode(recipient) + &hex::encode(fee_encoded),
+        recipient.encode() + &hex::encode(fee_encoded),
     );
 
     let recipient_balance_end = runner.get_balance(recipient.into());
