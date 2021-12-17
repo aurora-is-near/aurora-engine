@@ -267,7 +267,7 @@ fn test_ft_on_transfer() {
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
     let token = runner.deploy_erc20_token(&nep141);
-    let amount = 10;
+    let amount = Balance::new(10);
     let recipient = runner.create_account().address;
 
     let balance = runner.balance_of(token, recipient, origin());
@@ -278,7 +278,7 @@ fn test_ft_on_transfer() {
     assert_eq!(res, "\"0\"");
 
     let balance = runner.balance_of(token, recipient, origin());
-    assert_eq!(balance, U256::from(amount));
+    assert_eq!(balance, U256::from(amount.as_u128()));
 }
 
 #[test]
@@ -286,7 +286,7 @@ fn test_ft_on_transfer_fail() {
     let mut runner = AuroraRunner::new();
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
-    let amount = 10;
+    let amount = Balance::new(10);
 
     let recipient = runner.create_account().address;
 
@@ -301,7 +301,7 @@ fn test_relayer_charge_fee() {
     let mut runner = AuroraRunner::new();
     // Standalone runner presently does not support ft_on_transfer
     runner.standalone_runner = None;
-    let amount = 10;
+    let amount = Balance::new(10);
     let fee = 51;
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
@@ -339,7 +339,7 @@ fn test_relayer_charge_fee() {
     assert_eq!(relayer_balance, Wei::new_u64(fee));
 
     let balance = runner.balance_of(token, recipient, origin());
-    assert_eq!(balance, U256::from(amount));
+    assert_eq!(balance, U256::from(amount.as_u128()));
 }
 
 #[test]
