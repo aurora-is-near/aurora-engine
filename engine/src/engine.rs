@@ -763,7 +763,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let selector = ERC20_MINT_SELECTOR;
         let tail = ethabi::encode(&[
             ethabi::Token::Address(recipient),
-            ethabi::Token::Uint(args.amount.into()),
+            ethabi::Token::Uint(U256::from(args.amount.as_u128())),
         ]);
 
         let erc20_admin_address = current_address(current_account_id);
@@ -1142,9 +1142,7 @@ pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
 }
 
 pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
-    // The `unwrap` is safe here because if the connector
-    // is implemented correctly then the "Eth on Aurora" wll never underflow.
-    let balance = get_balance(io, address).try_into_u128().unwrap();
+    let balance = get_balance(io, address);
     // Apply changes for eth-connector. The `unwrap` is safe here because (a) if the connector
     // is implemented correctly then the total supply wll never underflow and (b) we are passing
     // in the balance directly so there will always be enough balance.

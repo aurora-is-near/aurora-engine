@@ -77,11 +77,12 @@ mod contract {
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
+    use crate::prelude::account_id::AccountId;
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::Runtime;
     use aurora_engine_sdk::promise::PromiseHandler;
-    use aurora_engine_types::account_id::AccountId;
+    use aurora_engine_types::types::Yocto;
 
     use crate::json::parse_json;
     use crate::prelude::parameters::RefundCallArgs;
@@ -89,10 +90,9 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
     use crate::prelude::{
-        sdk, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei,
-        ERC20_MINT_SELECTOR, H256, U256,
+        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei,
+        ERC20_MINT_SELECTOR, ERR_FAILED_PARSE, H256, U256,
     };
 
     #[cfg(feature = "integration-test")]
@@ -732,7 +732,7 @@ mod contract {
         let mut io = Runtime;
         let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
         let predecessor_account_id = io.predecessor_account_id();
-        let amount = io.attached_deposit();
+        let amount = Yocto::new(io.attached_deposit());
         let maybe_promise = EthConnectorContract::init_instance(io)
             .storage_deposit(predecessor_account_id, amount, args)
             .sdk_unwrap();
@@ -846,6 +846,8 @@ mod contract {
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn mint_account() {
+        use crate::connector::ZERO_ATTACHED_BALANCE;
+        use crate::prelude::NEP141Wei;
         use evm::backend::ApplyBackend;
         const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
         const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
@@ -854,12 +856,15 @@ mod contract {
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
         let address = Address(args.0);
         let nonce = U256::from(args.1);
-        let balance = U256::from(args.2);
+        let balance = NEP141Wei::new(args.2 as u128);
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {
             address,
-            basic: evm::backend::Basic { balance, nonce },
+            basic: evm::backend::Basic {
+                balance: U256::from(balance.as_u128()),
+                nonce,
+            },
             code: None,
             storage: core::iter::empty(),
             reset_storage: false,
@@ -871,7 +876,7 @@ mod contract {
         let aurora_account_id = io.current_account_id();
         let args = crate::parameters::FinishDepositCallArgs {
             new_owner_id: aurora_account_id.clone(),
-            amount: balance.low_u128(),
+            amount: balance,
             proof_key: crate::prelude::String::new(),
             relayer_id: aurora_account_id.clone(),
             fee: 0.into(),
@@ -881,15 +886,15 @@ mod contract {
             target_account_id: aurora_account_id.clone(),
             method: "verify_log_entry".to_string(),
             args: Vec::new(),
-            attached_balance: 0,
-            attached_gas: GAS_FOR_VERIFY.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_VERIFY,
         };
         let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
             target_account_id: aurora_account_id,
             method: "finish_deposit".to_string(),
             args: args.try_to_vec().unwrap(),
-            attached_balance: 0,
-            attached_gas: GAS_FOR_FINISH.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FINISH,
         };
         io.promise_crate_with_callback(&aurora_engine_types::parameters::PromiseWithCallbackArgs {
             base: verify_call,
