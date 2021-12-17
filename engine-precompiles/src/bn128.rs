@@ -1,5 +1,5 @@
-use crate::prelude::types::EthGas;
-use crate::prelude::{types_new::Address, Borrowed, PhantomData, Vec};
+use crate::prelude::types::{Address, EthGas};
+use crate::prelude::{Borrowed, PhantomData, Vec};
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 

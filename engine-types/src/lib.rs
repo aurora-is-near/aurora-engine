@@ -7,7 +7,6 @@ pub mod account_id;
 pub mod parameters;
 pub mod storage;
 pub mod types;
-pub mod types_new;
 
 mod v0 {
     #[cfg(not(feature = "std"))]
@@ -31,7 +30,7 @@ mod v0 {
     #[cfg(not(feature = "std"))]
     pub use core::{
         cmp::Ordering, convert::TryFrom, convert::TryInto, fmt::Display, marker::PhantomData, mem,
-        ops::Add, ops::Div, ops::Mul, ops::Sub,
+        ops::Add, ops::Div, ops::Mul, ops::Sub, ops::SubAssign,
     };
     pub use primitive_types::{H160, H256, U256};
     #[cfg(feature = "std")]
@@ -39,7 +38,7 @@ mod v0 {
         borrow::Cow, borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, cmp::Ordering,
         collections::BTreeMap, collections::HashMap, convert::TryFrom, convert::TryInto,
         error::Error, fmt, fmt::Display, format, marker::PhantomData, mem, ops::Add, ops::Div,
-        ops::Mul, ops::Sub, str, string::String, string::ToString, vec, vec::Vec,
+        ops::Mul, ops::Sub, ops::SubAssign, str, string::String, string::ToString, vec, vec::Vec,
     };
 }
 

@@ -1,9 +1,8 @@
 use crate::test_utils::standalone::mocks::{promise, storage};
 use aurora_engine::engine;
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
-use aurora_engine_types::types::Wei;
-use aurora_engine_types::types_new::ADDRESS;
-use aurora_engine_types::{account_id::AccountId, types_new::Address, H160, H256, U256};
+use aurora_engine_types::types::{Address, Wei, ADDRESS};
+use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use std::sync::RwLock;
 
 #[test]

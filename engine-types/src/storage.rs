@@ -1,4 +1,4 @@
-use crate::types_new::Address;
+use crate::types::Address;
 use crate::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 

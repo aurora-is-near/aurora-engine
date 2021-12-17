@@ -1,6 +1,6 @@
 use crate::test_utils::standalone;
-use aurora_engine_types::types_new::ADDRESS;
-use aurora_engine_types::{types_new::Address, H160, U256};
+use aurora_engine_types::types::{Address, ADDRESS};
+use aurora_engine_types::{H160, U256};
 use engine_standalone_storage::json_snapshot;
 
 const NONCE_PREFIX: [u8; 2] = [0x07, 0x01];

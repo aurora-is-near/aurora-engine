@@ -1,4 +1,4 @@
-use crate::prelude::{types_new::Address, U256};
+use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::test_utils;
 use crate::tests::state_migration;
@@ -517,7 +517,7 @@ fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Addre
     (runner, signer, dest_address)
 }
 
-use aurora_engine_types::types_new::ADDRESS;
+use aurora_engine_types::types::ADDRESS;
 use aurora_engine_types::H160;
 use sha3::Digest;
 

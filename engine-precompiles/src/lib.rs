@@ -26,7 +26,7 @@ use crate::prelude::types::EthGas;
 use crate::prelude::{Vec, H160, H256};
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
-use aurora_engine_types::{account_id::AccountId, types_new::Address, vec, BTreeMap, Box};
+use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
 use evm::backend::Log;
 use evm::executor;
 use evm::{Context, ExitError, ExitSucceed};
@@ -52,7 +52,7 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
     fn from(output: PrecompileOutput) -> Self {
         evm::executor::PrecompileOutput {
             exit_status: ExitSucceed::Returned,
-            cost: output.cost.into_u64(),
+            cost: output.cost.as_u64(),
             output: output.output,
             logs: output.logs,
         }
@@ -262,10 +262,10 @@ impl Precompiles {
 /// fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
-pub const fn make_address(x: u32, y: u128) -> prelude::types_new::Address {
+pub const fn make_address(x: u32, y: u128) -> prelude::types::Address {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
-    prelude::types_new::ADDRESS(H160([
+    prelude::types::ADDRESS(H160([
         x_bytes[0],
         x_bytes[1],
         x_bytes[2],
@@ -332,7 +332,7 @@ const fn make_h256(x: u128, y: u128) -> prelude::H256 {
 mod tests {
     use crate::prelude::H160;
     use crate::{prelude, Byzantium, Istanbul};
-    use prelude::types_new::{Address, ADDRESS};
+    use prelude::types::{Address, ADDRESS};
     use rand::Rng;
 
     #[test]

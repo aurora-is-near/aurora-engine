@@ -13,15 +13,13 @@ use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::precompiles::Precompiles;
-use crate::prelude::H160;
 use crate::prelude::{
-    address_to_key, bytes_to_key, sdk, storage_to_key, types_new::Address, u256_to_arr, vec,
-    AccountId, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs,
-    ToString, TryFrom, TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
+    address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
+    BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, TryFrom,
+    TryInto, Vec, Wei, ADDRESS, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
 use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_precompiles::PrecompileConstructorContext;
-use aurora_engine_types::types_new::ADDRESS;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -779,7 +777,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let selector = ERC20_MINT_SELECTOR;
         let tail = ethabi::encode(&[
             ethabi::Token::Address(recipient.raw()),
-            ethabi::Token::Uint(args.amount.into()),
+            ethabi::Token::Uint(U256::from(args.amount.as_u128())),
         ]);
 
         let erc20_admin_address = current_address(current_account_id);
@@ -1158,9 +1156,7 @@ pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
 }
 
 pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
-    // The `unwrap` is safe here because if the connector
-    // is implemented correctly then the "Eth on Aurora" wll never underflow.
-    let balance = get_balance(io, address).try_into_u128().unwrap();
+    let balance = get_balance(io, address);
     // Apply changes for eth-connector. The `unwrap` is safe here because (a) if the connector
     // is implemented correctly then the total supply wll never underflow and (b) we are passing
     // in the balance directly so there will always be enough balance.

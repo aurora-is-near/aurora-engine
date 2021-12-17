@@ -2,7 +2,8 @@ use aurora_engine::transaction::{
     legacy::{LegacyEthSignedTransaction, TransactionLegacy},
     EthTransactionKind,
 };
-use aurora_engine_types::{types::Wei, types_new::Address, H256, U256};
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{H256, U256};
 use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::time::SystemTime;

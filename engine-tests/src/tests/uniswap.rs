@@ -1,4 +1,4 @@
-use crate::prelude::{types_new::Address, U256};
+use crate::prelude::{Address, U256};
 use crate::test_utils::{
     self,
     erc20::{ERC20Constructor, ERC20},
@@ -8,8 +8,7 @@ use crate::test_utils::{
     },
     AuroraRunner, ExecutionProfile, Signer,
 };
-use aurora_engine_types::types::Wei;
-use aurora_engine_types::types_new::ADDRESS;
+use aurora_engine_types::types::{Wei, ADDRESS};
 use aurora_engine_types::H160;
 use secp256k1::SecretKey;
 

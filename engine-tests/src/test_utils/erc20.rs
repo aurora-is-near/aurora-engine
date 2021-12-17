@@ -1,4 +1,4 @@
-use crate::prelude::{transaction::legacy::TransactionLegacy, types_new::Address, U256};
+use crate::prelude::{transaction::legacy::TransactionLegacy, Address, U256};
 use crate::test_utils::solidity;
 use std::path::{Path, PathBuf};
 use std::sync::Once;

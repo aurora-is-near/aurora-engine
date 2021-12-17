@@ -1,14 +1,11 @@
-use crate::prelude::{vec, TryFrom, Vec, U256};
-use primitive_types::H160;
+use crate::prelude::types::{Address, Wei};
+use crate::prelude::{vec, TryFrom, Vec, H160, U256};
+use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 
 pub mod eip_1559;
 pub mod eip_2930;
 pub mod legacy;
-
-use crate::prelude::types::Wei;
-use crate::prelude::types_new::Address;
-use eip_2930::AccessTuple;
 
 /// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
 #[derive(Debug, Eq, PartialEq, Clone)]

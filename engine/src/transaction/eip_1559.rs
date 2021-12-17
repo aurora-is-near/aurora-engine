@@ -1,9 +1,6 @@
 use crate::prelude::precompiles::secp256k1::ecrecover;
-use crate::prelude::{Vec, U256};
+use crate::prelude::{Address, Vec, Wei, H160, U256};
 use crate::transaction::eip_2930::AccessTuple;
-use aurora_engine_types::types::Wei;
-use aurora_engine_types::types_new::Address;
-use aurora_engine_types::H160;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 /// Type indicator (per EIP-1559)

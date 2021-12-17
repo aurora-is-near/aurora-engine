@@ -1,5 +1,6 @@
 use aurora_engine_sdk::env::Env;
-use aurora_engine_types::{types::Wei, types_new::Address, H256, U256};
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{H256, U256};
 use engine_standalone_tracing::{sputnik, types::TransactionTrace};
 use serde::Deserialize;
 use std::path::Path;
@@ -170,7 +171,7 @@ fn test_evm_tracing() {
         .logs()
         .0
         .iter()
-        .map(|l| l.gas_cost.into_u64() as u32)
+        .map(|l| l.gas_cost.as_u64() as u32)
         .collect();
     assert_eq!(costs.as_slice(), &EXPECTED_COSTS);
 
@@ -210,7 +211,7 @@ fn check_transaction_trace<P: AsRef<Path>>(trace: TransactionTrace, expected_tra
         assert_eq!(log.depth.into_u32(), step.depth, "Depths should match");
         assert_eq!(log.opcode.as_u8(), step.op, "opcodes should match");
         assert_eq!(
-            log.gas_cost.into_u64(),
+            log.gas_cost.as_u64(),
             step.gas_cost,
             "gas costs should match"
         );

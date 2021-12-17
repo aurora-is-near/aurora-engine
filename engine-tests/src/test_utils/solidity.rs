@@ -1,4 +1,4 @@
-use crate::prelude::{transaction::legacy::TransactionLegacy, types_new::Address, U256};
+use crate::prelude::{transaction::legacy::TransactionLegacy, Address, U256};
 use near_sdk::serde_json;
 use serde::Deserialize;
 use std::fs;

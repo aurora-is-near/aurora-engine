@@ -3,11 +3,11 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    format, types_new::Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256,
-    String, ToString, TryFrom, Vec, WeiU256,
+    format, Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256, String, ToString,
+    TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
-use aurora_engine_types::types::Fee;
+use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
@@ -237,6 +237,8 @@ pub struct BeginBlockArgs {
 #[derive(Debug, Clone)]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
+    /// Balance can be for Eth on Near and for Eth to Aurora
+    /// `ft_on_transfer` can be called with arbitrary NEP-141 tokens attached, therefore we do not specify a particular type Wei.
     pub amount: Balance,
     pub msg: String,
 }
@@ -248,7 +250,7 @@ impl TryFrom<JsonValue> for NEP141FtOnTransferArgs {
         Ok(Self {
             sender_id: AccountId::try_from(value.string("sender_id")?)
                 .map_err(|_| JsonError::InvalidString)?,
-            amount: value.u128("amount")?,
+            amount: Balance::new(value.u128("amount")?),
             msg: value.string("msg")?,
         })
     }
@@ -286,7 +288,7 @@ pub struct IsUsedProofCallArgs {
 #[derive(BorshSerialize)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(BorshDeserialize))]
 pub struct WithdrawResult {
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub recipient_id: Address,
     pub eth_custodian_address: Address,
 }
@@ -294,8 +296,8 @@ pub struct WithdrawResult {
 /// Fungible token storage balance
 #[derive(Default)]
 pub struct StorageBalance {
-    pub total: Balance,
-    pub available: Balance,
+    pub total: Yocto,
+    pub available: Yocto,
 }
 
 impl StorageBalance {
@@ -314,7 +316,7 @@ impl StorageBalance {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct ResolveTransferCallArgs {
     pub sender_id: AccountId,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub receiver_id: AccountId,
 }
 
@@ -322,7 +324,7 @@ pub struct ResolveTransferCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FinishDepositCallArgs {
     pub new_owner_id: AccountId,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub proof_key: String,
     pub relayer_id: AccountId,
     pub fee: Fee,
@@ -340,7 +342,7 @@ pub struct DepositEthCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FinishDepositEthCallArgs {
     pub new_owner_id: Address,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub fee: Balance,
     pub relayer_eth_account: AccountId,
     pub proof: Proof,
@@ -361,7 +363,7 @@ pub type SetContractDataCallArgs = InitCallArgs;
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct TransferCallCallArgs {
     pub receiver_id: AccountId,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub memo: Option<String>,
     pub msg: String,
 }
@@ -371,7 +373,7 @@ impl TryFrom<JsonValue> for TransferCallCallArgs {
 
     fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
         let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
-        let amount = v.u128("amount")?;
+        let amount = NEP141Wei::new(v.u128("amount")?);
         let memo = v.string("memo").ok();
         let msg = v.string("msg")?;
         Ok(Self {
@@ -419,13 +421,13 @@ impl From<JsonValue> for StorageDepositCallArgs {
 /// storage_withdraw eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StorageWithdrawCallArgs {
-    pub amount: Option<u128>,
+    pub amount: Option<Yocto>,
 }
 
 impl From<JsonValue> for StorageWithdrawCallArgs {
     fn from(v: JsonValue) -> Self {
         Self {
-            amount: v.u128("amount").ok(),
+            amount: v.u128("amount").map(Yocto::new).ok(),
         }
     }
 }
@@ -434,7 +436,7 @@ impl From<JsonValue> for StorageWithdrawCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct TransferCallArgs {
     pub receiver_id: AccountId,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub memo: Option<String>,
 }
 
@@ -444,7 +446,7 @@ impl TryFrom<JsonValue> for TransferCallArgs {
     fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
         Ok(Self {
             receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: v.u128("amount")?,
+            amount: NEP141Wei::new(v.u128("amount")?),
             memo: v.string("memo").ok(),
         })
     }
@@ -488,7 +490,7 @@ impl TryFrom<JsonValue> for ResolveTransferCallArgs {
         Ok(Self {
             sender_id: AccountId::try_from(v.string("sender_id")?)?,
             receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: v.u128("amount")?,
+            amount: NEP141Wei::new(v.u128("amount")?),
         })
     }
 }

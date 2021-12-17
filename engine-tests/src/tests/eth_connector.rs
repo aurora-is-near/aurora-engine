@@ -1,4 +1,4 @@
-use crate::prelude::types_new::Address;
+use crate::prelude::Address;
 use crate::prelude::WithdrawCallArgs;
 use crate::test_utils::str_to_account_id;
 use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
@@ -9,7 +9,7 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
-use aurora_engine_types::types::Fee;
+use aurora_engine_types::types::{Fee, NEP141Wei};
 use borsh::{BorshDeserialize, BorshSerialize};
 use byte_slice_cast::AsByteSlice;
 use ethabi::ethereum_types::U256;
@@ -304,7 +304,7 @@ fn test_withdraw_eth_from_near() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
     call_deposit_eth_to_near(&contract, CONTRACT_ACC);
 
-    let withdraw_amount = 100;
+    let withdraw_amount = NEP141Wei::new(100);
     let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
     let res = contract.call(
         CONTRACT_ACC.parse().unwrap(),
@@ -334,13 +334,13 @@ fn test_withdraw_eth_from_near() {
     }
 
     let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE - withdraw_amount as u128);
+    assert_eq!(balance, DEPOSITED_FEE - withdraw_amount.as_u128());
 
     let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount as u128);
+    assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount.as_u128());
 }
 
 #[test]
@@ -609,7 +609,7 @@ fn test_deposit_with_0x_prefix() {
 
     // Note the 0x prefix before the deposit address.
     let message = [CONTRACT_ACC, ":", "0x", &recipient_address_encoded].concat();
-    let fee: Fee = 0.into();
+    let fee: Fee = Fee::new(NEP141Wei::new(0));
     let token_message_data =
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
             .unwrap();
@@ -618,7 +618,7 @@ fn test_deposit_with_0x_prefix() {
         eth_custodian_address,
         sender: Address::zero(),
         token_message_data,
-        amount: deposit_amount,
+        amount: NEP141Wei::new(deposit_amount),
         fee,
     };
 
@@ -636,8 +636,8 @@ fn test_deposit_with_0x_prefix() {
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(U256::from(deposit_event.amount)),
-            ethabi::Token::Uint(U256::from(deposit_event.fee.into_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
         ]),
     };
     let proof = Proof {
@@ -903,7 +903,7 @@ fn test_admin_controlled_admin_can_peform_actions_when_paused() {
         p.assert_success()
     }
 
-    let withdraw_amount = 100;
+    let withdraw_amount = NEP141Wei::new(100);
     let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
 
     // 1st withdraw call when unpaused  - should succeed
@@ -1016,7 +1016,7 @@ fn test_withdraw_from_near_pausability() {
 
     call_deposit_eth_to_near(&contract, CONTRACT_ACC);
 
-    let withdraw_amount = 100;
+    let withdraw_amount = NEP141Wei::new(100);
     let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
     // 1st withdraw - should succeed
     let res = user_account.call(

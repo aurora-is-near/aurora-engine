@@ -1,5 +1,6 @@
 use aurora_engine::parameters::ViewCallArgs;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::types::NEP141Wei;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
@@ -19,7 +20,7 @@ use crate::prelude::transaction::{
     eip_2930::{self, SignedTransaction2930, Transaction2930},
     legacy::{LegacyEthSignedTransaction, TransactionLegacy},
 };
-use crate::prelude::{sdk, types_new::Address, Wei, H256, U256};
+use crate::prelude::{sdk, Address, Wei, H256, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
@@ -269,7 +270,8 @@ impl AuroraRunner {
                 .get(&ft_key)
                 .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
                 .unwrap_or_default();
-            current_ft.total_eth_supply_on_near += init_balance.raw().as_u128();
+            current_ft.total_eth_supply_on_near =
+                current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
             current_ft
         };
 

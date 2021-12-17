@@ -1,6 +1,7 @@
 use aurora_engine::engine;
 use aurora_engine_sdk::env::Timestamp;
-use aurora_engine_types::{types::Wei, types_new::Address, H256, U256};
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{H256, U256};
 use engine_standalone_storage::BlockMetadata;
 
 use crate::test_utils::standalone::{mocks, storage::create_db};
@@ -236,9 +237,7 @@ fn test_transaction_index() {
             aurora_engine_types::storage::KeyPrefix::Balance,
             &[1u8; 20],
         );
-        let value = aurora_engine_types::types::Wei::new_u64(159)
-            .to_bytes()
-            .to_vec();
+        let value = crate::prelude::Wei::new_u64(159).to_bytes().to_vec();
         tmp.modify(key, value);
         tmp
     };

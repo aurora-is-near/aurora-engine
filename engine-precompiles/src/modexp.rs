@@ -1,7 +1,7 @@
-use crate::prelude::{types_new::Address, PhantomData, Vec, U256};
+use crate::prelude::{PhantomData, Vec, U256};
 use crate::{Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput};
 
-use crate::prelude::types::EthGas;
+use crate::prelude::types::{Address, EthGas};
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 

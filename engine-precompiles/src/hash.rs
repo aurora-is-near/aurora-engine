@@ -1,7 +1,6 @@
 #[cfg(feature = "contract")]
 use crate::prelude::sdk;
-use crate::prelude::types::EthGas;
-use crate::prelude::types_new::Address;
+use crate::prelude::types::{Address, EthGas};
 use crate::prelude::vec;
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};

@@ -1,14 +1,13 @@
+use crate::test_utils;
 use aurora_engine::engine;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{FinishDepositCallArgs, InitCallArgs, NewCallArgs};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::NearGas;
-use aurora_engine_types::{account_id::AccountId, types::Wei, types_new::Address, H256, U256};
+use aurora_engine_types::types::{Address, NEP141Wei, NearGas, Wei};
+use aurora_engine_types::{account_id::AccountId, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
 use near_sdk_sim::DEFAULT_GAS;
-
-use crate::test_utils;
 
 pub mod block;
 pub mod promise;
@@ -101,7 +100,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
 
     let deposit_args = FinishDepositCallArgs {
         new_owner_id: aurora_account_id.clone(),
-        amount: balance.raw().low_u128(),
+        amount: NEP141Wei::new(balance.raw().as_u128()),
         proof_key: String::new(),
         relayer_id: aurora_account_id.clone(),
         fee: 0.into(),
