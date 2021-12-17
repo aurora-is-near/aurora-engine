@@ -78,9 +78,9 @@ pub enum StorageKeyKind {
 impl AsRef<[u8]> for StorageKeyKind {
     fn as_ref(&self) -> &[u8] {
         use StorageKeyKind::*;
-        match self {
-            Normal(v) => v.as_slice(),
-            Generation(v) => v.as_slice(),
+        match &self {
+            Normal(v) => v,
+            Generation(v) => v,
         }
     }
 }
