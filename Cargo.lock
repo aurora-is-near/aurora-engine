@@ -1201,21 +1201,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "engine-standalone"
-version = "0.1.0"
-dependencies = [
- "aurora-engine",
- "aurora-engine-sdk",
- "aurora-engine-types",
- "borsh 0.8.2",
- "engine-standalone-storage",
- "engine-standalone-tracing",
- "evm-core",
- "libc",
- "rocksdb",
-]
-
-[[package]]
 name = "engine-standalone-storage"
 version = "0.1.0"
 dependencies = [
