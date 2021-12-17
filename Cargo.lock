@@ -158,18 +158,14 @@ dependencies = [
  "evm-core",
  "hex",
  "libsecp256k1",
- "logos",
  "num",
  "primitive-types 0.10.1",
  "rand 0.7.3",
  "ripemd160",
- "rjson",
- "rlp",
  "serde",
  "serde_json",
  "sha2 0.9.5",
  "sha3 0.9.1",
- "wee_alloc",
 ]
 
 [[package]]
