@@ -28,12 +28,12 @@ impl Address {
     }
 
     pub fn decode(address: String) -> Result<Address, error::AddressError> {
-        let data = hex::decode(address).map_err(|_| error::AddressError::FailedDecodeHex)?;
-        if data.len() != 20 {
+        if address.len() != 40 {
             return Err(error::AddressError::IncorrectLength);
         }
         let mut result = [0u8; 20];
-        result.copy_from_slice(&data);
+        hex::decode_to_slice(address, &mut result)
+            .map_err(|_| error::AddressError::FailedDecodeHex)?;
         Ok(Address::new(H160(result)))
     }
 
@@ -41,8 +41,15 @@ impl Address {
         self.0.as_bytes()
     }
 
-    pub fn from_slice(raw_addr: &[u8]) -> Self {
-        Self::new(H160::from_slice(raw_addr))
+    pub fn try_from_slice(raw_addr: &[u8]) -> Result<Self, error::AddressError> {
+        if raw_addr.len() != 20 {
+            return Err(error::AddressError::IncorrectLength);
+        }
+        Ok(Self::new(H160::from_slice(raw_addr)))
+    }
+
+    pub fn from_array(array: [u8; 20]) -> Self {
+        Self(H160(array))
     }
 
     pub const fn zero() -> Self {
@@ -138,10 +145,8 @@ mod tests {
     fn test_wrong_address_19() {
         let serialized_addr = [0u8; 19];
         let addr = Address::try_from_slice(&serialized_addr);
-        assert_eq!(
-            addr.unwrap_err().to_string(),
-            error::AddressError::IncorrectLength.to_string()
-        );
+        let err = addr.unwrap_err();
+        matches!(err, error::AddressError::IncorrectLength);
     }
 }
 

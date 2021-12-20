@@ -99,9 +99,7 @@ fn init_contract(
 }
 
 fn validate_eth_address(address: &str) -> Address {
-    let data = hex::decode(address).unwrap();
-    assert_eq!(data.len(), 20);
-    Address::from_slice(&data)
+    Address::decode(address.to_string()).unwrap()
 }
 
 fn call_deposit_eth_to_near(
@@ -599,11 +597,8 @@ fn test_deposit_with_0x_prefix() {
     use aurora_engine::deposit_event::TokenMessageData;
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
 
-    let eth_custodian_address: Address = {
-        let bytes = hex::decode(CUSTODIAN_ADDRESS).unwrap();
-        Address::from_slice(&bytes)
-    };
-    let recipient_address = Address::from_slice(&[10u8; 20]);
+    let eth_custodian_address: Address = Address::decode(CUSTODIAN_ADDRESS.to_string()).unwrap();
+    let recipient_address = Address::from_array([10u8; 20]);
     let deposit_amount = 17;
     let recipient_address_encoded = recipient_address.encode();
 

@@ -59,7 +59,7 @@ impl FtTransferMessageData {
         let fee: Fee = fee_u128.into();
 
         // Get recipient Eth address from message slice
-        let recipient = Address::from_slice(&msg[32..52]);
+        let recipient = Address::try_from_slice(&msg[32..52]).unwrap();
 
         Ok(FtTransferMessageData {
             relayer: account_id,
@@ -264,7 +264,7 @@ impl DepositedEvent {
             .into_address()
             .ok_or(error::ParseError::InvalidSender)?
             .0;
-        let sender = Address::from_slice(&raw_sender);
+        let sender = Address::from_array(raw_sender);
 
         // parse_event_message
         let event_message_data: String = event.log.params[1].value.clone().to_string();

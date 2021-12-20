@@ -255,7 +255,7 @@ impl Precompile for ExitToNear {
     ) -> EvmPrecompileResult {
         #[cfg(feature = "error_refund")]
         fn parse_input(input: &[u8]) -> (Address, &[u8]) {
-            let refund_address = Address::from_slice(&input[1..21]);
+            let refund_address = Address::from_array(&input[1..21]);
             (refund_address, &input[21..])
         }
         #[cfg(not(feature = "error_refund"))]
@@ -538,7 +538,9 @@ impl Precompile for ExitToEthereum {
                     // Parse ethereum address in hex
                     let eth_recipient: String = hex::encode(input.to_vec());
                     // unwrap cannot fail since we checked the length already
-                    let recipient_address = Address::from_slice(input);
+                    let recipient_address = Address::try_from_slice(input).map_err(|_| {
+                        ExitError::Other(crate::prelude::Cow::from("ERR_WRONG_ADDRESS"))
+                    })?;
 
                     (
                         nep141_address,

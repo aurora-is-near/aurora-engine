@@ -38,7 +38,7 @@ impl<'a> Helper<'a> {
             })
             .unwrap();
 
-        let deployer_address = Address::from_slice(test_utils::unwrap_success_slice(&result));
+        let deployer_address = Address::from_array(test_utils::unwrap_success_slice(&result));
         let deployer = PoolDeployer(solidity::DeployedContract {
             abi,
             address: deployer_address,
@@ -71,7 +71,7 @@ impl<'a> Helper<'a> {
             })
             .unwrap();
 
-        let address = Address::from_slice(test_utils::unwrap_success_slice(&result));
+        let address = Address::from_array(test_utils::unwrap_success_slice(&result));
         let pool_factory = PoolFactory(constructor.deployed_at(address));
 
         (result, profile, pool_factory)
@@ -102,7 +102,7 @@ impl<'a> Helper<'a> {
             })
             .unwrap();
 
-        let address = Address::from_slice(&test_utils::unwrap_success_slice(&result)[12..32]);
+        let address = Address::from_array(&test_utils::unwrap_success_slice(&result)[12..32]);
         let pool = Pool(constructor.deployed_at(address));
 
         (result, profile, pool)

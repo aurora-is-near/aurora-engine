@@ -239,7 +239,9 @@ impl TryFrom<Vec<u8>> for ERC20Address {
 
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         if bytes.len() == 20 {
-            Ok(Self(Address::from_slice(&bytes)))
+            Ok(Self(
+                Address::try_from_slice(&bytes).map_err(|_| AddressParseError)?,
+            ))
         } else {
             Err(AddressParseError)
         }
@@ -646,9 +648,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 
     pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
         let key = Self::relayer_key(account_id);
-        self.io
-            .read_storage(&key)
-            .map(|v| Address::from_slice(&v.to_vec()))
+        let raw_addr = self.io.read_storage(&key).map(|v| v.to_vec())?;
+        Address::try_from_slice(&raw_addr[..]).ok()
     }
 
     pub fn register_token(
@@ -742,7 +743,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             (recipient, fee)
         };
 
-        let erc20_token = ADDRESS(H160(unwrap_res_or_finish!(
+        let erc20_token = Address::from_array(unwrap_res_or_finish!(
             unwrap_res_or_finish!(
                 get_erc20_from_nep141(&self.io, token),
                 output_on_fail,
@@ -752,7 +753,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             .try_into(),
             output_on_fail,
             self.io
-        )));
+        ));
 
         if fee != U256::from(0) {
             let relayer_address = unwrap_res_or_finish!(

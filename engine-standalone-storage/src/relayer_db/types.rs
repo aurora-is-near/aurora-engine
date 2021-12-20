@@ -178,7 +178,7 @@ impl From<postgres::Row> for TransactionRow {
             near_hash,
             near_receipt_hash,
             from,
-            to: to.map(Address::from_slice),
+            to: to.map(|arr| Address::try_from_slice(arr).unwrap()),
             nonce,
             gas_price,
             gas_limit,
@@ -226,7 +226,7 @@ fn get_hash(row: &postgres::Row, field: &str) -> H256 {
 
 fn get_address(row: &postgres::Row, field: &str) -> Address {
     let value: &[u8] = row.get(field);
-    Address::from_slice(value)
+    Address::try_from_slice(value).unwrap()
 }
 
 fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {

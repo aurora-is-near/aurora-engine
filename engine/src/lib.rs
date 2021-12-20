@@ -309,7 +309,7 @@ mod contract {
         .sdk_unwrap();
         engine.register_relayer(
             predecessor_account_id.as_bytes(),
-            Address::from_slice(&relayer_address),
+            Address::from_array(relayer_address),
         );
     }
 
@@ -474,7 +474,7 @@ mod contract {
     pub extern "C" fn get_code() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
-        let code = engine::get_code(&io, &Address::from_slice(&address));
+        let code = engine::get_code(&io, &Address::from_array(address));
         io.return_output(&code)
     }
 
@@ -482,7 +482,7 @@ mod contract {
     pub extern "C" fn get_balance() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
-        let balance = engine::get_balance(&io, &Address::from_slice(&address));
+        let balance = engine::get_balance(&io, &Address::from_array(address));
         io.return_output(&balance.to_bytes())
     }
 
@@ -490,7 +490,7 @@ mod contract {
     pub extern "C" fn get_nonce() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
-        let nonce = engine::get_nonce(&io, &Address::from_slice(&address));
+        let nonce = engine::get_nonce(&io, &Address::from_array(address));
         io.return_output(&u256_to_arr(&nonce))
     }
 
@@ -852,7 +852,7 @@ mod contract {
 
         let mut io = Runtime;
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
-        let address = Address::from_slice(&args.0);
+        let address = Address::from_array(args.0);
         let nonce = U256::from(args.1);
         let balance = NEP141Wei::new(args.2 as u128);
         let current_account_id = io.current_account_id();

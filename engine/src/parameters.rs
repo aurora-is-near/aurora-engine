@@ -539,8 +539,8 @@ mod tests {
     #[test]
     fn test_roundtrip_view_call() {
         let x = ViewCallArgs {
-            sender: Address::from_slice(&[1; 20]),
-            address: Address::from_slice(&[2; 20]),
+            sender: Address::from_array([1; 20]),
+            address: Address::from_array([2; 20]),
             amount: [3; 32],
             input: vec![1, 2, 3],
         };
@@ -552,12 +552,12 @@ mod tests {
     #[test]
     fn test_call_args_deserialize() {
         let new_input = FunctionCallArgsV2 {
-            contract: Address::from_slice(&[0u8; 20]),
+            contract: Address::from_array([0u8; 20]),
             value: WeiU256::default(),
             input: Vec::new(),
         };
         let legacy_input = FunctionCallArgsV1 {
-            contract: Address::from_slice(&[0u8; 20]),
+            contract: Address::from_array([0u8; 20]),
             input: Vec::new(),
         };
 

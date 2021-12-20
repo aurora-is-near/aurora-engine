@@ -370,7 +370,7 @@ fn eip_712_hash_argument(
             Ok(u256_to_arr(&U256::from_big_endian(b)).to_vec())
         }),
         ArgType::Address => {
-            eip_712_rlp_value(value, |b| Ok(encode_address(Address::from_slice(b))))
+            eip_712_rlp_value(value, |b| Ok(encode_address(Address::from_array(b))))
         }
         ArgType::Array { inner, .. } => eip_712_rlp_list(value, |l| {
             let mut r = vec![];

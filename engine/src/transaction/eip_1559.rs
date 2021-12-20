@@ -78,7 +78,6 @@ impl SignedTransaction1559 {
             message_hash,
             &super::vrs_to_arr(self.parity, self.r, self.s),
         )
-        .map(|v| Address::from_slice(v.as_bytes()))
         .ok()
     }
 }
