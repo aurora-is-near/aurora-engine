@@ -43,7 +43,7 @@ fn test_eip_1559_tx_encoding_decoding() {
 
     assert_eq!(
         signed_tx.sender().unwrap(),
-        test_utils::address_from_secret_key(&secret_key).raw()
+        test_utils::address_from_secret_key(&secret_key)
     )
 }
 

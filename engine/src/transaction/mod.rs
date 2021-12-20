@@ -102,7 +102,7 @@ impl From<EthTransactionKind> for NormalizedEthTransaction {
                 access_list: tx.transaction.access_list,
             },
             Eip1559(tx) => Self {
-                address: tx.sender().map(|v| Address::from_slice(v.as_bytes())),
+                address: tx.sender(),
                 chain_id: Some(tx.transaction.chain_id),
                 nonce: tx.transaction.nonce,
                 gas_limit: tx.transaction.gas_limit,

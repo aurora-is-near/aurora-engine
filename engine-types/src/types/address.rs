@@ -107,6 +107,34 @@ mod tests {
     }
 
     #[test]
+    fn test_address_deocde() {
+        // Test compatibility with previous typ RawAddress.
+        // It was: type RawAddress = [u8;20];
+        let eth_address_vec =
+            hex::decode("096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_string()).unwrap();
+        let mut eth_address = [0u8; 20];
+        eth_address.copy_from_slice(&eth_address_vec[..]);
+
+        let aurora_eth_address =
+            Address::decode("096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_string()).unwrap();
+        assert_eq!(eth_address, aurora_eth_address.as_bytes());
+
+        let serialized_addr = eth_address.try_to_vec().unwrap();
+        let aurora_serialized_addr = aurora_eth_address.try_to_vec().unwrap();
+
+        assert_eq!(serialized_addr.len(), 20);
+        assert_eq!(aurora_serialized_addr.len(), 20);
+        assert_eq!(serialized_addr, aurora_serialized_addr);
+
+        // Used serialized data from `RawAddress`
+        let addr = Address::try_from_slice(&serialized_addr).unwrap();
+        assert_eq!(
+            addr.encode(),
+            "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_lowercase()
+        );
+    }
+
+    #[test]
     fn test_wrong_address_19() {
         let serialized_addr = [0u8; 19];
         let addr = Address::try_from_slice(&serialized_addr);

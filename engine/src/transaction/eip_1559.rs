@@ -1,5 +1,5 @@
 use crate::prelude::precompiles::secp256k1::ecrecover;
-use crate::prelude::{Address, Vec, Wei, H160, U256};
+use crate::prelude::{Address, Vec, Wei, U256};
 use crate::transaction::eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
@@ -69,7 +69,7 @@ pub struct SignedTransaction1559 {
 }
 
 impl SignedTransaction1559 {
-    pub fn sender(&self) -> Option<ethabi::Address> {
+    pub fn sender(&self) -> Option<Address> {
         let mut rlp_stream = RlpStream::new();
         rlp_stream.append(&TYPE_BYTE);
         self.transaction.rlp_append_unsigned(&mut rlp_stream);
@@ -78,7 +78,7 @@ impl SignedTransaction1559 {
             message_hash,
             &super::vrs_to_arr(self.parity, self.r, self.s),
         )
-        .map(|v| H160::from_slice(v.as_bytes()))
+        .map(|v| Address::from_slice(v.as_bytes()))
         .ok()
     }
 }
