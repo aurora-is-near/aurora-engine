@@ -542,7 +542,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 )
             }
             CallArgs::V1(call_args) => {
-                let contract = ADDRESS(call_args.contract.raw());
+                let contract = call_args.contract;
                 let value = Wei::zero();
                 let input = call_args.input;
                 self.call(
