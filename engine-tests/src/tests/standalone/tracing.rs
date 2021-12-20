@@ -21,9 +21,9 @@ fn test_evm_tracing_with_storage() {
     let mut signer = test_utils::Signer::random();
     let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
     let sender_address =
-        Address::from_array(&hex::decode("304ee8ae14eceb3a544dff53a27eb1bb1aaa471f").unwrap());
+        Address::decode("304ee8ae14eceb3a544dff53a27eb1bb1aaa471f".to_string()).unwrap();
     let weth_address =
-        Address::from_array(&hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
+        Address::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2".to_string()).unwrap();
 
     // Initialize EVM
     runner.init_evm_with_chain_id(1);
@@ -35,7 +35,8 @@ fn test_evm_tracing_with_storage() {
     let result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
-    let contract_address = Address::from_array(test_utils::unwrap_success_slice(&result));
+    let contract_address =
+        Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
 
     // Move it over to the same address as it exists on mainnet
     let mut diff = engine_standalone_storage::Diff::default();
@@ -140,7 +141,8 @@ fn test_evm_tracing() {
     let result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
-    let contract_address = Address::from_array(test_utils::unwrap_success_slice(&result));
+    let contract_address =
+        Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
 
     // Interact with contract (and trace execution)
     let tx = aurora_engine::transaction::legacy::TransactionLegacy {

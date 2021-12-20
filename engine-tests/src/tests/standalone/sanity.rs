@@ -50,7 +50,9 @@ fn test_deploy_code() {
 
     // execution was successful
     let contract_address = match result.unwrap().status {
-        aurora_engine::parameters::TransactionStatus::Succeed(bytes) => Address::from_array(&bytes),
+        aurora_engine::parameters::TransactionStatus::Succeed(bytes) => {
+            Address::try_from_slice(&bytes).unwrap()
+        }
         other => panic!("Unexpected status: {:?}", other),
     };
 

@@ -118,7 +118,7 @@ impl test_utils::AuroraRunner {
             .unwrap()
             .try_into()
             .unwrap();
-        Address::from_array(&raw_address)
+        Address::try_from_slice(&raw_address).unwrap()
     }
 
     pub fn create_account(&mut self) -> EthereumAddress {
@@ -628,7 +628,8 @@ mod sim_tests {
         let constructor = TesterConstructor::load();
         let deploy_data = constructor.deploy(0, Address::zero()).data;
         let submit_result: SubmitResult = aurora.call("deploy_code", &deploy_data).unwrap_borsh();
-        let tester_address = Address::from_array(&test_utils::unwrap_success(submit_result));
+        let tester_address =
+            Address::try_from_slice(&test_utils::unwrap_success(submit_result)).unwrap();
 
         TestExitToNearEthContext {
             signer,
@@ -809,7 +810,7 @@ mod sim_tests {
         };
         let result = aurora.call("deploy_erc20_token", &args.try_to_vec().unwrap());
         let addr_bytes: Vec<u8> = result.unwrap_borsh();
-        let address = Address::from_array(&addr_bytes);
+        let address = Address::try_from_slice(&addr_bytes).unwrap();
         let abi = ERC20Constructor::load().0.abi;
         ERC20(crate::test_utils::solidity::DeployedContract { abi, address })
     }

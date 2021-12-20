@@ -369,9 +369,11 @@ fn eip_712_hash_argument(
         ArgType::Uint | ArgType::Int | ArgType::Bool => eip_712_rlp_value(value, |b| {
             Ok(u256_to_arr(&U256::from_big_endian(b)).to_vec())
         }),
-        ArgType::Address => {
-            eip_712_rlp_value(value, |b| Ok(encode_address(Address::from_array(b))))
-        }
+        ArgType::Address => eip_712_rlp_value(value, |b| {
+            Ok(encode_address(
+                Address::try_from_slice(b).map_err(|_| ParsingError::ArgumentParseError)?,
+            ))
+        }),
         ArgType::Array { inner, .. } => eip_712_rlp_list(value, |l| {
             let mut r = vec![];
             for element in l {

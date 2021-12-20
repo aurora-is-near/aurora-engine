@@ -199,6 +199,6 @@ mod tests {
 
     fn address_from_arr(arr: &[u8]) -> Address {
         assert_eq!(arr.len(), 20);
-        Address::from_array(arr)
+        Address::try_from_slice(arr).unwrap()
     }
 }

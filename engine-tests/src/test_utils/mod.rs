@@ -376,7 +376,7 @@ impl AuroraRunner {
         assert!(maybe_err.is_none());
         let submit_result =
             SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();
-        let address = Address::from_array(&unwrap_success(submit_result));
+        let address = Address::try_from_slice(&unwrap_success(submit_result)).unwrap();
         let contract_constructor: ContractConstructor = contract_constructor.into();
         DeployedContract {
             abi: contract_constructor.abi,
@@ -733,7 +733,7 @@ pub(crate) fn sign_eip_1559_transaction(
 pub(crate) fn address_from_secret_key(sk: &SecretKey) -> Address {
     let pk = PublicKey::from_secret_key(sk);
     let hash = sdk::keccak(&pk.serialize()[1..]);
-    Address::from_array(&hash[12..])
+    Address::try_from_slice(&hash[12..]).unwrap()
 }
 
 pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
@@ -762,7 +762,7 @@ pub(crate) fn address_from_hex(address: &str) -> Address {
         hex::decode(address).unwrap()
     };
 
-    Address::from_array(&bytes)
+    Address::try_from_slice(&bytes).unwrap()
 }
 
 pub(crate) fn as_account_id(account_id: &str) -> near_primitives_core::types::AccountId {

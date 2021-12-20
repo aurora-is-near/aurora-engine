@@ -57,7 +57,7 @@ fn test_deploy_contract() {
             test_utils::create_deploy_transaction(code.clone(), nonce)
         })
         .unwrap();
-    let address = Address::from_array(test_utils::unwrap_success_slice(&result));
+    let address = Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
 
     // Confirm the code stored at that address is equal to the input code.
     let stored_code = runner.get_code(address);
@@ -204,7 +204,7 @@ fn test_override_state() {
             }
         })
         .unwrap();
-    let address = Address::from_array(&test_utils::unwrap_success(result));
+    let address = Address::try_from_slice(&test_utils::unwrap_success(result)).unwrap();
     let contract = contract.deployed_at(address);
 
     // define functions to interact with the contract
@@ -217,7 +217,7 @@ fn test_override_state() {
             .unwrap();
         match result {
             crate::prelude::parameters::TransactionStatus::Succeed(bytes) => {
-                Address::from_array(&bytes[12..32])
+                Address::try_from_slice(&bytes[12..32]).unwrap()
             }
             _ => panic!("tx failed"),
         }

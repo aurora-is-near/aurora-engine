@@ -101,7 +101,7 @@ fn test_consume_deploy_message() {
     for (key, value) in diff.iter() {
         match value.value() {
             Some(bytes) if bytes == code.as_slice() => {
-                deployed_address = Address::from_array(&key[2..22]);
+                deployed_address = Address::try_from_slice(&key[2..22]).unwrap();
                 break;
             }
             _ => continue,
@@ -180,7 +180,7 @@ fn test_consume_deploy_erc20_message() {
     let deployed_token = test_utils::erc20::ERC20(
         test_utils::erc20::ERC20Constructor::load()
             .0
-            .deployed_at(Address::from_array(&erc20_address)),
+            .deployed_at(Address::try_from_slice(&erc20_address).unwrap()),
     );
     let signer = test_utils::Signer::random();
     let tx = deployed_token.balance_of(dest_address, signer.nonce.into());

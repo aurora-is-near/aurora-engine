@@ -85,7 +85,7 @@ fn withdraw() {
         } else {
             // transferred to 0xE0f5206BBD039e7b0592d8918820024e2a7437b9 (defined in Tester.sol)
             let address = hex::decode("E0f5206BBD039e7b0592d8918820024e2a7437b9").unwrap();
-            let address = Address::from_array(&address);
+            let address = Address::try_from_slice(&address).unwrap();
             ethabi::LogParam {
                 name: "dest".to_string(),
                 value: ethabi::Token::Address(address.raw()),

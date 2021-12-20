@@ -65,7 +65,7 @@ fn public_key_to_address(public_key: PublicKey) -> Address {
         PublicKey::SECP256K1(pubkey) => {
             let pk: [u8; 64] = pubkey.into();
             let bytes = keccak(&pk.to_vec());
-            Address::from_array(&bytes[12..])
+            Address::try_from_slice(&bytes[12..]).unwrap()
         }
     }
 }
@@ -82,7 +82,7 @@ fn test_meta_parsing() {
         chain_id,
         U256::from(14),
         Wei::new_u64(6),
-        Address::from_array(&[0u8; 20]),
+        Address::try_from_slice(&[0u8; 20]).unwrap(),
         signer_addr.clone(),
         Wei::zero(),
         "adopt(uint256 petId)",
@@ -102,7 +102,7 @@ fn test_meta_parsing() {
         chain_id,
         U256::from(14),
         Wei::new_u64(6),
-        Address::from_array(&[0u8; 20]),
+        Address::try_from_slice(&[0u8; 20]).unwrap(),
         signer_addr.clone(),
         Wei::zero(),
         "adopt(uint256 petId,PetObj petObject)PetObj(string petName,address owner)",

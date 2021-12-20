@@ -148,7 +148,7 @@ impl UniswapTestContext {
             .unwrap();
         assert!(result.status.is_ok(), "Failed to create pool");
 
-        let address = Address::from_array(&test_utils::unwrap_success(result)[12..]);
+        let address = Address::try_from_slice(&test_utils::unwrap_success(result)[12..]).unwrap();
         let pool = Pool::from_address(address);
 
         // 2^96 corresponds to a price ratio of 1
