@@ -6,14 +6,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Address(H160);
 
-#[allow(non_snake_case, dead_code)]
-pub const fn ADDRESS(addr: H160) -> Address {
-    Address(addr)
-}
-
 impl Address {
     /// Construct Address from H160
-    pub fn new(val: H160) -> Self {
+    pub const fn new(val: H160) -> Self {
         Self(val)
     }
 
@@ -53,7 +48,7 @@ impl Address {
     }
 
     pub const fn zero() -> Self {
-        ADDRESS(H160([0u8; 20]))
+        Address::new(H160([0u8; 20]))
     }
 }
 

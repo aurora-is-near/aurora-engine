@@ -1,5 +1,5 @@
 use crate::test_utils::standalone;
-use aurora_engine_types::types::{Address, ADDRESS};
+use aurora_engine_types::types::Address;
 use aurora_engine_types::{H160, U256};
 use engine_standalone_storage::json_snapshot;
 
@@ -41,5 +41,5 @@ fn test_consume_snapshot() {
 fn address_from_key(key: &[u8]) -> Address {
     let mut result = [0u8; 20];
     result.copy_from_slice(&key[2..22]);
-    ADDRESS(H160(result))
+    Address::new(H160(result))
 }

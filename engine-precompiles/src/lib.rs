@@ -265,7 +265,7 @@ impl Precompiles {
 pub const fn make_address(x: u32, y: u128) -> prelude::types::Address {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
-    prelude::types::ADDRESS(H160([
+    prelude::types::Address::new(H160([
         x_bytes[0],
         x_bytes[1],
         x_bytes[2],
@@ -332,7 +332,7 @@ const fn make_h256(x: u128, y: u128) -> prelude::H256 {
 mod tests {
     use crate::prelude::H160;
     use crate::{prelude, Byzantium, Istanbul};
-    use prelude::types::{Address, ADDRESS};
+    use prelude::types::Address;
     use rand::Rng;
 
     #[test]
@@ -356,7 +356,7 @@ mod tests {
 
         let mut rng = rand::thread_rng();
         for _ in 0..u8::MAX {
-            let address = ADDRESS(H160(rng.gen()));
+            let address = Address::new(H160(rng.gen()));
             let (x, y) = split_address(address);
             assert_eq!(address, super::make_address(x, y))
         }
@@ -365,7 +365,7 @@ mod tests {
     fn u8_to_address(x: u8) -> Address {
         let mut bytes = [0u8; 20];
         bytes[19] = x;
-        ADDRESS(H160(bytes))
+        Address::new(H160(bytes))
     }
 
     // Inverse function of `super::make_address`.

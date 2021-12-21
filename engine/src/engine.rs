@@ -16,7 +16,7 @@ use crate::prelude::precompiles::Precompiles;
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
     BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, TryFrom,
-    TryInto, Vec, Wei, ADDRESS, ERC20_MINT_SELECTOR, H160, H256, U256,
+    TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
 use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_precompiles::PrecompileConstructorContext;
@@ -530,7 +530,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let origin = Address::new(self.origin());
         match args {
             CallArgs::V2(call_args) => {
-                let contract = ADDRESS(call_args.contract.raw());
+                let contract = Address::new(call_args.contract.raw());
                 let value = call_args.value.into();
                 let input = call_args.input;
                 self.call(
@@ -724,7 +724,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             let mut message = args.msg.as_bytes();
             assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
 
-            let recipient = ADDRESS(H160(unwrap_res_or_finish!(
+            let recipient = Address::new(H160(unwrap_res_or_finish!(
                 hex::decode(&message[..40]).unwrap().as_slice().try_into(),
                 output_on_fail,
                 self.io
@@ -1052,7 +1052,9 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
         handler,
     ) {
         Ok(result) => match result.status {
-            TransactionStatus::Succeed(ret) => ADDRESS(H160(ret.as_slice().try_into().unwrap())),
+            TransactionStatus::Succeed(ret) => {
+                Address::new(H160(ret.as_slice().try_into().unwrap()))
+            }
             other => return Err(DeployErc20Error::Failed(other)),
         },
         Err(e) => return Err(DeployErc20Error::Engine(e)),

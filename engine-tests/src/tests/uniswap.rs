@@ -8,7 +8,7 @@ use crate::test_utils::{
     },
     AuroraRunner, ExecutionProfile, Signer,
 };
-use aurora_engine_types::types::{Wei, ADDRESS};
+use aurora_engine_types::types::Wei;
 use aurora_engine_types::H160;
 use secp256k1::SecretKey;
 
@@ -97,7 +97,7 @@ impl UniswapTestContext {
                 c.deploy(
                     factory.0.address,
                     weth_address,
-                    ADDRESS(H160([0; 20])),
+                    Address::new(H160([0; 20])),
                     nonce.into(),
                 )
             },
@@ -233,7 +233,7 @@ impl UniswapTestContext {
             token_out: token_out.0.address,
             fee: POOL_FEE,
 
-            recipient: ADDRESS(H160([0; 20])),
+            recipient: Address::new(H160([0; 20])),
             deadline: U256::MAX,
             amount_out,
             amount_in_max: U256::from(100) * amount_out,

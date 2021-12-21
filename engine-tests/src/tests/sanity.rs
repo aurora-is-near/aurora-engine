@@ -237,7 +237,7 @@ fn test_override_state() {
     };
 
     // Assert the initial state is 0
-    assert_eq!(get_address(&runner), ADDRESS(H160([0; 20])));
+    assert_eq!(get_address(&runner), Address::new(H160([0; 20])));
     post_address(&mut runner, &mut account1);
     // Assert the address matches the first caller
     assert_eq!(get_address(&runner), account1_address);
@@ -517,7 +517,6 @@ fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Addre
     (runner, signer, dest_address)
 }
 
-use aurora_engine_types::types::ADDRESS;
 use aurora_engine_types::H160;
 use sha3::Digest;
 
@@ -623,7 +622,7 @@ fn test_eth_transfer_insufficient_balance_sim() {
     // Run transaction which will fail (transfer more than current balance)
     let nonce = signer.use_nonce();
     let tx = test_utils::transfer(
-        ADDRESS(H160([1; 20])),
+        Address::new(H160([1; 20])),
         INITIAL_BALANCE + INITIAL_BALANCE,
         nonce.into(),
     );
@@ -654,7 +653,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
 
     // Run transaction which will fail (not enough balance to cover gas)
     let nonce = signer.use_nonce();
-    let mut tx = test_utils::transfer(ADDRESS(H160([1; 20])), TRANSFER_AMOUNT, nonce.into());
+    let mut tx = test_utils::transfer(Address::new(H160([1; 20])), TRANSFER_AMOUNT, nonce.into());
     tx.gas_limit = 3_000_000.into();
     tx.gas_price = GAS_PRICE.into();
     let signed_tx = test_utils::sign_transaction(
