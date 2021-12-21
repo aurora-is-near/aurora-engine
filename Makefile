@@ -85,7 +85,26 @@ check-format:
 	$(CARGO) fmt -- --check
 
 check-clippy:
-	$(CARGO) clippy --no-default-features --features=$(FEATURES_CLIPPY)$(ADDITIONAL_FEATURES) -- -D warnings
+	$(CARGO) clippy --no-default-features --features=$(FEATURES_CLIPPY)$(ADDITIONAL_FEATURES) \
+		-- -D warnings \
+		-D clippy::empty_line_after_outer_attr \
+		-D clippy::fallible_impl_from \
+		-D clippy::fallible_impl_from \
+		-D clippy::option_if_let_else \
+		-D clippy::redundant_pub_crate \
+		-D clippy::string_lit_as_bytes \
+		-D clippy::use_self \
+		-D clippy::useless_let_if_seq \
+		-D clippy::cast_lossless \
+		-D clippy::cast_possible_truncation \
+		-D clippy::cast_possible_wrap \
+		-D clippy::checked_conversions \
+		-D clippy::match_on_vec_items \
+		-D clippy::wildcard_imports \
+		-D clippy::as_conversions \
+		-D clippy::expect_used \
+		-D clippy::get_unwrap \
+		-D clippy::unwrap_used
 
 test-sol:
 	cd etc/eth-contracts && yarn && yarn test
