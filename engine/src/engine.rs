@@ -530,7 +530,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let origin = Address::new(self.origin());
         match args {
             CallArgs::V2(call_args) => {
-                let contract = Address::new(call_args.contract.raw());
+                let contract = call_args.contract;
                 let value = call_args.value.into();
                 let input = call_args.input;
                 self.call(
