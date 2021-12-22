@@ -705,7 +705,7 @@ pub fn set_contract_data<I: IO>(
     // Get initial contract arguments
     let contract_data = EthConnector {
         prover_account: args.prover_account,
-        eth_custodian_address: Address::decode(args.eth_custodian_address)?,
+        eth_custodian_address: Address::decode(&args.eth_custodian_address)?,
     };
     // Save eth-connector specific data
     io.write_borsh(

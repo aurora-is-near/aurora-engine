@@ -103,7 +103,7 @@ impl FtTransferMessageData {
             recipient
         };
         let recipient_address =
-            Address::decode(address).map_err(ParseEventMessageError::EthAddressValidationError)?;
+            Address::decode(&address).map_err(ParseEventMessageError::EthAddressValidationError)?;
         // Second data section should contain Eth address
         data.extend(recipient_address.as_bytes());
         // Add `:` separator between relayer_id and data message
