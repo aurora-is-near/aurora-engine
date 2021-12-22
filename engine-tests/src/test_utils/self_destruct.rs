@@ -75,7 +75,7 @@ impl SelfDestructFactory {
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
         let result = test_utils::unwrap_success(result);
 
-        Address::from_slice(&result[12..])
+        Address::try_from_slice(&result[12..]).unwrap()
     }
 }
 

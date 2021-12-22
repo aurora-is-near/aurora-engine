@@ -97,7 +97,7 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
             exports::keccak256(u64::MAX, RECOVER_REGISTER_ID, KECCACK_REGISTER_ID);
             let keccak_hash_bytes = [0u8; 32];
             exports::read_register(KECCACK_REGISTER_ID, keccak_hash_bytes.as_ptr() as u64);
-            Ok(Address::from_slice(&keccak_hash_bytes[12..]))
+            Ok(Address::try_from_slice(&keccak_hash_bytes[12..]).map_err(|_| ECRecoverErr)?)
         } else {
             Err(ECRecoverErr)
         }

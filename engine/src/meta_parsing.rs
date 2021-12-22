@@ -2,7 +2,7 @@ use crate::parameters::MetaCallArgs;
 use crate::prelude::precompiles::secp256k1::ecrecover;
 use crate::prelude::{
     keccak, u256_to_arr, vec, Address, BorshDeserialize, Box, HashMap, InternalMetaCallArgs,
-    RawU256, String, ToOwned, ToString, Vec, Wei, H256, U256,
+    RawU256, String, ToOwned, ToString, Vec, Wei, H160, H256, U256,
 };
 use ethabi::{encode, Token as ABIToken};
 use logos::Logos;
@@ -160,7 +160,7 @@ pub fn method_sig_to_abi(method_sig: &str) -> [u8; 4] {
 
 pub fn encode_address(addr: Address) -> Vec<u8> {
     let mut bytes = vec![0u8; 12];
-    bytes.extend_from_slice(&addr.0);
+    bytes.extend_from_slice(&addr.raw().as_bytes());
     bytes
 }
 
@@ -369,9 +369,11 @@ fn eip_712_hash_argument(
         ArgType::Uint | ArgType::Int | ArgType::Bool => eip_712_rlp_value(value, |b| {
             Ok(u256_to_arr(&U256::from_big_endian(b)).to_vec())
         }),
-        ArgType::Address => {
-            eip_712_rlp_value(value, |b| Ok(encode_address(Address::from_slice(b))))
-        }
+        ArgType::Address => eip_712_rlp_value(value, |b| {
+            Ok(encode_address(
+                Address::try_from_slice(b).map_err(|_| ParsingError::ArgumentParseError)?,
+            ))
+        }),
         ArgType::Array { inner, .. } => eip_712_rlp_list(value, |l| {
             let mut r = vec![];
             for element in l {
@@ -447,7 +449,7 @@ fn arg_to_abi_token(
             value_to_abi_token(arg, |b| Ok(ABIToken::Uint(U256::from_big_endian(b))))
         }
         ArgType::Address => {
-            value_to_abi_token(arg, |b| Ok(ABIToken::Address(Address::from_slice(b))))
+            value_to_abi_token(arg, |b| Ok(ABIToken::Address(H160::from_slice(&b[..]))))
         }
         ArgType::Array {
             inner,
@@ -578,8 +580,8 @@ pub fn parse_meta_call(
         MetaCallArgs::try_from_slice(&args).map_err(|_| ParsingError::ArgumentParseError)?;
     let nonce = U256::from(meta_tx.nonce);
     let fee_amount = Wei::new(U256::from(meta_tx.fee_amount));
-    let fee_address = Address::from(meta_tx.fee_address);
-    let contract_address = Address::from(meta_tx.contract_address);
+    let fee_address = meta_tx.fee_address;
+    let contract_address = meta_tx.contract_address;
     let value = Wei::new(U256::from(meta_tx.value));
 
     let mut result = InternalMetaCallArgs {

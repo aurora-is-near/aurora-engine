@@ -1,4 +1,6 @@
+use aurora_engine::parameters::ViewCallArgs;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::types::NEP141Wei;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
@@ -12,9 +14,7 @@ use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::prelude::parameters::{
-    InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus, ViewCallArgs,
-};
+use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transaction::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -270,7 +270,8 @@ impl AuroraRunner {
                 .get(&ft_key)
                 .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
                 .unwrap_or_default();
-            current_ft.total_eth_supply_on_near += init_balance.raw().as_u128();
+            current_ft.total_eth_supply_on_near =
+                current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
             current_ft
         };
 
@@ -375,7 +376,7 @@ impl AuroraRunner {
         assert!(maybe_err.is_none());
         let submit_result =
             SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();
-        let address = Address::from_slice(&unwrap_success(submit_result));
+        let address = Address::try_from_slice(&unwrap_success(submit_result)).unwrap();
         let contract_constructor: ContractConstructor = contract_constructor.into();
         DeployedContract {
             abi: contract_constructor.abi,
@@ -419,7 +420,7 @@ impl AuroraRunner {
 
     pub fn get_storage(&self, address: Address, key: H256) -> H256 {
         let input = aurora_engine::parameters::GetStorageAtArgs {
-            address: address.0,
+            address,
             key: key.0,
         };
         let (outcome, maybe_error) =
@@ -653,8 +654,8 @@ pub(crate) fn create_eth_transaction(
 
 pub(crate) fn as_view_call(tx: TransactionLegacy, sender: Address) -> ViewCallArgs {
     ViewCallArgs {
-        sender: sender.0,
-        address: tx.to.unwrap().0,
+        sender,
+        address: tx.to.unwrap(),
         amount: tx.value.to_bytes(),
         input: tx.data,
     }
@@ -732,7 +733,7 @@ pub(crate) fn sign_eip_1559_transaction(
 pub(crate) fn address_from_secret_key(sk: &SecretKey) -> Address {
     let pk = PublicKey::from_secret_key(sk);
     let hash = sdk::keccak(&pk.serialize()[1..]);
-    Address::from_slice(&hash[12..])
+    Address::try_from_slice(&hash[12..]).unwrap()
 }
 
 pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
@@ -761,7 +762,7 @@ pub(crate) fn address_from_hex(address: &str) -> Address {
         hex::decode(address).unwrap()
     };
 
-    Address::from_slice(&bytes)
+    Address::try_from_slice(&bytes).unwrap()
 }
 
 pub(crate) fn as_account_id(account_id: &str) -> near_primitives_core::types::AccountId {

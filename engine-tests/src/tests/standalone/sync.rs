@@ -1,7 +1,7 @@
 use aurora_engine::deposit_event::TokenMessageData;
 use aurora_engine_sdk::env::{Env, Timestamp};
-use aurora_engine_types::types::Fee;
-use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
+use aurora_engine_types::types::{Address, Balance, Fee, NEP141Wei, Wei};
+use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use borsh::BorshSerialize;
 use engine_standalone_storage::sync;
 
@@ -40,7 +40,7 @@ fn test_consume_block_message() {
 fn test_consume_deposit_message() {
     let (mut runner, block_message) = initialize();
 
-    let recipient_address = Address([22u8; 20]);
+    let recipient_address = Address::new(H160([22u8; 20]));
     let deposit_amount = Wei::new_u64(123_456_789);
     let proof = mock_proof(recipient_address, deposit_amount);
 
@@ -97,11 +97,11 @@ fn test_consume_deploy_message() {
             position: 0,
         })
         .unwrap();
-    let mut deployed_address = Address([0u8; 20]);
+    let mut deployed_address = Address::zero();
     for (key, value) in diff.iter() {
         match value.value() {
             Some(bytes) if bytes == code.as_slice() => {
-                deployed_address.0.copy_from_slice(&key[2..22]);
+                deployed_address = Address::try_from_slice(&key[2..22]).unwrap();
                 break;
             }
             _ => continue,
@@ -119,7 +119,7 @@ fn test_consume_deploy_erc20_message() {
 
     let token: AccountId = "some_nep141.near".parse().unwrap();
     let mint_amount: u128 = 555_555;
-    let dest_address = Address([170u8; 20]);
+    let dest_address = Address::new(H160([170u8; 20]));
 
     let args = aurora_engine::parameters::DeployErc20TokenArgs {
         nep141: token.clone(),
@@ -155,7 +155,7 @@ fn test_consume_deploy_erc20_message() {
 
     let args = aurora_engine::parameters::NEP141FtOnTransferArgs {
         sender_id: "mr_money_bags.near".parse().unwrap(),
-        amount: mint_amount,
+        amount: Balance::new(mint_amount),
         msg: hex::encode(dest_address.as_bytes()),
     };
     let transaction_message = sync::types::TransactionMessage {
@@ -180,7 +180,7 @@ fn test_consume_deploy_erc20_message() {
     let deployed_token = test_utils::erc20::ERC20(
         test_utils::erc20::ERC20Constructor::load()
             .0
-            .deployed_at(Address::from_slice(&erc20_address)),
+            .deployed_at(Address::try_from_slice(&erc20_address).unwrap()),
     );
     let signer = test_utils::Signer::random();
     let tx = deployed_token.balance_of(dest_address, signer.nonce.into());
@@ -200,12 +200,12 @@ fn test_consume_ft_on_transfer_message() {
 
     let mint_amount = 8_675_309;
     let fee = Wei::zero();
-    let dest_address = Address([221u8; 20]);
+    let dest_address = Address::new(H160([221u8; 20]));
 
     // Mint ETH on Aurora per the bridge workflow
     let args = aurora_engine::parameters::NEP141FtOnTransferArgs {
         sender_id: "mr_money_bags.near".parse().unwrap(),
-        amount: mint_amount,
+        amount: Balance::new(mint_amount),
         msg: [
             "relayer.near",
             ":",
@@ -245,7 +245,7 @@ fn test_consume_call_message() {
     let initial_balance = Wei::new_u64(800_000);
     let transfer_amount = Wei::new_u64(115_321);
     let caller_address = aurora_engine_sdk::types::near_account_to_evm_address(caller.as_bytes());
-    let recipient_address = Address([1u8; 20]);
+    let recipient_address = Address::new(H160([1u8; 20]));
     runner.mint_account(caller_address, initial_balance, U256::zero(), None);
 
     runner.env.block_height += 1;
@@ -290,7 +290,7 @@ fn test_consume_submit_message() {
     let initial_balance = Wei::new_u64(800_000);
     let transfer_amount = Wei::new_u64(115_321);
     let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
-    let recipient_address = Address([1u8; 20]);
+    let recipient_address = Address::new(H160([1u8; 20]));
     runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);
 
     runner.env.block_height += 1;
@@ -334,17 +334,17 @@ fn test_consume_submit_message() {
 fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine::proof::Proof {
     let eth_custodian_address = test_utils::standalone::mocks::ETH_CUSTODIAN_ADDRESS;
 
-    let fee = Fee::new(0);
-    let message = ["aurora", ":", hex::encode(&recipient_address).as_str()].concat();
+    let fee = Fee::new(NEP141Wei::new(0));
+    let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
     let token_message_data: TokenMessageData =
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
             .unwrap();
 
     let deposit_event = aurora_engine::deposit_event::DepositedEvent {
-        eth_custodian_address: eth_custodian_address.0,
-        sender: [0u8; 20],
+        eth_custodian_address,
+        sender: Address::new(H160([0u8; 20])),
         token_message_data,
-        amount: deposit_amount.raw().as_u128(),
+        amount: NEP141Wei::new(deposit_amount.raw().as_u128()),
         fee,
     };
 
@@ -354,7 +354,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         anonymous: false,
     };
     let log_entry = aurora_engine::log_entry::LogEntry {
-        address: eth_custodian_address,
+        address: eth_custodian_address.raw(),
         topics: vec![
             event_schema.signature(),
             // the sender is not important
@@ -362,8 +362,8 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(U256::from(deposit_event.amount)),
-            ethabi::Token::Uint(U256::from(deposit_event.fee.into_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
         ]),
     };
     aurora_engine::proof::Proof {
@@ -382,7 +382,7 @@ fn simple_transfer_args(
     transfer_amount: Wei,
 ) -> aurora_engine::parameters::CallArgs {
     aurora_engine::parameters::CallArgs::V2(aurora_engine::parameters::FunctionCallArgsV2 {
-        contract: dest_address.0,
+        contract: dest_address,
         value: transfer_amount.to_bytes(),
         input: Vec::new(),
     })

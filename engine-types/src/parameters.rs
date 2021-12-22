@@ -16,8 +16,8 @@ pub struct PromiseCreateArgs {
     pub target_account_id: AccountId,
     pub method: String,
     pub args: Vec<u8>,
-    pub attached_balance: u128,
-    pub attached_gas: u64,
+    pub attached_balance: Yocto,
+    pub attached_gas: NearGas,
 }
 
 #[must_use]
@@ -30,7 +30,7 @@ pub struct PromiseWithCallbackArgs {
 #[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
 pub enum PromiseAction {
     Transfer {
-        amount: u128,
+        amount: Yocto,
     },
     DeployConotract {
         code: Vec<u8>,
@@ -38,8 +38,8 @@ pub enum PromiseAction {
     FunctionCall {
         name: String,
         args: Vec<u8>,
-        attached_yocto: u128,
-        gas: u64,
+        attached_yocto: Yocto,
+        gas: NearGas,
     },
 }
 
@@ -53,14 +53,14 @@ pub struct PromiseBatchAction {
 /// withdraw NEAR eth-connector call args
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct WithdrawCallArgs {
-    pub recipient_address: EthAddress,
-    pub amount: Balance,
+    pub recipient_address: Address,
+    pub amount: NEP141Wei,
 }
 
 /// withdraw NEAR eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RefundCallArgs {
-    pub recipient_address: EthAddress,
-    pub erc20_address: Option<EthAddress>,
+    pub recipient_address: Address,
+    pub erc20_address: Option<Address>,
     pub amount: RawU256,
 }

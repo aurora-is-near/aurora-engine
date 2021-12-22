@@ -69,6 +69,7 @@ mod contract {
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, current_address, Engine, EngineState};
     use crate::fungible_token::FungibleTokenMetadata;
+    use crate::json::parse_json;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
@@ -77,23 +78,20 @@ mod contract {
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use aurora_engine_sdk::env::Env;
-    use aurora_engine_sdk::io::{StorageIntermediate, IO};
-    use aurora_engine_sdk::near_runtime::Runtime;
-    use aurora_engine_sdk::promise::PromiseHandler;
-    use aurora_engine_types::account_id::AccountId;
-
-    use crate::json::parse_json;
+    use crate::prelude::account_id::AccountId;
     use crate::prelude::parameters::RefundCallArgs;
     use crate::prelude::sdk::types::{
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::types::{u256_to_arr, ERR_FAILED_PARSE};
     use crate::prelude::{
-        sdk, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei,
-        ERC20_MINT_SELECTOR, H256, U256,
+        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei, Yocto,
+        ERC20_MINT_SELECTOR, ERR_FAILED_PARSE, H256, U256,
     };
+    use aurora_engine_sdk::env::Env;
+    use aurora_engine_sdk::io::{StorageIntermediate, IO};
+    use aurora_engine_sdk::near_runtime::Runtime;
+    use aurora_engine_sdk::promise::PromiseHandler;
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
@@ -282,8 +280,8 @@ mod contract {
         let mut engine =
             Engine::new_with_state(state, meta_call_args.sender, current_account_id, io, &io);
         let result = engine.call(
-            meta_call_args.sender,
-            meta_call_args.contract_address,
+            &meta_call_args.sender,
+            &meta_call_args.contract_address,
             meta_call_args.value,
             meta_call_args.input,
             u64::MAX, // TODO: is there a gas limit with meta calls?
@@ -309,7 +307,10 @@ mod contract {
             &io,
         )
         .sdk_unwrap();
-        engine.register_relayer(predecessor_account_id.as_bytes(), Address(relayer_address));
+        engine.register_relayer(
+            predecessor_account_id.as_bytes(),
+            Address::from_array(relayer_address),
+        );
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.
@@ -391,20 +392,20 @@ mod contract {
                     let erc20_admin_address = current_address(&current_account_id);
                     let mut engine =
                         Engine::new(erc20_admin_address, current_account_id, io, &io).sdk_unwrap();
-                    let erc20_address = Address(erc20_address);
-                    let refund_address = Address(args.recipient_address);
+                    let erc20_address = erc20_address;
+                    let refund_address = args.recipient_address;
                     let amount = U256::from_big_endian(&args.amount);
 
                     let selector = ERC20_MINT_SELECTOR;
                     let mint_args = ethabi::encode(&[
-                        ethabi::Token::Address(refund_address),
+                        ethabi::Token::Address(refund_address.raw()),
                         ethabi::Token::Uint(amount),
                     ]);
 
                     engine
                         .call(
-                            erc20_admin_address,
-                            erc20_address,
+                            &erc20_admin_address,
+                            &erc20_address,
                             Wei::zero(),
                             [selector, mint_args.as_slice()].concat(),
                             u64::MAX,
@@ -418,16 +419,19 @@ mod contract {
                     let exit_address = aurora_engine_precompiles::native::ExitToNear::ADDRESS;
                     let mut engine =
                         Engine::new(exit_address, current_account_id, io, &io).sdk_unwrap();
-                    let refund_address = Address(args.recipient_address);
+                    let refund_address = args.recipient_address;
                     let amount = Wei::new(U256::from_big_endian(&args.amount));
                     engine
                         .call(
-                            exit_address,
-                            refund_address,
+                            &exit_address,
+                            &refund_address,
                             amount,
                             Vec::new(),
                             u64::MAX,
-                            vec![(exit_address, Vec::new()), (refund_address, Vec::new())],
+                            vec![
+                                (exit_address.raw(), Vec::new()),
+                                (refund_address.raw(), Vec::new()),
+                            ],
                             &mut Runtime,
                         )
                         .sdk_unwrap()
@@ -448,13 +452,7 @@ mod contract {
         let mut io = Runtime;
         let args: ViewCallArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
-        let engine = Engine::new(
-            Address::from_slice(&args.sender),
-            current_account_id,
-            io,
-            &io,
-        )
-        .sdk_unwrap();
+        let engine = Engine::new(args.sender, current_account_id, io, &io).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args).sdk_unwrap();
         io.return_output(&result.try_to_vec().sdk_expect("ERR_SERIALIZE"));
     }
@@ -476,7 +474,7 @@ mod contract {
     pub extern "C" fn get_code() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
-        let code = engine::get_code(&io, &Address(address));
+        let code = engine::get_code(&io, &Address::from_array(address));
         io.return_output(&code)
     }
 
@@ -484,7 +482,7 @@ mod contract {
     pub extern "C" fn get_balance() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
-        let balance = engine::get_balance(&io, &Address(address));
+        let balance = engine::get_balance(&io, &Address::from_array(address));
         io.return_output(&balance.to_bytes())
     }
 
@@ -492,7 +490,7 @@ mod contract {
     pub extern "C" fn get_nonce() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
-        let nonce = engine::get_nonce(&io, &Address(address));
+        let nonce = engine::get_nonce(&io, &Address::from_array(address));
         io.return_output(&u256_to_arr(&nonce))
     }
 
@@ -500,9 +498,9 @@ mod contract {
     pub extern "C" fn get_storage_at() {
         let mut io = Runtime;
         let args: GetStorageAtArgs = io.read_input_borsh().sdk_unwrap();
-        let address = Address(args.address);
+        let address = args.address;
         let generation = engine::get_generation(&io, &address);
-        let value = engine::get_storage(&io, &Address(args.address), &H256(args.key), generation);
+        let value = engine::get_storage(&io, &args.address, &H256(args.key), generation);
         io.return_output(&value.0)
     }
 
@@ -522,8 +520,8 @@ mod contract {
         for account_balance in args.genesis_alloc {
             engine::set_balance(
                 &mut io,
-                &Address(account_balance.address),
-                &crate::prelude::types::Wei::new(U256::from(account_balance.balance)),
+                &account_balance.address,
+                &crate::prelude::Wei::new(U256::from(account_balance.balance)),
             )
         }
         // return new chain ID
@@ -732,7 +730,7 @@ mod contract {
         let mut io = Runtime;
         let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
         let predecessor_account_id = io.predecessor_account_id();
-        let amount = io.attached_deposit();
+        let amount = Yocto::new(io.attached_deposit());
         let maybe_promise = EthConnectorContract::init_instance(io)
             .storage_deposit(predecessor_account_id, amount, args)
             .sdk_unwrap();
@@ -846,20 +844,25 @@ mod contract {
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn mint_account() {
+        use crate::connector::ZERO_ATTACHED_BALANCE;
+        use crate::prelude::NEP141Wei;
         use evm::backend::ApplyBackend;
         const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
         const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
 
         let mut io = Runtime;
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
-        let address = Address(args.0);
+        let address = Address::from_array(args.0);
         let nonce = U256::from(args.1);
-        let balance = U256::from(args.2);
+        let balance = NEP141Wei::new(args.2 as u128);
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {
-            address,
-            basic: evm::backend::Basic { balance, nonce },
+            address: address.raw(),
+            basic: evm::backend::Basic {
+                balance: U256::from(balance.as_u128()),
+                nonce,
+            },
             code: None,
             storage: core::iter::empty(),
             reset_storage: false,
@@ -871,7 +874,7 @@ mod contract {
         let aurora_account_id = io.current_account_id();
         let args = crate::parameters::FinishDepositCallArgs {
             new_owner_id: aurora_account_id.clone(),
-            amount: balance.low_u128(),
+            amount: balance,
             proof_key: crate::prelude::String::new(),
             relayer_id: aurora_account_id.clone(),
             fee: 0.into(),
@@ -881,15 +884,15 @@ mod contract {
             target_account_id: aurora_account_id.clone(),
             method: "verify_log_entry".to_string(),
             args: Vec::new(),
-            attached_balance: 0,
-            attached_gas: GAS_FOR_VERIFY.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_VERIFY,
         };
         let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
             target_account_id: aurora_account_id,
             method: "finish_deposit".to_string(),
             args: args.try_to_vec().unwrap(),
-            attached_balance: 0,
-            attached_gas: GAS_FOR_FINISH.into_u64(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FINISH,
         };
         io.promise_crate_with_callback(&aurora_engine_types::parameters::PromiseWithCallbackArgs {
             base: verify_call,

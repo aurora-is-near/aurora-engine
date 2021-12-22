@@ -2,8 +2,8 @@ use aurora_engine::engine;
 use aurora_engine::parameters::{CallArgs, DeployErc20TokenArgs, SubmitResult, TransactionStatus};
 use aurora_engine::transaction::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_sdk::env::{self, Env};
-use aurora_engine_types::types::NearGas;
-use aurora_engine_types::{types::Wei, Address, H256, U256};
+use aurora_engine_types::types::{Address, NearGas, Wei};
+use aurora_engine_types::{H256, U256};
 use borsh::BorshDeserialize;
 use engine_standalone_storage::engine_state;
 use engine_standalone_storage::{BlockMetadata, Diff, Storage};
@@ -50,7 +50,7 @@ impl StandaloneRunner {
         let env = &mut self.env;
         let transaction_hash = {
             let bytes = [
-                address.as_ref(),
+                address.raw().as_ref(),
                 &balance.to_bytes(),
                 &aurora_engine_types::types::u256_to_arr(&nonce),
             ]
@@ -184,7 +184,7 @@ impl StandaloneRunner {
                 .unwrap();
             io.finish().commit(storage, &mut self.cumulative_diff);
             Ok(SubmitResult::new(
-                TransactionStatus::Succeed(address.as_ref().to_vec()),
+                TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
                 0,
                 Vec::new(),
             ))

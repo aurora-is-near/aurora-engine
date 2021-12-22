@@ -1,12 +1,11 @@
-use crate::prelude::{vec, Address, TryFrom, Vec, U256};
+use crate::prelude::types::{Address, Wei};
+use crate::prelude::{vec, TryFrom, Vec, H160, U256};
+use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 
 pub mod eip_1559;
 pub mod eip_2930;
 pub mod legacy;
-
-use aurora_engine_types::types::Wei;
-use eip_2930::AccessTuple;
 
 /// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -189,11 +188,12 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
             Err(rlp::DecoderError::RlpExpectedToBeData)
         }
     } else {
-        let v: Address = value.as_val()?;
-        if v == Address::zero() {
+        let v: H160 = value.as_val()?;
+        let addr = Address::new(v);
+        if addr == Address::zero() {
             Ok(None)
         } else {
-            Ok(Some(v))
+            Ok(Some(addr))
         }
     }
 }

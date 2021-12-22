@@ -1,7 +1,7 @@
 use evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
-use crate::prelude::{mem, Address, Borrowed, TryInto};
+use crate::prelude::{mem, types::Address, Borrowed, TryInto};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 
 /// Blake2 costs.

@@ -57,7 +57,7 @@ fn test_deploy_contract() {
             test_utils::create_deploy_transaction(code.clone(), nonce)
         })
         .unwrap();
-    let address = Address::from_slice(test_utils::unwrap_success_slice(&result));
+    let address = Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
 
     // Confirm the code stored at that address is equal to the input code.
     let stored_code = runner.get_code(address);
@@ -123,7 +123,7 @@ fn test_log_address() {
         .submit_with_signer(&mut signer, |nonce| {
             caller_contract.call_method_with_args(
                 "greet",
-                &[ethabi::Token::Address(greet_contract.address)],
+                &[ethabi::Token::Address(greet_contract.address.raw())],
                 nonce,
             )
         })
@@ -132,7 +132,7 @@ fn test_log_address() {
     // Address included in the log should come from the contract emitting the log,
     // not the contract that invoked the call.
     let log_address = result.logs.first().unwrap().address;
-    assert_eq!(Address(log_address), greet_contract.address);
+    assert_eq!(log_address, greet_contract.address);
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn test_override_state() {
             }
         })
         .unwrap();
-    let address = Address::from_slice(&test_utils::unwrap_success(result));
+    let address = Address::try_from_slice(&test_utils::unwrap_success(result)).unwrap();
     let contract = contract.deployed_at(address);
 
     // define functions to interact with the contract
@@ -217,7 +217,7 @@ fn test_override_state() {
             .unwrap();
         match result {
             crate::prelude::parameters::TransactionStatus::Succeed(bytes) => {
-                Address::from_slice(&bytes[12..32])
+                Address::try_from_slice(&bytes[12..32]).unwrap()
             }
             _ => panic!("tx failed"),
         }
@@ -237,7 +237,7 @@ fn test_override_state() {
     };
 
     // Assert the initial state is 0
-    assert_eq!(get_address(&runner), Address([0; 20]));
+    assert_eq!(get_address(&runner), Address::new(H160([0; 20])));
     post_address(&mut runner, &mut account1);
     // Assert the address matches the first caller
     assert_eq!(get_address(&runner), account1_address);
@@ -517,6 +517,7 @@ fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Addre
     (runner, signer, dest_address)
 }
 
+use aurora_engine_types::H160;
 use sha3::Digest;
 
 #[test]
@@ -621,7 +622,7 @@ fn test_eth_transfer_insufficient_balance_sim() {
     // Run transaction which will fail (transfer more than current balance)
     let nonce = signer.use_nonce();
     let tx = test_utils::transfer(
-        Address([1; 20]),
+        Address::new(H160([1; 20])),
         INITIAL_BALANCE + INITIAL_BALANCE,
         nonce.into(),
     );
@@ -652,7 +653,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
 
     // Run transaction which will fail (not enough balance to cover gas)
     let nonce = signer.use_nonce();
-    let mut tx = test_utils::transfer(Address([1; 20]), TRANSFER_AMOUNT, nonce.into());
+    let mut tx = test_utils::transfer(Address::new(H160([1; 20])), TRANSFER_AMOUNT, nonce.into());
     tx.gas_limit = 3_000_000.into();
     tx.gas_price = GAS_PRICE.into();
     let signed_tx = test_utils::sign_transaction(
@@ -680,7 +681,7 @@ fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, 
     let signer = test_utils::Signer::random();
     let address = test_utils::address_from_secret_key(&signer.secret_key);
 
-    let args = (address.0, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
+    let args = (address, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
     aurora
         .call("mint_account", &args.try_to_vec().unwrap())
         .assert_success();
@@ -703,7 +704,7 @@ fn query_address_sim(
     method: &str,
     aurora: &state_migration::AuroraAccount,
 ) -> U256 {
-    let x = aurora.call(method, &address.0);
+    let x = aurora.call(method, address.as_bytes());
     match &x.outcome().status {
         near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
         other => panic!("Unexpected outcome: {:?}", other),
