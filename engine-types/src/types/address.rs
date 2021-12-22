@@ -22,7 +22,7 @@ impl Address {
         hex::encode(self.0.as_bytes())
     }
 
-    pub fn decode(address: String) -> Result<Address, error::AddressError> {
+    pub fn decode(address: &str) -> Result<Address, error::AddressError> {
         if address.len() != 40 {
             return Err(error::AddressError::IncorrectLength);
         }
