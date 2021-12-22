@@ -109,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn test_address_deocde() {
+    fn test_address_decode() {
         // Test compatibility with previous typ RawAddress.
         // It was: type RawAddress = [u8;20];
         let eth_address_vec =
