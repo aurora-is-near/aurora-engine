@@ -30,7 +30,7 @@ impl TesterConstructor {
             .abi
             .constructor()
             .unwrap()
-            .encode_input(self.0.code.clone(), &[ethabi::Token::Address(token)])
+            .encode_input(self.0.code.clone(), &[ethabi::Token::Address(token.raw())])
             .unwrap();
 
         TransactionLegacy {
@@ -200,7 +200,7 @@ impl Tester {
                 signer,
                 "withdrawEthToEthereum",
                 amount,
-                &[ethabi::Token::Address(DEST_ADDRESS)],
+                &[ethabi::Token::Address(DEST_ADDRESS.raw())],
             )
         }
     }

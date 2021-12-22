@@ -3,8 +3,8 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    format, Balance, BorshDeserialize, BorshSerialize, EthAddress, RawAddress, RawH256, RawU256,
-    String, ToString, TryFrom, Vec, WeiU256,
+    format, Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256, String, ToString,
+    TryFrom, Vec, WeiU256,
 };
 use crate::proof::Proof;
 use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
@@ -32,8 +32,8 @@ pub struct MetaCallArgs {
     pub v: u8,
     pub nonce: RawU256,
     pub fee_amount: RawU256,
-    pub fee_address: RawAddress,
-    pub contract_address: RawAddress,
+    pub fee_address: Address,
+    pub contract_address: Address,
     pub value: RawU256,
     pub method_def: String,
     pub args: Vec<u8>,
@@ -42,7 +42,7 @@ pub struct MetaCallArgs {
 /// Borsh-encoded log for use in a `SubmitResult`.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct ResultLog {
-    pub address: RawAddress,
+    pub address: Address,
     pub topics: Vec<RawU256>,
     pub data: Vec<u8>,
 }
@@ -55,7 +55,7 @@ impl From<Log> for ResultLog {
             .map(|topic| topic.0)
             .collect::<Vec<_>>();
         ResultLog {
-            address: log.address.0,
+            address: Address::new(log.address),
             topics,
             data: log.data,
         }
@@ -134,7 +134,7 @@ impl SubmitResult {
 /// Borsh-encoded parameters for the engine `call` function.
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct FunctionCallArgsV2 {
-    pub contract: RawAddress,
+    pub contract: Address,
     /// Wei compatible Borsh-encoded value field to attach an ETH balance to the transaction
     pub value: WeiU256,
     pub input: Vec<u8>,
@@ -143,7 +143,7 @@ pub struct FunctionCallArgsV2 {
 /// Legacy Borsh-encoded parameters for the engine `call` function, to provide backward type compatibility
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct FunctionCallArgsV1 {
-    pub contract: RawAddress,
+    pub contract: Address,
     pub input: Vec<u8>,
 }
 
@@ -176,8 +176,8 @@ impl CallArgs {
 /// Borsh-encoded parameters for the `view` function.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
 pub struct ViewCallArgs {
-    pub sender: RawAddress,
-    pub address: RawAddress,
+    pub sender: Address,
+    pub address: Address,
     pub amount: RawU256,
     pub input: Vec<u8>,
 }
@@ -194,7 +194,7 @@ pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgs;
 /// Borsh-encoded parameters for the `get_storage_at` function.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct GetStorageAtArgs {
-    pub address: RawAddress,
+    pub address: Address,
     pub key: RawH256,
 }
 
@@ -202,7 +202,7 @@ pub struct GetStorageAtArgs {
 #[cfg(feature = "evm_bully")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct AccountBalance {
-    pub address: RawAddress,
+    pub address: Address,
     pub balance: RawU256,
 }
 
@@ -221,7 +221,7 @@ pub struct BeginBlockArgs {
     /// The current block's hash (for replayer use).
     pub hash: RawU256,
     /// The current block's beneficiary address.
-    pub coinbase: RawAddress,
+    pub coinbase: Address,
     /// The current block's timestamp (in seconds since the Unix epoch).
     pub timestamp: RawU256,
     /// The current block's number (the genesis block is number zero).
@@ -274,7 +274,7 @@ pub struct DepositCallArgs {
     /// Proof data
     pub proof: Proof,
     /// Optional relayer address
-    pub relayer_eth_account: Option<EthAddress>,
+    pub relayer_eth_account: Option<Address>,
 }
 
 /// Eth-connector isUsedProof arguments
@@ -289,8 +289,8 @@ pub struct IsUsedProofCallArgs {
 #[cfg_attr(not(target_arch = "wasm32"), derive(BorshDeserialize))]
 pub struct WithdrawResult {
     pub amount: NEP141Wei,
-    pub recipient_id: RawAddress,
-    pub eth_custodian_address: RawAddress,
+    pub recipient_id: Address,
+    pub eth_custodian_address: Address,
 }
 
 /// Fungible token storage balance
@@ -335,13 +335,13 @@ pub struct FinishDepositCallArgs {
 #[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
 pub struct DepositEthCallArgs {
     pub proof: Proof,
-    pub relayer_eth_account: EthAddress,
+    pub relayer_eth_account: Address,
 }
 
 /// Finish deposit NEAR eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct FinishDepositEthCallArgs {
-    pub new_owner_id: EthAddress,
+    pub new_owner_id: Address,
     pub amount: NEP141Wei,
     pub fee: Balance,
     pub relayer_eth_account: AccountId,
@@ -460,7 +460,7 @@ pub struct BalanceOfCallArgs {
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct BalanceOfEthCallArgs {
-    pub address: EthAddress,
+    pub address: Address,
 }
 
 impl TryFrom<JsonValue> for BalanceOfCallArgs {
@@ -475,7 +475,7 @@ impl TryFrom<JsonValue> for BalanceOfCallArgs {
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RegisterRelayerCallArgs {
-    pub address: EthAddress,
+    pub address: Address,
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -539,8 +539,8 @@ mod tests {
     #[test]
     fn test_roundtrip_view_call() {
         let x = ViewCallArgs {
-            sender: [1; 20],
-            address: [2; 20],
+            sender: Address::from_array([1; 20]),
+            address: Address::from_array([2; 20]),
             amount: [3; 32],
             input: vec![1, 2, 3],
         };
@@ -552,12 +552,12 @@ mod tests {
     #[test]
     fn test_call_args_deserialize() {
         let new_input = FunctionCallArgsV2 {
-            contract: [0u8; 20],
+            contract: Address::from_array([0u8; 20]),
             value: WeiU256::default(),
             input: Vec::new(),
         };
         let legacy_input = FunctionCallArgsV1 {
-            contract: [0u8; 20],
+            contract: Address::from_array([0u8; 20]),
             input: Vec::new(),
         };
 

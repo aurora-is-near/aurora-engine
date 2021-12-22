@@ -132,7 +132,7 @@ fn example_transaction() -> Transaction1559 {
         value: Wei::zero(),
         data: vec![0],
         access_list: vec![AccessTuple {
-            address: test_utils::address_from_hex(CONTRACT_ADDRESS),
+            address: test_utils::address_from_hex(CONTRACT_ADDRESS).raw(),
             storage_keys: vec![H256::zero(), one()],
         }],
     }

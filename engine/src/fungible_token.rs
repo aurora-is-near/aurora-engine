@@ -5,9 +5,9 @@ use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, Storage
 use crate::prelude::account_id::AccountId;
 use crate::prelude::Wei;
 use crate::prelude::{
-    sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, EthAddress,
-    NearGas, PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult,
-    PromiseWithCallbackArgs, StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
+    sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, NearGas,
+    PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult, PromiseWithCallbackArgs,
+    StorageBalanceBounds, StorageUsage, String, ToString, TryInto, Vec,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::types::{NEP141Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO};
@@ -152,8 +152,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     /// Balance of ETH (ETH on Aurora)
-    pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: EthAddress) -> Wei {
-        engine::get_balance(&self.io, &Address(address))
+    pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: &Address) -> Wei {
+        engine::get_balance(&self.io, address)
     }
 
     /// Internal ETH deposit to NEAR - nETH (NEP-141)
@@ -179,14 +179,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     /// Internal ETH deposit to Aurora
     pub fn internal_deposit_eth_to_aurora(
         &mut self,
-        address: EthAddress,
+        address: Address,
         amount: Wei,
     ) -> Result<(), error::DepositError> {
-        let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
+        let balance = self.internal_unwrap_balance_of_eth_on_aurora(&address);
         let new_balance = balance
             .checked_add(amount)
             .ok_or(error::DepositError::BalanceOverflow)?;
-        engine::set_balance(&mut self.io, &Address(address), &new_balance);
+        engine::set_balance(&mut self.io, &address, &new_balance);
         self.total_eth_supply_on_aurora = self
             .total_eth_supply_on_aurora
             .checked_add(amount)
@@ -217,14 +217,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     /// Withdraw ETH tokens
     pub fn internal_withdraw_eth_from_aurora(
         &mut self,
-        address: EthAddress,
+        address: &Address,
         amount: Wei,
     ) -> Result<(), error::WithdrawError> {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
         let new_balance = balance
             .checked_sub(amount)
             .ok_or(error::WithdrawError::InsufficientFunds)?;
-        engine::set_balance(&mut self.io, &Address(address), &new_balance);
+        engine::set_balance(&mut self.io, address, &new_balance);
         self.total_eth_supply_on_aurora = self
             .total_eth_supply_on_aurora
             .checked_sub(amount)
@@ -595,7 +595,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 }
 
 pub mod error {
-    use crate::prelude::types::error::BalanceOverflowError;
+    use crate::prelude::types::balance::error::BalanceOverflowError;
 
     const TOTAL_SUPPLY_OVERFLOW: &[u8; 25] = b"ERR_TOTAL_SUPPLY_OVERFLOW";
     const BALANCE_OVERFLOW: &[u8; 20] = b"ERR_BALANCE_OVERFLOW";

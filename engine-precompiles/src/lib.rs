@@ -23,10 +23,10 @@ use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::types::EthGas;
-use crate::prelude::{Vec, H256};
+use crate::prelude::{Vec, H160, H256};
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
-use aurora_engine_types::{account_id::AccountId, vec, Address, BTreeMap, Box};
+use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
 use evm::backend::Log;
 use evm::executor;
 use evm::{Context, ExitError, ExitSucceed};
@@ -106,20 +106,20 @@ pub struct Precompiles(pub prelude::BTreeMap<Address, Box<dyn Precompile>>);
 impl executor::PrecompileSet for Precompiles {
     fn execute(
         &self,
-        address: prelude::Address,
+        address: prelude::H160,
         input: &[u8],
         gas_limit: Option<u64>,
         context: &Context,
         is_static: bool,
     ) -> Option<Result<executor::PrecompileOutput, executor::PrecompileFailure>> {
-        self.0.get(&address).map(|p| {
+        self.0.get(&Address::new(address)).map(|p| {
             p.run(input, gas_limit.map(EthGas::new), context, is_static)
                 .map_err(|exit_status| executor::PrecompileFailure::Error { exit_status })
         })
     }
 
-    fn is_precompile(&self, address: prelude::Address) -> bool {
-        self.0.contains_key(&address)
+    fn is_precompile(&self, address: prelude::H160) -> bool {
+        self.0.contains_key(&Address::new(address))
     }
 }
 
@@ -259,13 +259,13 @@ impl Precompiles {
     }
 }
 
-/// const fn for making an address by concatenating the bytes from two given numbers,
+/// fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
-pub const fn make_address(x: u32, y: u128) -> prelude::Address {
+pub const fn make_address(x: u32, y: u128) -> prelude::types::Address {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
-    prelude::Address([
+    prelude::types::Address::new(H160([
         x_bytes[0],
         x_bytes[1],
         x_bytes[2],
@@ -286,7 +286,7 @@ pub const fn make_address(x: u32, y: u128) -> prelude::Address {
         y_bytes[13],
         y_bytes[14],
         y_bytes[15],
-    ])
+    ]))
 }
 
 const fn make_h256(x: u128, y: u128) -> prelude::H256 {
@@ -330,7 +330,9 @@ const fn make_h256(x: u128, y: u128) -> prelude::H256 {
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::H160;
     use crate::{prelude, Byzantium, Istanbul};
+    use prelude::types::Address;
     use rand::Rng;
 
     #[test]
@@ -354,25 +356,25 @@ mod tests {
 
         let mut rng = rand::thread_rng();
         for _ in 0..u8::MAX {
-            let address: prelude::Address = prelude::Address(rng.gen());
+            let address = Address::new(H160(rng.gen()));
             let (x, y) = split_address(address);
             assert_eq!(address, super::make_address(x, y))
         }
     }
 
-    fn u8_to_address(x: u8) -> prelude::Address {
+    fn u8_to_address(x: u8) -> Address {
         let mut bytes = [0u8; 20];
         bytes[19] = x;
-        prelude::Address(bytes)
+        Address::new(H160(bytes))
     }
 
     // Inverse function of `super::make_address`.
-    fn split_address(a: prelude::Address) -> (u32, u128) {
+    fn split_address(a: Address) -> (u32, u128) {
         let mut x_bytes = [0u8; 4];
         let mut y_bytes = [0u8; 16];
 
-        x_bytes.copy_from_slice(&a[0..4]);
-        y_bytes.copy_from_slice(&a[4..20]);
+        x_bytes.copy_from_slice(&a.raw()[0..4]);
+        y_bytes.copy_from_slice(&a.raw()[4..20]);
 
         (u32::from_be_bytes(x_bytes), u128::from_be_bytes(y_bytes))
     }

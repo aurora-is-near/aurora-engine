@@ -43,12 +43,3 @@ mod v0 {
 }
 
 pub use v0::*;
-
-/// See: https://ethereum-magicians.org/t/increasing-address-size-from-20-to-32-bytes/5485
-pub type Address = H160;
-
-#[allow(non_snake_case, dead_code)]
-// Gets around the fact that you can't contract pub fields with types.
-pub const fn Address(input: [u8; 20]) -> Address {
-    H160(input)
-}

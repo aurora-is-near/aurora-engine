@@ -1,6 +1,5 @@
 use crate::prelude::precompiles::secp256k1::ecrecover;
-use crate::prelude::Wei;
-use crate::prelude::{sdk, Address, Vec, H256, U256};
+use crate::prelude::{sdk, Address, Vec, Wei, H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 /// Type indicator (per EIP-2718) for access list transactions
@@ -8,7 +7,7 @@ pub const TYPE_BYTE: u8 = 0x01;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct AccessTuple {
-    pub address: Address,
+    pub address: H160,
     pub storage_keys: Vec<H256>,
 }
 
@@ -56,7 +55,7 @@ impl Transaction2930 {
         s.append(&self.gas_limit);
         match self.to.as_ref() {
             None => s.append(&""),
-            Some(address) => s.append(address),
+            Some(address) => s.append(&address.raw()),
         };
         s.append(&self.value.raw());
         s.append(&self.data);

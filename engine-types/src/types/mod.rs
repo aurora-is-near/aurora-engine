@@ -1,21 +1,21 @@
-use crate::{str, vec, Address, String, Vec, U256};
+use crate::{str, vec, String, Vec, U256};
 
+pub mod address;
 pub mod balance;
 pub mod fee;
 pub mod gas;
 pub mod wei;
 
+pub use address::*;
 pub use balance::*;
 pub use fee::*;
 pub use gas::*;
 pub use wei::*;
 
-pub type RawAddress = [u8; 20];
 pub type RawU256 = [u8; 32];
 // Big-endian large integer type.
 pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 
-pub type EthAddress = [u8; 20];
 pub type StorageUsage = u64;
 
 /// Selector to call mint function in ERC 20 contract
@@ -37,17 +37,6 @@ impl AsRef<[u8]> for AddressValidationError {
             Self::IncorrectLength => b"ETH_WRONG_ADDRESS_LENGTH",
         }
     }
-}
-
-/// Validate Ethereum address from string and return Result data EthAddress or Error data
-pub fn validate_eth_address(address: String) -> Result<EthAddress, AddressValidationError> {
-    let data = hex::decode(address).map_err(|_| AddressValidationError::FailedDecodeHex)?;
-    if data.len() != 20 {
-        return Err(AddressValidationError::IncorrectLength);
-    }
-    let mut result = [0u8; 20];
-    result.copy_from_slice(&data);
-    Ok(result)
 }
 
 pub const STORAGE_PRICE_PER_BYTE: u128 = 10_000_000_000_000_000_000;

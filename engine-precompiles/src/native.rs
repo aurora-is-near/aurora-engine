@@ -6,7 +6,7 @@ use crate::prelude::{
     sdk,
     storage::{bytes_to_key, KeyPrefix},
     types::Yocto,
-    vec, BorshSerialize, Cow, String, ToString, TryFrom, TryInto, Vec, H160, U256,
+    vec, BorshSerialize, Cow, String, ToString, TryFrom, TryInto, Vec, U256,
 };
 #[cfg(all(feature = "error_refund", feature = "contract"))]
 use crate::prelude::{
@@ -14,8 +14,7 @@ use crate::prelude::{
     types,
 };
 
-use crate::prelude::types::EthGas;
-use crate::prelude::Address;
+use crate::prelude::types::{Address, EthGas};
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
 #[cfg(feature = "contract")]
@@ -45,7 +44,7 @@ mod costs {
 }
 
 pub mod events {
-    use crate::prelude::{vec, Address, String, ToString, H256, U256};
+    use crate::prelude::{types::Address, vec, String, ToString, H160, H256, U256};
 
     /// Derived from event signature (see tests::test_exit_signatures)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
@@ -62,7 +61,7 @@ pub mod events {
     /// which ERC-20 token is being withdrawn. However, ETH is not an ERC-20 token
     /// So we need to have some other address to fill this field. This constant is
     /// used for this purpose.
-    pub const ETH_ADDRESS: Address = Address([0; 20]);
+    pub const ETH_ADDRESS: Address = Address::new(H160([0; 20]));
 
     /// ExitToNear(
     ///    Address indexed sender,
@@ -128,7 +127,7 @@ pub mod events {
 
     fn encode_address(a: Address) -> H256 {
         let mut result = [0u8; 32];
-        result[12..].copy_from_slice(a.as_ref());
+        result[12..].copy_from_slice(a.as_bytes());
         H256(result)
     }
 
@@ -253,7 +252,7 @@ impl Precompile for ExitToNear {
     ) -> EvmPrecompileResult {
         #[cfg(feature = "error_refund")]
         fn parse_input(input: &[u8]) -> (Address, &[u8]) {
-            let refund_address = Address::from_slice(&input[1..21]);
+            let refund_address = Address::from_array(&input[1..21]);
             (refund_address, &input[21..])
         }
         #[cfg(not(feature = "error_refund"))]
@@ -302,7 +301,7 @@ impl Precompile for ExitToNear {
                             context.apparent_value.as_u128()
                         ),
                         events::ExitToNear {
-                            sender: context.caller,
+                            sender: Address::new(context.caller),
                             erc20_address: events::ETH_ADDRESS,
                             dest: dest_account.to_string(),
                             amount: context.apparent_value,
@@ -346,8 +345,8 @@ impl Precompile for ExitToNear {
                             amount.as_u128()
                         ),
                         events::ExitToNear {
-                            sender: erc20_address,
-                            erc20_address,
+                            sender: Address::new(erc20_address),
+                            erc20_address: Address::new(erc20_address),
                             dest: receiver_account_id.to_string(),
                             amount,
                         },
@@ -365,11 +364,11 @@ impl Precompile for ExitToNear {
         let erc20_address = if flag == 0 {
             None
         } else {
-            Some(exit_event.erc20_address.0)
+            Some(exit_event.erc20_address)
         };
         #[cfg(feature = "error_refund")]
         let refund_args = RefundCallArgs {
-            recipient_address: refund_address.0,
+            recipient_address: refund_address,
             erc20_address,
             amount: types::u256_to_arr(&exit_event.amount),
         };
@@ -398,13 +397,13 @@ impl Precompile for ExitToNear {
         let promise = PromiseArgs::Create(transfer_promise);
 
         let promise_log = Log {
-            address: Self::ADDRESS,
+            address: Self::ADDRESS.raw(),
             topics: Vec::new(),
             data: promise.try_to_vec().unwrap(),
         };
         let exit_event_log = exit_event.encode();
         let exit_event_log = Log {
-            address: Self::ADDRESS,
+            address: Self::ADDRESS.raw(),
             topics: exit_event_log.topics,
             data: exit_event_log.data,
         };
@@ -489,7 +488,7 @@ impl Precompile for ExitToEthereum {
                 //
                 // Input slice format:
                 //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
-                let recipient_address = input
+                let recipient_address: Address = input
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
                 (
@@ -503,9 +502,9 @@ impl Precompile for ExitToEthereum {
                     .try_to_vec()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
                     events::ExitToEth {
-                        sender: context.caller,
+                        sender: Address::new(context.caller),
                         erc20_address: events::ETH_ADDRESS,
-                        dest: H160(recipient_address),
+                        dest: recipient_address,
                         amount: context.apparent_value,
                     },
                 )
@@ -536,7 +535,9 @@ impl Precompile for ExitToEthereum {
                     // Parse ethereum address in hex
                     let eth_recipient: String = hex::encode(input.to_vec());
                     // unwrap cannot fail since we checked the length already
-                    let recipient_address = input.try_into().unwrap();
+                    let recipient_address = Address::try_from_slice(input).map_err(|_| {
+                        ExitError::Other(crate::prelude::Cow::from("ERR_WRONG_ADDRESS"))
+                    })?;
 
                     (
                         nep141_address,
@@ -550,9 +551,9 @@ impl Precompile for ExitToEthereum {
                         .as_bytes()
                         .to_vec(),
                         events::ExitToEth {
-                            sender: erc20_address,
-                            erc20_address,
-                            dest: H160(recipient_address),
+                            sender: Address::new(erc20_address),
+                            erc20_address: Address::new(erc20_address),
+                            dest: recipient_address,
                             amount,
                         },
                     )
@@ -577,13 +578,13 @@ impl Precompile for ExitToEthereum {
 
         let promise = PromiseArgs::Create(withdraw_promise).try_to_vec().unwrap();
         let promise_log = Log {
-            address: Self::ADDRESS,
+            address: Self::ADDRESS.raw(),
             topics: Vec::new(),
             data: promise,
         };
         let exit_event_log = exit_event.encode();
         let exit_event_log = Log {
-            address: Self::ADDRESS,
+            address: Self::ADDRESS.raw(),
             topics: exit_event_log.topics,
             data: exit_event_log.data,
         };

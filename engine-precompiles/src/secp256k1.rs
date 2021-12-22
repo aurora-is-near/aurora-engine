@@ -1,7 +1,6 @@
-use crate::prelude::types::EthGas;
+use crate::prelude::types::{Address, EthGas};
 use crate::prelude::{sdk, vec, Borrowed, H256};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use ethabi::Address;
 use evm::{Context, ExitError};
 
 mod costs {
@@ -45,7 +44,8 @@ fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
         if let Ok(public_key) = secp256k1::recover(&hash, &signature, &recovery_id) {
             // recover returns a 65-byte key, but addresses come from the raw 64-byte key
             let r = sha3::Keccak256::digest(&public_key.serialize()[1..]);
-            return Ok(Address::from_slice(&r[12..]));
+            return Address::try_from_slice(&r[12..])
+                .map_err(|_| ExitError::Other(Borrowed("ERR_INCORRECT_ADDRESS")));
         }
     }
 
@@ -132,8 +132,10 @@ mod tests {
         let signature =
             &hex::decode("b9f0bb08640d3c1c00761cdd0121209268f6fd3816bc98b9e6f3cc77bf82b69812ac7a61788a0fdc0e19180f14c945a8e1088a27d92a74dce81c0981fb6447441b")
                 .unwrap();
-        let signer =
-            Address::from_slice(&hex::decode("1563915e194D8CfBA1943570603F7606A3115508").unwrap());
+        let signer = Address::try_from_slice(
+            &hex::decode("1563915e194D8CfBA1943570603F7606A3115508").unwrap(),
+        )
+        .unwrap();
         assert!(ecverify(hash, &signature, signer));
     }
 
