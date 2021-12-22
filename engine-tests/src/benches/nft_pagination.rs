@@ -1,5 +1,4 @@
-use crate::prelude::types::Wei;
-use crate::prelude::{Address, U256};
+use crate::prelude::{Address, Wei, U256};
 use crate::test_utils::{self, solidity};
 use aurora_engine::transaction::legacy::TransactionLegacy;
 use secp256k1::SecretKey;
@@ -134,7 +133,7 @@ impl MarketPlace {
         self.0.call_method_with_args(
             "minar",
             &[
-                ethabi::Token::Address(recipient),
+                ethabi::Token::Address(recipient.raw()),
                 ethabi::Token::String(data),
                 ethabi::Token::Uint(price.raw()),
             ],

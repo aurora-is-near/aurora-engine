@@ -1,8 +1,8 @@
 use crate::test_utils::standalone::mocks::{promise, storage};
 use aurora_engine::engine;
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
-use aurora_engine_types::types::Wei;
-use aurora_engine_types::{account_id::AccountId, Address, H256, U256};
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use std::sync::RwLock;
 
 #[test]
@@ -20,7 +20,7 @@ fn test_deploy_code() {
         bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
     };
-    let origin = Address([0u8; 20]);
+    let origin = Address::new(H160([0u8; 20]));
     let storage = RwLock::new(storage::Storage::default());
     let io = storage::StoragePointer(&storage);
     let env = aurora_engine_sdk::env::Fixed {
@@ -50,7 +50,9 @@ fn test_deploy_code() {
 
     // execution was successful
     let contract_address = match result.unwrap().status {
-        aurora_engine::parameters::TransactionStatus::Succeed(bytes) => Address::from_slice(&bytes),
+        aurora_engine::parameters::TransactionStatus::Succeed(bytes) => {
+            Address::try_from_slice(&bytes).unwrap()
+        }
         other => panic!("Unexpected status: {:?}", other),
     };
 

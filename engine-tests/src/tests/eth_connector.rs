@@ -1,4 +1,4 @@
-use crate::prelude::EthAddress;
+use crate::prelude::Address;
 use crate::prelude::WithdrawCallArgs;
 use crate::test_utils::str_to_account_id;
 use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
@@ -98,12 +98,8 @@ fn init_contract(
     contract_account
 }
 
-fn validate_eth_address(address: &str) -> EthAddress {
-    let data = hex::decode(address).unwrap();
-    assert_eq!(data.len(), 20);
-    let mut result = [0u8; 20];
-    result.copy_from_slice(&data);
-    result
+fn validate_eth_address(address: &str) -> Address {
+    Address::decode(address).unwrap()
 }
 
 fn call_deposit_eth_to_near(
@@ -192,10 +188,10 @@ fn get_eth_on_near_balance(master_account: &UserAccount, acc: &str, contract: &s
     val.parse().unwrap()
 }
 
-fn get_eth_balance(master_account: &UserAccount, address: EthAddress, contract: &str) -> u128 {
+fn get_eth_balance(master_account: &UserAccount, address: Address, contract: &str) -> u128 {
     #[derive(BorshSerialize, BorshDeserialize)]
     pub struct BalanceOfEthCallArgs {
-        pub address: EthAddress,
+        pub address: Address,
     }
 
     let balance = master_account.view(
@@ -412,7 +408,11 @@ fn test_ft_transfer_call_eth() {
     let transfer_amount = 50;
     let fee: u128 = 30;
     let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
+    msg.append(
+        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
+            .as_bytes()
+            .to_vec(),
+    );
 
     let message = [CONTRACT_ACC, hex::encode(msg).as_str()].join(":");
     let res = contract.call(
@@ -597,15 +597,10 @@ fn test_deposit_with_0x_prefix() {
     use aurora_engine::deposit_event::TokenMessageData;
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
 
-    let eth_custodian_address: [u8; 20] = {
-        let mut buf = [0u8; 20];
-        let bytes = hex::decode(CUSTODIAN_ADDRESS).unwrap();
-        buf.copy_from_slice(&bytes);
-        buf
-    };
-    let recipient_address = [10u8; 20];
+    let eth_custodian_address: Address = Address::decode(&CUSTODIAN_ADDRESS.to_string()).unwrap();
+    let recipient_address = Address::from_array([10u8; 20]);
     let deposit_amount = 17;
-    let recipient_address_encoded = hex::encode(&recipient_address);
+    let recipient_address_encoded = recipient_address.encode();
 
     // Note the 0x prefix before the deposit address.
     let message = [CONTRACT_ACC, ":", "0x", &recipient_address_encoded].concat();
@@ -616,7 +611,7 @@ fn test_deposit_with_0x_prefix() {
 
     let deposit_event = aurora_engine::deposit_event::DepositedEvent {
         eth_custodian_address,
-        sender: [0u8; 20],
+        sender: Address::zero(),
         token_message_data,
         amount: NEP141Wei::new(deposit_amount),
         fee,
@@ -628,7 +623,7 @@ fn test_deposit_with_0x_prefix() {
         anonymous: false,
     };
     let log_entry = aurora_engine::log_entry::LogEntry {
-        address: eth_custodian_address.into(),
+        address: eth_custodian_address.raw(),
         topics: vec![
             event_schema.signature(),
             // the sender is not important
@@ -718,7 +713,11 @@ fn test_ft_transfer_call_without_relayer() {
     let transfer_amount = 50;
     let fee: u128 = 30;
     let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
+    msg.append(
+        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
+            .as_bytes()
+            .to_vec(),
+    );
     let relayer_id = "relayer.root";
     let message = [relayer_id, hex::encode(msg).as_str()].join(":");
     let res = contract.call(
@@ -774,7 +773,11 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
     let transfer_amount = 10;
     let fee: u128 = transfer_amount + 10;
     let mut msg = fee.to_be_bytes().to_vec();
-    msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
+    msg.append(
+        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
+            .as_bytes()
+            .to_vec(),
+    );
     let relayer_id = "relayer.root";
     let message = [relayer_id, hex::encode(msg).as_str()].join(":");
     let res = contract.call(

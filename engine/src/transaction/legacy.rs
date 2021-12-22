@@ -1,6 +1,5 @@
 use crate::prelude::precompiles::secp256k1::ecrecover;
-use crate::prelude::Wei;
-use crate::prelude::{sdk, Address, Vec, U256};
+use crate::prelude::{sdk, Address, Vec, Wei, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -27,7 +26,7 @@ impl TransactionLegacy {
         s.append(&self.gas_limit);
         match self.to.as_ref() {
             None => s.append(&""),
-            Some(address) => s.append(address),
+            Some(address) => s.append(&address.raw()),
         };
         s.append(&self.value.raw());
         s.append(&self.data);
@@ -107,7 +106,7 @@ impl Encodable for LegacyEthSignedTransaction {
         s.append(&self.transaction.gas_limit);
         match self.transaction.to.as_ref() {
             None => s.append(&""),
-            Some(address) => s.append(address),
+            Some(address) => s.append(&address.raw()),
         };
         s.append(&self.transaction.value.raw());
         s.append(&self.transaction.data);
@@ -200,8 +199,6 @@ mod tests {
 
     fn address_from_arr(arr: &[u8]) -> Address {
         assert_eq!(arr.len(), 20);
-        let mut address = [0u8; 20];
-        address.copy_from_slice(&arr);
-        Address::from(address)
+        Address::try_from_slice(arr).unwrap()
     }
 }

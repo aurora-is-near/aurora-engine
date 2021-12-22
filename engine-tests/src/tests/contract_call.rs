@@ -4,7 +4,7 @@ use crate::test_utils::{origin, AuroraRunner, Signer};
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS};
 
-fn setup_test() -> (AuroraRunner, Signer, [u8; 20], Tester) {
+fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
     let mut signer = test_utils::Signer::random();
@@ -49,7 +49,6 @@ fn hello_world_solidity() {
 #[test]
 fn withdraw() {
     let (mut runner, mut signer, token, tester) = setup_test();
-    let token = Address(token);
 
     let test_data = vec![
         (true, "call_contract tt.testnet.ft_transfer"),
@@ -86,20 +85,20 @@ fn withdraw() {
         } else {
             // transferred to 0xE0f5206BBD039e7b0592d8918820024e2a7437b9 (defined in Tester.sol)
             let address = hex::decode("E0f5206BBD039e7b0592d8918820024e2a7437b9").unwrap();
-            let address = Address::from_slice(&address);
+            let address = Address::try_from_slice(&address).unwrap();
             ethabi::LogParam {
                 name: "dest".to_string(),
-                value: ethabi::Token::Address(address),
+                value: ethabi::Token::Address(address.raw()),
             }
         };
         let expected_event = vec![
             ethabi::LogParam {
                 name: "sender".to_string(),
-                value: ethabi::Token::Address(token),
+                value: ethabi::Token::Address(token.raw()),
             },
             ethabi::LogParam {
                 name: "erc20_address".to_string(),
-                value: ethabi::Token::Address(token),
+                value: ethabi::Token::Address(token.raw()),
             },
             dest,
             ethabi::LogParam {
@@ -188,11 +187,13 @@ fn withdraw_eth() {
     let mut expected_event = vec![
         ethabi::LogParam {
             name: "sender".to_string(),
-            value: ethabi::Token::Address(tester.contract.address),
+            value: ethabi::Token::Address(tester.contract.address.raw()),
         },
         ethabi::LogParam {
             name: "erc20_address".to_string(),
-            value: ethabi::Token::Address(aurora_engine_precompiles::native::events::ETH_ADDRESS),
+            value: ethabi::Token::Address(
+                aurora_engine_precompiles::native::events::ETH_ADDRESS.raw(),
+            ),
         },
         ethabi::LogParam {
             name: "dest".to_string(),
@@ -215,7 +216,7 @@ fn withdraw_eth() {
         .unwrap();
     expected_event[2] = ethabi::LogParam {
         name: "dest".to_string(),
-        value: ethabi::Token::Address(DEST_ADDRESS),
+        value: ethabi::Token::Address(DEST_ADDRESS.raw()),
     };
     expected_event[3] = ethabi::LogParam {
         name: "amount".to_string(),

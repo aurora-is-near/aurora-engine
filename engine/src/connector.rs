@@ -9,18 +9,16 @@ use crate::parameters::{
     StorageWithdrawCallArgs, TransferCallArgs, TransferCallCallArgs, WithdrawResult,
 };
 use crate::prelude::{
-    format, sdk, str, validate_eth_address, AccountId, Address, BorshDeserialize, BorshSerialize,
-    EthAddress, EthConnectorStorageId, KeyPrefix, NearGas, PromiseResult, ToString, Vec,
-    WithdrawCallArgs, Yocto, ERR_FAILED_PARSE, H160,
+    address::error::AddressError, NEP141Wei, Wei, U256, ZERO_NEP141_WEI, ZERO_WEI,
 };
 use crate::prelude::{
-    AddressValidationError, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
+    format, sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
+    KeyPrefix, NearGas, PromiseResult, ToString, Vec, WithdrawCallArgs, Yocto, ERR_FAILED_PARSE,
 };
+use crate::prelude::{PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs};
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::types::{NEP141Wei, Wei, ZERO_NEP141_WEI, ZERO_WEI};
-use primitive_types::U256;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -57,7 +55,7 @@ pub struct EthConnector {
     /// It used in the Deposit flow, to verify log entry form incoming proof.
     pub prover_account: AccountId,
     /// It is Eth address, used in the Deposit and Withdraw logic.
-    pub eth_custodian_address: EthAddress,
+    pub eth_custodian_address: Address,
 }
 
 impl<I: IO + Copy> EthConnectorContract<I> {
@@ -146,7 +144,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         sdk::log!(&format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
-            hex::encode(event.sender),
+            event.sender.encode(),
             event.token_message_data.get_recipient(),
             event.amount,
             event.fee
@@ -154,8 +152,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         sdk::log!(&format!(
             "Event's address {}, custodian address {}",
-            hex::encode(&event.eth_custodian_address),
-            hex::encode(&self.contract.eth_custodian_address),
+            event.eth_custodian_address.encode(),
+            self.contract.eth_custodian_address.encode(),
         ));
 
         if event.eth_custodian_address != self.contract.eth_custodian_address {
@@ -293,7 +291,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         address: &Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
-        self.burn_eth_on_aurora(address.0, amount)?;
+        self.burn_eth_on_aurora(address, amount)?;
         self.save_ft_contract();
         Ok(())
     }
@@ -327,13 +325,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ///  Mint ETH tokens
     fn mint_eth_on_aurora(
         &mut self,
-        owner_id: EthAddress,
+        owner_id: Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!(&format!(
             "Mint {} ETH tokens for: {}",
             amount,
-            hex::encode(owner_id)
+            owner_id.encode()
         ));
         self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
     }
@@ -341,13 +339,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Burn ETH tokens
     fn burn_eth_on_aurora(
         &mut self,
-        address: EthAddress,
+        address: &Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         sdk::log!(&format!(
             "Burn {} ETH tokens for: {}",
             amount,
-            hex::encode(address)
+            address.encode()
         ));
         self.ft.internal_withdraw_eth_from_aurora(address, amount)
     }
@@ -411,13 +409,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_balance_of_eth_on_aurora(
         &mut self,
         args: BalanceOfEthCallArgs,
-    ) -> Result<(), crate::prelude::types::error::BalanceOverflowError> {
+    ) -> Result<(), crate::prelude::types::balance::error::BalanceOverflowError> {
         let balance = self
             .ft
-            .internal_unwrap_balance_of_eth_on_aurora(args.address);
+            .internal_unwrap_balance_of_eth_on_aurora(&args.address);
         sdk::log!(&format!(
             "Balance of ETH [{}]: {}",
-            hex::encode(args.address),
+            args.address.encode(),
             balance
         ));
         self.io
@@ -498,7 +496,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             // Note: It can't overflow because the total supply doesn't change during transfer.
             let amount_for_check = self
                 .ft
-                .internal_unwrap_balance_of_eth_on_aurora(message_data.recipient);
+                .internal_unwrap_balance_of_eth_on_aurora(&message_data.recipient);
             if amount_for_check
                 .checked_add(Wei::from(args.amount))
                 .is_none()
@@ -607,7 +605,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (wei_fee, relayer) {
-            (fee, Some(H160(evm_relayer_address))) if fee > ZERO_WEI => {
+            (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
                 self.mint_eth_on_aurora(
                     message_data.recipient,
                     Wei::new(U256::from(args.amount.as_u128())) - fee,
@@ -703,11 +701,11 @@ fn get_contract_data<T: BorshDeserialize, I: IO>(io: &I, suffix: &EthConnectorSt
 pub fn set_contract_data<I: IO>(
     io: &mut I,
     args: SetContractDataCallArgs,
-) -> Result<EthConnector, AddressValidationError> {
+) -> Result<EthConnector, AddressError> {
     // Get initial contract arguments
     let contract_data = EthConnector {
         prover_account: args.prover_account,
-        eth_custodian_address: validate_eth_address(args.eth_custodian_address)?,
+        eth_custodian_address: Address::decode(&args.eth_custodian_address)?,
     };
     // Save eth-connector specific data
     io.write_borsh(
@@ -732,7 +730,8 @@ pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
 }
 
 pub mod error {
-    use crate::prelude::types::{error::BalanceOverflowError, AddressValidationError};
+    use aurora_engine_types::types::address::error::AddressError;
+    use aurora_engine_types::types::balance::error::BalanceOverflowError;
 
     use crate::deposit_event::error::ParseOnTransferMessageError;
     use crate::{deposit_event, fungible_token};
@@ -746,7 +745,7 @@ pub mod error {
         EventParseFailed(deposit_event::error::ParseError),
         CustodianAddressMismatch,
         InsufficientAmountForFee,
-        InvalidAddress(AddressValidationError),
+        InvalidAddress(AddressError),
     }
 
     impl AsRef<[u8]> for DepositError {
@@ -854,7 +853,7 @@ pub mod error {
 
     pub enum InitContractError {
         AlreadyInitialized,
-        InvalidCustodianAddress(AddressValidationError),
+        InvalidCustodianAddress(AddressError),
     }
 
     impl AsRef<[u8]> for InitContractError {

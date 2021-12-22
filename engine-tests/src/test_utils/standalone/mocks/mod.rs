@@ -4,8 +4,8 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{FinishDepositCallArgs, InitCallArgs, NewCallArgs};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::{NEP141Wei, NearGas};
-use aurora_engine_types::{account_id::AccountId, types::Wei, Address, H256, U256};
+use aurora_engine_types::types::{Address, NEP141Wei, NearGas, Wei};
+use aurora_engine_types::{account_id::AccountId, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
 use near_sdk_sim::DEFAULT_GAS;
 
@@ -61,7 +61,7 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
 
     let connector_args = InitCallArgs {
         prover_account: test_utils::str_to_account_id("prover.near"),
-        eth_custodian_address: hex::encode(&ETH_CUSTODIAN_ADDRESS),
+        eth_custodian_address: ETH_CUSTODIAN_ADDRESS.encode(),
         metadata: FungibleTokenMetadata::default(),
     };
 
@@ -87,7 +87,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     let aurora_account_id = env.current_account_id();
     let mut engine = engine::Engine::new(address, aurora_account_id.clone(), io, env).unwrap();
     let state_change = evm::backend::Apply::Modify {
-        address,
+        address: address.raw(),
         basic: evm::backend::Basic {
             balance: balance.raw(),
             nonce,
