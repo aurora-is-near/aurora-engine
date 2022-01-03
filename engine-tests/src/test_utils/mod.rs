@@ -6,7 +6,6 @@ use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
 use near_primitives_core::runtime::fees::RuntimeFeesConfig;
-use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome};
 use near_vm_runner::{MockCompiledContractCache, VMError};
@@ -35,6 +34,7 @@ pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
+pub(crate) mod mocked_external;
 pub(crate) mod one_inch;
 pub(crate) mod random;
 pub(crate) mod rust;
@@ -76,7 +76,7 @@ pub(crate) struct AuroraRunner {
     pub chain_id: u64,
     pub code: ContractCode,
     pub cache: MockCompiledContractCache,
-    pub ext: MockedExternal,
+    pub ext: mocked_external::MockedExternalWithTrie,
     pub context: VMContext,
     pub wasm_config: VMConfig,
     pub fees_config: RuntimeFeesConfig,
@@ -92,7 +92,7 @@ pub(crate) struct AuroraRunner {
 #[derive(Clone)]
 pub(crate) struct OneShotAuroraRunner<'a> {
     pub base: &'a AuroraRunner,
-    pub ext: MockedExternal,
+    pub ext: mocked_external::MockedExternalWithTrie,
     pub context: VMContext,
 }
 
@@ -239,7 +239,7 @@ impl AuroraRunner {
         init_nonce: U256,
         code: Option<Vec<u8>>,
     ) {
-        let trie = &mut self.ext.fake_trie;
+        let trie = &mut self.ext.underlying.fake_trie;
 
         let balance_key = crate::prelude::storage::address_to_key(
             crate::prelude::storage::KeyPrefix::Balance,
@@ -470,9 +470,9 @@ impl AuroraRunner {
             let standalone_state = standalone_runner.get_current_state();
             // The number of keys in standalone_state may be larger because values are never deleted
             // (they are replaced with a Deleted identifier instead; this is important for replaying transactions).
-            assert!(self.ext.fake_trie.len() <= standalone_state.iter().count());
+            assert!(self.ext.underlying.fake_trie.len() <= standalone_state.iter().count());
             for (key, value) in standalone_state.iter() {
-                let trie_value = self.ext.fake_trie.get(key).map(|v| v.as_slice());
+                let trie_value = self.ext.underlying.fake_trie.get(key).map(|v| v.as_slice());
                 let standalone_value = value.value();
                 if trie_value != standalone_value {
                     panic!(
@@ -506,7 +506,7 @@ impl Default for AuroraRunner {
             chain_id: 1313161556, // NEAR localnet,
             code: ContractCode::new(evm_wasm_bytes, None),
             cache: Default::default(),
-            ext: Default::default(),
+            ext: mocked_external::MockedExternalWithTrie::new(Default::default()),
             context: VMContext {
                 current_account_id: as_account_id(&aurora_account_id),
                 signer_account_id: as_account_id(&aurora_account_id),
@@ -538,7 +538,7 @@ impl Default for AuroraRunner {
 /// (which was removed in https://github.com/near/nearcore/pull/4438).
 #[derive(Default, Clone)]
 pub(crate) struct ExecutionProfile {
-    host_breakdown: ProfileData,
+    pub host_breakdown: ProfileData,
     wasm_gas: u64,
 }
 
