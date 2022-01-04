@@ -57,7 +57,7 @@ fn test_1inch_liquidity_protocol() {
             max_token_b: 10_000.into(),
         },
     );
-    assert!(result.gas_used >= 2_000); // more than 302k EVM gas used
+    assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
     assert_gas_bound(profile.all_gas(), 46); // less than 46 NEAR Tgas used
 
     // Same here
@@ -100,9 +100,9 @@ fn test_1_inch_limit_order_deploy() {
 
     // more than 3.5 million Ethereum gas used
     assert!(result.gas_used > 3_500_000);
-    // less than 27 NEAR Tgas used
-    assert_gas_bound(profile.all_gas(), 28);
-    // at least 70% of which is from wasm execution
+    // less than 14 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 14);
+    // at least 45% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         wasm_fraction >= 45,
