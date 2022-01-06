@@ -112,8 +112,8 @@ fn profile_erc20_get_balance() {
     // at least 70% of the cost is spent on wasm computation (as opposed to host functions)
     let wasm_fraction = (100 * profile.wasm_gas()) / profile.all_gas();
     assert!(
-        wasm_fraction >= 68,
-        "{}% is not greater than 68%",
+        wasm_fraction >= 46,
+        "{}% is not greater than 46%",
         wasm_fraction
     );
 }

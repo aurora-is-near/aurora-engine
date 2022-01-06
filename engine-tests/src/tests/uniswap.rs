@@ -29,15 +29,15 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    test_utils::assert_gas_bound(profile.all_gas(), 114);
+    test_utils::assert_gas_bound(profile.all_gas(), 64);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
-    assert!(wasm_fraction >= 68, "{}% not more than 68%", wasm_fraction);
+    assert!(wasm_fraction >= 46, "{}% not more than 46%", wasm_fraction);
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    test_utils::assert_gas_bound(profile.all_gas(), 68);
+    test_utils::assert_gas_bound(profile.all_gas(), 36);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
-    assert!(wasm_fraction >= 72, "{}% not more than 72%", wasm_fraction);
+    assert!(wasm_fraction >= 52, "{}% not more than 52%", wasm_fraction);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
