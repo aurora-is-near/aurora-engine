@@ -497,7 +497,9 @@ impl Default for AuroraRunner {
         };
         let mut wasm_config = VMConfig::default();
         // See https://github.com/near/nearcore/pull/4979/
-        wasm_config.regular_op_cost = 2207874;
+        //wasm_config.regular_op_cost = 2207874;
+        // See https://github.com/near/nearcore/pull/5365
+        wasm_config.regular_op_cost = 822756;
 
         Self {
             aurora_account_id: aurora_account_id.clone(),
