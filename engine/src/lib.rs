@@ -177,6 +177,7 @@ mod contract {
     pub extern "C" fn deploy_upgrade() {
         let io = Runtime;
         let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
         let index = internal_get_upgrade_index();
         if io.block_height() <= index + state.upgrade_delay_blocks {
             sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
