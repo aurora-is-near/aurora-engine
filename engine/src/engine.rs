@@ -215,6 +215,7 @@ pub enum DeployErc20Error {
     Engine(EngineError),
     Register(RegisterTokenError),
 }
+
 impl AsRef<[u8]> for DeployErc20Error {
     fn as_ref(&self) -> &[u8] {
         match self {
@@ -860,7 +861,12 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         .address
         .ok_or(EngineErrorKind::InvalidSignature)?;
 
-    sdk::log!(crate::prelude::format!("signer_address {:?}", sender).as_str());
+    sdk::log!(crate::prelude::format!(
+        "tx_hash: 0x{}",
+        hex::encode(aurora_engine_sdk::keccak(transaction_bytes))
+    )
+    .as_str());
+    sdk::log!(crate::prelude::format!("signer_address: {:?}", sender).as_str());
 
     check_nonce(&io, &sender, &transaction.nonce)?;
 
