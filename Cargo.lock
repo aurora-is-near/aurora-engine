@@ -120,6 +120,7 @@ dependencies = [
  "aurora-bn",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
+ "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
  "blake2 0.9.1 (git+https://github.com/near/near-blake2.git)",
@@ -214,6 +215,17 @@ dependencies = [
  "sha3 0.9.1",
  "tempfile",
  "wasmer-near",
+]
+
+[[package]]
+name = "aurora-engine-transactions"
+version = "1.0.0"
+dependencies = [
+ "aurora-engine-precompiles",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "evm",
+ "rlp",
 ]
 
 [[package]]
@@ -1202,6 +1214,7 @@ version = "0.1.0"
 dependencies = [
  "aurora-engine",
  "aurora-engine-sdk",
+ "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
  "borsh 0.8.2",

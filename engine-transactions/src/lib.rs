@@ -1,5 +1,5 @@
-use crate::prelude::types::{Address, Wei};
-use crate::prelude::{vec, TryFrom, Vec, H160, U256};
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{vec, TryFrom, Vec, H160, U256};
 use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 

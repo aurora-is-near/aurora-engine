@@ -13,12 +13,12 @@ use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::precompiles::Precompiles;
+use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
     BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, TryFrom,
     TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
-use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_precompiles::PrecompileConstructorContext;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
@@ -82,7 +82,7 @@ pub enum EngineErrorKind {
     EvmFatal(ExitFatal),
     /// Incorrect nonce.
     IncorrectNonce,
-    FailedTransactionParse(crate::transaction::ParseTransactionError),
+    FailedTransactionParse(crate::prelude::transactions::ParseTransactionError),
     InvalidChainId,
     InvalidSignature,
     IntrinsicGasNotMet,
@@ -215,6 +215,7 @@ pub enum DeployErc20Error {
     Engine(EngineError),
     Register(RegisterTokenError),
 }
+
 impl AsRef<[u8]> for DeployErc20Error {
     fn as_ref(&self) -> &[u8] {
         match self {

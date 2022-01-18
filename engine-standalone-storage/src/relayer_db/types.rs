@@ -1,4 +1,4 @@
-use aurora_engine::transaction::{
+use aurora_engine_transactions::{
     legacy::{LegacyEthSignedTransaction, TransactionLegacy},
     EthTransactionKind,
 };
