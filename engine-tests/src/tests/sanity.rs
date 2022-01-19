@@ -194,7 +194,7 @@ fn test_override_state() {
     // deploy contract
     let result = runner
         .submit_with_signer(&mut account1, |nonce| {
-            crate::prelude::transaction::legacy::TransactionLegacy {
+            crate::prelude::transactions::legacy::TransactionLegacy {
                 nonce,
                 gas_price: Default::default(),
                 gas_limit: u64::MAX.into(),

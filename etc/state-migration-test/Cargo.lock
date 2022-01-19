@@ -42,6 +42,7 @@ dependencies = [
  "aurora-bn",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
+ "aurora-engine-transactions",
  "aurora-engine-types",
  "base64",
  "blake2",
@@ -102,6 +103,18 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
  "borsh",
+]
+
+[[package]]
+name = "aurora-engine-transactions"
+version = "1.0.0"
+dependencies = [
+ "aurora-engine-precompiles",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "evm",
+ "hex",
+ "rlp",
 ]
 
 [[package]]

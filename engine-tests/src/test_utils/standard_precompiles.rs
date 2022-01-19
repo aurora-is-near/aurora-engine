@@ -1,4 +1,4 @@
-use crate::prelude::{transaction::legacy::TransactionLegacy, U256};
+use crate::prelude::{transactions::legacy::TransactionLegacy, U256};
 use crate::test_utils::solidity;
 use std::path::{Path, PathBuf};
 

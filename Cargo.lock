@@ -186,6 +186,7 @@ dependencies = [
  "aurora-engine",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
+ "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
  "borsh 0.8.2",
@@ -225,6 +226,7 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
  "evm",
+ "hex",
  "rlp",
 ]
 

@@ -304,7 +304,7 @@ fn test_consume_submit_message() {
     let signed_transaction =
         test_utils::sign_transaction(transaction, Some(runner.chain_id), &signer.secret_key);
     let eth_transaction =
-        aurora_engine::transaction::EthTransactionKind::Legacy(signed_transaction);
+        crate::prelude::transactions::EthTransactionKind::Legacy(signed_transaction);
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash,

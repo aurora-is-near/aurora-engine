@@ -1,4 +1,4 @@
-use aurora_engine::transaction::legacy::TransactionLegacy;
+use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::U256;
 
