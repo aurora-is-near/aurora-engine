@@ -1,6 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
-#![cfg_attr(feature = "log", feature(panic_info_message))]
 
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, TryFrom, Vec, H160, U256};

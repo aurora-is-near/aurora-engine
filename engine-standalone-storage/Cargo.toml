@@ -2,7 +2,7 @@
 name = "engine-standalone-storage"
 version = "0.1.0"
 edition = "2018"
-authors = ["Aurora <hello@aurora.dev>"]
+authors = ["Aurora Labs <hello@aurora.dev>"]
 description = "Aurora engine standalone storage library. Provides the storage backend used by the standalone engine."
 homepage = "https://github.com/aurora-is-near/aurora-engine"
 repository = "https://github.com/aurora-is-near/aurora-engine"

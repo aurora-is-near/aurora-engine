@@ -1,7 +1,7 @@
 [package]
 name = "aurora-engine"
 version = "2.1.0"
-authors = ["NEAR <hello@near.org>"]
+authors = ["Aurora Labs <hello@aurora.dev>"]
 edition = "2018"
 description = ""
 documentation = ""
@@ -46,7 +46,7 @@ rand = "0.7.3"
 
 [features]
 default = ["std"]
-std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "logos/std", "bn/std", "aurora-engine-types/std", "rjson/std", "aurora-engine-precompiles/std"]
+std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "logos/std", "bn/std", "aurora-engine-types/std", "rjson/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std"]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
 evm_bully = []
 log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]
