@@ -136,6 +136,38 @@ fn test_log_address() {
 }
 
 #[test]
+fn test_revert_during_contract_deploy() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+        "src/tests/res",
+        "target/solidity_build",
+        "reverter.sol",
+        "ReverterByDefault",
+    );
+
+    let nonce = signer.use_nonce();
+    let deploy_tx =
+        constructor.deploy_with_args(nonce.into(), &[ethabi::Token::Uint(U256::zero())]);
+    let submit_result = runner
+        .submit_transaction(&signer.secret_key, deploy_tx)
+        .unwrap();
+
+    let revert_bytes = crate::test_utils::unwrap_revert(submit_result);
+    // First 4 bytes is a function selector with signature `Error(string)`
+    assert_eq!(&revert_bytes[0..4], &[8, 195, 121, 160]);
+    // Remaining data is an ABI-encoded string
+    let revert_message = ethabi::decode(&[ethabi::ParamType::String], &revert_bytes[4..])
+        .unwrap()
+        .pop()
+        .unwrap()
+        .into_string()
+        .unwrap();
+
+    assert_eq!(revert_message.as_str(), "Revert message");
+}
+
+#[test]
 fn test_timestamp() {
     let (mut runner, mut signer, _) = initialize_transfer();
 

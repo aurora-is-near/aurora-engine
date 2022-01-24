@@ -350,15 +350,15 @@ impl StackExecutorParams {
     fn make_executor<'a, 'env, I: IO + Copy, E: Env>(
         &'a self,
         engine: &'a Engine<'env, I, E>,
-    ) -> executor::StackExecutor<
+    ) -> executor::stack::StackExecutor<
         'static,
         'a,
-        executor::MemoryStackState<Engine<'env, I, E>>,
+        executor::stack::MemoryStackState<Engine<'env, I, E>>,
         Precompiles,
     > {
-        let metadata = executor::StackSubstateMetadata::new(self.gas_limit, CONFIG);
-        let state = executor::MemoryStackState::new(metadata, engine);
-        executor::StackExecutor::new_with_precompiles(state, CONFIG, &self.precompiles)
+        let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
+        let state = executor::stack::MemoryStackState::new(metadata, engine);
+        executor::stack::StackExecutor::new_with_precompiles(state, CONFIG, &self.precompiles)
     }
 }
 
@@ -499,13 +499,16 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let address = executor.create_address(CreateScheme::Legacy {
             caller: origin.raw(),
         });
-        let (exit_reason, result) = (
-            executor.transact_create(origin.raw(), value.raw(), input, gas_limit, access_list),
-            address,
-        );
+        let (exit_reason, return_value) =
+            executor.transact_create(origin.raw(), value.raw(), input, gas_limit, access_list);
+        let result = if exit_reason.is_succeed() {
+            address.0.to_vec()
+        } else {
+            return_value
+        };
 
         let used_gas = executor.used_gas();
-        let status = match exit_reason.into_result(result.0.to_vec()) {
+        let status = match exit_reason.into_result(result) {
             Ok(status) => status,
             Err(e) => {
                 increment_nonce(&mut self.io, &origin);
