@@ -232,6 +232,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto_impl"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7862e21c893d65a1650125d157eaeec691439379a1cee17ee49031b79236ada4"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1358,9 +1370,10 @@ checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 
 [[package]]
 name = "evm"
-version = "0.31.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
+version = "0.33.1"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=177e253ad947b7186bfa6920843075556b60ff54#177e253ad947b7186bfa6920843075556b60ff54"
 dependencies = [
+ "auto_impl",
  "environmental",
  "ethereum",
  "evm-core",
@@ -1377,8 +1390,8 @@ dependencies = [
 
 [[package]]
 name = "evm-core"
-version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
+version = "0.33.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=177e253ad947b7186bfa6920843075556b60ff54#177e253ad947b7186bfa6920843075556b60ff54"
 dependencies = [
  "funty",
  "parity-scale-codec",
@@ -1389,8 +1402,8 @@ dependencies = [
 
 [[package]]
 name = "evm-gasometer"
-version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
+version = "0.33.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=177e253ad947b7186bfa6920843075556b60ff54#177e253ad947b7186bfa6920843075556b60ff54"
 dependencies = [
  "environmental",
  "evm-core",
@@ -1400,9 +1413,10 @@ dependencies = [
 
 [[package]]
 name = "evm-runtime"
-version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
+version = "0.33.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=177e253ad947b7186bfa6920843075556b60ff54#177e253ad947b7186bfa6920843075556b60ff54"
 dependencies = [
+ "auto_impl",
  "environmental",
  "evm-core",
  "primitive-types 0.10.1",

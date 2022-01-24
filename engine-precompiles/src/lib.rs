@@ -47,9 +47,9 @@ impl PrecompileOutput {
     }
 }
 
-impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
+impl From<PrecompileOutput> for executor::stack::PrecompileOutput {
     fn from(output: PrecompileOutput) -> Self {
-        evm::executor::PrecompileOutput {
+        executor::stack::PrecompileOutput {
             exit_status: ExitSucceed::Returned,
             cost: output.cost.as_u64(),
             output: output.output,
@@ -58,7 +58,7 @@ impl From<PrecompileOutput> for evm::executor::PrecompileOutput {
     }
 }
 
-type EvmPrecompileResult = Result<evm::executor::PrecompileOutput, ExitError>;
+type EvmPrecompileResult = Result<executor::stack::PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
 pub trait Precompile {
@@ -102,7 +102,7 @@ impl HardFork for Berlin {}
 
 pub struct Precompiles(pub prelude::BTreeMap<Address, Box<dyn Precompile>>);
 
-impl executor::PrecompileSet for Precompiles {
+impl executor::stack::PrecompileSet for Precompiles {
     fn execute(
         &self,
         address: prelude::H160,
@@ -110,10 +110,10 @@ impl executor::PrecompileSet for Precompiles {
         gas_limit: Option<u64>,
         context: &Context,
         is_static: bool,
-    ) -> Option<Result<executor::PrecompileOutput, executor::PrecompileFailure>> {
+    ) -> Option<Result<executor::stack::PrecompileOutput, executor::stack::PrecompileFailure>> {
         self.0.get(&Address::new(address)).map(|p| {
             p.run(input, gas_limit.map(EthGas::new), context, is_static)
-                .map_err(|exit_status| executor::PrecompileFailure::Error { exit_status })
+                .map_err(|exit_status| executor::stack::PrecompileFailure::Error { exit_status })
         })
     }
 
