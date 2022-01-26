@@ -3,8 +3,8 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    format, Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256, String, ToString,
-    TryFrom, Vec, WeiU256,
+    format, Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256, String, TryFrom,
+    Vec, WeiU256,
 };
 use crate::proof::Proof;
 use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
@@ -263,7 +263,7 @@ impl From<NEP141FtOnTransferArgs> for String {
             value.sender_id,
             value.amount,
             // Escape message to avoid json injection attacks
-            value.msg.replace("\\", "\\\\").replace("\"", "\\\"")
+            value.msg.replace('\\', "\\\\").replace('"', "\\\"")
         )
     }
 }
@@ -304,11 +304,9 @@ impl StorageBalance {
     pub fn to_json_bytes(&self) -> Vec<u8> {
         format!(
             "{{\"total\": \"{}\", \"available\": \"{}\"}}",
-            self.total.to_string(),
-            self.available.to_string()
+            self.total, self.available
         )
-        .as_bytes()
-        .to_vec()
+        .into_bytes()
     }
 }
 

@@ -184,12 +184,12 @@ impl From<postgres::Row> for TransactionRow {
             gas_limit,
             gas_used: gas_used.low_u64(),
             value: Wei::new(value),
-            input: input.unwrap_or_else(Vec::new),
+            input: input.unwrap_or_default(),
             v: v.low_u64(),
             r,
             s,
             status,
-            output: output.unwrap_or_else(Vec::new),
+            output: output.unwrap_or_default(),
         }
     }
 }

@@ -1083,7 +1083,7 @@ pub fn remove_code<I: IO>(io: &mut I, address: &Address) {
 pub fn get_code<I: IO>(io: &I, address: &Address) -> Vec<u8> {
     io.read_storage(&address_to_key(KeyPrefix::Code, address))
         .map(|s| s.to_vec())
-        .unwrap_or_else(Vec::new)
+        .unwrap_or_default()
 }
 
 pub fn get_code_size<I: IO>(io: &I, address: &Address) -> usize {
@@ -1205,7 +1205,7 @@ pub fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32
                 None
             }
         })
-        .unwrap_or_else(H256::default)
+        .unwrap_or_default()
 }
 
 pub fn is_account_empty<I: IO>(io: &I, address: &Address) -> bool {
