@@ -1,6 +1,6 @@
 use crate::prelude::{Address, U256};
 use crate::test_utils::solidity;
-use aurora_engine::transaction::legacy::TransactionLegacy;
+use aurora_engine_transactions::legacy::TransactionLegacy;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::process::Command;

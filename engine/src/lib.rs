@@ -14,7 +14,6 @@ mod map;
 pub mod meta_parsing;
 pub mod parameters;
 pub mod proof;
-pub mod transaction;
 
 pub mod admin_controlled;
 #[cfg_attr(feature = "contract", allow(dead_code))]

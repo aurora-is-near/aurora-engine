@@ -14,7 +14,7 @@ use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
-use crate::prelude::transaction::{
+use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
     legacy::{LegacyEthSignedTransaction, TransactionLegacy},

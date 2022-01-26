@@ -35,6 +35,7 @@ members = [
     "engine-standalone-storage",
     "engine-standalone-tracing",
     "engine-tests",
+    "engine-transactions",
     "engine-types",
 ]
 exclude = [

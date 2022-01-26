@@ -27,7 +27,7 @@ impl<'a> Helper<'a> {
         let (result, profile) = self
             .runner
             .submit_with_signer_profiled(self.signer, |nonce| {
-                crate::prelude::transaction::legacy::TransactionLegacy {
+                crate::prelude::transactions::legacy::TransactionLegacy {
                     nonce,
                     gas_price: Default::default(),
                     gas_limit: u64::MAX.into(),
