@@ -533,7 +533,7 @@ impl Precompile for ExitToEthereum {
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
-                    let eth_recipient: String = hex::encode(input.to_vec());
+                    let eth_recipient: String = hex::encode(input);
                     // unwrap cannot fail since we checked the length already
                     let recipient_address = Address::try_from_slice(input).map_err(|_| {
                         ExitError::Other(crate::prelude::Cow::from("ERR_WRONG_ADDRESS"))
