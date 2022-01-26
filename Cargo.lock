@@ -4905,9 +4905,9 @@ dependencies = [
 
 [[package]]
 name = "wasmer-runtime-core-near"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cf26de331c8ef4257bef33649b4665535b105c927ab2e00715f17891362efe8"
+checksum = "5a3fac37da3c625e98708c5dd92d3f642aaf700fd077168d3d0fff277ec6a165"
 dependencies = [
  "bincode",
  "blake3",
