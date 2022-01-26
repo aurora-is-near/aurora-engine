@@ -1,7 +1,7 @@
 [package]
 name = "aurora-engine-precompiles"
 version = "1.0.0"
-authors = ["NEAR <hello@near.org>"]
+authors = ["Aurora Labs <hello@aurora.dev>"]
 edition = "2018"
 description = ""
 documentation = ""

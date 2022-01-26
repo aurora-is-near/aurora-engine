@@ -2,7 +2,7 @@ use crate::prelude::{Address, Balance, TryInto, Wei, WeiU256, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
-use aurora_engine::transaction::legacy::LegacyEthSignedTransaction;
+use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
 use near_vm_logic::VMOutcome;
@@ -520,7 +520,7 @@ mod sim_tests {
             nep_141_balance_of(
                 aurora.contract.account_id.as_str(),
                 &aurora.contract,
-                &aurora
+                &aurora,
             ),
             (INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT).into()
         );
@@ -615,7 +615,7 @@ mod sim_tests {
             nep_141_balance_of(
                 aurora.contract.account_id.as_str(),
                 &aurora.contract,
-                &aurora
+                &aurora,
             ),
             INITIAL_ETH_BALANCE.into()
         );

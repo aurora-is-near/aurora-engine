@@ -1,6 +1,6 @@
 use aurora_engine::engine;
-use aurora_engine::transaction::EthTransactionKind;
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
+use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::H256;
 use postgres::fallible_iterator::FallibleIterator;
@@ -166,16 +166,19 @@ pub mod error {
             Self::Storage(e)
         }
     }
+
     impl From<postgres::Error> for Error {
         fn from(e: postgres::Error) -> Self {
             Self::Postgres(e)
         }
     }
+
     impl From<engine::EngineStateError> for Error {
         fn from(e: engine::EngineStateError) -> Self {
             Self::EngineState(e)
         }
     }
+
     impl From<engine::EngineError> for Error {
         fn from(e: engine::EngineError) -> Self {
             Self::Engine(e)

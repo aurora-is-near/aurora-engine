@@ -1,6 +1,6 @@
 use crate::prelude::U256;
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
-use aurora_engine::transaction::legacy::TransactionLegacy;
+use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::H256;
 use ethabi::Constructor;
 

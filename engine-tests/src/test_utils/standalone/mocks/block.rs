@@ -1,4 +1,4 @@
-use aurora_engine::transaction::legacy::LegacyEthSignedTransaction;
+use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
 
 /// A vastly simplified block structure
 pub struct Block {

@@ -130,7 +130,7 @@ fn test_evm_tracing() {
     runner.init_evm();
 
     // Deploy contract
-    let deploy_tx = aurora_engine::transaction::legacy::TransactionLegacy {
+    let deploy_tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: U256::zero(),
         gas_limit: u64::MAX.into(),
@@ -145,7 +145,7 @@ fn test_evm_tracing() {
         Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
 
     // Interact with contract (and trace execution)
-    let tx = aurora_engine::transaction::legacy::TransactionLegacy {
+    let tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: U256::zero(),
         gas_limit: 90_000.into(),

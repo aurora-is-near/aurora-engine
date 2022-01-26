@@ -1,5 +1,7 @@
-use crate::prelude::precompiles::secp256k1::ecrecover;
-use crate::prelude::{sdk, Address, Vec, Wei, U256};
+use aurora_engine_precompiles::secp256k1::ecrecover;
+use aurora_engine_sdk as sdk;
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{Vec, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -40,7 +42,7 @@ impl TransactionLegacy {
     /// Returns self.gas as a u64, or None if self.gas > u64::MAX
     #[allow(unused)]
     pub fn get_gas_limit(&self) -> Option<u64> {
-        use crate::prelude::TryInto;
+        use aurora_engine_types::TryInto;
         self.gas_limit.try_into().ok()
     }
 
@@ -149,6 +151,7 @@ impl Decodable for LegacyEthSignedTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aurora_engine_types::vec;
 
     #[test]
     fn test_eth_signed_no_chain_sender() {

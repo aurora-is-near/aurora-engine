@@ -2,7 +2,7 @@
 name = "engine-standalone-storage"
 version = "0.1.0"
 edition = "2018"
-authors = ["Aurora <hello@aurora.dev>"]
+authors = ["Aurora Labs <hello@aurora.dev>"]
 description = "Aurora engine standalone storage library. Provides the storage backend used by the standalone engine."
 homepage = "https://github.com/aurora-is-near/aurora-engine"
 repository = "https://github.com/aurora-is-near/aurora-engine"
@@ -17,6 +17,7 @@ crate-type = ["lib"]
 aurora-engine = { path = "../engine", default-features = false, features = ["std"] }
 aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
+aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
 borsh = { version = "0.8.2" }
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "177e253ad947b7186bfa6920843075556b60ff54", default-features = false }
 rocksdb = "0.16.0"

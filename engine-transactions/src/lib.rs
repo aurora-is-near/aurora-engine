@@ -1,5 +1,8 @@
-use crate::prelude::types::{Address, Wei};
-use crate::prelude::{vec, TryFrom, Vec, H160, U256};
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{vec, TryFrom, Vec, H160, U256};
 use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 
