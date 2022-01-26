@@ -548,8 +548,7 @@ impl Precompile for ExitToEthereum {
                             amount.as_u128(),
                             eth_recipient
                         )
-                        .as_bytes()
-                        .to_vec(),
+                        .into_bytes(),
                         events::ExitToEth {
                             sender: Address::new(erc20_address),
                             erc20_address: Address::new(erc20_address),
