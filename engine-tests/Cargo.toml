@@ -42,12 +42,12 @@ near-vm-runner = { git = "https://github.com/near/nearcore.git", rev = "0c9ad79a
 near-vm-logic = { git = "https://github.com/near/nearcore.git", rev = "0c9ad79a18e431f843e6123cf4559f9c2c5dd228" }
 near-primitives-core = { git = "https://github.com/near/nearcore.git", rev = "0c9ad79a18e431f843e6123cf4559f9c2c5dd228" }
 near-primitives = { git = "https://github.com/near/nearcore.git", rev = "0c9ad79a18e431f843e6123cf4559f9c2c5dd228" }
-wasmer = { package = "wasmer-near", version = "2.0.1", default-features = false, features = ["singlepass", "universal"] }
 libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
 tempfile = "3.2.0"
+walrus = "0.19"
 
 [features]
 meta-call = ["aurora-engine/meta-call"]

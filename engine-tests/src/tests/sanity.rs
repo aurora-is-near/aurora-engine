@@ -283,9 +283,10 @@ fn test_num_wasm_functions() {
     // Counts the number of functions in our wasm output.
     // See https://github.com/near/nearcore/issues/4814 for context
     let runner = test_utils::deploy_evm();
-    let artifact = get_compiled_artifact(&runner);
-    let module_info = artifact.info();
-    let num_functions = module_info.functions.len();
+    let module = walrus::ModuleConfig::default()
+        .parse(runner.code.code())
+        .unwrap();
+    let num_functions = module.funcs.iter().count();
     assert!(
         num_functions <= 1440,
         "{} is not less than 1440",
@@ -741,26 +742,4 @@ fn query_address_sim(
         near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
         other => panic!("Unexpected outcome: {:?}", other),
     }
-}
-
-fn get_compiled_artifact(runner: &test_utils::AuroraRunner) -> wasmer::Module {
-    use near_primitives::types::CompiledContractCache;
-
-    let current_protocol_version = u32::MAX;
-    let vm_kind = near_vm_runner::VMKind::for_protocol_version(current_protocol_version);
-    near_vm_runner::precompile_contract(
-        &runner.code,
-        &runner.wasm_config,
-        current_protocol_version,
-        Some(&runner.cache),
-    )
-    .unwrap()
-    .unwrap();
-    let cache_key =
-        near_vm_runner::get_contract_cache_key(&runner.code, vm_kind, &runner.wasm_config);
-    let cache_record =
-        Vec::try_from_slice(&runner.cache.get(cache_key.as_ref()).unwrap().unwrap()[1..]).unwrap();
-    let store = wasmer::Store::new(&wasmer::Universal::new(wasmer::Singlepass::new()).engine());
-
-    unsafe { wasmer::Module::deserialize(&store, &cache_record).unwrap() }
 }
