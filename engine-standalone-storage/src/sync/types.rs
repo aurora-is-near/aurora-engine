@@ -40,6 +40,7 @@ pub struct TransactionMessage {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum TransactionKind {
     /// Raw Ethereum transaction submitted to the engine
     Submit(EthTransactionKind),
