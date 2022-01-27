@@ -136,6 +136,47 @@ fn test_log_address() {
 }
 
 #[test]
+fn test_solidity_pure_bench() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+    runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
+
+    let constructor = test_utils::solidity::ContractConstructor::force_compile(
+        "src/tests/res",
+        "target/solidity_build",
+        "bench.sol",
+        "Bencher",
+    );
+
+    let nonce = signer.use_nonce();
+    let contract = runner.deploy_contract(
+        &signer.secret_key,
+        |c| c.deploy_without_constructor(nonce.into()),
+        constructor,
+    );
+
+    // Number of iterations to do
+    let loop_limit = 10_000;
+    let (result, profile) = runner
+        .submit_with_signer_profiled(&mut signer, |nonce| {
+            contract.call_method_with_args(
+                "cpu_ram_soak_test",
+                &[ethabi::Token::Uint(loop_limit.into())],
+                nonce,
+            )
+        })
+        .unwrap();
+
+    assert!(
+        result.gas_used > 38_000_000,
+        "Over 38 million EVM gas is used"
+    );
+    assert!(
+        profile.all_gas() > 2900 * 1_000_000_000_000,
+        "Over 2900 NEAR Tgas is used"
+    );
+}
+
+#[test]
 fn test_revert_during_contract_deploy() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
