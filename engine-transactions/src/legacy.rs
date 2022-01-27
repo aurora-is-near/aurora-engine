@@ -42,7 +42,6 @@ impl TransactionLegacy {
     /// Returns self.gas as a u64, or None if self.gas > u64::MAX
     #[allow(unused)]
     pub fn get_gas_limit(&self) -> Option<u64> {
-        use aurora_engine_types::TryInto;
         self.gas_limit.try_into().ok()
     }
 

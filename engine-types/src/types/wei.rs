@@ -115,7 +115,6 @@ impl Wei {
     /// Try convert U256 to u128 with checking overflow.
     /// NOTICE: Error can contain only overflow
     pub fn try_into_u128(self) -> Result<u128, error::BalanceOverflowError> {
-        use crate::TryInto;
         self.0.try_into().map_err(|_| error::BalanceOverflowError)
     }
 }

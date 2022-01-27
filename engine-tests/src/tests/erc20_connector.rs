@@ -1,4 +1,4 @@
-use crate::prelude::{Address, Balance, TryInto, Wei, WeiU256, U256};
+use crate::prelude::{Address, Balance, Wei, WeiU256, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};

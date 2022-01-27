@@ -3,8 +3,8 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    format, Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256, String, TryFrom,
-    Vec, WeiU256,
+    format, Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256, String, Vec,
+    WeiU256,
 };
 use crate::proof::Proof;
 use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};

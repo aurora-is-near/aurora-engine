@@ -83,7 +83,7 @@ mod contract {
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{
-        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, TryFrom, TryInto, Vec, Wei, Yocto,
+        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, Vec, Wei, Yocto,
         ERC20_MINT_SELECTOR, ERR_FAILED_PARSE, H256, U256,
     };
     use aurora_engine_sdk::env::Env;
