@@ -1,7 +1,7 @@
 [package]
 name = "engine-standalone-tracing"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 authors = ["Aurora Labs <hello@aurora.dev>"]
 description = "Aurora engine standalone tracing library. Provides functions and types for extracing geth-like traces from standalone engine execution."
 homepage = "https://github.com/aurora-is-near/aurora-engine"

@@ -4,7 +4,6 @@ use crate::prelude::{
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use borsh::BorshSerialize;
-use std::convert::TryInto;
 
 pub(crate) struct SelfDestructFactoryConstructor(pub solidity::ContractConstructor);
 
