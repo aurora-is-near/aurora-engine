@@ -171,7 +171,6 @@ fn initialize_evm() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
     signer.nonce = INITIAL_NONCE;
 
     runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
-    runner.wasm_config.limit_config.max_gas_burnt_view = u64::MAX;
 
     (runner, signer, dest_address)
 }

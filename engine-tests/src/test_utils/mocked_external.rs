@@ -160,10 +160,6 @@ impl near_vm_logic::External for MockedExternalWithTrie {
         self.trie_node_count.get()
     }
 
-    fn reset_touched_nodes_counter(&mut self) {
-        self.trie_node_count.set(0)
-    }
-
     fn validator_stake(
         &self,
         account_id: &near_primitives::types::AccountId,
