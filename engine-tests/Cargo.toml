@@ -2,7 +2,7 @@
 name = "aurora-engine-tests"
 version = "1.0.0"
 authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2018"
+edition = "2021"
 description = ""
 documentation = ""
 readme = true

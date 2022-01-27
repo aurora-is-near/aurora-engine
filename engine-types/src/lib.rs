@@ -8,12 +8,9 @@ pub mod storage;
 pub mod types;
 
 mod v0 {
-    #[cfg(not(feature = "std"))]
     extern crate alloc;
-    #[cfg(not(feature = "std"))]
     extern crate core;
 
-    #[cfg(not(feature = "std"))]
     pub use alloc::{
         borrow::ToOwned,
         borrow::{Cow, Cow::*},
@@ -26,19 +23,11 @@ mod v0 {
         vec,
         vec::Vec,
     };
-    #[cfg(not(feature = "std"))]
     pub use core::{
-        cmp::Ordering, convert::TryFrom, convert::TryInto, fmt::Display, marker::PhantomData, mem,
-        ops::Add, ops::Div, ops::Mul, ops::Sub, ops::SubAssign,
+        cmp::Ordering, fmt::Display, marker::PhantomData, mem, ops::Add, ops::Div, ops::Mul,
+        ops::Sub, ops::SubAssign,
     };
     pub use primitive_types::{H160, H256, U256};
-    #[cfg(feature = "std")]
-    pub use std::{
-        borrow::Cow, borrow::Cow::Borrowed, borrow::ToOwned, boxed::Box, cmp::Ordering,
-        collections::BTreeMap, collections::HashMap, convert::TryFrom, convert::TryInto,
-        error::Error, fmt, fmt::Display, format, marker::PhantomData, mem, ops::Add, ops::Div,
-        ops::Mul, ops::Sub, ops::SubAssign, str, string::String, string::ToString, vec, vec::Vec,
-    };
 }
 
 pub use v0::*;

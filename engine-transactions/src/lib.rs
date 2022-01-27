@@ -2,7 +2,7 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 
 use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::{vec, TryFrom, Vec, H160, U256};
+use aurora_engine_types::{vec, Vec, H160, U256};
 use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 
