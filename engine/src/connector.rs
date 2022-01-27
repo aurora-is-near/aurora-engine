@@ -382,7 +382,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let total_supply = self.ft.ft_total_eth_supply_on_near();
         sdk::log!(&format!("Total ETH supply on NEAR: {}", total_supply));
         self.io
-            .return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
+            .return_output(format!("\"{}\"", total_supply).as_bytes());
     }
 
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
@@ -390,7 +390,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let total_supply = self.ft.ft_total_eth_supply_on_aurora();
         sdk::log!(&format!("Total ETH supply on Aurora: {}", total_supply));
         self.io
-            .return_output(format!("\"{}\"", total_supply.to_string()).as_bytes());
+            .return_output(format!("\"{}\"", total_supply).as_bytes());
     }
 
     /// Return balance of nETH (ETH on Near)
@@ -401,8 +401,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             args.account_id, balance
         ));
 
-        self.io
-            .return_output(format!("\"{}\"", balance.to_string()).as_bytes());
+        self.io.return_output(format!("\"{}\"", balance).as_bytes());
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
@@ -418,8 +417,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             args.address.encode(),
             balance
         ));
-        self.io
-            .return_output(format!("\"{}\"", balance.to_string()).as_bytes());
+        self.io.return_output(format!("\"{}\"", balance).as_bytes());
         Ok(())
     }
 
@@ -461,8 +459,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         ));
         // `ft_resolve_transfer` can change `total_supply` so we should save the contract
         self.save_ft_contract();
-        self.io
-            .return_output(format!("\"{}\"", amount.to_string()).as_bytes());
+        self.io.return_output(format!("\"{}\"", amount).as_bytes());
     }
 
     /// FT transfer call from sender account (invoker account) to receiver

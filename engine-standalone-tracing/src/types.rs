@@ -218,6 +218,7 @@ impl IntoIterator for Logs {
 }
 
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct TransactionTrace {
     /// The total gas cost of the transaction.
     gas: EthGas,
@@ -231,7 +232,6 @@ pub struct TransactionTrace {
 
 impl TransactionTrace {
     /// Constructs a new TransactionTrace with a given gas, return, and logs.
-    #[allow(dead_code)]
     pub fn new(
         gas: EthGas,
         failed: bool,
