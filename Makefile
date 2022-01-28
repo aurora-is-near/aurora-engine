@@ -58,7 +58,7 @@ testnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
 target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
-	RUSTFLAGS='-C link-arg=-s' $(CARGO) build \
+	RUSTFLAGS='' $(CARGO) build \
 		--target wasm32-unknown-unknown \
 		--release \
 		--verbose \
