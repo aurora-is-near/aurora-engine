@@ -12,7 +12,7 @@ rpath = false
 [profile.dev]
 # Due to a strange bug, setting this to 3 will cause test failures
 opt-level = "z"
-debug = false
+debug = true
 debug-assertions = true
 overflow-checks = true
 lto = true

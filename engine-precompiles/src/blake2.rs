@@ -1,3 +1,4 @@
+use core::ptr;
 use evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
@@ -106,7 +107,7 @@ impl Precompile for Blake2F {
 fn to_u8_slice(slice: &[u64]) -> &[u8] {
     let byte_len = 8*slice.len();
     unsafe {
-        std::slice::from_raw_parts(
+        &*ptr::slice_from_raw_parts(
             slice.as_ptr().cast::<u8>(),
             byte_len
         )

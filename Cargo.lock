@@ -2278,7 +2278,7 @@ checksum = "7843ec2de400bcbc6a6328c958dc38e5359da6e93e72e37bc5246bf1ae776389"
 [[package]]
 name = "near-account-id"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "borsh 0.9.2",
  "serde",
@@ -2306,7 +2306,7 @@ dependencies = [
 [[package]]
 name = "near-cache"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "lru",
 ]
@@ -2330,7 +2330,7 @@ dependencies = [
 [[package]]
 name = "near-crypto"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "arrayref",
  "blake2",
@@ -2428,7 +2428,7 @@ dependencies = [
 [[package]]
 name = "near-primitives"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "borsh 0.9.2",
  "byteorder",
@@ -2513,7 +2513,7 @@ dependencies = [
 [[package]]
 name = "near-primitives-core"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "base64 0.11.0",
  "borsh 0.9.2",
@@ -2563,7 +2563,7 @@ dependencies = [
 [[package]]
 name = "near-rpc-error-core"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "quote",
  "serde",
@@ -2595,7 +2595,7 @@ dependencies = [
 [[package]]
 name = "near-rpc-error-macro"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "near-rpc-error-core 0.0.0",
  "serde",
@@ -2696,7 +2696,7 @@ dependencies = [
 [[package]]
 name = "near-stable-hasher"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 
 [[package]]
 name = "near-store"
@@ -2727,7 +2727,7 @@ dependencies = [
 [[package]]
 name = "near-vm-errors"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "borsh 0.9.2",
  "near-account-id 0.0.0",
@@ -2761,7 +2761,7 @@ dependencies = [
 [[package]]
 name = "near-vm-logic"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "base64 0.13.0",
  "borsh 0.9.2",
@@ -2821,7 +2821,7 @@ dependencies = [
 [[package]]
 name = "near-vm-runner"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore.git?branch=profiler#e110af7074dc05863c99effae2c054c66d3c10d2"
+source = "git+https://github.com/near/nearcore.git?branch=profiler#abb96f976986bc66c0ffbb488552b6944f6c5874"
 dependencies = [
  "borsh 0.9.2",
  "loupe",
