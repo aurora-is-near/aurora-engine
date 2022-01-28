@@ -94,8 +94,22 @@ impl Precompile for Blake2F {
         }
         let finished = input[212] != 0;
 
-        let output = near_blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
+        let mut hasher = near_blake2::VarBlake2b::with_state(rounds, h, t);
+        hasher.update_inner(to_u8_slice(&m));
+        let output = hasher.output().to_vec();
+        // TODO: used to be
+        // let output = near_blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
         Ok(PrecompileOutput::without_logs(cost, output).into())
+    }
+}
+
+fn to_u8_slice(slice: &[u64]) -> &[u8] {
+    let byte_len = 8*slice.len();
+    unsafe {
+        std::slice::from_raw_parts(
+            slice.as_ptr().cast::<u8>(),
+            byte_len
+        )
     }
 }
 
