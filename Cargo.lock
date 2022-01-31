@@ -2296,7 +2296,7 @@ dependencies = [
 [[package]]
 name = "near-blake2"
 version = "0.9.1"
-source = "git+https://github.com/near/near-blake2.git#29a15a1ffa3bfb7baa54318c89ee6cfebaf4d590"
+source = "git+https://github.com/near/near-blake2.git#cebb7df79608a7058017940830d37c37d55d21fe"
 dependencies = [
  "crypto-mac 0.8.0",
  "digest 0.9.0",
