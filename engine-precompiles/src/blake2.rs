@@ -1,4 +1,3 @@
-use core::ptr;
 use evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
