@@ -365,6 +365,17 @@ mod contract {
         // TODO: charge for storage
     }
 
+    /// Deploy ERC20-Locker
+    #[no_mangle]
+    pub extern "C" fn deploy_erc20_locker() {
+        let mut io = Runtime;
+        // Only the owner can initialize the ERC20 locker
+        io.assert_private_call().sdk_unwrap();
+        let address = engine::deploy_erc20_locker(io, &io, &mut Runtime).sdk_unwrap();
+
+        io.return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
+    }
+
     /// Callback invoked by exit to NEAR precompile to handle potential
     /// errors in the exit call.
     #[no_mangle]

@@ -1,4 +1,5 @@
 use crate::parameters::{CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs};
+use aurora_engine_types::types::ERC20_UNLOCK_SELECTOR;
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
@@ -223,6 +224,22 @@ impl AsRef<[u8]> for DeployErc20Error {
             Self::Failed(e) => e.as_ref(),
             Self::Engine(e) => e.as_ref(),
             Self::Register(e) => e.as_ref(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum DeployErc20LockerError {
+    State(EngineStateError),
+    Failed(TransactionStatus),
+    Engine(EngineError),
+}
+impl AsRef<[u8]> for DeployErc20LockerError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::State(e) => e.as_ref(),
+            Self::Failed(e) => e.as_ref(),
+            Self::Engine(e) => e.as_ref(),
         }
     }
 }
@@ -747,17 +764,47 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             (recipient, fee)
         };
 
-        let erc20_token = Address::from_array(unwrap_res_or_finish!(
-            unwrap_res_or_finish!(
-                get_erc20_from_nep141(&self.io, token),
+        let factory_account_id = get_erc20_factory_account(&self.io);
+        let token_str = token.to_string();
+        let parts: Vec<&str> = token_str.split(".").collect();
+        let selector: &[u8];
+        let tail: Vec<u8>;
+        let contract: Address;
+
+        if factory_account_id.is_some()
+            && crate::prelude::format!("{}.{}", parts[0], factory_account_id.unwrap()) == token_str
+        {
+            let erc20_token = Address::from_array(unwrap_res_or_finish!(
+                parts[0].as_bytes().try_into(),
                 output_on_fail,
                 self.io
-            )
-            .as_slice()
-            .try_into(),
-            output_on_fail,
-            self.io
-        ));
+            ));
+            contract = get_erc20_locker_address(&self.io);
+            selector = ERC20_UNLOCK_SELECTOR;
+            tail = ethabi::encode(&[
+                ethabi::Token::Address(erc20_token.raw()),
+                ethabi::Token::Uint(U256::from(args.amount.as_u128())),
+                ethabi::Token::Address(recipient.raw()),
+            ]);
+        } else {
+            let erc20_token = Address::from_array(unwrap_res_or_finish!(
+                unwrap_res_or_finish!(
+                    get_erc20_from_nep141(&self.io, token),
+                    output_on_fail,
+                    self.io
+                )
+                .as_slice()
+                .try_into(),
+                output_on_fail,
+                self.io
+            ));
+            contract = erc20_token;
+            selector = ERC20_MINT_SELECTOR;
+            tail = ethabi::encode(&[
+                ethabi::Token::Address(recipient.raw()),
+                ethabi::Token::Uint(U256::from(args.amount.as_u128())),
+            ]);
+        }
 
         if fee != U256::from(0) {
             let relayer_address = unwrap_res_or_finish!(
@@ -779,17 +826,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             );
         }
 
-        let selector = ERC20_MINT_SELECTOR;
-        let tail = ethabi::encode(&[
-            ethabi::Token::Address(recipient.raw()),
-            ethabi::Token::Uint(U256::from(args.amount.as_u128())),
-        ]);
-
         let erc20_admin_address = current_address(current_account_id);
         unwrap_res_or_finish!(
             self.call(
                 &erc20_admin_address,
-                &erc20_token,
+                &contract,
                 Wei::zero(),
                 [selector, tail.as_slice()].concat(),
                 u64::MAX,
@@ -1074,6 +1115,62 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
         .map_err(DeployErc20Error::Register)?;
 
     Ok(address)
+}
+
+/// Used to bridge erc20 tokens from Aurora to NEAR. On Near the ERC-20 becomes an NEP-141.
+pub fn deploy_erc20_locker<I: IO + Copy, E: Env, P: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut P,
+) -> Result<Address, DeployErc20LockerError> {
+    let current_account_id = env.current_account_id();
+    let erc20_admin_address = current_address(&current_account_id);
+    let mut engine = Engine::new(
+        aurora_engine_sdk::types::near_account_to_evm_address(
+            env.predecessor_account_id().as_bytes(),
+        ),
+        current_account_id,
+        io,
+        env,
+    )
+    .map_err(DeployErc20LockerError::State)?;
+
+    let erc20_locker_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20Locker.bin");
+
+    let deploy_args = ethabi::encode(&[ethabi::Token::Address(erc20_admin_address.raw())]);
+
+    let address = match Engine::deploy_code_with_input(
+        &mut engine,
+        (&[erc20_locker_contract, deploy_args.as_slice()].concat()).to_vec(),
+        handler,
+    ) {
+        Ok(result) => match result.status {
+            TransactionStatus::Succeed(ret) => {
+                Address::from_array(ret.as_slice().try_into().unwrap())
+            }
+            other => return Err(DeployErc20LockerError::Failed(other)),
+        },
+        Err(e) => return Err(DeployErc20LockerError::Engine(e)),
+    };
+
+    sdk::log!(
+        crate::prelude::format!("Deployed ERC-20-locker in Aurora at: {:#?}", address).as_str()
+    );
+    Ok(address)
+}
+
+pub fn get_erc20_factory_account<I: IO>(io: &I) -> Option<AccountId> {
+    let data = io.read_storage(b"erc20_factory").map(|s| s.to_vec()); // TODO
+
+    match AccountId::try_from(data.unwrap_or_else(Vec::new)) {
+        Err(_error) => None,
+        Ok(account) => Some(account),
+    }
+}
+
+pub fn get_erc20_locker_address<I: IO>(io: &I) -> Address {
+    let data = io.read_storage(b"erc20_locker").map(|s| s.to_vec()); // TODO
+    Address::try_from_slice(&data.unwrap_or_else(Vec::new)).unwrap()
 }
 
 pub fn set_code<I: IO>(io: &mut I, address: &Address, code: &[u8]) {

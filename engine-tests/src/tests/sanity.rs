@@ -1,5 +1,5 @@
 use crate::prelude::{Address, U256};
-use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
+use crate::prelude::{Wei, ERC20_MINT_SELECTOR, ERC20_UNLOCK_SELECTOR};
 use crate::test_utils;
 use crate::tests::state_migration;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
@@ -602,6 +602,13 @@ fn check_selector() {
     let mut hasher = sha3::Keccak256::default();
     hasher.update(b"mint(address,uint256)");
     assert_eq!(hasher.finalize()[..4].to_vec(), ERC20_MINT_SELECTOR);
+
+    // Selector to call unlockToken function in ERC 20 locker contract
+    //
+    // keccak("unlockToken(address, uint256, address)".as_bytes())[..4];
+    let mut hasher = sha3::Keccak256::default();
+    hasher.update(b"unlockToken(address, uint256, address)");
+    assert_eq!(hasher.finalize()[..4].to_vec(), ERC20_UNLOCK_SELECTOR);
 }
 
 #[test]

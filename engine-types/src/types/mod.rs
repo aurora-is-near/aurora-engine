@@ -24,6 +24,12 @@ pub type StorageUsage = u64;
 #[allow(dead_code)]
 pub const ERC20_MINT_SELECTOR: &[u8] = &[64, 193, 15, 25];
 
+/// Selector to call unlockToken function in ERC 20 locker contract
+///
+/// keccak("unlockToken(address, uint256, address)".as_bytes())[..4];
+#[allow(dead_code)]
+pub const ERC20_UNLOCK_SELECTOR: &[u8] = &[101, 102, 236, 117];
+
 #[derive(Debug)]
 pub enum AddressValidationError {
     FailedDecodeHex,
