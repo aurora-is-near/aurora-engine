@@ -72,7 +72,8 @@ mod contract {
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
-        StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallCallArgs, ViewCallArgs,
+        SetErc20FactoryAccountArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
+        TransferCallCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -382,6 +383,19 @@ mod contract {
         engine::set_native_erc20_state(&mut io, state);
 
         io.return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
+    }
+
+    /// Set ERC20 factory account
+    #[no_mangle]
+    pub extern "C" fn set_native_erc20_factory() {
+        let mut io = Runtime;
+        // Only the owner can initialize the ERC20 locker
+        io.assert_private_call().sdk_unwrap();
+        let args: SetErc20FactoryAccountArgs = io.read_input_borsh().sdk_unwrap();
+
+        let mut state = engine::get_native_erc20_state(&io).unwrap_or_default();
+        state.erc20_factory_account = args.factory;
+        engine::set_native_erc20_state(&mut io, state);
     }
 
     /// Callback invoked by exit to NEAR precompile to handle potential

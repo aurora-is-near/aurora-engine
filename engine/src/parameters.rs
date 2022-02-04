@@ -188,6 +188,12 @@ pub struct DeployErc20TokenArgs {
     pub nep141: AccountId,
 }
 
+/// Borsh-encoded parameters for `set_native_erc20_factory` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+pub struct SetErc20FactoryAccountArgs {
+    pub factory: AccountId,
+}
+
 /// Borsh-encoded parameters for `get_erc20_from_nep141` function.
 pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgs;
 
