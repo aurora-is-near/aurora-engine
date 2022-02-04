@@ -1,4 +1,3 @@
-use crate::account_id::AccountId;
 use crate::types::Address;
 use crate::*;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -122,7 +121,7 @@ pub const NATIVE_ERC20_BRIDGE_STATE_KEY: &[u8; 7] = b"B_STATE";
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
 pub struct NativeErc20EngineState {
     /// Account of the erc20 factory on near to mint native erc20 tokens.
-    pub erc20_factory_account: AccountId,
+    pub erc20_factory_account: String,
     /// Address of the erc20 locker on Aurora side.
     pub erc20_locker_address: Address,
 }

@@ -765,13 +765,13 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let native_erc20_state = get_native_erc20_state(&self.io).unwrap_or_default();
-        let factory_account_id = native_erc20_state.erc20_factory_account.to_string();
+        let factory_account_id = native_erc20_state.erc20_factory_account;
         let token_str = token.to_string();
         let parts: Vec<&str> = token_str.split('.').collect();
         let contract: Address;
         let call_data: Vec<u8>;
 
-        if !factory_account_id.is_empty()
+        if AccountId::validate(&factory_account_id).is_ok()
             && crate::prelude::format!("{}.{}", parts[0], factory_account_id) == token_str
         {
             let erc20_token = unwrap_res_or_finish!(

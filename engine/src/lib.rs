@@ -394,7 +394,7 @@ mod contract {
         let args: SetErc20FactoryAccountArgs = io.read_input_borsh().sdk_unwrap();
 
         let mut state = engine::get_native_erc20_state(&io).unwrap_or_default();
-        state.erc20_factory_account = args.factory;
+        state.erc20_factory_account = args.factory.to_string();
         engine::set_native_erc20_state(&mut io, state);
     }
 
