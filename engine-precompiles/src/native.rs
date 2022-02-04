@@ -303,7 +303,7 @@ impl Precompile for ExitToNear {
         #[cfg(feature = "error_refund")]
         let refund_on_error_target = current_account_id.clone();
 
-        let (nep141_address, args, exit_event) = match flag {
+        let (nep141_address, args, exit_event, transfer_method) = match flag {
             0x0 => {
                 // ETH transfer
                 //
@@ -326,6 +326,7 @@ impl Precompile for ExitToNear {
                             dest: dest_account.to_string(),
                             amount: context.apparent_value,
                         },
+                        "ft_transfer",
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from(
@@ -370,6 +371,7 @@ impl Precompile for ExitToNear {
                             dest: receiver_account_id.to_string(),
                             amount,
                         },
+                        "ft_transfer",
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from(
@@ -383,6 +385,7 @@ impl Precompile for ExitToNear {
                 // This precompile branch is expected to be called from the ERC20 lock function\
                 //
                 // Input slice format:
+                //      erc20_token_address (20 bytes) - the erc20 token that was locked
                 //      amount (U256 big-endian bytes) - the amount that was locked
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
 
@@ -424,9 +427,11 @@ impl Precompile for ExitToNear {
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
-                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            receiver_account_id,
-                            amount.as_u128()
+                            r#"{{"locker_address": "{}", "token": "{}", "amount": "{}", "recipient": {}}}"#,
+                            caller_address,
+                            erc20_address.encode(),
+                            amount.as_u128(),
+                            receiver_account_id
                         ),
                         events::ExitToNear {
                             sender: Address::new(context.caller),
@@ -434,6 +439,7 @@ impl Precompile for ExitToNear {
                             dest: receiver_account_id.to_string(),
                             amount,
                         },
+                        "deposit",
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from(
@@ -466,7 +472,7 @@ impl Precompile for ExitToNear {
         };
         let transfer_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
-            method: "ft_transfer".to_string(),
+            method: transfer_method.to_string(),
             args: args.as_bytes().to_vec(),
             attached_balance: Yocto::new(1),
             attached_gas: costs::FT_TRANSFER_GAS,
