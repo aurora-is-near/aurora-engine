@@ -184,7 +184,9 @@ impl test_utils::AuroraRunner {
             ],
         );
 
-        let input = create_eth_transaction(Some(token.into()), Wei::zero(), input, None, &sender);
+        let chain_id = Some(self.chain_id);
+        let input =
+            create_eth_transaction(Some(token.into()), Wei::zero(), input, chain_id, &sender);
 
         let result = self.evm_submit(input, origin); // create_eth_transaction()
         result.check_ok();
