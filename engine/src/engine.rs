@@ -774,11 +774,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         if !factory_account_id.is_empty()
             && crate::prelude::format!("{}.{}", parts[0], factory_account_id) == token_str
         {
-            let erc20_token = Address::from_array(unwrap_res_or_finish!(
-                parts[0].as_bytes().try_into(),
+            let erc20_token = unwrap_res_or_finish!(
+                Address::try_from_slice(parts[0].as_bytes()),
                 output_on_fail,
                 self.io
-            ));
+            );
             contract = native_erc20_state.erc20_locker_address;
             let tail = ethabi::encode(&[
                 ethabi::Token::Address(erc20_token.raw()),
