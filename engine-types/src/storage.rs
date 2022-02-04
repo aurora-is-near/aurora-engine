@@ -1,3 +1,4 @@
+use crate::account_id::AccountId;
 use crate::types::Address;
 use crate::*;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -112,4 +113,16 @@ fn generation_storage_key(address: &Address, key: &H256, generation: u32) -> [u8
     result[22..26].copy_from_slice(&generation.to_le_bytes());
     result[26..58].copy_from_slice(&key.0);
     result
+}
+
+/// Key for storing the state of the native erc20 bridge state.
+pub const NATIVE_ERC20_BRIDGE_STATE_KEY: &[u8; 7] = b"B_STATE";
+
+/// Engine internal state of native ERC20 bridge.
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
+pub struct NativeErc20EngineState {
+    /// Account of the erc20 factory on near to mint native erc20 tokens.
+    pub erc20_factory_account: AccountId,
+    /// Address of the erc20 locker on Aurora side.
+    pub erc20_locker_address: Address,
 }

@@ -39,8 +39,9 @@ contract EvmErc20Locker is AdminControlled {
     {
         require(IERC20(ethToken).balanceOf(address(this)).add(amount) <= ((uint256(1) << 128) - 1), "Maximum tokens locked exceeded (< 2^128 - 1)");
         IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
+        bytes32 ethToken_b = bytes32(uint256(uint160(ethToken)));
         bytes32 amount_b = bytes32(amount);
-        bytes memory input = abi.encodePacked("\x01", amount_b, recipient);
+        bytes memory input = abi.encodePacked("\x02", ethToken_b, amount_b, recipient);
         uint input_size = 1 + 32 + recipient.length;
 
         assembly {

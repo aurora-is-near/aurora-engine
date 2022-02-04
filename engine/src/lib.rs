@@ -371,7 +371,15 @@ mod contract {
         let mut io = Runtime;
         // Only the owner can initialize the ERC20 locker
         io.assert_private_call().sdk_unwrap();
+        let mut state = engine::get_native_erc20_state(&io).unwrap_or_default();
+
+        if state.erc20_locker_address != Address::zero() {
+            sdk::panic_utf8(b"The erc20 locker already deployed");
+        }
+
         let address = engine::deploy_erc20_locker(io, &io, &mut Runtime).sdk_unwrap();
+        state.erc20_locker_address = address;
+        engine::set_native_erc20_state(&mut io, state);
 
         io.return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
     }
