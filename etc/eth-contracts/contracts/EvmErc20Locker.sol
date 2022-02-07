@@ -42,7 +42,7 @@ contract EvmErc20Locker is AdminControlled {
         bytes20 ethToken_b = bytes20(ethToken);
         bytes32 amount_b = bytes32(amount);
         bytes memory input = abi.encodePacked("\x02", ethToken_b, amount_b, recipient);
-        uint input_size = 1 + 32 + recipient.length;
+        uint input_size = 1 + 20 + 32 + recipient.length;
 
         assembly {
             let res := call(gas(), 0xe9217bc70b7ed1f598ddd3199e80b093fa71124f, 0, add(input, 32), input_size, 0, 32)
