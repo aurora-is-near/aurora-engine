@@ -24,7 +24,7 @@ base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
 near-blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
-evm = { git = "https://github.com/olonho/sputnikvm.git", branch = "gas_cost", default-features = false, features = ["noop-gas"] }
+evm = { git = "https://github.com/olonho/sputnikvm.git", branch = "gas_cost", default-features = false }
 evm-core = { git = "https://github.com/olonho/sputnikvm.git", branch = "gas_cost", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
@@ -48,6 +48,7 @@ rand = "0.7.3"
 default = ["std"]
 std = ["borsh/std", "evm/std", "primitive-types/std", "rlp/std", "sha3/std", "ethabi/std", "logos/std", "bn/std", "aurora-engine-types/std", "rjson/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std"]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
+noop-gas =  ["evm/noop-gas"]
 evm_bully = []
 log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]
 tracing = ["evm/tracing"]
