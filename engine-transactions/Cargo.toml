@@ -16,7 +16,7 @@ autobenches = false
 aurora-engine-types = { path = "../engine-types", default-features = false }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
-evm = { git = "https://github.com/olonho/sputnikvm.git", branch = "gas_cost", default-features = false }
+evm = { git = "https://github.com/olonho/sputnikvm.git", branch = "gas_cost", default-features = false, features = ["noop-gas"] }
 rlp = { version = "0.5.0", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 

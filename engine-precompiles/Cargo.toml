@@ -19,7 +19,7 @@ base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
 near-blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
-evm = { git = "https://github.com/olonho/sputnikvm.git", branch = "gas_cost", default-features = false }
+evm = { git = "https://github.com/olonho/sputnikvm.git", branch = "gas_cost", default-features = false, features = ["noop-gas"] }
 evm-core = { git = "https://github.com/olonho/sputnikvm.git", branch = "gas_cost", default-features = false }
 libsecp256k1 = { version = "0.3.5", default-features = false }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
