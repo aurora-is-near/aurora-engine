@@ -1389,7 +1389,7 @@ checksum = "77f3309417938f28bf8228fcff79a4a37103981e3e186d2ccd19c74b38f4eb71"
 [[package]]
 name = "evm"
 version = "0.33.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=177e253ad947b7186bfa6920843075556b60ff54#177e253ad947b7186bfa6920843075556b60ff54"
+source = "git+https://github.com/olonho/sputnikvm.git?branch=gas_cost#cbffe4e7206ac92a0488783db1335c29ea8ae56e"
 dependencies = [
  "auto_impl",
  "environmental",
@@ -1409,7 +1409,7 @@ dependencies = [
 [[package]]
 name = "evm-core"
 version = "0.33.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=177e253ad947b7186bfa6920843075556b60ff54#177e253ad947b7186bfa6920843075556b60ff54"
+source = "git+https://github.com/olonho/sputnikvm.git?branch=gas_cost#cbffe4e7206ac92a0488783db1335c29ea8ae56e"
 dependencies = [
  "funty",
  "parity-scale-codec",
@@ -1421,7 +1421,7 @@ dependencies = [
 [[package]]
 name = "evm-gasometer"
 version = "0.33.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=177e253ad947b7186bfa6920843075556b60ff54#177e253ad947b7186bfa6920843075556b60ff54"
+source = "git+https://github.com/olonho/sputnikvm.git?branch=gas_cost#cbffe4e7206ac92a0488783db1335c29ea8ae56e"
 dependencies = [
  "environmental",
  "evm-core",
@@ -1432,7 +1432,7 @@ dependencies = [
 [[package]]
 name = "evm-runtime"
 version = "0.33.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=177e253ad947b7186bfa6920843075556b60ff54#177e253ad947b7186bfa6920843075556b60ff54"
+source = "git+https://github.com/olonho/sputnikvm.git?branch=gas_cost#cbffe4e7206ac92a0488783db1335c29ea8ae56e"
 dependencies = [
  "auto_impl",
  "environmental",
@@ -2775,7 +2775,7 @@ dependencies = [
  "ripemd160",
  "serde",
  "sha2 0.8.2",
- "sha3 0.8.2",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -2795,7 +2795,7 @@ dependencies = [
  "ripemd160",
  "serde",
  "sha2 0.8.2",
- "sha3 0.8.2",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -2815,7 +2815,7 @@ dependencies = [
  "ripemd160",
  "serde",
  "sha2 0.8.2",
- "sha3 0.8.2",
+ "sha3 0.9.1",
 ]
 
 [[package]]
