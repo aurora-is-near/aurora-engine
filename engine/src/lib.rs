@@ -85,7 +85,7 @@ mod contract {
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{
         sdk, u256_to_arr, vec, Address, PromiseResult, ToString, Vec, Wei, Yocto,
-        ERC20_MINT_SELECTOR, ERR_FAILED_PARSE, H256, U256,
+        ERC20_MINT_SELECTOR, ERC20_UNLOCK_SELECTOR, ERR_FAILED_PARSE, H256, U256,
     };
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -419,27 +419,44 @@ mod contract {
             let current_account_id = io.current_account_id();
             let args: RefundCallArgs = io.read_input_borsh().sdk_unwrap();
             let refund_result = match args.erc20_address {
-                // ERC-20 exit; re-mint burned tokens
+                // ERC-20 exit
                 Some(erc20_address) => {
-                    let erc20_admin_address = current_address(&current_account_id);
+                    let contract: Address;
+                    let call_data: Vec<u8>;
+                    if let Some(erc20_locker_address) = args.erc20_locker_address {
+                        // unlock locked tokens
+                        contract = erc20_locker_address;
+                        let refund_address = args.recipient_address;
+                        let amount = U256::from_big_endian(&args.amount);
+
+                        let unlock_args = ethabi::encode(&[
+                            ethabi::Token::Address(erc20_address.raw()),
+                            ethabi::Token::Uint(amount),
+                            ethabi::Token::Address(refund_address.raw()),
+                        ]);
+                        call_data = [ERC20_UNLOCK_SELECTOR, unlock_args.as_slice()].concat();
+                    } else {
+                        // re-mint burned tokens
+                        contract = erc20_address;
+                        let refund_address = args.recipient_address;
+                        let amount = U256::from_big_endian(&args.amount);
+
+                        let mint_args = ethabi::encode(&[
+                            ethabi::Token::Address(refund_address.raw()),
+                            ethabi::Token::Uint(amount),
+                        ]);
+                        call_data = [ERC20_MINT_SELECTOR, mint_args.as_slice()].concat();
+                    }
+
+                    let admin_address = current_address(&current_account_id);
                     let mut engine =
-                        Engine::new(erc20_admin_address, current_account_id, io, &io).sdk_unwrap();
-                    let erc20_address = erc20_address;
-                    let refund_address = args.recipient_address;
-                    let amount = U256::from_big_endian(&args.amount);
-
-                    let selector = ERC20_MINT_SELECTOR;
-                    let mint_args = ethabi::encode(&[
-                        ethabi::Token::Address(refund_address.raw()),
-                        ethabi::Token::Uint(amount),
-                    ]);
-
+                        Engine::new(admin_address, current_account_id, io, &io).sdk_unwrap();
                     engine
                         .call(
-                            &erc20_admin_address,
-                            &erc20_address,
+                            &admin_address,
+                            &contract,
                             Wei::zero(),
-                            [selector, mint_args.as_slice()].concat(),
+                            call_data,
                             u64::MAX,
                             Vec::new(),
                             &mut Runtime,

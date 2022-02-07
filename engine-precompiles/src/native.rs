@@ -395,12 +395,11 @@ impl Precompile for ExitToNear {
                     )));
                 }
 
-                let caller_address = context.caller;
                 let native_erc20_state = get_native_erc20_state();
                 let factory_account = AccountId::new(&native_erc20_state.erc20_factory_account)
                     .expect("ERR_INVALID_FACTORY_ACCOUNT");
 
-                if caller_address != native_erc20_state.erc20_locker_address.raw() {
+                if context.caller != native_erc20_state.erc20_locker_address.raw() {
                     return Err(ExitError::Other(Cow::from(
                         "ERR_INVALID_ERC20_LOCKER_ADDRESS",
                     )));
@@ -419,7 +418,7 @@ impl Precompile for ExitToNear {
                         // as decimal and valid account id respectively.
                         format!(
                             r#"{{"locker_address": "{}", "token": "{}", "amount": "{}", "recipient": {}}}"#,
-                            caller_address,
+                            context.caller,
                             erc20_address.encode(),
                             amount.as_u128(),
                             receiver_account_id
@@ -447,11 +446,20 @@ impl Precompile for ExitToNear {
         } else {
             Some(exit_event.erc20_address)
         };
+
+        #[cfg(feature = "error_refund")]
+        let erc20_locker_address = if flag == 2 {
+            Some(exit_event.sender.0)
+        } else {
+            None
+        };
+
         #[cfg(feature = "error_refund")]
         let refund_args = RefundCallArgs {
             recipient_address: refund_address,
             erc20_address,
             amount: types::u256_to_arr(&exit_event.amount),
+            erc20_locker_address,
         };
         #[cfg(feature = "error_refund")]
         let refund_promise = PromiseCreateArgs {
