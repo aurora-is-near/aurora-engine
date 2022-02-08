@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./AdminControlled.sol";
 
+
 contract EvmErc20Locker is AdminControlled {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -37,7 +38,11 @@ contract EvmErc20Locker is AdminControlled {
         public
         pausable (PAUSED_LOCK)
     {
-        require(IERC20(ethToken).balanceOf(address(this)).add(amount) <= ((uint256(1) << 128) - 1), "Maximum tokens locked exceeded (< 2^128 - 1)");
+        require(
+            IERC20(ethToken).balanceOf(address(this)).add(amount) <= ((uint256(1) << 128) - 1),
+            "Maximum tokens locked exceeded (< 2^128 - 1)"
+            );
+
         IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
         bytes20 ethToken_b = bytes20(ethToken);
         bytes32 amount_b = bytes32(amount);
