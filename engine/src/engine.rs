@@ -16,10 +16,11 @@ use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, Vec,
-    Wei, ERC20_MINT_SELECTOR, H160, H256, U256,
+    BTreeMap, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs,
+    ToString, Vec, Wei, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
 use aurora_engine_precompiles::PrecompileConstructorContext;
+use core::cell::RefCell;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -404,6 +405,7 @@ pub struct Engine<'env, I: IO, E: Env> {
     current_account_id: AccountId,
     io: I,
     env: &'env E,
+    generation_cache: RefCell<BTreeMap<Address, u32>>,
 }
 
 pub(crate) const CONFIG: &Config = &Config::london();
@@ -435,6 +437,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             current_account_id,
             io,
             env,
+            generation_cache: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -1433,7 +1436,11 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     /// Get storage value of address at index.
     fn storage(&self, address: H160, index: H256) -> H256 {
         let address = Address::new(address);
-        let generation = get_generation(&self.io, &address);
+        let generation = *self
+            .generation_cache
+            .borrow_mut()
+            .entry(address)
+            .or_insert_with(|| get_generation(&self.io, &address));
         get_storage(&self.io, &address, &index, generation)
     }
 
