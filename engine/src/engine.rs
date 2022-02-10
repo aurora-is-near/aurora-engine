@@ -670,7 +670,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         origin: Address,
         contract_address: Address,
         selector: &[u8],
-    ) -> Result<Vec<u8>, EngineErrorKind> {
+        output_types: &[ethabi::ParamType],
+    ) -> Result<ethabi::Token, EngineErrorKind> {
         let result = self.view(
             &origin,
             &contract_address,
@@ -679,29 +680,58 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             u64::MAX,
         );
 
-        match result {
+        let output: Vec<u8> = match result {
             Ok(result) => match result {
-                TransactionStatus::Succeed(ret) => Ok(ret),
-                _other => Ok(Vec::new()),
+                TransactionStatus::Succeed(ret) => ret,
+                _other => Vec::new(),
             },
-            Err(e) => Err(e),
-        }
+            Err(e) => return Err(e),
+        };
+
+        Ok(ethabi::decode(output_types, output.as_slice())
+            .unwrap()
+            .pop()
+            .unwrap())
     }
 
     pub fn get_erc20_metadata(&self, erc20_address: Address) -> NativeErc20Metadata {
-        let name = self
-            .view_with_selector(self.origin, erc20_address, &[6, 253, 222, 3])
+        let name: String = self
+            .view_with_selector(
+                self.origin,
+                erc20_address,
+                &[6, 253, 222, 3],
+                &[ethabi::ParamType::String],
+            )
+            .unwrap()
+            .into_string()
             .unwrap();
-        let symbol = self
-            .view_with_selector(self.origin, erc20_address, &[149, 216, 155, 65])
+        let symbol: String = self
+            .view_with_selector(
+                self.origin,
+                erc20_address,
+                &[149, 216, 155, 65],
+                &[ethabi::ParamType::String],
+            )
+            .unwrap()
+            .into_string()
             .unwrap();
-        let decimals = self
-            .view_with_selector(self.origin, erc20_address, &[49, 60, 229, 103])
+        let decimals: u8 = self
+            .view_with_selector(
+                self.origin,
+                erc20_address,
+                &[49, 60, 229, 103],
+                &[ethabi::ParamType::Uint(8)],
+            )
+            .unwrap()
+            .into_uint()
+            .unwrap()
+            .try_into()
             .unwrap();
+
         NativeErc20Metadata {
-            name: String::from_utf8(name).unwrap(),
-            symbol: String::from_utf8(symbol).unwrap(),
-            decimals: decimals[0],
+            name,
+            symbol,
+            decimals,
         }
     }
 

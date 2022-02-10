@@ -182,12 +182,6 @@ pub struct ViewCallArgs {
     pub input: Vec<u8>,
 }
 
-/// Borsh-encoded parameters for the `view` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
-pub struct GetErc20MetadataArgs {
-    pub erc20_address: Address,
-}
-
 /// Borsh-encoded parameters for `deploy_erc20_token` function.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
 pub struct DeployErc20TokenArgs {
