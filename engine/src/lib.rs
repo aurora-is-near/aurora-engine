@@ -63,6 +63,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
+    use parameters::GetErc20MetadataArgs;
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, current_address, Engine, EngineState};
@@ -878,6 +879,22 @@ mod contract {
         let metadata: FungibleTokenMetadata = connector::get_metadata(&io).unwrap_or_default();
         let json_data = crate::json::JsonValue::from(metadata);
         io.return_output(json_data.to_string().as_bytes())
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_erc20_metadata() {
+        let mut io = Runtime;
+        let args: GetErc20MetadataArgs = io.read_input_borsh().sdk_unwrap();
+        let current_account_id = io.current_account_id();
+        let engine = Engine::new(
+            predecessor_address(&io.predecessor_account_id()),
+            current_account_id,
+            io,
+            &io,
+        )
+        .sdk_unwrap();
+        let result = engine.get_erc20_metadata(args.erc20_address);
+        io.return_output(&result.try_to_vec().sdk_expect("ERR_SERIALIZE"));
     }
 
     #[cfg(feature = "integration-test")]

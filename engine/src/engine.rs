@@ -17,8 +17,8 @@ use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction}
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
     BorshDeserialize, BorshSerialize, KeyPrefix, NativeErc20EngineState, PromiseArgs,
-    PromiseCreateArgs, ToString, Vec, Wei, ERC20_MINT_SELECTOR, ERC20_UNLOCK_SELECTOR, H160, H256,
-    NATIVE_ERC20_BRIDGE_STATE_KEY, U256,
+    PromiseCreateArgs, String, ToString, Vec, Wei, ERC20_MINT_SELECTOR, ERC20_UNLOCK_SELECTOR,
+    H160, H256, NATIVE_ERC20_BRIDGE_STATE_KEY, U256,
 };
 use aurora_engine_precompiles::PrecompileConstructorContext;
 
@@ -414,6 +414,13 @@ impl From<NewCallArgs> for EngineState {
     }
 }
 
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
+pub struct NativeErc20Metadata {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+}
+
 pub struct Engine<'env, I: IO, E: Env> {
     state: EngineState,
     origin: Address,
@@ -656,6 +663,46 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             Vec::new(),
         );
         status.into_result(result)
+    }
+
+    fn view_with_selector(
+        &self,
+        origin: Address,
+        contract_address: Address,
+        selector: &[u8],
+    ) -> Result<Vec<u8>, EngineErrorKind> {
+        let result = self.view(
+            &origin,
+            &contract_address,
+            Wei::zero(),
+            selector.to_vec(),
+            u64::MAX,
+        );
+
+        match result {
+            Ok(result) => match result {
+                TransactionStatus::Succeed(ret) => Ok(ret),
+                _other => Ok(Vec::new()),
+            },
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn get_erc20_metadata(&self, erc20_address: Address) -> NativeErc20Metadata {
+        let name = self
+            .view_with_selector(self.origin, erc20_address, &[6, 253, 222, 3])
+            .unwrap();
+        let symbol = self
+            .view_with_selector(self.origin, erc20_address, &[149, 216, 155, 65])
+            .unwrap();
+        let decimals = self
+            .view_with_selector(self.origin, erc20_address, &[49, 60, 229, 103])
+            .unwrap();
+        NativeErc20Metadata {
+            name: String::from_utf8(name).unwrap(),
+            symbol: String::from_utf8(symbol).unwrap(),
+            decimals: decimals[0],
+        }
     }
 
     fn relayer_key(account_id: &[u8]) -> Vec<u8> {
