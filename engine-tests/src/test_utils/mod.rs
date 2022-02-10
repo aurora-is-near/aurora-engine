@@ -2,6 +2,8 @@ use aurora_engine::parameters::ViewCallArgs;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::NEP141Wei;
 use borsh::{BorshDeserialize, BorshSerialize};
+use near_primitives::runtime::config_store::RuntimeConfigStore;
+use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
@@ -495,11 +497,11 @@ impl Default for AuroraRunner {
         } else {
             panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
         };
-        let mut wasm_config = VMConfig::test();
-        // See https://github.com/near/nearcore/pull/4979/
-        //wasm_config.regular_op_cost = 2207874;
-        // See https://github.com/near/nearcore/pull/5365
-        wasm_config.regular_op_cost = 822756;
+
+        // Fetch config (mainly costs) for the latest protocol version.
+        let runtime_config_store = RuntimeConfigStore::new(None);
+        let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
+        let wasm_config = runtime_config.wasm_config.clone();
 
         Self {
             aurora_account_id: aurora_account_id.clone(),
