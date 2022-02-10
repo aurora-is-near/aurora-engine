@@ -10,6 +10,7 @@ use crate::test_utils::{
 };
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::H160;
+use rand::SeedableRng;
 use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1000;
@@ -92,7 +93,7 @@ pub(crate) struct UniswapTestContext {
 impl UniswapTestContext {
     pub fn new(name: &str) -> Self {
         let mut runner = test_utils::deploy_evm();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(414243);
         let source_account = SecretKey::random(&mut rng);
         let source_address = test_utils::address_from_secret_key(&source_account);
         runner.create_address(
