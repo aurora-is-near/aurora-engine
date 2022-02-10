@@ -225,7 +225,7 @@ fn deploy_erc_20_out_of_gas() {
     assert!(error_message.contains("ERR_INTRINSIC_GAS"));
 
     // not enough gas to complete transaction
-    deploy_transaction.gas_limit = U256::from(3_200_000);
+    deploy_transaction.gas_limit = U256::from(intrinsic_gas + 1);
     let outcome = runner.submit_transaction(&source_account, deploy_transaction);
     let error = outcome.unwrap();
     assert_eq!(error.status, TransactionStatus::OutOfGas);
