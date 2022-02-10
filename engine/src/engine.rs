@@ -1216,10 +1216,9 @@ pub fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32
 }
 
 pub fn is_account_empty<I: IO>(io: &I, address: &Address) -> bool {
-    let balance = get_balance(io, address);
-    let nonce = get_nonce(io, address);
-    let code_len = get_code_size(io, address);
-    balance.is_zero() && nonce.is_zero() && code_len == 0
+    get_balance(io, address).is_zero()
+        && get_nonce(io, address).is_zero()
+        && get_code_size(io, address) == 0
 }
 
 /// Increments storage generation for a given address.
