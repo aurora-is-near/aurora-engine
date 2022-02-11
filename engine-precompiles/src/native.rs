@@ -417,8 +417,8 @@ impl Precompile for ExitToNear {
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
-                            r#"{{"locker_address": "{}", "token": "{}", "amount": "{}", "recipient": {}}}"#,
-                            context.caller,
+                            r#"{{"locker_address": "{}", "token": "{}", "amount": {}, "recipient": "{}"}}"#,
+                            Address::new(context.caller).encode(),
                             erc20_address.encode(),
                             amount.as_u128(),
                             receiver_account_id
