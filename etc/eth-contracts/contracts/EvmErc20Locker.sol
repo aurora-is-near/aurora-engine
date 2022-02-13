@@ -44,9 +44,8 @@ contract EvmErc20Locker is AdminControlled {
             );
 
         IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
-        bytes20 ethToken_b = bytes20(ethToken);
         bytes32 amount_b = bytes32(amount);
-        bytes memory input = abi.encodePacked("\x02", ethToken_b, amount_b, recipient);
+        bytes memory input = abi.encodePacked("\x02", ethToken, amount_b, recipient);
         uint input_size = 1 + 20 + 32 + recipient.length;
 
         assembly {
