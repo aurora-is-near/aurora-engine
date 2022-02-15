@@ -73,7 +73,7 @@ mod contract {
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
         SetErc20FactoryAccountArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
-        TransferCallCallArgs, ViewCallArgs,
+        TransferCallCallArgs, UnlockErc20TokenArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -396,6 +396,31 @@ mod contract {
         let mut state = engine::get_native_erc20_state(&io).unwrap_or_default();
         state.erc20_factory_account = args.factory.to_string();
         engine::set_native_erc20_state(&mut io, state);
+    }
+
+    /// Unlock native ERC-20 token
+    ///
+    /// This function can be called only form the tokens factory.
+    #[no_mangle]
+    pub extern "C" fn unlock_erc20_token() {
+        let io = Runtime;
+        let current_account_id = io.current_account_id();
+        let predecessor_account_id = io.predecessor_account_id();
+        let mut engine = Engine::new(
+            predecessor_address(&predecessor_account_id),
+            current_account_id.clone(),
+            io,
+            &io,
+        )
+        .sdk_unwrap();
+
+        let args: UnlockErc20TokenArgs = io.read_input_borsh().sdk_unwrap();
+        engine.unlock_erc20_token(
+            &predecessor_account_id,
+            &args,
+            &current_account_id,
+            &mut Runtime,
+        );
     }
 
     /// Callback invoked by exit to NEAR precompile to handle potential

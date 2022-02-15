@@ -1,4 +1,6 @@
-use crate::parameters::{CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs};
+use crate::parameters::{
+    CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, UnlockErc20TokenArgs, ViewCallArgs,
+};
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
@@ -841,48 +843,17 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             (recipient, fee)
         };
 
-        let native_erc20_state = get_native_erc20_state(&self.io).unwrap_or_default();
-        let factory_account_id = native_erc20_state.erc20_factory_account;
-        let token_str = token.to_string();
-        let parts: Vec<&str> = token_str.split('.').collect();
-        let contract: Address;
-        let call_data: Vec<u8>;
-
-        if AccountId::validate(&factory_account_id).is_ok()
-            && crate::prelude::format!("{}.{}", parts[0], factory_account_id) == token_str
-        {
-            let erc20_token = unwrap_res_or_finish!(
-                Address::try_from_slice(parts[0].as_bytes()),
+        let erc20_token = Address::from_array(unwrap_res_or_finish!(
+            unwrap_res_or_finish!(
+                get_erc20_from_nep141(&self.io, token),
                 output_on_fail,
                 self.io
-            );
-            contract = native_erc20_state.erc20_locker_address;
-            let tail = ethabi::encode(&[
-                ethabi::Token::Address(erc20_token.raw()),
-                ethabi::Token::Uint(U256::from(args.amount.as_u128())),
-                ethabi::Token::Address(recipient.raw()),
-            ]);
-            call_data = [ERC20_UNLOCK_SELECTOR, tail.as_slice()].concat();
-        } else {
-            let erc20_token = Address::from_array(unwrap_res_or_finish!(
-                unwrap_res_or_finish!(
-                    get_erc20_from_nep141(&self.io, token),
-                    output_on_fail,
-                    self.io
-                )
-                .as_slice()
-                .try_into(),
-                output_on_fail,
-                self.io
-            ));
-            contract = erc20_token;
-            let tail = ethabi::encode(&[
-                ethabi::Token::Address(recipient.raw()),
-                ethabi::Token::Uint(U256::from(args.amount.as_u128())),
-            ]);
-
-            call_data = [ERC20_MINT_SELECTOR, tail.as_slice()].concat();
-        }
+            )
+            .as_slice()
+            .try_into(),
+            output_on_fail,
+            self.io
+        ));
 
         if fee != U256::from(0) {
             let relayer_address = unwrap_res_or_finish!(
@@ -904,13 +875,19 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             );
         }
 
+        let selector = ERC20_MINT_SELECTOR;
+        let tail = ethabi::encode(&[
+            ethabi::Token::Address(recipient.raw()),
+            ethabi::Token::Uint(U256::from(args.amount.as_u128())),
+        ]);
+
         let erc20_admin_address = current_address(current_account_id);
         unwrap_res_or_finish!(
             self.call(
                 &erc20_admin_address,
-                &contract,
+                &erc20_token,
                 Wei::zero(),
-                call_data,
+                [selector, tail.as_slice()].concat(),
                 u64::MAX,
                 Vec::new(), // TODO: are there values we should put here?
                 handler,
@@ -955,6 +932,52 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         // TODO(marX)
         // Everything succeed so return "0"
         self.io.return_output(b"\"0\"");
+    }
+
+    pub fn unlock_erc20_token<P: PromiseHandler>(
+        &mut self,
+        predecessor_account_id: &AccountId,
+        args: &UnlockErc20TokenArgs,
+        current_account_id: &AccountId,
+        handler: &mut P,
+    ) {
+        let native_erc20_state = get_native_erc20_state(&self.io).unwrap_or_default();
+        assert_eq!(
+            &AccountId::new(&native_erc20_state.erc20_factory_account)
+                .expect("Invalid ERC-20 factory account"),
+            predecessor_account_id,
+            "The predecessor account is not an ERC-20 factory"
+        );
+        assert_eq!(
+            args.locker_address,
+            native_erc20_state.erc20_locker_address,
+            "Passed locker address {} does not match current locker address {}",
+            args.locker_address.encode(),
+            native_erc20_state.erc20_locker_address.encode(),
+        );
+        let token_str = args.nep141.to_string();
+        let parts: Vec<&str> = token_str.split('.').collect();
+        let erc20_token = Address::decode(parts[0]).expect("Invalid ERC-20 token address");
+        let tail = ethabi::encode(&[
+            ethabi::Token::Address(erc20_token.raw()),
+            ethabi::Token::Uint(U256::from(args.amount.as_u128())),
+            ethabi::Token::Address(args.recipient.raw()),
+        ]);
+        let call_input = [ERC20_UNLOCK_SELECTOR, tail.as_slice()].concat();
+        let erc20_admin_address = current_address(current_account_id);
+        let result = self
+            .call(
+                &erc20_admin_address,
+                &native_erc20_state.erc20_locker_address,
+                Wei::zero(),
+                call_input,
+                u64::MAX,
+                Vec::new(),
+                handler,
+            )
+            .unwrap();
+
+        assert!(result.status.is_ok(), "Failed to unlock ERC-20 token");
     }
 }
 

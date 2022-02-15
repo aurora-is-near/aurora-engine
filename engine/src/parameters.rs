@@ -238,6 +238,15 @@ pub struct BeginBlockArgs {
     pub gaslimit: RawU256,
 }
 
+/// Borsh-encoded parameters for `unlock_erc20_tokens` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+pub struct UnlockErc20TokenArgs {
+    pub locker_address: Address,
+    pub nep141: AccountId,
+    pub amount: Balance,
+    pub recipient: Address,
+}
+
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
 #[derive(Debug, Clone)]
