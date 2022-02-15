@@ -271,7 +271,8 @@ impl Precompile for ExitToNear {
     ) -> EvmPrecompileResult {
         #[cfg(feature = "error_refund")]
         fn parse_input(input: &[u8]) -> (Address, &[u8]) {
-            let refund_address = Address::from_array(&input[1..21]);
+            let refund_address =
+                Address::try_from_slice(&input[1..21]).expect("Invalid refund address");
             (refund_address, &input[21..])
         }
         #[cfg(not(feature = "error_refund"))]
@@ -405,6 +406,11 @@ impl Precompile for ExitToNear {
                     )));
                 }
 
+                #[cfg(not(feature = "error_refund"))]
+                {
+                    input = &input[20..]; // Skip refund_address because it is already parsed by `parse_input`.
+                }
+
                 let erc20_address =
                     Address::try_from_slice(&input[..20]).expect("Invalid locked erc20 address");
                 input = &input[20..];
@@ -449,7 +455,7 @@ impl Precompile for ExitToNear {
 
         #[cfg(feature = "error_refund")]
         let erc20_locker_address = if flag == 2 {
-            Some(exit_event.sender.0)
+            Some(exit_event.sender)
         } else {
             None
         };

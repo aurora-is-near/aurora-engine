@@ -607,7 +607,7 @@ fn check_selector() {
     //
     // keccak("unlockToken(address, uint256, address)".as_bytes())[..4];
     let mut hasher = sha3::Keccak256::default();
-    hasher.update(b"unlockToken(address, uint256, address)");
+    hasher.update(b"unlockToken(address,uint256,address)");
     assert_eq!(hasher.finalize()[..4].to_vec(), ERC20_UNLOCK_SELECTOR);
 }
 
