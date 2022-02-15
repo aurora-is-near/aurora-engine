@@ -100,7 +100,15 @@ impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
                 if let Ok(pc) = position {
                     self.current.program_counter = ProgramCounter(*pc as u32);
                 }
-                self.current.stack = stack.data().as_slice().into();
+                self.current.stack = stack
+                    .data()
+                    .iter()
+                    .map(|x| {
+                        let mut buf = [0u8; 32];
+                        x.to_big_endian(&mut buf);
+                        buf
+                    })
+                    .collect();
                 self.current.memory = memory.data().as_slice().into();
             }
 

@@ -1,5 +1,5 @@
 use aurora_engine_types::types::EthGas;
-use aurora_engine_types::{BTreeMap, H256};
+use aurora_engine_types::BTreeMap;
 use evm_core::Opcode;
 use std::ops::Index;
 
@@ -85,9 +85,9 @@ impl LogStack {
     }
 }
 
-impl From<&[H256]> for LogStack {
-    fn from(stack: &[H256]) -> Self {
-        let vec = stack.iter().map(|bytes| bytes.0).collect();
+impl std::iter::FromIterator<[u8; 32]> for LogStack {
+    fn from_iter<T: IntoIterator<Item = [u8; 32]>>(iter: T) -> Self {
+        let vec = iter.into_iter().collect();
         Self(vec)
     }
 }
