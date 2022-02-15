@@ -92,8 +92,8 @@ fn test_deploy_largest_contract() {
         result.gas_used,
     );
 
-    // Less than 18 NEAR Tgas
-    test_utils::assert_gas_bound(profile.all_gas(), 18);
+    // Less than 14 NEAR Tgas
+    test_utils::assert_gas_bound(profile.all_gas(), 14);
 }
 
 #[test]
@@ -171,8 +171,8 @@ fn test_solidity_pure_bench() {
         "Over 38 million EVM gas is used"
     );
     assert!(
-        profile.all_gas() > 2900 * 1_000_000_000_000,
-        "Over 2900 NEAR Tgas is used"
+        profile.all_gas() > 2200 * 1_000_000_000_000,
+        "Over 2200 NEAR Tgas is used"
     );
 }
 
