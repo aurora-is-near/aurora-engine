@@ -6,6 +6,7 @@ use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::connector::EthConnectorContract;
 use crate::map::BijectionMap;
+use aurora_engine_sdk::dup_cache::{DupCache, PairDupCache};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
@@ -406,6 +407,8 @@ pub struct Engine<'env, I: IO, E: Env> {
     io: I,
     env: &'env E,
     generation_cache: RefCell<BTreeMap<Address, u32>>,
+    account_info_cache: RefCell<DupCache<Address, Basic>>,
+    contract_storage_cache: RefCell<PairDupCache<Address, H256, H256>>,
 }
 
 pub(crate) const CONFIG: &Config = &Config::london();
@@ -438,6 +441,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             io,
             env,
             generation_cache: RefCell::new(BTreeMap::new()),
+            account_info_cache: RefCell::new(DupCache::default()),
+            contract_storage_cache: RefCell::new(PairDupCache::default()),
         }
     }
 
@@ -1421,10 +1426,15 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     /// Returns basic account information.
     fn basic(&self, address: H160) -> Basic {
         let address = Address::new(address);
-        Basic {
-            nonce: get_nonce(&self.io, &address),
-            balance: get_balance(&self.io, &address).raw(),
-        }
+        let result = self
+            .account_info_cache
+            .borrow_mut()
+            .get_or_insert_with(&address, || Basic {
+                nonce: get_nonce(&self.io, &address),
+                balance: get_balance(&self.io, &address).raw(),
+            })
+            .clone();
+        result
     }
 
     /// Returns the code of the contract from an address.
@@ -1440,7 +1450,13 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
             .borrow_mut()
             .entry(address)
             .or_insert_with(|| get_generation(&self.io, &address));
-        get_storage(&self.io, &address, &index, generation)
+        let result = *self
+            .contract_storage_cache
+            .borrow_mut()
+            .get_or_insert_with((&address, &index), || {
+                get_storage(&self.io, &address, &index, generation)
+            });
+        result
     }
 
     /// Get original storage value of address at index, if available.

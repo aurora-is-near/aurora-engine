@@ -23,11 +23,11 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, deployer_address) = helper.create_mooniswap_deployer();
     assert!(result.gas_used >= 5_100_000); // more than 5.1M EVM gas used
-    assert_gas_bound(profile.all_gas(), 14); // less than 14 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 12); // less than 12 NEAR Tgas used
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
-    assert_gas_bound(profile.all_gas(), 13); // less than 13 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 12); // less than 12 NEAR Tgas used
 
     // create some ERC-20 tokens to have a liquidity pool for
     let signer_address = test_utils::address_from_secret_key(&helper.signer.secret_key);
@@ -39,7 +39,7 @@ fn test_1inch_liquidity_protocol() {
     let (result, profile, pool) =
         helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
     assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
-    assert_gas_bound(profile.all_gas(), 40); // less than 40 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 34); // less than 34 NEAR Tgas used
 
     // Approve giving ERC-20 tokens to the pool
     helper.approve_erc20_tokens(&token_a, pool.address());
@@ -58,7 +58,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
-    assert_gas_bound(profile.all_gas(), 55); // less than 55 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 45); // less than 45 NEAR Tgas used
 
     // Same here
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
@@ -73,7 +73,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_gas_bound(profile.all_gas(), 57); // less than 57 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 48); // less than 48 NEAR Tgas used
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
@@ -84,7 +84,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
-    assert_gas_bound(profile.all_gas(), 49); // less than 49 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 39); // less than 39 NEAR Tgas used
 }
 
 #[test]
@@ -100,13 +100,13 @@ fn test_1_inch_limit_order_deploy() {
 
     // more than 3.5 million Ethereum gas used
     assert!(result.gas_used > 3_500_000);
-    // less than 14 NEAR Tgas used
-    assert_gas_bound(profile.all_gas(), 14);
+    // less than 12 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 12);
     // at least 45% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        30 <= wasm_fraction && wasm_fraction <= 40,
-        "{}% is not between 30% and 40%",
+        40 <= wasm_fraction && wasm_fraction <= 50,
+        "{}% is not between 40% and 50%",
         wasm_fraction
     );
 }
