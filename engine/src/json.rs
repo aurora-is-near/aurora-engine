@@ -1,4 +1,4 @@
-use crate::prelude::{BTreeMap, String, TryFrom, TryInto, Vec};
+use crate::prelude::{BTreeMap, String, Vec};
 
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
@@ -274,7 +274,6 @@ impl core::fmt::Display for JsonValue {
     }
 }
 
-#[allow(dead_code)]
 pub fn parse_json(data: &[u8]) -> Option<JsonValue> {
     let data_array: Vec<char> = data.iter().map(|b| *b as char).collect::<Vec<_>>();
     let mut index = 0;

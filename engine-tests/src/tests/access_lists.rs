@@ -1,8 +1,8 @@
+use crate::prelude::transactions::eip_2930::{self, AccessTuple, Transaction2930};
+use crate::prelude::transactions::EthTransactionKind;
 use crate::prelude::Wei;
 use crate::prelude::{H256, U256};
 use crate::test_utils;
-use aurora_engine::transaction::eip_2930::{self, AccessTuple, Transaction2930};
-use aurora_engine::transaction::EthTransactionKind;
 use std::convert::TryFrom;
 use std::iter;
 
@@ -26,11 +26,13 @@ fn test_access_list_tx_encoding_decoding() {
         data: vec![0],
         access_list: vec![
             AccessTuple {
-                address: test_utils::address_from_hex("0x095e7baea6a6c7c4c2dfeb977efac326af552d87"),
+                address: test_utils::address_from_hex("0x095e7baea6a6c7c4c2dfeb977efac326af552d87")
+                    .raw(),
                 storage_keys: vec![H256::zero(), one()],
             },
             AccessTuple {
-                address: test_utils::address_from_hex("0x195e7baea6a6c7c4c2dfeb977efac326af552d87"),
+                address: test_utils::address_from_hex("0x195e7baea6a6c7c4c2dfeb977efac326af552d87")
+                    .raw(),
                 storage_keys: vec![H256::zero()],
             },
         ],

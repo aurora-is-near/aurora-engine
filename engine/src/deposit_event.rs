@@ -2,9 +2,9 @@ use crate::deposit_event::error::ParseEventMessageError;
 use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    validate_eth_address, vec, AddressValidationError, Balance, BorshDeserialize, BorshSerialize,
-    EthAddress, Fee, String, ToString, TryFrom, TryInto, Vec, U256,
+    vec, Address, BorshDeserialize, BorshSerialize, Fee, NEP141Wei, String, ToString, Vec, U256,
 };
+use aurora_engine_types::types::address::error::AddressError;
 use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
@@ -18,7 +18,7 @@ pub type EventParams = Vec<EventParam>;
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub struct FtTransferMessageData {
     pub relayer: AccountId,
-    pub recipient: EthAddress,
+    pub recipient: Address,
     pub fee: Fee,
 }
 
@@ -58,8 +58,7 @@ impl FtTransferMessageData {
         let fee: Fee = fee_u128.into();
 
         // Get recipient Eth address from message slice
-        let mut recipient: EthAddress = Default::default();
-        recipient.copy_from_slice(&msg[32..52]);
+        let recipient = Address::try_from_slice(&msg[32..52]).unwrap();
 
         Ok(FtTransferMessageData {
             relayer: account_id,
@@ -73,9 +72,9 @@ impl FtTransferMessageData {
         // The first data section should contain fee data.
         // Pay attention, that for compatibility reasons we used U256 type
         // it means 32 bytes for fee data
-        let mut data = U256::from(self.fee.into_u128()).as_byte_slice().to_vec();
+        let mut data = U256::from(self.fee.as_u128()).as_byte_slice().to_vec();
         // Second data section should contain Eth address
-        data.extend(self.recipient);
+        data.extend(self.recipient.as_bytes());
         // Add `:` separator between relayer_id and data message
         [self.relayer.as_ref(), &hex::encode(data)].join(":")
     }
@@ -89,23 +88,23 @@ impl FtTransferMessageData {
         // The first data section should contain fee data.
         // Pay attention, that for compatibility reasons we used U256 type
         // it means 32 bytes for fee data
-        let mut data = U256::from(fee.into_u128()).as_byte_slice().to_vec();
+        let mut data = U256::from(fee.as_u128()).as_byte_slice().to_vec();
 
         // Check message length.
         let address = if recipient.len() == 42 {
             recipient
                 .strip_prefix("0x")
                 .ok_or(ParseEventMessageError::EthAddressValidationError(
-                    AddressValidationError::FailedDecodeHex,
+                    AddressError::FailedDecodeHex,
                 ))?
                 .to_string()
         } else {
             recipient
         };
-        let recipient_address = validate_eth_address(address)
-            .map_err(ParseEventMessageError::EthAddressValidationError)?;
+        let recipient_address =
+            Address::decode(&address).map_err(ParseEventMessageError::EthAddressValidationError)?;
         // Second data section should contain Eth address
-        data.extend(recipient_address);
+        data.extend(recipient_address.as_bytes());
         // Add `:` separator between relayer_id and data message
         //Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
         Ok(Self {
@@ -182,7 +181,7 @@ impl TokenMessageData {
 
 /// Ethereum event
 pub struct EthEvent {
-    pub eth_custodian_address: EthAddress,
+    pub eth_custodian_address: Address,
     pub log: Log,
 }
 
@@ -200,7 +199,7 @@ impl EthEvent {
             anonymous: false,
         };
         let log_entry: LogEntry = rlp::decode(data).map_err(|_| error::DecodeError::RlpFailed)?;
-        let eth_custodian_address = log_entry.address.0;
+        let eth_custodian_address = Address::new(log_entry.address);
         let topics = log_entry.topics.iter().map(|h| Hash::from(h.0)).collect();
 
         let raw_log = RawLog {
@@ -220,10 +219,10 @@ impl EthEvent {
 
 /// Data that was emitted by Deposited event.
 pub struct DepositedEvent {
-    pub eth_custodian_address: EthAddress,
-    pub sender: EthAddress,
+    pub eth_custodian_address: Address,
+    pub sender: Address,
     pub token_message_data: TokenMessageData,
-    pub amount: Balance,
+    pub amount: NEP141Wei,
     pub fee: Fee,
 }
 
@@ -258,31 +257,33 @@ impl DepositedEvent {
     pub fn from_log_entry_data(data: &[u8]) -> Result<Self, error::ParseError> {
         let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data)
             .map_err(error::ParseError::LogParseFailed)?;
-        let sender = event.log.params[0]
+        let raw_sender = event.log.params[0]
             .value
             .clone()
             .into_address()
             .ok_or(error::ParseError::InvalidSender)?
             .0;
+        let sender = Address::from_array(raw_sender);
 
         // parse_event_message
         let event_message_data: String = event.log.params[1].value.clone().to_string();
 
-        let amount: u128 = event.log.params[2]
+        let amount = event.log.params[2]
             .value
             .clone()
             .into_uint()
             .ok_or(error::ParseError::InvalidAmount)?
             .try_into()
+            .map(NEP141Wei::new)
             .map_err(|_| error::ParseError::OverflowNumber)?;
-        let raw_fee: u128 = event.log.params[3]
+        let fee = event.log.params[3]
             .value
             .clone()
             .into_uint()
             .ok_or(error::ParseError::InvalidFee)?
             .try_into()
+            .map(|v| Fee::new(NEP141Wei::new(v)))
             .map_err(|_| error::ParseError::OverflowNumber)?;
-        let fee: Fee = raw_fee.into();
 
         let token_message_data =
             TokenMessageData::parse_event_message_and_prepare_token_message_data(
@@ -321,7 +322,7 @@ pub mod error {
     pub enum ParseEventMessageError {
         TooManyParts,
         InvalidAccount,
-        EthAddressValidationError(AddressValidationError),
+        EthAddressValidationError(AddressError),
         ParseMessageError(ParseOnTransferMessageError),
     }
 

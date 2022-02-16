@@ -3,12 +3,14 @@ use crate::test_utils::{
     self,
     erc20::{ERC20Constructor, ERC20},
     uniswap::{
-        ExactOutputSingleParams, Factory, FactoryConstructor, MintParams, Pool, PositionManager,
-        PositionManagerConstructor, SwapRouter, SwapRouterConstructor,
+        ExactInputParams, ExactOutputSingleParams, Factory, FactoryConstructor, MintParams, Pool,
+        PositionManager, PositionManagerConstructor, SwapRouter, SwapRouterConstructor,
     },
     AuroraRunner, ExecutionProfile, Signer,
 };
 use aurora_engine_types::types::Wei;
+use aurora_engine_types::H160;
+use rand::SeedableRng;
 use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1000;
@@ -16,9 +18,33 @@ const INITIAL_NONCE: u64 = 0;
 // The "fee" can only be specific values, see
 // https://github.com/Uniswap/uniswap-v3-core/blob/main/contracts/UniswapV3Factory.sol#L26
 const POOL_FEE: u64 = 500;
-const MINT_AMOUNT: u64 = 1_000_000_000;
-const LIQUIDITY_AMOUNT: u64 = MINT_AMOUNT / 2;
+const MINT_AMOUNT: u64 = 1_000_000_000_000;
+const LIQUIDITY_AMOUNT: u64 = MINT_AMOUNT / 5;
 const OUTPUT_AMOUNT: u64 = LIQUIDITY_AMOUNT / 100;
+const INPUT_AMOUNT: u64 = LIQUIDITY_AMOUNT / 100;
+
+#[test]
+fn test_uniswap_input_multihop() {
+    let mut context = UniswapTestContext::new("uniswap");
+
+    // evm_gas = 970k
+    // near total gas = 214 Tgas
+    // Wish: optimize so that this transaction costs less than 200 Tgas.
+    // For now we just have to increase the burnt gas limit to make it run to completion.
+    context.runner.wasm_config.limit_config.max_gas_burnt = 500_000_000_000_000;
+
+    let tokens = context.create_tokens(10, MINT_AMOUNT.into());
+    for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {
+        context.create_pool(token_a, token_b);
+        context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
+    }
+
+    let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
+
+    println!("{:?}", profile.host_breakdown);
+    println!("NEAR_GAS_WASM {:?}", profile.wasm_gas());
+    println!("NEAR_GAS_TOTAL {:?}", profile.all_gas());
+}
 
 #[test]
 fn test_uniswap_exact_output() {
@@ -28,15 +54,23 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    test_utils::assert_gas_bound(profile.all_gas(), 114);
+    test_utils::assert_gas_bound(profile.all_gas(), 58);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
-    assert!(wasm_fraction >= 68, "{}% not more than 68%", wasm_fraction);
+    assert!(
+        20 <= wasm_fraction && wasm_fraction <= 30,
+        "{}% is not between 20% and 30%",
+        wasm_fraction
+    );
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    test_utils::assert_gas_bound(profile.all_gas(), 68);
+    test_utils::assert_gas_bound(profile.all_gas(), 32);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
-    assert!(wasm_fraction >= 72, "{}% not more than 72%", wasm_fraction);
+    assert!(
+        25 <= wasm_fraction && wasm_fraction <= 35,
+        "{}% is not between 25% and 35%",
+        wasm_fraction
+    );
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -59,7 +93,7 @@ pub(crate) struct UniswapTestContext {
 impl UniswapTestContext {
     pub fn new(name: &str) -> Self {
         let mut runner = test_utils::deploy_evm();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(414243);
         let source_account = SecretKey::random(&mut rng);
         let source_address = test_utils::address_from_secret_key(&source_account);
         runner.create_address(
@@ -96,7 +130,7 @@ impl UniswapTestContext {
                 c.deploy(
                     factory.0.address,
                     weth_address,
-                    Address([0; 20]),
+                    Address::new(H160([0; 20])),
                     nonce.into(),
                 )
             },
@@ -124,6 +158,18 @@ impl UniswapTestContext {
         self.runner.wasm_config.regular_op_cost = 0;
     }
 
+    pub fn create_tokens(&mut self, n: usize, mint_amount: U256) -> Vec<ERC20> {
+        let names = ('a'..'z').into_iter().map(|c| format!("token_{}", c));
+        let symbols = ('A'..'Z').into_iter().map(|c| format!("{}{}{}", c, c, c));
+        let mut result: Vec<ERC20> = names
+            .zip(symbols)
+            .take(n)
+            .map(|(name, symbol)| self.create_token(&name, &symbol, mint_amount))
+            .collect();
+        result.sort_by_key(|t| t.0.address);
+        result
+    }
+
     pub fn create_token_pair(&mut self, mint_amount: U256) -> (ERC20, ERC20) {
         let token_a = self.create_token("token_a", "A", mint_amount);
         let token_b = self.create_token("token_b", "B", mint_amount);
@@ -147,9 +193,8 @@ impl UniswapTestContext {
             .unwrap();
         assert!(result.status.is_ok(), "Failed to create pool");
 
-        let mut address = [0u8; 20];
-        address.copy_from_slice(&test_utils::unwrap_success(result)[12..]);
-        let pool = Pool::from_address(Address(address));
+        let address = Address::try_from_slice(&test_utils::unwrap_success(result)[12..]).unwrap();
+        let pool = Pool::from_address(address);
 
         // 2^96 corresponds to a price ratio of 1
         let result = self
@@ -222,6 +267,46 @@ impl UniswapTestContext {
         (result, profile)
     }
 
+    pub fn exact_input_params(&self, amount_in: U256, token_path: &[ERC20]) -> ExactInputParams {
+        let path = token_path
+            .iter()
+            .skip(1)
+            .map(|t| (POOL_FEE, t.0.address))
+            .collect();
+        ExactInputParams {
+            token_in: token_path[0].0.address,
+            path,
+
+            recipient: Address::new(H160([0; 20])),
+            deadline: U256::MAX,
+            amount_in,
+            amount_out_min: U256::one(),
+        }
+    }
+
+    pub fn exact_input(
+        &mut self,
+        token_path: &[ERC20],
+        amount_in: U256,
+    ) -> (U256, u64, ExecutionProfile) {
+        for token in token_path.iter() {
+            self.approve_erc20(token, self.swap_router.0.address, U256::MAX);
+        }
+        let params = self.exact_input_params(amount_in, token_path);
+        let swap_router = &self.swap_router;
+        let (result, profile) = self
+            .runner
+            .submit_with_signer_profiled(&mut self.signer, |nonce| {
+                swap_router.exact_input(params, nonce)
+            })
+            .unwrap();
+        assert!(result.status.is_ok(), "Swap failed");
+
+        let evm_gas = result.gas_used;
+        let amount_out = U256::from_big_endian(&test_utils::unwrap_success(result));
+        (amount_out, evm_gas, profile)
+    }
+
     pub fn exact_output_single_params(
         &self,
         amount_out: U256,
@@ -232,7 +317,8 @@ impl UniswapTestContext {
             token_in: token_in.0.address,
             token_out: token_out.0.address,
             fee: POOL_FEE,
-            recipient: Address([0; 20]),
+
+            recipient: Address::new(H160([0; 20])),
             deadline: U256::MAX,
             amount_out,
             amount_in_max: U256::from(100) * amount_out,

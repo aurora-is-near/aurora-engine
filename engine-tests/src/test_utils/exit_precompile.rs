@@ -1,5 +1,5 @@
 use crate::prelude::{
-    parameters::SubmitResult, transaction::legacy::TransactionLegacy, Address, Wei, U256,
+    parameters::SubmitResult, transactions::legacy::TransactionLegacy, Address, Wei, U256,
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 
@@ -30,7 +30,7 @@ impl TesterConstructor {
             .abi
             .constructor()
             .unwrap()
-            .encode_input(self.0.code.clone(), &[ethabi::Token::Address(token)])
+            .encode_input(self.0.code.clone(), &[ethabi::Token::Address(token.raw())])
             .unwrap();
 
         TransactionLegacy {
@@ -200,7 +200,7 @@ impl Tester {
                 signer,
                 "withdrawEthToEthereum",
                 amount,
-                &[ethabi::Token::Address(DEST_ADDRESS)],
+                &[ethabi::Token::Address(DEST_ADDRESS.raw())],
             )
         }
     }

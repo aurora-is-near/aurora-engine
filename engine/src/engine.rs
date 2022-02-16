@@ -6,6 +6,7 @@ use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::connector::EthConnectorContract;
 use crate::map::BijectionMap;
+use aurora_engine_sdk::dup_cache::{DupCache, PairDupCache};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
@@ -13,13 +14,14 @@ use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
 use crate::prelude::precompiles::Precompiles;
+use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, TryFrom,
-    TryInto, Vec, Wei, ERC20_MINT_SELECTOR, H256, U256,
+    BTreeMap, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs,
+    ToString, Vec, Wei, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
-use crate::transaction::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_precompiles::PrecompileConstructorContext;
+use core::cell::RefCell;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -82,7 +84,7 @@ pub enum EngineErrorKind {
     EvmFatal(ExitFatal),
     /// Incorrect nonce.
     IncorrectNonce,
-    FailedTransactionParse(crate::transaction::ParseTransactionError),
+    FailedTransactionParse(crate::prelude::transactions::ParseTransactionError),
     InvalidChainId,
     InvalidSignature,
     IntrinsicGasNotMet,
@@ -215,6 +217,7 @@ pub enum DeployErc20Error {
     Engine(EngineError),
     Register(RegisterTokenError),
 }
+
 impl AsRef<[u8]> for DeployErc20Error {
     fn as_ref(&self) -> &[u8] {
         match self {
@@ -239,7 +242,9 @@ impl TryFrom<Vec<u8>> for ERC20Address {
 
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         if bytes.len() == 20 {
-            Ok(Self(Address::from_slice(&bytes)))
+            Ok(Self(
+                Address::try_from_slice(&bytes).map_err(|_| AddressParseError)?,
+            ))
         } else {
             Err(AddressParseError)
         }
@@ -348,15 +353,15 @@ impl StackExecutorParams {
     fn make_executor<'a, 'env, I: IO + Copy, E: Env>(
         &'a self,
         engine: &'a Engine<'env, I, E>,
-    ) -> executor::StackExecutor<
+    ) -> executor::stack::StackExecutor<
         'static,
         'a,
-        executor::MemoryStackState<Engine<'env, I, E>>,
+        executor::stack::MemoryStackState<Engine<'env, I, E>>,
         Precompiles,
     > {
-        let metadata = executor::StackSubstateMetadata::new(self.gas_limit, CONFIG);
-        let state = executor::MemoryStackState::new(metadata, engine);
-        executor::StackExecutor::new_with_precompiles(state, CONFIG, &self.precompiles)
+        let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
+        let state = executor::stack::MemoryStackState::new(metadata, engine);
+        executor::stack::StackExecutor::new_with_precompiles(state, CONFIG, &self.precompiles)
     }
 }
 
@@ -401,6 +406,9 @@ pub struct Engine<'env, I: IO, E: Env> {
     current_account_id: AccountId,
     io: I,
     env: &'env E,
+    generation_cache: RefCell<BTreeMap<Address, u32>>,
+    account_info_cache: RefCell<DupCache<Address, Basic>>,
+    contract_storage_cache: RefCell<PairDupCache<Address, H256, H256>>,
 }
 
 pub(crate) const CONFIG: &Config = &Config::london();
@@ -432,6 +440,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             current_account_id,
             io,
             env,
+            generation_cache: RefCell::new(BTreeMap::new()),
+            account_info_cache: RefCell::new(DupCache::default()),
+            contract_storage_cache: RefCell::new(PairDupCache::default()),
         }
     }
 
@@ -474,7 +485,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         input: Vec<u8>,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let origin = self.origin();
+        let origin = Address::new(self.origin());
         let value = Wei::zero();
         self.deploy_code(origin, value, input, u64::MAX, Vec::new(), handler)
     }
@@ -485,7 +496,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
-        access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
+        access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let executor_params = StackExecutorParams::new(
@@ -494,14 +505,19 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
         );
         let mut executor = executor_params.make_executor(self);
-        let address = executor.create_address(CreateScheme::Legacy { caller: origin });
-        let (exit_reason, result) = (
-            executor.transact_create(origin, value.raw(), input, gas_limit, access_list),
-            address,
-        );
+        let address = executor.create_address(CreateScheme::Legacy {
+            caller: origin.raw(),
+        });
+        let (exit_reason, return_value) =
+            executor.transact_create(origin.raw(), value.raw(), input, gas_limit, access_list);
+        let result = if exit_reason.is_succeed() {
+            address.0.to_vec()
+        } else {
+            return_value
+        };
 
         let used_gas = executor.used_gas();
-        let status = match exit_reason.into_result(result.0.to_vec()) {
+        let status = match exit_reason.into_result(result) {
             Ok(status) => status,
             Err(e) => {
                 increment_nonce(&mut self.io, &origin);
@@ -523,15 +539,15 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         args: CallArgs,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let origin = self.origin();
+        let origin = Address::new(self.origin());
         match args {
             CallArgs::V2(call_args) => {
-                let contract = Address(call_args.contract);
+                let contract = call_args.contract;
                 let value = call_args.value.into();
                 let input = call_args.input;
                 self.call(
-                    origin,
-                    contract,
+                    &origin,
+                    &contract,
                     value,
                     input,
                     u64::MAX,
@@ -540,12 +556,12 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 )
             }
             CallArgs::V1(call_args) => {
-                let contract = Address(call_args.contract);
+                let contract = call_args.contract;
                 let value = Wei::zero();
                 let input = call_args.input;
                 self.call(
-                    origin,
-                    contract,
+                    &origin,
+                    &contract,
                     value,
                     input,
                     u64::MAX,
@@ -559,12 +575,12 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     #[allow(clippy::too_many_arguments)]
     pub fn call<P: PromiseHandler>(
         &mut self,
-        origin: Address,
-        contract: Address,
+        origin: &Address,
+        contract: &Address,
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
-        access_list: Vec<(Address, Vec<H256>)>, // See EIP-2930
+        access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let executor_params = StackExecutorParams::new(
@@ -573,14 +589,20 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
         );
         let mut executor = executor_params.make_executor(self);
-        let (exit_reason, result) =
-            executor.transact_call(origin, contract, value.raw(), input, gas_limit, access_list);
+        let (exit_reason, result) = executor.transact_call(
+            origin.raw(),
+            contract.raw(),
+            value.raw(),
+            input,
+            gas_limit,
+            access_list,
+        );
 
         let used_gas = executor.used_gas();
         let status = match exit_reason.into_result(result) {
             Ok(status) => status,
             Err(e) => {
-                increment_nonce(&mut self.io, &origin);
+                increment_nonce(&mut self.io, origin);
                 return Err(e.with_gas_used(used_gas));
             }
         };
@@ -596,16 +618,16 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     }
 
     pub fn view_with_args(&self, args: ViewCallArgs) -> Result<TransactionStatus, EngineErrorKind> {
-        let origin = Address::from_slice(&args.sender);
-        let contract = Address::from_slice(&args.address);
+        let origin = &args.sender;
+        let contract = &args.address;
         let value = U256::from_big_endian(&args.amount);
         self.view(origin, contract, Wei::new(value), args.input, u64::MAX)
     }
 
     pub fn view(
         &self,
-        origin: Address,
-        contract: Address,
+        origin: &Address,
+        contract: &Address,
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
@@ -616,8 +638,14 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
         );
         let mut executor = executor_params.make_executor(self);
-        let (status, result) =
-            executor.transact_call(origin, contract, value.raw(), input, gas_limit, Vec::new());
+        let (status, result) = executor.transact_call(
+            origin.raw(),
+            contract.raw(),
+            value.raw(),
+            input,
+            gas_limit,
+            Vec::new(),
+        );
         status.into_result(result)
     }
 
@@ -632,9 +660,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 
     pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
         let key = Self::relayer_key(account_id);
-        self.io
-            .read_storage(&key)
-            .map(|v| Address::from_slice(&v.to_vec()))
+        let raw_addr = self.io.read_storage(&key).map(|v| v.to_vec())?;
+        Address::try_from_slice(&raw_addr[..]).ok()
     }
 
     pub fn register_token(
@@ -670,8 +697,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         self.call(
-            sender,
-            receiver,
+            &sender,
+            &receiver,
             value,
             Vec::new(),
             gas_limit,
@@ -709,11 +736,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             let mut message = args.msg.as_bytes();
             assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
 
-            let recipient = Address(unwrap_res_or_finish!(
+            let recipient = Address::new(H160(unwrap_res_or_finish!(
                 hex::decode(&message[..40]).unwrap().as_slice().try_into(),
                 output_on_fail,
                 self.io
-            ));
+            )));
             message = &message[40..];
 
             let fee = if message.is_empty() {
@@ -728,7 +755,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             (recipient, fee)
         };
 
-        let erc20_token = Address(unwrap_res_or_finish!(
+        let erc20_token = Address::from_array(unwrap_res_or_finish!(
             unwrap_res_or_finish!(
                 get_erc20_from_nep141(&self.io, token),
                 output_on_fail,
@@ -762,15 +789,15 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 
         let selector = ERC20_MINT_SELECTOR;
         let tail = ethabi::encode(&[
-            ethabi::Token::Address(recipient),
-            ethabi::Token::Uint(args.amount.into()),
+            ethabi::Token::Address(recipient.raw()),
+            ethabi::Token::Uint(U256::from(args.amount.as_u128())),
         ]);
 
         let erc20_admin_address = current_address(current_account_id);
         unwrap_res_or_finish!(
             self.call(
-                erc20_admin_address,
-                erc20_token,
+                &erc20_admin_address,
+                &erc20_token,
                 Wei::zero(),
                 [selector, tail.as_slice()].concat(),
                 u64::MAX,
@@ -838,6 +865,10 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         if U256::from(chain_id) != U256::from(state.chain_id) {
             return Err(EngineErrorKind::InvalidChainId.into());
         }
+    } else {
+        // Do not allow missing chain_id in production
+        #[cfg(not(feature = "evm_bully"))]
+        return Err(EngineErrorKind::InvalidChainId.into());
     }
 
     // Retrieve the signer of the transaction:
@@ -888,8 +919,8 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         .collect();
     let result = if let Some(receiver) = transaction.to {
         engine.call(
-            sender,
-            receiver,
+            &sender,
+            &receiver,
             transaction.value,
             transaction.data,
             gas_limit,
@@ -1028,7 +1059,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
         ethabi::Token::String("Empty".to_string()),
         ethabi::Token::String("EMPTY".to_string()),
         ethabi::Token::Uint(ethabi::Uint::from(0)),
-        ethabi::Token::Address(erc20_admin_address),
+        ethabi::Token::Address(erc20_admin_address.raw()),
     ]);
 
     let address = match Engine::deploy_code_with_input(
@@ -1037,7 +1068,9 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
         handler,
     ) {
         Ok(result) => match result.status {
-            TransactionStatus::Succeed(ret) => Address(ret.as_slice().try_into().unwrap()),
+            TransactionStatus::Succeed(ret) => {
+                Address::new(H160(ret.as_slice().try_into().unwrap()))
+            }
             other => return Err(DeployErc20Error::Failed(other)),
         },
         Err(e) => return Err(DeployErc20Error::Engine(e)),
@@ -1062,7 +1095,7 @@ pub fn remove_code<I: IO>(io: &mut I, address: &Address) {
 pub fn get_code<I: IO>(io: &I, address: &Address) -> Vec<u8> {
     io.read_storage(&address_to_key(KeyPrefix::Code, address))
         .map(|s| s.to_vec())
-        .unwrap_or_else(Vec::new)
+        .unwrap_or_default()
 }
 
 pub fn get_code_size<I: IO>(io: &I, address: &Address) -> usize {
@@ -1142,9 +1175,7 @@ pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
 }
 
 pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
-    // The `unwrap` is safe here because if the connector
-    // is implemented correctly then the "Eth on Aurora" wll never underflow.
-    let balance = get_balance(io, address).try_into_u128().unwrap();
+    let balance = get_balance(io, address);
     // Apply changes for eth-connector. The `unwrap` is safe here because (a) if the connector
     // is implemented correctly then the total supply wll never underflow and (b) we are passing
     // in the balance directly so there will always be enough balance.
@@ -1186,14 +1217,13 @@ pub fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32
                 None
             }
         })
-        .unwrap_or_else(H256::default)
+        .unwrap_or_default()
 }
 
 pub fn is_account_empty<I: IO>(io: &I, address: &Address) -> bool {
-    let balance = get_balance(io, address);
-    let nonce = get_nonce(io, address);
-    let code_len = get_code_size(io, address);
-    balance.is_zero() && nonce.is_zero() && code_len == 0
+    get_balance(io, address).is_zero()
+        && get_nonce(io, address).is_zero()
+        && get_code_size(io, address) == 0
 }
 
 /// Increments storage generation for a given address.
@@ -1242,7 +1272,9 @@ where
 {
     logs.into_iter()
         .filter_map(|log| {
-            if log.address == ExitToNear::ADDRESS || log.address == ExitToEthereum::ADDRESS {
+            if log.address == ExitToNear::ADDRESS.raw()
+                || log.address == ExitToEthereum::ADDRESS.raw()
+            {
                 if log.topics.is_empty() {
                     if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
                         match promise {
@@ -1297,8 +1329,8 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     }
 
     /// Returns the origin address that created the contract.
-    fn origin(&self) -> Address {
-        self.origin
+    fn origin(&self) -> H160 {
+        self.origin.raw()
     }
 
     /// Returns a block hash from a given index.
@@ -1341,8 +1373,8 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     /// account, being 0x4444588443C3a91288c5002483449Aba1054192b.
     ///
     /// See: https://doc.aurora.dev/develop/compat/evm#coinbase
-    fn block_coinbase(&self) -> Address {
-        Address([
+    fn block_coinbase(&self) -> H160 {
+        H160([
             0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
             0x9A, 0xba, 0x10, 0x54, 0x19, 0x2b,
         ])
@@ -1387,27 +1419,44 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     }
 
     /// Checks if an address exists.
-    fn exists(&self, address: Address) -> bool {
-        !is_account_empty(&self.io, &address)
+    fn exists(&self, address: H160) -> bool {
+        !is_account_empty(&self.io, &Address::new(address))
     }
 
     /// Returns basic account information.
-    fn basic(&self, address: Address) -> Basic {
-        Basic {
-            nonce: get_nonce(&self.io, &address),
-            balance: get_balance(&self.io, &address).raw(),
-        }
+    fn basic(&self, address: H160) -> Basic {
+        let address = Address::new(address);
+        let result = self
+            .account_info_cache
+            .borrow_mut()
+            .get_or_insert_with(&address, || Basic {
+                nonce: get_nonce(&self.io, &address),
+                balance: get_balance(&self.io, &address).raw(),
+            })
+            .clone();
+        result
     }
 
     /// Returns the code of the contract from an address.
-    fn code(&self, address: Address) -> Vec<u8> {
-        get_code(&self.io, &address)
+    fn code(&self, address: H160) -> Vec<u8> {
+        get_code(&self.io, &Address::new(address))
     }
 
     /// Get storage value of address at index.
-    fn storage(&self, address: Address, index: H256) -> H256 {
-        let generation = get_generation(&self.io, &address);
-        get_storage(&self.io, &address, &index, generation)
+    fn storage(&self, address: H160, index: H256) -> H256 {
+        let address = Address::new(address);
+        let generation = *self
+            .generation_cache
+            .borrow_mut()
+            .entry(address)
+            .or_insert_with(|| get_generation(&self.io, &address));
+        let result = *self
+            .contract_storage_cache
+            .borrow_mut()
+            .get_or_insert_with((&address, &index), || {
+                get_storage(&self.io, &address, &index, generation)
+            });
+        result
     }
 
     /// Get original storage value of address at index, if available.
@@ -1415,7 +1464,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     /// Since SputnikVM collects storage changes in memory until the transaction is over,
     /// the "original storage" will always be the same as the storage because no values
     /// are written to storage until after the transaction is complete.
-    fn original_storage(&self, address: Address, index: H256) -> Option<H256> {
+    fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
         Some(self.storage(address, index))
     }
 }
@@ -1438,6 +1487,7 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
                     storage,
                     reset_storage,
                 } => {
+                    let address = Address::new(address);
                     let generation = get_generation(&self.io, &address);
                     set_nonce(&mut self.io, &address, &basic.nonce);
                     set_balance(&mut self.io, &address, &Wei::new(basic.balance));
@@ -1484,6 +1534,7 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
                     }
                 }
                 Apply::Delete { address } => {
+                    let address = Address::new(address);
                     let generation = get_generation(&self.io, &address);
                     remove_account(&mut self.io, &address, generation);
                     writes_counter += 1;

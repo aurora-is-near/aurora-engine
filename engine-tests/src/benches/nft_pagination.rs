@@ -1,7 +1,6 @@
-use crate::prelude::types::Wei;
-use crate::prelude::{Address, U256};
+use crate::prelude::{Address, Wei, U256};
 use crate::test_utils::{self, solidity};
-use aurora_engine::transaction::legacy::TransactionLegacy;
+use aurora_engine_transactions::legacy::TransactionLegacy;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -55,6 +54,7 @@ pub(crate) fn measure_gas_usage(
 }
 
 struct MarketPlaceConstructor(solidity::ContractConstructor);
+
 struct MarketPlace(solidity::DeployedContract);
 
 impl MarketPlaceConstructor {
@@ -134,7 +134,7 @@ impl MarketPlace {
         self.0.call_method_with_args(
             "minar",
             &[
-                ethabi::Token::Address(recipient),
+                ethabi::Token::Address(recipient.raw()),
                 ethabi::Token::String(data),
                 ethabi::Token::Uint(price.raw()),
             ],
@@ -171,7 +171,6 @@ fn initialize_evm() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
     signer.nonce = INITIAL_NONCE;
 
     runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
-    runner.wasm_config.limit_config.max_gas_burnt_view = u64::MAX;
 
     (runner, signer, dest_address)
 }

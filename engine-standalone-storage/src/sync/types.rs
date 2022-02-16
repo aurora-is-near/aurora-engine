@@ -1,5 +1,5 @@
 use aurora_engine::parameters;
-use aurora_engine::transaction::EthTransactionKind;
+use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::H256;
 
@@ -40,6 +40,7 @@ pub struct TransactionMessage {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum TransactionKind {
     /// Raw Ethereum transaction submitted to the engine
     Submit(EthTransactionKind),

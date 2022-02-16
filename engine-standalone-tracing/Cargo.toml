@@ -1,8 +1,8 @@
 [package]
 name = "engine-standalone-tracing"
 version = "0.1.0"
-edition = "2018"
-authors = ["Aurora <hello@aurora.dev>"]
+edition = "2021"
+authors = ["Aurora Labs <hello@aurora.dev>"]
 description = "Aurora engine standalone tracing library. Provides functions and types for extracing geth-like traces from standalone engine execution."
 homepage = "https://github.com/aurora-is-near/aurora-engine"
 repository = "https://github.com/aurora-is-near/aurora-engine"
@@ -17,10 +17,10 @@ crate-type = ["lib"]
 aurora-engine = { path = "../engine", default-features = false, features = ["std"] }
 aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false, features = ["std"] }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false, features = ["std", "tracing"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", default-features = false, features = ["std", "tracing"] }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "f4ee520254856898d451c7225851520a35c97cea", default-features = false, features = ["std"] }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "f4ee520254856898d451c7225851520a35c97cea", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "f4ee520254856898d451c7225851520a35c97cea", default-features = false, features = ["std", "tracing"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "f4ee520254856898d451c7225851520a35c97cea", default-features = false, features = ["std", "tracing"] }
 
 [features]
 default = []

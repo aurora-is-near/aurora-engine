@@ -1,0 +1,24 @@
+[package]
+name = "aurora-engine-transactions"
+version = "1.0.0"
+authors = ["Aurora Labs <hello@aurora.dev>"]
+edition = "2021"
+description = ""
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "CC0-1.0"
+publish = false
+autobenches = false
+
+[dependencies]
+aurora-engine-types = { path = "../engine-types", default-features = false }
+aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
+aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "f4ee520254856898d451c7225851520a35c97cea", default-features = false }
+rlp = { version = "0.5.0", default-features = false }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+
+[features]
+std = ["aurora-engine-types/std", "aurora-engine-precompiles/std", "evm/std", "rlp/std", "hex/std"]

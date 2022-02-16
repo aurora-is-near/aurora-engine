@@ -32,10 +32,10 @@ members = [
     "engine",
     "engine-precompiles",
     "engine-sdk",
-    "engine-standalone",
     "engine-standalone-storage",
     "engine-standalone-tracing",
     "engine-tests",
+    "engine-transactions",
     "engine-types",
 ]
 exclude = [

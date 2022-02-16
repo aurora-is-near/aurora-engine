@@ -1,7 +1,7 @@
 use evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
-use crate::prelude::{mem, Address, Borrowed, TryInto};
+use crate::prelude::{mem, types::Address, Borrowed};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 
 /// Blake2 costs.
@@ -94,7 +94,7 @@ impl Precompile for Blake2F {
         }
         let finished = input[212] != 0;
 
-        let output = blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
+        let output = near_blake2::blake2b_f(rounds, h, m, t, finished).to_vec();
         Ok(PrecompileOutput::without_logs(cost, output).into())
     }
 }

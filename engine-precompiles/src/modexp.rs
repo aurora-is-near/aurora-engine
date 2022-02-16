@@ -1,7 +1,7 @@
-use crate::prelude::{Address, PhantomData, Vec, U256};
+use crate::prelude::{PhantomData, Vec, U256};
 use crate::{Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput};
 
-use crate::prelude::types::EthGas;
+use crate::prelude::types::{Address, EthGas};
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
@@ -131,7 +131,7 @@ impl ModExp<Berlin> {
     // output bounded by 2^122
     fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
-        let words = U256::from(max_len.div_ceil(&8));
+        let words = U256::from(Integer::div_ceil(&max_len, &8));
         words * words
     }
 }

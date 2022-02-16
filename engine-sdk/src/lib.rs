@@ -1,4 +1,3 @@
-#![feature(array_methods)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
@@ -8,6 +7,7 @@ use crate::prelude::Address;
 use crate::prelude::{H256, STORAGE_PRICE_PER_BYTE};
 pub use types::keccak;
 
+pub mod dup_cache;
 pub mod env;
 pub mod error;
 pub mod io;
@@ -97,7 +97,7 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
             exports::keccak256(u64::MAX, RECOVER_REGISTER_ID, KECCACK_REGISTER_ID);
             let keccak_hash_bytes = [0u8; 32];
             exports::read_register(KECCACK_REGISTER_ID, keccak_hash_bytes.as_ptr() as u64);
-            Ok(Address::from_slice(&keccak_hash_bytes[12..]))
+            Ok(Address::try_from_slice(&keccak_hash_bytes[12..]).map_err(|_| ECRecoverErr)?)
         } else {
             Err(ECRecoverErr)
         }

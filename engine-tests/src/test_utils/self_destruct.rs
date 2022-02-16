@@ -1,10 +1,9 @@
 use crate::prelude::{
-    parameters::CallArgs, parameters::FunctionCallArgsV2, transaction::legacy::TransactionLegacy,
+    parameters::CallArgs, parameters::FunctionCallArgsV2, transactions::legacy::TransactionLegacy,
     Address, WeiU256, U256,
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use borsh::BorshSerialize;
-use std::convert::TryInto;
 
 pub(crate) struct SelfDestructFactoryConstructor(pub solidity::ContractConstructor);
 
@@ -75,7 +74,7 @@ impl SelfDestructFactory {
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
         let result = test_utils::unwrap_success(result);
 
-        Address::from_slice(&result[12..])
+        Address::try_from_slice(&result[12..]).unwrap()
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::prelude::EthAddress;
+use crate::prelude::Address;
 use crate::prelude::WithdrawCallArgs;
 use crate::test_utils::str_to_account_id;
 use aurora_engine::admin_controlled::{PausedMask, ERR_PAUSED};
@@ -9,7 +9,7 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
-use aurora_engine_types::types::Fee;
+use aurora_engine_types::types::{Fee, NEP141Wei};
 use borsh::{BorshDeserialize, BorshSerialize};
 use byte_slice_cast::AsByteSlice;
 use ethabi::ethereum_types::U256;
@@ -98,12 +98,8 @@ fn init_contract(
     contract_account
 }
 
-fn validate_eth_address(address: &str) -> EthAddress {
-    let data = hex::decode(address).unwrap();
-    assert_eq!(data.len(), 20);
-    let mut result = [0u8; 20];
-    result.copy_from_slice(&data);
-    result
+fn validate_eth_address(address: &str) -> Address {
+    Address::decode(address).unwrap()
 }
 
 fn call_deposit_eth_to_near(
@@ -192,10 +188,10 @@ fn get_eth_on_near_balance(master_account: &UserAccount, acc: &str, contract: &s
     val.parse().unwrap()
 }
 
-fn get_eth_balance(master_account: &UserAccount, address: EthAddress, contract: &str) -> u128 {
+fn get_eth_balance(master_account: &UserAccount, address: Address, contract: &str) -> u128 {
     #[derive(BorshSerialize, BorshDeserialize)]
     pub struct BalanceOfEthCallArgs {
-        pub address: EthAddress,
+        pub address: Address,
     }
 
     let balance = master_account.view(
@@ -306,7 +302,7 @@ fn test_withdraw_eth_from_near() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
     call_deposit_eth_to_near(&contract, CONTRACT_ACC);
 
-    let withdraw_amount = 100;
+    let withdraw_amount = NEP141Wei::new(100);
     let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
     let res = contract.call(
         CONTRACT_ACC.parse().unwrap(),
@@ -336,13 +332,13 @@ fn test_withdraw_eth_from_near() {
     }
 
     let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE - withdraw_amount as u128);
+    assert_eq!(balance, DEPOSITED_FEE - withdraw_amount.as_u128());
 
     let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount as u128);
+    assert_eq!(balance, DEPOSITED_AMOUNT - withdraw_amount.as_u128());
 }
 
 #[test]
@@ -412,7 +408,11 @@ fn test_ft_transfer_call_eth() {
     let transfer_amount = 50;
     let fee: u128 = 30;
     let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
+    msg.append(
+        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
+            .as_bytes()
+            .to_vec(),
+    );
 
     let message = [CONTRACT_ACC, hex::encode(msg).as_str()].join(":");
     let res = contract.call(
@@ -597,28 +597,23 @@ fn test_deposit_with_0x_prefix() {
     use aurora_engine::deposit_event::TokenMessageData;
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
 
-    let eth_custodian_address: [u8; 20] = {
-        let mut buf = [0u8; 20];
-        let bytes = hex::decode(CUSTODIAN_ADDRESS).unwrap();
-        buf.copy_from_slice(&bytes);
-        buf
-    };
-    let recipient_address = [10u8; 20];
+    let eth_custodian_address: Address = Address::decode(&CUSTODIAN_ADDRESS.to_string()).unwrap();
+    let recipient_address = Address::from_array([10u8; 20]);
     let deposit_amount = 17;
-    let recipient_address_encoded = hex::encode(&recipient_address);
+    let recipient_address_encoded = recipient_address.encode();
 
     // Note the 0x prefix before the deposit address.
     let message = [CONTRACT_ACC, ":", "0x", &recipient_address_encoded].concat();
-    let fee: Fee = 0.into();
+    let fee: Fee = Fee::new(NEP141Wei::new(0));
     let token_message_data =
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
             .unwrap();
 
     let deposit_event = aurora_engine::deposit_event::DepositedEvent {
         eth_custodian_address,
-        sender: [0u8; 20],
+        sender: Address::zero(),
         token_message_data,
-        amount: deposit_amount,
+        amount: NEP141Wei::new(deposit_amount),
         fee,
     };
 
@@ -628,7 +623,7 @@ fn test_deposit_with_0x_prefix() {
         anonymous: false,
     };
     let log_entry = aurora_engine::log_entry::LogEntry {
-        address: eth_custodian_address.into(),
+        address: eth_custodian_address.raw(),
         topics: vec![
             event_schema.signature(),
             // the sender is not important
@@ -636,8 +631,8 @@ fn test_deposit_with_0x_prefix() {
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(U256::from(deposit_event.amount)),
-            ethabi::Token::Uint(U256::from(deposit_event.fee.into_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
         ]),
     };
     let proof = Proof {
@@ -718,7 +713,11 @@ fn test_ft_transfer_call_without_relayer() {
     let transfer_amount = 50;
     let fee: u128 = 30;
     let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
+    msg.append(
+        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
+            .as_bytes()
+            .to_vec(),
+    );
     let relayer_id = "relayer.root";
     let message = [relayer_id, hex::encode(msg).as_str()].join(":");
     let res = contract.call(
@@ -774,7 +773,11 @@ fn test_ft_transfer_call_fee_greater_than_amount() {
     let transfer_amount = 10;
     let fee: u128 = transfer_amount + 10;
     let mut msg = fee.to_be_bytes().to_vec();
-    msg.append(&mut validate_eth_address(RECIPIENT_ETH_ADDRESS).to_vec());
+    msg.append(
+        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
+            .as_bytes()
+            .to_vec(),
+    );
     let relayer_id = "relayer.root";
     let message = [relayer_id, hex::encode(msg).as_str()].join(":");
     let res = contract.call(
@@ -895,7 +898,7 @@ fn test_admin_controlled_admin_can_peform_actions_when_paused() {
         p.assert_success()
     }
 
-    let withdraw_amount = 100;
+    let withdraw_amount = NEP141Wei::new(100);
     let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
 
     // 1st withdraw call when unpaused  - should succeed
@@ -1008,7 +1011,7 @@ fn test_withdraw_from_near_pausability() {
 
     call_deposit_eth_to_near(&contract, CONTRACT_ACC);
 
-    let withdraw_amount = 100;
+    let withdraw_amount = NEP141Wei::new(100);
     let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
     // 1st withdraw - should succeed
     let res = user_account.call(

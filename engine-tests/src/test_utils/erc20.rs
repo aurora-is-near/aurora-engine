@@ -1,4 +1,4 @@
-use crate::prelude::{transaction::legacy::TransactionLegacy, Address, U256};
+use crate::prelude::{transactions::legacy::TransactionLegacy, Address, U256};
 use crate::test_utils::solidity;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
@@ -78,7 +78,7 @@ impl ERC20 {
             .function("mint")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(recipient),
+                ethabi::Token::Address(recipient.raw()),
                 ethabi::Token::Uint(amount),
             ])
             .unwrap();
@@ -100,7 +100,7 @@ impl ERC20 {
             .function("transfer")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(recipient),
+                ethabi::Token::Address(recipient.raw()),
                 ethabi::Token::Uint(amount),
             ])
             .unwrap();
@@ -120,7 +120,10 @@ impl ERC20 {
             .abi
             .function("approve")
             .unwrap()
-            .encode_input(&[ethabi::Token::Address(spender), ethabi::Token::Uint(amount)])
+            .encode_input(&[
+                ethabi::Token::Address(spender.raw()),
+                ethabi::Token::Uint(amount),
+            ])
             .unwrap();
         TransactionLegacy {
             nonce,
@@ -138,7 +141,7 @@ impl ERC20 {
             .abi
             .function("balanceOf")
             .unwrap()
-            .encode_input(&[ethabi::Token::Address(address)])
+            .encode_input(&[ethabi::Token::Address(address.raw())])
             .unwrap();
         TransactionLegacy {
             nonce,

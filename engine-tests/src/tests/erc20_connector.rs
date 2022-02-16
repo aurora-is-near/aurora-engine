@@ -1,8 +1,8 @@
-use crate::prelude::{Address, Balance, RawAddress, TryInto, Wei, WeiU256, U256};
+use crate::prelude::{Address, Balance, Wei, WeiU256, U256};
 use crate::test_utils;
 use crate::test_utils::{create_eth_transaction, origin, AuroraRunner};
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
-use aurora_engine::transaction::legacy::LegacyEthSignedTransaction;
+use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
 use near_vm_logic::VMOutcome;
@@ -61,7 +61,7 @@ fn create_ethereum_address() -> Address {
 
 pub struct EthereumAddress {
     pub secret_key: SecretKey,
-    pub address: RawAddress,
+    pub address: Address,
 }
 
 impl test_utils::AuroraRunner {
@@ -91,7 +91,7 @@ impl test_utils::AuroraRunner {
         CallResult { outcome, error }
     }
 
-    pub fn evm_call(&mut self, contract: RawAddress, input: Vec<u8>, origin: String) -> CallResult {
+    pub fn evm_call(&mut self, contract: Address, input: Vec<u8>, origin: String) -> CallResult {
         self.make_call(
             "call",
             origin,
@@ -109,15 +109,16 @@ impl test_utils::AuroraRunner {
         self.make_call("submit", origin, rlp::encode(&input).to_vec())
     }
 
-    pub fn deploy_erc20_token(&mut self, nep141: &String) -> RawAddress {
+    pub fn deploy_erc20_token(&mut self, nep141: &String) -> Address {
         let result = self.make_call("deploy_erc20_token", origin(), nep141.try_to_vec().unwrap());
 
         result.check_ok();
 
-        Vec::<u8>::try_from_slice(result.value().as_slice())
+        let raw_address: [u8; 20] = Vec::<u8>::try_from_slice(result.value().as_slice())
             .unwrap()
             .try_into()
-            .unwrap()
+            .unwrap();
+        Address::try_from_slice(&raw_address).unwrap()
     }
 
     pub fn create_account(&mut self) -> EthereumAddress {
@@ -131,8 +132,8 @@ impl test_utils::AuroraRunner {
         }
     }
 
-    pub fn balance_of(&mut self, token: RawAddress, target: RawAddress, origin: String) -> U256 {
-        let input = build_input("balanceOf(address)", &[Token::Address(target.into())]);
+    pub fn balance_of(&mut self, token: Address, target: Address, origin: String) -> U256 {
+        let input = build_input("balanceOf(address)", &[Token::Address(target.raw())]);
         let result = self.evm_call(token, input, origin);
         result.check_ok();
         let output = test_utils::unwrap_success(result.submit_result());
@@ -141,15 +142,15 @@ impl test_utils::AuroraRunner {
 
     pub fn mint(
         &mut self,
-        token: RawAddress,
-        target: RawAddress,
+        token: Address,
+        target: Address,
         amount: u64,
         origin: String,
     ) -> CallResult {
         let input = build_input(
             "mint(address,uint256)",
             &[
-                Token::Address(target.into()),
+                Token::Address(target.raw()),
                 Token::Uint(U256::from(amount).into()),
             ],
         );
@@ -159,7 +160,7 @@ impl test_utils::AuroraRunner {
     }
 
     #[allow(dead_code)]
-    pub fn admin(&mut self, token: RawAddress, origin: String) -> CallResult {
+    pub fn admin(&mut self, token: Address, origin: String) -> CallResult {
         let input = build_input("admin()", &[]);
         let result = self.evm_call(token, input, origin);
         result.check_ok();
@@ -168,9 +169,9 @@ impl test_utils::AuroraRunner {
 
     pub fn transfer_erc20(
         &mut self,
-        token: RawAddress,
+        token: Address,
         sender: SecretKey,
-        receiver: RawAddress,
+        receiver: Address,
         amount: u64,
         origin: String,
     ) -> CallResult {
@@ -178,12 +179,14 @@ impl test_utils::AuroraRunner {
         let input = build_input(
             "transfer(address,uint256)",
             &[
-                Token::Address(receiver.into()),
+                Token::Address(receiver.raw()),
                 Token::Uint(U256::from(amount)),
             ],
         );
 
-        let input = create_eth_transaction(Some(token.into()), Wei::zero(), input, None, &sender);
+        let chain_id = Some(self.chain_id);
+        let input =
+            create_eth_transaction(Some(token.into()), Wei::zero(), input, chain_id, &sender);
 
         let result = self.evm_submit(input, origin); // create_eth_transaction()
         result.check_ok();
@@ -222,7 +225,7 @@ impl test_utils::AuroraRunner {
         self.make_call(
             "register_relayer",
             relayer_account_id,
-            relayer_address.as_fixed_bytes().try_to_vec().unwrap(),
+            relayer_address.try_to_vec().unwrap(),
         )
     }
 }
@@ -267,18 +270,18 @@ fn test_ft_on_transfer() {
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
     let token = runner.deploy_erc20_token(&nep141);
-    let amount = 10;
+    let amount = Balance::new(10);
     let recipient = runner.create_account().address;
 
     let balance = runner.balance_of(token, recipient, origin());
     assert_eq!(balance, U256::from(0));
 
-    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, hex::encode(recipient));
+    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, recipient.encode());
     // Transaction should succeed so return amount is 0
     assert_eq!(res, "\"0\"");
 
     let balance = runner.balance_of(token, recipient, origin());
-    assert_eq!(balance, U256::from(amount));
+    assert_eq!(balance, U256::from(amount.as_u128()));
 }
 
 #[test]
@@ -286,11 +289,11 @@ fn test_ft_on_transfer_fail() {
     let mut runner = AuroraRunner::new();
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
-    let amount = 10;
+    let amount = Balance::new(10);
 
     let recipient = runner.create_account().address;
 
-    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, hex::encode(recipient));
+    let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, recipient.encode());
 
     // Transaction should fail so it must return everything
     assert_eq!(res, format!("\"{}\"", amount.to_string()));
@@ -301,7 +304,7 @@ fn test_relayer_charge_fee() {
     let mut runner = AuroraRunner::new();
     // Standalone runner presently does not support ft_on_transfer
     runner.standalone_runner = None;
-    let amount = 10;
+    let amount = Balance::new(10);
     let fee = 51;
     let nep141 = "tt.testnet".to_string();
     let alice = "alice".to_string();
@@ -327,7 +330,7 @@ fn test_relayer_charge_fee() {
         alice.clone(),
         alice,
         amount,
-        hex::encode(recipient) + &hex::encode(fee_encoded),
+        recipient.encode() + &hex::encode(fee_encoded),
     );
 
     let recipient_balance_end = runner.get_balance(recipient.into());
@@ -339,7 +342,7 @@ fn test_relayer_charge_fee() {
     assert_eq!(relayer_balance, Wei::new_u64(fee));
 
     let balance = runner.balance_of(token, recipient, origin());
-    assert_eq!(balance, U256::from(amount));
+    assert_eq!(balance, U256::from(amount.as_u128()));
 }
 
 #[test]
@@ -390,7 +393,7 @@ fn test_transfer_erc20_token() {
 // Note: `AuroraRunner` is not suitable for these tests because
 // it does not execute promises; but `near-sdk-sim` does.
 mod sim_tests {
-    use crate::prelude::{types::Wei, Address, WeiU256, U256};
+    use crate::prelude::{Wei, WeiU256, U256};
     use crate::test_utils;
     use crate::test_utils::erc20::{ERC20Constructor, ERC20};
     use crate::test_utils::exit_precompile::TesterConstructor;
@@ -398,6 +401,7 @@ mod sim_tests {
     use aurora_engine::parameters::{
         CallArgs, DeployErc20TokenArgs, FunctionCallArgsV2, SubmitResult,
     };
+    use aurora_engine_types::types::Address;
     use borsh::BorshSerialize;
     use near_sdk_sim::UserAccount;
     use serde_json::json;
@@ -518,13 +522,13 @@ mod sim_tests {
             nep_141_balance_of(
                 aurora.contract.account_id.as_str(),
                 &aurora.contract,
-                &aurora
+                &aurora,
             ),
-            (INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT).into()
+            (INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT) as u128
         );
         assert_eq!(
             nep_141_balance_of(exit_account_id.as_str(), &aurora.contract, &aurora),
-            ETH_EXIT_AMOUNT.into()
+            ETH_EXIT_AMOUNT as u128
         );
         assert_eq!(
             eth_balance_of(signer_address, &aurora),
@@ -603,7 +607,7 @@ mod sim_tests {
         aurora
             .call(
                 "mint_account",
-                &(signer_address.0, signer.nonce, INITIAL_ETH_BALANCE)
+                &(signer_address, signer.nonce, INITIAL_ETH_BALANCE)
                     .try_to_vec()
                     .unwrap(),
             )
@@ -613,9 +617,9 @@ mod sim_tests {
             nep_141_balance_of(
                 aurora.contract.account_id.as_str(),
                 &aurora.contract,
-                &aurora
+                &aurora,
             ),
-            INITIAL_ETH_BALANCE.into()
+            INITIAL_ETH_BALANCE as u128
         );
         assert_eq!(
             eth_balance_of(signer_address, &aurora),
@@ -626,7 +630,8 @@ mod sim_tests {
         let constructor = TesterConstructor::load();
         let deploy_data = constructor.deploy(0, Address::zero()).data;
         let submit_result: SubmitResult = aurora.call("deploy_code", &deploy_data).unwrap_borsh();
-        let tester_address = Address::from_slice(&test_utils::unwrap_success(submit_result));
+        let tester_address =
+            Address::try_from_slice(&test_utils::unwrap_success(submit_result)).unwrap();
 
         TestExitToNearEthContext {
             signer,
@@ -651,7 +656,7 @@ mod sim_tests {
         aurora
             .call(
                 "mint_account",
-                &(ft_owner_address.0, 0u64, INITIAL_ETH_BALANCE)
+                &(ft_owner_address, 0u64, INITIAL_ETH_BALANCE)
                     .try_to_vec()
                     .unwrap(),
             )
@@ -718,7 +723,7 @@ mod sim_tests {
             ],
         );
         let call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: erc20.0.address.0,
+            contract: erc20.0.address,
             value: WeiU256::default(),
             input,
         });
@@ -758,7 +763,7 @@ mod sim_tests {
 
         let mint_tx = erc20.mint(dest, amount.into(), 0.into());
         let call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: erc20.0.address.0,
+            contract: erc20.0.address,
             value: WeiU256::default(),
             input: mint_tx.data,
         });
@@ -789,7 +794,7 @@ mod sim_tests {
     fn erc20_balance(erc20: &ERC20, address: Address, aurora: &AuroraAccount) -> U256 {
         let balance_tx = erc20.balance_of(address, 0.into());
         let call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: erc20.0.address.0,
+            contract: erc20.0.address,
             value: WeiU256::default(),
             input: balance_tx.data,
         });
@@ -807,7 +812,7 @@ mod sim_tests {
         };
         let result = aurora.call("deploy_erc20_token", &args.try_to_vec().unwrap());
         let addr_bytes: Vec<u8> = result.unwrap_borsh();
-        let address = Address::from_slice(&addr_bytes);
+        let address = Address::try_from_slice(&addr_bytes).unwrap();
         let abi = ERC20Constructor::load().0.abi;
         ERC20(crate::test_utils::solidity::DeployedContract { abi, address })
     }

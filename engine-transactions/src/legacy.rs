@@ -1,5 +1,7 @@
-use crate::prelude::precompiles::secp256k1::ecrecover;
-use crate::prelude::{sdk, Address, Vec, Wei, U256};
+use aurora_engine_precompiles::secp256k1::ecrecover;
+use aurora_engine_sdk as sdk;
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{Vec, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -26,7 +28,7 @@ impl TransactionLegacy {
         s.append(&self.gas_limit);
         match self.to.as_ref() {
             None => s.append(&""),
-            Some(address) => s.append(address),
+            Some(address) => s.append(&address.raw()),
         };
         s.append(&self.value.raw());
         s.append(&self.data);
@@ -40,7 +42,6 @@ impl TransactionLegacy {
     /// Returns self.gas as a u64, or None if self.gas > u64::MAX
     #[allow(unused)]
     pub fn get_gas_limit(&self) -> Option<u64> {
-        use crate::prelude::TryInto;
         self.gas_limit.try_into().ok()
     }
 
@@ -106,7 +107,7 @@ impl Encodable for LegacyEthSignedTransaction {
         s.append(&self.transaction.gas_limit);
         match self.transaction.to.as_ref() {
             None => s.append(&""),
-            Some(address) => s.append(address),
+            Some(address) => s.append(&address.raw()),
         };
         s.append(&self.transaction.value.raw());
         s.append(&self.transaction.data);
@@ -149,6 +150,7 @@ impl Decodable for LegacyEthSignedTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aurora_engine_types::vec;
 
     #[test]
     fn test_eth_signed_no_chain_sender() {
@@ -199,8 +201,6 @@ mod tests {
 
     fn address_from_arr(arr: &[u8]) -> Address {
         assert_eq!(arr.len(), 20);
-        let mut address = [0u8; 20];
-        address.copy_from_slice(&arr);
-        Address::from(address)
+        Address::try_from_slice(arr).unwrap()
     }
 }

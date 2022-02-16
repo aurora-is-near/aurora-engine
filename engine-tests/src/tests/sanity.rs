@@ -5,7 +5,7 @@ use crate::tests::state_migration;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{SubmitResult, TransactionStatus};
 use aurora_engine_sdk as sdk;
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshSerialize;
 use rand::RngCore;
 use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
@@ -57,7 +57,7 @@ fn test_deploy_contract() {
             test_utils::create_deploy_transaction(code.clone(), nonce)
         })
         .unwrap();
-    let address = Address::from_slice(test_utils::unwrap_success_slice(&result));
+    let address = Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
 
     // Confirm the code stored at that address is equal to the input code.
     let stored_code = runner.get_code(address);
@@ -92,8 +92,8 @@ fn test_deploy_largest_contract() {
         result.gas_used,
     );
 
-    // Less than 28 NEAR Tgas
-    test_utils::assert_gas_bound(profile.all_gas(), 28);
+    // Less than 12 NEAR Tgas
+    test_utils::assert_gas_bound(profile.all_gas(), 12);
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn test_log_address() {
         .submit_with_signer(&mut signer, |nonce| {
             caller_contract.call_method_with_args(
                 "greet",
-                &[ethabi::Token::Address(greet_contract.address)],
+                &[ethabi::Token::Address(greet_contract.address.raw())],
                 nonce,
             )
         })
@@ -132,7 +132,80 @@ fn test_log_address() {
     // Address included in the log should come from the contract emitting the log,
     // not the contract that invoked the call.
     let log_address = result.logs.first().unwrap().address;
-    assert_eq!(Address(log_address), greet_contract.address);
+    assert_eq!(log_address, greet_contract.address);
+}
+
+#[test]
+fn test_solidity_pure_bench() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+    runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
+
+    let constructor = test_utils::solidity::ContractConstructor::force_compile(
+        "src/tests/res",
+        "target/solidity_build",
+        "bench.sol",
+        "Bencher",
+    );
+
+    let nonce = signer.use_nonce();
+    let contract = runner.deploy_contract(
+        &signer.secret_key,
+        |c| c.deploy_without_constructor(nonce.into()),
+        constructor,
+    );
+
+    // Number of iterations to do
+    let loop_limit = 10_000;
+    let (result, profile) = runner
+        .submit_with_signer_profiled(&mut signer, |nonce| {
+            contract.call_method_with_args(
+                "cpu_ram_soak_test",
+                &[ethabi::Token::Uint(loop_limit.into())],
+                nonce,
+            )
+        })
+        .unwrap();
+
+    assert!(
+        result.gas_used > 38_000_000,
+        "Over 38 million EVM gas is used"
+    );
+    assert!(
+        profile.all_gas() > 2200 * 1_000_000_000_000,
+        "Over 2200 NEAR Tgas is used"
+    );
+}
+
+#[test]
+fn test_revert_during_contract_deploy() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+        "src/tests/res",
+        "target/solidity_build",
+        "reverter.sol",
+        "ReverterByDefault",
+    );
+
+    let nonce = signer.use_nonce();
+    let deploy_tx =
+        constructor.deploy_with_args(nonce.into(), &[ethabi::Token::Uint(U256::zero())]);
+    let submit_result = runner
+        .submit_transaction(&signer.secret_key, deploy_tx)
+        .unwrap();
+
+    let revert_bytes = crate::test_utils::unwrap_revert(submit_result);
+    // First 4 bytes is a function selector with signature `Error(string)`
+    assert_eq!(&revert_bytes[0..4], &[8, 195, 121, 160]);
+    // Remaining data is an ABI-encoded string
+    let revert_message = ethabi::decode(&[ethabi::ParamType::String], &revert_bytes[4..])
+        .unwrap()
+        .pop()
+        .unwrap()
+        .into_string()
+        .unwrap();
+
+    assert_eq!(revert_message.as_str(), "Revert message");
 }
 
 #[test]
@@ -194,7 +267,7 @@ fn test_override_state() {
     // deploy contract
     let result = runner
         .submit_with_signer(&mut account1, |nonce| {
-            crate::prelude::transaction::legacy::TransactionLegacy {
+            crate::prelude::transactions::legacy::TransactionLegacy {
                 nonce,
                 gas_price: Default::default(),
                 gas_limit: u64::MAX.into(),
@@ -204,7 +277,7 @@ fn test_override_state() {
             }
         })
         .unwrap();
-    let address = Address::from_slice(&test_utils::unwrap_success(result));
+    let address = Address::try_from_slice(&test_utils::unwrap_success(result)).unwrap();
     let contract = contract.deployed_at(address);
 
     // define functions to interact with the contract
@@ -217,7 +290,7 @@ fn test_override_state() {
             .unwrap();
         match result {
             crate::prelude::parameters::TransactionStatus::Succeed(bytes) => {
-                Address::from_slice(&bytes[12..32])
+                Address::try_from_slice(&bytes[12..32]).unwrap()
             }
             _ => panic!("tx failed"),
         }
@@ -237,7 +310,7 @@ fn test_override_state() {
     };
 
     // Assert the initial state is 0
-    assert_eq!(get_address(&runner), Address([0; 20]));
+    assert_eq!(get_address(&runner), Address::new(H160([0; 20])));
     post_address(&mut runner, &mut account1);
     // Assert the address matches the first caller
     assert_eq!(get_address(&runner), account1_address);
@@ -251,9 +324,10 @@ fn test_num_wasm_functions() {
     // Counts the number of functions in our wasm output.
     // See https://github.com/near/nearcore/issues/4814 for context
     let runner = test_utils::deploy_evm();
-    let artifact = get_compiled_artifact(&runner);
-    let module_info = artifact.info();
-    let num_functions = module_info.functions.len();
+    let module = walrus::ModuleConfig::default()
+        .parse(runner.code.code())
+        .unwrap();
+    let num_functions = module.funcs.iter().count();
     assert!(
         num_functions <= 1440,
         "{} is not less than 1440",
@@ -517,6 +591,7 @@ fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Addre
     (runner, signer, dest_address)
 }
 
+use aurora_engine_types::H160;
 use sha3::Digest;
 
 #[test]
@@ -621,7 +696,7 @@ fn test_eth_transfer_insufficient_balance_sim() {
     // Run transaction which will fail (transfer more than current balance)
     let nonce = signer.use_nonce();
     let tx = test_utils::transfer(
-        Address([1; 20]),
+        Address::new(H160([1; 20])),
         INITIAL_BALANCE + INITIAL_BALANCE,
         nonce.into(),
     );
@@ -652,7 +727,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
 
     // Run transaction which will fail (not enough balance to cover gas)
     let nonce = signer.use_nonce();
-    let mut tx = test_utils::transfer(Address([1; 20]), TRANSFER_AMOUNT, nonce.into());
+    let mut tx = test_utils::transfer(Address::new(H160([1; 20])), TRANSFER_AMOUNT, nonce.into());
     tx.gas_limit = 3_000_000.into();
     tx.gas_price = GAS_PRICE.into();
     let signed_tx = test_utils::sign_transaction(
@@ -680,7 +755,7 @@ fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, 
     let signer = test_utils::Signer::random();
     let address = test_utils::address_from_secret_key(&signer.secret_key);
 
-    let args = (address.0, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
+    let args = (address, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
     aurora
         .call("mint_account", &args.try_to_vec().unwrap())
         .assert_success();
@@ -703,31 +778,9 @@ fn query_address_sim(
     method: &str,
     aurora: &state_migration::AuroraAccount,
 ) -> U256 {
-    let x = aurora.call(method, &address.0);
+    let x = aurora.call(method, address.as_bytes());
     match &x.outcome().status {
         near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
         other => panic!("Unexpected outcome: {:?}", other),
     }
-}
-
-fn get_compiled_artifact(runner: &test_utils::AuroraRunner) -> wasmer::Module {
-    use near_primitives::types::CompiledContractCache;
-
-    let current_protocol_version = u32::MAX;
-    let vm_kind = near_vm_runner::VMKind::for_protocol_version(current_protocol_version);
-    near_vm_runner::precompile_contract(
-        &runner.code,
-        &runner.wasm_config,
-        current_protocol_version,
-        Some(&runner.cache),
-    )
-    .unwrap()
-    .unwrap();
-    let cache_key =
-        near_vm_runner::get_contract_cache_key(&runner.code, vm_kind, &runner.wasm_config);
-    let cache_record =
-        Vec::try_from_slice(&runner.cache.get(cache_key.as_ref()).unwrap().unwrap()[1..]).unwrap();
-    let store = wasmer::Store::new(&wasmer::Universal::new(wasmer::Singlepass::new()).engine());
-
-    unsafe { wasmer::Module::deserialize(&store, &cache_record).unwrap() }
 }

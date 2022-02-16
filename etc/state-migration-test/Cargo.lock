@@ -42,9 +42,9 @@ dependencies = [
  "aurora-bn",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
+ "aurora-engine-transactions",
  "aurora-engine-types",
  "base64",
- "blake2",
  "borsh",
  "byte-slice-cast",
  "ethabi",
@@ -53,6 +53,7 @@ dependencies = [
  "hex",
  "libsecp256k1",
  "logos",
+ "near-blake2",
  "num",
  "primitive-types",
  "ripemd160",
@@ -70,22 +71,18 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
  "base64",
- "blake2",
  "borsh",
  "ethabi",
  "evm",
  "evm-core",
  "hex",
  "libsecp256k1",
- "logos",
+ "near-blake2",
  "num",
  "primitive-types",
  "ripemd160",
- "rjson",
- "rlp",
  "sha2",
  "sha3 0.9.1",
- "wee_alloc",
 ]
 
 [[package]]
@@ -109,6 +106,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-transactions"
+version = "1.0.0"
+dependencies = [
+ "aurora-engine-precompiles",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "evm",
+ "hex",
+ "rlp",
+]
+
+[[package]]
 name = "aurora-engine-types"
 version = "1.0.0"
 dependencies = [
@@ -117,6 +126,18 @@ dependencies = [
  "hex",
  "primitive-types",
  "sha3 0.9.1",
+]
+
+[[package]]
+name = "auto_impl"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7862e21c893d65a1650125d157eaeec691439379a1cee17ee49031b79236ada4"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -136,16 +157,6 @@ name = "beef"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6736e2428df2ca2848d846c43e88745121a6654696e349ce0054a420815a7409"
-
-[[package]]
-name = "blake2"
-version = "0.9.1"
-source = "git+https://github.com/near/near-blake2.git#736ff607cc8160af87ffa697c14ebef85050138f"
-dependencies = [
- "crypto-mac",
- "digest 0.9.0",
- "opaque-debug 0.3.0",
-]
 
 [[package]]
 name = "block-buffer"
@@ -383,9 +394,10 @@ dependencies = [
 
 [[package]]
 name = "evm"
-version = "0.31.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
+version = "0.33.1"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=f4ee520254856898d451c7225851520a35c97cea#f4ee520254856898d451c7225851520a35c97cea"
 dependencies = [
+ "auto_impl",
  "ethereum",
  "evm-core",
  "evm-gasometer",
@@ -398,8 +410,8 @@ dependencies = [
 
 [[package]]
 name = "evm-core"
-version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
+version = "0.33.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=f4ee520254856898d451c7225851520a35c97cea#f4ee520254856898d451c7225851520a35c97cea"
 dependencies = [
  "funty",
  "primitive-types",
@@ -407,8 +419,8 @@ dependencies = [
 
 [[package]]
 name = "evm-gasometer"
-version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
+version = "0.33.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=f4ee520254856898d451c7225851520a35c97cea#f4ee520254856898d451c7225851520a35c97cea"
 dependencies = [
  "evm-core",
  "evm-runtime",
@@ -417,9 +429,10 @@ dependencies = [
 
 [[package]]
 name = "evm-runtime"
-version = "0.31.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git#0fbde9fa7797308290f89111c6abe5cee55a5eac"
+version = "0.33.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=f4ee520254856898d451c7225851520a35c97cea#f4ee520254856898d451c7225851520a35c97cea"
 dependencies = [
+ "auto_impl",
  "evm-core",
  "primitive-types",
  "sha3 0.8.2",
@@ -619,6 +632,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
+name = "near-blake2"
+version = "0.9.1"
+source = "git+https://github.com/near/near-blake2.git#cebb7df79608a7058017940830d37c37d55d21fe"
+dependencies = [
+ "crypto-mac",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
+]
+
+[[package]]
 name = "num"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -766,6 +789,30 @@ checksum = "1ebace6889caf889b4d3f76becee12e90353f2b8c7d875534a71e5742f8f6f83"
 dependencies = [
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "proc-macro-error"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da25490ff9892aab3fcf7c36f08cfb902dd3e71ca0f9f9517bea02a73a5ce38c"
+dependencies = [
+ "proc-macro-error-attr",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "version_check",
+]
+
+[[package]]
+name = "proc-macro-error-attr"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "version_check",
 ]
 
 [[package]]

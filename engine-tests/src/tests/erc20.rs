@@ -107,13 +107,13 @@ fn profile_erc20_get_balance() {
         runner.profiled_view_call(test_utils::as_view_call(balance_tx, source_address));
     assert!(result.is_ok());
 
-    // call costs less than 4 Tgas
-    test_utils::assert_gas_bound(profile.all_gas(), 4);
+    // call costs less than 3 Tgas
+    test_utils::assert_gas_bound(profile.all_gas(), 3);
     // at least 70% of the cost is spent on wasm computation (as opposed to host functions)
     let wasm_fraction = (100 * profile.wasm_gas()) / profile.all_gas();
     assert!(
-        wasm_fraction >= 68,
-        "{}% is not greater than 68%",
+        15 <= wasm_fraction && wasm_fraction <= 20,
+        "{}% is not between 15% and 20%",
         wasm_fraction
     );
 }
@@ -225,7 +225,7 @@ fn deploy_erc_20_out_of_gas() {
     assert!(error_message.contains("ERR_INTRINSIC_GAS"));
 
     // not enough gas to complete transaction
-    deploy_transaction.gas_limit = U256::from(3_200_000);
+    deploy_transaction.gas_limit = U256::from(intrinsic_gas + 1);
     let outcome = runner.submit_transaction(&source_account, deploy_transaction);
     let error = outcome.unwrap();
     assert_eq!(error.status, TransactionStatus::OutOfGas);

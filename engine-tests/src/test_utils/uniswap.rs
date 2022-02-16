@@ -1,6 +1,6 @@
 use crate::prelude::{Address, U256};
 use crate::test_utils::solidity;
-use aurora_engine::transaction::legacy::TransactionLegacy;
+use aurora_engine_transactions::legacy::TransactionLegacy;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -112,9 +112,9 @@ impl PositionManagerConstructor {
             .encode_input(
                 self.0.code.clone(),
                 &[
-                    ethabi::Token::Address(factory),
-                    ethabi::Token::Address(wrapped_eth),
-                    ethabi::Token::Address(token_descriptor),
+                    ethabi::Token::Address(factory.raw()),
+                    ethabi::Token::Address(wrapped_eth.raw()),
+                    ethabi::Token::Address(token_descriptor.raw()),
                 ],
             )
             .unwrap();
@@ -143,8 +143,8 @@ impl Factory {
             .function("createPool")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(token_a),
-                ethabi::Token::Address(token_b),
+                ethabi::Token::Address(token_a.raw()),
+                ethabi::Token::Address(token_b.raw()),
                 ethabi::Token::Uint(fee),
             ])
             .unwrap();
@@ -213,8 +213,8 @@ impl PositionManager {
             .function("mint")
             .unwrap()
             .encode_input(&[ethabi::Token::Tuple(vec![
-                ethabi::Token::Address(params.token0),
-                ethabi::Token::Address(params.token1),
+                ethabi::Token::Address(params.token0.raw()),
+                ethabi::Token::Address(params.token1.raw()),
                 ethabi::Token::Uint(params.fee.into()),
                 ethabi::Token::Int(tick_lower),
                 ethabi::Token::Int(tick_upper),
@@ -222,7 +222,7 @@ impl PositionManager {
                 ethabi::Token::Uint(params.amount1_desired),
                 ethabi::Token::Uint(params.amount0_min),
                 ethabi::Token::Uint(params.amount1_min),
-                ethabi::Token::Address(params.recipient),
+                ethabi::Token::Address(params.recipient.raw()),
                 ethabi::Token::Uint(params.deadline),
             ])])
             .unwrap();
@@ -276,8 +276,8 @@ impl SwapRouterConstructor {
             .encode_input(
                 self.0.code.clone(),
                 &[
-                    ethabi::Token::Address(factory),
-                    ethabi::Token::Address(wrapped_eth),
+                    ethabi::Token::Address(factory.raw()),
+                    ethabi::Token::Address(wrapped_eth.raw()),
                 ],
             )
             .unwrap();
@@ -303,6 +303,16 @@ pub struct ExactOutputSingleParams {
     pub price_limit: U256,
 }
 
+pub struct ExactInputParams {
+    pub token_in: Address,
+    // Vec of poolFee + tokenAddress
+    pub path: Vec<(u64, Address)>,
+    pub recipient: Address,
+    pub deadline: U256,
+    pub amount_in: U256,
+    pub amount_out_min: U256,
+}
+
 impl SwapRouter {
     pub fn exact_output_single(
         &self,
@@ -315,14 +325,50 @@ impl SwapRouter {
             .function("exactOutputSingle")
             .unwrap()
             .encode_input(&[ethabi::Token::Tuple(vec![
-                ethabi::Token::Address(params.token_in),
-                ethabi::Token::Address(params.token_out),
+                ethabi::Token::Address(params.token_in.raw()),
+                ethabi::Token::Address(params.token_out.raw()),
                 ethabi::Token::Uint(params.fee.into()),
-                ethabi::Token::Address(params.recipient),
+                ethabi::Token::Address(params.recipient.raw()),
                 ethabi::Token::Uint(params.deadline),
                 ethabi::Token::Uint(params.amount_out),
                 ethabi::Token::Uint(params.amount_in_max),
                 ethabi::Token::Uint(params.price_limit),
+            ])])
+            .unwrap();
+
+        TransactionLegacy {
+            nonce,
+            gas_price: Default::default(),
+            gas_limit: u64::MAX.into(),
+            to: Some(self.0.address),
+            value: Default::default(),
+            data,
+        }
+    }
+
+    pub fn exact_input(&self, params: ExactInputParams, nonce: U256) -> TransactionLegacy {
+        let path: Vec<u8> = {
+            // The encoding here is 32-byte address, then 3-byte (24-bit) fee, alternating
+            let mut result = Vec::with_capacity(32 + 35 * params.path.len());
+            result.extend_from_slice(params.token_in.as_bytes());
+            for (fee, token) in params.path.iter() {
+                let fee_bytes = fee.to_be_bytes();
+                result.extend_from_slice(&fee_bytes[5..8]);
+                result.extend_from_slice(token.as_bytes());
+            }
+            result
+        };
+        let data = self
+            .0
+            .abi
+            .function("exactInput")
+            .unwrap()
+            .encode_input(&[ethabi::Token::Tuple(vec![
+                ethabi::Token::Bytes(path),
+                ethabi::Token::Address(params.recipient.raw()),
+                ethabi::Token::Uint(params.deadline),
+                ethabi::Token::Uint(params.amount_in),
+                ethabi::Token::Uint(params.amount_out_min),
             ])])
             .unwrap();
 

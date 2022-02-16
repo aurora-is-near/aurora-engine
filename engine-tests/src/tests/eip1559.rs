@@ -1,10 +1,10 @@
+use crate::prelude::transactions::eip_1559::{self, SignedTransaction1559, Transaction1559};
+use crate::prelude::transactions::eip_2930::AccessTuple;
+use crate::prelude::transactions::EthTransactionKind;
 use crate::prelude::Wei;
 use crate::prelude::{H256, U256};
 use crate::test_utils;
 use aurora_engine::parameters::SubmitResult;
-use aurora_engine::transaction::eip_1559::{self, SignedTransaction1559, Transaction1559};
-use aurora_engine::transaction::eip_2930::AccessTuple;
-use aurora_engine::transaction::EthTransactionKind;
 use borsh::BorshDeserialize;
 use std::convert::TryFrom;
 use std::iter;
@@ -132,7 +132,7 @@ fn example_transaction() -> Transaction1559 {
         value: Wei::zero(),
         data: vec![0],
         access_list: vec![AccessTuple {
-            address: test_utils::address_from_hex(CONTRACT_ADDRESS),
+            address: test_utils::address_from_hex(CONTRACT_ADDRESS).raw(),
             storage_keys: vec![H256::zero(), one()],
         }],
     }

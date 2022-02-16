@@ -1,8 +1,8 @@
 [package]
 name = "aurora-engine-types"
 version = "1.0.0"
-authors = ["NEAR <hello@near.org>"]
-edition = "2018"
+authors = ["Aurora Labs <hello@aurora.dev>"]
+edition = "2021"
 description = ""
 documentation = ""
 readme = true

@@ -1,5 +1,6 @@
 use aurora_engine_sdk::env::Env;
-use aurora_engine_types::{types::Wei, Address, H256, U256};
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{H256, U256};
 use engine_standalone_tracing::{sputnik, types::TransactionTrace};
 use serde::Deserialize;
 use std::path::Path;
@@ -20,9 +21,9 @@ fn test_evm_tracing_with_storage() {
     let mut signer = test_utils::Signer::random();
     let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
     let sender_address =
-        Address::from_slice(&hex::decode("304ee8ae14eceb3a544dff53a27eb1bb1aaa471f").unwrap());
+        Address::decode(&"304ee8ae14eceb3a544dff53a27eb1bb1aaa471f".to_string()).unwrap();
     let weth_address =
-        Address::from_slice(&hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap());
+        Address::decode(&"c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2".to_string()).unwrap();
 
     // Initialize EVM
     runner.init_evm_with_chain_id(1);
@@ -34,7 +35,8 @@ fn test_evm_tracing_with_storage() {
     let result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
-    let contract_address = Address::from_slice(test_utils::unwrap_success_slice(&result));
+    let contract_address =
+        Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
 
     // Move it over to the same address as it exists on mainnet
     let mut diff = engine_standalone_storage::Diff::default();
@@ -128,7 +130,7 @@ fn test_evm_tracing() {
     runner.init_evm();
 
     // Deploy contract
-    let deploy_tx = aurora_engine::transaction::legacy::TransactionLegacy {
+    let deploy_tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: U256::zero(),
         gas_limit: u64::MAX.into(),
@@ -139,10 +141,11 @@ fn test_evm_tracing() {
     let result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
-    let contract_address = Address::from_slice(test_utils::unwrap_success_slice(&result));
+    let contract_address =
+        Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
 
     // Interact with contract (and trace execution)
-    let tx = aurora_engine::transaction::legacy::TransactionLegacy {
+    let tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: U256::zero(),
         gas_limit: 90_000.into(),
@@ -170,7 +173,7 @@ fn test_evm_tracing() {
         .logs()
         .0
         .iter()
-        .map(|l| l.gas_cost.into_u64() as u32)
+        .map(|l| l.gas_cost.as_u64() as u32)
         .collect();
     assert_eq!(costs.as_slice(), &EXPECTED_COSTS);
 
@@ -210,7 +213,7 @@ fn check_transaction_trace<P: AsRef<Path>>(trace: TransactionTrace, expected_tra
         assert_eq!(log.depth.into_u32(), step.depth, "Depths should match");
         assert_eq!(log.opcode.as_u8(), step.op, "opcodes should match");
         assert_eq!(
-            log.gas_cost.into_u64(),
+            log.gas_cost.as_u64(),
             step.gas_cost,
             "gas costs should match"
         );

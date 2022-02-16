@@ -1,5 +1,5 @@
 use aurora_engine_types::types::EthGas;
-use aurora_engine_types::{BTreeMap, H256};
+use aurora_engine_types::BTreeMap;
 use evm_core::Opcode;
 use std::ops::Index;
 
@@ -85,9 +85,9 @@ impl LogStack {
     }
 }
 
-impl From<&[H256]> for LogStack {
-    fn from(stack: &[H256]) -> Self {
-        let vec = stack.iter().map(|bytes| bytes.0).collect();
+impl std::iter::FromIterator<[u8; 32]> for LogStack {
+    fn from_iter<T: IntoIterator<Item = [u8; 32]>>(iter: T) -> Self {
+        let vec = iter.into_iter().collect();
         Self(vec)
     }
 }
@@ -151,9 +151,9 @@ pub struct TraceLog {
     pub depth: Depth,
     /// Any errors that may have occurred during execution.
     pub error: Option<String>,
-    /// Gas used to execute the transaction.
+    /// Remaining (unused) gas.
     pub gas: EthGas,
-    /// Gas cost for the transaction.
+    /// Gas cost for the opcode at this step.
     pub gas_cost: EthGas,
     /// The bounded memory.
     pub memory: LogMemory,
@@ -218,6 +218,7 @@ impl IntoIterator for Logs {
 }
 
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct TransactionTrace {
     /// The total gas cost of the transaction.
     gas: EthGas,
@@ -231,7 +232,6 @@ pub struct TransactionTrace {
 
 impl TransactionTrace {
     /// Constructs a new TransactionTrace with a given gas, return, and logs.
-    #[allow(dead_code)]
     pub fn new(
         gas: EthGas,
         failed: bool,

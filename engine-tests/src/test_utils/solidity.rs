@@ -1,4 +1,4 @@
-use crate::prelude::{transaction::legacy::TransactionLegacy, Address, U256};
+use crate::prelude::{transactions::legacy::TransactionLegacy, Address, U256};
 use near_sdk::serde_json;
 use serde::Deserialize;
 use std::fs;
@@ -22,6 +22,27 @@ struct ExtendedJsonSolidityArtifact {
 }
 
 impl ContractConstructor {
+    /// Same as `compile_from_source` but always recompiles instead of reusing artifacts when they exist.
+    pub fn force_compile<P1, P2, P3>(
+        sources_root: P1,
+        artifacts_base_path: P2,
+        contract_file: P3,
+        contract_name: &str,
+    ) -> Self
+    where
+        P1: AsRef<Path>,
+        P2: AsRef<Path>,
+        P3: AsRef<Path>,
+    {
+        compile(&sources_root, &contract_file, &artifacts_base_path);
+        Self::compile_from_source(
+            sources_root,
+            artifacts_base_path,
+            contract_file,
+            contract_name,
+        )
+    }
+
     // Note: `contract_file` must be relative to `sources_root`
     pub fn compile_from_source<P1, P2, P3>(
         sources_root: P1,

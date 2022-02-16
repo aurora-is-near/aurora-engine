@@ -1,8 +1,9 @@
-use aurora_engine::transaction::{
+use aurora_engine_transactions::{
     legacy::{LegacyEthSignedTransaction, TransactionLegacy},
     EthTransactionKind,
 };
-use aurora_engine_types::{types::Wei, Address, H256, U256};
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{H256, U256};
 use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::time::SystemTime;
@@ -177,18 +178,18 @@ impl From<postgres::Row> for TransactionRow {
             near_hash,
             near_receipt_hash,
             from,
-            to: to.map(Address::from_slice),
+            to: to.map(|arr| Address::try_from_slice(arr).unwrap()),
             nonce,
             gas_price,
             gas_limit,
             gas_used: gas_used.low_u64(),
             value: Wei::new(value),
-            input: input.unwrap_or_else(Vec::new),
+            input: input.unwrap_or_default(),
             v: v.low_u64(),
             r,
             s,
             status,
-            output: output.unwrap_or_else(Vec::new),
+            output: output.unwrap_or_default(),
         }
     }
 }
@@ -225,7 +226,7 @@ fn get_hash(row: &postgres::Row, field: &str) -> H256 {
 
 fn get_address(row: &postgres::Row, field: &str) -> Address {
     let value: &[u8] = row.get(field);
-    Address::from_slice(value)
+    Address::try_from_slice(value).unwrap()
 }
 
 fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {
