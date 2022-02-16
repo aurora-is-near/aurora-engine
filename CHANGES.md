@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2022-02-16
+
+### Changes
+
+- Performance improvements by [@birchmd] and [@matklad]; the engine should now consume much less NEAR gas: ([#427]) ([#438]) ([#439]) ([#445]) ([#446])
+- Security improvment: only Engine contract owner can use the `deploy_upgrade` method by [@birchmd]. ([#410])
+- Bug fix: Engine now returns the error message in the case of a revert during an EVM contract deploy, previously it would always return an address (even when the deploy failed) by [@birchmd]. ([#424])
+- Security improvment: Engine will no longer accept EVM transactions without a chain ID as part of their signature by [@birchmd]. This should have no impact on users as all modern Ethereum tooling includes the chain ID. ([#432])
+- Improvements to code quality by [@mrLSD]: ([#386]) ([#387])
+- Improvements and additions to internal tests and benchmarks by [@birchmd]: ([#408]) ([#415]) ([#429])
+
+[#386]: https://github.com/aurora-is-near/aurora-engine/pull/386
+[#387]: https://github.com/aurora-is-near/aurora-engine/pull/387
+[#408]: https://github.com/aurora-is-near/aurora-engine/pull/408
+[#410]: https://github.com/aurora-is-near/aurora-engine/pull/410
+[#415]: https://github.com/aurora-is-near/aurora-engine/pull/415
+[#424]: https://github.com/aurora-is-near/aurora-engine/pull/424
+[#427]: https://github.com/aurora-is-near/aurora-engine/pull/427
+[#429]: https://github.com/aurora-is-near/aurora-engine/pull/429
+[#432]: https://github.com/aurora-is-near/aurora-engine/pull/432
+[#438]: https://github.com/aurora-is-near/aurora-engine/pull/438
+[#439]: https://github.com/aurora-is-near/aurora-engine/pull/439
+[#445]: https://github.com/aurora-is-near/aurora-engine/pull/445
+[#446]: https://github.com/aurora-is-near/aurora-engine/pull/446
+
 ## [2.3.0] - 2021-12-10
 
 ### Added
@@ -180,7 +205,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.3.0...master
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.4.0...master
+[2.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.3.0...2.4.0
 [2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0 
 [2.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.1.0...2.2.0
 [2.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.2...2.1.0
@@ -209,3 +235,4 @@ struct SubmitResult {
 [@mfornet]: https://github.com/mfornet
 [@mrLSD]: https://github.com/mrLSD
 [@sept-en]: https://github.com/sept-en
+[@matklad]: https://github.com/matklad
