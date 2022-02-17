@@ -6,6 +6,7 @@ mod erc20_connector;
 mod eth_connector;
 #[cfg(feature = "meta-call")]
 mod meta_parsing;
+mod native_erc20_connector;
 mod one_inch;
 mod random;
 mod sanity;
