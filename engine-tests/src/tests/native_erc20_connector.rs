@@ -13,10 +13,10 @@ mod sim_tests {
     use aurora_engine_types::account_id::AccountId;
     use aurora_engine_types::types::Address;
     use borsh::BorshSerialize;
+    use ethabi::Token;
     use near_sdk_sim::UserAccount;
     use serde_json::json;
     use sha3::Digest;
-    use ethabi::Token;
 
     const TOKEN_FACTORY_PATH: &str = "src/tests/res/bridge_aurora_token_factory.wasm";
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;
@@ -38,7 +38,7 @@ mod sim_tests {
 
         assert_eq!(
             erc20_balance(&erc20, ft_owner_address, &aurora),
-            (FT_TOTAL_SUPPLY).into()
+            FT_TOTAL_SUPPLY.into()
         );
 
         approve_erc20_token(
@@ -51,7 +51,7 @@ mod sim_tests {
 
         nep141_storage_deposit(ft_owner.account_id.as_str(), &nep141, &aurora);
 
-        // Call lock function on ERC-20; observe ERC-20 locked + NEP-141 minted
+        // Call lock function on ERC-20 locker; observe ERC-20 locked + NEP-141 minted
         lock_token(
             &erc20_locker,
             &ft_owner,
@@ -94,6 +94,56 @@ mod sim_tests {
         assert_eq!(
             erc20_balance(&erc20, ft_owner_address, &aurora),
             FT_TOTAL_SUPPLY.into()
+        );
+    }
+
+    #[test]
+    fn test_refund_on_lock_native_erc20() {
+        let TestExitToNearContext {
+            erc20_locker,
+            erc20,
+            nep141,
+            ft_owner,
+            ft_owner_address,
+            aurora,
+        } = test_exit_to_near_common();
+
+        mint_erc20_token(&erc20, ft_owner_address, FT_TOTAL_SUPPLY.into(), &aurora);
+
+        assert_eq!(
+            erc20_balance(&erc20, ft_owner_address, &aurora),
+            FT_TOTAL_SUPPLY.into()
+        );
+
+        approve_erc20_token(
+            &erc20,
+            &ft_owner,
+            &erc20_locker,
+            FT_EXIT_AMOUNT.into(),
+            &aurora,
+        );
+
+        // Call lock function on ERC-20 locker; deposit promise fails; expect unlock locked tokens;
+        // The lock will fail because this account is not registered with the NEP-141
+        lock_token(
+            &erc20_locker,
+            &ft_owner,
+            ft_owner.account_id.as_str(),
+            FT_EXIT_AMOUNT,
+            &erc20.0.address,
+            &aurora,
+        );
+
+        assert_eq!(
+            erc20_balance(&erc20, ft_owner_address, &aurora),
+            FT_TOTAL_SUPPLY.into()
+        );
+
+        assert_eq!(erc20_balance(&erc20, erc20_locker, &aurora), 0.into());
+
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep141, &aurora),
+            0
         );
     }
 
