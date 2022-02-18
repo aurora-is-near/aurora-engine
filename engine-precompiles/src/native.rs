@@ -9,7 +9,7 @@ use crate::prelude::{
     types::Yocto,
     vec, BorshSerialize, Cow, String, ToString, Vec, U256,
 };
-#[cfg(all(feature = "error_refund", feature = "contract"))]
+#[cfg(all(feature = "contract"))]
 use crate::prelude::{
     parameters::{PromiseWithCallbackArgs, RefundCallArgs},
     types,
@@ -40,7 +40,6 @@ mod costs {
     pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(100_000_000_000_000);
 
     // TODO(#332): Determine the correct amount of gas
-    #[cfg(feature = "error_refund")]
     pub(super) const REFUND_ON_ERROR_GAS: NearGas = NearGas::new(60_000_000_000_000);
 
     // TODO(#332): Determine the correct amount of gas
@@ -239,6 +238,41 @@ fn get_native_erc20_state() -> NativeErc20EngineState {
         .expect(ERR_NATIVE_ERC20_STATE_DESERIALIZATION_FAILED)
 }
 
+#[cfg(all(feature = "contract"))]
+fn create_refund_promise(
+    refund_address: Address,
+    flag: u8,
+    exit_event: &events::ExitToNear,
+    refund_on_error_target: AccountId,
+) -> PromiseCreateArgs {
+    let erc20_address = if flag == 1 || flag == 2 {
+        Some(exit_event.erc20_address)
+    } else {
+        None
+    };
+
+    let erc20_locker_address = if flag == 2 {
+        Some(exit_event.sender)
+    } else {
+        None
+    };
+
+    let refund_args = RefundCallArgs {
+        recipient_address: refund_address,
+        erc20_address,
+        amount: types::u256_to_arr(&exit_event.amount),
+        erc20_locker_address,
+    };
+
+    PromiseCreateArgs {
+        target_account_id: refund_on_error_target,
+        method: "refund_on_error".to_string(),
+        args: refund_args.try_to_vec().unwrap(),
+        attached_balance: Yocto::new(0),
+        attached_gas: costs::REFUND_ON_ERROR_GAS,
+    }
+}
+
 impl Precompile for ExitToNear {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
@@ -269,15 +303,10 @@ impl Precompile for ExitToNear {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        #[cfg(feature = "error_refund")]
-        fn parse_input(input: &[u8]) -> (Address, &[u8]) {
+        fn parse_refund_address(input: &[u8]) -> (Option<Address>, &[u8]) {
             let refund_address =
-                Address::try_from_slice(&input[1..21]).expect("Invalid refund address");
-            (refund_address, &input[21..])
-        }
-        #[cfg(not(feature = "error_refund"))]
-        fn parse_input(input: &[u8]) -> &[u8] {
-            &input[1..]
+                Address::try_from_slice(&input[0..20]).expect("Invalid refund address");
+            (Some(refund_address), &input[20..])
         }
 
         if let Some(target_gas) = target_gas {
@@ -296,13 +325,8 @@ impl Precompile for ExitToNear {
         //      0x1 -> Erc20 transfer
         //      0x2 -> Native erc20 transfer
         let flag = input[0];
-        #[cfg(feature = "error_refund")]
-        let (refund_address, mut input) = parse_input(input);
-        #[cfg(not(feature = "error_refund"))]
-        let mut input = parse_input(input);
-        let current_account_id = self.current_account_id.clone();
-        #[cfg(feature = "error_refund")]
-        let refund_on_error_target = current_account_id.clone();
+        let mut input = &input[1..];
+        let mut refund_address: Option<Address> = None;
 
         let (target_transfer_account, args, exit_event, transfer_method) = match flag {
             0x0 => {
@@ -311,9 +335,14 @@ impl Precompile for ExitToNear {
                 // Input slice format:
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
+                #[cfg(feature = "error_refund")]
+                {
+                    (refund_address, input) = parse_refund_address(input);
+                }
+
                 if let Ok(dest_account) = AccountId::try_from(input) {
                     (
-                        current_account_id,
+                        self.current_account_id.clone(),
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
@@ -343,6 +372,11 @@ impl Precompile for ExitToNear {
                 // Input slice format:
                 //      amount (U256 big-endian bytes) - the amount that was burned
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
+
+                #[cfg(feature = "error_refund")]
+                {
+                    (refund_address, input) = parse_refund_address(input);
+                }
 
                 if context.apparent_value != U256::from(0) {
                     return Err(ExitError::Other(Cow::from(
@@ -390,6 +424,8 @@ impl Precompile for ExitToNear {
                 //      amount (U256 big-endian bytes) - the amount that was locked
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
 
+                (refund_address, input) = parse_refund_address(input);
+
                 if context.apparent_value != U256::from(0) {
                     return Err(ExitError::Other(Cow::from(
                         "ERR_ETH_ATTACHED_FOR_ERC20_EXIT",
@@ -404,11 +440,6 @@ impl Precompile for ExitToNear {
                     return Err(ExitError::Other(Cow::from(
                         "ERR_INVALID_ERC20_LOCKER_ADDRESS",
                     )));
-                }
-
-                #[cfg(not(feature = "error_refund"))]
-                {
-                    input = &input[20..]; // Skip refund_address because it is already parsed by `parse_input`.
                 }
 
                 let erc20_address =
@@ -446,35 +477,6 @@ impl Precompile for ExitToNear {
             _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
         };
 
-        #[cfg(feature = "error_refund")]
-        let erc20_address = if flag == 0 {
-            None
-        } else {
-            Some(exit_event.erc20_address)
-        };
-
-        #[cfg(feature = "error_refund")]
-        let erc20_locker_address = if flag == 2 {
-            Some(exit_event.sender)
-        } else {
-            None
-        };
-
-        #[cfg(feature = "error_refund")]
-        let refund_args = RefundCallArgs {
-            recipient_address: refund_address,
-            erc20_address,
-            amount: types::u256_to_arr(&exit_event.amount),
-            erc20_locker_address,
-        };
-        #[cfg(feature = "error_refund")]
-        let refund_promise = PromiseCreateArgs {
-            target_account_id: refund_on_error_target,
-            method: "refund_on_error".to_string(),
-            args: refund_args.try_to_vec().unwrap(),
-            attached_balance: Yocto::new(0),
-            attached_gas: costs::REFUND_ON_ERROR_GAS,
-        };
         let transfer_promise = PromiseCreateArgs {
             target_account_id: target_transfer_account,
             method: transfer_method.to_string(),
@@ -483,13 +485,18 @@ impl Precompile for ExitToNear {
             attached_gas: costs::FT_TRANSFER_GAS,
         };
 
-        #[cfg(feature = "error_refund")]
-        let promise = PromiseArgs::Callback(PromiseWithCallbackArgs {
-            base: transfer_promise,
-            callback: refund_promise,
-        });
-        #[cfg(not(feature = "error_refund"))]
-        let promise = PromiseArgs::Create(transfer_promise);
+        let promise = match refund_address {
+            Some(address) => PromiseArgs::Callback(PromiseWithCallbackArgs {
+                base: transfer_promise,
+                callback: create_refund_promise(
+                    address,
+                    flag,
+                    &exit_event,
+                    self.current_account_id.clone(),
+                ),
+            }),
+            None => PromiseArgs::Create(transfer_promise),
+        };
 
         let promise_log = Log {
             address: Self::ADDRESS.raw(),
