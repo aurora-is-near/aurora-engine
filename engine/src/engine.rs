@@ -351,6 +351,48 @@ impl AsRef<[u8]> for EngineStateError {
     }
 }
 
+#[derive(Debug)]
+pub enum UnlockErc20Error {
+    State(EngineStateError),
+    Failed(TransactionStatus),
+    Engine(EngineError),
+    FactoryAddressMismatch,
+    LockerAddressMismatch,
+    InvalidNep141AccountId,
+}
+
+impl AsRef<[u8]> for UnlockErc20Error {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::State(e) => e.as_ref(),
+            Self::Failed(e) => e.as_ref(),
+            Self::Engine(e) => e.as_ref(),
+            Self::FactoryAddressMismatch => b"ERR_ONLY_FACTORY_CAN_CALL_UNLOCK",
+            Self::LockerAddressMismatch => b"ERR_WRONG_LOCKER_ADDRESS",
+            Self::InvalidNep141AccountId => b"ERR_INVALID_NEP141_ACCOUNT_ID",
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum MetadataError {
+    State(EngineStateError),
+    Failed(TransactionStatus),
+    Engine(EngineErrorKind),
+    InvalidReturnValue,
+}
+
+impl AsRef<[u8]> for MetadataError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::State(e) => e.as_ref(),
+            Self::Failed(e) => e.as_ref(),
+            Self::Engine(e) => e.as_ref(),
+            Self::InvalidReturnValue => b"ERR_INVALID_RETURN",
+        }
+    }
+}
+
 struct StackExecutorParams {
     precompiles: Precompiles,
     gas_limit: u64,
@@ -673,7 +715,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         contract_address: Address,
         selector: &[u8],
         output_types: &[ethabi::ParamType],
-    ) -> Result<ethabi::Token, EngineErrorKind> {
+    ) -> Result<ethabi::Token, MetadataError> {
         let result = self.view(
             &origin,
             &contract_address,
@@ -687,54 +729,54 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 TransactionStatus::Succeed(ret) => ret,
                 _other => Vec::new(),
             },
-            Err(e) => return Err(e),
+            Err(e) => return Err(MetadataError::Engine(e)),
         };
 
-        Ok(ethabi::decode(output_types, output.as_slice())
-            .unwrap()
+        ethabi::decode(output_types, output.as_slice())
+            .map_err(|_| MetadataError::InvalidReturnValue)?
             .pop()
-            .unwrap())
+            .ok_or(MetadataError::InvalidReturnValue)
     }
 
-    pub fn get_erc20_metadata(&self, erc20_address: Address) -> NativeErc20Metadata {
+    pub fn get_erc20_metadata(
+        &self,
+        erc20_address: Address,
+    ) -> Result<NativeErc20Metadata, MetadataError> {
         let name: String = self
             .view_with_selector(
                 self.origin,
                 erc20_address,
                 &[6, 253, 222, 3],
                 &[ethabi::ParamType::String],
-            )
-            .unwrap()
+            )?
             .into_string()
-            .unwrap();
+            .ok_or(MetadataError::InvalidReturnValue)?;
         let symbol: String = self
             .view_with_selector(
                 self.origin,
                 erc20_address,
                 &[149, 216, 155, 65],
                 &[ethabi::ParamType::String],
-            )
-            .unwrap()
+            )?
             .into_string()
-            .unwrap();
+            .ok_or(MetadataError::InvalidReturnValue)?;
         let decimals: u8 = self
             .view_with_selector(
                 self.origin,
                 erc20_address,
                 &[49, 60, 229, 103],
                 &[ethabi::ParamType::Uint(8)],
-            )
-            .unwrap()
+            )?
             .into_uint()
-            .unwrap()
+            .ok_or(MetadataError::InvalidReturnValue)?
             .try_into()
-            .unwrap();
+            .map_err(|_| MetadataError::InvalidReturnValue)?;
 
-        NativeErc20Metadata {
+        Ok(NativeErc20Metadata {
             name,
             symbol,
             decimals,
-        }
+        })
     }
 
     fn relayer_key(account_id: &[u8]) -> Vec<u8> {
@@ -940,24 +982,22 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         args: &UnlockErc20TokenArgs,
         current_account_id: &AccountId,
         handler: &mut P,
-    ) {
-        let native_erc20_state = get_native_erc20_state(&self.io).unwrap_or_default();
-        assert_eq!(
-            &AccountId::new(&native_erc20_state.erc20_factory_account)
-                .expect("Invalid ERC-20 factory account"),
-            predecessor_account_id,
-            "The predecessor account is not an ERC-20 factory"
-        );
-        assert_eq!(
-            args.locker_address,
-            native_erc20_state.erc20_locker_address,
-            "Passed locker address {} does not match current locker address {}",
-            args.locker_address.encode(),
-            native_erc20_state.erc20_locker_address.encode(),
-        );
+    ) -> Result<(), UnlockErc20Error> {
+        let native_erc20_state =
+            get_native_erc20_state(&self.io).map_err(UnlockErc20Error::State)?;
+
+        if predecessor_account_id.to_string() != native_erc20_state.erc20_factory_account {
+            return Err(UnlockErc20Error::FactoryAddressMismatch);
+        }
+
+        if args.locker_address != native_erc20_state.erc20_locker_address {
+            return Err(UnlockErc20Error::LockerAddressMismatch);
+        }
+
         let token_str = args.nep141.to_string();
         let parts: Vec<&str> = token_str.split('.').collect();
-        let erc20_token = Address::decode(parts[0]).expect("Invalid ERC-20 token address");
+        let erc20_token =
+            Address::decode(parts[0]).map_err(|_| UnlockErc20Error::InvalidNep141AccountId)?;
         let tail = ethabi::encode(&[
             ethabi::Token::Address(erc20_token.raw()),
             ethabi::Token::Uint(U256::from(args.amount.as_u128())),
@@ -965,19 +1005,21 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         ]);
         let call_input = [ERC20_UNLOCK_SELECTOR, tail.as_slice()].concat();
         let erc20_admin_address = current_address(current_account_id);
-        let result = self
-            .call(
-                &erc20_admin_address,
-                &native_erc20_state.erc20_locker_address,
-                Wei::zero(),
-                call_input,
-                u64::MAX,
-                Vec::new(),
-                handler,
-            )
-            .unwrap();
-
-        assert!(result.status.is_ok(), "Failed to unlock ERC-20 token");
+        match self.call(
+            &erc20_admin_address,
+            &native_erc20_state.erc20_locker_address,
+            Wei::zero(),
+            call_input,
+            u64::MAX,
+            Vec::new(),
+            handler,
+        ) {
+            Ok(result) => match result.status {
+                TransactionStatus::Succeed(_) => Ok(()),
+                other => Err(UnlockErc20Error::Failed(other)),
+            },
+            Err(e) => Err(UnlockErc20Error::Engine(e)),
+        }
     }
 }
 

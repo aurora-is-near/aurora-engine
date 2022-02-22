@@ -415,12 +415,14 @@ mod contract {
         .sdk_unwrap();
 
         let args: UnlockErc20TokenArgs = io.read_input_borsh().sdk_unwrap();
-        engine.unlock_erc20_token(
-            &predecessor_account_id,
-            &args,
-            &current_account_id,
-            &mut Runtime,
-        );
+        engine
+            .unlock_erc20_token(
+                &predecessor_account_id,
+                &args,
+                &current_account_id,
+                &mut Runtime,
+            )
+            .sdk_unwrap();
     }
 
     /// Callback invoked by exit to NEAR precompile to handle potential
@@ -447,7 +449,7 @@ mod contract {
                 // ERC-20 exit
                 Some(erc20_address) => {
                     let contract: Address;
-                    let call_data: Vec<u8>;
+                    let call_input: Vec<u8>;
                     if let Some(erc20_locker_address) = args.erc20_locker_address {
                         // unlock locked tokens
                         contract = erc20_locker_address;
@@ -459,7 +461,7 @@ mod contract {
                             ethabi::Token::Uint(amount),
                             ethabi::Token::Address(refund_address.raw()),
                         ]);
-                        call_data = [ERC20_UNLOCK_SELECTOR, unlock_args.as_slice()].concat();
+                        call_input = [ERC20_UNLOCK_SELECTOR, unlock_args.as_slice()].concat();
                     } else {
                         // re-mint burned tokens
                         contract = erc20_address;
@@ -470,7 +472,7 @@ mod contract {
                             ethabi::Token::Address(refund_address.raw()),
                             ethabi::Token::Uint(amount),
                         ]);
-                        call_data = [ERC20_MINT_SELECTOR, mint_args.as_slice()].concat();
+                        call_input = [ERC20_MINT_SELECTOR, mint_args.as_slice()].concat();
                     }
 
                     let admin_address = current_address(&current_account_id);
@@ -481,7 +483,7 @@ mod contract {
                             &admin_address,
                             &contract,
                             Wei::zero(),
-                            call_data,
+                            call_input,
                             u64::MAX,
                             Vec::new(),
                             &mut Runtime,
@@ -917,7 +919,9 @@ mod contract {
             &io,
         )
         .sdk_unwrap();
-        let result = engine.get_erc20_metadata(Address::from_array(erc20_address));
+        let result = engine
+            .get_erc20_metadata(Address::from_array(erc20_address))
+            .sdk_unwrap();
         io.return_output(&result.try_to_vec().sdk_expect("ERR_SERIALIZE"));
     }
 
