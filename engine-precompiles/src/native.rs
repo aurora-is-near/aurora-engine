@@ -4,8 +4,7 @@ use crate::prelude::{
     format,
     parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
     sdk,
-    storage::{bytes_to_key, KeyPrefix},
-    storage::{NativeErc20EngineState, NATIVE_ERC20_BRIDGE_STATE_KEY},
+    storage::{bytes_to_key, KeyPrefix, NativeErc20EngineState, NATIVE_ERC20_BRIDGE_STATE_KEY},
     types::Yocto,
     vec, BorshSerialize, Cow, String, ToString, Vec, U256,
 };
@@ -21,11 +20,6 @@ use aurora_engine_types::account_id::AccountId;
 #[cfg(feature = "contract")]
 use evm::backend::Log;
 use evm::{Context, ExitError};
-
-const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
-const ERR_NATIVE_ERC20_STATE_NOT_FOUND: &str = "The native ERC20 state not found";
-const ERR_NATIVE_ERC20_STATE_DESERIALIZATION_FAILED: &str =
-    "The native ERC20 state deserialization failed";
 
 mod costs {
     use crate::prelude::types::{EthGas, NearGas};
@@ -212,30 +206,29 @@ impl ExitToNear {
 }
 
 #[cfg(feature = "contract")]
-fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
+fn get_nep141_from_erc20(erc20_token: &[u8]) -> Result<AccountId, ExitError> {
     use sdk::io::{StorageIntermediate, IO};
-    AccountId::try_from(
-        sdk::near_runtime::Runtime
-            .read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
-            .map(|s| s.to_vec())
-            .expect(ERR_TARGET_TOKEN_NOT_FOUND),
-    )
-    .unwrap()
+    let nep141_vec = sdk::near_runtime::Runtime
+        .read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
+        .map(|s| s.to_vec())
+        .ok_or_else(|| ExitError::Other(Cow::from("ERR_TARGET_TOKEN_NOT_FOUND")))?;
+    AccountId::try_from(nep141_vec).map_err(|e| ExitError::Other(Cow::from(e.to_string())))
 }
 
 #[cfg(feature = "contract")]
-fn get_native_erc20_state() -> NativeErc20EngineState {
+fn get_native_erc20_state() -> Result<NativeErc20EngineState, ExitError> {
     use sdk::io::{StorageIntermediate, IO};
     let bytes = sdk::near_runtime::Runtime
         .read_storage(&bytes_to_key(
             KeyPrefix::Config,
             NATIVE_ERC20_BRIDGE_STATE_KEY,
         ))
-        .expect(ERR_NATIVE_ERC20_STATE_NOT_FOUND);
+        .ok_or_else(|| ExitError::Other(Cow::from("ERR_NATIVE_ERC20_STATE_NOT_FOUND")))?;
 
     use borsh::BorshDeserialize;
-    NativeErc20EngineState::try_from_slice(&bytes.to_vec())
-        .expect(ERR_NATIVE_ERC20_STATE_DESERIALIZATION_FAILED)
+    let result = NativeErc20EngineState::try_from_slice(&bytes.to_vec())
+        .map_err(|_| ExitError::Other(Cow::from("ERR_NATIVE_ERC20_STATE_CORRUPTED")))?;
+    Ok(result)
 }
 
 #[cfg(all(feature = "contract"))]
@@ -303,10 +296,10 @@ impl Precompile for ExitToNear {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        fn parse_refund_address(input: &[u8]) -> (Option<Address>, &[u8]) {
-            let refund_address =
-                Address::try_from_slice(&input[0..20]).expect("Invalid refund address");
-            (Some(refund_address), &input[20..])
+        fn parse_refund_address(input: &[u8]) -> Result<(Option<Address>, &[u8]), ExitError> {
+            let refund_address = Address::try_from_slice(&input[0..20])
+                .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_REFUND_ADDRESS")))?;
+            Ok((Some(refund_address), &input[20..]))
         }
 
         if let Some(target_gas) = target_gas {
@@ -326,7 +319,7 @@ impl Precompile for ExitToNear {
         //      0x2 -> Native erc20 transfer
         let flag = input[0];
         let mut input = &input[1..];
-        let mut refund_address: Option<Address> = None;
+        let refund_address: Option<Address>;
 
         let (target_transfer_account, args, exit_event, transfer_method) = match flag {
             0x0 => {
@@ -337,7 +330,11 @@ impl Precompile for ExitToNear {
 
                 #[cfg(feature = "error_refund")]
                 {
-                    (refund_address, input) = parse_refund_address(input);
+                    (refund_address, input) = parse_refund_address(input)?;
+                }
+                #[cfg(not(feature = "error_refund"))]
+                {
+                    refund_address = None;
                 }
 
                 if let Ok(dest_account) = AccountId::try_from(input) {
@@ -375,7 +372,11 @@ impl Precompile for ExitToNear {
 
                 #[cfg(feature = "error_refund")]
                 {
-                    (refund_address, input) = parse_refund_address(input);
+                    (refund_address, input) = parse_refund_address(input)?;
+                }
+                #[cfg(not(feature = "error_refund"))]
+                {
+                    refund_address = None;
                 }
 
                 if context.apparent_value != U256::from(0) {
@@ -385,7 +386,7 @@ impl Precompile for ExitToNear {
                 }
 
                 let erc20_address = context.caller;
-                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes());
+                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes())?;
 
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
@@ -424,7 +425,7 @@ impl Precompile for ExitToNear {
                 //      amount (U256 big-endian bytes) - the amount that was locked
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
 
-                (refund_address, input) = parse_refund_address(input);
+                (refund_address, input) = parse_refund_address(input)?;
 
                 if context.apparent_value != U256::from(0) {
                     return Err(ExitError::Other(Cow::from(
@@ -432,9 +433,9 @@ impl Precompile for ExitToNear {
                     )));
                 }
 
-                let native_erc20_state = get_native_erc20_state();
+                let native_erc20_state = get_native_erc20_state()?;
                 let factory_account = AccountId::new(&native_erc20_state.erc20_factory_account)
-                    .expect("ERR_INVALID_FACTORY_ACCOUNT");
+                    .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_FACTORY_ACCOUNT")))?;
 
                 if context.caller != native_erc20_state.erc20_locker_address.raw() {
                     return Err(ExitError::Other(Cow::from(
@@ -442,8 +443,9 @@ impl Precompile for ExitToNear {
                     )));
                 }
 
-                let erc20_address =
-                    Address::try_from_slice(&input[..20]).expect("Invalid locked erc20 address");
+                let erc20_address = Address::try_from_slice(&input[..20])
+                    .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_LOCKED_ERC20_ADDRESS")))?;
+
                 input = &input[20..];
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
@@ -628,7 +630,7 @@ impl Precompile for ExitToEthereum {
                 }
 
                 let erc20_address = context.caller;
-                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes());
+                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes())?;
 
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
