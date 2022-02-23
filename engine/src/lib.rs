@@ -582,7 +582,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .deposit(raw_proof, current_account_id, predecessor_account_id)
             .sdk_unwrap();
-        let promise_id = io.promise_crate_with_callback(&promise_args);
+        let promise_id = io.promise_create_with_callback(&promise_args);
         io.promise_return(promise_id);
     }
 
@@ -618,7 +618,7 @@ mod contract {
             .sdk_unwrap();
 
         if let Some(promise_args) = maybe_promise_args {
-            let promise_id = io.promise_crate_with_callback(&promise_args);
+            let promise_id = io.promise_create_with_callback(&promise_args);
             io.promise_return(promise_id);
         }
     }
@@ -720,7 +720,7 @@ mod contract {
                 io.prepaid_gas(),
             )
             .sdk_unwrap();
-        let promise_id = io.promise_crate_with_callback(&promise_args);
+        let promise_id = io.promise_create_with_callback(&promise_args);
         io.promise_return(promise_id);
     }
 
@@ -893,10 +893,12 @@ mod contract {
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FINISH,
         };
-        io.promise_crate_with_callback(&aurora_engine_types::parameters::PromiseWithCallbackArgs {
-            base: verify_call,
-            callback: finish_call,
-        });
+        io.promise_create_with_callback(
+            &aurora_engine_types::parameters::PromiseWithCallbackArgs {
+                base: verify_call,
+                callback: finish_call,
+            },
+        );
     }
 
     ///
