@@ -188,6 +188,19 @@ impl StandaloneRunner {
                 0,
                 Vec::new(),
             ))
+        } else if method_name == test_utils::DEPLOY_ERC20_LOCKER {
+            let mut handler = mocks::promise::PromiseTracker::default();
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let io = Self::get_engine_io(storage, &env, 0, transaction_hash);
+            let address = engine::deploy_erc20_locker(io.engine_io, &env, &mut handler)
+                .map_err(mocks::unsafe_to_string)
+                .unwrap();
+            io.finish().commit(storage, &mut self.cumulative_diff);
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
+                0,
+                Vec::new(),
+            ))
         } else {
             panic!("Unsupported standalone method {}", method_name);
         }

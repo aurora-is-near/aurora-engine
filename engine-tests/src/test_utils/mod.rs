@@ -31,6 +31,7 @@ pub fn origin() -> String {
 pub(crate) const SUBMIT: &str = "submit";
 pub(crate) const CALL: &str = "call";
 pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
+pub(crate) const DEPLOY_ERC20_LOCKER: &str = "deploy_erc20_locker";
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
@@ -201,7 +202,10 @@ impl AuroraRunner {
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             if maybe_error.is_none()
-                && (method_name == SUBMIT || method_name == CALL || method_name == DEPLOY_ERC20)
+                && (method_name == SUBMIT
+                    || method_name == CALL
+                    || method_name == DEPLOY_ERC20
+                    || method_name == DEPLOY_ERC20_LOCKER)
             {
                 standalone_runner
                     .submit_raw(method_name, &self.context)

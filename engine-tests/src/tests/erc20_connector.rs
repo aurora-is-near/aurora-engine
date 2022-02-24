@@ -15,8 +15,8 @@ const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 
 pub struct CallResult {
-    outcome: Option<VMOutcome>,
-    error: Option<VMError>,
+    pub outcome: Option<VMOutcome>,
+    pub error: Option<VMError>,
 }
 
 impl CallResult {
@@ -24,7 +24,7 @@ impl CallResult {
         assert!(self.error.is_none());
     }
 
-    fn value(&self) -> Vec<u8> {
+    pub fn value(&self) -> Vec<u8> {
         self.outcome
             .as_ref()
             .unwrap()
@@ -47,7 +47,7 @@ fn get_selector(str_selector: &str) -> Vec<u8> {
     keccak256(str_selector.as_bytes())[..4].to_vec()
 }
 
-fn build_input(str_selector: &str, inputs: &[Token]) -> Vec<u8> {
+pub fn build_input(str_selector: &str, inputs: &[Token]) -> Vec<u8> {
     let sel = get_selector(str_selector);
     let inputs = ethabi::encode(inputs);
     [sel.as_slice(), inputs.as_slice()].concat().to_vec()

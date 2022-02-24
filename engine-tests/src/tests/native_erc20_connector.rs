@@ -1,3 +1,160 @@
+use crate::prelude::{Address, U256};
+use crate::test_utils;
+use crate::test_utils::{origin, AuroraRunner};
+use crate::tests::erc20_connector::build_input;
+use crate::tests::erc20_connector::CallResult;
+use aurora_engine::engine::NativeErc20Metadata;
+use borsh::BorshDeserialize;
+use ethabi::Token;
+
+impl test_utils::AuroraRunner {
+    pub fn deploy_erc20_locker(&mut self, origin: String) -> Option<Address> {
+        let result = self.make_call("deploy_erc20_locker", origin, Vec::new());
+        if !result.error.is_none() {
+            return None;
+        }
+
+        let raw_address: [u8; 20] = Vec::<u8>::try_from_slice(result.value().as_slice())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        Some(Address::try_from_slice(&raw_address).unwrap())
+    }
+
+    pub fn get_erc20_metadata(&mut self, token: Address, origin: String) -> NativeErc20Metadata {
+        let result = self.make_call("get_erc20_metadata", origin, token.as_bytes().to_vec());
+        assert!(result.error.is_none());
+        NativeErc20Metadata::try_from_slice(result.value().as_slice()).unwrap()
+    }
+
+    pub fn unlock_erc20(
+        &mut self,
+        locker: Address,
+        token: Address,
+        amount: u64,
+        recipient: Address,
+        origin: String,
+    ) -> CallResult {
+        let input = build_input(
+            "unlockToken(address,uint256,address)",
+            &[
+                Token::Address(token.raw()),
+                Token::Uint(U256::from(amount).into()),
+                Token::Address(recipient.raw()),
+            ],
+        );
+        let result = self.evm_call(locker, input, origin);
+        assert!(result.error.is_none());
+        result
+    }
+
+    pub fn set_metadata(
+        &mut self,
+        token: Address,
+        name: String,
+        symbol: String,
+        decimals: u8,
+        origin: String,
+    ) -> CallResult {
+        let input = build_input(
+            "setMetadata(string,string,uint8)",
+            &[
+                Token::String(name),
+                Token::String(symbol),
+                Token::Uint(decimals.into()),
+            ],
+        );
+        let result = self.evm_call(token, input, origin);
+        assert!(result.error.is_none());
+        result
+    }
+}
+
+#[test]
+fn test_deploy_erc20_locker() {
+    let mut runner = AuroraRunner::new();
+    let address = runner.deploy_erc20_locker(origin()).unwrap();
+    assert_ne!(address, Address::zero());
+}
+
+#[test]
+fn test_locker_unlock() {
+    let mut runner = AuroraRunner::new();
+    let ft_owner = "tt.testnet".to_string();
+    let ft_owner_address =
+        aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.as_bytes());
+    let locker = runner.deploy_erc20_locker(origin()).unwrap();
+    let token = runner.deploy_erc20_token(&ft_owner);
+
+    assert_eq!(
+        runner.balance_of(token, ft_owner_address, origin()),
+        U256::from(0)
+    );
+    let amount = 10;
+    runner.mint(token, locker, amount, origin());
+    assert_eq!(
+        runner.balance_of(token, locker, origin()),
+        U256::from(amount)
+    );
+    runner.unlock_erc20(locker, token, amount, ft_owner_address, origin());
+    assert_eq!(runner.balance_of(token, locker, origin()), U256::from(0));
+    assert_eq!(
+        runner.balance_of(token, ft_owner_address, origin()),
+        U256::from(amount)
+    );
+}
+
+#[test]
+fn test_locker_unlock_not_admin() {
+    let mut runner = AuroraRunner::new();
+    let ft_owner = "tt.testnet".to_string();
+    let ft_owner_address =
+        aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.as_bytes());
+    let locker = runner.deploy_erc20_locker(origin()).unwrap();
+    let token = runner.deploy_erc20_token(&ft_owner);
+
+    assert_eq!(
+        runner.balance_of(token, ft_owner_address, origin()),
+        U256::from(0)
+    );
+    let amount = 10;
+    runner.mint(token, locker, amount, origin());
+    assert_eq!(
+        runner.balance_of(token, locker, origin()),
+        U256::from(amount)
+    );
+    runner.unlock_erc20(locker, token, amount, ft_owner_address, ft_owner);
+    assert_eq!(
+        runner.balance_of(token, locker, origin()),
+        U256::from(amount)
+    );
+    assert_eq!(
+        runner.balance_of(token, ft_owner_address, origin()),
+        U256::from(0)
+    );
+}
+
+#[test]
+fn test_get_erc20_metadata() {
+    let mut runner = AuroraRunner::new();
+    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let metadata_input = NativeErc20Metadata {
+        name: "MyToken".to_string(),
+        symbol: "MTKN".to_string(),
+        decimals: 18,
+    };
+
+    runner.set_metadata(
+        token,
+        metadata_input.name.clone(),
+        metadata_input.symbol.clone(),
+        metadata_input.decimals,
+        origin(),
+    );
+
+    assert_eq!(metadata_input, runner.get_erc20_metadata(token, origin()));
+}
+
 // Simulation tests for exit to NEAR precompile.
 // Note: `AuroraRunner` is not suitable for these tests because
 // it does not execute promises; but `near-sdk-sim` does.

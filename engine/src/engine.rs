@@ -458,7 +458,7 @@ impl From<NewCallArgs> for EngineState {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Debug)]
 pub struct NativeErc20Metadata {
     pub name: String,
     pub symbol: String,
