@@ -215,6 +215,18 @@ impl AuroraRunner {
         (maybe_outcome, maybe_error)
     }
 
+    pub fn consume_json_snapshot(
+        &mut self,
+        snapshot: engine_standalone_storage::json_snapshot::types::JsonSnapshot,
+    ) {
+        let trie = &mut self.ext.underlying.fake_trie;
+        for entry in snapshot.result.values {
+            let key = base64::decode(entry.key).unwrap();
+            let value = base64::decode(entry.value).unwrap();
+            trie.insert(key, value);
+        }
+    }
+
     pub fn create_address(
         &mut self,
         address: Address,

@@ -8,6 +8,7 @@ mod eth_connector;
 mod meta_parsing;
 mod one_inch;
 mod random;
+mod repro;
 mod sanity;
 mod self_destruct_state;
 mod standalone;
