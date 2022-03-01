@@ -408,6 +408,7 @@ pub struct Engine<'env, I: IO, E: Env> {
     env: &'env E,
     generation_cache: RefCell<BTreeMap<Address, u32>>,
     account_info_cache: RefCell<DupCache<Address, Basic>>,
+    contract_code_cache: RefCell<DupCache<Address, Vec<u8>>>,
     contract_storage_cache: RefCell<PairDupCache<Address, H256, H256>>,
 }
 
@@ -442,6 +443,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             env,
             generation_cache: RefCell::new(BTreeMap::new()),
             account_info_cache: RefCell::new(DupCache::default()),
+            contract_code_cache: RefCell::new(DupCache::default()),
             contract_storage_cache: RefCell::new(PairDupCache::default()),
         }
     }
@@ -1439,7 +1441,11 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
 
     /// Returns the code of the contract from an address.
     fn code(&self, address: H160) -> Vec<u8> {
-        get_code(&self.io, &Address::new(address))
+        let address = Address::new(address);
+        self.contract_code_cache
+            .borrow_mut()
+            .get_or_insert_with(&address, || get_code(&self.io, &address))
+            .clone()
     }
 
     /// Get storage value of address at index.
