@@ -1422,7 +1422,18 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
 
     /// Checks if an address exists.
     fn exists(&self, address: H160) -> bool {
-        !is_account_empty(&self.io, &Address::new(address))
+        let address = Address::new(address);
+        let mut cache = self.account_info_cache.borrow_mut();
+        let basic_info = cache.get_or_insert_with(&address, || Basic {
+            nonce: get_nonce(&self.io, &address),
+            balance: get_balance(&self.io, &address).raw(),
+        });
+        if !basic_info.balance.is_zero() || !basic_info.nonce.is_zero() {
+            return false;
+        }
+        let mut cache = self.contract_code_cache.borrow_mut();
+        let code = cache.get_or_insert_with(&address, || get_code(&self.io, &address));
+        !code.is_empty()
     }
 
     /// Returns basic account information.
