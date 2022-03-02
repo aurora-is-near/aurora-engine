@@ -93,7 +93,7 @@ where
         let block_hash = row.block_hash;
         let block_metadata = storage.get_block_metadata(block_hash)?;
         let tx: EthTransactionKind = row.into();
-        let transaction_bytes: Vec<u8> = tx.into();
+        let transaction_bytes: Vec<u8> = (&tx).into();
         let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
         env.block_height = block_height;
