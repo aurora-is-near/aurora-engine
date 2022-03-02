@@ -193,11 +193,7 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
     } else {
         let v: H160 = value.as_val()?;
         let addr = Address::new(v);
-        if addr == Address::zero() {
-            Ok(None)
-        } else {
-            Ok(Some(addr))
-        }
+        Ok(Some(addr))
     }
 }
 

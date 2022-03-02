@@ -16,6 +16,24 @@ const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
 #[test]
+fn test_transaction_to_zero_address() {
+    // Transactions that explicit list `0x0000...` as the `to` field in the transaction
+    // should not be interpreted as contract creation. Previously this was the case
+    // and it caused the Engine to incorrectly derive the sender's address.
+    // See the mismatch between the sender address reported by the Aurora explorer
+    // and the sender logged by the engine:
+    //   - https://testnet.aurorascan.dev/tx/0x51846313113e13ff87ccbd153f1b339b857bf7729fe16af7d351ff06943c4c20
+    //   - https://explorer.testnet.near.org/transactions/5URFuet378c6zokikG62uK4YH31AnZb99pDPRnVJBAy2
+    // This is a test to show the bug is now fixed.
+    let tx_hex = "f8648080836691b79400000000000000000000000000000000000000008080849c8a82caa0464cada9d6a907f5537dcc0f95274a30ddaeff33276e9b3993815586293a2010a07626bd794381ba59f30e26ec6f3448d19f63bb12dcda19acda429b2fb7d3dfba";
+    let tx_bytes = hex::decode(tx_hex).unwrap();
+    let tx = aurora_engine_transactions::EthTransactionKind::try_from(tx_bytes.as_slice()).unwrap();
+    let normalized_tx = aurora_engine_transactions::NormalizedEthTransaction::from(tx);
+    let sender = hex::encode(normalized_tx.address.unwrap().as_bytes());
+    assert_eq!(sender.as_str(), "63eafba871e0bda44be3cde19df5aa1c0f078142");
+}
+
+#[test]
 fn test_state_format() {
     // The purpose of this test is to make sure that if we accidentally
     // change the binary format of the `EngineState` then we will know
