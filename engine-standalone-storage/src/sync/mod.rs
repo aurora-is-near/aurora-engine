@@ -55,7 +55,7 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                     // Only promises possible from `submit` are exit precompiles and we cannot act on those promises
                     let mut handler = crate::promise::Noop;
                     let engine_state = engine::get_state(&io)?;
-                    let transaction_bytes: Vec<u8> = tx.into();
+                    let transaction_bytes: Vec<u8> = (&tx).into();
                     let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
                     let _result = engine::submit(
