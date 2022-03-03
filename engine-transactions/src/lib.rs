@@ -6,6 +6,7 @@ use aurora_engine_types::{vec, Vec, H160, U256};
 use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 
+pub mod backwards_compatibility;
 pub mod eip_1559;
 pub mod eip_2930;
 pub mod legacy;
