@@ -29,8 +29,30 @@ fn test_transaction_to_zero_address() {
     let tx_bytes = hex::decode(tx_hex).unwrap();
     let tx = aurora_engine_transactions::EthTransactionKind::try_from(tx_bytes.as_slice()).unwrap();
     let normalized_tx = aurora_engine_transactions::NormalizedEthTransaction::from(tx);
-    let sender = hex::encode(normalized_tx.address.unwrap().as_bytes());
+    let address = normalized_tx.address.as_ref().unwrap();
+    let sender = hex::encode(address.as_bytes());
     assert_eq!(sender.as_str(), "63eafba871e0bda44be3cde19df5aa1c0f078142");
+
+    // We want the standalone engine to still reproduce the old behaviour for blocks before the bug fix, and
+    // to use the correct parsing for blocks after the fix.
+    let mut runner = test_utils::standalone::StandaloneRunner::default();
+    runner.init_evm_with_chain_id(normalized_tx.chain_id.unwrap());
+    let mut context = test_utils::AuroraRunner::default().context;
+    context.input = tx_bytes;
+    // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
+    // It also incorrectly derives the sender address, so does not increment the right nonce.
+    context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT - 1;
+    let result = runner.submit_raw(test_utils::SUBMIT, &context).unwrap();
+    assert_eq!(result.gas_used, 53_000);
+    runner.env.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT;
+    assert_eq!(runner.get_nonce(address), U256::zero());
+
+    // After the fix this transaction is simply a transfer of 0 ETH to the zero address
+    context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT;
+    let result = runner.submit_raw(test_utils::SUBMIT, &context).unwrap();
+    assert_eq!(result.gas_used, 21_000);
+    runner.env.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    assert_eq!(runner.get_nonce(address), U256::one());
 }
 
 #[test]
