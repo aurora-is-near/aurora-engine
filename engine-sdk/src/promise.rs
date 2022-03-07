@@ -29,7 +29,7 @@ pub trait PromiseHandler {
     fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId;
     fn promise_return(&mut self, promise: PromiseId);
 
-    fn promise_crate_with_callback(&mut self, args: &PromiseWithCallbackArgs) -> PromiseId {
+    fn promise_create_with_callback(&mut self, args: &PromiseWithCallbackArgs) -> PromiseId {
         let base = self.promise_create_call(&args.base);
         self.promise_attach_callback(base, &args.callback)
     }
