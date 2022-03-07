@@ -30,6 +30,12 @@ const BLOCK_HASH_PREFIX_SIZE: usize = 1;
 const BLOCK_HEIGHT_SIZE: usize = 8;
 const CHAIN_ID_SIZE: usize = 32;
 
+#[cfg(not(feature = "contract"))]
+/// Block height where the bug fix for parsing transactions to the zero address
+/// is deployed. The current value is only approximate; will be updated once the
+/// fix is actually deployed.
+pub const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61200152;
+
 pub fn current_address(current_account_id: &AccountId) -> Address {
     aurora_engine_sdk::types::near_account_to_evm_address(current_account_id.as_bytes())
 }
@@ -858,9 +864,26 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     relayer_address: Address,
     handler: &mut P,
 ) -> EngineResult<SubmitResult> {
+    #[cfg(feature = "contract")]
     let transaction: NormalizedEthTransaction = EthTransactionKind::try_from(transaction_bytes)
         .map_err(EngineErrorKind::FailedTransactionParse)?
         .into();
+
+    #[cfg(not(feature = "contract"))]
+    // The standalone engine must use the backwards compatible parser to reproduce the NEAR state,
+    // but the contract itself does not need to make such checks because it never executes historical
+    // transactions.
+    let transaction: NormalizedEthTransaction = {
+        let adapter =
+            aurora_engine_transactions::backwards_compatibility::EthTransactionKindAdapter::new(
+                ZERO_ADDRESS_FIX_HEIGHT,
+            );
+        let block_height = env.block_height();
+        let tx: EthTransactionKind = adapter
+            .try_parse_bytes(transaction_bytes, block_height)
+            .map_err(EngineErrorKind::FailedTransactionParse)?;
+        tx.into()
+    };
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
