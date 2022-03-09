@@ -30,6 +30,12 @@ const BLOCK_HASH_PREFIX_SIZE: usize = 1;
 const BLOCK_HEIGHT_SIZE: usize = 8;
 const CHAIN_ID_SIZE: usize = 32;
 
+#[cfg(not(feature = "contract"))]
+/// Block height where the bug fix for parsing transactions to the zero address
+/// is deployed. The current value is only approximate; will be updated once the
+/// fix is actually deployed.
+pub const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61200152;
+
 pub fn current_address(current_account_id: &AccountId) -> Address {
     aurora_engine_sdk::types::near_account_to_evm_address(current_account_id.as_bytes())
 }
@@ -408,6 +414,7 @@ pub struct Engine<'env, I: IO, E: Env> {
     env: &'env E,
     generation_cache: RefCell<BTreeMap<Address, u32>>,
     account_info_cache: RefCell<DupCache<Address, Basic>>,
+    contract_code_cache: RefCell<DupCache<Address, Vec<u8>>>,
     contract_storage_cache: RefCell<PairDupCache<Address, H256, H256>>,
 }
 
@@ -442,6 +449,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             env,
             generation_cache: RefCell::new(BTreeMap::new()),
             account_info_cache: RefCell::new(DupCache::default()),
+            contract_code_cache: RefCell::new(DupCache::default()),
             contract_storage_cache: RefCell::new(PairDupCache::default()),
         }
     }
@@ -856,9 +864,26 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     relayer_address: Address,
     handler: &mut P,
 ) -> EngineResult<SubmitResult> {
+    #[cfg(feature = "contract")]
     let transaction: NormalizedEthTransaction = EthTransactionKind::try_from(transaction_bytes)
         .map_err(EngineErrorKind::FailedTransactionParse)?
         .into();
+
+    #[cfg(not(feature = "contract"))]
+    // The standalone engine must use the backwards compatible parser to reproduce the NEAR state,
+    // but the contract itself does not need to make such checks because it never executes historical
+    // transactions.
+    let transaction: NormalizedEthTransaction = {
+        let adapter =
+            aurora_engine_transactions::backwards_compatibility::EthTransactionKindAdapter::new(
+                ZERO_ADDRESS_FIX_HEIGHT,
+            );
+        let block_height = env.block_height();
+        let tx: EthTransactionKind = adapter
+            .try_parse_bytes(transaction_bytes, block_height)
+            .map_err(EngineErrorKind::FailedTransactionParse)?;
+        tx.into()
+    };
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
@@ -1420,7 +1445,18 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
 
     /// Checks if an address exists.
     fn exists(&self, address: H160) -> bool {
-        !is_account_empty(&self.io, &Address::new(address))
+        let address = Address::new(address);
+        let mut cache = self.account_info_cache.borrow_mut();
+        let basic_info = cache.get_or_insert_with(&address, || Basic {
+            nonce: get_nonce(&self.io, &address),
+            balance: get_balance(&self.io, &address).raw(),
+        });
+        if !basic_info.balance.is_zero() || !basic_info.nonce.is_zero() {
+            return false;
+        }
+        let mut cache = self.contract_code_cache.borrow_mut();
+        let code = cache.get_or_insert_with(&address, || get_code(&self.io, &address));
+        !code.is_empty()
     }
 
     /// Returns basic account information.
@@ -1439,7 +1475,11 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
 
     /// Returns the code of the contract from an address.
     fn code(&self, address: H160) -> Vec<u8> {
-        get_code(&self.io, &Address::new(address))
+        let address = Address::new(address);
+        self.contract_code_cache
+            .borrow_mut()
+            .get_or_insert_with(&address, || get_code(&self.io, &address))
+            .clone()
     }
 
     /// Get storage value of address at index.

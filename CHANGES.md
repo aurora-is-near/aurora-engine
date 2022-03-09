@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2022-03-09
+
+### Changes
+
+- Performance improvement by [@birchmd] and [@olonho]: ([#455]) ([#456])
+
+### Fixes
+
+- Bug fix for the behaviour of transactions to the zero address by [@birchmd]. ([#458])
+
+[#455]: https://github.com/aurora-is-near/aurora-engine/pull/455
+[#456]: https://github.com/aurora-is-near/aurora-engine/pull/456
+[#458]: https://github.com/aurora-is-near/aurora-engine/pull/458
+
 ## [2.4.0] - 2022-02-16
 
 ### Changes
@@ -205,7 +219,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.4.0...master
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.0...develop
+[2.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.4.0...2.5.0
 [2.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.3.0...2.4.0
 [2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0 
 [2.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.1.0...2.2.0
@@ -236,3 +251,4 @@ struct SubmitResult {
 [@mrLSD]: https://github.com/mrLSD
 [@sept-en]: https://github.com/sept-en
 [@matklad]: https://github.com/matklad
+[@olonho]: https://github.com/olonho

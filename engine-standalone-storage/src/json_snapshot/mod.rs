@@ -8,15 +8,15 @@ pub fn initialize_engine_state(
     storage: &mut Storage,
     snapshot: types::JsonSnapshot,
 ) -> Result<(), error::Error> {
-    // When we access engine storage, we are accessing the pre-state. The snapshot is giving
-    // us a post-state, which of course is the pre-state of the following block.
-    let block_height = snapshot.result.block_height + 1;
+    // The snapshot is giving us a post-state, so we insert it right at the end of its block height.
+    let block_height = snapshot.result.block_height;
+    let transaction_position = u16::MAX;
 
     let mut batch = rocksdb::WriteBatch::default();
     for entry in snapshot.result.values {
         let key = base64::decode(entry.key)?;
         let value = base64::decode(entry.value)?;
-        let storage_key = crate::construct_engine_key(&key, block_height, 0);
+        let storage_key = crate::construct_engine_key(&key, block_height, transaction_position);
         let storage_value = crate::diff::DiffValue::Modified(value);
         batch.put(storage_key, storage_value.try_to_bytes()?);
     }

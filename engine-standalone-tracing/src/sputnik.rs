@@ -98,7 +98,7 @@ impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
         use evm_runtime::tracing::Event;
         match event {
             Event::Step {
-                context: _,
+                address: _,
                 opcode,
                 position,
                 stack,

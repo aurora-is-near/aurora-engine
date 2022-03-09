@@ -6,6 +6,7 @@ use aurora_engine_types::{vec, Vec, H160, U256};
 use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 
+pub mod backwards_compatibility;
 pub mod eip_1559;
 pub mod eip_2930;
 pub mod legacy;
@@ -41,20 +42,20 @@ impl TryFrom<&[u8]> for EthTransactionKind {
     }
 }
 
-impl From<EthTransactionKind> for Vec<u8> {
-    fn from(tx: EthTransactionKind) -> Self {
+impl<'a> From<&'a EthTransactionKind> for Vec<u8> {
+    fn from(tx: &'a EthTransactionKind) -> Self {
         let mut stream = rlp::RlpStream::new();
-        match tx {
+        match &tx {
             EthTransactionKind::Legacy(tx) => {
-                stream.append(&tx);
+                stream.append(tx);
             }
             EthTransactionKind::Eip1559(tx) => {
                 stream.append(&eip_1559::TYPE_BYTE);
-                stream.append(&tx);
+                stream.append(tx);
             }
             EthTransactionKind::Eip2930(tx) => {
                 stream.append(&eip_2930::TYPE_BYTE);
-                stream.append(&tx);
+                stream.append(tx);
             }
         }
         stream.out().to_vec()
@@ -193,11 +194,7 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
     } else {
         let v: H160 = value.as_val()?;
         let addr = Address::new(v);
-        if addr == Address::zero() {
-            Ok(None)
-        } else {
-            Ok(Some(addr))
-        }
+        Ok(Some(addr))
     }
 }
 

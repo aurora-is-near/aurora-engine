@@ -196,7 +196,14 @@ mod tests {
 
         let encoded_tx = hex::decode("f8d98001831e848094000000000000000000000000000000000000000080b874600060005560648060106000396000f360e060020a6000350480638ada066e146028578063d09de08a1460365780632baeceb714604d57005b5060005460005260206000f3005b5060016000540160005560005460005260206000f3005b5060016000540360005560005460005260206000f300849c8a82cba0668cfa20c8521b28fa8e42f26df0f2c090dda2fb5cbbb60dd616e8d00f93d9d8a00a1e5de8454ce9072cefd8268c0bf8eba2c1206a5e5a43914c1d62962c121d94").unwrap();
         let tx_2 = LegacyEthSignedTransaction::decode(&Rlp::new(&encoded_tx)).unwrap();
-        assert_eq!(tx_1.transaction.to, tx_2.transaction.to);
+
+        // tx_2 has the zero address as its `to` field
+        assert_eq!(tx_2.transaction.to, Some(address_from_arr(&[0u8; 20])));
+
+        // otherwise, tx_1 and tx_2 are identical.
+        let mut tx_2_mod = tx_2.clone();
+        tx_2_mod.transaction.to = None;
+        assert_eq!(tx_1.transaction, tx_2_mod.transaction);
     }
 
     fn address_from_arr(arr: &[u8]) -> Address {
