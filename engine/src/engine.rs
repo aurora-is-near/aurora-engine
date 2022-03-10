@@ -346,11 +346,17 @@ struct StackExecutorParams {
 }
 
 impl StackExecutorParams {
-    fn new(gas_limit: u64, current_account_id: AccountId, random_seed: H256) -> Self {
+    fn new(
+        gas_limit: u64,
+        current_account_id: AccountId,
+        predecessor_account_id: AccountId,
+        random_seed: H256,
+    ) -> Self {
         Self {
             precompiles: Precompiles::new_london(PrecompileConstructorContext {
                 current_account_id,
                 random_seed,
+                predecessor_account_id,
             }),
             gas_limit,
         }
@@ -510,6 +516,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let executor_params = StackExecutorParams::new(
             gas_limit,
             self.current_account_id.clone(),
+            self.env.predecessor_account_id(),
             self.env.random_seed(),
         );
         let mut executor = executor_params.make_executor(self);
@@ -594,6 +601,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let executor_params = StackExecutorParams::new(
             gas_limit,
             self.current_account_id.clone(),
+            self.env.predecessor_account_id(),
             self.env.random_seed(),
         );
         let mut executor = executor_params.make_executor(self);
@@ -643,6 +651,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let executor_params = StackExecutorParams::new(
             gas_limit,
             self.current_account_id.clone(),
+            self.env.predecessor_account_id(),
             self.env.random_seed(),
         );
         let mut executor = executor_params.make_executor(self);
