@@ -3,11 +3,14 @@ use aurora_engine_sdk as sdk;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{Vec, H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// Type indicator (per EIP-2718) for access list transactions
 pub const TYPE_BYTE: u8 = 0x01;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AccessTuple {
     pub address: H160,
     pub storage_keys: Vec<H256>,
