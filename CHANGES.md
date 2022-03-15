@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2022-03-16
+
+### Fixes
+
+- Fix for bug in checking address exists introduced in the v2.5.0 release by [@birchmd]. ([#469])
+
+### Added
+
+- New Aurora-only precompiles for checking the current and predecessor NEAR account IDs by [@birchmd]. ([#462])
+
+[#462]: https://github.com/aurora-is-near/aurora-engine/pull/462
+[#469]: https://github.com/aurora-is-near/aurora-engine/pull/469
+
 ## [2.5.0] - 2022-03-09
 
 ### Changes
@@ -220,6 +233,7 @@ struct SubmitResult {
 ## [1.0.0] - 2021-05-12
 
 [Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.0...develop
+[2.5.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.0...2.5.1
 [2.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.4.0...2.5.0
 [2.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.3.0...2.4.0
 [2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0 
