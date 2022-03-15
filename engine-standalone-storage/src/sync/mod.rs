@@ -139,6 +139,13 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                         &promise_args.callback.args,
                     )
                     .expect("Connector deposit function must return valid args");
+                    // Since this would be executed as a callback, the predecessor_account_id
+                    // is now equal to the current_account_id
+                    let env = {
+                        let mut tmp = env.clone();
+                        tmp.predecessor_account_id = env.current_account_id;
+                        tmp
+                    };
                     let maybe_promise_args = connector_contract.finish_deposit(
                         env.predecessor_account_id(),
                         env.current_account_id(),
