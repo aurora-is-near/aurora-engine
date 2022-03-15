@@ -1461,7 +1461,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
             balance: get_balance(&self.io, &address).raw(),
         });
         if !basic_info.balance.is_zero() || !basic_info.nonce.is_zero() {
-            return false;
+            return true;
         }
         let mut cache = self.contract_code_cache.borrow_mut();
         let code = cache.get_or_insert_with(&address, || get_code(&self.io, &address));
