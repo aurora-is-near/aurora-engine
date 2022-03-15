@@ -195,7 +195,7 @@ fn test_solidity_pure_bench() {
     );
 
     // Number of iterations to do
-    let loop_limit = 10_000;
+    let loop_limit: u32 = 10_000;
     let (result, profile) = runner
         .submit_with_signer_profiled(&mut signer, |nonce| {
             contract.call_method_with_args(
@@ -216,6 +216,35 @@ fn test_solidity_pure_bench() {
         "Expected 1500 NEAR Tgas to be used, but only consumed {}",
         near_gas / 1_000_000_000_000,
     );
+
+    // Pure rust version of the same contract
+    let base_path = std::path::Path::new("../etc").join("benchmark-contract");
+    let output_path =
+        base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
+    test_utils::rust::compile(base_path);
+    let contract_bytes = std::fs::read(output_path).unwrap();
+    let code = near_primitives_core::contract::ContractCode::new(contract_bytes, None);
+    let mut context = runner.context.clone();
+    context.input = loop_limit.to_le_bytes().to_vec();
+    let (outcome, error) = near_vm_runner::run(
+        &code,
+        "cpu_ram_soak_test",
+        &mut runner.ext,
+        context,
+        &runner.wasm_config,
+        &runner.fees_config,
+        &[],
+        runner.current_protocol_version,
+        Some(&runner.cache),
+    );
+    if let Some(e) = error {
+        panic!("{:?}", e);
+    }
+    let outcome = outcome.unwrap();
+    let profile = test_utils::ExecutionProfile::new(&outcome);
+    // Check the contract actually did the work.
+    assert_eq!(&outcome.logs, &[format!("Done {} iterations!", loop_limit)]);
+    assert!(profile.all_gas() < 1_000_000_000_000); // Less than 1 Tgas used!
 }
 
 #[test]
