@@ -229,8 +229,15 @@ fn test_is_contract() {
     );
 
     // Should return true for contracts
+    let erc20_constructor = test_utils::erc20::ERC20Constructor::load();
+    let nonce = signer.use_nonce();
+    let token_a = runner.deploy_contract(
+        &signer.secret_key,
+        |c| c.deploy("TOKEN_A", "TA", nonce.into()),
+        erc20_constructor,
+    );
     assert_eq!(
-        call_contract(contract.address, &mut runner, &mut signer),
+        call_contract(token_a.address, &mut runner, &mut signer),
         true,
     );
 }
