@@ -358,7 +358,7 @@ pub struct InitCallArgs {
 pub type SetContractDataCallArgs = InitCallArgs;
 
 /// transfer eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct TransferCallCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,

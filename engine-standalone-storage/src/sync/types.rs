@@ -54,4 +54,7 @@ pub enum TransactionKind {
     FtOnTransfer(parameters::NEP141FtOnTransferArgs),
     /// Bytes here will be parsed into `aurora_engine::proof::Proof`
     Deposit(Vec<u8>),
+    /// This can change balances on aurora in the case that `receiver_id == aurora`.
+    /// Example: https://explorer.mainnet.near.org/transactions/DH6iNvXCt5n5GZBZPV1A6sLmMf1EsKcxXE4uqk1cShzj
+    FtTransferCall(parameters::TransferCallCallArgs),
 }

@@ -8,7 +8,10 @@ use types::{Message, TransactionKind};
 
 const AURORA_ACCOUNT_ID: &str = "aurora";
 
-pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result<(), error::Error> {
+pub fn consume_message(
+    storage: &mut crate::Storage,
+    message: Message,
+) -> Result<ConsumeMessageOutcome, error::Error> {
     match message {
         Message::Block(block_message) => {
             let block_hash = block_message.hash;
@@ -17,13 +20,13 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
             storage
                 .set_block_data(block_hash, block_height, block_metadata)
                 .map_err(crate::Error::Rocksdb)?;
-            Ok(())
+            Ok(ConsumeMessageOutcome::BlockAdded)
         }
 
         Message::Transaction(transaction_message) => {
             // Failed transactions have no impact on the state of our database.
             if !transaction_message.succeeded {
-                return Ok(());
+                return Ok(ConsumeMessageOutcome::FailedTransactionIgnored);
             }
 
             let signer_account_id = transaction_message.signer;
@@ -122,6 +125,45 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                     near_tx_hash
                 }
 
+                TransactionKind::FtTransferCall(args) => {
+                    // This transaction only has an impact on the aurora state
+                    // if the receiver is the Aurora contract
+                    if args.receiver_id.as_ref() == AURORA_ACCOUNT_ID {
+                        let mut connector = connector::EthConnectorContract::init_instance(io);
+                        let promise_args = connector.ft_transfer_call(
+                            env.predecessor_account_id.clone(),
+                            env.current_account_id.clone(),
+                            args,
+                            env.prepaid_gas,
+                        )?;
+                        let env = {
+                            let mut tmp = env.clone();
+                            // Since this would be executed as a callback, the predecessor_account_id
+                            // is now equal to the current_account_id
+                            tmp.predecessor_account_id = env.current_account_id;
+                            tmp
+                        };
+                        let on_transfer_args =
+                            aurora_engine::json::parse_json(&promise_args.base.args)
+                                .and_then(|json| {
+                                    parameters::NEP141FtOnTransferArgs::try_from(json).ok()
+                                })
+                                .expect("Connector finish_deposit function must return valid args");
+                        let engine = engine::Engine::new(
+                            relayer_address,
+                            env.current_account_id(),
+                            io,
+                            &env,
+                        )?;
+                        connector.ft_on_transfer(&engine, &on_transfer_args)?;
+                        // `ft_on_transfer` always returns an unused amount of 0 if it executes
+                        // successfully, meaning that `ft_resolve_transfer` will do nothing,
+                        // so we skip the promise_args callback.
+                    }
+
+                    near_tx_hash
+                }
+
                 TransactionKind::Deposit(raw_proof) => {
                     let mut connector_contract = connector::EthConnectorContract::init_instance(io);
                     let promise_args = connector_contract.deposit(
@@ -183,9 +225,26 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
             };
             storage.set_transaction_included(tx_hash, &tx_included, &diff)?;
 
-            Ok(())
+            let outcome = TransactionIncludedOutcome {
+                hash: tx_hash,
+                info: tx_included,
+                diff,
+            };
+            Ok(ConsumeMessageOutcome::TransactionIncluded(outcome))
         }
     }
+}
+
+pub enum ConsumeMessageOutcome {
+    BlockAdded,
+    FailedTransactionIgnored,
+    TransactionIncluded(TransactionIncludedOutcome),
+}
+
+pub struct TransactionIncludedOutcome {
+    pub hash: aurora_engine_types::H256,
+    pub info: crate::TransactionIncluded,
+    pub diff: crate::Diff,
 }
 
 pub mod error {
