@@ -791,6 +791,7 @@ pub mod error {
         }
     }
 
+    #[derive(Debug)]
     pub enum WithdrawError {
         Paused,
         FT(fungible_token::error::WithdrawError),
@@ -848,6 +849,7 @@ pub mod error {
         }
     }
 
+    #[derive(Debug)]
     pub enum InitContractError {
         AlreadyInitialized,
         InvalidCustodianAddress(AddressError),
