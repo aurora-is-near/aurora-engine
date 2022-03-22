@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.2] 2022-03-22
+
+### Removed
+
+- New Aurora-only precompiles removed since they do not work in NEAR view calls. This will need to be fixed and they will be re-added to a future release.
+
 ## [2.5.1] - 2022-03-16
 
 ### Fixes
@@ -232,7 +238,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.1...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.2...develop
+[2.5.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.1...2.5.2
 [2.5.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.0...2.5.1
 [2.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.4.0...2.5.0
 [2.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.3.0...2.4.0
