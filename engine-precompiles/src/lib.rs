@@ -2,7 +2,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 
-pub mod account_ids;
 pub mod blake2;
 pub mod bn128;
 pub mod hash;
@@ -15,7 +14,6 @@ pub mod secp256k1;
 #[cfg(test)]
 mod utils;
 
-use crate::account_ids::{CurrentAccount, PredecessorAccount};
 use crate::blake2::Blake2F;
 use crate::bn128::{Bn128Add, Bn128Mul, Bn128Pair};
 use crate::hash::{RIPEMD160, SHA256};
@@ -126,7 +124,6 @@ impl executor::stack::PrecompileSet for Precompiles {
 pub struct PrecompileConstructorContext {
     pub current_account_id: AccountId,
     pub random_seed: H256,
-    pub predecessor_account_id: AccountId,
 }
 
 impl Precompiles {
@@ -139,18 +136,14 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
             RandomSeed::ADDRESS,
-            CurrentAccount::ADDRESS,
-            PredecessorAccount::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
             Box::new(ExitToNear::new(ctx.current_account_id.clone())),
-            Box::new(ExitToEthereum::new(ctx.current_account_id.clone())),
+            Box::new(ExitToEthereum::new(ctx.current_account_id)),
             Box::new(RandomSeed::new(ctx.random_seed)),
-            Box::new(CurrentAccount::new(ctx.current_account_id)),
-            Box::new(PredecessorAccount::new(ctx.predecessor_account_id)),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
@@ -171,8 +164,6 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
             RandomSeed::ADDRESS,
-            CurrentAccount::ADDRESS,
-            PredecessorAccount::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -184,10 +175,8 @@ impl Precompiles {
             Box::new(Bn128Mul::<Byzantium>::new()),
             Box::new(Bn128Pair::<Byzantium>::new()),
             Box::new(ExitToNear::new(ctx.current_account_id.clone())),
-            Box::new(ExitToEthereum::new(ctx.current_account_id.clone())),
+            Box::new(ExitToEthereum::new(ctx.current_account_id)),
             Box::new(RandomSeed::new(ctx.random_seed)),
-            Box::new(CurrentAccount::new(ctx.current_account_id)),
-            Box::new(PredecessorAccount::new(ctx.predecessor_account_id)),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
@@ -208,8 +197,6 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
             RandomSeed::ADDRESS,
-            CurrentAccount::ADDRESS,
-            PredecessorAccount::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -222,10 +209,8 @@ impl Precompiles {
             Box::new(Bn128Pair::<Istanbul>::new()),
             Box::new(Blake2F),
             Box::new(ExitToNear::new(ctx.current_account_id.clone())),
-            Box::new(ExitToEthereum::new(ctx.current_account_id.clone())),
+            Box::new(ExitToEthereum::new(ctx.current_account_id)),
             Box::new(RandomSeed::new(ctx.random_seed)),
-            Box::new(CurrentAccount::new(ctx.current_account_id)),
-            Box::new(PredecessorAccount::new(ctx.predecessor_account_id)),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
@@ -246,8 +231,6 @@ impl Precompiles {
             ExitToNear::ADDRESS,
             ExitToEthereum::ADDRESS,
             RandomSeed::ADDRESS,
-            CurrentAccount::ADDRESS,
-            PredecessorAccount::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -260,10 +243,8 @@ impl Precompiles {
             Box::new(Bn128Pair::<Istanbul>::new()),
             Box::new(Blake2F),
             Box::new(ExitToNear::new(ctx.current_account_id.clone())),
-            Box::new(ExitToEthereum::new(ctx.current_account_id.clone())),
+            Box::new(ExitToEthereum::new(ctx.current_account_id)),
             Box::new(RandomSeed::new(ctx.random_seed)),
-            Box::new(CurrentAccount::new(ctx.current_account_id)),
-            Box::new(PredecessorAccount::new(ctx.predecessor_account_id)),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
