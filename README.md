@@ -15,8 +15,8 @@ documentation.
 Network | Contract ID         | Chain ID   | Version
 ------- | ------------------- | ---------- | ------
 Mainnet | [`aurora`][Mainnet] | 1313161554 | 2.4.0
-Testnet | [`aurora`][Testnet] | 1313161555 | 2.5.0
-Local   | `aurora.test.near`  | 1313161556 | 2.5.0
+Testnet | [`aurora`][Testnet] | 1313161555 | 2.5.1
+Local   | `aurora.test.near`  | 1313161556 | 2.5.1
 
 [Mainnet]: https://explorer.near.org/accounts/aurora
 [Testnet]: https://explorer.testnet.near.org/accounts/aurora

@@ -46,7 +46,7 @@ fn repro_GdASJ3KESs() {
         SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
     assert_eq!(submit_result.gas_used, 706713);
-    assert_eq!(238, profile.all_gas() / 1_000_000_000_000);
+    assert_eq!(239, profile.all_gas() / 1_000_000_000_000);
 
     // Also validate the SubmitResult in the standalone engine
     let mut standalone = standalone::StandaloneRunner::default();
