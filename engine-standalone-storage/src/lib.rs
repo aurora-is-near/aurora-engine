@@ -2,6 +2,7 @@ use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::H256;
 use rocksdb::DB;
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::path::Path;
 
 const VERSION: u8 = 0;
@@ -17,6 +18,11 @@ pub mod sync;
 
 pub use diff::Diff;
 pub use error::Error;
+
+/// Length (in bytes) of the suffix appended to Engine keys which specify the
+/// block height and transaction position. 64 bits for the block height,
+/// 16 bits for the transaction position.
+const ENGINE_KEY_SUFFIX_LEN: usize = (64 / 8) + (16 / 8);
 
 #[repr(u8)]
 pub enum StoragePrefix {
@@ -168,6 +174,53 @@ impl Storage {
         }
 
         self.db.write(batch).map_err(Into::into)
+    }
+
+    /// Construct a snapshot of the Engine post-state at the given block height.
+    /// I.e. get the state of the Engine after all transactions in that block have been applied.
+    pub fn get_snapshot(&self, block_height: u64) -> Result<HashMap<Vec<u8>, Vec<u8>>, rocksdb::Error> {
+        let engine_prefix = construct_storage_key(StoragePrefix::Engine, &[]);
+        let mut iter: rocksdb::DBRawIterator = self.db.prefix_iterator(&engine_prefix).into();
+        let mut result = HashMap::new();
+
+        while iter.valid() {
+            // unwrap is safe because the iterator is valid
+            let db_key = iter.key().unwrap().to_vec();
+            if &db_key[0..engine_prefix.len()] != &engine_prefix {
+                break;
+            }
+            // raw engine key skips the 2-byte prefix and the block+position suffix
+            let engine_key = &db_key[2..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)];
+            // the key we want is the last key for this block, or the key immediately before it
+            let desired_db_key = construct_engine_key(engine_key, block_height, u16::MAX);
+            iter.seek_for_prev(&desired_db_key);
+            
+            let value = if iter.valid() {
+                let bytes = iter.value().unwrap();
+                diff::DiffValue::try_from_bytes(bytes).unwrap_or_else(|e|{
+                    panic!(
+                        "Could not deserialize key={} value={} error={:?}",
+                        base64::encode(&db_key),
+                        base64::encode(bytes),
+                        e,
+                    )
+                })
+            } else {
+                break;
+            };
+            // only put it values that are still present (i.e. ignore deleted keys)
+            if let Some(bytes) = value.take_value() {
+                result.insert(engine_key.to_vec(), bytes);
+            }
+
+            // move to the next db key, which is after all the blocks for this engine key
+            let key = construct_engine_key(engine_key, u64::MAX, u16::MAX);
+            iter.seek(&key);
+        }
+        
+        iter.status()?;
+
+        Ok(result)
     }
 
     /// Get an object which represents the state of the engine at the given block hash,
