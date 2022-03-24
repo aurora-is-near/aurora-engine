@@ -340,38 +340,38 @@ impl AsRef<[u8]> for EngineStateError {
     }
 }
 
-struct StackExecutorParams<I> {
-    precompiles: Precompiles<I>,
+struct StackExecutorParams<'a, I, E> {
+    precompiles: Precompiles<'a, I, E>,
     gas_limit: u64,
 }
 
-impl<I: IO + Copy> StackExecutorParams<I> {
+impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
     fn new(
         gas_limit: u64,
         current_account_id: AccountId,
-        predecessor_account_id: AccountId,
         random_seed: H256,
         io: I,
+        env: &'env E,
     ) -> Self {
         Self {
             precompiles: Precompiles::new_london(PrecompileConstructorContext {
                 current_account_id,
                 random_seed,
-                predecessor_account_id,
                 io,
+                env,
             }),
             gas_limit,
         }
     }
 
-    fn make_executor<'a, 'env, E: Env>(
+    fn make_executor<'a>(
         &'a self,
         engine: &'a Engine<'env, I, E>,
     ) -> executor::stack::StackExecutor<
         'static,
         'a,
         executor::stack::MemoryStackState<Engine<'env, I, E>>,
-        Precompiles<I>,
+        Precompiles<'env, I, E>,
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::stack::MemoryStackState::new(metadata, engine);
@@ -518,9 +518,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let executor_params = StackExecutorParams::new(
             gas_limit,
             self.current_account_id.clone(),
-            self.env.predecessor_account_id(),
             self.env.random_seed(),
             self.io,
+            self.env,
         );
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy {
@@ -604,9 +604,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let executor_params = StackExecutorParams::new(
             gas_limit,
             self.current_account_id.clone(),
-            self.env.predecessor_account_id(),
             self.env.random_seed(),
             self.io,
+            self.env,
         );
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) = executor.transact_call(
@@ -655,9 +655,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let executor_params = StackExecutorParams::new(
             gas_limit,
             self.current_account_id.clone(),
-            self.env.predecessor_account_id(),
             self.env.random_seed(),
             self.io,
+            self.env,
         );
         let mut executor = executor_params.make_executor(self);
         let (status, result) = executor.transact_call(

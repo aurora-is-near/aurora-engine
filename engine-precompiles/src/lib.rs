@@ -15,7 +15,7 @@ pub mod secp256k1;
 #[cfg(test)]
 mod utils;
 
-use crate::account_ids::{CurrentAccount, PredecessorAccount};
+use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
 use crate::blake2::Blake2F;
 use crate::bn128::{Bn128Add, Bn128Mul, Bn128Pair};
 use crate::hash::{RIPEMD160, SHA256};
@@ -26,6 +26,7 @@ use crate::prelude::types::EthGas;
 use crate::prelude::{Vec, H160, H256};
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
+use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
 use evm::backend::Log;
@@ -102,15 +103,16 @@ impl HardFork for Istanbul {}
 
 impl HardFork for Berlin {}
 
-pub struct Precompiles<I> {
+pub struct Precompiles<'a, I, E> {
     pub generic_precompiles: prelude::BTreeMap<Address, Box<dyn Precompile>>,
     // Cannot be part of the generic precompiles because the `dyn` type-erasure messes with
     // with the lifetime requirements on the type parameter `I`.
     pub near_exit: ExitToNear<I>,
     pub ethereum_exit: ExitToEthereum<I>,
+    pub predecessor_account_id: PredecessorAccount<'a, E>,
 }
 
-impl<I: IO + Copy> executor::stack::PrecompileSet for Precompiles<I> {
+impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a, I, E> {
     fn execute(
         &self,
         address: prelude::H160,
@@ -131,23 +133,22 @@ impl<I: IO + Copy> executor::stack::PrecompileSet for Precompiles<I> {
     }
 }
 
-pub struct PrecompileConstructorContext<I> {
+pub struct PrecompileConstructorContext<'a, I, E> {
     pub current_account_id: AccountId,
     pub random_seed: H256,
-    pub predecessor_account_id: AccountId,
     pub io: I,
+    pub env: &'a E,
 }
 
-impl<I: IO + Copy> Precompiles<I> {
+impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
     #[allow(dead_code)]
-    pub fn new_homestead(ctx: PrecompileConstructorContext<I>) -> Self {
+    pub fn new_homestead(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
-            PredecessorAccount::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -155,14 +156,13 @@ impl<I: IO + Copy> Precompiles<I> {
             Box::new(RIPEMD160),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
-            Box::new(PredecessorAccount::new(ctx.predecessor_account_id.clone())),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
         Self::with_generic_precompiles(map, ctx)
     }
 
     #[allow(dead_code)]
-    pub fn new_byzantium(ctx: PrecompileConstructorContext<I>) -> Self {
+    pub fn new_byzantium(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -174,7 +174,6 @@ impl<I: IO + Copy> Precompiles<I> {
             Bn128Pair::<Byzantium>::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
-            PredecessorAccount::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -187,14 +186,13 @@ impl<I: IO + Copy> Precompiles<I> {
             Box::new(Bn128Pair::<Byzantium>::new()),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
-            Box::new(PredecessorAccount::new(ctx.predecessor_account_id.clone())),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_istanbul(ctx: PrecompileConstructorContext<I>) -> Self {
+    pub fn new_istanbul(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -207,7 +205,6 @@ impl<I: IO + Copy> Precompiles<I> {
             Blake2F::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
-            PredecessorAccount::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -221,14 +218,13 @@ impl<I: IO + Copy> Precompiles<I> {
             Box::new(Blake2F),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
-            Box::new(PredecessorAccount::new(ctx.predecessor_account_id.clone())),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_berlin(ctx: PrecompileConstructorContext<I>) -> Self {
+    pub fn new_berlin(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -241,7 +237,6 @@ impl<I: IO + Copy> Precompiles<I> {
             Blake2F::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
-            PredecessorAccount::ADDRESS,
         ];
         let fun: prelude::Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -255,29 +250,30 @@ impl<I: IO + Copy> Precompiles<I> {
             Box::new(Blake2F),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
-            Box::new(PredecessorAccount::new(ctx.predecessor_account_id.clone())),
         ];
         let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
 
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_london(ctx: PrecompileConstructorContext<I>) -> Self {
+    pub fn new_london(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
         // no precompile changes in London HF
         Self::new_berlin(ctx)
     }
 
     fn with_generic_precompiles(
         generic_precompiles: BTreeMap<Address, Box<dyn Precompile>>,
-        ctx: PrecompileConstructorContext<I>,
+        ctx: PrecompileConstructorContext<'a, I, E>,
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
         let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
+        let predecessor_account_id = PredecessorAccount::new(ctx.env);
 
         Self {
             generic_precompiles,
             near_exit,
             ethereum_exit,
+            predecessor_account_id,
         }
     }
 
@@ -290,6 +286,8 @@ impl<I: IO + Copy> Precompiles<I> {
             return Some(f(&self.near_exit));
         } else if address == exit_to_ethereum::ADDRESS {
             return Some(f(&self.ethereum_exit));
+        } else if address == predecessor_account::ADDRESS {
+            return Some(f(&self.predecessor_account_id));
         }
         self.generic_precompiles
             .get(&address)
