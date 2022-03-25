@@ -16,7 +16,7 @@ pub mod relayer_db;
 /// Functions for receiving new blocks and transactions to keep the storage up to date.
 pub mod sync;
 
-pub use diff::Diff;
+pub use diff::{Diff, DiffValue};
 pub use error::Error;
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
@@ -153,27 +153,81 @@ impl Storage {
         tx_included: &TransactionIncluded,
         diff: &Diff,
     ) -> Result<(), error::Error> {
+        let batch = rocksdb::WriteBatch::default();
+        self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, value| batch.put(key, value))
+    }
+
+    pub fn revert_transaction_included(
+        &mut self,
+        tx_hash: H256,
+        tx_included: &TransactionIncluded,
+        diff: &Diff,
+    ) -> Result<(), error::Error> {
+        let batch = rocksdb::WriteBatch::default();
+        self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, _value| batch.delete(key))
+    }
+
+    fn process_transaction<F: Fn(&mut rocksdb::WriteBatch, &[u8], &[u8])>(
+        &mut self,
+        tx_hash: H256,
+        tx_included: &TransactionIncluded,
+        diff: &Diff,
+        mut batch: rocksdb::WriteBatch,
+        action: F,
+    ) -> Result<(), error::Error> {
         let tx_included_bytes = tx_included.to_bytes();
         let block_height = self.get_block_height_by_hash(tx_included.block_hash)?;
 
-        let mut batch = rocksdb::WriteBatch::default();
-
         let storage_key = construct_storage_key(StoragePrefix::TransactionHash, &tx_included_bytes);
-        batch.put(storage_key, tx_hash);
+        action(&mut batch, &storage_key, tx_hash.as_ref());
 
         let storage_key =
             construct_storage_key(StoragePrefix::TransactionPosition, tx_hash.as_ref());
-        batch.put(storage_key, tx_included_bytes);
+        action(&mut batch, &storage_key, &tx_included_bytes);
 
         let storage_key = construct_storage_key(StoragePrefix::Diff, &tx_included_bytes);
-        batch.put(storage_key, diff.try_to_bytes().unwrap());
+        let diff_bytes = diff.try_to_bytes().unwrap();
+        action(&mut batch, &storage_key, &diff_bytes);
 
         for (key, value) in diff.iter() {
             let storage_key = construct_engine_key(key, block_height, tx_included.position);
-            batch.put(storage_key, value.try_to_bytes().unwrap());
+            let value_bytes = value.try_to_bytes().unwrap();
+            action(&mut batch, &storage_key, &value_bytes);
         }
 
         self.db.write(batch).map_err(Into::into)
+    }
+
+    /// Returns a list of transactions that modified the key, and the values _after_ each transaction.
+    pub fn track_engine_key(&self, engine_key: &[u8]) -> Result<Vec<(u64, H256, DiffValue)>, error::Error> {
+        let db_key_prefix = construct_storage_key(StoragePrefix::Engine, engine_key);
+        let n = db_key_prefix.len();
+        let iter = self.db.prefix_iterator(&db_key_prefix);
+        let mut result = Vec::with_capacity(100);
+        for (k, v) in iter {
+            if &k[0..n] != &db_key_prefix {
+                break;
+            }
+            let value = DiffValue::try_from_bytes(v.as_ref()).unwrap();
+            let block_height = {
+                let mut buf = [0u8; 8];
+                buf.copy_from_slice(&k[n..(n+8)]);
+                u64::from_be_bytes(buf)
+            };
+            let transaction_position = {
+                let mut buf = [0u8; 2];
+                buf.copy_from_slice(&k[(n+8)..(n+10)]);
+                u16::from_be_bytes(buf)
+            };
+            let block_hash = self.get_block_hash_by_height(block_height).unwrap_or_default();
+            let tx_included = TransactionIncluded {
+                block_hash,
+                position: transaction_position,
+            };
+            let tx_hash = self.get_transaction_by_position(tx_included).unwrap_or_default();
+            result.push((block_height, tx_hash, value))
+        }
+        Ok(result)
     }
 
     /// Construct a snapshot of the Engine post-state at the given block height.
