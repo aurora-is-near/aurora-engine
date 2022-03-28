@@ -154,7 +154,9 @@ impl Storage {
         diff: &Diff,
     ) -> Result<(), error::Error> {
         let batch = rocksdb::WriteBatch::default();
-        self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, value| batch.put(key, value))
+        self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, value| {
+            batch.put(key, value)
+        })
     }
 
     pub fn revert_transaction_included(
@@ -164,7 +166,9 @@ impl Storage {
         diff: &Diff,
     ) -> Result<(), error::Error> {
         let batch = rocksdb::WriteBatch::default();
-        self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, _value| batch.delete(key))
+        self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, _value| {
+            batch.delete(key)
+        })
     }
 
     fn process_transaction<F: Fn(&mut rocksdb::WriteBatch, &[u8], &[u8])>(
@@ -199,7 +203,10 @@ impl Storage {
     }
 
     /// Returns a list of transactions that modified the key, and the values _after_ each transaction.
-    pub fn track_engine_key(&self, engine_key: &[u8]) -> Result<Vec<(u64, H256, DiffValue)>, error::Error> {
+    pub fn track_engine_key(
+        &self,
+        engine_key: &[u8],
+    ) -> Result<Vec<(u64, H256, DiffValue)>, error::Error> {
         let db_key_prefix = construct_storage_key(StoragePrefix::Engine, engine_key);
         let n = db_key_prefix.len();
         let iter = self.db.prefix_iterator(&db_key_prefix);
@@ -211,20 +218,24 @@ impl Storage {
             let value = DiffValue::try_from_bytes(v.as_ref()).unwrap();
             let block_height = {
                 let mut buf = [0u8; 8];
-                buf.copy_from_slice(&k[n..(n+8)]);
+                buf.copy_from_slice(&k[n..(n + 8)]);
                 u64::from_be_bytes(buf)
             };
             let transaction_position = {
                 let mut buf = [0u8; 2];
-                buf.copy_from_slice(&k[(n+8)..(n+10)]);
+                buf.copy_from_slice(&k[(n + 8)..(n + 10)]);
                 u16::from_be_bytes(buf)
             };
-            let block_hash = self.get_block_hash_by_height(block_height).unwrap_or_default();
+            let block_hash = self
+                .get_block_hash_by_height(block_height)
+                .unwrap_or_default();
             let tx_included = TransactionIncluded {
                 block_hash,
                 position: transaction_position,
             };
-            let tx_hash = self.get_transaction_by_position(tx_included).unwrap_or_default();
+            let tx_hash = self
+                .get_transaction_by_position(tx_included)
+                .unwrap_or_default();
             result.push((block_height, tx_hash, value))
         }
         Ok(result)
@@ -232,7 +243,10 @@ impl Storage {
 
     /// Construct a snapshot of the Engine post-state at the given block height.
     /// I.e. get the state of the Engine after all transactions in that block have been applied.
-    pub fn get_snapshot(&self, block_height: u64) -> Result<HashMap<Vec<u8>, Vec<u8>>, rocksdb::Error> {
+    pub fn get_snapshot(
+        &self,
+        block_height: u64,
+    ) -> Result<HashMap<Vec<u8>, Vec<u8>>, rocksdb::Error> {
         let engine_prefix = construct_storage_key(StoragePrefix::Engine, &[]);
         let mut iter: rocksdb::DBRawIterator = self.db.prefix_iterator(&engine_prefix).into();
         let mut result = HashMap::new();
@@ -248,10 +262,10 @@ impl Storage {
             // the key we want is the last key for this block, or the key immediately before it
             let desired_db_key = construct_engine_key(engine_key, block_height, u16::MAX);
             iter.seek_for_prev(&desired_db_key);
-            
+
             let value = if iter.valid() {
                 let bytes = iter.value().unwrap();
-                diff::DiffValue::try_from_bytes(bytes).unwrap_or_else(|e|{
+                diff::DiffValue::try_from_bytes(bytes).unwrap_or_else(|e| {
                     panic!(
                         "Could not deserialize key={} value={} error={:?}",
                         base64::encode(&db_key),
@@ -271,7 +285,7 @@ impl Storage {
             let key = construct_engine_key(engine_key, u64::MAX, u16::MAX);
             iter.seek(&key);
         }
-        
+
         iter.status()?;
 
         Ok(result)
