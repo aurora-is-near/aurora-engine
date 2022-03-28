@@ -212,7 +212,7 @@ impl Storage {
         let iter = self.db.prefix_iterator(&db_key_prefix);
         let mut result = Vec::with_capacity(100);
         for (k, v) in iter {
-            if &k[0..n] != &db_key_prefix {
+            if k[0..n] != db_key_prefix {
                 break;
             }
             let value = DiffValue::try_from_bytes(v.as_ref()).unwrap();
@@ -248,42 +248,62 @@ impl Storage {
         block_height: u64,
     ) -> Result<HashMap<Vec<u8>, Vec<u8>>, rocksdb::Error> {
         let engine_prefix = construct_storage_key(StoragePrefix::Engine, &[]);
+        let engine_prefix_len = engine_prefix.len();
         let mut iter: rocksdb::DBRawIterator = self.db.prefix_iterator(&engine_prefix).into();
         let mut result = HashMap::new();
 
         while iter.valid() {
             // unwrap is safe because the iterator is valid
             let db_key = iter.key().unwrap().to_vec();
-            if &db_key[0..engine_prefix.len()] != &engine_prefix {
+            if db_key[0..engine_prefix_len] != engine_prefix {
                 break;
             }
             // raw engine key skips the 2-byte prefix and the block+position suffix
-            let engine_key = &db_key[2..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)];
-            // the key we want is the last key for this block, or the key immediately before it
-            let desired_db_key = construct_engine_key(engine_key, block_height, u16::MAX);
-            iter.seek_for_prev(&desired_db_key);
-
-            let value = if iter.valid() {
-                let bytes = iter.value().unwrap();
-                diff::DiffValue::try_from_bytes(bytes).unwrap_or_else(|e| {
-                    panic!(
-                        "Could not deserialize key={} value={} error={:?}",
-                        base64::encode(&db_key),
-                        base64::encode(bytes),
-                        e,
-                    )
-                })
-            } else {
-                break;
+            let engine_key = &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)];
+            let key_block_height = {
+                let n = engine_prefix_len + engine_key.len();
+                let mut buf = [0u8; 8];
+                buf.copy_from_slice(&db_key[n..(n + 8)]);
+                u64::from_be_bytes(buf)
             };
-            // only put it values that are still present (i.e. ignore deleted keys)
-            if let Some(bytes) = value.take_value() {
-                result.insert(engine_key.to_vec(), bytes);
+            // If the key was created after the block height we want then we can skip it
+            if key_block_height <= block_height {
+                // the key we want is the last key for this block, or the key immediately before it
+                let desired_db_key = construct_engine_key(engine_key, block_height, u16::MAX);
+                iter.seek_for_prev(&desired_db_key);
+
+                let value = if iter.valid() {
+                    let bytes = iter.value().unwrap();
+                    diff::DiffValue::try_from_bytes(bytes).unwrap_or_else(|e| {
+                        panic!(
+                            "Could not deserialize key={} value={} error={:?}",
+                            base64::encode(&db_key),
+                            base64::encode(bytes),
+                            e,
+                        )
+                    })
+                } else {
+                    break;
+                };
+                // only put it values that are still present (i.e. ignore deleted keys)
+                if let Some(bytes) = value.take_value() {
+                    result.insert(engine_key.to_vec(), bytes);
+                }
             }
 
-            // move to the next db key, which is after all the blocks for this engine key
-            let key = construct_engine_key(engine_key, u64::MAX, u16::MAX);
-            iter.seek(&key);
+            // move to the next key by skipping all other DB keys corresponding to the same engine key
+            while iter.valid()
+                && iter
+                    .key()
+                    .map(|db_key| {
+                        db_key[0..engine_prefix_len] == engine_prefix
+                            && &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)]
+                                == engine_key
+                    })
+                    .unwrap_or(false)
+            {
+                iter.next();
+            }
         }
 
         iter.status()?;
