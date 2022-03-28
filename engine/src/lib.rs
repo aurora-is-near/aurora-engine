@@ -418,7 +418,7 @@ mod contract {
                 }
                 // ETH exit; transfer ETH back from precompile address
                 None => {
-                    let exit_address = aurora_engine_precompiles::native::ExitToNear::ADDRESS;
+                    let exit_address = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
                     let mut engine =
                         Engine::new(exit_address, current_account_id, io, &io).sdk_unwrap();
                     let refund_address = args.recipient_address;
