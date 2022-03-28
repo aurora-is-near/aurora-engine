@@ -212,7 +212,7 @@ impl Storage {
         let iter = self.db.prefix_iterator(&db_key_prefix);
         let mut result = Vec::with_capacity(100);
         for (k, v) in iter {
-            if k[0..n] != db_key_prefix {
+            if k.len() < n || k[0..n] != db_key_prefix {
                 break;
             }
             let value = DiffValue::try_from_bytes(v.as_ref()).unwrap();
