@@ -347,4 +347,6 @@ fn test_track_key() {
         assert_eq!(balance, expected_balance);
         expected_balance = expected_balance - transfer_amount;
     }
+
+    runner.close();
 }

@@ -1,6 +1,6 @@
 use aurora_engine::{connector, engine, parameters::SubmitResult};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
-use aurora_engine_types::types::Yocto;
+use aurora_engine_types::{parameters::PromiseWithCallbackArgs, types::Yocto};
 
 pub mod types;
 
@@ -72,7 +72,7 @@ pub fn consume_message(
                         &mut handler,
                     );
 
-                    (tx_hash, Some(result))
+                    (tx_hash, Some(TransactionExecutionResult::Submit(result)))
                 }
 
                 TransactionKind::Call(args) => {
@@ -83,7 +83,10 @@ pub fn consume_message(
 
                     let result = engine.call_with_args(args, &mut handler);
 
-                    (near_receipt_id, Some(result))
+                    (
+                        near_receipt_id,
+                        Some(TransactionExecutionResult::Submit(result)),
+                    )
                 }
 
                 TransactionKind::Deploy(input) => {
@@ -94,7 +97,10 @@ pub fn consume_message(
 
                     let result = engine.deploy_code_with_input(input, &mut handler);
 
-                    (near_receipt_id, Some(result))
+                    (
+                        near_receipt_id,
+                        Some(TransactionExecutionResult::Submit(result)),
+                    )
                 }
 
                 TransactionKind::DeployErc20(args) => {
@@ -128,17 +134,17 @@ pub fn consume_message(
 
                 TransactionKind::FtTransferCall(args) => {
                     let mut connector = connector::EthConnectorContract::init_instance(io);
-                    let _promise_args = connector.ft_transfer_call(
+                    let promise_args = connector.ft_transfer_call(
                         env.predecessor_account_id.clone(),
                         env.current_account_id.clone(),
                         args,
                         env.prepaid_gas,
                     )?;
-                    // We do not need to do anything with the returned promise args in the standalone engine.
-                    // They would have resulted in new receipts being created on-chain, but here we will simply be passed
-                    // those receipts as part of the indexer stream.
 
-                    (near_receipt_id, None)
+                    (
+                        near_receipt_id,
+                        Some(TransactionExecutionResult::Promise(promise_args)),
+                    )
                 }
 
                 TransactionKind::ResolveTransfer(args, promise_result) => {
@@ -168,29 +174,31 @@ pub fn consume_message(
 
                 TransactionKind::Deposit(raw_proof) => {
                     let connector_contract = connector::EthConnectorContract::init_instance(io);
-                    let _promise_args = connector_contract.deposit(
+                    let promise_args = connector_contract.deposit(
                         raw_proof,
                         env.current_account_id(),
                         env.predecessor_account_id(),
                     )?;
-                    // We do not need to do anything with returned promise args.
-                    // See comment on TransactionKind::FtTransferCall for details.
 
-                    (near_receipt_id, None)
+                    (
+                        near_receipt_id,
+                        Some(TransactionExecutionResult::Promise(promise_args)),
+                    )
                 }
 
                 TransactionKind::FinishDeposit(finish_args) => {
                     let mut connector = connector::EthConnectorContract::init_instance(io);
-                    let _maybe_promise_args = connector.finish_deposit(
+                    let maybe_promise_args = connector.finish_deposit(
                         env.predecessor_account_id(),
                         env.current_account_id(),
                         finish_args,
                         env.prepaid_gas,
                     )?;
-                    // We do not need to do anything with returned promise args (if any).
-                    // See comment on TransactionKind::FtTransferCall for details.
 
-                    (near_receipt_id, None)
+                    (
+                        near_receipt_id,
+                        maybe_promise_args.map(TransactionExecutionResult::Promise),
+                    )
                 }
 
                 TransactionKind::StorageDeposit(args) => {
@@ -267,10 +275,8 @@ pub fn consume_message(
                 position: transaction_position,
             };
             match &result {
-                None | Some(Ok(_)) => {
-                    storage.set_transaction_included(tx_hash, &tx_included, &diff)?
-                }
-                Some(Err(_)) => (), // do not persist if Engine encounters an error
+                Some(TransactionExecutionResult::Submit(Err(_))) => (), // do not persist if Engine encounters an error
+                _ => storage.set_transaction_included(tx_hash, &tx_included, &diff)?,
             }
 
             let outcome = TransactionIncludedOutcome {
@@ -279,22 +285,32 @@ pub fn consume_message(
                 diff,
                 maybe_result: result,
             };
-            Ok(ConsumeMessageOutcome::TransactionIncluded(outcome))
+            Ok(ConsumeMessageOutcome::TransactionIncluded(Box::new(
+                outcome,
+            )))
         }
     }
 }
 
+#[derive(Debug)]
 pub enum ConsumeMessageOutcome {
     BlockAdded,
     FailedTransactionIgnored,
-    TransactionIncluded(TransactionIncludedOutcome),
+    TransactionIncluded(Box<TransactionIncludedOutcome>),
 }
 
+#[derive(Debug)]
 pub struct TransactionIncludedOutcome {
     pub hash: aurora_engine_types::H256,
     pub info: crate::TransactionIncluded,
     pub diff: crate::Diff,
-    pub maybe_result: Option<engine::EngineResult<SubmitResult>>,
+    pub maybe_result: Option<TransactionExecutionResult>,
+}
+
+#[derive(Debug)]
+pub enum TransactionExecutionResult {
+    Submit(engine::EngineResult<SubmitResult>),
+    Promise(PromiseWithCallbackArgs),
 }
 
 pub mod error {
