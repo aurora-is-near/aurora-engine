@@ -242,14 +242,20 @@ pub fn consume_message(
                 }
 
                 TransactionKind::RefundOnError(maybe_args) => {
-                    if let Some(_args) = maybe_args {
-                        // TODO: Need to factor the main logic out of engine/src/lib.rs
-                        // Not super urgent since this function cannot even be called presently
-                        // (the exit precompiles have not been upgraded to use the callback)
-                        todo!();
-                    }
+                    let result: Result<
+                        Option<TransactionExecutionResult>,
+                        engine::EngineStateError,
+                    > = maybe_args
+                        .map(|args| {
+                            let mut handler = crate::promise::Noop;
+                            let engine_state = engine::get_state(&io)?;
+                            let result =
+                                engine::refund_on_error(io, &env, engine_state, args, &mut handler);
+                            Ok(TransactionExecutionResult::Submit(result))
+                        })
+                        .transpose();
 
-                    (near_receipt_id, None)
+                    (near_receipt_id, result?)
                 }
 
                 TransactionKind::SetConnectorData(args) => {
