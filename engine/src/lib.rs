@@ -90,7 +90,7 @@ mod contract {
     };
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
-    use aurora_engine_sdk::near_runtime::Runtime;
+    use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
 
     #[cfg(feature = "integration-test")]
@@ -402,9 +402,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn view() {
         let mut io = Runtime;
+        let env = ViewEnv;
         let args: ViewCallArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
-        let engine = Engine::new(args.sender, current_account_id, io, &io).sdk_unwrap();
+        let engine = Engine::new(args.sender, current_account_id, io, &env).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args).sdk_unwrap();
         io.return_output(&result.try_to_vec().sdk_expect("ERR_SERIALIZE"));
     }

@@ -41,6 +41,14 @@ fn test_account_id_precompiles() {
         .unwrap();
     assert_eq!(unwrap_ethabi_string(&result), "some-account.near");
 
+    // confirm the precompile works in view calls too
+    let tx = contract.call_method_without_args("predecessorAccountId", 0.into());
+    let sender = test_utils::address_from_secret_key(&signer.secret_key);
+    let result = runner
+        .view_call(test_utils::as_view_call(tx, sender))
+        .unwrap();
+    assert!(result.is_ok());
+
     // double check the case where account_id is the full 64 bytes
     let account_id = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
     assert_eq!(account_id.len(), 64);
