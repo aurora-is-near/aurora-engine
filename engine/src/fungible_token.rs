@@ -57,7 +57,7 @@ pub struct FungibleTokenOps<I: IO> {
 
 /// Fungible token Reference hash type.
 /// Used for FungibleTokenMetadata
-#[derive(BorshDeserialize, BorshSerialize, Clone)]
+#[derive(Debug, BorshDeserialize, BorshSerialize, Clone)]
 pub struct FungibleReferenceHash([u8; 32]);
 
 impl FungibleReferenceHash {
@@ -73,7 +73,7 @@ impl AsRef<[u8]> for FungibleReferenceHash {
     }
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Clone)]
+#[derive(Debug, BorshDeserialize, BorshSerialize, Clone)]
 pub struct FungibleTokenMetadata {
     pub spec: String,
     pub name: String,

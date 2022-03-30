@@ -236,9 +236,12 @@ impl<I: IO> Precompile for ExitToNear<I> {
         is_static: bool,
     ) -> EvmPrecompileResult {
         #[cfg(feature = "error_refund")]
-        fn parse_input(input: &[u8]) -> (Address, &[u8]) {
-            let refund_address = Address::from_array(&input[1..21]);
-            (refund_address, &input[21..])
+        fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
+            if input.len() < 21 {
+                return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));
+            }
+            let refund_address = Address::try_from_slice(&input[1..21]).unwrap();
+            Ok((refund_address, &input[21..]))
         }
         #[cfg(not(feature = "error_refund"))]
         fn parse_input(input: &[u8]) -> &[u8] {
@@ -263,7 +266,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
         //      0x1 -> Erc20 transfer
         let flag = input[0];
         #[cfg(feature = "error_refund")]
-        let (refund_address, mut input) = parse_input(input);
+        let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input);
         let current_account_id = self.current_account_id.clone();

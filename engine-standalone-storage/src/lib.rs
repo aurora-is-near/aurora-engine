@@ -2,6 +2,7 @@ use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::H256;
 use rocksdb::DB;
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::path::Path;
 
 const VERSION: u8 = 0;
@@ -15,8 +16,13 @@ pub mod relayer_db;
 /// Functions for receiving new blocks and transactions to keep the storage up to date.
 pub mod sync;
 
-pub use diff::Diff;
+pub use diff::{Diff, DiffValue};
 pub use error::Error;
+
+/// Length (in bytes) of the suffix appended to Engine keys which specify the
+/// block height and transaction position. 64 bits for the block height,
+/// 16 bits for the transaction position.
+const ENGINE_KEY_SUFFIX_LEN: usize = (64 / 8) + (16 / 8);
 
 #[repr(u8)]
 pub enum StoragePrefix {
@@ -147,27 +153,162 @@ impl Storage {
         tx_included: &TransactionIncluded,
         diff: &Diff,
     ) -> Result<(), error::Error> {
+        let batch = rocksdb::WriteBatch::default();
+        self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, value| {
+            batch.put(key, value)
+        })
+    }
+
+    pub fn revert_transaction_included(
+        &mut self,
+        tx_hash: H256,
+        tx_included: &TransactionIncluded,
+        diff: &Diff,
+    ) -> Result<(), error::Error> {
+        let batch = rocksdb::WriteBatch::default();
+        self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, _value| {
+            batch.delete(key)
+        })
+    }
+
+    fn process_transaction<F: Fn(&mut rocksdb::WriteBatch, &[u8], &[u8])>(
+        &mut self,
+        tx_hash: H256,
+        tx_included: &TransactionIncluded,
+        diff: &Diff,
+        mut batch: rocksdb::WriteBatch,
+        action: F,
+    ) -> Result<(), error::Error> {
         let tx_included_bytes = tx_included.to_bytes();
         let block_height = self.get_block_height_by_hash(tx_included.block_hash)?;
 
-        let mut batch = rocksdb::WriteBatch::default();
-
         let storage_key = construct_storage_key(StoragePrefix::TransactionHash, &tx_included_bytes);
-        batch.put(storage_key, tx_hash);
+        action(&mut batch, &storage_key, tx_hash.as_ref());
 
         let storage_key =
             construct_storage_key(StoragePrefix::TransactionPosition, tx_hash.as_ref());
-        batch.put(storage_key, tx_included_bytes);
+        action(&mut batch, &storage_key, &tx_included_bytes);
 
         let storage_key = construct_storage_key(StoragePrefix::Diff, &tx_included_bytes);
-        batch.put(storage_key, diff.try_to_bytes().unwrap());
+        let diff_bytes = diff.try_to_bytes().unwrap();
+        action(&mut batch, &storage_key, &diff_bytes);
 
         for (key, value) in diff.iter() {
             let storage_key = construct_engine_key(key, block_height, tx_included.position);
-            batch.put(storage_key, value.try_to_bytes().unwrap());
+            let value_bytes = value.try_to_bytes().unwrap();
+            action(&mut batch, &storage_key, &value_bytes);
         }
 
         self.db.write(batch).map_err(Into::into)
+    }
+
+    /// Returns a list of transactions that modified the key, and the values _after_ each transaction.
+    pub fn track_engine_key(
+        &self,
+        engine_key: &[u8],
+    ) -> Result<Vec<(u64, H256, DiffValue)>, error::Error> {
+        let db_key_prefix = construct_storage_key(StoragePrefix::Engine, engine_key);
+        let n = db_key_prefix.len();
+        let iter = self.db.prefix_iterator(&db_key_prefix);
+        let mut result = Vec::with_capacity(100);
+        for (k, v) in iter {
+            if k.len() < n || k[0..n] != db_key_prefix {
+                break;
+            }
+            let value = DiffValue::try_from_bytes(v.as_ref()).unwrap();
+            let block_height = {
+                let mut buf = [0u8; 8];
+                buf.copy_from_slice(&k[n..(n + 8)]);
+                u64::from_be_bytes(buf)
+            };
+            let transaction_position = {
+                let mut buf = [0u8; 2];
+                buf.copy_from_slice(&k[(n + 8)..(n + 10)]);
+                u16::from_be_bytes(buf)
+            };
+            let block_hash = self
+                .get_block_hash_by_height(block_height)
+                .unwrap_or_default();
+            let tx_included = TransactionIncluded {
+                block_hash,
+                position: transaction_position,
+            };
+            let tx_hash = self
+                .get_transaction_by_position(tx_included)
+                .unwrap_or_default();
+            result.push((block_height, tx_hash, value))
+        }
+        Ok(result)
+    }
+
+    /// Construct a snapshot of the Engine post-state at the given block height.
+    /// I.e. get the state of the Engine after all transactions in that block have been applied.
+    pub fn get_snapshot(
+        &self,
+        block_height: u64,
+    ) -> Result<HashMap<Vec<u8>, Vec<u8>>, rocksdb::Error> {
+        let engine_prefix = construct_storage_key(StoragePrefix::Engine, &[]);
+        let engine_prefix_len = engine_prefix.len();
+        let mut iter: rocksdb::DBRawIterator = self.db.prefix_iterator(&engine_prefix).into();
+        let mut result = HashMap::new();
+
+        while iter.valid() {
+            // unwrap is safe because the iterator is valid
+            let db_key = iter.key().unwrap().to_vec();
+            if db_key[0..engine_prefix_len] != engine_prefix {
+                break;
+            }
+            // raw engine key skips the 2-byte prefix and the block+position suffix
+            let engine_key = &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)];
+            let key_block_height = {
+                let n = engine_prefix_len + engine_key.len();
+                let mut buf = [0u8; 8];
+                buf.copy_from_slice(&db_key[n..(n + 8)]);
+                u64::from_be_bytes(buf)
+            };
+            // If the key was created after the block height we want then we can skip it
+            if key_block_height <= block_height {
+                // the key we want is the last key for this block, or the key immediately before it
+                let desired_db_key = construct_engine_key(engine_key, block_height, u16::MAX);
+                iter.seek_for_prev(&desired_db_key);
+
+                let value = if iter.valid() {
+                    let bytes = iter.value().unwrap();
+                    diff::DiffValue::try_from_bytes(bytes).unwrap_or_else(|e| {
+                        panic!(
+                            "Could not deserialize key={} value={} error={:?}",
+                            base64::encode(&db_key),
+                            base64::encode(bytes),
+                            e,
+                        )
+                    })
+                } else {
+                    break;
+                };
+                // only put it values that are still present (i.e. ignore deleted keys)
+                if let Some(bytes) = value.take_value() {
+                    result.insert(engine_key.to_vec(), bytes);
+                }
+            }
+
+            // move to the next key by skipping all other DB keys corresponding to the same engine key
+            while iter.valid()
+                && iter
+                    .key()
+                    .map(|db_key| {
+                        db_key[0..engine_prefix_len] == engine_prefix
+                            && &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)]
+                                == engine_key
+                    })
+                    .unwrap_or(false)
+            {
+                iter.next();
+            }
+        }
+
+        iter.status()?;
+
+        Ok(result)
     }
 
     /// Get an object which represents the state of the engine at the given block hash,

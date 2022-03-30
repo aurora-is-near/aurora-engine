@@ -2,7 +2,7 @@ use aurora_engine::deposit_event::TokenMessageData;
 use aurora_engine_sdk::env::{Env, Timestamp};
 use aurora_engine_types::types::{Address, Balance, Fee, NEP141Wei, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 use engine_standalone_storage::sync;
 
 use crate::test_utils::{self, standalone::StandaloneRunner};
@@ -46,13 +46,76 @@ fn test_consume_deposit_message() {
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
-        near_tx_hash: H256([7u8; 32]),
+        near_receipt_id: H256([0x11; 32]),
         position: 0,
         succeeded: true,
         signer: runner.env.signer_account_id(),
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: sync::types::TransactionKind::Deposit(proof.try_to_vec().unwrap()),
+    };
+
+    let outcome = sync::consume_message(
+        &mut runner.storage,
+        sync::types::Message::Transaction(Box::new(transaction_message)),
+    )
+    .unwrap();
+    let outcome = match outcome {
+        sync::ConsumeMessageOutcome::TransactionIncluded(outcome) => outcome,
+        other => panic!("Unexpected outcome {:?}", other),
+    };
+
+    let finish_deposit_args = match outcome.maybe_result.unwrap() {
+        sync::TransactionExecutionResult::Promise(promise_args) => {
+            let bytes = promise_args.callback.args;
+            aurora_engine::parameters::FinishDepositCallArgs::try_from_slice(&bytes).unwrap()
+        }
+        other => panic!("Unexpected result {:?}", other),
+    };
+    // Now executing aurora callbacks, so predecessor_account_id = current_account_id
+    runner.env.predecessor_account_id = runner.env.current_account_id.clone();
+
+    let transaction_message = sync::types::TransactionMessage {
+        block_hash: block_message.hash,
+        near_receipt_id: H256([0x22; 32]),
+        position: 1,
+        succeeded: true,
+        signer: runner.env.signer_account_id(),
+        caller: runner.env.predecessor_account_id(),
+        attached_near: 0,
+        transaction: sync::types::TransactionKind::FinishDeposit(finish_deposit_args),
+    };
+
+    let outcome = sync::consume_message(
+        &mut runner.storage,
+        sync::types::Message::Transaction(Box::new(transaction_message)),
+    )
+    .unwrap();
+    let outcome = match outcome {
+        sync::ConsumeMessageOutcome::TransactionIncluded(outcome) => outcome,
+        other => panic!("Unexpected outcome {:?}", other),
+    };
+
+    let ft_on_transfer_args = match outcome.maybe_result.unwrap() {
+        sync::TransactionExecutionResult::Promise(promise_args) => {
+            let bytes = promise_args.base.args;
+            let json = aurora_engine::json::parse_json(&bytes).unwrap();
+            aurora_engine::parameters::NEP141FtOnTransferArgs::try_from(json)
+                .ok()
+                .unwrap()
+        }
+        other => panic!("Unexpected result {:?}", other),
+    };
+
+    let transaction_message = sync::types::TransactionMessage {
+        block_hash: block_message.hash,
+        near_receipt_id: H256([0x33; 32]),
+        position: 2,
+        succeeded: true,
+        signer: runner.env.signer_account_id(),
+        caller: runner.env.predecessor_account_id(),
+        attached_near: 0,
+        transaction: sync::types::TransactionKind::FtOnTransfer(ft_on_transfer_args),
     };
 
     sync::consume_message(
@@ -75,7 +138,7 @@ fn test_consume_deploy_message() {
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
-        near_tx_hash: H256([7u8; 32]),
+        near_receipt_id: H256([8u8; 32]),
         position: 0,
         succeeded: true,
         signer: runner.env.signer_account_id(),
@@ -126,7 +189,7 @@ fn test_consume_deploy_erc20_message() {
     };
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
-        near_tx_hash: H256([7u8; 32]),
+        near_receipt_id: H256([8u8; 32]),
         position: 0,
         succeeded: true,
         signer: runner.env.signer_account_id(),
@@ -160,7 +223,7 @@ fn test_consume_deploy_erc20_message() {
     };
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
-        near_tx_hash: H256([8u8; 32]),
+        near_receipt_id: H256([8u8; 32]),
         position: 0,
         succeeded: true,
         signer: runner.env.signer_account_id(),
@@ -216,7 +279,7 @@ fn test_consume_ft_on_transfer_message() {
     };
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
-        near_tx_hash: H256([7u8; 32]),
+        near_receipt_id: H256([8u8; 32]),
         position: 0,
         succeeded: true,
         signer: runner.env.signer_account_id(),
@@ -256,7 +319,7 @@ fn test_consume_call_message() {
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
-        near_tx_hash: H256([7u8; 32]),
+        near_receipt_id: H256([8u8; 32]),
         position: 0,
         succeeded: true,
         signer: runner.env.signer_account_id(),
@@ -308,7 +371,7 @@ fn test_consume_submit_message() {
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
-        near_tx_hash: H256([7u8; 32]),
+        near_receipt_id: H256([8u8; 32]),
         position: 0,
         succeeded: true,
         signer: runner.env.signer_account_id(),

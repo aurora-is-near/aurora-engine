@@ -47,7 +47,7 @@ pub(crate) mod standard_precompiles;
 pub(crate) mod uniswap;
 pub(crate) mod weth;
 
-pub(crate) struct Signer {
+pub struct Signer {
     pub nonce: u64,
     pub secret_key: SecretKey,
 }
