@@ -291,3 +291,62 @@ fn test_transaction_index() {
     drop(storage);
     temp_dir.close().unwrap();
 }
+
+#[test]
+fn test_track_key() {
+    // Set up the test
+    let mut signer = Signer::random();
+    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let initial_balance = Wei::new_u64(1000);
+    let transfer_amount = Wei::new_u64(37);
+    let dest1 = Address::from_array([0x11; 20]);
+    let dest2 = Address::from_array([0x22; 20]);
+    let mut runner = test_utils::standalone::StandaloneRunner::default();
+
+    runner.init_evm();
+    runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);
+    let created_block_height = runner.env.block_height;
+
+    let result = runner
+        .transfer_with_signer(&mut signer, transfer_amount, dest1)
+        .unwrap();
+    assert!(result.status.is_ok());
+    let result = runner
+        .transfer_with_signer(&mut signer, transfer_amount, dest2)
+        .unwrap();
+    assert!(result.status.is_ok());
+
+    // The balance key for the signer will have changed 3 times:
+    // 1. Account minted
+    // 2. Transfer to dest1
+    // 3. Transfer to dest2
+    let balance_key = aurora_engine_types::storage::address_to_key(
+        aurora_engine_types::storage::KeyPrefix::Balance,
+        &signer_address,
+    );
+    let trace = runner.storage.track_engine_key(&balance_key).unwrap();
+    let mut expected_balance = initial_balance;
+    for (i, (block_height, tx_hash, value)) in trace.into_iter().enumerate() {
+        let i = i as u64;
+        assert_eq!(block_height, created_block_height + i);
+        let transaction_included = engine_standalone_storage::TransactionIncluded {
+            block_hash: runner
+                .storage
+                .get_block_hash_by_height(block_height)
+                .unwrap(),
+            position: 0,
+        };
+        assert_eq!(
+            tx_hash,
+            runner
+                .storage
+                .get_transaction_by_position(transaction_included)
+                .unwrap()
+        );
+        let balance = Wei::new(U256::from_big_endian(value.value().unwrap()));
+        assert_eq!(balance, expected_balance);
+        expected_balance = expected_balance - transfer_amount;
+    }
+
+    runner.close();
+}

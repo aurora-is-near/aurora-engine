@@ -12,6 +12,7 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
+use crate::prelude::parameters::RefundCallArgs;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
@@ -994,6 +995,63 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     // return result to user
     result
+}
+
+pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
+    io: I,
+    env: &E,
+    state: EngineState,
+    args: RefundCallArgs,
+    handler: &mut P,
+) -> EngineResult<SubmitResult> {
+    let current_account_id = env.current_account_id();
+    match args.erc20_address {
+        // ERC-20 exit; re-mint burned tokens
+        Some(erc20_address) => {
+            let erc20_admin_address = current_address(&current_account_id);
+            let mut engine =
+                Engine::new_with_state(state, erc20_admin_address, current_account_id, io, env);
+            let erc20_address = erc20_address;
+            let refund_address = args.recipient_address;
+            let amount = U256::from_big_endian(&args.amount);
+
+            let selector = ERC20_MINT_SELECTOR;
+            let mint_args = ethabi::encode(&[
+                ethabi::Token::Address(refund_address.raw()),
+                ethabi::Token::Uint(amount),
+            ]);
+
+            engine.call(
+                &erc20_admin_address,
+                &erc20_address,
+                Wei::zero(),
+                [selector, mint_args.as_slice()].concat(),
+                u64::MAX,
+                Vec::new(),
+                handler,
+            )
+        }
+        // ETH exit; transfer ETH back from precompile address
+        None => {
+            let exit_address = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
+            let mut engine =
+                Engine::new_with_state(state, exit_address, current_account_id, io, env);
+            let refund_address = args.recipient_address;
+            let amount = Wei::new(U256::from_big_endian(&args.amount));
+            engine.call(
+                &exit_address,
+                &refund_address,
+                amount,
+                Vec::new(),
+                u64::MAX,
+                vec![
+                    (exit_address.raw(), Vec::new()),
+                    (refund_address.raw(), Vec::new()),
+                ],
+                handler,
+            )
+        }
+    }
 }
 
 /// There is one Aurora block per NEAR block height (note: when heights in NEAR are skipped

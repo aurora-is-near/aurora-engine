@@ -40,7 +40,7 @@ pub struct MetaCallArgs {
 }
 
 /// Borsh-encoded log for use in a `SubmitResult`.
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct ResultLog {
     pub address: Address,
     pub topics: Vec<RawU256>,
@@ -105,7 +105,7 @@ impl AsRef<[u8]> for TransactionStatus {
 
 /// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
 /// and `deploy_with_input` methods.
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SubmitResult {
     version: u8,
     pub status: TransactionStatus,
@@ -311,7 +311,7 @@ impl StorageBalance {
 }
 
 /// ft_resolve_transfer eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ResolveTransferCallArgs {
     pub sender_id: AccountId,
     pub amount: NEP141Wei,
@@ -319,7 +319,7 @@ pub struct ResolveTransferCallArgs {
 }
 
 /// Finish deposit NEAR eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct FinishDepositCallArgs {
     pub new_owner_id: AccountId,
     pub amount: NEP141Wei,
@@ -347,7 +347,7 @@ pub struct FinishDepositEthCallArgs {
 }
 
 /// Eth-connector initial args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct InitCallArgs {
     pub prover_account: AccountId,
     pub eth_custodian_address: String,
@@ -358,7 +358,7 @@ pub struct InitCallArgs {
 pub type SetContractDataCallArgs = InitCallArgs;
 
 /// transfer eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct TransferCallCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
@@ -399,7 +399,7 @@ impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
 }
 
 /// storage_deposit eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct StorageDepositCallArgs {
     pub account_id: Option<AccountId>,
     pub registration_only: Option<bool>,
@@ -417,7 +417,7 @@ impl From<JsonValue> for StorageDepositCallArgs {
 }
 
 /// storage_withdraw eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct StorageWithdrawCallArgs {
     pub amount: Option<Yocto>,
 }
@@ -431,7 +431,7 @@ impl From<JsonValue> for StorageWithdrawCallArgs {
 }
 
 /// transfer args for json invocation
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct TransferCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
@@ -476,7 +476,7 @@ pub struct RegisterRelayerCallArgs {
     pub address: Address,
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,
 }

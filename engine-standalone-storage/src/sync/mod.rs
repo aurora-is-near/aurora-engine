@@ -1,6 +1,6 @@
-use aurora_engine::{connector, engine, parameters};
+use aurora_engine::{connector, engine, parameters::SubmitResult};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
-use borsh::BorshDeserialize;
+use aurora_engine_types::{parameters::PromiseWithCallbackArgs, types::Yocto};
 
 pub mod types;
 
@@ -8,7 +8,10 @@ use types::{Message, TransactionKind};
 
 const AURORA_ACCOUNT_ID: &str = "aurora";
 
-pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result<(), error::Error> {
+pub fn consume_message(
+    storage: &mut crate::Storage,
+    message: Message,
+) -> Result<ConsumeMessageOutcome, error::Error> {
     match message {
         Message::Block(block_message) => {
             let block_hash = block_message.hash;
@@ -17,13 +20,13 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
             storage
                 .set_block_data(block_hash, block_height, block_metadata)
                 .map_err(crate::Error::Rocksdb)?;
-            Ok(())
+            Ok(ConsumeMessageOutcome::BlockAdded)
         }
 
         Message::Transaction(transaction_message) => {
             // Failed transactions have no impact on the state of our database.
             if !transaction_message.succeeded {
-                return Ok(());
+                return Ok(ConsumeMessageOutcome::FailedTransactionIgnored);
             }
 
             let signer_account_id = transaction_message.signer;
@@ -32,7 +35,7 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                 predecessor_account_id.as_bytes(),
             );
             let transaction_position = transaction_message.position;
-            let near_tx_hash = transaction_message.near_tx_hash;
+            let near_receipt_id = transaction_message.near_receipt_id;
             let block_hash = transaction_message.block_hash;
             let block_height = storage.get_block_height_by_hash(block_hash)?;
             let block_metadata = storage.get_block_metadata(block_hash)?;
@@ -47,18 +50,19 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                 random_seed: block_metadata.random_seed,
                 prepaid_gas: DEFAULT_PREPAID_GAS,
             };
-            let io =
+            let mut io =
                 storage.access_engine_storage_at_position(block_height, transaction_position, &[]);
 
-            let tx_hash = match transaction_message.transaction {
+            let (tx_hash, result) = match transaction_message.transaction {
                 TransactionKind::Submit(tx) => {
-                    // Only promises possible from `submit` are exit precompiles and we cannot act on those promises
+                    // We can ignore promises in the standalone engine because it processes each receipt separately
+                    // and it is fed a stream of receipts (it does not schedule them)
                     let mut handler = crate::promise::Noop;
                     let engine_state = engine::get_state(&io)?;
                     let transaction_bytes: Vec<u8> = (&tx).into();
                     let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
-                    let _result = engine::submit(
+                    let result = engine::submit(
                         io,
                         &env,
                         &transaction_bytes,
@@ -66,38 +70,44 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                         env.current_account_id(),
                         relayer_address,
                         &mut handler,
-                    )?;
+                    );
 
-                    tx_hash
+                    (tx_hash, Some(TransactionExecutionResult::Submit(result)))
                 }
 
                 TransactionKind::Call(args) => {
-                    // Only promises possible from `call` are exit precompiles and we cannot act on those promises
+                    // We can ignore promises in the standalone engine (see above)
                     let mut handler = crate::promise::Noop;
                     let mut engine =
                         engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
-                    let _result = engine.call_with_args(args, &mut handler)?;
+                    let result = engine.call_with_args(args, &mut handler);
 
-                    near_tx_hash
+                    (
+                        near_receipt_id,
+                        Some(TransactionExecutionResult::Submit(result)),
+                    )
                 }
 
                 TransactionKind::Deploy(input) => {
-                    // Only promises possible from `deploy` are exit precompiles and we cannot act on those promises
+                    // We can ignore promises in the standalone engine (see above)
                     let mut handler = crate::promise::Noop;
                     let mut engine =
                         engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
-                    let _result = engine.deploy_code_with_input(input, &mut handler)?;
+                    let result = engine.deploy_code_with_input(input, &mut handler);
 
-                    near_tx_hash
+                    (
+                        near_receipt_id,
+                        Some(TransactionExecutionResult::Submit(result)),
+                    )
                 }
 
                 TransactionKind::DeployErc20(args) => {
                     // No promises can be created by `deploy_erc20_token`
                     let mut handler = crate::promise::Noop;
                     let _result = engine::deploy_erc20_token(args, io, &env, &mut handler)?;
-                    near_tx_hash
+                    (near_receipt_id, None)
                 }
 
                 TransactionKind::FtOnTransfer(args) => {
@@ -119,60 +129,149 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                         );
                     }
 
-                    near_tx_hash
+                    (near_receipt_id, None)
+                }
+
+                TransactionKind::FtTransferCall(args) => {
+                    let mut connector = connector::EthConnectorContract::init_instance(io);
+                    let promise_args = connector.ft_transfer_call(
+                        env.predecessor_account_id.clone(),
+                        env.current_account_id.clone(),
+                        args,
+                        env.prepaid_gas,
+                    )?;
+
+                    (
+                        near_receipt_id,
+                        Some(TransactionExecutionResult::Promise(promise_args)),
+                    )
+                }
+
+                TransactionKind::ResolveTransfer(args, promise_result) => {
+                    let mut connector = connector::EthConnectorContract::init_instance(io);
+                    connector.ft_resolve_transfer(args, promise_result);
+
+                    (near_receipt_id, None)
+                }
+
+                TransactionKind::FtTransfer(args) => {
+                    let mut connector = connector::EthConnectorContract::init_instance(io);
+                    connector.ft_transfer(&env.predecessor_account_id, args)?;
+
+                    (near_receipt_id, None)
+                }
+
+                TransactionKind::Withdraw(args) => {
+                    let mut connector = connector::EthConnectorContract::init_instance(io);
+                    connector.withdraw_eth_from_near(
+                        &env.current_account_id,
+                        &env.predecessor_account_id,
+                        args,
+                    )?;
+
+                    (near_receipt_id, None)
                 }
 
                 TransactionKind::Deposit(raw_proof) => {
-                    let mut connector_contract = connector::EthConnectorContract::init_instance(io);
+                    let connector_contract = connector::EthConnectorContract::init_instance(io);
                     let promise_args = connector_contract.deposit(
                         raw_proof,
                         env.current_account_id(),
                         env.predecessor_account_id(),
                     )?;
 
-                    // Assume the relayer will mark `transaction.succeeded = false` if the
-                    // proof failed to verify. This means the proof must be valid if we made
-                    // it this far, so we will not worry about `promise_args.base` and move
-                    // straight to the callback.
-
-                    let finish_args = parameters::FinishDepositCallArgs::try_from_slice(
-                        &promise_args.callback.args,
+                    (
+                        near_receipt_id,
+                        Some(TransactionExecutionResult::Promise(promise_args)),
                     )
-                    .expect("Connector deposit function must return valid args");
-                    // Since this would be executed as a callback, the predecessor_account_id
-                    // is now equal to the current_account_id
-                    let env = {
-                        let mut tmp = env.clone();
-                        tmp.predecessor_account_id = env.current_account_id;
-                        tmp
-                    };
-                    let maybe_promise_args = connector_contract.finish_deposit(
+                }
+
+                TransactionKind::FinishDeposit(finish_args) => {
+                    let mut connector = connector::EthConnectorContract::init_instance(io);
+                    let maybe_promise_args = connector.finish_deposit(
                         env.predecessor_account_id(),
                         env.current_account_id(),
                         finish_args,
                         env.prepaid_gas,
                     )?;
 
-                    if let Some(promise_args) = maybe_promise_args {
-                        let on_transfer_args =
-                            aurora_engine::json::parse_json(&promise_args.base.args)
-                                .and_then(|json| {
-                                    parameters::NEP141FtOnTransferArgs::try_from(json).ok()
-                                })
-                                .expect("Connector finish_deposit function must return valid args");
-                        let engine = engine::Engine::new(
-                            relayer_address,
-                            env.current_account_id(),
-                            io,
-                            &env,
-                        )?;
-                        connector_contract.ft_on_transfer(&engine, &on_transfer_args)?;
-                        // `ft_on_transfer` always returns an unused amount of 0 if it executes
-                        // successfully, meaning that `ft_resolve_transfer` will do nothing,
-                        // so we skip the promise_args callback.
-                    }
+                    (
+                        near_receipt_id,
+                        maybe_promise_args.map(TransactionExecutionResult::Promise),
+                    )
+                }
 
-                    near_tx_hash
+                TransactionKind::StorageDeposit(args) => {
+                    let mut connector = connector::EthConnectorContract::init_instance(io);
+                    let _ = connector.storage_deposit(
+                        env.predecessor_account_id,
+                        Yocto::new(env.attached_deposit),
+                        args,
+                    )?;
+
+                    (near_receipt_id, None)
+                }
+
+                TransactionKind::StorageUnregister(force) => {
+                    let mut connector = connector::EthConnectorContract::init_instance(io);
+                    let _ = connector.storage_unregister(env.predecessor_account_id, force)?;
+
+                    (near_receipt_id, None)
+                }
+
+                TransactionKind::StorageWithdraw(args) => {
+                    let mut connector = connector::EthConnectorContract::init_instance(io);
+                    connector.storage_withdraw(&env.predecessor_account_id, args)?;
+
+                    (near_receipt_id, None)
+                }
+
+                TransactionKind::SetPausedFlags(args) => {
+                    let mut connector = connector::EthConnectorContract::init_instance(io);
+                    connector.set_paused_flags(args);
+
+                    (near_receipt_id, None)
+                }
+
+                TransactionKind::RegisterRelayer(evm_address) => {
+                    let mut engine =
+                        engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
+                    engine.register_relayer(env.predecessor_account_id.as_bytes(), evm_address);
+
+                    (near_receipt_id, None)
+                }
+
+                TransactionKind::RefundOnError(maybe_args) => {
+                    let result: Result<
+                        Option<TransactionExecutionResult>,
+                        engine::EngineStateError,
+                    > = maybe_args
+                        .map(|args| {
+                            let mut handler = crate::promise::Noop;
+                            let engine_state = engine::get_state(&io)?;
+                            let result =
+                                engine::refund_on_error(io, &env, engine_state, args, &mut handler);
+                            Ok(TransactionExecutionResult::Submit(result))
+                        })
+                        .transpose();
+
+                    (near_receipt_id, result?)
+                }
+
+                TransactionKind::SetConnectorData(args) => {
+                    connector::set_contract_data(&mut io, args)?;
+
+                    (near_receipt_id, None)
+                }
+
+                TransactionKind::NewConnector(args) => {
+                    connector::EthConnectorContract::create_contract(
+                        io,
+                        env.current_account_id,
+                        args,
+                    )?;
+
+                    (near_receipt_id, None)
                 }
             };
 
@@ -181,15 +280,47 @@ pub fn consume_message(storage: &mut crate::Storage, message: Message) -> Result
                 block_hash,
                 position: transaction_position,
             };
-            storage.set_transaction_included(tx_hash, &tx_included, &diff)?;
+            match &result {
+                Some(TransactionExecutionResult::Submit(Err(_))) => (), // do not persist if Engine encounters an error
+                _ => storage.set_transaction_included(tx_hash, &tx_included, &diff)?,
+            }
 
-            Ok(())
+            let outcome = TransactionIncludedOutcome {
+                hash: tx_hash,
+                info: tx_included,
+                diff,
+                maybe_result: result,
+            };
+            Ok(ConsumeMessageOutcome::TransactionIncluded(Box::new(
+                outcome,
+            )))
         }
     }
 }
 
+#[derive(Debug)]
+pub enum ConsumeMessageOutcome {
+    BlockAdded,
+    FailedTransactionIgnored,
+    TransactionIncluded(Box<TransactionIncludedOutcome>),
+}
+
+#[derive(Debug)]
+pub struct TransactionIncludedOutcome {
+    pub hash: aurora_engine_types::H256,
+    pub info: crate::TransactionIncluded,
+    pub diff: crate::Diff,
+    pub maybe_result: Option<TransactionExecutionResult>,
+}
+
+#[derive(Debug)]
+pub enum TransactionExecutionResult {
+    Submit(engine::EngineResult<SubmitResult>),
+    Promise(PromiseWithCallbackArgs),
+}
+
 pub mod error {
-    use aurora_engine::{connector, engine};
+    use aurora_engine::{connector, engine, fungible_token};
 
     #[derive(Debug)]
     pub enum Error {
@@ -200,6 +331,11 @@ pub mod error {
         FtOnTransfer(connector::error::FtTransferCallError),
         Deposit(connector::error::DepositError),
         FinishDeposit(connector::error::FinishDepositError),
+        FtTransfer(fungible_token::error::TransferError),
+        FtWithdraw(connector::error::WithdrawError),
+        FtStorageFunding(fungible_token::error::StorageFundingError),
+        InvalidAddress(aurora_engine_types::types::address::error::AddressError),
+        ConnectorInit(connector::error::InitContractError),
     }
 
     impl From<crate::Error> for Error {
@@ -235,6 +371,36 @@ pub mod error {
     impl From<connector::error::FinishDepositError> for Error {
         fn from(e: connector::error::FinishDepositError) -> Self {
             Self::FinishDeposit(e)
+        }
+    }
+
+    impl From<fungible_token::error::TransferError> for Error {
+        fn from(e: fungible_token::error::TransferError) -> Self {
+            Self::FtTransfer(e)
+        }
+    }
+
+    impl From<connector::error::WithdrawError> for Error {
+        fn from(e: connector::error::WithdrawError) -> Self {
+            Self::FtWithdraw(e)
+        }
+    }
+
+    impl From<fungible_token::error::StorageFundingError> for Error {
+        fn from(e: fungible_token::error::StorageFundingError) -> Self {
+            Self::FtStorageFunding(e)
+        }
+    }
+
+    impl From<aurora_engine_types::types::address::error::AddressError> for Error {
+        fn from(e: aurora_engine_types::types::address::error::AddressError) -> Self {
+            Self::InvalidAddress(e)
+        }
+    }
+
+    impl From<connector::error::InitContractError> for Error {
+        fn from(e: connector::error::InitContractError) -> Self {
+            Self::ConnectorInit(e)
         }
     }
 }

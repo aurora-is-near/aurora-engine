@@ -58,8 +58,16 @@ impl Diff {
         self.0.get(key)
     }
 
+    pub fn take(&mut self, key: &[u8]) -> Option<DiffValue> {
+        self.0.remove(key)
+    }
+
     pub fn iter(&self) -> btree_map::Iter<Vec<u8>, DiffValue> {
         self.0.iter()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     pub fn try_to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {

@@ -68,7 +68,7 @@ mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use crate::connector::{self, EthConnectorContract};
-    use crate::engine::{self, current_address, Engine, EngineState};
+    use crate::engine::{self, Engine, EngineState};
     use crate::fungible_token::FungibleTokenMetadata;
     use crate::json::parse_json;
     use crate::parameters::{
@@ -86,8 +86,7 @@ mod contract {
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{
-        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, Vec, Wei, Yocto,
-        ERC20_MINT_SELECTOR, ERR_FAILED_PARSE, H256, U256,
+        sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
     };
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -265,6 +264,7 @@ mod contract {
     #[cfg(feature = "meta-call")]
     #[no_mangle]
     pub extern "C" fn meta_call() {
+        use crate::prelude::U256;
         let io = Runtime;
         let input = io.read_input().to_vec();
         let state = engine::get_state(&io).sdk_unwrap();
@@ -385,60 +385,10 @@ mod contract {
             // Promise succeeded -- nothing to do
         } else {
             // Exit call failed; need to refund tokens
-
-            let current_account_id = io.current_account_id();
             let args: RefundCallArgs = io.read_input_borsh().sdk_unwrap();
-            let refund_result = match args.erc20_address {
-                // ERC-20 exit; re-mint burned tokens
-                Some(erc20_address) => {
-                    let erc20_admin_address = current_address(&current_account_id);
-                    let mut engine =
-                        Engine::new(erc20_admin_address, current_account_id, io, &io).sdk_unwrap();
-                    let erc20_address = erc20_address;
-                    let refund_address = args.recipient_address;
-                    let amount = U256::from_big_endian(&args.amount);
-
-                    let selector = ERC20_MINT_SELECTOR;
-                    let mint_args = ethabi::encode(&[
-                        ethabi::Token::Address(refund_address.raw()),
-                        ethabi::Token::Uint(amount),
-                    ]);
-
-                    engine
-                        .call(
-                            &erc20_admin_address,
-                            &erc20_address,
-                            Wei::zero(),
-                            [selector, mint_args.as_slice()].concat(),
-                            u64::MAX,
-                            Vec::new(),
-                            &mut Runtime,
-                        )
-                        .sdk_unwrap()
-                }
-                // ETH exit; transfer ETH back from precompile address
-                None => {
-                    let exit_address = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
-                    let mut engine =
-                        Engine::new(exit_address, current_account_id, io, &io).sdk_unwrap();
-                    let refund_address = args.recipient_address;
-                    let amount = Wei::new(U256::from_big_endian(&args.amount));
-                    engine
-                        .call(
-                            &exit_address,
-                            &refund_address,
-                            amount,
-                            Vec::new(),
-                            u64::MAX,
-                            vec![
-                                (exit_address.raw(), Vec::new()),
-                                (refund_address.raw(), Vec::new()),
-                            ],
-                            &mut Runtime,
-                        )
-                        .sdk_unwrap()
-                }
-            };
+            let state = engine::get_state(&io).sdk_unwrap();
+            let refund_result =
+                engine::refund_on_error(io, &io, state, args, &mut Runtime).sdk_unwrap();
 
             if !refund_result.status.is_ok() {
                 sdk::panic_utf8(b"ERR_REFUND_FAILURE");
@@ -512,6 +462,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_chain() {
+        use crate::prelude::U256;
         let mut io = Runtime;
         let mut state = engine::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
@@ -847,7 +798,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use crate::connector::ZERO_ATTACHED_BALANCE;
-        use crate::prelude::NEP141Wei;
+        use crate::prelude::{NEP141Wei, U256};
         use evm::backend::ApplyBackend;
         const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
         const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
@@ -885,7 +836,7 @@ mod contract {
         let verify_call = aurora_engine_types::parameters::PromiseCreateArgs {
             target_account_id: aurora_account_id.clone(),
             method: "verify_log_entry".to_string(),
-            args: Vec::new(),
+            args: crate::prelude::Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_VERIFY,
         };

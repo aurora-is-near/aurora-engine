@@ -66,6 +66,23 @@ impl StandaloneRunner {
         io.finish().commit(storage, &mut self.cumulative_diff);
     }
 
+    pub fn transfer_with_signer(
+        &mut self,
+        signer: &mut test_utils::Signer,
+        amount: Wei,
+        dest: Address,
+    ) -> Result<SubmitResult, engine::EngineError> {
+        let tx = TransactionLegacy {
+            nonce: signer.use_nonce().into(),
+            gas_price: U256::zero(),
+            gas_limit: u64::MAX.into(),
+            to: Some(dest),
+            value: amount,
+            data: Vec::new(),
+        };
+        self.submit_transaction(&signer.secret_key, tx)
+    }
+
     pub fn submit_transaction(
         &mut self,
         account: &SecretKey,
