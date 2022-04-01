@@ -11,7 +11,7 @@ pub enum PromiseArgs {
 }
 
 #[must_use]
-#[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
+#[derive(Debug, BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq)]
 pub struct PromiseCreateArgs {
     pub target_account_id: AccountId,
     pub method: String,
@@ -21,7 +21,7 @@ pub struct PromiseCreateArgs {
 }
 
 #[must_use]
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq)]
 pub struct PromiseWithCallbackArgs {
     pub base: PromiseCreateArgs,
     pub callback: PromiseCreateArgs,

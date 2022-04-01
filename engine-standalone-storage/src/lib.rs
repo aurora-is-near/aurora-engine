@@ -346,10 +346,10 @@ impl Storage {
         block_height: u64,
         transaction_position: u16,
         input: &'input [u8],
-        mut f: F,
+        f: F,
     ) -> EngineAccessResult<R>
     where
-        F: for<'output> FnMut(engine_state::EngineStateAccess<'db, 'input, 'output>) -> R,
+        F: for<'output> FnOnce(engine_state::EngineStateAccess<'db, 'input, 'output>) -> R,
     {
         let diff = RefCell::new(Diff::default());
         let engine_output = Cell::new(Vec::new());

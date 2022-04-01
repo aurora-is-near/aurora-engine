@@ -89,8 +89,7 @@ fn test_replay_transaction() {
                         .execute_transaction_at_position(tx, block_height, position as u16)
                         .unwrap();
 
-                    diff.clone()
-                        .commit(&mut runner.storage, &mut runner.cumulative_diff);
+                    test_utils::standalone::storage::commit(&mut runner.storage, &diff);
 
                     assert_eq!(
                         runner.get_balance(&address),

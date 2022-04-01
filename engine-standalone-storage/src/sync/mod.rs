@@ -1,6 +1,10 @@
 use aurora_engine::{connector, engine, parameters::SubmitResult};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
-use aurora_engine_types::{parameters::PromiseWithCallbackArgs, types::Yocto, H256};
+use aurora_engine_types::{
+    parameters::PromiseWithCallbackArgs,
+    types::{Address, Yocto},
+    H256,
+};
 
 pub mod types;
 
@@ -160,8 +164,11 @@ fn execute_transaction<'db, 'input, 'output>(
         TransactionKind::DeployErc20(args) => {
             // No promises can be created by `deploy_erc20_token`
             let mut handler = crate::promise::Noop;
-            let _result = engine::deploy_erc20_token(args.clone(), io, &env, &mut handler)?;
-            (near_receipt_id, None)
+            let result = engine::deploy_erc20_token(args.clone(), io, &env, &mut handler)?;
+            (
+                near_receipt_id,
+                Some(TransactionExecutionResult::DeployErc20(result)),
+            )
         }
 
         TransactionKind::FtOnTransfer(args) => {
@@ -341,7 +348,7 @@ pub enum ConsumeMessageOutcome {
     TransactionIncluded(Box<TransactionIncludedOutcome>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionIncludedOutcome {
     pub hash: aurora_engine_types::H256,
     pub info: TransactionMessage,
@@ -349,9 +356,10 @@ pub struct TransactionIncludedOutcome {
     pub maybe_result: Option<TransactionExecutionResult>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransactionExecutionResult {
     Submit(engine::EngineResult<SubmitResult>),
+    DeployErc20(Address),
     Promise(PromiseWithCallbackArgs),
 }
 
