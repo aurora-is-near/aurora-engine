@@ -335,6 +335,51 @@ impl Storage {
             &self.db,
         )
     }
+
+    /// Same as `access_engine_storage_at_position`, but does not modify `self`, hence the immutable
+    /// borrow instead of the mutable one. The use case for this function is to execute a transaction
+    /// with the engine, but not to make any immediate changes to storage; only return the diff and outcome.
+    /// Note the closure is allowed to mutate the `EngineStateAccess` object, but this does not impact the `Storage`
+    /// because all changes are held in the diff in memory.
+    pub fn with_engine_access<'db, 'input, R, F>(
+        &'db self,
+        block_height: u64,
+        transaction_position: u16,
+        input: &'input [u8],
+        mut f: F,
+    ) -> EngineAccessResult<R>
+    where
+        F: for<'output> FnMut(engine_state::EngineStateAccess<'db, 'input, 'output>) -> R,
+    {
+        let diff = RefCell::new(Diff::default());
+        let engine_output = Cell::new(Vec::new());
+
+        let engine_state = engine_state::EngineStateAccess::new(
+            input,
+            block_height,
+            transaction_position,
+            &diff,
+            &engine_output,
+            &self.db,
+        );
+
+        let result = f(engine_state);
+        let diff = engine_state.get_transaction_diff();
+        let engine_output = engine_output.into_inner();
+
+        EngineAccessResult {
+            result,
+            engine_output,
+            diff,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct EngineAccessResult<R> {
+    pub result: R,
+    pub engine_output: Vec<u8>,
+    pub diff: Diff,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
