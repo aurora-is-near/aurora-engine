@@ -6,6 +6,8 @@ pub mod types;
 
 use types::{Message, TransactionKind};
 
+use self::types::TransactionMessage;
+
 const AURORA_ACCOUNT_ID: &str = "aurora";
 
 pub fn consume_message(
@@ -29,8 +31,8 @@ pub fn consume_message(
                 return Ok(ConsumeMessageOutcome::FailedTransactionIgnored);
             }
 
-            let signer_account_id = transaction_message.signer;
-            let predecessor_account_id = transaction_message.caller;
+            let signer_account_id = transaction_message.signer.clone();
+            let predecessor_account_id = transaction_message.caller.clone();
             let relayer_address = aurora_engine_sdk::types::near_account_to_evm_address(
                 predecessor_account_id.as_bytes(),
             );
@@ -53,13 +55,13 @@ pub fn consume_message(
             let mut io =
                 storage.access_engine_storage_at_position(block_height, transaction_position, &[]);
 
-            let (tx_hash, result) = match transaction_message.transaction {
+            let (tx_hash, result) = match &transaction_message.transaction {
                 TransactionKind::Submit(tx) => {
                     // We can ignore promises in the standalone engine because it processes each receipt separately
                     // and it is fed a stream of receipts (it does not schedule them)
                     let mut handler = crate::promise::Noop;
                     let engine_state = engine::get_state(&io)?;
-                    let transaction_bytes: Vec<u8> = (&tx).into();
+                    let transaction_bytes: Vec<u8> = tx.into();
                     let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
                     let result = engine::submit(
@@ -81,7 +83,7 @@ pub fn consume_message(
                     let mut engine =
                         engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
-                    let result = engine.call_with_args(args, &mut handler);
+                    let result = engine.call_with_args(args.clone(), &mut handler);
 
                     (
                         near_receipt_id,
@@ -95,7 +97,7 @@ pub fn consume_message(
                     let mut engine =
                         engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
-                    let result = engine.deploy_code_with_input(input, &mut handler);
+                    let result = engine.deploy_code_with_input(input.clone(), &mut handler);
 
                     (
                         near_receipt_id,
@@ -106,7 +108,7 @@ pub fn consume_message(
                 TransactionKind::DeployErc20(args) => {
                     // No promises can be created by `deploy_erc20_token`
                     let mut handler = crate::promise::Noop;
-                    let _result = engine::deploy_erc20_token(args, io, &env, &mut handler)?;
+                    let _result = engine::deploy_erc20_token(args.clone(), io, &env, &mut handler)?;
                     (near_receipt_id, None)
                 }
 
@@ -118,12 +120,12 @@ pub fn consume_message(
 
                     if env.predecessor_account_id == env.current_account_id {
                         connector::EthConnectorContract::init_instance(io)
-                            .ft_on_transfer(&engine, &args)?;
+                            .ft_on_transfer(&engine, args)?;
                     } else {
                         engine.receive_erc20_tokens(
                             &env.predecessor_account_id,
                             &env.signer_account_id,
-                            &args,
+                            args,
                             &env.current_account_id,
                             &mut handler,
                         );
@@ -137,7 +139,7 @@ pub fn consume_message(
                     let promise_args = connector.ft_transfer_call(
                         env.predecessor_account_id.clone(),
                         env.current_account_id.clone(),
-                        args,
+                        args.clone(),
                         env.prepaid_gas,
                     )?;
 
@@ -149,14 +151,14 @@ pub fn consume_message(
 
                 TransactionKind::ResolveTransfer(args, promise_result) => {
                     let mut connector = connector::EthConnectorContract::init_instance(io);
-                    connector.ft_resolve_transfer(args, promise_result);
+                    connector.ft_resolve_transfer(args.clone(), promise_result.clone());
 
                     (near_receipt_id, None)
                 }
 
                 TransactionKind::FtTransfer(args) => {
                     let mut connector = connector::EthConnectorContract::init_instance(io);
-                    connector.ft_transfer(&env.predecessor_account_id, args)?;
+                    connector.ft_transfer(&env.predecessor_account_id, args.clone())?;
 
                     (near_receipt_id, None)
                 }
@@ -166,7 +168,7 @@ pub fn consume_message(
                     connector.withdraw_eth_from_near(
                         &env.current_account_id,
                         &env.predecessor_account_id,
-                        args,
+                        args.clone(),
                     )?;
 
                     (near_receipt_id, None)
@@ -175,7 +177,7 @@ pub fn consume_message(
                 TransactionKind::Deposit(raw_proof) => {
                     let connector_contract = connector::EthConnectorContract::init_instance(io);
                     let promise_args = connector_contract.deposit(
-                        raw_proof,
+                        raw_proof.clone(),
                         env.current_account_id(),
                         env.predecessor_account_id(),
                     )?;
@@ -191,7 +193,7 @@ pub fn consume_message(
                     let maybe_promise_args = connector.finish_deposit(
                         env.predecessor_account_id(),
                         env.current_account_id(),
-                        finish_args,
+                        finish_args.clone(),
                         env.prepaid_gas,
                     )?;
 
@@ -206,7 +208,7 @@ pub fn consume_message(
                     let _ = connector.storage_deposit(
                         env.predecessor_account_id,
                         Yocto::new(env.attached_deposit),
-                        args,
+                        args.clone(),
                     )?;
 
                     (near_receipt_id, None)
@@ -214,21 +216,21 @@ pub fn consume_message(
 
                 TransactionKind::StorageUnregister(force) => {
                     let mut connector = connector::EthConnectorContract::init_instance(io);
-                    let _ = connector.storage_unregister(env.predecessor_account_id, force)?;
+                    let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
 
                     (near_receipt_id, None)
                 }
 
                 TransactionKind::StorageWithdraw(args) => {
                     let mut connector = connector::EthConnectorContract::init_instance(io);
-                    connector.storage_withdraw(&env.predecessor_account_id, args)?;
+                    connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
 
                     (near_receipt_id, None)
                 }
 
                 TransactionKind::SetPausedFlags(args) => {
                     let mut connector = connector::EthConnectorContract::init_instance(io);
-                    connector.set_paused_flags(args);
+                    connector.set_paused_flags(args.clone());
 
                     (near_receipt_id, None)
                 }
@@ -236,7 +238,7 @@ pub fn consume_message(
                 TransactionKind::RegisterRelayer(evm_address) => {
                     let mut engine =
                         engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
-                    engine.register_relayer(env.predecessor_account_id.as_bytes(), evm_address);
+                    engine.register_relayer(env.predecessor_account_id.as_bytes(), *evm_address);
 
                     (near_receipt_id, None)
                 }
@@ -246,6 +248,7 @@ pub fn consume_message(
                         Option<TransactionExecutionResult>,
                         engine::EngineStateError,
                     > = maybe_args
+                        .clone()
                         .map(|args| {
                             let mut handler = crate::promise::Noop;
                             let engine_state = engine::get_state(&io)?;
@@ -259,7 +262,7 @@ pub fn consume_message(
                 }
 
                 TransactionKind::SetConnectorData(args) => {
-                    connector::set_contract_data(&mut io, args)?;
+                    connector::set_contract_data(&mut io, args.clone())?;
 
                     (near_receipt_id, None)
                 }
@@ -268,26 +271,23 @@ pub fn consume_message(
                     connector::EthConnectorContract::create_contract(
                         io,
                         env.current_account_id,
-                        args,
+                        args.clone(),
                     )?;
 
                     (near_receipt_id, None)
                 }
+                TransactionKind::Unknown => (near_receipt_id, None),
             };
 
             let diff = io.get_transaction_diff();
-            let tx_included = crate::TransactionIncluded {
-                block_hash,
-                position: transaction_position,
-            };
             match &result {
                 Some(TransactionExecutionResult::Submit(Err(_))) => (), // do not persist if Engine encounters an error
-                _ => storage.set_transaction_included(tx_hash, &tx_included, &diff)?,
+                _ => storage.set_transaction_included(tx_hash, &transaction_message, &diff)?,
             }
 
             let outcome = TransactionIncludedOutcome {
                 hash: tx_hash,
-                info: tx_included,
+                info: *transaction_message,
                 diff,
                 maybe_result: result,
             };
@@ -308,7 +308,7 @@ pub enum ConsumeMessageOutcome {
 #[derive(Debug)]
 pub struct TransactionIncludedOutcome {
     pub hash: aurora_engine_types::H256,
-    pub info: crate::TransactionIncluded,
+    pub info: TransactionMessage,
     pub diff: crate::Diff,
     pub maybe_result: Option<TransactionExecutionResult>,
 }

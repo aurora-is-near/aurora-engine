@@ -1,5 +1,9 @@
 use aurora_engine_types::H256;
-use engine_standalone_storage::{self, Storage};
+use engine_standalone_storage::{
+    self,
+    sync::types::{TransactionKind, TransactionMessage},
+    Storage,
+};
 use tempfile::TempDir;
 
 pub fn commit(
@@ -9,12 +13,18 @@ pub fn commit(
     transaction_position: u16,
     transaction_hash: H256,
 ) {
-    let tx_included = engine_standalone_storage::TransactionIncluded {
+    let tx_msg = TransactionMessage {
         block_hash,
+        near_receipt_id: H256::zero(),
         position: transaction_position,
+        succeeded: true,
+        signer: "placeholder.near".parse().unwrap(),
+        caller: "placeholder.near".parse().unwrap(),
+        attached_near: 0,
+        transaction: TransactionKind::Unknown,
     };
     storage
-        .set_transaction_included(transaction_hash, &tx_included, &diff)
+        .set_transaction_included(transaction_hash, &tx_msg, &diff)
         .unwrap();
 }
 

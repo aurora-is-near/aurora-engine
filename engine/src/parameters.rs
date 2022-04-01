@@ -234,7 +234,7 @@ pub struct BeginBlockArgs {
 
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
     /// Balance can be for Eth on Near and for Eth to Aurora
@@ -311,7 +311,7 @@ impl StorageBalance {
 }
 
 /// ft_resolve_transfer eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct ResolveTransferCallArgs {
     pub sender_id: AccountId,
     pub amount: NEP141Wei,
@@ -319,7 +319,7 @@ pub struct ResolveTransferCallArgs {
 }
 
 /// Finish deposit NEAR eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct FinishDepositCallArgs {
     pub new_owner_id: AccountId,
     pub amount: NEP141Wei,
@@ -347,7 +347,7 @@ pub struct FinishDepositEthCallArgs {
 }
 
 /// Eth-connector initial args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct InitCallArgs {
     pub prover_account: AccountId,
     pub eth_custodian_address: String,
@@ -358,7 +358,7 @@ pub struct InitCallArgs {
 pub type SetContractDataCallArgs = InitCallArgs;
 
 /// transfer eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct TransferCallCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
@@ -399,7 +399,7 @@ impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
 }
 
 /// storage_deposit eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct StorageDepositCallArgs {
     pub account_id: Option<AccountId>,
     pub registration_only: Option<bool>,
@@ -417,7 +417,7 @@ impl From<JsonValue> for StorageDepositCallArgs {
 }
 
 /// storage_withdraw eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct StorageWithdrawCallArgs {
     pub amount: Option<Yocto>,
 }
@@ -431,7 +431,7 @@ impl From<JsonValue> for StorageWithdrawCallArgs {
 }
 
 /// transfer args for json invocation
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct TransferCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
@@ -476,7 +476,7 @@ pub struct RegisterRelayerCallArgs {
     pub address: Address,
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,
 }

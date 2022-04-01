@@ -2,7 +2,10 @@ use aurora_engine::engine;
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
-use engine_standalone_storage::BlockMetadata;
+use engine_standalone_storage::{
+    sync::types::{TransactionKind, TransactionMessage},
+    BlockMetadata,
+};
 
 use crate::test_utils::standalone::{mocks, storage::create_db};
 use crate::test_utils::{self, Signer};
@@ -227,6 +230,16 @@ fn test_transaction_index() {
     let block_hash = mocks::compute_block_hash(block_height);
     let tx_hash = H256([77u8; 32]);
     let tx_position = 0u16;
+    let tx_msg = TransactionMessage {
+        block_hash,
+        near_receipt_id: H256::zero(),
+        position: tx_position,
+        succeeded: true,
+        signer: "placeholder.near".parse().unwrap(),
+        caller: "placeholder.near".parse().unwrap(),
+        attached_near: 0,
+        transaction: TransactionKind::Unknown,
+    };
     let tx_included = engine_standalone_storage::TransactionIncluded {
         block_hash,
         position: tx_position,
@@ -244,13 +257,10 @@ fn test_transaction_index() {
 
     // write transaction association
     storage
-        .set_transaction_included(tx_hash, &tx_included, &diff)
+        .set_transaction_included(tx_hash, &tx_msg, &diff)
         .unwrap();
     // read it back
-    assert_eq!(
-        tx_included,
-        storage.get_transaction_by_hash(tx_hash).unwrap(),
-    );
+    assert_eq!(tx_msg, storage.get_transaction_data(tx_hash).unwrap(),);
     assert_eq!(
         tx_hash,
         storage.get_transaction_by_position(tx_included).unwrap()
@@ -271,7 +281,7 @@ fn test_transaction_index() {
         position: 0,
     };
     let missing_tx_hash = H256([13u8; 32]);
-    match storage.get_transaction_by_hash(missing_tx_hash) {
+    match storage.get_transaction_data(missing_tx_hash) {
         Err(engine_standalone_storage::Error::TransactionHashNotFound(h))
             if h == missing_tx_hash =>
         {

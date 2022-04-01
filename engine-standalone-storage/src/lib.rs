@@ -4,6 +4,7 @@ use rocksdb::DB;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::Path;
+use sync::types::TransactionMessage;
 
 const VERSION: u8 = 0;
 
@@ -28,7 +29,7 @@ const ENGINE_KEY_SUFFIX_LEN: usize = (64 / 8) + (16 / 8);
 pub enum StoragePrefix {
     BlockHash = 0x00,
     BlockHeight = 0x01,
-    TransactionPosition = 0x02,
+    TransactionData = 0x02,
     TransactionHash = 0x03,
     Diff = 0x04,
     Engine = 0x05,
@@ -108,20 +109,17 @@ impl Storage {
         self.db.write(batch)
     }
 
-    pub fn get_transaction_by_hash(
+    pub fn get_transaction_data(
         &self,
         tx_hash: H256,
-    ) -> Result<TransactionIncluded, error::Error> {
-        let storage_key =
-            construct_storage_key(StoragePrefix::TransactionPosition, tx_hash.as_ref());
-        self.db
+    ) -> Result<sync::types::TransactionMessage, error::Error> {
+        let storage_key = construct_storage_key(StoragePrefix::TransactionData, tx_hash.as_ref());
+        let bytes = self
+            .db
             .get_pinned(storage_key)?
-            .map(|slice| {
-                let mut buf = [0u8; 34];
-                buf.copy_from_slice(slice.as_ref());
-                TransactionIncluded::from_bytes(buf)
-            })
-            .ok_or(error::Error::TransactionHashNotFound(tx_hash))
+            .ok_or(error::Error::TransactionHashNotFound(tx_hash))?;
+        let message = TransactionMessage::try_from_slice(bytes.as_ref())?;
+        Ok(message)
     }
 
     pub fn get_transaction_by_position(
@@ -150,7 +148,7 @@ impl Storage {
     pub fn set_transaction_included(
         &mut self,
         tx_hash: H256,
-        tx_included: &TransactionIncluded,
+        tx_included: &TransactionMessage,
         diff: &Diff,
     ) -> Result<(), error::Error> {
         let batch = rocksdb::WriteBatch::default();
@@ -162,7 +160,7 @@ impl Storage {
     pub fn revert_transaction_included(
         &mut self,
         tx_hash: H256,
-        tx_included: &TransactionIncluded,
+        tx_included: &TransactionMessage,
         diff: &Diff,
     ) -> Result<(), error::Error> {
         let batch = rocksdb::WriteBatch::default();
@@ -174,20 +172,24 @@ impl Storage {
     fn process_transaction<F: Fn(&mut rocksdb::WriteBatch, &[u8], &[u8])>(
         &mut self,
         tx_hash: H256,
-        tx_included: &TransactionIncluded,
+        tx_msg: &TransactionMessage,
         diff: &Diff,
         mut batch: rocksdb::WriteBatch,
         action: F,
     ) -> Result<(), error::Error> {
+        let tx_included = TransactionIncluded {
+            block_hash: tx_msg.block_hash,
+            position: tx_msg.position,
+        };
         let tx_included_bytes = tx_included.to_bytes();
         let block_height = self.get_block_height_by_hash(tx_included.block_hash)?;
 
         let storage_key = construct_storage_key(StoragePrefix::TransactionHash, &tx_included_bytes);
         action(&mut batch, &storage_key, tx_hash.as_ref());
 
-        let storage_key =
-            construct_storage_key(StoragePrefix::TransactionPosition, tx_hash.as_ref());
-        action(&mut batch, &storage_key, &tx_included_bytes);
+        let storage_key = construct_storage_key(StoragePrefix::TransactionData, tx_hash.as_ref());
+        let msg_bytes = tx_msg.to_bytes();
+        action(&mut batch, &storage_key, &msg_bytes);
 
         let storage_key = construct_storage_key(StoragePrefix::Diff, &tx_included_bytes);
         let diff_bytes = diff.try_to_bytes().unwrap();
