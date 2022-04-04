@@ -195,6 +195,14 @@ fn test_block_index() {
         block_metadata,
         storage.get_block_metadata(block_hash).unwrap()
     );
+    assert_eq!(
+        (block_hash, block_height),
+        storage.get_latest_block().unwrap(),
+    );
+    assert_eq!(
+        (block_hash, block_height),
+        storage.get_earliest_block().unwrap(),
+    );
 
     // block hash / height that do not exist are errors
     let missing_block_height = block_height + 1;
@@ -213,6 +221,40 @@ fn test_block_index() {
         Err(engine_standalone_storage::Error::BlockNotFound(h)) if h == missing_block_hash => (), // ok
         other => panic!("Unexpected response: {:?}", other),
     }
+
+    // insert later block
+    let next_height = block_height + 1;
+    let next_hash = H256([0xaa; 32]);
+    storage
+        .set_block_data(next_hash, next_height, block_metadata.clone())
+        .unwrap();
+
+    // check earliest+latest blocks are still correct
+    assert_eq!(
+        (next_hash, next_height),
+        storage.get_latest_block().unwrap(),
+    );
+    assert_eq!(
+        (block_hash, block_height),
+        storage.get_earliest_block().unwrap(),
+    );
+
+    // insert earlier block
+    let prev_height = block_height - 1;
+    let prev_hash = H256([0xbb; 32]);
+    storage
+        .set_block_data(prev_hash, prev_height, block_metadata.clone())
+        .unwrap();
+
+    // check earliest+latest blocks are still correct
+    assert_eq!(
+        (next_hash, next_height),
+        storage.get_latest_block().unwrap(),
+    );
+    assert_eq!(
+        (prev_hash, prev_height),
+        storage.get_earliest_block().unwrap(),
+    );
 
     drop(storage);
     temp_dir.close().unwrap();
