@@ -14,7 +14,7 @@ pub const ADDRESS: Address = crate::make_address(0x536822d2, 0x7de53629ef1f84c60
 mod costs {
     use crate::prelude::types::EthGas;
 
-    // TODO(#51): Determine the correct amount of gas
+    // TODO(#483): Determine the correct amount of gas
     pub(super) const PREPAID_GAS_COST: EthGas = EthGas::new(0);
 }
 
