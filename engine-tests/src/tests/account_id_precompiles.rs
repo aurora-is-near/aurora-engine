@@ -58,9 +58,9 @@ fn test_account_id_precompiles() {
         .as_mut()
         .unwrap()
         .env
-        .current_account_id = account_id.parse().unwrap();
+        .predecessor_account_id = account_id.parse().unwrap();
     let nonce = signer.use_nonce();
-    let tx = contract.call_method_without_args("currentAccountId", nonce.into());
+    let tx = contract.call_method_without_args("predecessorAccountId", nonce.into());
     let result = runner
         .standalone_runner
         .as_mut()
