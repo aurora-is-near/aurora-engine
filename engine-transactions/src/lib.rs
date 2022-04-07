@@ -167,6 +167,16 @@ pub enum ParseTransactionError {
     RlpDecodeError(DecoderError),
 }
 
+impl ParseTransactionError {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::UnknownTransactionType => "ERR_UNKNOWN_TX_TYPE",
+            Self::ReservedSentinel => "ERR_RESERVED_LEADING_TX_BYTE",
+            Self::RlpDecodeError(_) => "ERR_TX_RLP_DECODE",
+        }
+    }
+}
+
 impl From<DecoderError> for ParseTransactionError {
     fn from(e: DecoderError) -> Self {
         Self::RlpDecodeError(e)
@@ -175,11 +185,7 @@ impl From<DecoderError> for ParseTransactionError {
 
 impl AsRef<[u8]> for ParseTransactionError {
     fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::UnknownTransactionType => b"ERR_UNKNOWN_TX_TYPE",
-            Self::ReservedSentinel => b"ERR_RESERVED_LEADING_TX_BYTE",
-            Self::RlpDecodeError(_) => b"ERR_TX_RLP_DECODE",
-        }
+        self.as_str().as_bytes()
     }
 }
 
