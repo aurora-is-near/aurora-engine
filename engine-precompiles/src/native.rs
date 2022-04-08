@@ -24,10 +24,10 @@ const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 mod costs {
     use crate::prelude::types::{EthGas, NearGas};
 
-    // TODO(#51): Determine the correct amount of gas
+    // TODO(#483): Determine the correct amount of gas
     pub(super) const EXIT_TO_NEAR_GAS: EthGas = EthGas::new(0);
 
-    // TODO(#51): Determine the correct amount of gas
+    // TODO(#483): Determine the correct amount of gas
     pub(super) const EXIT_TO_ETHEREUM_GAS: EthGas = EthGas::new(0);
 
     // TODO(#332): Determine the correct amount of gas
