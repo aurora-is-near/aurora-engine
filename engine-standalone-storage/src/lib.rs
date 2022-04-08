@@ -54,6 +54,36 @@ impl Storage {
         })
     }
 
+    pub fn get_latest_block(&self) -> Result<(H256, u64), error::Error> {
+        self.block_read(rocksdb::IteratorMode::End)
+    }
+
+    pub fn get_earliest_block(&self) -> Result<(H256, u64), error::Error> {
+        self.block_read(rocksdb::IteratorMode::Start)
+    }
+
+    fn block_read(&self, mode: rocksdb::IteratorMode) -> Result<(H256, u64), error::Error> {
+        let upper_bound = construct_storage_key(StoragePrefix::BlockHash, &u64::MAX.to_be_bytes());
+        let lower_bound = construct_storage_key(StoragePrefix::BlockHash, &[]);
+        let prefix_len = lower_bound.len();
+        let mut opt = rocksdb::ReadOptions::default();
+        opt.set_iterate_upper_bound(upper_bound);
+        opt.set_iterate_lower_bound(lower_bound);
+
+        let mut iter = self.db.iterator_opt(mode, opt);
+        iter.next()
+            .map(|(key, value)| {
+                let block_height = {
+                    let mut buf = [0u8; 8];
+                    buf.copy_from_slice(&key[prefix_len..]);
+                    u64::from_be_bytes(buf)
+                };
+                let block_hash = H256::from_slice(&value);
+                (block_hash, block_height)
+            })
+            .ok_or(error::Error::NoBlockAtHeight(0))
+    }
+
     pub fn get_block_hash_by_height(&self, block_height: u64) -> Result<H256, error::Error> {
         let storage_key =
             construct_storage_key(StoragePrefix::BlockHash, &block_height.to_be_bytes());
