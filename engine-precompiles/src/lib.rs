@@ -10,6 +10,7 @@ pub mod identity;
 pub mod modexp;
 pub mod native;
 mod prelude;
+pub mod prepaid_gas;
 pub mod random;
 pub mod secp256k1;
 #[cfg(test)]
@@ -24,6 +25,7 @@ use crate::modexp::ModExp;
 use crate::native::{exit_to_ethereum, exit_to_near, ExitToEthereum, ExitToNear};
 use crate::prelude::types::EthGas;
 use crate::prelude::{Vec, H160, H256};
+use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
 use aurora_engine_sdk::env::Env;
@@ -110,6 +112,7 @@ pub struct Precompiles<'a, I, E> {
     pub near_exit: ExitToNear<I>,
     pub ethereum_exit: ExitToEthereum<I>,
     pub predecessor_account_id: PredecessorAccount<'a, E>,
+    pub prepaid_gas: PrepaidGas<'a, E>,
 }
 
 impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a, I, E> {
@@ -268,12 +271,14 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
         let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
+        let prepaid_gas = PrepaidGas::new(ctx.env);
 
         Self {
             generic_precompiles,
             near_exit,
             ethereum_exit,
             predecessor_account_id,
+            prepaid_gas,
         }
     }
 
@@ -288,6 +293,8 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             return Some(f(&self.ethereum_exit));
         } else if address == predecessor_account::ADDRESS {
             return Some(f(&self.predecessor_account_id));
+        } else if address == prepaid_gas::ADDRESS {
+            return Some(f(&self.prepaid_gas));
         }
         self.generic_precompiles
             .get(&address)

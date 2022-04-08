@@ -8,6 +8,7 @@ mod eth_connector;
 #[cfg(feature = "meta-call")]
 mod meta_parsing;
 mod one_inch;
+mod prepaid_gas_precompile;
 mod random;
 mod repro;
 mod sanity;

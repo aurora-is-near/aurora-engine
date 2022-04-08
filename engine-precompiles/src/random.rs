@@ -7,7 +7,7 @@ use evm::{Context, ExitError};
 mod costs {
     use crate::prelude::types::EthGas;
 
-    // TODO(#51): Determine the correct amount of gas
+    // TODO(#483): Determine the correct amount of gas
     pub(super) const RANDOM_BYTES_GAS: EthGas = EthGas::new(0);
 }
 
