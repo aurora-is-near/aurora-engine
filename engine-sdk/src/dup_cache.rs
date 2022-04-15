@@ -1,3 +1,17 @@
+use aurora_engine_types::BTreeMap;
+
+/// All entries are cached (unlike `DupCache`).
+#[derive(Default)]
+pub struct FullCache<K, V> {
+    inner: BTreeMap<K, V>,
+}
+
+impl<K: Ord, V> FullCache<K, V> {
+    pub fn get_or_insert_with<F: FnOnce() -> V>(&mut self, k: K, f: F) -> &mut V {
+        self.inner.entry(k).or_insert_with(f)
+    }
+}
+
 /// The intention of this struct is to prevent repeating duplicate computations/IO with the
 /// same input (key). However, unlike memoization or typical caching, this only remembers the
 /// most recent key-value pair. This means it is optimized for consecutive duplicate lookups,
