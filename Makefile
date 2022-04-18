@@ -47,6 +47,7 @@ test-mainnet: mainnet-test-build
 	$(CARGO) test --features mainnet-test$(ADDITIONAL_FEATURES)
 mainnet-test-build: FEATURES=mainnet,integration-test,meta-call
 mainnet-test-build: mainnet-test.wasm
+mainnet-test.wasm: etc/async-aurora/target/wasm32-unknown-unknown/release/async_aurora.wasm
 mainnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
@@ -54,6 +55,7 @@ test-testnet: testnet-test-build
 	$(CARGO) test --features testnet-test$(ADDITIONAL_FEATURES)
 testnet-test-build: FEATURES=testnet,integration-test,meta-call
 testnet-test-build: testnet-test.wasm
+mainnet-test.wasm: etc/async-aurora/target/wasm32-unknown-unknown/release/async_aurora.wasm
 testnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
@@ -74,6 +76,14 @@ target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(
 		--no-default-features \
 		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps
+
+etc/async-aurora/target/wasm32-unknown-unknown/release/async_aurora.wasm:
+	RUSTFLAGS='-C link-arg=-s' $(CARGO) build \
+		--manifest-path etc/async-aurora/Cargo.toml \
+		--target wasm32-unknown-unknown \
+		-p async-aurora \
+		--release \
+		--verbose \
 
 etc/eth-contracts/res/EvmErc20.bin: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
 	cd etc/eth-contracts && yarn && yarn build
@@ -103,6 +113,7 @@ clean:
 .PHONY: testnet testnet-debug test-testnet testnet-test-build
 .PHONY: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 .PHONY: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
+.PHONY: etc/async-aurora/target/wasm32-unknown-unknown/release/async_aurora.wasm
 .PHONY: check-format check-clippy test-sol format clean
 
 .SECONDARY:

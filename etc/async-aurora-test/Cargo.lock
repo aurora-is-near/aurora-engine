@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-aurora"
+name = "async_aurora_test"
 version = "0.1.0"
 dependencies = [
  "near-sdk",

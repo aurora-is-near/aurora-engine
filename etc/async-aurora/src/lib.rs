@@ -4,9 +4,6 @@ use near_sdk::assert_self;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, ext_contract, near_bindgen, AccountId, PanicOnDefault, Promise};
 
-
-near_sdk::setup_alloc!();
-
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct AsyncAurora {

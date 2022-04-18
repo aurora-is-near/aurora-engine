@@ -2,6 +2,8 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 
 pub type EthAddress = [u8; 20];
 pub type RawU256 = [u8; 32];
+/// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
+pub type WeiU256 = [u8; 32];
 
 /// The status of a transaction.
 #[derive(Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
@@ -12,6 +14,15 @@ pub enum TransactionStatus {
     OutOfFund,
     OutOfOffset,
     CallTooDeep,
+}
+
+/// Borsh-encoded parameters for the engine `call` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
+pub struct FunctionCallArgs {
+    pub contract: EthAddress,
+    /// Wei compatible Borsh-encoded value field to attach an ETH balance to the transaction
+    pub value: WeiU256,
+    pub input: Vec<u8>,
 }
 
 /// Borsh-encoded parameters for the `view` function.

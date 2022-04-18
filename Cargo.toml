@@ -39,7 +39,9 @@ members = [
     "engine-types",
 ]
 exclude = [
+    "etc/async-aurora",
     "etc/state-migration-test",
     "etc/ft-receiver",
     "etc/benchmark-contract",
+    "etc/async-aurora-test",
 ]
