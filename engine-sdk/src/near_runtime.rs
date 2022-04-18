@@ -365,6 +365,53 @@ impl crate::promise::PromiseHandler for Runtime {
     }
 }
 
+/// Some host functions are not usable in NEAR view calls.
+/// This struct puts in default values for those calls instead.
+pub struct ViewEnv;
+
+impl crate::env::Env for ViewEnv {
+    fn signer_account_id(&self) -> AccountId {
+        AccountId::new("system").unwrap()
+    }
+
+    fn current_account_id(&self) -> AccountId {
+        unsafe {
+            exports::current_account_id(Runtime::ENV_REGISTER_ID.0);
+        }
+        Runtime::read_account_id()
+    }
+
+    fn predecessor_account_id(&self) -> AccountId {
+        AccountId::new("system").unwrap()
+    }
+
+    fn block_height(&self) -> u64 {
+        unsafe { exports::block_index() }
+    }
+
+    fn block_timestamp(&self) -> crate::env::Timestamp {
+        let ns = unsafe { exports::block_timestamp() };
+        crate::env::Timestamp::new(ns)
+    }
+
+    fn attached_deposit(&self) -> u128 {
+        1
+    }
+
+    fn random_seed(&self) -> H256 {
+        unsafe {
+            exports::random_seed(0);
+            let bytes = H256::zero();
+            exports::read_register(0, bytes.0.as_ptr() as *const u64 as u64);
+            bytes
+        }
+    }
+
+    fn prepaid_gas(&self) -> NearGas {
+        NearGas::new(300)
+    }
+}
+
 pub(crate) mod exports {
     #[allow(unused)]
     extern "C" {

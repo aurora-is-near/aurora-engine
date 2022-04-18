@@ -12,7 +12,8 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
-use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
+use crate::prelude::parameters::RefundCallArgs;
+use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
@@ -340,36 +341,38 @@ impl AsRef<[u8]> for EngineStateError {
     }
 }
 
-struct StackExecutorParams {
-    precompiles: Precompiles,
+struct StackExecutorParams<'a, I, E> {
+    precompiles: Precompiles<'a, I, E>,
     gas_limit: u64,
 }
 
-impl StackExecutorParams {
+impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
     fn new(
         gas_limit: u64,
         current_account_id: AccountId,
-        predecessor_account_id: AccountId,
         random_seed: H256,
+        io: I,
+        env: &'env E,
     ) -> Self {
         Self {
             precompiles: Precompiles::new_london(PrecompileConstructorContext {
                 current_account_id,
                 random_seed,
-                predecessor_account_id,
+                io,
+                env,
             }),
             gas_limit,
         }
     }
 
-    fn make_executor<'a, 'env, I: IO + Copy, E: Env>(
+    fn make_executor<'a>(
         &'a self,
         engine: &'a Engine<'env, I, E>,
     ) -> executor::stack::StackExecutor<
         'static,
         'a,
         executor::stack::MemoryStackState<Engine<'env, I, E>>,
-        Precompiles,
+        Precompiles<'env, I, E>,
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::stack::MemoryStackState::new(metadata, engine);
@@ -516,8 +519,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let executor_params = StackExecutorParams::new(
             gas_limit,
             self.current_account_id.clone(),
-            self.env.predecessor_account_id(),
             self.env.random_seed(),
+            self.io,
+            self.env,
         );
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy {
@@ -601,8 +605,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let executor_params = StackExecutorParams::new(
             gas_limit,
             self.current_account_id.clone(),
-            self.env.predecessor_account_id(),
             self.env.random_seed(),
+            self.io,
+            self.env,
         );
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) = executor.transact_call(
@@ -651,8 +656,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let executor_params = StackExecutorParams::new(
             gas_limit,
             self.current_account_id.clone(),
-            self.env.predecessor_account_id(),
             self.env.random_seed(),
+            self.io,
+            self.env,
         );
         let mut executor = executor_params.make_executor(self);
         let (status, result) = executor.transact_call(
@@ -991,6 +997,63 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     result
 }
 
+pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
+    io: I,
+    env: &E,
+    state: EngineState,
+    args: RefundCallArgs,
+    handler: &mut P,
+) -> EngineResult<SubmitResult> {
+    let current_account_id = env.current_account_id();
+    match args.erc20_address {
+        // ERC-20 exit; re-mint burned tokens
+        Some(erc20_address) => {
+            let erc20_admin_address = current_address(&current_account_id);
+            let mut engine =
+                Engine::new_with_state(state, erc20_admin_address, current_account_id, io, env);
+            let erc20_address = erc20_address;
+            let refund_address = args.recipient_address;
+            let amount = U256::from_big_endian(&args.amount);
+
+            let selector = ERC20_MINT_SELECTOR;
+            let mint_args = ethabi::encode(&[
+                ethabi::Token::Address(refund_address.raw()),
+                ethabi::Token::Uint(amount),
+            ]);
+
+            engine.call(
+                &erc20_admin_address,
+                &erc20_address,
+                Wei::zero(),
+                [selector, mint_args.as_slice()].concat(),
+                u64::MAX,
+                Vec::new(),
+                handler,
+            )
+        }
+        // ETH exit; transfer ETH back from precompile address
+        None => {
+            let exit_address = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
+            let mut engine =
+                Engine::new_with_state(state, exit_address, current_account_id, io, env);
+            let refund_address = args.recipient_address;
+            let amount = Wei::new(U256::from_big_endian(&args.amount));
+            engine.call(
+                &exit_address,
+                &refund_address,
+                amount,
+                Vec::new(),
+                u64::MAX,
+                vec![
+                    (exit_address.raw(), Vec::new()),
+                    (refund_address.raw(), Vec::new()),
+                ],
+                handler,
+            )
+        }
+    }
+}
+
 /// There is one Aurora block per NEAR block height (note: when heights in NEAR are skipped
 /// they are interpreted as empty blocks on Aurora). The blockhash is derived from the height
 /// according to
@@ -1306,8 +1369,8 @@ where
 {
     logs.into_iter()
         .filter_map(|log| {
-            if log.address == ExitToNear::ADDRESS.raw()
-                || log.address == ExitToEthereum::ADDRESS.raw()
+            if log.address == exit_to_near::ADDRESS.raw()
+                || log.address == exit_to_ethereum::ADDRESS.raw()
             {
                 if log.topics.is_empty() {
                     if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
@@ -1461,7 +1524,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
             balance: get_balance(&self.io, &address).raw(),
         });
         if !basic_info.balance.is_zero() || !basic_info.nonce.is_zero() {
-            return false;
+            return true;
         }
         let mut cache = self.contract_code_cache.borrow_mut();
         let code = cache.get_or_insert_with(&address, || get_code(&self.io, &address));

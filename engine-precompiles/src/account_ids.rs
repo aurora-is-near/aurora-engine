@@ -1,38 +1,41 @@
 use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::{Address, EthGas};
 use crate::PrecompileOutput;
+use aurora_engine_sdk::env::Env;
 use aurora_engine_types::account_id::AccountId;
 use evm::{Context, ExitError};
 
 mod costs {
     use crate::prelude::types::EthGas;
 
-    // TODO(#51): Determine the correct amount of gas
+    // TODO(#483): Determine the correct amount of gas
     pub(super) const PREDECESSOR_ACCOUNT_GAS: EthGas = EthGas::new(0);
-    // TODO(#51): Determine the correct amount of gas
+    // TODO(#483): Determine the correct amount of gas
     pub(super) const CURRENT_ACCOUNT_GAS: EthGas = EthGas::new(0);
 }
 
-pub struct PredecessorAccount {
-    predecessor_account_id: AccountId,
+pub struct PredecessorAccount<'a, E> {
+    env: &'a E,
 }
 
-impl PredecessorAccount {
+pub mod predecessor_account {
+    use aurora_engine_types::types::Address;
+
     /// predecessor_account_id precompile address
     ///
     /// Address: `0x723ffbaba940e75e7bf5f6d61dcbf8d9a4de0fd7`
     /// This address is computed as: `&keccak("predecessorAccountId")[12..]`
     pub const ADDRESS: Address =
-        super::make_address(0x723ffbab, 0xa940e75e7bf5f6d61dcbf8d9a4de0fd7);
+        crate::make_address(0x723ffbab, 0xa940e75e7bf5f6d61dcbf8d9a4de0fd7);
+}
 
-    pub fn new(predecessor_account_id: AccountId) -> Self {
-        Self {
-            predecessor_account_id,
-        }
+impl<'a, E> PredecessorAccount<'a, E> {
+    pub fn new(env: &'a E) -> Self {
+        Self { env }
     }
 }
 
-impl Precompile for PredecessorAccount {
+impl<'a, E: Env> Precompile for PredecessorAccount<'a, E> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::PREDECESSOR_ACCOUNT_GAS)
     }
@@ -51,10 +54,8 @@ impl Precompile for PredecessorAccount {
             }
         }
 
-        Ok(
-            PrecompileOutput::without_logs(cost, self.predecessor_account_id.as_bytes().to_vec())
-                .into(),
-        )
+        let predecessor_account_id = self.env.predecessor_account_id();
+        Ok(PrecompileOutput::without_logs(cost, predecessor_account_id.as_bytes().to_vec()).into())
     }
 }
 
@@ -103,13 +104,13 @@ impl Precompile for CurrentAccount {
 
 #[cfg(test)]
 mod tests {
-    use crate::account_ids::{CurrentAccount, PredecessorAccount};
+    use crate::account_ids::{predecessor_account, CurrentAccount};
     use crate::prelude::sdk::types::near_account_to_evm_address;
 
     #[test]
     fn test_predecessor_account_precompile_id() {
         assert_eq!(
-            PredecessorAccount::ADDRESS,
+            predecessor_account::ADDRESS,
             near_account_to_evm_address("predecessorAccountId".as_bytes())
         );
     }

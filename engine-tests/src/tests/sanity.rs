@@ -176,6 +176,73 @@ fn test_log_address() {
 }
 
 #[test]
+fn test_is_contract() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+
+    let constructor = test_utils::solidity::ContractConstructor::force_compile(
+        "src/tests/res",
+        "target/solidity_build",
+        "is_contract.sol",
+        "IsContract",
+    );
+
+    let nonce = signer.use_nonce();
+    let contract = runner.deploy_contract(
+        &signer.secret_key,
+        |c| c.deploy_without_constructor(nonce.into()),
+        constructor,
+    );
+
+    let call_contract = |account: Address,
+                         runner: &mut test_utils::AuroraRunner,
+                         signer: &mut test_utils::Signer|
+     -> bool {
+        let result = runner
+            .submit_with_signer(signer, |nonce| {
+                contract.call_method_with_args(
+                    "isContract",
+                    &[ethabi::Token::Address(account.raw())],
+                    nonce,
+                )
+            })
+            .unwrap();
+        let bytes = test_utils::unwrap_success_slice(&result);
+        ethabi::decode(&[ethabi::ParamType::Bool], bytes)
+            .unwrap()
+            .pop()
+            .unwrap()
+            .into_bool()
+            .unwrap()
+    };
+
+    // Should return false for accounts that don't exist
+    assert_eq!(
+        call_contract(Address::from_array([1; 20]), &mut runner, &mut signer),
+        false,
+    );
+
+    // Should return false for accounts that don't have contract code
+    assert_eq!(
+        call_contract(signer_address, &mut runner, &mut signer),
+        false,
+    );
+
+    // Should return true for contracts
+    let erc20_constructor = test_utils::erc20::ERC20Constructor::load();
+    let nonce = signer.use_nonce();
+    let token_a = runner.deploy_contract(
+        &signer.secret_key,
+        |c| c.deploy("TOKEN_A", "TA", nonce.into()),
+        erc20_constructor,
+    );
+    assert_eq!(
+        call_contract(token_a.address, &mut runner, &mut signer),
+        true,
+    );
+}
+
+#[test]
 fn test_solidity_pure_bench() {
     let (mut runner, mut signer, _) = initialize_transfer();
     runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
@@ -195,7 +262,7 @@ fn test_solidity_pure_bench() {
     );
 
     // Number of iterations to do
-    let loop_limit = 10_000;
+    let loop_limit: u32 = 10_000;
     let (result, profile) = runner
         .submit_with_signer_profiled(&mut signer, |nonce| {
             contract.call_method_with_args(
@@ -216,6 +283,35 @@ fn test_solidity_pure_bench() {
         "Expected 1500 NEAR Tgas to be used, but only consumed {}",
         near_gas / 1_000_000_000_000,
     );
+
+    // Pure rust version of the same contract
+    let base_path = std::path::Path::new("../etc").join("benchmark-contract");
+    let output_path =
+        base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
+    test_utils::rust::compile(base_path);
+    let contract_bytes = std::fs::read(output_path).unwrap();
+    let code = near_primitives_core::contract::ContractCode::new(contract_bytes, None);
+    let mut context = runner.context.clone();
+    context.input = loop_limit.to_le_bytes().to_vec();
+    let (outcome, error) = near_vm_runner::run(
+        &code,
+        "cpu_ram_soak_test",
+        &mut runner.ext,
+        context,
+        &runner.wasm_config,
+        &runner.fees_config,
+        &[],
+        runner.current_protocol_version,
+        Some(&runner.cache),
+    );
+    if let Some(e) = error {
+        panic!("{:?}", e);
+    }
+    let outcome = outcome.unwrap();
+    let profile = test_utils::ExecutionProfile::new(&outcome);
+    // Check the contract actually did the work.
+    assert_eq!(&outcome.logs, &[format!("Done {} iterations!", loop_limit)]);
+    assert!(profile.all_gas() < 1_000_000_000_000); // Less than 1 Tgas used!
 }
 
 #[test]

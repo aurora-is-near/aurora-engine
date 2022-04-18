@@ -9,7 +9,7 @@ use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
 use near_primitives_core::runtime::fees::RuntimeFeesConfig;
 use near_vm_logic::types::ReturnData;
-use near_vm_logic::{VMContext, VMOutcome};
+use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
 use secp256k1::{self, Message, PublicKey, SecretKey};
@@ -47,7 +47,7 @@ pub(crate) mod standard_precompiles;
 pub(crate) mod uniswap;
 pub(crate) mod weth;
 
-pub(crate) struct Signer {
+pub struct Signer {
     pub nonce: u64,
     pub secret_key: SecretKey,
 }
@@ -400,7 +400,11 @@ impl AuroraRunner {
 
     pub fn view_call(&self, args: ViewCallArgs) -> Result<TransactionStatus, VMError> {
         let input = args.try_to_vec().unwrap();
-        let (outcome, maybe_error) = self.one_shot().call("view", "viewer", input);
+        let mut runner = self.one_shot();
+        runner.context.view_config = Some(ViewConfig {
+            max_gas_burnt: u64::MAX,
+        });
+        let (outcome, maybe_error) = runner.call("view", "viewer", input);
         Ok(
             TransactionStatus::try_from_slice(&Self::bytes_from_outcome(outcome, maybe_error)?)
                 .unwrap(),
@@ -412,8 +416,11 @@ impl AuroraRunner {
         args: ViewCallArgs,
     ) -> (Result<TransactionStatus, VMError>, ExecutionProfile) {
         let input = args.try_to_vec().unwrap();
-        let (outcome, maybe_error, profile) =
-            self.one_shot().profiled_call("view", "viewer", input);
+        let mut runner = self.one_shot();
+        runner.context.view_config = Some(ViewConfig {
+            max_gas_burnt: u64::MAX,
+        });
+        let (outcome, maybe_error, profile) = runner.profiled_call("view", "viewer", input);
         let status = Self::bytes_from_outcome(outcome, maybe_error)
             .map(|bytes| TransactionStatus::try_from_slice(&bytes).unwrap());
 

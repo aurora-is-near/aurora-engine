@@ -2,7 +2,10 @@ use aurora_engine::engine;
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
-use engine_standalone_storage::BlockMetadata;
+use engine_standalone_storage::{
+    sync::types::{TransactionKind, TransactionMessage},
+    BlockMetadata,
+};
 
 use crate::test_utils::standalone::{mocks, storage::create_db};
 use crate::test_utils::{self, Signer};
@@ -86,8 +89,7 @@ fn test_replay_transaction() {
                         .execute_transaction_at_position(tx, block_height, position as u16)
                         .unwrap();
 
-                    diff.clone()
-                        .commit(&mut runner.storage, &mut runner.cumulative_diff);
+                    test_utils::standalone::storage::commit(&mut runner.storage, &diff);
 
                     assert_eq!(
                         runner.get_balance(&address),
@@ -195,6 +197,14 @@ fn test_block_index() {
         block_metadata,
         storage.get_block_metadata(block_hash).unwrap()
     );
+    assert_eq!(
+        (block_hash, block_height),
+        storage.get_latest_block().unwrap(),
+    );
+    assert_eq!(
+        (block_hash, block_height),
+        storage.get_earliest_block().unwrap(),
+    );
 
     // block hash / height that do not exist are errors
     let missing_block_height = block_height + 1;
@@ -214,6 +224,40 @@ fn test_block_index() {
         other => panic!("Unexpected response: {:?}", other),
     }
 
+    // insert later block
+    let next_height = block_height + 1;
+    let next_hash = H256([0xaa; 32]);
+    storage
+        .set_block_data(next_hash, next_height, block_metadata.clone())
+        .unwrap();
+
+    // check earliest+latest blocks are still correct
+    assert_eq!(
+        (next_hash, next_height),
+        storage.get_latest_block().unwrap(),
+    );
+    assert_eq!(
+        (block_hash, block_height),
+        storage.get_earliest_block().unwrap(),
+    );
+
+    // insert earlier block
+    let prev_height = block_height - 1;
+    let prev_hash = H256([0xbb; 32]);
+    storage
+        .set_block_data(prev_hash, prev_height, block_metadata.clone())
+        .unwrap();
+
+    // check earliest+latest blocks are still correct
+    assert_eq!(
+        (next_hash, next_height),
+        storage.get_latest_block().unwrap(),
+    );
+    assert_eq!(
+        (prev_hash, prev_height),
+        storage.get_earliest_block().unwrap(),
+    );
+
     drop(storage);
     temp_dir.close().unwrap();
 }
@@ -227,6 +271,16 @@ fn test_transaction_index() {
     let block_hash = mocks::compute_block_hash(block_height);
     let tx_hash = H256([77u8; 32]);
     let tx_position = 0u16;
+    let tx_msg = TransactionMessage {
+        block_hash,
+        near_receipt_id: H256::zero(),
+        position: tx_position,
+        succeeded: true,
+        signer: "placeholder.near".parse().unwrap(),
+        caller: "placeholder.near".parse().unwrap(),
+        attached_near: 0,
+        transaction: TransactionKind::Unknown,
+    };
     let tx_included = engine_standalone_storage::TransactionIncluded {
         block_hash,
         position: tx_position,
@@ -244,13 +298,10 @@ fn test_transaction_index() {
 
     // write transaction association
     storage
-        .set_transaction_included(tx_hash, &tx_included, &diff)
+        .set_transaction_included(tx_hash, &tx_msg, &diff)
         .unwrap();
     // read it back
-    assert_eq!(
-        tx_included,
-        storage.get_transaction_by_hash(tx_hash).unwrap(),
-    );
+    assert_eq!(tx_msg, storage.get_transaction_data(tx_hash).unwrap(),);
     assert_eq!(
         tx_hash,
         storage.get_transaction_by_position(tx_included).unwrap()
@@ -271,7 +322,7 @@ fn test_transaction_index() {
         position: 0,
     };
     let missing_tx_hash = H256([13u8; 32]);
-    match storage.get_transaction_by_hash(missing_tx_hash) {
+    match storage.get_transaction_data(missing_tx_hash) {
         Err(engine_standalone_storage::Error::TransactionHashNotFound(h))
             if h == missing_tx_hash =>
         {
@@ -290,4 +341,63 @@ fn test_transaction_index() {
 
     drop(storage);
     temp_dir.close().unwrap();
+}
+
+#[test]
+fn test_track_key() {
+    // Set up the test
+    let mut signer = Signer::random();
+    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let initial_balance = Wei::new_u64(1000);
+    let transfer_amount = Wei::new_u64(37);
+    let dest1 = Address::from_array([0x11; 20]);
+    let dest2 = Address::from_array([0x22; 20]);
+    let mut runner = test_utils::standalone::StandaloneRunner::default();
+
+    runner.init_evm();
+    runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);
+    let created_block_height = runner.env.block_height;
+
+    let result = runner
+        .transfer_with_signer(&mut signer, transfer_amount, dest1)
+        .unwrap();
+    assert!(result.status.is_ok());
+    let result = runner
+        .transfer_with_signer(&mut signer, transfer_amount, dest2)
+        .unwrap();
+    assert!(result.status.is_ok());
+
+    // The balance key for the signer will have changed 3 times:
+    // 1. Account minted
+    // 2. Transfer to dest1
+    // 3. Transfer to dest2
+    let balance_key = aurora_engine_types::storage::address_to_key(
+        aurora_engine_types::storage::KeyPrefix::Balance,
+        &signer_address,
+    );
+    let trace = runner.storage.track_engine_key(&balance_key).unwrap();
+    let mut expected_balance = initial_balance;
+    for (i, (block_height, tx_hash, value)) in trace.into_iter().enumerate() {
+        let i = i as u64;
+        assert_eq!(block_height, created_block_height + i);
+        let transaction_included = engine_standalone_storage::TransactionIncluded {
+            block_hash: runner
+                .storage
+                .get_block_hash_by_height(block_height)
+                .unwrap(),
+            position: 0,
+        };
+        assert_eq!(
+            tx_hash,
+            runner
+                .storage
+                .get_transaction_by_position(transaction_included)
+                .unwrap()
+        );
+        let balance = Wei::new(U256::from_big_endian(value.value().unwrap()));
+        assert_eq!(balance, expected_balance);
+        expected_balance = expected_balance - transfer_amount;
+    }
+
+    runner.close();
 }

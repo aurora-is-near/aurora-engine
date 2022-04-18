@@ -11,7 +11,7 @@ pub enum PromiseArgs {
 }
 
 #[must_use]
-#[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
+#[derive(Debug, BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq)]
 pub struct PromiseCreateArgs {
     pub target_account_id: AccountId,
     pub method: String,
@@ -21,7 +21,7 @@ pub struct PromiseCreateArgs {
 }
 
 #[must_use]
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq)]
 pub struct PromiseWithCallbackArgs {
     pub base: PromiseCreateArgs,
     pub callback: PromiseCreateArgs,
@@ -51,14 +51,14 @@ pub struct PromiseBatchAction {
 }
 
 /// withdraw NEAR eth-connector call args
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct WithdrawCallArgs {
     pub recipient_address: Address,
     pub amount: NEP141Wei,
 }
 
 /// withdraw NEAR eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct RefundCallArgs {
     pub recipient_address: Address,
     pub erc20_address: Option<Address>,

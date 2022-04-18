@@ -63,13 +63,22 @@ fn test_evm_tracing_with_storage() {
         .storage
         .set_block_data(block_hash, block_height, block_metadata)
         .unwrap();
-    let tx = test_utils::standalone::TransactionComplete {
+    let tx = engine_standalone_storage::sync::TransactionIncludedOutcome {
+        hash: H256::zero(),
+        info: engine_standalone_storage::sync::types::TransactionMessage {
+            block_hash,
+            near_receipt_id: H256::zero(),
+            position: 0,
+            succeeded: true,
+            signer: "system".parse().unwrap(),
+            caller: "system".parse().unwrap(),
+            attached_near: 0,
+            transaction: engine_standalone_storage::sync::types::TransactionKind::Unknown,
+        },
         diff,
-        block_hash,
-        transaction_position: 0,
-        transaction_hash: H256::zero(),
+        maybe_result: None,
     };
-    tx.commit(&mut runner.storage, &mut runner.cumulative_diff);
+    test_utils::standalone::storage::commit(&mut runner.storage, &tx);
 
     // Replay transaction depositing some ETH to get WETH (for the first time)
     // tx: https://etherscan.io/tx/0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4

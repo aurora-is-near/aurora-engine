@@ -141,11 +141,17 @@ where
         }
 
         let diff = io.get_transaction_diff();
-        let tx_included = crate::TransactionIncluded {
+        let tx_msg = crate::TransactionMessage {
             block_hash,
+            near_receipt_id: near_tx_hash,
             position: transaction_position,
+            succeeded: true,
+            signer: env.signer_account_id(),
+            caller: env.predecessor_account_id(),
+            attached_near: 0,
+            transaction: crate::sync::types::TransactionKind::Submit(tx),
         };
-        storage.set_transaction_included(tx_hash, &tx_included, &diff)?;
+        storage.set_transaction_included(tx_hash, &tx_msg, &diff)?;
     }
     Ok(())
 }
@@ -189,6 +195,7 @@ pub mod error {
 #[cfg(test)]
 mod test {
     use super::FallibleIterator;
+    use crate::sync::types::{TransactionKind, TransactionMessage};
     use aurora_engine::{connector, engine, parameters};
     use aurora_engine_types::H256;
 
@@ -237,9 +244,15 @@ mod test {
             storage
                 .set_transaction_included(
                     H256::zero(),
-                    &crate::TransactionIncluded {
+                    &TransactionMessage {
                         block_hash,
                         position: 0,
+                        near_receipt_id: H256::zero(),
+                        succeeded: true,
+                        signer: "aurora".parse().unwrap(),
+                        caller: "aurora".parse().unwrap(),
+                        attached_near: 0,
+                        transaction: TransactionKind::Unknown,
                     },
                     &diff,
                 )

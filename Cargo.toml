@@ -41,4 +41,5 @@ members = [
 exclude = [
     "etc/state-migration-test",
     "etc/ft-receiver",
+    "etc/benchmark-contract",
 ]
