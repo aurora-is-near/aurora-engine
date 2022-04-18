@@ -42,7 +42,7 @@ pub struct MetaCallArgs {
 }
 
 /// Borsh-encoded log for use in a `SubmitResult`.
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ResultLog {
     pub address: Address,
