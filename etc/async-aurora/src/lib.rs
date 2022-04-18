@@ -24,10 +24,9 @@ pub trait ExtBridgeTokenFactory {
 
 #[ext_contract(ext_aurora)]
 pub trait Aurora {
-    #[result_serializer(borsh)]
     fn submit(
         &mut self,
-        #[serializer(borsh)] payload : FunctionCallArgs,
+        input : Vec<u8>,
     ) -> Promise<SubmitResult>;
 }
 
@@ -102,14 +101,11 @@ fn parse_promises(input: String) -> Vec<PromiseDescription> {
 impl AsyncAurora {
     pub fn call(
         &self,
-        #[serializer(borsh)]
-        args: FunctionCallArgs,
-        #[serializer(borsh)]
+        input: Vec<u8>,
         silo_account_id: AccountId,
     ) -> Promise {
-        assert_eq!(args.value, [0; 32], "Value should be 0");
         ext_aurora::submit(
-            args,
+            input,
             &silo_account_id,
             0, 
             env::prepaid_gas()
