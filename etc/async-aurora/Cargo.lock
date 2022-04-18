@@ -24,11 +24,7 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "async-aurora"
-=======
-name = "async_aurora"
->>>>>>> 511fc7674288a048d59e86ce18d0f8846b7ff0e4
 version = "0.1.0"
 dependencies = [
  "near-sdk",
