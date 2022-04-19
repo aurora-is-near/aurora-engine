@@ -88,11 +88,11 @@ pub fn execute_transaction_message(
     Ok(outcome)
 }
 
-fn execute_transaction<'db, 'input, 'output>(
+fn execute_transaction<'db>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
-    io: EngineStateAccess<'db, 'input, 'output>,
+    mut io: EngineStateAccess<'db, 'db, 'db>,
 ) -> Result<(H256, Diff, Option<TransactionExecutionResult>), error::Error> {
     let signer_account_id = transaction_message.signer.clone();
     let predecessor_account_id = transaction_message.caller.clone();
@@ -330,6 +330,11 @@ fn execute_transaction<'db, 'input, 'output>(
                 env.current_account_id,
                 args.clone(),
             )?;
+
+            (near_receipt_id, None)
+        }
+        TransactionKind::NewEngine(args) => {
+            engine::set_state(&mut io, args.clone().into());
 
             (near_receipt_id, None)
         }
