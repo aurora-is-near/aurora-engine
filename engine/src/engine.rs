@@ -6,7 +6,7 @@ use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::connector::EthConnectorContract;
 use crate::map::BijectionMap;
-use aurora_engine_sdk::dup_cache::{DupCache, PairDupCache};
+use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
@@ -422,9 +422,9 @@ pub struct Engine<'env, I: IO, E: Env> {
     io: I,
     env: &'env E,
     generation_cache: RefCell<BTreeMap<Address, u32>>,
-    account_info_cache: RefCell<DupCache<Address, Basic>>,
-    contract_code_cache: RefCell<DupCache<Address, Vec<u8>>>,
-    contract_storage_cache: RefCell<PairDupCache<Address, H256, H256>>,
+    account_info_cache: RefCell<FullCache<Address, Basic>>,
+    contract_code_cache: RefCell<FullCache<Address, Vec<u8>>>,
+    contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
 }
 
 pub(crate) const CONFIG: &Config = &Config::london();
@@ -457,9 +457,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             io,
             env,
             generation_cache: RefCell::new(BTreeMap::new()),
-            account_info_cache: RefCell::new(DupCache::default()),
-            contract_code_cache: RefCell::new(DupCache::default()),
-            contract_storage_cache: RefCell::new(PairDupCache::default()),
+            account_info_cache: RefCell::new(FullCache::default()),
+            contract_code_cache: RefCell::new(FullCache::default()),
+            contract_storage_cache: RefCell::new(FullCache::default()),
         }
     }
 
@@ -1519,7 +1519,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     fn exists(&self, address: H160) -> bool {
         let address = Address::new(address);
         let mut cache = self.account_info_cache.borrow_mut();
-        let basic_info = cache.get_or_insert_with(&address, || Basic {
+        let basic_info = cache.get_or_insert_with(address, || Basic {
             nonce: get_nonce(&self.io, &address),
             balance: get_balance(&self.io, &address).raw(),
         });
@@ -1527,7 +1527,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
             return true;
         }
         let mut cache = self.contract_code_cache.borrow_mut();
-        let code = cache.get_or_insert_with(&address, || get_code(&self.io, &address));
+        let code = cache.get_or_insert_with(address, || get_code(&self.io, &address));
         !code.is_empty()
     }
 
@@ -1537,7 +1537,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
         let result = self
             .account_info_cache
             .borrow_mut()
-            .get_or_insert_with(&address, || Basic {
+            .get_or_insert_with(address, || Basic {
                 nonce: get_nonce(&self.io, &address),
                 balance: get_balance(&self.io, &address).raw(),
             })
@@ -1550,7 +1550,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
         let address = Address::new(address);
         self.contract_code_cache
             .borrow_mut()
-            .get_or_insert_with(&address, || get_code(&self.io, &address))
+            .get_or_insert_with(address, || get_code(&self.io, &address))
             .clone()
     }
 
@@ -1565,7 +1565,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
         let result = *self
             .contract_storage_cache
             .borrow_mut()
-            .get_or_insert_with((&address, &index), || {
+            .get_or_insert_with((address, index), || {
                 get_storage(&self.io, &address, &index, generation)
             });
         result

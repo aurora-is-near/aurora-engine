@@ -28,10 +28,7 @@ fn test_uniswap_input_multihop() {
     let mut context = UniswapTestContext::new("uniswap");
 
     // evm_gas = 970k
-    // near total gas = 204 Tgas
-    // Wish: optimize so that this transaction costs less than 200 Tgas.
-    // For now we just have to increase the burnt gas limit to make it run to completion.
-    context.runner.wasm_config.limit_config.max_gas_burnt = 500_000_000_000_000;
+    // near total gas = 163 Tgas
 
     let tokens = context.create_tokens(10, MINT_AMOUNT.into());
     for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {
@@ -41,9 +38,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    println!("{:?}", profile.host_breakdown);
-    println!("NEAR_GAS_WASM {:?}", profile.wasm_gas());
-    println!("NEAR_GAS_TOTAL {:?}", profile.all_gas());
+    assert_eq!(163, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
@@ -54,7 +49,7 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    test_utils::assert_gas_bound(profile.all_gas(), 57);
+    test_utils::assert_gas_bound(profile.all_gas(), 47);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         25 <= wasm_fraction && wasm_fraction <= 35,
@@ -64,7 +59,7 @@ fn test_uniswap_exact_output() {
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    test_utils::assert_gas_bound(profile.all_gas(), 31);
+    test_utils::assert_gas_bound(profile.all_gas(), 26);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         25 <= wasm_fraction && wasm_fraction <= 35,
