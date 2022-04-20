@@ -14,15 +14,6 @@ pub enum TransactionStatus {
     CallTooDeep,
 }
 
-/// Borsh-encoded parameters for the `view` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
-pub struct ViewCallArgs {
-    pub sender: EthAddress,
-    pub address: EthAddress,
-    pub amount: RawU256,
-    pub input: Vec<u8>,
-}
-
 /// Borsh-encoded log for use in a `SubmitResult`.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct ResultLog {
