@@ -38,20 +38,12 @@ pub enum StoragePrefix {
 
 pub struct Storage {
     db: DB,
-    engine_transaction: RefCell<Diff>,
-    engine_output: Cell<Vec<u8>>,
 }
 
 impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
         let db = DB::open_default(path)?;
-        let engine_transaction = RefCell::new(Diff::default());
-        let engine_output = Cell::new(Vec::new());
-        Ok(Self {
-            db,
-            engine_transaction,
-            engine_output,
-        })
+        Ok(Self { db })
     }
 
     pub fn get_latest_block(&self) -> Result<(H256, u64), error::Error> {
@@ -341,29 +333,6 @@ impl Storage {
         iter.status()?;
 
         Ok(result)
-    }
-
-    /// Get an object which represents the state of the engine at the given block hash,
-    /// after transactions up to (not including) the given transaction index.
-    /// The `input` is the bytes that would be present in the NEAR runtime (normally
-    /// not needed for standalone engine).
-    pub fn access_engine_storage_at_position<'db, 'input: 'db>(
-        &'db mut self,
-        block_height: u64,
-        transaction_position: u16,
-        input: &'input [u8],
-    ) -> engine_state::EngineStateAccess<'db, 'db, 'db> {
-        self.engine_transaction.borrow_mut().clear();
-        self.engine_output.set(Vec::new());
-
-        engine_state::EngineStateAccess::new(
-            input,
-            block_height,
-            transaction_position,
-            &self.engine_transaction,
-            &self.engine_output,
-            &self.db,
-        )
     }
 
     /// Same as `access_engine_storage_at_position`, but does not modify `self`, hence the immutable
