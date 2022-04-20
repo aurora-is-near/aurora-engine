@@ -1,26 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-
 contract TestAsync {
     constructor() public {}
 
     function simpleCall(
         string memory accountId,
         string memory method,
-        int128 arg,
-        uin256 gas
+        uint128 arg,
+        string memory gas
     ) public returns (string memory) {
         string memory args = string(
-            abi.encodePacked(
-                '{"arg":"',
-                Strings.toString(arg),
-                '"}'
+            abi.encodePacked('{"arg":', toString(arg), '}'
             )
         );
 
@@ -28,13 +19,10 @@ contract TestAsync {
             string(
                 abi.encodePacked(
                     "promises:",
-                    accountId,
-                    "#",
-                    "deposit",
-                    "#",
-                    args,
-                    "#",
-                    Strings.toString(gas)
+                    accountId, "#",
+                    method, "#",
+                    args, "#",
+                    gas
                 )
             );
     }
@@ -43,14 +31,11 @@ contract TestAsync {
         string memory accountId,
         string memory method1,
         string memory method2,
-        int128 arg,
-        uin256 gas
+        uint128 arg,
+        string memory gas
     ) public returns (string memory) {
         string memory args = string(
-            abi.encodePacked(
-                '{"arg":"',
-                Strings.toString(arg),
-                '"}'
+            abi.encodePacked('{"arg":', toString(arg), '}'
             )
         );
 
@@ -61,12 +46,12 @@ contract TestAsync {
                     accountId, "#",
                     method1, "#",
                     args,"#",
-                    Strings.toString(gas),
+                    gas,
                     "##",
                     accountId,"#",
                     method2,"#",
                     args,"#",
-                    Strings.toString(gas), "#",
+                    gas, "#",
                     "->", "#",
                     "0"
                 )
@@ -79,47 +64,68 @@ contract TestAsync {
         string memory method2,
         string memory method3,
         string memory method4,
-        int128 arg,
-        uin256 gas
+        uint128 arg,
+        string memory gas
     ) public returns (string memory) {
         string memory args = string(
-            abi.encodePacked(
-                '{"arg":"',
-                Strings.toString(arg),
-                '"}'
+            abi.encodePacked('{"arg":', toString(arg), '}'
             )
         );
 
-        return
-            string(
-                abi.encodePacked(
-                    "promises:",
+        string memory p1 = string(abi.encodePacked("promises:",
                     accountId, "#",
                     method1, "#",
-                    args,"#",
-                    Strings.toString(gas),
-                    "##",
-                    accountId,"#",
-                    method2,"#",
-                    args,"#",
-                    Strings.toString(gas), "#",
+                    args, "#",
+                    gas,
+                    "##"));
+
+        string memory p2 = string(abi.encodePacked(
+                    accountId, "#",
+                    method2, "#",
+                    args, "#",
+                    gas, "#",
                     "&", "#",
                     "0",
-                    "##",
-                    accountId,"#",
-                    method2,"#",
-                    args,"#",
-                    Strings.toString(gas), "#",
+                    "##"));
+
+        string memory p3 = string(abi.encodePacked(
+                    accountId, "#",
+                    method3, "#",
+                    args, "#",
+                    gas, "#",
                     "->", "#",
                     "1",
-                    "##",
-                    accountId,"#",
-                    method2,"#",
-                    args,"#",
-                    Strings.toString(gas), "#",
+                    "##"));
+
+        string memory p4 = string(abi.encodePacked(
+                    accountId, "#",
+                    method4, "#",
+                    args, "#",
+                    gas, "#",
                     "&", "#",
-                    "2"
-                )
+                    "0"));       
+        return
+            string(
+                abi.encodePacked(p1, p2, p3, p4)
             );
+    }
+
+    function toString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
     }
 }

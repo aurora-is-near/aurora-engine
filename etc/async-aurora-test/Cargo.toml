@@ -1,5 +1,5 @@
 [package]
-name = "async_aurora_test"
+name = "async-aurora-test"
 version = "0.1.0"
 authors = ["Aurora <hello@aurora.dev>"]
 edition = "2021"
