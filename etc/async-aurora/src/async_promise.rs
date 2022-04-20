@@ -33,10 +33,9 @@ pub fn parse_promises(input: String) -> Vec<PromiseDescription> {
         let gas = iter.next().expect(ERR_INVALID_PROMISE).parse::<u64>().expect(ERR_INVALID_PROMISE);
         let mut combinator: Option<CombinatorDescription> = None;
 
-        if let Some(index_str) = iter.next() {
-            let promise_index = index_str.parse::<u8>().expect(ERR_INVALID_PROMISE);
-            let type_str = iter.next().expect(ERR_INVALID_PROMISE);
+        if let Some(type_str) = iter.next() {
             let combinator_type = if type_str == "&" {CombinatorType::And} else {CombinatorType::Then};
+            let promise_index = iter.next().expect(ERR_INVALID_PROMISE).parse::<u8>().expect(ERR_INVALID_PROMISE);
             combinator = Some(CombinatorDescription {
                 promise_index,
                 combinator_type,

@@ -19,6 +19,7 @@ overflow-checks = true
 
 [dependencies]
 near-sdk = "3.1.0"
+ethabi = "12.0.0"
 
 [features]
 default = []
