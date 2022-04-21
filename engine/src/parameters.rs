@@ -11,7 +11,7 @@ use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
 use evm::backend::Log;
 
 /// Borsh-encoded parameters for the `new` function.
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct NewCallArgs {
     /// Chain id, according to the EIP-115 / ethereum-lists spec.
     pub chain_id: RawU256,

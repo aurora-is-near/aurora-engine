@@ -98,6 +98,8 @@ pub enum TransactionKind {
     SetConnectorData(parameters::SetContractDataCallArgs),
     /// Initialize eth-connector
     NewConnector(parameters::InitCallArgs),
+    /// Initialize Engine
+    NewEngine(parameters::NewCallArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -183,6 +185,7 @@ enum BorshableTransactionKind<'a> {
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
     NewConnector(Cow<'a, parameters::InitCallArgs>),
+    NewEngine(Cow<'a, parameters::NewCallArgs>),
     Unknown,
 }
 
@@ -213,6 +216,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::RefundOnError(x) => Self::RefundOnError(Cow::Borrowed(x)),
             TransactionKind::SetConnectorData(x) => Self::SetConnectorData(Cow::Borrowed(x)),
             TransactionKind::NewConnector(x) => Self::NewConnector(Cow::Borrowed(x)),
+            TransactionKind::NewEngine(x) => Self::NewEngine(Cow::Borrowed(x)),
             TransactionKind::Unknown => Self::Unknown,
         }
     }
@@ -256,6 +260,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::SetConnectorData(x.into_owned()))
             }
             BorshableTransactionKind::NewConnector(x) => Ok(Self::NewConnector(x.into_owned())),
+            BorshableTransactionKind::NewEngine(x) => Ok(Self::NewEngine(x.into_owned())),
             BorshableTransactionKind::Unknown => Ok(Self::Unknown),
         }
     }
