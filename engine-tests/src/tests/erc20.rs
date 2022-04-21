@@ -184,7 +184,7 @@ fn erc20_transfer_insufficient_balance() {
         })
         .unwrap();
     let message = parse_erc20_error_message(&test_utils::unwrap_revert(outcome));
-    assert_eq!(&message, "&ERC20: transfer amount exceeds balance");
+    assert_eq!(&message, "EVM_ERC20: transfer amount exceeds balance");
 
     // Validate post-state
     assert_eq!(
@@ -260,7 +260,9 @@ fn get_address_erc20_balance(
 }
 
 fn parse_erc20_error_message(result: &[u8]) -> String {
-    let start_index = result.find_char('&').unwrap();
+    let lala = String::from_utf8_lossy(result).to_string();
+    println!("{:?}", lala);
+    let start_index = result.find_char('*').unwrap() + 1;
     let end_index = result[start_index..].find_byte(0).unwrap() + start_index;
 
     String::from_utf8(result[start_index..end_index].to_vec()).unwrap()

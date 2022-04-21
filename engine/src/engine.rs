@@ -23,6 +23,7 @@ use crate::prelude::{
 };
 use aurora_engine_precompiles::PrecompileConstructorContext;
 use core::cell::RefCell;
+use ethabi::Token;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -171,7 +172,29 @@ impl ExitIntoResult for ExitReason {
         use ExitReason::*;
         match self {
             Succeed(_) => Ok(TransactionStatus::Succeed(data)),
-            Revert(_) => Ok(TransactionStatus::Revert(data)),
+            Revert(_) => {
+                if data.len() <= 4 {
+                    return Ok(TransactionStatus::Revert(data));
+                }
+
+                // First 4 bytes is a function selector with signature `Error(string)`
+                let function_selector = data[..4].to_vec();
+
+                if let Ok(mut tokens) = ethabi::decode(&[ethabi::ParamType::String], &data[4..]) {
+                    // Remaining data is an ABI-encoded string
+                    let message = tokens.pop().unwrap().into_string().unwrap();
+
+                    // Prefix contract error with EVM_
+                    let message = "EVM_".to_string() + &message;
+                    tokens.push(Token::String(message));
+                    let message = ethabi::encode(&tokens[..]);
+                    let data = function_selector.into_iter().chain(message).collect();
+
+                    return Ok(TransactionStatus::Revert(data));
+                }
+
+                Ok(TransactionStatus::Revert(data))
+            }
             Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
             Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
             Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
@@ -1667,4 +1690,44 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::engine::ExitIntoResult;
+    use crate::parameters::TransactionStatus;
+    use ethabi::Token;
+    use evm_core::{ExitReason, ExitRevert};
+
+    type Result = std::result::Result<(), Box<dyn std::error::Error>>;
+
+    #[test]
+    fn test_revert_transaction_status_prefixes_contract_error() -> Result {
+        let revert = ExitReason::Revert(ExitRevert::Reverted);
+        let error_message = ethabi::encode(&[Token::String("ERROR".to_string())]);
+        let function_selector = &[8u8, 195, 121, 160];
+        let data: Vec<u8> = function_selector
+            .into_iter()
+            .copied()
+            .chain(error_message.into_iter())
+            .collect();
+        let status = revert.into_result(data).expect("Failed to get result");
+        let expected_message = "EVM_ERROR";
+
+        match status {
+            TransactionStatus::Revert(data) => {
+                // First 4 bytes is a function selector with signature `Error(string)`
+                assert_eq!(&data[..4], function_selector);
+                // Remaining data is an ABI-encoded string
+                let revert_message = ethabi::decode(&[ethabi::ParamType::String], &data[4..])
+                    .unwrap()
+                    .pop()
+                    .unwrap()
+                    .into_string()
+                    .unwrap();
+
+                assert_eq!(revert_message.as_str(), expected_message);
+
+                Ok(())
+            }
+            status => panic!("Unexpected transaction status {:?}", status),
+        }
+    }
+}

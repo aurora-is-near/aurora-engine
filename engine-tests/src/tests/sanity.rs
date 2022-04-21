@@ -334,7 +334,7 @@ fn test_revert_during_contract_deploy() {
 
     let revert_bytes = crate::test_utils::unwrap_revert(submit_result);
     // First 4 bytes is a function selector with signature `Error(string)`
-    assert_eq!(&revert_bytes[0..4], &[8, 195, 121, 160]);
+    assert_eq!(&revert_bytes[..4], &[8, 195, 121, 160]);
     // Remaining data is an ABI-encoded string
     let revert_message = ethabi::decode(&[ethabi::ParamType::String], &revert_bytes[4..])
         .unwrap()
@@ -343,7 +343,7 @@ fn test_revert_during_contract_deploy() {
         .into_string()
         .unwrap();
 
-    assert_eq!(revert_message.as_str(), "Revert message");
+    assert_eq!(revert_message.as_str(), "EVM_Revert message");
 }
 
 #[test]
