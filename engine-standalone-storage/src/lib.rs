@@ -12,7 +12,7 @@ pub mod diff;
 pub mod engine_state;
 pub mod error;
 pub mod json_snapshot;
-mod promise;
+pub mod promise;
 pub mod relayer_db;
 /// Functions for receiving new blocks and transactions to keep the storage up to date.
 pub mod sync;
