@@ -9,6 +9,8 @@ use crate::prelude::{
 use crate::proof::Proof;
 use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
 use evm::backend::Log;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -41,6 +43,7 @@ pub struct MetaCallArgs {
 
 /// Borsh-encoded log for use in a `SubmitResult`.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ResultLog {
     pub address: Address,
     pub topics: Vec<RawU256>,

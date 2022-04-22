@@ -38,6 +38,7 @@ ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 byte-slice-cast = { version = "1.0", default-features = false }
 rjson = { git = "https://github.com/aurora-is-near/rjson", rev = "cc3da949", default-features = false, features = ["integer"] }
+serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -58,3 +59,4 @@ mainnet = ["contract", "log"]
 testnet = ["contract", "log"]
 mainnet-test = ["meta-call"]
 testnet-test = ["meta-call"]
+impl-serde = ["aurora-engine-types/impl-serde", "serde", "aurora-engine-transactions/impl-serde"]
