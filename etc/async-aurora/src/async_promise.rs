@@ -30,12 +30,24 @@ pub fn parse_promises(input: String) -> Vec<PromiseDescription> {
         let target = iter.next().expect(ERR_INVALID_PROMISE).into();
         let method_name = iter.next().expect(ERR_INVALID_PROMISE).into();
         let arguments = iter.next().expect(ERR_INVALID_PROMISE).into();
-        let gas = iter.next().expect(ERR_INVALID_PROMISE).parse::<u64>().expect(ERR_INVALID_PROMISE);
+        let gas = iter
+            .next()
+            .expect(ERR_INVALID_PROMISE)
+            .parse::<u64>()
+            .expect(ERR_INVALID_PROMISE);
         let mut combinator: Option<CombinatorDescription> = None;
 
         if let Some(type_str) = iter.next() {
-            let combinator_type = if type_str == "&" {CombinatorType::And} else {CombinatorType::Then};
-            let promise_index = iter.next().expect(ERR_INVALID_PROMISE).parse::<u8>().expect(ERR_INVALID_PROMISE);
+            let combinator_type = if type_str == "&" {
+                CombinatorType::And
+            } else {
+                CombinatorType::Then
+            };
+            let promise_index = iter
+                .next()
+                .expect(ERR_INVALID_PROMISE)
+                .parse::<u8>()
+                .expect(ERR_INVALID_PROMISE);
             combinator = Some(CombinatorDescription {
                 promise_index,
                 combinator_type,
