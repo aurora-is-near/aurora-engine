@@ -71,27 +71,27 @@ impl AsyncAurora {
 
         let promises_str = ethabi::decode(&[ethabi::ParamType::String], output.as_slice()).unwrap().pop().unwrap().to_string().unwrap();
         let promises_desc = parse_promises(promises_str);
-        let mut promises: Vec<Promise> = Vec::new();
-        for (ix, promise_desc) in promises_desc.iter().enumerate() {
-            let promise = Promise::new(promise_desc.target.clone()).function_call(
+        let mut promises: Vec<Promise> = Vec::with_capacity(promises_desc.len());
+        for promise_desc in promises_desc {
+            let mut promise = Promise::new(promise_desc.target.clone()).function_call(
                 promise_desc.method_name.clone(),
                 promise_desc.arguments.clone(),
                 0,
                 promise_desc.gas,
             ).as_return();
 
-            promises.push(promise.clone());
-
             if let Some(combinator) = &promise_desc.combinator {
                 match combinator.combinator_type {
                     CombinatorType::And => {
-                        promises[ix] = promises[combinator.promise_index as usize].clone().and(promise);
+                        promise = promises[combinator.promise_index as usize].clone().and(promise);
                     },
                     CombinatorType::Then => {
-                        promises[ix] = promises[combinator.promise_index as usize].clone().then(promise);
+                        promise = promises[combinator.promise_index as usize].clone().then(promise);
                     },
                 }
             }
+
+            promises.push(promise);
         }
     }
 }
