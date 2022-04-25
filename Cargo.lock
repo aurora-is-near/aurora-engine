@@ -114,6 +114,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-blake2"
+version = "0.9.1"
+source = "git+https://github.com/aurora-is-near/aurora-blake2.git#05a0b5f7a544c527c0118f8afe2f943b3de4bb03"
+dependencies = [
+ "crypto-mac 0.8.0",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
+]
+
+[[package]]
 name = "aurora-bn"
 version = "0.1.0"
 source = "git+https://github.com/aurora-is-near/aurora-bn.git#8f1743884061981cac84388862e2763b2aa09307"
@@ -142,7 +152,6 @@ dependencies = [
  "hex",
  "libsecp256k1",
  "logos",
- "near-blake2",
  "num",
  "primitive-types 0.10.1",
  "rand 0.7.3",
@@ -159,6 +168,7 @@ dependencies = [
 name = "aurora-engine-precompiles"
 version = "1.0.0"
 dependencies = [
+ "aurora-blake2",
  "aurora-bn",
  "aurora-engine-sdk",
  "aurora-engine-types",
@@ -169,7 +179,6 @@ dependencies = [
  "evm-core",
  "hex",
  "libsecp256k1",
- "near-blake2",
  "num",
  "primitive-types 0.10.1",
  "rand 0.7.3",
@@ -2313,16 +2322,6 @@ source = "git+https://github.com/near/nearcore.git?rev=8a377fda0b4ce319385c463f1
 dependencies = [
  "borsh 0.8.2",
  "serde",
-]
-
-[[package]]
-name = "near-blake2"
-version = "0.9.1"
-source = "git+https://github.com/near/near-blake2.git#cebb7df79608a7058017940830d37c37d55d21fe"
-dependencies = [
- "crypto-mac 0.8.0",
- "digest 0.9.0",
- "opaque-debug 0.3.0",
 ]
 
 [[package]]
