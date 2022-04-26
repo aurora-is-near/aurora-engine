@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.5.3] 2022-04-27
+## [2.6.0] 2022-06-07
+
+### Added
+
+- A precompile at the address `0x536822d27de53629ef1f84c60555689e9488609f` was created to expose the prepaid gas from the NEAR host function by [@birchmd]. ([#479])
+
+### Changes
+
+- A better implementation of caching was added to reduce the overall gas costs of storage reads resulting in roughly a 15% - 18% reduction of gas costs by [@birchmd]. ([#488])
+
+### Fixes
+
+- The predecessor account ID was failing in the `view` method by [@birchmd]. ([#477])
+
+[#477]: https://github.com/aurora-is-near/aurora-engine/pull/477
+[#479]: https://github.com/aurora-is-near/aurora-engine/pull/479
+[#488]: https://github.com/aurora-is-near/aurora-engine/pull/488
+
+## [2.5.3] 2022-04-26
 
 ### Fixes
 
@@ -75,22 +93,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A precompile which exposes NEAR's random number generator was added by [@mfornet] as requested by 
-[@birchmd]. ([#368] [#297])
+- A precompile which exposes NEAR's random number generator was added by [@mfornet] as requested by
+  [@birchmd]. ([#368] [#297])
 - London hard fork support was added by [@birchmd]. ([#244])
 
 ### Changes
 
 - The gas limit for `deposit` and `ft_on_transfer` were changed as they were not attaching enough
-gas, as changed by [@mrLSD]. ([#389])
+  gas, as changed by [@mrLSD]. ([#389])
 
 ### Fixes
 
-- There was an issue with the original storage not actually being stored. Unfortunately, previous 
-transactions can't be updated with this change. This has been fixed by [@birchmd]. ([#390])
+- There was an issue with the original storage not actually being stored. Unfortunately, previous
+  transactions can't be updated with this change. This has been fixed by [@birchmd]. ([#390])
 - Call arguments were intended to have a value attached to them to make it equivalent to an ETH
-call. This was fixed in a backwards compatible manner by [@andrcmdr], as reported by [@birchmd].
-([#351] [#309])
+  call. This was fixed in a backwards compatible manner by [@andrcmdr], as reported by [@birchmd].
+  ([#351] [#309])
 
 ### Removed
 
@@ -101,10 +119,10 @@ call. This was fixed in a backwards compatible manner by [@andrcmdr], as reporte
 [#388]: https://github.com/aurora-is-near/aurora-engine/pull/388
 [#368]: https://github.com/aurora-is-near/aurora-engine/pull/368
 [#351]: https://github.com/aurora-is-near/aurora-engine/pull/351
-[#311]: https://github.com/aurora-is-near/aurora-engine/pull/311 
+[#311]: https://github.com/aurora-is-near/aurora-engine/pull/311
 [#309]: https://github.com/aurora-is-near/aurora-engine/issues/309
 [#297]: https://github.com/aurora-is-near/aurora-engine/issues/297
-[#244]: https://github.com/aurora-is-near/aurora-engine/pull/244 
+[#244]: https://github.com/aurora-is-near/aurora-engine/pull/244
 
 ## [2.2.0] - 2021-11-09
 
@@ -244,13 +262,14 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.3...develop
-[2.5.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.2...2.5.3 
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.0...develop
+[2.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.3...2.6.0 
+[2.5.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.2...2.5.3
 [2.5.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.1...2.5.2
 [2.5.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.0...2.5.1
 [2.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.4.0...2.5.0
 [2.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.3.0...2.4.0
-[2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0 
+[2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0
 [2.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.1.0...2.2.0
 [2.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.2...2.1.0
 [2.0.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.1...2.0.2
