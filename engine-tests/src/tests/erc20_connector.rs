@@ -402,7 +402,7 @@ mod sim_tests {
         CallArgs, DeployErc20TokenArgs, FunctionCallArgsV2, SubmitResult,
     };
     use aurora_engine_types::types::Address;
-    use borsh::BorshSerialize;
+    use borsh::{BorshDeserialize, BorshSerialize};
     use near_sdk_sim::UserAccount;
     use serde_json::json;
 
@@ -413,6 +413,69 @@ mod sim_tests {
     const FT_ACCOUNT: &str = "test_token";
     const INITIAL_ETH_BALANCE: u64 = 777_777_777;
     const ETH_EXIT_AMOUNT: u64 = 111_111_111;
+
+    #[test]
+    fn test_ghsa_5c82_x4m4_hcj6_exploit() {
+        let TestExitToNearEthContext {
+            mut signer,
+            signer_address,
+            chain_id,
+            tester_address: _,
+            aurora,
+        } = test_exit_to_near_eth_common();
+
+        let constructor = test_utils::solidity::ContractConstructor::force_compile(
+            "src/tests/res",
+            "target/solidity_build",
+            "exploit.sol",
+            "Exploit",
+        );
+        let nonce = signer.use_nonce().into();
+        let deploy_tx = constructor.deploy_without_constructor(nonce);
+        let signed_tx = test_utils::sign_transaction(deploy_tx, Some(chain_id), &signer.secret_key);
+        let deploy_result = aurora.call("submit", &rlp::encode(&signed_tx));
+        let contract_address = match &deploy_result.status() {
+            near_sdk_sim::transaction::ExecutionStatus::SuccessValue(bytes) => {
+                let submit_result = SubmitResult::try_from_slice(bytes).unwrap();
+                Address::try_from_slice(test_utils::unwrap_success_slice(&submit_result)).unwrap()
+            }
+            _ => panic!("Unknown result: {:?}", deploy_result),
+        };
+        let contract = constructor.deployed_at(contract_address);
+
+        let nonce = signer.use_nonce().into();
+        let hacker_account = "hacker.near";
+        let hacker_account_bytes = hacker_account.as_bytes().to_vec();
+        let mut exploit_tx = contract.call_method_with_args(
+            "exploit",
+            &[ethabi::Token::Bytes(hacker_account_bytes)],
+            nonce,
+        );
+        exploit_tx.value = Wei::new_u64(ETH_EXIT_AMOUNT);
+        let signed_tx =
+            test_utils::sign_transaction(exploit_tx, Some(chain_id), &signer.secret_key);
+        aurora
+            .call("submit", &rlp::encode(&signed_tx))
+            .assert_success();
+
+        // check balances -- Hacker does not steal any funds!
+        assert_eq!(
+            nep_141_balance_of(
+                aurora.contract.account_id.as_str(),
+                &aurora.contract,
+                &aurora,
+            ),
+            INITIAL_ETH_BALANCE as u128
+        );
+        assert_eq!(
+            nep_141_balance_of(hacker_account, &aurora.contract, &aurora),
+            0
+        );
+        assert_eq!(
+            eth_balance_of(signer_address, &aurora),
+            Wei::new_u64(INITIAL_ETH_BALANCE)
+        );
+    }
 
     #[test]
     fn test_exit_to_near() {
