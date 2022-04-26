@@ -1,4 +1,5 @@
 use crate::parameters::{CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs};
+use aurora_engine_precompiles::async_router;
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
@@ -545,7 +546,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(handler, logs);
+        let (logs, _call_result) = filter_promises_from_logs(self, handler, logs);
 
         self.apply(values, Vec::<Log>::new(), true);
 
@@ -629,13 +630,13 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(handler, logs);
+        let (logs, call_result) = filter_promises_from_logs(self, handler, logs);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
 
-        Ok(SubmitResult::new(status, used_gas, logs))
+        call_result.unwrap_or(Ok(SubmitResult::new(status, used_gas, logs)))
     }
 
     pub fn view_with_args(&self, args: ViewCallArgs) -> Result<TransactionStatus, EngineErrorKind> {
@@ -1362,12 +1363,18 @@ fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) 
     remove_all_storage(io, address, generation);
 }
 
-fn filter_promises_from_logs<T, P>(handler: &mut P, logs: T) -> Vec<ResultLog>
+fn filter_promises_from_logs<'env, I: IO + Copy, E: Env, T, P>(
+    engine: &mut Engine<'_, I, E>,
+    handler: &mut P,
+    logs: T,
+) -> (Vec<ResultLog>, Option<EngineResult<SubmitResult>>)
 where
     T: IntoIterator<Item = Log>,
     P: PromiseHandler,
 {
-    logs.into_iter()
+    let mut call_result: Option<EngineResult<SubmitResult>> = None;
+    let logs_result = logs
+        .into_iter()
         .filter_map(|log| {
             if log.address == exit_to_near::ADDRESS.raw()
                 || log.address == exit_to_ethereum::ADDRESS.raw()
@@ -1390,11 +1397,17 @@ where
                     // `topics` field.
                     Some(log.into())
                 }
+            } else if log.address == async_router::ADDRESS.raw() {
+                let args = CallArgs::deserialize(&log.data)?;
+                call_result = Some(engine.call_with_args(args, handler));
+                None
             } else {
                 Some(log.into())
             }
         })
-        .collect()
+        .collect();
+
+    (logs_result, call_result)
 }
 
 fn schedule_promise<P: PromiseHandler>(handler: &mut P, promise: &PromiseCreateArgs) -> PromiseId {

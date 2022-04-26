@@ -3,6 +3,7 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 
 pub mod account_ids;
+pub mod async_router;
 pub mod blake2;
 pub mod bn128;
 pub mod hash;
@@ -17,6 +18,7 @@ pub mod secp256k1;
 mod utils;
 
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
+use crate::async_router::AsyncRouter;
 use crate::blake2::Blake2F;
 use crate::bn128::{Bn128Add, Bn128Mul, Bn128Pair};
 use crate::hash::{RIPEMD160, SHA256};
@@ -113,6 +115,7 @@ pub struct Precompiles<'a, I, E> {
     pub ethereum_exit: ExitToEthereum<I>,
     pub predecessor_account_id: PredecessorAccount<'a, E>,
     pub prepaid_gas: PrepaidGas<'a, E>,
+    pub async_router: AsyncRouter,
 }
 
 impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a, I, E> {
@@ -272,6 +275,7 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
         let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);
+        let async_router = AsyncRouter {};
 
         Self {
             generic_precompiles,
@@ -279,6 +283,7 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             ethereum_exit,
             predecessor_account_id,
             prepaid_gas,
+            async_router,
         }
     }
 
@@ -295,6 +300,8 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             return Some(f(&self.predecessor_account_id));
         } else if address == prepaid_gas::ADDRESS {
             return Some(f(&self.prepaid_gas));
+        } else if address == async_router::ADDRESS {
+            return Some(f(&self.async_router));
         }
         self.generic_precompiles
             .get(&address)
