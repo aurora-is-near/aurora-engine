@@ -3,6 +3,7 @@ mod sim_tests {
     use crate::test_utils::{self, create_eth_transaction};
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
     use aurora_engine::parameters::SubmitResult;
+    use aurora_engine_precompiles::async_router;
     use aurora_engine_types::types::Address;
     use borsh::{BorshDeserialize, BorshSerialize};
     use ethabi::ethereum_types::U128;
@@ -15,7 +16,7 @@ mod sim_tests {
     const RECEIVER_ACCOUNT: &str = "receiver_contract";
     const AURORA_ASYNC_ACCOUNT: &str = "aurora_async";
     const CALLER_GAS: Gas = 25_000_000_000_000;
-    const SUBMIT_GAS: Gas = 20_000_000_000_000;
+    const SUBMIT_GAS: Gas = 50_000_000_000_000;
 
     struct TestContext {
         async_aurora: near_sdk_sim::UserAccount,
@@ -99,7 +100,42 @@ mod sim_tests {
         }
     }
 
-    fn submit(context: &TestContext, input: Vec<u8>) {
+    fn call_aurora_async_submit_over_router(context: &TestContext, input: Vec<u8>) {
+        let router_input = ethabi::encode(&[
+            ethabi::Token::Address(context.caller.raw()),
+            ethabi::Token::Bytes(input),
+            ethabi::Token::Bool(false),
+        ]);
+
+        let signer = test_utils::Signer::random();
+        let tx = create_eth_transaction(
+            Some(async_router::ADDRESS),
+            Wei::new_u64(0),
+            router_input,
+            Some(context.chain_id),
+            &signer.secret_key,
+        );
+
+        let submit_args = AsyncAuroraSubmitArgs {
+            input: rlp::encode(&tx).to_vec(),
+            silo_account_id: context.aurora.contract.account_id().to_string(),
+            submit_gas: SUBMIT_GAS,
+        };
+
+        context
+            .aurora
+            .user
+            .call(
+                context.async_aurora.account_id(),
+                "submit",
+                &submit_args.try_to_vec().unwrap(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .assert_success();
+    }
+
+    fn call_aurora_async_submit(context: &TestContext, input: Vec<u8>) {
         let signer = test_utils::Signer::random();
         let tx = create_eth_transaction(
             Some(context.caller),
@@ -128,7 +164,15 @@ mod sim_tests {
             .assert_success();
     }
 
-    fn caller_simple_call(context: &TestContext, method: String, arg: u128) {
+    fn submit(context: &TestContext, input: Vec<u8>, use_router: bool) {
+        if use_router {
+            call_aurora_async_submit_over_router(context, input);
+        } else {
+            call_aurora_async_submit(context, input);
+        }
+    }
+
+    fn caller_simple_call(context: &TestContext, method: String, arg: u128, use_router: bool) {
         let input = build_input(
             "simpleCall(string,string,uint128,string)",
             &[
@@ -139,10 +183,16 @@ mod sim_tests {
             ],
         );
 
-        submit(context, input);
+        submit(context, input, use_router);
     }
 
-    fn caller_then_call(context: &TestContext, method1: String, method2: String, arg: i128) {
+    fn caller_then_call(
+        context: &TestContext,
+        method1: String,
+        method2: String,
+        arg: i128,
+        use_router: bool,
+    ) {
         let input = build_input(
             "thenCall(string,string,string,uint128,string)",
             &[
@@ -154,7 +204,7 @@ mod sim_tests {
             ],
         );
 
-        submit(context, input);
+        submit(context, input, use_router);
     }
 
     fn caller_and_then_and_call(
@@ -164,6 +214,7 @@ mod sim_tests {
         method3: String,
         method4: String,
         arg: i128,
+        use_router: bool,
     ) {
         let input = build_input(
             "andThenAndCall(string,string,string,string,string,uint128,string)",
@@ -178,22 +229,39 @@ mod sim_tests {
             ],
         );
 
-        submit(context, input);
+        submit(context, input, use_router);
     }
 
-    #[test]
-    fn test_aurora_async() {
+    fn test_aurora_async(use_router: bool) {
         let context = test_common();
-        caller_simple_call(&context, "add".to_string(), 10);
+        caller_simple_call(&context, "add".to_string(), 10, use_router);
         assert_eq!(get_current_receiver_value(&context.receiver), 10);
-        caller_simple_call(&context, "sub".to_string(), 10);
+        caller_simple_call(&context, "sub".to_string(), 10, use_router);
         assert_eq!(get_current_receiver_value(&context.receiver), 0);
 
-        caller_then_call(&context, "add".to_string(), "mul".to_string(), 5);
+        caller_then_call(
+            &context,
+            "add".to_string(),
+            "mul".to_string(),
+            5,
+            use_router,
+        );
         assert_eq!(get_current_receiver_value(&context.receiver), 25);
-        caller_then_call(&context, "sub".to_string(), "mul".to_string(), 5);
+        caller_then_call(
+            &context,
+            "sub".to_string(),
+            "mul".to_string(),
+            5,
+            use_router,
+        );
         assert_eq!(get_current_receiver_value(&context.receiver), 100);
-        caller_then_call(&context, "sub".to_string(), "sub".to_string(), 50);
+        caller_then_call(
+            &context,
+            "sub".to_string(),
+            "sub".to_string(),
+            50,
+            use_router,
+        );
         assert_eq!(get_current_receiver_value(&context.receiver), 0);
 
         caller_and_then_and_call(
@@ -203,10 +271,11 @@ mod sim_tests {
             "mul".to_string(),
             "add".to_string(),
             5,
+            use_router,
         );
         assert_eq!(get_current_receiver_value(&context.receiver), 75);
 
-        caller_simple_call(&context, "sub".to_string(), 75);
+        caller_simple_call(&context, "sub".to_string(), 75, use_router);
         assert_eq!(get_current_receiver_value(&context.receiver), 0);
 
         caller_and_then_and_call(
@@ -216,7 +285,18 @@ mod sim_tests {
             "add".to_string(),
             "add".to_string(),
             5,
+            use_router,
         );
         assert_eq!(get_current_receiver_value(&context.receiver), 35);
+    }
+
+    #[test]
+    fn test_aurora_async_without_router() {
+        test_aurora_async(true);
+    }
+
+    #[test]
+    fn test_aurora_async_with_router() {
+        test_aurora_async(false);
     }
 }

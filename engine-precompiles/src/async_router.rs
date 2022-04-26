@@ -56,27 +56,29 @@ impl Precompile for AsyncRouter {
                 ethabi::ParamType::Bytes,
                 ethabi::ParamType::Bool,
             ],
-            &input,
+            input,
         )
         .map_err(|_| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?;
+
+        let attach_msg_sender = tokens
+            .pop()
+            .ok_or_else(|| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?
+            .into_bool()
+            .ok_or_else(|| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?;
+
+        let mut payload = tokens
+            .pop()
+            .ok_or_else(|| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?
+            .into_bytes()
+            .ok_or_else(|| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?;
 
         let contract = Address::new(
             tokens
                 .pop()
-                .ok_or(ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?
+                .ok_or_else(|| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?
                 .into_address()
-                .ok_or(ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?,
+                .ok_or_else(|| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?,
         );
-        let mut payload = tokens
-            .pop()
-            .ok_or(ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?
-            .into_bytes()
-            .ok_or(ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?;
-        let attach_msg_sender = tokens
-            .pop()
-            .ok_or(ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?
-            .into_bool()
-            .ok_or(ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?;
 
         if attach_msg_sender {
             payload.extend_from_slice(context.caller.as_bytes())
@@ -85,10 +87,8 @@ impl Precompile for AsyncRouter {
         let args = CallArgs::V2(FunctionCallArgsV2 {
             contract,
             value: WeiU256::from(context.apparent_value),
-            input: input.to_vec(),
-        })
-        .try_to_vec()
-        .unwrap();
+            input: payload,
+        });
 
         let call_event_log = Log {
             address: ADDRESS.raw(),

@@ -5,7 +5,7 @@ use crate::async_promise::*;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{assert_self, env, ext_contract, near_bindgen, Gas, Promise};
 
-pub const GAS_RESERVED_FOR_CURRENT_CALL: Gas = 20_000_000_000_000;
+pub const GAS_RESERVED_FOR_SUBMIT: Gas = 20_000_000_000_000;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct AsyncAuroraSubmitArgs {
@@ -43,7 +43,7 @@ impl AsyncAurora {
             .then(ext_self::call_back(
                 &env::current_account_id(),
                 env::attached_deposit(),
-                env::prepaid_gas() - args.submit_gas - GAS_RESERVED_FOR_CURRENT_CALL,
+                env::prepaid_gas() - args.submit_gas - GAS_RESERVED_FOR_SUBMIT,
             ))
     }
 

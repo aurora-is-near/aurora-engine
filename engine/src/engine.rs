@@ -636,7 +636,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         // allows a return of UTF-8 strings.
         self.apply(values, Vec::<Log>::new(), true);
 
-        call_result.unwrap_or(Ok(SubmitResult::new(status, used_gas, logs)))
+        call_result.unwrap_or_else(|| Ok(SubmitResult::new(status, used_gas, logs)))
     }
 
     pub fn view_with_args(&self, args: ViewCallArgs) -> Result<TransactionStatus, EngineErrorKind> {
@@ -1364,7 +1364,7 @@ fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) 
 }
 
 fn filter_promises_from_logs<'env, I: IO + Copy, E: Env, T, P>(
-    engine: &mut Engine<'_, I, E>,
+    engine: &mut Engine<'env, I, E>,
     handler: &mut P,
     logs: T,
 ) -> (Vec<ResultLog>, Option<EngineResult<SubmitResult>>)
