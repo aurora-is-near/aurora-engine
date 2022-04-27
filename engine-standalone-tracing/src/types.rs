@@ -1,10 +1,13 @@
 use aurora_engine_types::types::EthGas;
 use aurora_engine_types::BTreeMap;
 use evm_core::Opcode;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::ops::Index;
 
 /// Depth of a log.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Depth(u32);
 
 impl Depth {
@@ -28,6 +31,7 @@ impl Depth {
 
 /// A trace log memory.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogMemory(Vec<[u8; 32]>);
 
 impl LogMemory {
@@ -65,6 +69,7 @@ impl From<&[u8]> for LogMemory {
 
 /// The stack of the log.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogStack(Vec<[u8; 32]>);
 
 impl LogStack {
@@ -94,6 +99,7 @@ impl std::iter::FromIterator<[u8; 32]> for LogStack {
 
 /// A trace log program counter.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ProgramCounter(pub u32);
 
 impl ProgramCounter {
@@ -105,6 +111,7 @@ impl ProgramCounter {
 
 /// A storage key for the `LogStorage`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogStorageKey(pub [u8; 32]);
 
 impl LogStorageKey {
@@ -116,6 +123,7 @@ impl LogStorageKey {
 
 /// A storage value for the `LogStorage`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogStorageValue(pub [u8; 32]);
 
 impl LogStorageValue {
@@ -127,6 +135,7 @@ impl LogStorageValue {
 
 /// A map for `LogStorageKeys` to `LogStorageValue`s.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogStorage(BTreeMap<LogStorageKey, LogStorageValue>);
 
 impl LogStorage {
@@ -146,6 +155,7 @@ impl IntoIterator for LogStorage {
 
 /// The trace log of an execution on the EVM.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TraceLog {
     /// The depth of the log.
     pub depth: Depth,
@@ -158,6 +168,7 @@ pub struct TraceLog {
     /// The bounded memory.
     pub memory: LogMemory,
     /// The opcode as a byte.
+    #[cfg_attr(feature = "serde", serde(with = "opcode_serde"))]
     pub opcode: Opcode,
     /// The current program counter of the transaction.
     pub program_counter: ProgramCounter,
@@ -184,6 +195,7 @@ impl Default for TraceLog {
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Logs(pub Vec<TraceLog>);
 
 impl Logs {
@@ -218,6 +230,7 @@ impl IntoIterator for Logs {
 }
 
 #[derive(Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(dead_code)]
 pub struct TransactionTrace {
     /// The total gas cost of the transaction.
@@ -295,5 +308,40 @@ impl StepTransactionTrace {
             self.step += 1;
             Some(&self.inner.struct_logs[self.step])
         }
+    }
+}
+
+// Custom serde serialization for opcode, given it is not provided upstream
+// See here for custom serde serialization: https://serde.rs/custom-serialization.html
+mod opcode_serde {
+    pub fn serialize<S>(opcode: &evm_core::Opcode, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u8(opcode.0)
+    }
+
+    struct U8Visitor;
+
+    impl<'de> serde::de::Visitor<'de> for U8Visitor {
+        type Value = u8;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("an integer between 0 and 2^8 - 1")
+        }
+
+        fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(v)
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<evm_core::Opcode, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(evm_core::Opcode(deserializer.deserialize_u8(U8Visitor)?))
     }
 }
