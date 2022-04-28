@@ -41,15 +41,17 @@ pub fn consume_message(
             let block_hash = transaction_message.block_hash;
             let block_height = storage.get_block_height_by_hash(block_hash)?;
             let block_metadata = storage.get_block_metadata(block_hash)?;
-            let io =
-                storage.access_engine_storage_at_position(block_height, transaction_position, &[]);
 
-            let (tx_hash, diff, result) = execute_transaction(
-                transaction_message.as_ref(),
-                block_height,
-                &block_metadata,
-                io,
-            )?;
+            let (tx_hash, diff, result) = storage
+                .with_engine_access(block_height, transaction_position, &[], |io| {
+                    execute_transaction(
+                        transaction_message.as_ref(),
+                        block_height,
+                        &block_metadata,
+                        io,
+                    )
+                })
+                .result?;
             match &result {
                 Some(TransactionExecutionResult::Submit(Err(_))) => (), // do not persist if Engine encounters an error
                 _ => storage.set_transaction_included(tx_hash, &transaction_message, &diff)?,
