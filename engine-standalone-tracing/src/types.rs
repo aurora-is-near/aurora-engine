@@ -313,6 +313,7 @@ impl StepTransactionTrace {
 
 // Custom serde serialization for opcode, given it is not provided upstream
 // See here for custom serde serialization: https://serde.rs/custom-serialization.html
+#[cfg(feature = "serde")]
 mod opcode_serde {
     pub fn serialize<S>(opcode: &evm_core::Opcode, serializer: S) -> Result<S::Ok, S::Error>
     where
