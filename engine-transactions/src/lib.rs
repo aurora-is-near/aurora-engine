@@ -160,11 +160,18 @@ impl NormalizedEthTransaction {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ParseTransactionError {
     UnknownTransactionType,
     // Per the EIP-2718 spec 0xff is a reserved value
     ReservedSentinel,
+    #[cfg_attr(feature = "serde", serde(serialize_with = "decoder_err_to_str"))]
     RlpDecodeError(DecoderError),
+}
+
+#[cfg(feature = "serde")]
+fn decoder_err_to_str<S: serde::Serializer>(err: &DecoderError, ser: S) -> Result<S::Ok, S::Error> {
+    ser.serialize_str(&format!("{:?}", err))
 }
 
 impl ParseTransactionError {

@@ -1,4 +1,3 @@
-use aurora_engine::engine;
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
@@ -148,23 +147,11 @@ fn test_consume_transaction() {
     let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
     assert!(result.status.is_ok());
 
-    // Look at the engine state for the following block
-    let engine_io =
-        runner
-            .storage
-            .access_engine_storage_at_position(runner.env.block_height + 1, 0, &[]);
-
     // Confirm the balances and nonces match the expected values (note the transfer has been applied)
-    assert_eq!(
-        engine::get_balance(&engine_io, &address),
-        balance - transfer_amount
-    );
-    assert_eq!(
-        engine::get_balance(&engine_io, &dest_address),
-        transfer_amount
-    );
-    assert_eq!(engine::get_nonce(&engine_io, &address), U256::one());
-    assert_eq!(engine::get_nonce(&engine_io, &dest_address), U256::zero());
+    assert_eq!(runner.get_balance(&address), balance - transfer_amount);
+    assert_eq!(runner.get_balance(&dest_address), transfer_amount);
+    assert_eq!(runner.get_nonce(&address), U256::one());
+    assert_eq!(runner.get_nonce(&dest_address), U256::zero());
 
     runner.close();
 }

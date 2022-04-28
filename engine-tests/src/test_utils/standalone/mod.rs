@@ -239,24 +239,27 @@ impl StandaloneRunner {
     }
 
     pub fn get_balance(&mut self, address: &Address) -> Wei {
-        let io = self
-            .storage
-            .access_engine_storage_at_position(self.env.block_height + 1, 0, &[]);
-        engine::get_balance(&io, address)
+        self.storage
+            .with_engine_access(self.env.block_height + 1, 0, &[], |io| {
+                engine::get_balance(&io, address)
+            })
+            .result
     }
 
     pub fn get_nonce(&mut self, address: &Address) -> U256 {
-        let io = self
-            .storage
-            .access_engine_storage_at_position(self.env.block_height + 1, 0, &[]);
-        engine::get_nonce(&io, address)
+        self.storage
+            .with_engine_access(self.env.block_height + 1, 0, &[], |io| {
+                engine::get_nonce(&io, address)
+            })
+            .result
     }
 
     pub fn get_code(&mut self, address: &Address) -> Vec<u8> {
-        let io = self
-            .storage
-            .access_engine_storage_at_position(self.env.block_height + 1, 0, &[]);
-        engine::get_code(&io, address)
+        self.storage
+            .with_engine_access(self.env.block_height + 1, 0, &[], |io| {
+                engine::get_code(&io, address)
+            })
+            .result
     }
 
     pub fn close(self) {

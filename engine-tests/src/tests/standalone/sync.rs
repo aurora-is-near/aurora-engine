@@ -205,10 +205,13 @@ fn test_consume_deploy_erc20_message() {
     )
     .unwrap();
 
-    let io = runner
+    let erc20_address = runner
         .storage
-        .access_engine_storage_at_position(runner.env.block_height + 1, 0, &[]);
-    let erc20_address = aurora_engine::engine::get_erc20_from_nep141(&io, &token).unwrap();
+        .with_engine_access(runner.env.block_height + 1, 0, &[], |io| {
+            aurora_engine::engine::get_erc20_from_nep141(&io, &token)
+        })
+        .result
+        .unwrap();
 
     runner.env.block_height += 1;
     runner.env.signer_account_id = "some_account.near".parse().unwrap();
