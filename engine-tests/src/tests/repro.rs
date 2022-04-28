@@ -21,14 +21,14 @@ fn repro_GdASJ3KESs() {
     // Note: this snapshot is pruned from the full Engine state on testnet at that block height.
     // The full snapshot is very large, and all that is necessary for this test are the keys used
     // in the transaction. This pruned snapshot contains precisely those keys, and no others.
-    repro_common(
-        "src/tests/res/aurora_state_GdASJ3KESs.json",
-        83596945,
-        1645717564644206730,
-        "src/tests/res/input_GdASJ3KESs.hex",
-        706713,
-        173,
-    );
+    repro_common(ReproContext {
+        snapshot_path: "src/tests/res/aurora_state_GdASJ3KESs.json",
+        block_index: 83596945,
+        block_timestamp: 1645717564644206730,
+        input_path: "src/tests/res/input_GdASJ3KESs.hex",
+        evm_gas_used: 706713,
+        near_gas_used: 173,
+    });
 }
 
 /// This test reproduces a transaction from mainnet:
@@ -46,24 +46,26 @@ fn repro_8ru7VEA() {
     // Note: this snapshot is pruned from the full Engine state on mainnet at that block height.
     // The full snapshot is very large, and all that is necessary for this test are the keys used
     // in the transaction. This pruned snapshot contains precisely those keys, and no others.
-    repro_common(
-        "src/tests/res/aurora_state_8ru7VEA.json",
-        62625815,
-        1648829935343349589,
-        "src/tests/res/input_8ru7VEA.hex",
-        1732181,
-        309,
-    );
+    repro_common(ReproContext {
+        snapshot_path: "src/tests/res/aurora_state_8ru7VEA.json",
+        block_index: 62625815,
+        block_timestamp: 1648829935343349589,
+        input_path: "src/tests/res/input_8ru7VEA.hex",
+        evm_gas_used: 1732181,
+        near_gas_used: 309,
+    });
 }
 
-fn repro_common(
-    snapshot_path: &str,
-    block_index: u64,
-    block_timestamp: u64,
-    input_path: &str,
-    evm_gas_used: u64,
-    near_gas_used: u64,
-) {
+fn repro_common<'a>(context: ReproContext<'a>) {
+    let ReproContext {
+        snapshot_path,
+        block_index,
+        block_timestamp,
+        input_path,
+        evm_gas_used,
+        near_gas_used,
+    } = context;
+
     let snapshot = json_snapshot::types::JsonSnapshot::load_from_file(snapshot_path).unwrap();
 
     let mut runner = AuroraRunner::default();
@@ -97,4 +99,13 @@ fn repro_common(
         standalone_result.try_to_vec().unwrap()
     );
     standalone.close()
+}
+
+struct ReproContext<'a> {
+    snapshot_path: &'a str,
+    block_index: u64,
+    block_timestamp: u64,
+    input_path: &'a str,
+    evm_gas_used: u64,
+    near_gas_used: u64,
 }
