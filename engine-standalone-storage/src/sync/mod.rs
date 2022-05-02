@@ -394,31 +394,37 @@ pub mod error {
             Self::Storage(e)
         }
     }
+
     impl From<engine::EngineStateError> for Error {
         fn from(e: engine::EngineStateError) -> Self {
             Self::EngineState(e)
         }
     }
+
     impl From<engine::EngineError> for Error {
         fn from(e: engine::EngineError) -> Self {
             Self::Engine(e)
         }
     }
+
     impl From<engine::DeployErc20Error> for Error {
         fn from(e: engine::DeployErc20Error) -> Self {
             Self::DeployErc20(e)
         }
     }
+
     impl From<connector::error::FtTransferCallError> for Error {
         fn from(e: connector::error::FtTransferCallError) -> Self {
             Self::FtOnTransfer(e)
         }
     }
+
     impl From<connector::error::DepositError> for Error {
         fn from(e: connector::error::DepositError) -> Self {
             Self::Deposit(e)
         }
     }
+
     impl From<connector::error::FinishDepositError> for Error {
         fn from(e: connector::error::FinishDepositError) -> Self {
             Self::FinishDeposit(e)
