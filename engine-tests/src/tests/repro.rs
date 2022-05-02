@@ -56,6 +56,26 @@ fn repro_8ru7VEA() {
     });
 }
 
+/// This test reproduces a transaction from mainnet:
+/// https://explorer.mainnet.near.org/transactions/FRcorNvFojoxBrdiVMTy9gRD3H8EYXXKau4feevMZmFV
+/// It hit the gas limit at the time of its execution (engine v2.5.2 after 300 Tgas limit increase).
+/// The transaction performs some complex defi interaction (description from the user):
+/// 1. It sell 30% BSTN to NEAR, and mint cNEAR
+/// 2. It sells 35% BSTN to NEAR, and make NEAR-BSTN LP token
+/// 3. Deposit LP token created from step2 to Trisolaris farm
+#[allow(non_snake_case)]
+#[test]
+fn repro_FRcorNv() {
+    repro_common(ReproContext {
+        snapshot_path: "src/tests/res/aurora_state_FRcorNv.json",
+        block_index: 64328524,
+        block_timestamp: 1650960438774745116,
+        input_path: "src/tests/res/input_FRcorNv.hex",
+        evm_gas_used: 1239721,
+        near_gas_used: 245,
+    });
+}
+
 fn repro_common<'a>(context: ReproContext<'a>) {
     let ReproContext {
         snapshot_path,
