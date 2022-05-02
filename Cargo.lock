@@ -1282,6 +1282,7 @@ dependencies = [
  "evm-core",
  "evm-gasometer",
  "evm-runtime",
+ "serde",
 ]
 
 [[package]]
