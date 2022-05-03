@@ -100,7 +100,7 @@ fn test_replay_transaction() {
                     );
 
                     i += 1;
-                    diff
+                    diff.diff
                 })
                 .collect()
         })
@@ -118,7 +118,8 @@ fn test_replay_transaction() {
         for ((position, tx), diff) in txs {
             let replay_diff = runner
                 .execute_transaction_at_position(tx, block_height, position as u16)
-                .unwrap();
+                .unwrap()
+                .diff;
             assert_eq!(replay_diff, diff);
         }
     }

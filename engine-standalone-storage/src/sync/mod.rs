@@ -19,7 +19,7 @@ const AURORA_ACCOUNT_ID: &str = "aurora";
 pub fn consume_message(
     storage: &mut Storage,
     message: Message,
-) -> Result<ConsumeMessageOutcome, error::Error> {
+) -> Result<ConsumeMessageOutcome, crate::Error> {
     match message {
         Message::Block(block_message) => {
             let block_hash = block_message.hash;
@@ -51,9 +51,9 @@ pub fn consume_message(
                         io,
                     )
                 })
-                .result?;
-            match &result {
-                Some(TransactionExecutionResult::Submit(Err(_))) => (), // do not persist if Engine encounters an error
+                .result;
+            match result.as_ref() {
+                Err(_) | Ok(Some(TransactionExecutionResult::Submit(Err(_)))) => (), // do not persist if Engine encounters an error
                 _ => storage.set_transaction_included(tx_hash, &transaction_message, &diff)?,
             }
             let outcome = TransactionIncludedOutcome {
@@ -72,7 +72,7 @@ pub fn consume_message(
 pub fn execute_transaction_message(
     storage: &Storage,
     transaction_message: TransactionMessage,
-) -> Result<TransactionIncludedOutcome, error::Error> {
+) -> Result<TransactionIncludedOutcome, crate::Error> {
     let transaction_position = transaction_message.position;
     let block_hash = transaction_message.block_hash;
     let block_height = storage.get_block_height_by_hash(block_hash)?;
@@ -80,7 +80,7 @@ pub fn execute_transaction_message(
     let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
         execute_transaction(&transaction_message, block_height, &block_metadata, io)
     });
-    let (tx_hash, diff, maybe_result) = result.result?;
+    let (tx_hash, diff, maybe_result) = result.result;
     let outcome = TransactionIncludedOutcome {
         hash: tx_hash,
         info: transaction_message,
@@ -94,8 +94,12 @@ fn execute_transaction<'db>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
-    mut io: EngineStateAccess<'db, 'db, 'db>,
-) -> Result<(H256, Diff, Option<TransactionExecutionResult>), error::Error> {
+    io: EngineStateAccess<'db, 'db, 'db>,
+) -> (
+    H256,
+    Diff,
+    Result<Option<TransactionExecutionResult>, error::Error>,
+) {
     let signer_account_id = transaction_message.signer.clone();
     let predecessor_account_id = transaction_message.caller.clone();
     let relayer_address =
@@ -118,23 +122,48 @@ fn execute_transaction<'db>(
             // We can ignore promises in the standalone engine because it processes each receipt separately
             // and it is fed a stream of receipts (it does not schedule them)
             let mut handler = crate::promise::Noop;
-            let engine_state = engine::get_state(&io)?;
             let transaction_bytes: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
-            let result = engine::submit(
-                io,
-                &env,
-                &transaction_bytes,
-                engine_state,
-                env.current_account_id(),
-                relayer_address,
-                &mut handler,
-            );
+            let result = engine::get_state(&io)
+                .map(|engine_state| {
+                    let submit_result = engine::submit(
+                        io,
+                        &env,
+                        &transaction_bytes,
+                        engine_state,
+                        env.current_account_id(),
+                        relayer_address,
+                        &mut handler,
+                    );
+                    Some(TransactionExecutionResult::Submit(submit_result))
+                })
+                .map_err(Into::into);
 
-            (tx_hash, Some(TransactionExecutionResult::Submit(result)))
+            (tx_hash, result)
         }
 
+        other => {
+            let result = non_submit_execute(other, io, env, relayer_address);
+            (near_receipt_id, result)
+        }
+    };
+
+    let diff = io.get_transaction_diff();
+
+    (tx_hash, diff, result)
+}
+
+/// Handles all transaction kinds other than `submit`.
+/// The `submit` transaction kind is special because it is the only one where the transaction hash is
+/// different than the NEAR receipt hash.
+fn non_submit_execute<'db>(
+    transaction: &TransactionKind,
+    mut io: EngineStateAccess<'db, 'db, 'db>,
+    env: env::Fixed,
+    relayer_address: Address,
+) -> Result<Option<TransactionExecutionResult>, error::Error> {
+    let result = match transaction {
         TransactionKind::Call(args) => {
             // We can ignore promises in the standalone engine (see above)
             let mut handler = crate::promise::Noop;
@@ -143,10 +172,7 @@ fn execute_transaction<'db>(
 
             let result = engine.call_with_args(args.clone(), &mut handler);
 
-            (
-                near_receipt_id,
-                Some(TransactionExecutionResult::Submit(result)),
-            )
+            Some(TransactionExecutionResult::Submit(result))
         }
 
         TransactionKind::Deploy(input) => {
@@ -157,20 +183,15 @@ fn execute_transaction<'db>(
 
             let result = engine.deploy_code_with_input(input.clone(), &mut handler);
 
-            (
-                near_receipt_id,
-                Some(TransactionExecutionResult::Submit(result)),
-            )
+            Some(TransactionExecutionResult::Submit(result))
         }
 
         TransactionKind::DeployErc20(args) => {
             // No promises can be created by `deploy_erc20_token`
             let mut handler = crate::promise::Noop;
             let result = engine::deploy_erc20_token(args.clone(), io, &env, &mut handler)?;
-            (
-                near_receipt_id,
-                Some(TransactionExecutionResult::DeployErc20(result)),
-            )
+
+            Some(TransactionExecutionResult::DeployErc20(result))
         }
 
         TransactionKind::FtOnTransfer(args) => {
@@ -191,7 +212,7 @@ fn execute_transaction<'db>(
                 );
             }
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::FtTransferCall(args) => {
@@ -203,24 +224,21 @@ fn execute_transaction<'db>(
                 env.prepaid_gas,
             )?;
 
-            (
-                near_receipt_id,
-                Some(TransactionExecutionResult::Promise(promise_args)),
-            )
+            Some(TransactionExecutionResult::Promise(promise_args))
         }
 
         TransactionKind::ResolveTransfer(args, promise_result) => {
             let mut connector = connector::EthConnectorContract::init_instance(io);
             connector.ft_resolve_transfer(args.clone(), promise_result.clone());
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::FtTransfer(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io);
             connector.ft_transfer(&env.predecessor_account_id, args.clone())?;
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::Withdraw(args) => {
@@ -231,7 +249,7 @@ fn execute_transaction<'db>(
                 args.clone(),
             )?;
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::Deposit(raw_proof) => {
@@ -242,10 +260,7 @@ fn execute_transaction<'db>(
                 env.predecessor_account_id(),
             )?;
 
-            (
-                near_receipt_id,
-                Some(TransactionExecutionResult::Promise(promise_args)),
-            )
+            Some(TransactionExecutionResult::Promise(promise_args))
         }
 
         TransactionKind::FinishDeposit(finish_args) => {
@@ -257,10 +272,7 @@ fn execute_transaction<'db>(
                 env.prepaid_gas,
             )?;
 
-            (
-                near_receipt_id,
-                maybe_promise_args.map(TransactionExecutionResult::Promise),
-            )
+            maybe_promise_args.map(TransactionExecutionResult::Promise)
         }
 
         TransactionKind::StorageDeposit(args) => {
@@ -271,28 +283,28 @@ fn execute_transaction<'db>(
                 args.clone(),
             )?;
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::StorageUnregister(force) => {
             let mut connector = connector::EthConnectorContract::init_instance(io);
             let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::StorageWithdraw(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io);
             connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::SetPausedFlags(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io);
             connector.set_paused_flags(args.clone());
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::RegisterRelayer(evm_address) => {
@@ -300,7 +312,7 @@ fn execute_transaction<'db>(
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
             engine.register_relayer(env.predecessor_account_id.as_bytes(), *evm_address);
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::RefundOnError(maybe_args) => {
@@ -316,14 +328,14 @@ fn execute_transaction<'db>(
                     })
                     .transpose();
 
-            (near_receipt_id, result?)
+            result?
         }
 
         TransactionKind::SetConnectorData(args) => {
             let mut connector_io = io;
             connector::set_contract_data(&mut connector_io, args.clone())?;
 
-            (near_receipt_id, None)
+            None
         }
 
         TransactionKind::NewConnector(args) => {
@@ -333,19 +345,19 @@ fn execute_transaction<'db>(
                 args.clone(),
             )?;
 
-            (near_receipt_id, None)
+            None
         }
         TransactionKind::NewEngine(args) => {
             engine::set_state(&mut io, args.clone().into());
 
-            (near_receipt_id, None)
+            None
         }
-        TransactionKind::Unknown => (near_receipt_id, None),
+        TransactionKind::Unknown => None,
+        // Not handled in this function; is handled by the general `execute_transaction` function
+        TransactionKind::Submit(_) => unreachable!(),
     };
 
-    let diff = io.get_transaction_diff();
-
-    Ok((tx_hash, diff, result))
+    Ok(result)
 }
 
 #[derive(Debug)]
@@ -355,12 +367,12 @@ pub enum ConsumeMessageOutcome {
     TransactionIncluded(Box<TransactionIncludedOutcome>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct TransactionIncludedOutcome {
     pub hash: aurora_engine_types::H256,
     pub info: TransactionMessage,
     pub diff: crate::Diff,
-    pub maybe_result: Option<TransactionExecutionResult>,
+    pub maybe_result: Result<Option<TransactionExecutionResult>, error::Error>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -375,7 +387,6 @@ pub mod error {
 
     #[derive(Debug)]
     pub enum Error {
-        Storage(crate::Error),
         EngineState(engine::EngineStateError),
         Engine(engine::EngineError),
         DeployErc20(engine::DeployErc20Error),
@@ -387,12 +398,6 @@ pub mod error {
         FtStorageFunding(fungible_token::error::StorageFundingError),
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
         ConnectorInit(connector::error::InitContractError),
-    }
-
-    impl From<crate::Error> for Error {
-        fn from(e: crate::Error) -> Self {
-            Self::Storage(e)
-        }
     }
 
     impl From<engine::EngineStateError> for Error {
