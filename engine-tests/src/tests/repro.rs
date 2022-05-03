@@ -76,6 +76,23 @@ fn repro_FRcorNv() {
     });
 }
 
+/// This test reproduces a transaction from mainnet:
+/// https://explorer.mainnet.near.org/transactions/5bEgfRQ5TSJfN9XCqYkMr9cgBLToM7JmS1bNzKpDXJhT
+/// It hit the gas limit at the time of its execution (engine v2.5.2 after 300 Tgas limit increase).
+/// The transaction is a "claim xp rewards action" from the game CryptoBlades.
+#[allow(non_snake_case)]
+#[test]
+fn repro_5bEgfRQ() {
+    repro_common(ReproContext {
+        snapshot_path: "src/tests/res/aurora_state_5bEgfRQ.json",
+        block_index: 64417403,
+        block_timestamp: 1651073772931594646,
+        input_path: "src/tests/res/input_5bEgfRQ.hex",
+        evm_gas_used: 6_414_105,
+        near_gas_used: 751,
+    });
+}
+
 fn repro_common<'a>(context: ReproContext<'a>) {
     let ReproContext {
         snapshot_path,
