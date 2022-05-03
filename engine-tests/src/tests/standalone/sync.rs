@@ -65,7 +65,7 @@ fn test_consume_deposit_message() {
         other => panic!("Unexpected outcome {:?}", other),
     };
 
-    let finish_deposit_args = match outcome.maybe_result.unwrap() {
+    let finish_deposit_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
             let bytes = promise_args.callback.args;
             aurora_engine::parameters::FinishDepositCallArgs::try_from_slice(&bytes).unwrap()
@@ -96,7 +96,7 @@ fn test_consume_deposit_message() {
         other => panic!("Unexpected outcome {:?}", other),
     };
 
-    let ft_on_transfer_args = match outcome.maybe_result.unwrap() {
+    let ft_on_transfer_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
             let bytes = promise_args.base.args;
             let json = aurora_engine::json::parse_json(&bytes).unwrap();

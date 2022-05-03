@@ -76,7 +76,7 @@ fn test_evm_tracing_with_storage() {
             transaction: engine_standalone_storage::sync::types::TransactionKind::Unknown,
         },
         diff,
-        maybe_result: None,
+        maybe_result: Ok(None),
     };
     test_utils::standalone::storage::commit(&mut runner.storage, &tx);
 
