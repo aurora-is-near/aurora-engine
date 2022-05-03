@@ -1282,7 +1282,7 @@ pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
     EthConnectorContract::init_instance(*io)
         .map(|mut connector| {
             // The `unwrap` is safe here because (a) if the connector
-            // is implemented correctly then the total supply wll never underflow and (b) we are passing
+            // is implemented correctly then the total supply will never underflow and (b) we are passing
             // in the balance directly so there will always be enough balance.
             connector.internal_remove_eth(address, balance).unwrap();
         })
