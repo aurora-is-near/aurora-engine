@@ -48,7 +48,7 @@ impl StandaloneRunner {
             hash: transaction_hash,
             info: tx_msg,
             diff: result.diff,
-            maybe_result: None,
+            maybe_result: Ok(None),
         };
         self.cumulative_diff.append(outcome.diff.clone());
         test_utils::standalone::storage::commit(storage, &outcome);
@@ -83,7 +83,7 @@ impl StandaloneRunner {
             hash: transaction_hash,
             info: tx_msg,
             diff: result.diff,
-            maybe_result: None,
+            maybe_result: Ok(None),
         };
         self.cumulative_diff.append(outcome.diff.clone());
         test_utils::standalone::storage::commit(storage, &outcome);
@@ -164,7 +164,7 @@ impl StandaloneRunner {
             TransactionKind::Submit(transaction_bytes.as_slice().try_into().unwrap());
         let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
 
-        match outcome.maybe_result.as_ref().unwrap() {
+        match outcome.maybe_result.as_ref().unwrap().as_ref().unwrap() {
             sync::TransactionExecutionResult::Submit(result) => match result.as_ref() {
                 Err(e) => return Err(e.clone()),
                 Ok(_) => (),
@@ -220,7 +220,7 @@ impl StandaloneRunner {
             self.cumulative_diff.append(outcome.diff.clone());
             test_utils::standalone::storage::commit(storage, &outcome);
 
-            let address = match outcome.maybe_result.unwrap() {
+            let address = match outcome.maybe_result.unwrap().unwrap() {
                 sync::TransactionExecutionResult::DeployErc20(address) => address,
                 _ => unreachable!(),
             };
@@ -316,7 +316,7 @@ impl StandaloneRunner {
 fn unwrap_result(
     outcome: sync::TransactionIncludedOutcome,
 ) -> Result<SubmitResult, engine::EngineError> {
-    match outcome.maybe_result.unwrap() {
+    match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Submit(result) => result,
         sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
         sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
