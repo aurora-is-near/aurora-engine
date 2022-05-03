@@ -1277,12 +1277,16 @@ pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
 
 pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
     let balance = get_balance(io, address);
-    // Apply changes for eth-connector. The `unwrap` is safe here because (a) if the connector
-    // is implemented correctly then the total supply wll never underflow and (b) we are passing
-    // in the balance directly so there will always be enough balance.
+    // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
+    // if we cannot read the storage then there is nothing to remove.
     EthConnectorContract::init_instance(*io)
-        .internal_remove_eth(address, balance)
-        .unwrap();
+        .map(|mut connector| {
+            // The `unwrap` is safe here because (a) if the connector
+            // is implemented correctly then the total supply wll never underflow and (b) we are passing
+            // in the balance directly so there will always be enough balance.
+            connector.internal_remove_eth(address, balance).unwrap();
+        })
+        .ok();
     io.remove_storage(&address_to_key(KeyPrefix::Balance, address));
 }
 
