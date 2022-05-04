@@ -115,6 +115,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     io.remove_storage(&proof_key);
 
     aurora_engine::connector::EthConnectorContract::init_instance(io)
+        .unwrap()
         .finish_deposit(
             aurora_account_id.clone(),
             aurora_account_id.clone(),

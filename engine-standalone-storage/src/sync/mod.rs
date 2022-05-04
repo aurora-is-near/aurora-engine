@@ -201,7 +201,8 @@ fn non_submit_execute<'db>(
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
             if env.predecessor_account_id == env.current_account_id {
-                connector::EthConnectorContract::init_instance(io).ft_on_transfer(&engine, args)?;
+                connector::EthConnectorContract::init_instance(io)?
+                    .ft_on_transfer(&engine, args)?;
             } else {
                 engine.receive_erc20_tokens(
                     &env.predecessor_account_id,
@@ -216,7 +217,7 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::FtTransferCall(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io);
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
             let promise_args = connector.ft_transfer_call(
                 env.predecessor_account_id.clone(),
                 env.current_account_id.clone(),
@@ -228,21 +229,21 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::ResolveTransfer(args, promise_result) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io);
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
             connector.ft_resolve_transfer(args.clone(), promise_result.clone());
 
             None
         }
 
         TransactionKind::FtTransfer(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io);
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
             connector.ft_transfer(&env.predecessor_account_id, args.clone())?;
 
             None
         }
 
         TransactionKind::Withdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io);
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
             connector.withdraw_eth_from_near(
                 &env.current_account_id,
                 &env.predecessor_account_id,
@@ -253,7 +254,7 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::Deposit(raw_proof) => {
-            let connector_contract = connector::EthConnectorContract::init_instance(io);
+            let connector_contract = connector::EthConnectorContract::init_instance(io)?;
             let promise_args = connector_contract.deposit(
                 raw_proof.clone(),
                 env.current_account_id(),
@@ -264,7 +265,7 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::FinishDeposit(finish_args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io);
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
             let maybe_promise_args = connector.finish_deposit(
                 env.predecessor_account_id(),
                 env.current_account_id(),
@@ -276,7 +277,7 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::StorageDeposit(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io);
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
             let _ = connector.storage_deposit(
                 env.predecessor_account_id,
                 Yocto::new(env.attached_deposit),
@@ -287,21 +288,21 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::StorageUnregister(force) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io);
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
             let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
 
             None
         }
 
         TransactionKind::StorageWithdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io);
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
             connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
 
             None
         }
 
         TransactionKind::SetPausedFlags(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io);
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
             connector.set_paused_flags(args.clone());
 
             None
@@ -398,6 +399,7 @@ pub mod error {
         FtStorageFunding(fungible_token::error::StorageFundingError),
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
         ConnectorInit(connector::error::InitContractError),
+        ConnectorStorage(connector::error::StorageReadError),
     }
 
     impl From<engine::EngineStateError> for Error {
@@ -463,6 +465,12 @@ pub mod error {
     impl From<connector::error::InitContractError> for Error {
         fn from(e: connector::error::InitContractError) -> Self {
             Self::ConnectorInit(e)
+        }
+    }
+
+    impl From<connector::error::StorageReadError> for Error {
+        fn from(e: connector::error::StorageReadError) -> Self {
+            Self::ConnectorStorage(e)
         }
     }
 }
