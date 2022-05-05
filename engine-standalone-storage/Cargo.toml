@@ -20,13 +20,18 @@ aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
 borsh = { version = "0.8.2" }
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false }
-rocksdb = "0.16.0"
+rocksdb = { version = "0.16.0", default-features = false }
 postgres = "0.19.2"
 serde = "1.0.130"
 serde_json = "1.0.72"
 base64 = "0.13.0"
 
 [features]
-default = []
+default = ["snappy", "lz4", "zstd", "zlib", "bzip2"]
 mainnet = []
 testnet = []
+snappy = ["rocksdb/snappy"]
+lz4 = ["rocksdb/lz4"]
+zstd = ["rocksdb/zstd"]
+zlib = ["rocksdb/zlib"]
+bzip2 = ["rocksdb/bzip2"]
