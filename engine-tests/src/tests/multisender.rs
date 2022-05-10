@@ -36,16 +36,9 @@ fn test_multisender_eth() {
         (result.gas_used, profile.all_gas())
     };
 
-    for n in [5, 10, 50, 100, 150, 200, 250, 300, 350, 400] {
-        let (evm_gas, near_gas) = multi_send_eth(n);
+    let (_evm_gas, near_gas) = multi_send_eth(350);
 
-        println!(
-            "{:?} {:?} {:?}",
-            n,
-            evm_gas / 1000,
-            near_gas / 1_000_000_000_000
-        );
-    }
+    assert!(near_gas / 1_000_000_000_000 < 300);
 }
 
 #[test]
@@ -103,16 +96,9 @@ fn test_multisender_erc20() {
         (result.gas_used, profile.all_gas())
     };
 
-    for n in [5, 10, 50, 100, 150, 200, 250, 300, 350, 400] {
-        let (evm_gas, near_gas) = multi_send_erc20(n);
+    let (_evm_gas, near_gas) = multi_send_erc20(150);
 
-        println!(
-            "{:?} {:?} {:?}",
-            n,
-            evm_gas / 1000,
-            near_gas / 1_000_000_000_000
-        );
-    }
+    assert!(near_gas / 1_000_000_000_000 < 300);
 }
 
 fn send_erc20_data(token_address: Address, amounts: &[(Address, U256)]) -> Vec<u8> {
