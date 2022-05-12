@@ -171,7 +171,12 @@ mod sim_tests {
         }
     }
 
-    fn caller_simple_call(context: &TestContext, method: String, arg: u128, use_router: bool) {
+    fn exec_testasync_simple_call(
+        context: &TestContext,
+        method: String,
+        arg: u128,
+        use_router: bool,
+    ) {
         let input = build_input(
             "simpleCall(string,string,uint128,uint64)",
             &[
@@ -185,7 +190,7 @@ mod sim_tests {
         submit(context, input, use_router);
     }
 
-    fn caller_then_call(
+    fn exec_testasync_then_call(
         context: &TestContext,
         method1: String,
         method2: String,
@@ -206,7 +211,7 @@ mod sim_tests {
         submit(context, input, use_router);
     }
 
-    fn caller_and_then_and_call(
+    fn exec_testasync_and_then_and_call(
         context: &TestContext,
         method1: String,
         method2: String,
@@ -233,12 +238,12 @@ mod sim_tests {
 
     fn test_aurora_async(use_router: bool) {
         let context = test_common();
-        caller_simple_call(&context, "add".to_string(), 10, use_router);
+        exec_testasync_simple_call(&context, "add".to_string(), 10, use_router);
         assert_eq!(get_current_receiver_value(&context.receiver), 10);
-        caller_simple_call(&context, "sub".to_string(), 10, use_router);
+        exec_testasync_simple_call(&context, "sub".to_string(), 10, use_router);
         assert_eq!(get_current_receiver_value(&context.receiver), 0);
 
-        caller_then_call(
+        exec_testasync_then_call(
             &context,
             "add".to_string(),
             "mul".to_string(),
@@ -246,7 +251,7 @@ mod sim_tests {
             use_router,
         );
         assert_eq!(get_current_receiver_value(&context.receiver), 25);
-        caller_then_call(
+        exec_testasync_then_call(
             &context,
             "sub".to_string(),
             "mul".to_string(),
@@ -254,7 +259,7 @@ mod sim_tests {
             use_router,
         );
         assert_eq!(get_current_receiver_value(&context.receiver), 100);
-        caller_then_call(
+        exec_testasync_then_call(
             &context,
             "sub".to_string(),
             "sub".to_string(),
@@ -263,7 +268,7 @@ mod sim_tests {
         );
         assert_eq!(get_current_receiver_value(&context.receiver), 0);
 
-        caller_and_then_and_call(
+        exec_testasync_and_then_and_call(
             &context,
             "add".to_string(),
             "add".to_string(),
@@ -274,10 +279,10 @@ mod sim_tests {
         );
         assert_eq!(get_current_receiver_value(&context.receiver), 75);
 
-        caller_simple_call(&context, "sub".to_string(), 75, use_router);
+        exec_testasync_simple_call(&context, "sub".to_string(), 75, use_router);
         assert_eq!(get_current_receiver_value(&context.receiver), 0);
 
-        caller_and_then_and_call(
+        exec_testasync_and_then_and_call(
             &context,
             "add".to_string(),
             "mul".to_string(),

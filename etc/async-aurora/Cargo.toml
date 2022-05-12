@@ -3,6 +3,7 @@ name = "async-aurora"
 version = "0.1.0"
 authors = ["Aurora <hello@aurora.dev>"]
 edition = "2021"
+description = "Async aurora contract. It parses and calls the promises that are returned by solidity contracts"
 publish = false
 
 [lib]
