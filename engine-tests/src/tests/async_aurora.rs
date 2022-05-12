@@ -1,12 +1,11 @@
 mod sim_tests {
-    use crate::prelude::{Wei, U256};
+    use crate::prelude::Wei;
     use crate::test_utils::{self, create_eth_transaction};
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
     use aurora_engine::parameters::SubmitResult;
     use aurora_engine_precompiles::async_router;
     use aurora_engine_types::types::Address;
     use borsh::{BorshDeserialize, BorshSerialize};
-    use ethabi::ethereum_types::U128;
     use near_sdk_sim::types::Gas;
     use near_sdk_sim::UserAccount;
 
@@ -174,12 +173,12 @@ mod sim_tests {
 
     fn caller_simple_call(context: &TestContext, method: String, arg: u128, use_router: bool) {
         let input = build_input(
-            "simpleCall(string,string,uint128,string)",
+            "simpleCall(string,string,uint128,uint64)",
             &[
                 ethabi::Token::String(context.receiver.account_id().to_string()),
                 ethabi::Token::String(method),
-                ethabi::Token::Int(U128::from(arg).into()),
-                ethabi::Token::String(CALLER_GAS.to_string()),
+                ethabi::Token::Uint(arg.into()),
+                ethabi::Token::Uint(CALLER_GAS.into()),
             ],
         );
 
@@ -194,13 +193,13 @@ mod sim_tests {
         use_router: bool,
     ) {
         let input = build_input(
-            "thenCall(string,string,string,uint128,string)",
+            "thenCall(string,string,string,uint128,uint64)",
             &[
                 ethabi::Token::String(context.receiver.account_id().to_string()),
                 ethabi::Token::String(method1),
                 ethabi::Token::String(method2),
-                ethabi::Token::Int(U256::from(arg).into()),
-                ethabi::Token::String(CALLER_GAS.to_string()),
+                ethabi::Token::Uint(arg.into()),
+                ethabi::Token::Uint(CALLER_GAS.into()),
             ],
         );
 
@@ -217,15 +216,15 @@ mod sim_tests {
         use_router: bool,
     ) {
         let input = build_input(
-            "andThenAndCall(string,string,string,string,string,uint128,string)",
+            "andThenAndCall(string,string,string,string,string,uint128,uint64)",
             &[
                 ethabi::Token::String(context.receiver.account_id().to_string()),
                 ethabi::Token::String(method1),
                 ethabi::Token::String(method2),
                 ethabi::Token::String(method3),
                 ethabi::Token::String(method4),
-                ethabi::Token::Int(U256::from(arg).into()),
-                ethabi::Token::String(CALLER_GAS.to_string()),
+                ethabi::Token::Uint(arg.into()),
+                ethabi::Token::Uint(CALLER_GAS.into()),
             ],
         );
 
@@ -292,11 +291,11 @@ mod sim_tests {
 
     #[test]
     fn test_aurora_async_without_router() {
-        test_aurora_async(true);
+        test_aurora_async(false);
     }
 
     #[test]
     fn test_aurora_async_with_router() {
-        test_aurora_async(false);
+        test_aurora_async(true);
     }
 }

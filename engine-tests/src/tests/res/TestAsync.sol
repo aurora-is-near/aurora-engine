@@ -8,12 +8,13 @@ contract TestAsync {
         string memory accountId,
         string memory method,
         uint128 arg,
-        string memory gas
+        uint64 gas
     ) public returns (string memory) {
         string memory args = string(
             abi.encodePacked('{"arg":', toString(arg), '}'
             )
         );
+        string memory gasStr = toString(gas);
 
         return
             string(
@@ -22,7 +23,7 @@ contract TestAsync {
                     accountId, "#",
                     method, "#",
                     args, "#",
-                    gas
+                    gasStr
                 )
             );
     }
@@ -32,12 +33,13 @@ contract TestAsync {
         string memory method1,
         string memory method2,
         uint128 arg,
-        string memory gas
+        uint64 gas
     ) public returns (string memory) {
         string memory args = string(
             abi.encodePacked('{"arg":', toString(arg), '}'
             )
         );
+        string memory gasStr = toString(gas);
 
         return
             string(
@@ -46,12 +48,12 @@ contract TestAsync {
                     accountId, "#",
                     method1, "#",
                     args,"#",
-                    gas,
+                    gasStr,
                     "##",
                     accountId,"#",
                     method2,"#",
                     args,"#",
-                    gas, "#",
+                    gasStr, "#",
                     "->", "#",
                     "0"
                 )
@@ -65,25 +67,26 @@ contract TestAsync {
         string memory method3,
         string memory method4,
         uint128 arg,
-        string memory gas
+        uint64 gas
     ) public returns (string memory) {
         string memory args = string(
             abi.encodePacked('{"arg":', toString(arg), '}'
             )
         );
+        string memory gasStr = toString(gas);
 
         string memory p1 = string(abi.encodePacked("promises:",
                     accountId, "#",
                     method1, "#",
                     args, "#",
-                    gas,
+                    gasStr,
                     "##"));
 
         string memory p2 = string(abi.encodePacked(
                     accountId, "#",
                     method2, "#",
                     args, "#",
-                    gas, "#",
+                    gasStr, "#",
                     "&", "#",
                     "0",
                     "##"));
@@ -92,7 +95,7 @@ contract TestAsync {
                     accountId, "#",
                     method3, "#",
                     args, "#",
-                    gas, "#",
+                    gasStr, "#",
                     "->", "#",
                     "1",
                     "##"));
@@ -101,7 +104,7 @@ contract TestAsync {
                     accountId, "#",
                     method4, "#",
                     args, "#",
-                    gas, "#",
+                    gasStr, "#",
                     "&", "#",
                     "0"));       
         return
