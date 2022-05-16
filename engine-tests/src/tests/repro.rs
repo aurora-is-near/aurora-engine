@@ -93,6 +93,24 @@ fn repro_5bEgfRQ() {
     });
 }
 
+/// This test reproduces a transaction from mainnet:
+/// https://explorer.mainnet.near.org/transactions/D98vwmi44hAYs8KtX5aLne1zEkj3MUss42e5SkG2a4SC
+/// It hit the gas limit at the time of its execution (engine v2.5.2 after 300 Tgas limit increase).
+/// The transaction is a harvest action for some sort of defi contract. See the report here:
+/// https://github.com/aurora-is-near/aurora-relayer/issues/60#issuecomment-1118549256
+#[allow(non_snake_case)]
+#[test]
+fn repro_D98vwmi() {
+    repro_common(ReproContext {
+        snapshot_path: "src/tests/res/aurora_state_D98vwmi.json",
+        block_index: 64945381,
+        block_timestamp: 1651753443421003245,
+        input_path: "src/tests/res/input_D98vwmi.hex",
+        evm_gas_used: 1_035_348,
+        near_gas_used: 244,
+    });
+}
+
 fn repro_common<'a>(context: ReproContext<'a>) {
     let ReproContext {
         snapshot_path,
