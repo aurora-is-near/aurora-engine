@@ -1,5 +1,5 @@
 use aurora_engine_sdk::env::Timestamp;
-use aurora_engine_types::H256;
+use aurora_engine_types::{account_id::AccountId, H256};
 use rocksdb::DB;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -34,7 +34,10 @@ pub enum StoragePrefix {
     Diff = 0x04,
     Engine = 0x05,
     BlockMetadata = 0x06,
+    EngineAccountId = 0x07,
 }
+
+const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
 pub struct Storage {
     db: DB,
@@ -44,6 +47,22 @@ impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
         let db = DB::open_default(path)?;
         Ok(Self { db })
+    }
+
+    pub fn set_engine_account_id(&mut self, id: &AccountId) -> Result<(), rocksdb::Error> {
+        let key = construct_storage_key(StoragePrefix::EngineAccountId, ACCOUNT_ID_KEY);
+        self.db.put(key, id.as_bytes())
+    }
+
+    pub fn get_engine_account_id(&self) -> Result<AccountId, error::Error> {
+        let key = construct_storage_key(StoragePrefix::EngineAccountId, ACCOUNT_ID_KEY);
+        let slice = self
+            .db
+            .get_pinned(key)?
+            .ok_or(Error::EngineAccountIdNotSet)?;
+        let account_id =
+            AccountId::try_from(slice.as_ref()).map_err(|_| Error::EngineAccountIdCorrupted)?;
+        Ok(account_id)
     }
 
     pub fn get_latest_block(&self) -> Result<(H256, u64), error::Error> {
