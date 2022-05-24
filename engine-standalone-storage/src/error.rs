@@ -10,6 +10,8 @@ pub enum Error {
     TransactionNotFound(TransactionIncluded),
     TransactionHashNotFound(H256),
     Rocksdb(rocksdb::Error),
+    EngineAccountIdNotSet,
+    EngineAccountIdCorrupted,
 }
 
 impl From<rocksdb::Error> for Error {
