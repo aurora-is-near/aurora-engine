@@ -1,6 +1,7 @@
 use aurora_engine::{connector, engine, parameters::SubmitResult};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::{
+    account_id::AccountId,
     parameters::PromiseWithCallbackArgs,
     types::{Address, Yocto},
     H256,
@@ -10,11 +11,7 @@ pub mod types;
 
 use crate::engine_state::EngineStateAccess;
 use crate::{BlockMetadata, Diff, Storage};
-use types::{Message, TransactionKind};
-
-use self::types::TransactionMessage;
-
-const AURORA_ACCOUNT_ID: &str = "aurora";
+use types::{Message, TransactionKind, TransactionMessage};
 
 pub fn consume_message(
     storage: &mut Storage,
@@ -41,6 +38,7 @@ pub fn consume_message(
             let block_hash = transaction_message.block_hash;
             let block_height = storage.get_block_height_by_hash(block_hash)?;
             let block_metadata = storage.get_block_metadata(block_hash)?;
+            let engine_account_id = storage.get_engine_account_id()?;
 
             let (tx_hash, diff, result) = storage
                 .with_engine_access(block_height, transaction_position, &[], |io| {
@@ -48,6 +46,7 @@ pub fn consume_message(
                         transaction_message.as_ref(),
                         block_height,
                         &block_metadata,
+                        engine_account_id,
                         io,
                     )
                 })
@@ -77,8 +76,15 @@ pub fn execute_transaction_message(
     let block_hash = transaction_message.block_hash;
     let block_height = storage.get_block_height_by_hash(block_hash)?;
     let block_metadata = storage.get_block_metadata(block_hash)?;
+    let engine_account_id = storage.get_engine_account_id()?;
     let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
-        execute_transaction(&transaction_message, block_height, &block_metadata, io)
+        execute_transaction(
+            &transaction_message,
+            block_height,
+            &block_metadata,
+            engine_account_id,
+            io,
+        )
     });
     let (tx_hash, diff, maybe_result) = result.result;
     let outcome = TransactionIncludedOutcome {
@@ -94,6 +100,7 @@ fn execute_transaction<'db>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
+    engine_account_id: AccountId,
     io: EngineStateAccess<'db, 'db, 'db>,
 ) -> (
     H256,
@@ -105,7 +112,7 @@ fn execute_transaction<'db>(
     let relayer_address =
         aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes());
     let near_receipt_id = transaction_message.near_receipt_id;
-    let current_account_id = AURORA_ACCOUNT_ID.parse().unwrap();
+    let current_account_id = engine_account_id;
     let env = env::Fixed {
         signer_account_id,
         current_account_id,

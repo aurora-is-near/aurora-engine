@@ -38,6 +38,9 @@ impl StandaloneRunner {
         self.chain_id = chain_id;
         let storage = &mut self.storage;
         let env = &mut self.env;
+        storage
+            .set_engine_account_id(&env.current_account_id)
+            .unwrap();
         env.block_height += 1;
         let transaction_hash = H256::zero();
         let tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash);
