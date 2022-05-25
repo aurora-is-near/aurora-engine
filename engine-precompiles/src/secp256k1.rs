@@ -1,5 +1,5 @@
 use crate::prelude::types::{Address, EthGas};
-use crate::prelude::{sdk, vec, Borrowed, H256};
+use crate::prelude::{sdk, vec::Vec, Borrowed, H256};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
@@ -93,7 +93,7 @@ impl Precompile for ECRecover {
         let v_bit = match v[31] {
             27 | 28 if v[..31] == [0; 31] => v[31] - 27,
             _ => {
-                return Ok(PrecompileOutput::without_logs(cost, vec![255u8; 32]).into());
+                return Ok(PrecompileOutput::without_logs(cost, Vec::new()).into());
             }
         };
         signature[64] = v_bit; // v
@@ -105,9 +105,7 @@ impl Precompile for ECRecover {
                 output[12..32].copy_from_slice(a.as_bytes());
                 output.to_vec()
             }
-            Err(_) => {
-                vec![255u8; 32]
-            }
+            Err(_) => Vec::new(),
         };
 
         Ok(PrecompileOutput::without_logs(cost, output).into())
@@ -160,9 +158,7 @@ mod tests {
 
         // bad inputs
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001a650acf9d3f5f0a2c799776a1254355d5f4061762a237396a99a0e0e3fc2bcd6729514a0dacb2e623ac4abd157cb18163ff942280db4d5caad66ddf941ba12e03").unwrap();
-        let expected =
-            hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-                .unwrap();
+        let expected: Vec<u8> = Vec::new();
 
         let res = ECRecover
             .run(&input, Some(EthGas::new(3_000)), &new_context(), false)
@@ -171,9 +167,7 @@ mod tests {
         assert_eq!(res, expected);
 
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b000000000000000000000000000000000000000000000000000000000000001b0000000000000000000000000000000000000000000000000000000000000000").unwrap();
-        let expected =
-            hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-                .unwrap();
+        let expected: Vec<u8> = Vec::new();
 
         let res = ECRecover
             .run(&input, Some(EthGas::new(3_000)), &new_context(), false)
@@ -182,9 +176,7 @@ mod tests {
         assert_eq!(res, expected);
 
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001b").unwrap();
-        let expected =
-            hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-                .unwrap();
+        let expected: Vec<u8> = Vec::new();
 
         let res = ECRecover
             .run(&input, Some(EthGas::new(3_000)), &new_context(), false)
@@ -193,9 +185,7 @@ mod tests {
         assert_eq!(res, expected);
 
         let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000001b").unwrap();
-        let expected =
-            hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-                .unwrap();
+        let expected: Vec<u8> = Vec::new();
 
         let res = ECRecover
             .run(&input, Some(EthGas::new(3_000)), &new_context(), false)
@@ -205,7 +195,7 @@ mod tests {
 
         // Why is this test returning an address???
         // let input = hex::decode("47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad000000000000000000000000000000000000000000000000000000000000001b000000000000000000000000000000000000000000000000000000000000001bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
-        // let expected = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
+        // let expected: Vec<u8> = Vec::new();
         //
         // let res = ecrecover_raw(&input, Some(500)).unwrap().output;
         // assert_eq!(res, expected);
