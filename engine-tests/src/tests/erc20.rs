@@ -8,7 +8,7 @@ use crate::test_utils::{
 use aurora_engine::parameters::TransactionStatus;
 use aurora_engine_sdk as sdk;
 use bstr::ByteSlice;
-use secp256k1::SecretKey;
+use libsecp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1_000_000;
 const INITIAL_NONCE: u64 = 0;

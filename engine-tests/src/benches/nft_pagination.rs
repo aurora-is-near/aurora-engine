@@ -1,7 +1,7 @@
 use crate::prelude::{Address, Wei, U256};
 use crate::test_utils::{self, solidity};
 use aurora_engine_transactions::legacy::TransactionLegacy;
-use secp256k1::SecretKey;
+use libsecp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Once;

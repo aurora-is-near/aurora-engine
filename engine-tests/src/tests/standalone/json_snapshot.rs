@@ -54,7 +54,7 @@ fn test_produce_snapshot() {
 
     // add a couple more transactions that write some extra keys
     runner.env.block_height = snapshot.result.block_height + 1;
-    let sk = secp256k1::SecretKey::parse(&[0x77; 32]).unwrap();
+    let sk = libsecp256k1::SecretKey::parse(&[0x77; 32]).unwrap();
     let mut signer = test_utils::Signer::new(sk);
     let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
     let dest1 = Address::from_array([0x11; 20]);

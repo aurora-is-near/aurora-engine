@@ -10,8 +10,8 @@ use crate::test_utils::{
 };
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::H160;
+use libsecp256k1::SecretKey;
 use rand::SeedableRng;
-use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;

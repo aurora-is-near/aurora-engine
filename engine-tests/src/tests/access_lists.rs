@@ -10,7 +10,7 @@ use std::iter;
 // TODO(#170): generally support Ethereum tests
 #[test]
 fn test_access_list_tx_encoding_decoding() {
-    let secret_key = secp256k1::SecretKey::parse_slice(
+    let secret_key = libsecp256k1::SecretKey::parse_slice(
         &hex::decode("45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8").unwrap(),
     )
     .unwrap();

@@ -3,8 +3,8 @@ use crate::prelude::{Wei, U256};
 use crate::test_utils::one_inch::liquidity_protocol;
 use crate::test_utils::{self, assert_gas_bound};
 use borsh::BorshDeserialize;
+use libsecp256k1::SecretKey;
 use near_vm_logic::VMOutcome;
-use secp256k1::SecretKey;
 use std::sync::Once;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
