@@ -1,0 +1,43 @@
+[package]
+name = "self-contained-5bEgfRQ"
+version = "1.0.0"
+authors = ["Aurora Labs <hello@aurora.dev>"]
+edition = "2021"
+description = "A wasm contract that reproduces a transaction from mainnet: https://explorer.mainnet.near.org/transactions/5bEgfRQ5TSJfN9XCqYkMr9cgBLToM7JmS1bNzKpDXJhT"
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "CC0-1.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "z"
+debug = false
+debug-assertions = false
+overflow-checks = true
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[profile.dev]
+opt-level = "z"
+debug = false
+debug-assertions = true
+overflow-checks = true
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[dependencies]
+borsh = { version = "0.8.2", default-features = false }
+aurora-engine = { path = "../../engine", default-features = false }
+aurora-engine-sdk = { path = "../../engine-sdk", default-features = false, features = ["contract"] }
+aurora-engine-types = { path = "../../engine-types", default-features = false }
