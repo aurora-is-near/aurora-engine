@@ -539,7 +539,7 @@ fn test_ft_transfer_call_without_message() {
     // Sending to external receiver with empty message should be success
     let dummy_ft_receiver = master_account.deploy(
         &dummy_ft_receiver_bytes(),
-        "ft-rec".parse().unwrap(),
+        "ft-rec.root".parse().unwrap(),
         near_sdk_sim::STORAGE_AMOUNT,
     );
     let res = recipient_account.call(

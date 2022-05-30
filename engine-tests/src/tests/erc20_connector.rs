@@ -410,7 +410,7 @@ mod sim_tests {
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;
     const FT_TRANSFER_AMOUNT: u128 = 300_000;
     const FT_EXIT_AMOUNT: u128 = 100_000;
-    const FT_ACCOUNT: &str = "test_token";
+    const FT_ACCOUNT: &str = "test_token.root";
     const INITIAL_ETH_BALANCE: u64 = 777_777_777;
     const ETH_EXIT_AMOUNT: u64 = 111_111_111;
 

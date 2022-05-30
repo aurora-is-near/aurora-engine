@@ -35,13 +35,13 @@ ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hex = { version = "0.4.3", default-features = false }
-near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "5e58722bd61d9d24ae6293326146c751f0a814fb" }
-near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "5e58722bd61d9d24ae6293326146c751f0a814fb" }
-near-crypto = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
-near-vm-runner = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783", default-features = false, features = [ "wasmer2_vm" ] }
-near-vm-logic = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
-near-primitives-core = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
-near-primitives = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
+near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07" }
+near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07" }
+near-crypto = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda" }
+near-vm-runner = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda", default-features = false, features = [ "wasmer2_vm" ] }
+near-vm-logic = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda" }
+near-primitives-core = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda" }
+near-primitives = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda" }
 libsecp256k1 = "0.3.5"
 rand = "0.7.3"
 criterion = "0.3.4"
