@@ -27,7 +27,7 @@ serde_json = "1.0.72"
 base64 = "0.13.0"
 
 [features]
-default = ["snappy", "lz4", "zstd", "zlib", "bzip2"]
+default = ["snappy", "lz4", "zstd", "zlib"]
 mainnet = []
 testnet = []
 snappy = ["rocksdb/snappy"]
