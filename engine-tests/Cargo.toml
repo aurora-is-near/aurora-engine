@@ -42,7 +42,7 @@ near-vm-runner = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d
 near-vm-logic = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
 near-primitives-core = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
 near-primitives = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
-libsecp256k1 = "0.3.5"
+libsecp256k1 = "0.5.0"
 rand = "0.7.3"
 criterion = "0.3.4"
 git2 = "0.13"
