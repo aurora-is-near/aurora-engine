@@ -126,7 +126,7 @@ impl<'a> OneShotAuroraRunner<'a> {
             input,
         );
 
-        near_vm_runner::run(
+        match near_vm_runner::run(
             &self.base.code,
             method_name,
             &mut self.ext,
@@ -136,7 +136,10 @@ impl<'a> OneShotAuroraRunner<'a> {
             &[],
             self.base.current_protocol_version,
             Some(&self.base.cache),
-        )
+        ) {
+            near_vm_runner::VMResult::Aborted(outcome, error) => (Some(outcome), Some(error)),
+            near_vm_runner::VMResult::Ok(outcome) => (Some(outcome), None),
+        }
     }
 }
 
@@ -185,7 +188,7 @@ impl AuroraRunner {
             input,
         );
 
-        let (maybe_outcome, maybe_error) = near_vm_runner::run(
+        let (maybe_outcome, maybe_error) = match near_vm_runner::run(
             &self.code,
             method_name,
             &mut self.ext,
@@ -195,7 +198,10 @@ impl AuroraRunner {
             &[],
             self.current_protocol_version,
             Some(&self.cache),
-        );
+        ) {
+            near_vm_runner::VMResult::Aborted(outcome, error) => (Some(outcome), Some(error)),
+            near_vm_runner::VMResult::Ok(outcome) => (Some(outcome), None),
+        };
         if let Some(outcome) = &maybe_outcome {
             self.context.storage_usage = outcome.storage_usage;
             self.previous_logs = outcome.logs.clone();
