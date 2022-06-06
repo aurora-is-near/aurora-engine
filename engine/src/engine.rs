@@ -909,10 +909,6 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         if U256::from(chain_id) != U256::from(state.chain_id) {
             return Err(EngineErrorKind::InvalidChainId.into());
         }
-    } else {
-        // Do not allow missing chain_id in production
-        #[cfg(not(feature = "evm_bully"))]
-        return Err(EngineErrorKind::InvalidChainId.into());
     }
 
     // Retrieve the signer of the transaction:
