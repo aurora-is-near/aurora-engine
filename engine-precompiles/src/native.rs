@@ -269,6 +269,8 @@ impl Precompile for ExitToNear {
         // It's not allowed to call exit precompiles in static mode
         if is_static {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        } else if context.address != Self::ADDRESS.raw() {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
@@ -473,6 +475,8 @@ impl Precompile for ExitToEthereum {
         // It's not allowed to call exit precompiles in static mode
         if is_static {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        } else if context.address != Self::ADDRESS.raw() {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:

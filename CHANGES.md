@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.3] 2022-04-27
+
+### Fixes
+
+- Fixed inflation vulnerability relating to ExitToNear and ExitToEthereum by [@birchmd], [@mfornet], and [@joshuajbouw]. Written by [@birchmd].
+
 ## [2.5.2] 2022-03-22
 
 ### Removed
@@ -238,7 +244,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.2...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.3...develop
+[2.5.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.2...2.5.3 
 [2.5.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.1...2.5.2
 [2.5.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.0...2.5.1
 [2.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.4.0...2.5.0
