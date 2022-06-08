@@ -105,16 +105,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aurora-blake2"
-version = "0.9.1"
-source = "git+https://github.com/aurora-is-near/aurora-blake2.git#05a0b5f7a544c527c0118f8afe2f943b3de4bb03"
-dependencies = [
- "crypto-mac 0.8.0",
- "digest 0.9.0",
- "opaque-debug 0.3.0",
-]
-
-[[package]]
 name = "aurora-bn"
 version = "0.1.0"
 source = "git+https://github.com/aurora-is-near/aurora-bn.git#8f1743884061981cac84388862e2763b2aa09307"
@@ -159,7 +149,6 @@ dependencies = [
 name = "aurora-engine-precompiles"
 version = "1.0.0"
 dependencies = [
- "aurora-blake2",
  "aurora-bn",
  "aurora-engine-sdk",
  "aurora-engine-types",
