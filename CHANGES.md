@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.6.0] 2022-06-07
+## [2.6.0] 2022-06-08
 
 ### Added
 
@@ -19,13 +19,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
+- If the `v` byte of secp256k1 is incorrect, it now returns correctly an empty vector by [@RomanHodulak]. ([#513])
+- Original ETH transactions which do not contain a Chain ID are allowed again to allow for use of [EIP-1820] by [@joshuajbouw]. ([#520])
+- Ecrecover didn't reject `r`, `s` values larger than curve order by [@RomanHodulak]. ([#515])
 - The predecessor account ID was failing in the `view` method by [@birchmd]. ([#477])
+- Ecrecover was incorrectly setting the NEAR ecrecover malleability flag by [@birchmd] and [@joshuajbouw]. ([#474])
 
-[#477]: https://github.com/aurora-is-near/aurora-engine/pull/477
-[#479]: https://github.com/aurora-is-near/aurora-engine/pull/479
+[EIP-1820]: https://eips.ethereum.org/EIPS/eip-1820
+[#520]: https://github.com/aurora-is-near/aurora-engine/pull/520
+[#515]: https://github.com/aurora-is-near/aurora-engine/pull/515
+[#513]: https://github.com/aurora-is-near/aurora-engine/pull/513
 [#488]: https://github.com/aurora-is-near/aurora-engine/pull/488
+[#479]: https://github.com/aurora-is-near/aurora-engine/pull/479
+[#477]: https://github.com/aurora-is-near/aurora-engine/pull/477
+[#474]: https://github.com/aurora-is-near/aurora-engine/pull/474
 
-## [2.5.3] 2022-04-26
+## [2.5.3] 2022-04-27
 
 ### Fixes
 
@@ -263,13 +272,13 @@ struct SubmitResult {
 ## [1.0.0] - 2021-05-12
 
 [Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.0...develop
-[2.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.3...2.6.0 
+[2.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.3...2.6.0
 [2.5.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.2...2.5.3
 [2.5.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.1...2.5.2
 [2.5.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.0...2.5.1
 [2.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.4.0...2.5.0
 [2.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.3.0...2.4.0
-[2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0
+[2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0 
 [2.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.1.0...2.2.0
 [2.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.2...2.1.0
 [2.0.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.1...2.0.2
@@ -296,6 +305,7 @@ struct SubmitResult {
 [@joshuajbouw]: https://github.com/joshuajbouw
 [@mfornet]: https://github.com/mfornet
 [@mrLSD]: https://github.com/mrLSD
+[@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
 [@matklad]: https://github.com/matklad
 [@olonho]: https://github.com/olonho
