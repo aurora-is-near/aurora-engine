@@ -14,7 +14,7 @@ documentation.
 
 Network | Contract ID         | Chain ID   | Version
 ------- | ------------------- | ---------- | ------
-Mainnet | [`aurora`][Mainnet] | 1313161554 | 2.6.0
+Mainnet | [`aurora`][Mainnet] | 1313161554 | 2.5.3
 Testnet | [`aurora`][Testnet] | 1313161555 | 2.6.0
 Local   | `aurora.test.near`  | 1313161556 | 2.6.0
 
