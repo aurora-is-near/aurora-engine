@@ -718,7 +718,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     test_utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
 }
 
-fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
+pub(crate) fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
     // set up Aurora runner and accounts
     let mut runner = test_utils::deploy_evm();
     let mut rng = rand::thread_rng();

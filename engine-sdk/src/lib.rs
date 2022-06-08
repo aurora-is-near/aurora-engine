@@ -24,7 +24,7 @@ const ECRECOVER_MESSAGE_SIZE: u64 = 32;
 #[cfg(feature = "contract")]
 const ECRECOVER_SIGNATURE_LENGTH: u64 = 64;
 #[cfg(feature = "contract")]
-const ECRECOVER_MALLEABILITY_FLAG: u64 = 1;
+const ECRECOVER_MALLEABILITY_FLAG: u64 = 0;
 
 #[cfg(feature = "contract")]
 pub fn panic_utf8(bytes: &[u8]) -> ! {
