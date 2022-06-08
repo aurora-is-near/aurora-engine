@@ -1,7 +1,10 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![cfg_attr(not(any(feature = "std", feature = "std-wasm32")), no_std)]
+#![cfg_attr(not(any(feature = "std", feature = "std-wasm32")), feature(alloc_error_handler))]
 #![cfg_attr(
-    all(feature = "log", target_arch = "wasm32"),
+    all(
+        all(feature = "log", target_arch = "wasm32"),
+        not(feature = "std-wasm32")
+    ),
     feature(panic_info_message)
 )]
 
@@ -35,6 +38,7 @@ mod prelude;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "std-wasm32"))]
 #[panic_handler]
 #[cfg_attr(not(feature = "log"), allow(unused_variables))]
 #[no_mangle]
@@ -59,6 +63,7 @@ pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
 }
 
 #[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "std-wasm32"))]
 #[alloc_error_handler]
 #[no_mangle]
 pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
