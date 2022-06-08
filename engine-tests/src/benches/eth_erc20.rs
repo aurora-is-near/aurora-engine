@@ -1,6 +1,6 @@
 use crate::prelude::U256;
 use criterion::{BatchSize, BenchmarkId, Criterion};
-use secp256k1::SecretKey;
+use libsecp256k1::SecretKey;
 
 use crate::test_utils::erc20::{ERC20Constructor, ERC20};
 use crate::test_utils::{address_from_secret_key, deploy_evm, sign_transaction, SUBMIT};

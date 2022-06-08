@@ -5,9 +5,9 @@ use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
 use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
+use libsecp256k1::SecretKey;
 use near_vm_logic::VMOutcome;
 use near_vm_runner::VMError;
-use secp256k1::SecretKey;
 use serde_json::json;
 use sha3::Digest;
 

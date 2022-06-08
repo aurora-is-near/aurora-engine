@@ -28,6 +28,7 @@ lto = true
 opt-level = 3
 
 [workspace]
+resolver = "2"
 members = [
     "engine",
     "engine-precompiles",

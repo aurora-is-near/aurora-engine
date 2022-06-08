@@ -1,5 +1,5 @@
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
-use secp256k1::SecretKey;
+use libsecp256k1::SecretKey;
 
 use crate::prelude::Wei;
 use crate::test_utils::{
