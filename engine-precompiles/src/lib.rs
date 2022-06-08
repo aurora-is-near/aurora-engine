@@ -1,6 +1,4 @@
 #![allow(dead_code)]
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 
 pub mod account_ids;
 pub mod blake2;

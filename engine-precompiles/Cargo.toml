@@ -13,8 +13,8 @@ publish = false
 autobenches = false
 
 [dependencies]
-aurora-engine-types = { path = "../engine-types", default-features = false }
-aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
+aurora-engine-types = { path = "../engine-types" }
+aurora-engine-sdk = { path = "../engine-sdk" }
 base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
@@ -27,7 +27,7 @@ ripemd160 = { version = "0.9.1", default-features = false }
 sha2 = { version = "0.9.3", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
+hex = "0.4"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
