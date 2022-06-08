@@ -1,5 +1,5 @@
 use criterion::{BatchSize, Criterion};
-use secp256k1::SecretKey;
+use libsecp256k1::SecretKey;
 
 use crate::prelude::Wei;
 use crate::test_utils::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};

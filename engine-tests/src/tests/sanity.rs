@@ -6,8 +6,8 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{SubmitResult, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use borsh::BorshSerialize;
+use libsecp256k1::SecretKey;
 use rand::RngCore;
-use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);

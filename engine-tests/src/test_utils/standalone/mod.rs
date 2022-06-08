@@ -12,7 +12,7 @@ use engine_standalone_storage::{
     },
     BlockMetadata, Diff, Storage,
 };
-use secp256k1::SecretKey;
+use libsecp256k1::SecretKey;
 use tempfile::TempDir;
 
 use crate::test_utils;

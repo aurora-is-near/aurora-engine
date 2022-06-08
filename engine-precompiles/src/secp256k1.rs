@@ -32,16 +32,17 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
 fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     use sha3::Digest;
 
-    let hash = secp256k1::Message::parse_slice(hash.as_bytes()).unwrap();
+    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes()).unwrap();
     let v = signature[64];
-    let signature = secp256k1::Signature::parse_slice(&signature[0..64]).unwrap();
+    let signature = libsecp256k1::Signature::parse_standard_slice(&signature[0..64])
+        .map_err(|_| ExitError::Other(Borrowed(sdk::ECRecoverErr.as_str())))?;
     let bit = match v {
         0..=26 => v,
         _ => v - 27,
     };
 
-    if let Ok(recovery_id) = secp256k1::RecoveryId::parse(bit) {
-        if let Ok(public_key) = secp256k1::recover(&hash, &signature, &recovery_id) {
+    if let Ok(recovery_id) = libsecp256k1::RecoveryId::parse(bit) {
+        if let Ok(public_key) = libsecp256k1::recover(&hash, &signature, &recovery_id) {
             // recover returns a 65-byte key, but addresses come from the raw 64-byte key
             let r = sha3::Keccak256::digest(&public_key.serialize()[1..]);
             return Address::try_from_slice(&r[12..])

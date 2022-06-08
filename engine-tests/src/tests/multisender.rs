@@ -2,7 +2,7 @@ use crate::test_utils;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::U256;
-use secp256k1::SecretKey;
+use libsecp256k1::SecretKey;
 
 const INITIAL_NONCE: u64 = 0;
 

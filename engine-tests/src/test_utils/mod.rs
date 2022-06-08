@@ -2,6 +2,7 @@ use aurora_engine::parameters::ViewCallArgs;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::NEP141Wei;
 use borsh::{BorshDeserialize, BorshSerialize};
+use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
 use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives_core::config::VMConfig;
@@ -12,7 +13,6 @@ use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
-use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
@@ -700,7 +700,7 @@ pub(crate) fn sign_transaction(
     let message_hash = sdk::keccak(rlp_stream.as_raw());
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
 
-    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
     let v: u64 = match chain_id {
         Some(chain_id) => (recovery_id.serialize() as u64) + 2 * chain_id + 35,
         None => (recovery_id.serialize() as u64) + 27,
@@ -725,7 +725,7 @@ pub(crate) fn sign_access_list_transaction(
     let message_hash = sdk::keccak(rlp_stream.as_raw());
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
 
-    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());
 
@@ -747,7 +747,7 @@ pub(crate) fn sign_eip_1559_transaction(
     let message_hash = sdk::keccak(rlp_stream.as_raw());
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
 
-    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());
 

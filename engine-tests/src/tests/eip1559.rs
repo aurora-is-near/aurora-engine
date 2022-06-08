@@ -113,7 +113,8 @@ fn encode_tx(signed_tx: &SignedTransaction1559) -> Vec<u8> {
 }
 
 fn exmaple_signer() -> test_utils::Signer {
-    let secret_key = secp256k1::SecretKey::parse_slice(&hex::decode(SECRET_KEY).unwrap()).unwrap();
+    let secret_key =
+        libsecp256k1::SecretKey::parse_slice(&hex::decode(SECRET_KEY).unwrap()).unwrap();
 
     test_utils::Signer {
         nonce: INITIAL_NONCE,
