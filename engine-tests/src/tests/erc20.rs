@@ -8,7 +8,7 @@ use crate::test_utils::{
 use aurora_engine::parameters::TransactionStatus;
 use aurora_engine_sdk as sdk;
 use bstr::ByteSlice;
-use secp256k1::SecretKey;
+use libsecp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1_000_000;
 const INITIAL_NONCE: u64 = 0;
@@ -108,12 +108,12 @@ fn profile_erc20_get_balance() {
     assert!(result.is_ok());
 
     // call costs less than 3 Tgas
-    test_utils::assert_gas_bound(profile.all_gas(), 3);
+    test_utils::assert_gas_bound(profile.all_gas(), 2);
     // at least 70% of the cost is spent on wasm computation (as opposed to host functions)
     let wasm_fraction = (100 * profile.wasm_gas()) / profile.all_gas();
     assert!(
-        15 <= wasm_fraction && wasm_fraction <= 20,
-        "{}% is not between 15% and 20%",
+        20 <= wasm_fraction && wasm_fraction <= 30,
+        "{}% is not between 20% and 30%",
         wasm_fraction
     );
 }

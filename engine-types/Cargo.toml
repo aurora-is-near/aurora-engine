@@ -18,6 +18,7 @@ ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.10.0", default-features = false, features = ["rlp"] }
 sha3 = { version = "0.9.1", default-features = false }
+serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 bstr = "0.2"
@@ -28,3 +29,4 @@ rand = "0.7.3"
 [features]
 default = ["std"]
 std = ["primitive-types/std"]
+impl-serde = ["primitive-types/impl-serde", "serde"]

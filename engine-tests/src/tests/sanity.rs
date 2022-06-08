@@ -6,8 +6,8 @@ use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{SubmitResult, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use borsh::BorshSerialize;
+use libsecp256k1::SecretKey;
 use rand::RngCore;
-use secp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
@@ -133,7 +133,7 @@ fn test_deploy_largest_contract() {
     );
 
     // Less than 12 NEAR Tgas
-    test_utils::assert_gas_bound(profile.all_gas(), 12);
+    test_utils::assert_gas_bound(profile.all_gas(), 11);
 }
 
 #[test]
@@ -293,7 +293,7 @@ fn test_solidity_pure_bench() {
     let code = near_primitives_core::contract::ContractCode::new(contract_bytes, None);
     let mut context = runner.context.clone();
     context.input = loop_limit.to_le_bytes().to_vec();
-    let (outcome, error) = near_vm_runner::run(
+    let (outcome, error) = match near_vm_runner::run(
         &code,
         "cpu_ram_soak_test",
         &mut runner.ext,
@@ -303,7 +303,10 @@ fn test_solidity_pure_bench() {
         &[],
         runner.current_protocol_version,
         Some(&runner.cache),
-    );
+    ) {
+        near_vm_runner::VMResult::Aborted(outcome, error) => (Some(outcome), Some(error)),
+        near_vm_runner::VMResult::Ok(outcome) => (Some(outcome), None),
+    };
     if let Some(e) = error {
         panic!("{:?}", e);
     }
@@ -715,7 +718,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     test_utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
 }
 
-fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
+pub(crate) fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
     // set up Aurora runner and accounts
     let mut runner = test_utils::deploy_evm();
     let mut rng = rand::thread_rng();

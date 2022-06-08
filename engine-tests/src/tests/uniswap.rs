@@ -10,8 +10,8 @@ use crate::test_utils::{
 };
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::H160;
+use libsecp256k1::SecretKey;
 use rand::SeedableRng;
-use secp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -28,10 +28,7 @@ fn test_uniswap_input_multihop() {
     let mut context = UniswapTestContext::new("uniswap");
 
     // evm_gas = 970k
-    // near total gas = 204 Tgas
-    // Wish: optimize so that this transaction costs less than 200 Tgas.
-    // For now we just have to increase the burnt gas limit to make it run to completion.
-    context.runner.wasm_config.limit_config.max_gas_burnt = 500_000_000_000_000;
+    // near total gas = 163 Tgas
 
     let tokens = context.create_tokens(10, MINT_AMOUNT.into());
     for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {
@@ -41,9 +38,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    println!("{:?}", profile.host_breakdown);
-    println!("NEAR_GAS_WASM {:?}", profile.wasm_gas());
-    println!("NEAR_GAS_TOTAL {:?}", profile.all_gas());
+    assert_eq!(128, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
@@ -54,21 +49,21 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    test_utils::assert_gas_bound(profile.all_gas(), 57);
+    test_utils::assert_gas_bound(profile.all_gas(), 35);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        25 <= wasm_fraction && wasm_fraction <= 35,
-        "{}% is not between 20% and 30%",
+        40 <= wasm_fraction && wasm_fraction <= 50,
+        "{}% is not between 40% and 50%",
         wasm_fraction
     );
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    test_utils::assert_gas_bound(profile.all_gas(), 31);
+    test_utils::assert_gas_bound(profile.all_gas(), 20);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        25 <= wasm_fraction && wasm_fraction <= 35,
-        "{}% is not between 25% and 35%",
+        45 <= wasm_fraction && wasm_fraction <= 55,
+        "{}% is not between 45% and 55%",
         wasm_fraction
     );
 }

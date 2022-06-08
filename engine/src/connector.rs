@@ -62,14 +62,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Init Eth-connector contract instance.
     /// Load contract data from storage and init I/O handler.
     /// Used as single point of contract access for various contract actions
-    pub fn init_instance(io: I) -> Self {
-        Self {
-            contract: get_contract_data(&io, &EthConnectorStorageId::Contract),
-            ft: get_contract_data::<FungibleToken, I>(&io, &EthConnectorStorageId::FungibleToken)
+    pub fn init_instance(io: I) -> Result<Self, error::StorageReadError> {
+        Ok(Self {
+            contract: get_contract_data(&io, &EthConnectorStorageId::Contract)?,
+            ft: get_contract_data::<FungibleToken, I>(&io, &EthConnectorStorageId::FungibleToken)?
                 .ops(io),
-            paused_mask: get_contract_data(&io, &EthConnectorStorageId::PausedMask),
+            paused_mask: get_contract_data(&io, &EthConnectorStorageId::PausedMask)?,
             io,
-        }
+        })
     }
 
     /// Create contract data - init eth-connector contract specific data.
@@ -687,11 +687,16 @@ fn construct_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
     crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
 }
 
-fn get_contract_data<T: BorshDeserialize, I: IO>(io: &I, suffix: &EthConnectorStorageId) -> T {
+fn get_contract_data<T: BorshDeserialize, I: IO>(
+    io: &I,
+    suffix: &EthConnectorStorageId,
+) -> Result<T, error::StorageReadError> {
     io.read_storage(&construct_contract_key(suffix))
-        .expect("Failed read storage")
-        .to_value()
-        .unwrap()
+        .ok_or(error::StorageReadError::KeyNotFound)
+        .and_then(|x| {
+            x.to_value()
+                .map_err(|_| error::StorageReadError::BorshDeserialize)
+        })
 }
 
 /// Sets the contract data and returns it back
@@ -734,6 +739,21 @@ pub mod error {
     use crate::{deposit_event, fungible_token};
 
     const PROOF_EXIST: &[u8; 15] = b"ERR_PROOF_EXIST";
+
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+    pub enum StorageReadError {
+        KeyNotFound,
+        BorshDeserialize,
+    }
+
+    impl AsRef<[u8]> for StorageReadError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::KeyNotFound => b"ERR_CONNECTOR_STORAGE_KEY_NOT_FOUND",
+                Self::BorshDeserialize => b"ERR_FAILED_DESERIALIZE_CONNECTOR_DATA",
+            }
+        }
+    }
 
     #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum DepositError {
@@ -791,6 +811,7 @@ pub mod error {
         }
     }
 
+    #[derive(Debug)]
     pub enum WithdrawError {
         Paused,
         FT(fungible_token::error::WithdrawError),
@@ -848,6 +869,7 @@ pub mod error {
         }
     }
 
+    #[derive(Debug)]
     pub enum InitContractError {
         AlreadyInitialized,
         InvalidCustodianAddress(AddressError),

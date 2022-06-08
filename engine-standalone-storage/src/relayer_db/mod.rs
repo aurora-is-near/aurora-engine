@@ -100,18 +100,18 @@ where
         env.block_timestamp = block_metadata.timestamp;
         env.random_seed = block_metadata.random_seed;
 
-        let io = storage.access_engine_storage_at_position(block_height, transaction_position, &[]);
-
-        let maybe_result = engine::submit(
-            io,
-            &env,
-            &transaction_bytes,
-            engine_state.clone(),
-            env.current_account_id(),
-            relayer_address,
-            &mut handler,
-        );
-        match maybe_result {
+        let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
+            engine::submit(
+                io,
+                &env,
+                &transaction_bytes,
+                engine_state.clone(),
+                env.current_account_id(),
+                relayer_address,
+                &mut handler,
+            )
+        });
+        match result.result {
             // Engine errors would always turn into panics on the NEAR side, so we do not need to persist
             // any diff. Therefore, even if the error was expected, we still continue to the next transaction.
             Err(e) => {
@@ -140,12 +140,18 @@ where
             }
         }
 
-        let diff = io.get_transaction_diff();
-        let tx_included = crate::TransactionIncluded {
+        let diff = result.diff;
+        let tx_msg = crate::TransactionMessage {
             block_hash,
+            near_receipt_id: near_tx_hash,
             position: transaction_position,
+            succeeded: true,
+            signer: env.signer_account_id(),
+            caller: env.predecessor_account_id(),
+            attached_near: 0,
+            transaction: crate::sync::types::TransactionKind::Submit(tx),
         };
-        storage.set_transaction_included(tx_hash, &tx_included, &diff)?;
+        storage.set_transaction_included(tx_hash, &tx_msg, &diff)?;
     }
     Ok(())
 }
@@ -189,6 +195,7 @@ pub mod error {
 #[cfg(test)]
 mod test {
     use super::FallibleIterator;
+    use crate::sync::types::{TransactionKind, TransactionMessage};
     use aurora_engine::{connector, engine, parameters};
     use aurora_engine_types::H256;
 
@@ -220,26 +227,35 @@ mod test {
             storage
                 .set_block_data(block_hash, block_height, block_metadata)
                 .unwrap();
-            let mut io = storage.access_engine_storage_at_position(block_height, 0, &[]);
-            engine::set_state(&mut io, engine_state.clone());
-            connector::EthConnectorContract::create_contract(
-                io,
-                engine_state.owner_id.clone(),
-                parameters::InitCallArgs {
-                    prover_account: engine_state.bridge_prover_id.clone(),
-                    eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52".to_string(),
-                    metadata: Default::default(),
-                },
-            )
-            .ok()
-            .unwrap();
-            let diff = io.get_transaction_diff();
+            let result = storage.with_engine_access(block_height, 0, &[], |io| {
+                let mut local_io = io.clone();
+                engine::set_state(&mut local_io, engine_state.clone());
+                connector::EthConnectorContract::create_contract(
+                    io,
+                    engine_state.owner_id.clone(),
+                    parameters::InitCallArgs {
+                        prover_account: engine_state.bridge_prover_id.clone(),
+                        eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"
+                            .to_string(),
+                        metadata: Default::default(),
+                    },
+                )
+            });
+
+            result.result.ok().unwrap();
+            let diff = result.diff;
             storage
                 .set_transaction_included(
                     H256::zero(),
-                    &crate::TransactionIncluded {
+                    &TransactionMessage {
                         block_hash,
                         position: 0,
+                        near_receipt_id: H256::zero(),
+                        succeeded: true,
+                        signer: "aurora".parse().unwrap(),
+                        caller: "aurora".parse().unwrap(),
+                        attached_near: 0,
+                        transaction: TransactionKind::Unknown,
                     },
                     &diff,
                 )

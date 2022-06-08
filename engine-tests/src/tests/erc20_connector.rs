@@ -5,9 +5,9 @@ use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
 use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
+use libsecp256k1::SecretKey;
 use near_vm_logic::VMOutcome;
 use near_vm_runner::VMError;
-use secp256k1::SecretKey;
 use serde_json::json;
 use sha3::Digest;
 
@@ -184,9 +184,7 @@ impl test_utils::AuroraRunner {
             ],
         );
 
-        let chain_id = Some(self.chain_id);
-        let input =
-            create_eth_transaction(Some(token.into()), Wei::zero(), input, chain_id, &sender);
+        let input = create_eth_transaction(Some(token.into()), Wei::zero(), input, None, &sender);
 
         let result = self.evm_submit(input, origin); // create_eth_transaction()
         result.check_ok();
@@ -410,7 +408,7 @@ mod sim_tests {
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;
     const FT_TRANSFER_AMOUNT: u128 = 300_000;
     const FT_EXIT_AMOUNT: u128 = 100_000;
-    const FT_ACCOUNT: &str = "test_token";
+    const FT_ACCOUNT: &str = "test_token.root";
     const INITIAL_ETH_BALANCE: u64 = 777_777_777;
     const ETH_EXIT_AMOUNT: u64 = 111_111_111;
 

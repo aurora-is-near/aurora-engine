@@ -1,6 +1,6 @@
 use crate::prelude::U256;
 use criterion::{BatchSize, BenchmarkId, Criterion};
-use secp256k1::SecretKey;
+use libsecp256k1::SecretKey;
 
 use crate::prelude::Wei;
 use crate::test_utils::standard_precompiles::{PrecompilesConstructor, PrecompilesContract};

@@ -1,23 +1,21 @@
 use super::{EvmPrecompileResult, Precompile};
-#[cfg(feature = "contract")]
 use crate::prelude::{
     format,
     parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
-    sdk,
+    sdk::io::{StorageIntermediate, IO},
     storage::{bytes_to_key, KeyPrefix},
-    types::Yocto,
+    types::{Address, Yocto},
     vec, BorshSerialize, Cow, String, ToString, Vec, U256,
 };
-#[cfg(all(feature = "error_refund", feature = "contract"))]
+#[cfg(feature = "error_refund")]
 use crate::prelude::{
     parameters::{PromiseWithCallbackArgs, RefundCallArgs},
     types,
 };
 
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::EthGas;
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
-#[cfg(feature = "contract")]
 use evm::backend::Log;
 use evm::{Context, ExitError};
 
@@ -26,10 +24,10 @@ const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 mod costs {
     use crate::prelude::types::{EthGas, NearGas};
 
-    // TODO(#51): Determine the correct amount of gas
+    // TODO(#483): Determine the correct amount of gas
     pub(super) const EXIT_TO_NEAR_GAS: EthGas = EthGas::new(0);
 
-    // TODO(#51): Determine the correct amount of gas
+    // TODO(#483): Determine the correct amount of gas
     pub(super) const EXIT_TO_ETHEREUM_GAS: EthGas = EthGas::new(0);
 
     // TODO(#332): Determine the correct amount of gas
@@ -191,58 +189,45 @@ pub mod events {
 }
 
 //TransferEthToNear
-pub struct ExitToNear {
+pub struct ExitToNear<I> {
     current_account_id: AccountId,
+    io: I,
 }
 
-impl ExitToNear {
+pub mod exit_to_near {
+    use aurora_engine_types::types::Address;
+
     /// Exit to NEAR precompile address
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
     pub const ADDRESS: Address =
-        super::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
+        crate::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
+}
 
-    pub fn new(current_account_id: AccountId) -> Self {
-        Self { current_account_id }
+impl<I> ExitToNear<I> {
+    pub fn new(current_account_id: AccountId, io: I) -> Self {
+        Self {
+            current_account_id,
+            io,
+        }
     }
 }
 
-#[cfg(feature = "contract")]
-fn get_nep141_from_erc20(erc20_token: &[u8]) -> AccountId {
-    use sdk::io::{StorageIntermediate, IO};
+fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId, ExitError> {
     AccountId::try_from(
-        sdk::near_runtime::Runtime
-            .read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
+        io.read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
             .map(|s| s.to_vec())
-            .expect(ERR_TARGET_TOKEN_NOT_FOUND),
+            .ok_or(ExitError::Other(Cow::Borrowed(ERR_TARGET_TOKEN_NOT_FOUND)))?,
     )
-    .unwrap()
+    .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
 }
 
-impl Precompile for ExitToNear {
+impl<I: IO> Precompile for ExitToNear<I> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
-    #[cfg(not(feature = "contract"))]
-    fn run(
-        &self,
-        input: &[u8],
-        target_gas: Option<EthGas>,
-        _context: &Context,
-        _is_static: bool,
-    ) -> EvmPrecompileResult {
-        if let Some(target_gas) = target_gas {
-            if Self::required_gas(input)? > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
-        }
-
-        Ok(PrecompileOutput::default().into())
-    }
-
-    #[cfg(feature = "contract")]
     fn run(
         &self,
         input: &[u8],
@@ -251,9 +236,12 @@ impl Precompile for ExitToNear {
         is_static: bool,
     ) -> EvmPrecompileResult {
         #[cfg(feature = "error_refund")]
-        fn parse_input(input: &[u8]) -> (Address, &[u8]) {
-            let refund_address = Address::from_array(&input[1..21]);
-            (refund_address, &input[21..])
+        fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
+            if input.len() < 21 {
+                return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));
+            }
+            let refund_address = Address::try_from_slice(&input[1..21]).unwrap();
+            Ok((refund_address, &input[21..]))
         }
         #[cfg(not(feature = "error_refund"))]
         fn parse_input(input: &[u8]) -> &[u8] {
@@ -269,7 +257,7 @@ impl Precompile for ExitToNear {
         // It's not allowed to call exit precompiles in static mode
         if is_static {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        } else if context.address != Self::ADDRESS.raw() {
+        } else if context.address != exit_to_near::ADDRESS.raw() {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
@@ -278,7 +266,7 @@ impl Precompile for ExitToNear {
         //      0x1 -> Erc20 transfer
         let flag = input[0];
         #[cfg(feature = "error_refund")]
-        let (refund_address, mut input) = parse_input(input);
+        let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input);
         let current_account_id = self.current_account_id.clone();
@@ -331,7 +319,7 @@ impl Precompile for ExitToNear {
                 }
 
                 let erc20_address = context.caller;
-                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes());
+                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes(), &self.io)?;
 
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
@@ -399,13 +387,13 @@ impl Precompile for ExitToNear {
         let promise = PromiseArgs::Create(transfer_promise);
 
         let promise_log = Log {
-            address: Self::ADDRESS.raw(),
+            address: exit_to_near::ADDRESS.raw(),
             topics: Vec::new(),
             data: promise.try_to_vec().unwrap(),
         };
         let exit_event_log = exit_event.encode();
         let exit_event_log = Log {
-            address: Self::ADDRESS.raw(),
+            address: exit_to_near::ADDRESS.raw(),
             topics: exit_event_log.topics,
             data: exit_event_log.data,
         };
@@ -418,46 +406,36 @@ impl Precompile for ExitToNear {
     }
 }
 
-pub struct ExitToEthereum {
+pub struct ExitToEthereum<I> {
     current_account_id: AccountId,
+    io: I,
 }
 
-impl ExitToEthereum {
+pub mod exit_to_ethereum {
+    use aurora_engine_types::types::Address;
+
     /// Exit to Ethereum precompile address
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
     pub const ADDRESS: Address =
-        super::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
+        crate::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
+}
 
-    pub fn new(current_account_id: AccountId) -> Self {
-        Self { current_account_id }
+impl<I> ExitToEthereum<I> {
+    pub fn new(current_account_id: AccountId, io: I) -> Self {
+        Self {
+            current_account_id,
+            io,
+        }
     }
 }
 
-impl Precompile for ExitToEthereum {
+impl<I: IO> Precompile for ExitToEthereum<I> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
-    #[cfg(not(feature = "contract"))]
-    fn run(
-        &self,
-        input: &[u8],
-        target_gas: Option<EthGas>,
-        _context: &Context,
-        _is_static: bool,
-    ) -> EvmPrecompileResult {
-        if let Some(target_gas) = target_gas {
-            if Self::required_gas(input)? > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
-        }
-
-        Ok(PrecompileOutput::default().into())
-    }
-
-    #[cfg(feature = "contract")]
     fn run(
         &self,
         input: &[u8],
@@ -475,7 +453,7 @@ impl Precompile for ExitToEthereum {
         // It's not allowed to call exit precompiles in static mode
         if is_static {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
-        } else if context.address != Self::ADDRESS.raw() {
+        } else if context.address != exit_to_ethereum::ADDRESS.raw() {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
@@ -530,7 +508,7 @@ impl Precompile for ExitToEthereum {
                 }
 
                 let erc20_address = context.caller;
-                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes());
+                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes(), &self.io)?;
 
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
@@ -581,13 +559,13 @@ impl Precompile for ExitToEthereum {
 
         let promise = PromiseArgs::Create(withdraw_promise).try_to_vec().unwrap();
         let promise_log = Log {
-            address: Self::ADDRESS.raw(),
+            address: exit_to_ethereum::ADDRESS.raw(),
             topics: Vec::new(),
             data: promise,
         };
         let exit_event_log = exit_event.encode();
         let exit_event_log = Log {
-            address: Self::ADDRESS.raw(),
+            address: exit_to_ethereum::ADDRESS.raw(),
             topics: exit_event_log.topics,
             data: exit_event_log.data,
         };
@@ -602,17 +580,17 @@ impl Precompile for ExitToEthereum {
 
 #[cfg(test)]
 mod tests {
-    use super::{ExitToEthereum, ExitToNear};
+    use super::{exit_to_ethereum, exit_to_near};
     use crate::prelude::sdk::types::near_account_to_evm_address;
 
     #[test]
     fn test_precompile_id() {
         assert_eq!(
-            ExitToEthereum::ADDRESS,
+            exit_to_ethereum::ADDRESS,
             near_account_to_evm_address("exitToEthereum".as_bytes())
         );
         assert_eq!(
-            ExitToNear::ADDRESS,
+            exit_to_near::ADDRESS,
             near_account_to_evm_address("exitToNear".as_bytes())
         );
     }

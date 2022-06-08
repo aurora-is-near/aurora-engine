@@ -1,4 +1,5 @@
 use crate::{str, vec, String, Vec, U256};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 pub mod address;
 pub mod balance;
@@ -62,7 +63,7 @@ pub struct StorageBalanceBounds {
 }
 
 /// promise results structure
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum PromiseResult {
     NotReady,
     Successful(Vec<u8>),

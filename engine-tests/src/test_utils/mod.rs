@@ -2,6 +2,7 @@ use aurora_engine::parameters::ViewCallArgs;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::NEP141Wei;
 use borsh::{BorshDeserialize, BorshSerialize};
+use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
 use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives_core::config::VMConfig;
@@ -9,10 +10,9 @@ use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
 use near_primitives_core::runtime::fees::RuntimeFeesConfig;
 use near_vm_logic::types::ReturnData;
-use near_vm_logic::{VMContext, VMOutcome};
+use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
-use secp256k1::{self, Message, PublicKey, SecretKey};
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
@@ -47,7 +47,7 @@ pub(crate) mod standard_precompiles;
 pub(crate) mod uniswap;
 pub(crate) mod weth;
 
-pub(crate) struct Signer {
+pub struct Signer {
     pub nonce: u64,
     pub secret_key: SecretKey,
 }
@@ -126,7 +126,7 @@ impl<'a> OneShotAuroraRunner<'a> {
             input,
         );
 
-        near_vm_runner::run(
+        match near_vm_runner::run(
             &self.base.code,
             method_name,
             &mut self.ext,
@@ -136,7 +136,10 @@ impl<'a> OneShotAuroraRunner<'a> {
             &[],
             self.base.current_protocol_version,
             Some(&self.base.cache),
-        )
+        ) {
+            near_vm_runner::VMResult::Aborted(outcome, error) => (Some(outcome), Some(error)),
+            near_vm_runner::VMResult::Ok(outcome) => (Some(outcome), None),
+        }
     }
 }
 
@@ -185,7 +188,7 @@ impl AuroraRunner {
             input,
         );
 
-        let (maybe_outcome, maybe_error) = near_vm_runner::run(
+        let (maybe_outcome, maybe_error) = match near_vm_runner::run(
             &self.code,
             method_name,
             &mut self.ext,
@@ -195,7 +198,10 @@ impl AuroraRunner {
             &[],
             self.current_protocol_version,
             Some(&self.cache),
-        );
+        ) {
+            near_vm_runner::VMResult::Aborted(outcome, error) => (Some(outcome), Some(error)),
+            near_vm_runner::VMResult::Ok(outcome) => (Some(outcome), None),
+        };
         if let Some(outcome) = &maybe_outcome {
             self.context.storage_usage = outcome.storage_usage;
             self.previous_logs = outcome.logs.clone();
@@ -400,7 +406,11 @@ impl AuroraRunner {
 
     pub fn view_call(&self, args: ViewCallArgs) -> Result<TransactionStatus, VMError> {
         let input = args.try_to_vec().unwrap();
-        let (outcome, maybe_error) = self.one_shot().call("view", "viewer", input);
+        let mut runner = self.one_shot();
+        runner.context.view_config = Some(ViewConfig {
+            max_gas_burnt: u64::MAX,
+        });
+        let (outcome, maybe_error) = runner.call("view", "viewer", input);
         Ok(
             TransactionStatus::try_from_slice(&Self::bytes_from_outcome(outcome, maybe_error)?)
                 .unwrap(),
@@ -412,8 +422,11 @@ impl AuroraRunner {
         args: ViewCallArgs,
     ) -> (Result<TransactionStatus, VMError>, ExecutionProfile) {
         let input = args.try_to_vec().unwrap();
-        let (outcome, maybe_error, profile) =
-            self.one_shot().profiled_call("view", "viewer", input);
+        let mut runner = self.one_shot();
+        runner.context.view_config = Some(ViewConfig {
+            max_gas_burnt: u64::MAX,
+        });
+        let (outcome, maybe_error, profile) = runner.profiled_call("view", "viewer", input);
         let status = Self::bytes_from_outcome(outcome, maybe_error)
             .map(|bytes| TransactionStatus::try_from_slice(&bytes).unwrap());
 
@@ -687,7 +700,7 @@ pub(crate) fn sign_transaction(
     let message_hash = sdk::keccak(rlp_stream.as_raw());
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
 
-    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
     let v: u64 = match chain_id {
         Some(chain_id) => (recovery_id.serialize() as u64) + 2 * chain_id + 35,
         None => (recovery_id.serialize() as u64) + 27,
@@ -712,7 +725,7 @@ pub(crate) fn sign_access_list_transaction(
     let message_hash = sdk::keccak(rlp_stream.as_raw());
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
 
-    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());
 
@@ -734,7 +747,7 @@ pub(crate) fn sign_eip_1559_transaction(
     let message_hash = sdk::keccak(rlp_stream.as_raw());
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
 
-    let (signature, recovery_id) = secp256k1::sign(&message, secret_key);
+    let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());
 
@@ -820,11 +833,12 @@ pub fn panic_on_fail(status: TransactionStatus) {
 }
 
 pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
-    let bound = tgas_bound * 1_000_000_000_000;
+    // Add 1 to round up
+    let tgas_used = (total_gas / 1_000_000_000_000) + 1;
     assert!(
-        total_gas <= bound,
-        "{} Tgas is not less than {} Tgas",
-        total_gas / 1_000_000_000_000,
+        tgas_used == tgas_bound,
+        "{} Tgas is not equal to {} Tgas",
+        tgas_used,
         tgas_bound,
     );
 }

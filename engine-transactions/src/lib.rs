@@ -160,11 +160,28 @@ impl NormalizedEthTransaction {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ParseTransactionError {
     UnknownTransactionType,
     // Per the EIP-2718 spec 0xff is a reserved value
     ReservedSentinel,
+    #[cfg_attr(feature = "serde", serde(serialize_with = "decoder_err_to_str"))]
     RlpDecodeError(DecoderError),
+}
+
+#[cfg(feature = "serde")]
+fn decoder_err_to_str<S: serde::Serializer>(err: &DecoderError, ser: S) -> Result<S::Ok, S::Error> {
+    ser.serialize_str(&format!("{:?}", err))
+}
+
+impl ParseTransactionError {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::UnknownTransactionType => "ERR_UNKNOWN_TX_TYPE",
+            Self::ReservedSentinel => "ERR_RESERVED_LEADING_TX_BYTE",
+            Self::RlpDecodeError(_) => "ERR_TX_RLP_DECODE",
+        }
+    }
 }
 
 impl From<DecoderError> for ParseTransactionError {
@@ -175,11 +192,7 @@ impl From<DecoderError> for ParseTransactionError {
 
 impl AsRef<[u8]> for ParseTransactionError {
     fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::UnknownTransactionType => b"ERR_UNKNOWN_TX_TYPE",
-            Self::ReservedSentinel => b"ERR_RESERVED_LEADING_TX_BYTE",
-            Self::RlpDecodeError(_) => b"ERR_TX_RLP_DECODE",
-        }
+        self.as_str().as_bytes()
     }
 }
 

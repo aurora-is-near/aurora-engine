@@ -6,13 +6,14 @@ use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::connector::EthConnectorContract;
 use crate::map::BijectionMap;
-use aurora_engine_sdk::dup_cache::{DupCache, PairDupCache};
+use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
-use crate::prelude::precompiles::native::{ExitToEthereum, ExitToNear};
+use crate::prelude::parameters::RefundCallArgs;
+use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
@@ -64,6 +65,7 @@ macro_rules! assert_or_finish {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct EngineError {
     pub kind: EngineErrorKind,
     pub gas_used: u64,
@@ -83,6 +85,7 @@ impl AsRef<[u8]> for EngineError {
 
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum EngineErrorKind {
     /// Normal EVM errors.
     EvmError(ExitError),
@@ -181,6 +184,7 @@ impl ExitIntoResult for ExitReason {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BalanceOverflow;
 
 impl AsRef<[u8]> for BalanceOverflow {
@@ -191,6 +195,7 @@ impl AsRef<[u8]> for BalanceOverflow {
 
 /// Errors resulting from trying to pay for gas
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GasPaymentError {
     /// Overflow adding ETH to an account balance (should never happen)
     BalanceOverflow(BalanceOverflow),
@@ -340,30 +345,38 @@ impl AsRef<[u8]> for EngineStateError {
     }
 }
 
-struct StackExecutorParams {
-    precompiles: Precompiles,
+struct StackExecutorParams<'a, I, E> {
+    precompiles: Precompiles<'a, I, E>,
     gas_limit: u64,
 }
 
-impl StackExecutorParams {
-    fn new(gas_limit: u64, current_account_id: AccountId, random_seed: H256) -> Self {
+impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
+    fn new(
+        gas_limit: u64,
+        current_account_id: AccountId,
+        random_seed: H256,
+        io: I,
+        env: &'env E,
+    ) -> Self {
         Self {
             precompiles: Precompiles::new_london(PrecompileConstructorContext {
                 current_account_id,
                 random_seed,
+                io,
+                env,
             }),
             gas_limit,
         }
     }
 
-    fn make_executor<'a, 'env, I: IO + Copy, E: Env>(
+    fn make_executor<'a>(
         &'a self,
         engine: &'a Engine<'env, I, E>,
     ) -> executor::stack::StackExecutor<
         'static,
         'a,
         executor::stack::MemoryStackState<Engine<'env, I, E>>,
-        Precompiles,
+        Precompiles<'env, I, E>,
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::stack::MemoryStackState::new(metadata, engine);
@@ -413,9 +426,9 @@ pub struct Engine<'env, I: IO, E: Env> {
     io: I,
     env: &'env E,
     generation_cache: RefCell<BTreeMap<Address, u32>>,
-    account_info_cache: RefCell<DupCache<Address, Basic>>,
-    contract_code_cache: RefCell<DupCache<Address, Vec<u8>>>,
-    contract_storage_cache: RefCell<PairDupCache<Address, H256, H256>>,
+    account_info_cache: RefCell<FullCache<Address, Basic>>,
+    contract_code_cache: RefCell<FullCache<Address, Vec<u8>>>,
+    contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
 }
 
 pub(crate) const CONFIG: &Config = &Config::london();
@@ -448,9 +461,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             io,
             env,
             generation_cache: RefCell::new(BTreeMap::new()),
-            account_info_cache: RefCell::new(DupCache::default()),
-            contract_code_cache: RefCell::new(DupCache::default()),
-            contract_storage_cache: RefCell::new(PairDupCache::default()),
+            account_info_cache: RefCell::new(FullCache::default()),
+            contract_code_cache: RefCell::new(FullCache::default()),
+            contract_storage_cache: RefCell::new(FullCache::default()),
         }
     }
 
@@ -511,6 +524,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             gas_limit,
             self.current_account_id.clone(),
             self.env.random_seed(),
+            self.io,
+            self.env,
         );
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy {
@@ -595,6 +610,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             gas_limit,
             self.current_account_id.clone(),
             self.env.random_seed(),
+            self.io,
+            self.env,
         );
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) = executor.transact_call(
@@ -644,6 +661,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             gas_limit,
             self.current_account_id.clone(),
             self.env.random_seed(),
+            self.io,
+            self.env,
         );
         let mut executor = executor_params.make_executor(self);
         let (status, result) = executor.transact_call(
@@ -890,10 +909,6 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         if U256::from(chain_id) != U256::from(state.chain_id) {
             return Err(EngineErrorKind::InvalidChainId.into());
         }
-    } else {
-        // Do not allow missing chain_id in production
-        #[cfg(not(feature = "evm_bully"))]
-        return Err(EngineErrorKind::InvalidChainId.into());
     }
 
     // Retrieve the signer of the transaction:
@@ -980,6 +995,63 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     // return result to user
     result
+}
+
+pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
+    io: I,
+    env: &E,
+    state: EngineState,
+    args: RefundCallArgs,
+    handler: &mut P,
+) -> EngineResult<SubmitResult> {
+    let current_account_id = env.current_account_id();
+    match args.erc20_address {
+        // ERC-20 exit; re-mint burned tokens
+        Some(erc20_address) => {
+            let erc20_admin_address = current_address(&current_account_id);
+            let mut engine =
+                Engine::new_with_state(state, erc20_admin_address, current_account_id, io, env);
+            let erc20_address = erc20_address;
+            let refund_address = args.recipient_address;
+            let amount = U256::from_big_endian(&args.amount);
+
+            let selector = ERC20_MINT_SELECTOR;
+            let mint_args = ethabi::encode(&[
+                ethabi::Token::Address(refund_address.raw()),
+                ethabi::Token::Uint(amount),
+            ]);
+
+            engine.call(
+                &erc20_admin_address,
+                &erc20_address,
+                Wei::zero(),
+                [selector, mint_args.as_slice()].concat(),
+                u64::MAX,
+                Vec::new(),
+                handler,
+            )
+        }
+        // ETH exit; transfer ETH back from precompile address
+        None => {
+            let exit_address = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
+            let mut engine =
+                Engine::new_with_state(state, exit_address, current_account_id, io, env);
+            let refund_address = args.recipient_address;
+            let amount = Wei::new(U256::from_big_endian(&args.amount));
+            engine.call(
+                &exit_address,
+                &refund_address,
+                amount,
+                Vec::new(),
+                u64::MAX,
+                vec![
+                    (exit_address.raw(), Vec::new()),
+                    (refund_address.raw(), Vec::new()),
+                ],
+                handler,
+            )
+        }
+    }
 }
 
 /// There is one Aurora block per NEAR block height (note: when heights in NEAR are skipped
@@ -1201,12 +1273,16 @@ pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
 
 pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
     let balance = get_balance(io, address);
-    // Apply changes for eth-connector. The `unwrap` is safe here because (a) if the connector
-    // is implemented correctly then the total supply wll never underflow and (b) we are passing
-    // in the balance directly so there will always be enough balance.
+    // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
+    // if we cannot read the storage then there is nothing to remove.
     EthConnectorContract::init_instance(*io)
-        .internal_remove_eth(address, balance)
-        .unwrap();
+        .map(|mut connector| {
+            // The `unwrap` is safe here because (a) if the connector
+            // is implemented correctly then the total supply will never underflow and (b) we are passing
+            // in the balance directly so there will always be enough balance.
+            connector.internal_remove_eth(address, balance).unwrap();
+        })
+        .ok();
     io.remove_storage(&address_to_key(KeyPrefix::Balance, address));
 }
 
@@ -1297,8 +1373,8 @@ where
 {
     logs.into_iter()
         .filter_map(|log| {
-            if log.address == ExitToNear::ADDRESS.raw()
-                || log.address == ExitToEthereum::ADDRESS.raw()
+            if log.address == exit_to_near::ADDRESS.raw()
+                || log.address == exit_to_ethereum::ADDRESS.raw()
             {
                 if log.topics.is_empty() {
                     if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
@@ -1447,7 +1523,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     fn exists(&self, address: H160) -> bool {
         let address = Address::new(address);
         let mut cache = self.account_info_cache.borrow_mut();
-        let basic_info = cache.get_or_insert_with(&address, || Basic {
+        let basic_info = cache.get_or_insert_with(address, || Basic {
             nonce: get_nonce(&self.io, &address),
             balance: get_balance(&self.io, &address).raw(),
         });
@@ -1455,7 +1531,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
             return true;
         }
         let mut cache = self.contract_code_cache.borrow_mut();
-        let code = cache.get_or_insert_with(&address, || get_code(&self.io, &address));
+        let code = cache.get_or_insert_with(address, || get_code(&self.io, &address));
         !code.is_empty()
     }
 
@@ -1465,7 +1541,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
         let result = self
             .account_info_cache
             .borrow_mut()
-            .get_or_insert_with(&address, || Basic {
+            .get_or_insert_with(address, || Basic {
                 nonce: get_nonce(&self.io, &address),
                 balance: get_balance(&self.io, &address).raw(),
             })
@@ -1478,7 +1554,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
         let address = Address::new(address);
         self.contract_code_cache
             .borrow_mut()
-            .get_or_insert_with(&address, || get_code(&self.io, &address))
+            .get_or_insert_with(address, || get_code(&self.io, &address))
             .clone()
     }
 
@@ -1493,7 +1569,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
         let result = *self
             .contract_storage_cache
             .borrow_mut()
-            .get_or_insert_with((&address, &index), || {
+            .get_or_insert_with((address, index), || {
                 get_storage(&self.io, &address, &index, generation)
             });
         result

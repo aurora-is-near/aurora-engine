@@ -21,12 +21,11 @@ aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false }
 base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
-near-blake2 = { git = "https://github.com/near/near-blake2.git", version = "0.9.1", default-features = false }
 borsh = { version = "0.8.2", default-features = false }
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false }
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false }
-libsecp256k1 = { version = "0.3.5", default-features = false }
+libsecp256k1 = { version = "0.7.0", default-features = false }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.10.0", default-features = false, features = ["rlp"] }
 ripemd160 = { version = "0.9.1", default-features = false }
@@ -38,6 +37,7 @@ ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 byte-slice-cast = { version = "1.0", default-features = false }
 rjson = { git = "https://github.com/aurora-is-near/rjson", rev = "cc3da949", default-features = false, features = ["integer"] }
+serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -58,3 +58,4 @@ mainnet = ["contract", "log"]
 testnet = ["contract", "log"]
 mainnet-test = ["meta-call"]
 testnet-test = ["meta-call"]
+impl-serde = ["aurora-engine-types/impl-serde", "serde", "aurora-engine-transactions/impl-serde", "evm-core/with-serde"]
