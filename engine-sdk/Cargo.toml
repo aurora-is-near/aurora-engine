@@ -15,8 +15,8 @@ autobenches = false
 [dependencies]
 aurora-engine-types = { path = "../engine-types" }
 borsh = "0.8.2"
-sha3 = { version = "0.9.1", default-features = false }
-sha2 = { version = "0.9.3", default-features = false }
+sha3 = "0.9.1"
+sha2 = "0.9.3"
 
 [features]
 contract = []

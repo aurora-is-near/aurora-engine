@@ -4,6 +4,7 @@ pub mod storage;
 pub mod types;
 
 mod v0 {
+    pub use primitive_types::{H160, H256, U256};
     pub use std::{
         borrow::ToOwned,
         borrow::{Cow, Cow::*},
@@ -20,7 +21,6 @@ mod v0 {
         cmp::Ordering, fmt::Display, marker::PhantomData, mem, ops::Add, ops::Div, ops::Mul,
         ops::Sub, ops::SubAssign,
     };
-    pub use primitive_types::{H160, H256, U256};
 }
 
 pub use v0::*;

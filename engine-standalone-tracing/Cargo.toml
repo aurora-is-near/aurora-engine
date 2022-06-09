@@ -24,7 +24,6 @@ evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev =
 serde = { version = "1", features = ["derive"], optional = true }
 
 [features]
-default = []
 mainnet = []
 testnet = []
 impl-serde = ["aurora-engine-types/impl-serde", "serde"]

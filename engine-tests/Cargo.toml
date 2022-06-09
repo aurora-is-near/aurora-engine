@@ -21,11 +21,11 @@ aurora-engine-transactions = { path = "../engine-transactions" }
 engine-standalone-storage = { path = "../engine-standalone-storage" }
 engine-standalone-tracing = { path = "../engine-standalone-tracing" }
 borsh = "0.8.2"
-sha3 = { version = "0.9.1", default-features = false }
+sha3 = "0.9.1"
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false, features = ["std", "tracing"] }
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false, features = ["std", "tracing"] }
 evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false, features = ["std", "tracing"] }
-rlp = { version = "0.5.0", default-features = false }
+rlp = "0.5.0"
 
 [dev-dependencies]
 base64 = "0.13.0"

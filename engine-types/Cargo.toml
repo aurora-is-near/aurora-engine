@@ -17,7 +17,7 @@ borsh = "0.8.2"
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
 hex = "0.4"
 primitive-types = { version = "0.10.0", default-features = false, features = ["rlp"] }
-sha3 = { version = "0.9.1", default-features = false }
+sha3 = "0.9.1"
 serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
