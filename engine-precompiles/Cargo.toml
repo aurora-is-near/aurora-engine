@@ -15,17 +15,17 @@ autobenches = false
 [dependencies]
 aurora-engine-types = { path = "../engine-types" }
 aurora-engine-sdk = { path = "../engine-sdk" }
-base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
-borsh = { version = "0.8.2", default-features = false }
+base64 = "0.13.0"
+borsh = "0.8.2"
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false }
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false }
-libsecp256k1 = { version = "0.7.0", default-features = false, features = ["static-context", "hmac"] }
-num = { version = "0.4.0", default-features = false, features = ["alloc"] }
+libsecp256k1 = { version = "0.7.0", features = ["static-context", "hmac"] }
+num = "0.4.0"
 primitive-types = { version = "0.10.0", default-features = false, features = ["rlp"] }
-ripemd160 = { version = "0.9.1", default-features = false }
-sha2 = { version = "0.9.3", default-features = false }
-sha3 = { version = "0.9.1", default-features = false }
+ripemd160 = "0.9.1"
+sha2 = "0.9.3"
+sha3 = "0.9.1"
 ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
 hex = "0.4"
 
@@ -35,7 +35,6 @@ serde_json = "1"
 rand = "0.7.3"
 
 [features]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "borsh/std", "bn/std", "evm/std", "evm-core/std", "libsecp256k1/std", "ripemd160/std", "sha2/std", "sha3/std", "ethabi/std"]
 contract = []
 log = []
 error_refund = []
