@@ -1,0 +1,11 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: aurora-engine-public
+  description: Public Aurora Engine repository
+spec:
+  targets:
+    - ./engine/.catalog-info.yaml
+    - ./etc/eth-contracts/.catalog-info.yaml
+    - ./engine-precompiles/.catalog-info.yaml
