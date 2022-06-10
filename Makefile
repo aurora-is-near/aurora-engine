@@ -46,14 +46,14 @@ testnet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 test-mainnet: mainnet-test-build
 	$(CARGO) test --features mainnet-test$(ADDITIONAL_FEATURES)
 mainnet-test-build: FEATURES=mainnet,integration-test,meta-call
-mainnet-test-build: mainnet-test.wasm
+mainnet-test-build: mainnet-test.wasm etc/eth-contracts/artifacts/contracts/test/StateTest.sol/SelfDestruct.json
 mainnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
 test-testnet: testnet-test-build
 	$(CARGO) test --features testnet-test$(ADDITIONAL_FEATURES)
 testnet-test-build: FEATURES=testnet,integration-test,meta-call
-testnet-test-build: testnet-test.wasm
+testnet-test-build: testnet-test.wasm etc/eth-contracts/artifacts/contracts/test/StateTest.sol/SelfDestruct.json
 testnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
@@ -78,7 +78,7 @@ target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(
 etc/eth-contracts/res/EvmErc20.bin: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
 	cd etc/eth-contracts && yarn && yarn build
 
-etc/eth-contracts/artifacts/contracts/test/StateTest.sol/StateTest.json: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
+etc/eth-contracts/artifacts/contracts/test/StateTest.sol/SelfDestruct.json: $(shell find etc/eth-contracts/contracts -name "*.sol") etc/eth-contracts/package.json
 	cd etc/eth-contracts && yarn && yarn build
 
 check-format:
