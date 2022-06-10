@@ -26,6 +26,10 @@ contract EvmErc20 is ERC20, AdminControlled, IExit {
         _decimals = metadata_decimals;
     }
 
+    function hello() public pure returns (string memory) {
+        return "Hello, World!";
+    }
+
     function name() public view override returns (string memory) {
         return _name;
     }
