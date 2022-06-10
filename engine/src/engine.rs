@@ -760,7 +760,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             // Message format:
             //      Recipient of the transaction - 40 characters (Address in hex)
             //      Fee to be paid in ETH (Optional) - 64 characters (Encoded in big endian / hex)
-            let mut message = args.msg.as_bytes();
+            let message = args.msg.as_bytes();
             assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
 
             let recipient = Address::new(H160(unwrap_res_or_finish!(
@@ -768,16 +768,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 output_on_fail,
                 self.io
             )));
-            message = &message[40..];
 
-            let fee = if message.is_empty() {
-                U256::from(0)
-            } else {
-                assert_or_finish!(message.len() == 64, output_on_fail, self.io);
-                U256::from_big_endian(
-                    unwrap_res_or_finish!(hex::decode(message), output_on_fail, self.io).as_slice(),
-                )
-            };
+            let fee = U256::zero();
 
             (recipient, fee)
         };
