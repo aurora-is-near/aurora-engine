@@ -38,3 +38,5 @@ jobs:
       - name: Run yarn lint
         working-directory: etc/eth-contracts
         run: yarn && yarn lint
+      - name: Check committed EvmErc20.bin
+        run: bash verify_evm_erc20.sh
