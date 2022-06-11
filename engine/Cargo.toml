@@ -25,7 +25,7 @@ borsh = "0.8.2"
 bn = { package = "aurora-bn", git = "https://github.com/aurora-is-near/aurora-bn.git", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false }
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false }
-libsecp256k1 = { version = "0.7.0" }
+libsecp256k1 = { version = "0.7.0", default-features = false }
 num = "0.4.0"
 primitive-types = { version = "0.10.0", default-features = false, features = ["rlp"] }
 ripemd160 = "0.9.1"
