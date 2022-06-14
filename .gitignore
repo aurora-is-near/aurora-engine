@@ -19,7 +19,6 @@ target/
 artifacts/
 cache/
 node_modules/
-etc/eth-contracts/res/
 
 # Other
 etc/state-migration-test/target/
