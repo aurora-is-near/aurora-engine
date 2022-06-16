@@ -517,7 +517,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn withdraw() {
-        let mut io = Runtime;
+        let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
         let args = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
@@ -527,7 +527,11 @@ mod contract {
             .withdraw_eth_from_near(&current_account_id, &predecessor_account_id, args)
             .sdk_unwrap();
         let result_bytes = result.try_to_vec().sdk_expect("ERR_SERIALIZE");
-        io.return_output(&result_bytes);
+        // We intentionally do not go through the `io` struct here because we must bypass
+        // the check that prevents output that is accepted by the eth_custodian
+        unsafe {
+            exports::value_return(result_bytes.len() as u64, result_bytes.as_ptr() as u64);
+        }
     }
 
     #[no_mangle]
@@ -907,6 +911,12 @@ mod contract {
 
     fn predecessor_address(predecessor_account_id: &AccountId) -> Address {
         near_account_to_evm_address(predecessor_account_id.as_bytes())
+    }
+
+    mod exports {
+        extern "C" {
+            pub(crate) fn value_return(value_len: u64, value_ptr: u64);
+        }
     }
 }
 
