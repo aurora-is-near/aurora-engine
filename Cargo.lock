@@ -1163,6 +1163,7 @@ dependencies = [
  "evm-core",
  "evm-gasometer",
  "evm-runtime",
+ "hex",
  "serde",
 ]
 
