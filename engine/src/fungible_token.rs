@@ -217,14 +217,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     /// Withdraw ETH tokens
     pub fn internal_withdraw_eth_from_aurora(
         &mut self,
-        address: &Address,
         amount: Wei,
     ) -> Result<(), error::WithdrawError> {
-        let balance = self.internal_unwrap_balance_of_eth_on_aurora(address);
-        let new_balance = balance
-            .checked_sub(amount)
-            .ok_or(error::WithdrawError::InsufficientFunds)?;
-        engine::set_balance(&mut self.io, address, &new_balance);
         self.total_eth_supply_on_aurora = self
             .total_eth_supply_on_aurora
             .checked_sub(amount)

@@ -18,6 +18,7 @@ pub mod meta_parsing;
 pub mod parameters;
 pub mod proof;
 
+pub mod accounting;
 pub mod admin_controlled;
 #[cfg_attr(feature = "contract", allow(dead_code))]
 pub mod connector;
