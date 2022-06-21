@@ -547,7 +547,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                 .read_u64(&key)
                 .unwrap_or(0)
                 .checked_add(1)
-                .expect("ERR_ACCOUNTS_COUNTER_OVERFLOW");
+                .expect(crate::errors::ERR_ACCOUNTS_COUNTER_OVERFLOW);
             self.io.write_storage(&key, &accounts_counter.to_le_bytes());
         }
         self.io
@@ -595,14 +595,15 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 }
 
 pub mod error {
+    use crate::errors;
     use crate::prelude::types::balance::error::BalanceOverflowError;
 
-    const TOTAL_SUPPLY_OVERFLOW: &[u8; 25] = b"ERR_TOTAL_SUPPLY_OVERFLOW";
-    const BALANCE_OVERFLOW: &[u8; 20] = b"ERR_BALANCE_OVERFLOW";
-    const NOT_ENOUGH_BALANCE: &[u8; 22] = b"ERR_NOT_ENOUGH_BALANCE";
-    const TOTAL_SUPPLY_UNDERFLOW: &[u8; 26] = b"ERR_TOTAL_SUPPLY_UNDERFLOW";
-    const ZERO_AMOUNT: &[u8; 15] = b"ERR_ZERO_AMOUNT";
-    const SELF_TRANSFER: &[u8; 26] = b"ERR_SENDER_EQUALS_RECEIVER";
+    const TOTAL_SUPPLY_OVERFLOW: &[u8; 25] = errors::ERR_TOTAL_SUPPLY_OVERFLOW;
+    const BALANCE_OVERFLOW: &[u8; 20] = errors::ERR_BALANCE_OVERFLOW;
+    const NOT_ENOUGH_BALANCE: &[u8; 22] = errors::ERR_NOT_ENOUGH_BALANCE;
+    const TOTAL_SUPPLY_UNDERFLOW: &[u8; 26] = errors::ERR_TOTAL_SUPPLY_UNDERFLOW;
+    const ZERO_AMOUNT: &[u8; 15] = errors::ERR_ZERO_AMOUNT;
+    const SELF_TRANSFER: &[u8; 26] = errors::ERR_SENDER_EQUALS_RECEIVER;
 
     #[derive(Debug)]
     pub enum DepositError {
@@ -689,11 +690,11 @@ pub mod error {
     impl AsRef<[u8]> for StorageFundingError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::NotRegistered => b"ERR_ACCOUNT_NOT_REGISTERED",
-                Self::NoAvailableBalance => b"ERR_NO_AVAILABLE_BALANCE",
-                Self::InsufficientDeposit => b"ERR_ATTACHED_DEPOSIT_NOT_ENOUGH",
+                Self::NotRegistered => errors::ERR_ACCOUNT_NOT_REGISTERED,
+                Self::NoAvailableBalance => errors::ERR_NO_AVAILABLE_BALANCE,
+                Self::InsufficientDeposit => errors::ERR_ATTACHED_DEPOSIT_NOT_ENOUGH,
                 Self::UnRegisterPositiveBalance => {
-                    b"ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE"
+                    errors::ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE
                 }
             }
         }
