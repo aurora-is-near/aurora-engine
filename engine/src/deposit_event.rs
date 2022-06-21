@@ -303,6 +303,7 @@ impl DepositedEvent {
 
 pub mod error {
     use super::*;
+    use crate::errors;
 
     #[derive(Debug)]
     pub enum DecodeError {
@@ -312,8 +313,8 @@ pub mod error {
     impl AsRef<[u8]> for DecodeError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::RlpFailed => b"ERR_RLP_FAILED",
-                Self::SchemaMismatch => b"ERR_PARSE_DEPOSIT_EVENT",
+                Self::RlpFailed => errors::ERR_RLP_FAILED,
+                Self::SchemaMismatch => errors::ERR_PARSE_DEPOSIT_EVENT,
             }
         }
     }
@@ -329,8 +330,8 @@ pub mod error {
     impl AsRef<[u8]> for ParseEventMessageError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::TooManyParts => b"ERR_INVALID_EVENT_MESSAGE_FORMAT",
-                Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
+                Self::TooManyParts => errors::ERR_INVALID_EVENT_MESSAGE_FORMAT,
+                Self::InvalidAccount => errors::ERR_INVALID_ACCOUNT_ID,
                 Self::EthAddressValidationError(e) => e.as_ref(),
                 Self::ParseMessageError(e) => e.as_ref(),
             }
@@ -356,11 +357,11 @@ pub mod error {
         fn as_ref(&self) -> &[u8] {
             match self {
                 Self::LogParseFailed(e) => e.as_ref(),
-                Self::InvalidSender => b"ERR_INVALID_SENDER",
-                Self::InvalidAmount => b"ERR_INVALID_AMOUNT",
-                Self::InvalidFee => b"ERR_INVALID_FEE",
+                Self::InvalidSender => errors::ERR_INVALID_SENDER,
+                Self::InvalidAmount => errors::ERR_INVALID_AMOUNT,
+                Self::InvalidFee => errors::ERR_INVALID_FEE,
                 Self::MessageParseFailed(e) => e.as_ref(),
-                Self::OverflowNumber => b"ERR_OVERFLOW_NUMBER",
+                Self::OverflowNumber => errors::ERR_OVERFLOW_NUMBER,
             }
         }
     }
@@ -377,11 +378,11 @@ pub mod error {
     impl AsRef<[u8]> for ParseOnTransferMessageError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::TooManyParts => b"ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT",
-                Self::InvalidHexData => b"ERR_INVALID_ON_TRANSFER_MESSAGE_HEX",
-                Self::WrongMessageFormat => b"ERR_INVALID_ON_TRANSFER_MESSAGE_DATA",
-                Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
-                Self::OverflowNumber => b"ERR_OVERFLOW_NUMBER",
+                Self::TooManyParts => errors::ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT,
+                Self::InvalidHexData => errors::ERR_INVALID_ON_TRANSFER_MESSAGE_HEX,
+                Self::WrongMessageFormat => errors::ERR_INVALID_ON_TRANSFER_MESSAGE_DATA,
+                Self::InvalidAccount => errors::ERR_INVALID_ACCOUNT_ID,
+                Self::OverflowNumber => errors::ERR_OVERFLOW_NUMBER,
             }
         }
     }
