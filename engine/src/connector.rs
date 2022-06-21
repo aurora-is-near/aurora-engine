@@ -732,13 +732,14 @@ pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
 }
 
 pub mod error {
+    use crate::errors;
     use aurora_engine_types::types::address::error::AddressError;
     use aurora_engine_types::types::balance::error::BalanceOverflowError;
 
     use crate::deposit_event::error::ParseOnTransferMessageError;
     use crate::{deposit_event, fungible_token};
 
-    const PROOF_EXIST: &[u8; 15] = b"ERR_PROOF_EXIST";
+    const PROOF_EXIST: &[u8; 15] = errors::ERR_PROOF_EXIST;
 
     #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum StorageReadError {
@@ -749,8 +750,8 @@ pub mod error {
     impl AsRef<[u8]> for StorageReadError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::KeyNotFound => b"ERR_CONNECTOR_STORAGE_KEY_NOT_FOUND",
-                Self::BorshDeserialize => b"ERR_FAILED_DESERIALIZE_CONNECTOR_DATA",
+                Self::KeyNotFound => errors::ERR_CONNECTOR_STORAGE_KEY_NOT_FOUND,
+                Self::BorshDeserialize => errors::ERR_FAILED_DESERIALIZE_CONNECTOR_DATA,
             }
         }
     }
@@ -771,7 +772,7 @@ pub mod error {
                 Self::Paused => crate::admin_controlled::ERR_PAUSED.as_bytes(),
                 Self::ProofParseFailed => super::ERR_FAILED_PARSE.as_bytes(),
                 Self::EventParseFailed(e) => e.as_ref(),
-                Self::CustodianAddressMismatch => b"ERR_WRONG_EVENT_ADDRESS",
+                Self::CustodianAddressMismatch => errors::ERR_WRONG_EVENT_ADDRESS,
                 Self::InsufficientAmountForFee => super::ERR_NOT_ENOUGH_BALANCE_FOR_FEE.as_bytes(),
                 Self::InvalidAddress(e) => e.as_ref(),
             }
@@ -878,7 +879,7 @@ pub mod error {
     impl AsRef<[u8]> for InitContractError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::AlreadyInitialized => b"ERR_CONTRACT_INITIALIZED",
+                Self::AlreadyInitialized => errors::ERR_CONTRACT_INITIALIZED,
                 Self::InvalidCustodianAddress(e) => e.as_ref(),
             }
         }
