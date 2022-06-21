@@ -5,6 +5,7 @@ use evm::executor;
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::connector::EthConnectorContract;
+use crate::errors;
 use crate::map::BijectionMap;
 use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
@@ -113,31 +114,31 @@ impl EngineErrorKind {
     pub fn as_bytes(&self) -> &[u8] {
         use EngineErrorKind::*;
         match self {
-            EvmError(ExitError::StackUnderflow) => b"ERR_STACK_UNDERFLOW",
-            EvmError(ExitError::StackOverflow) => b"ERR_STACK_OVERFLOW",
-            EvmError(ExitError::InvalidJump) => b"ERR_INVALID_JUMP",
-            EvmError(ExitError::InvalidRange) => b"ERR_INVALID_RANGE",
-            EvmError(ExitError::DesignatedInvalid) => b"ERR_DESIGNATED_INVALID",
-            EvmError(ExitError::CallTooDeep) => b"ERR_CALL_TOO_DEEP",
-            EvmError(ExitError::CreateCollision) => b"ERR_CREATE_COLLISION",
-            EvmError(ExitError::CreateContractLimit) => b"ERR_CREATE_CONTRACT_LIMIT",
-            EvmError(ExitError::OutOfOffset) => b"ERR_OUT_OF_OFFSET",
-            EvmError(ExitError::OutOfGas) => b"ERR_OUT_OF_GAS",
-            EvmError(ExitError::OutOfFund) => b"ERR_OUT_OF_FUND",
+            EvmError(ExitError::StackUnderflow) => errors::ERR_STACK_UNDERFLOW,
+            EvmError(ExitError::StackOverflow) => errors::ERR_STACK_OVERFLOW,
+            EvmError(ExitError::InvalidJump) => errors::ERR_INVALID_JUMP,
+            EvmError(ExitError::InvalidRange) => errors::ERR_INVALID_RANGE,
+            EvmError(ExitError::DesignatedInvalid) => errors::ERR_DESIGNATED_INVALID,
+            EvmError(ExitError::CallTooDeep) => errors::ERR_CALL_TOO_DEEP,
+            EvmError(ExitError::CreateCollision) => errors::ERR_CREATE_COLLISION,
+            EvmError(ExitError::CreateContractLimit) => errors::ERR_CREATE_CONTRACT_LIMIT,
+            EvmError(ExitError::OutOfOffset) => errors::ERR_OUT_OF_OFFSET,
+            EvmError(ExitError::OutOfGas) => errors::ERR_OUT_OF_GAS,
+            EvmError(ExitError::OutOfFund) => errors::ERR_OUT_OF_FUND,
             EvmError(ExitError::Other(m)) => m.as_bytes(),
             EvmError(_) => unreachable!(), // unused misc
-            EvmFatal(ExitFatal::NotSupported) => b"ERR_NOT_SUPPORTED",
-            EvmFatal(ExitFatal::UnhandledInterrupt) => b"ERR_UNHANDLED_INTERRUPT",
+            EvmFatal(ExitFatal::NotSupported) => errors::ERR_NOT_SUPPORTED,
+            EvmFatal(ExitFatal::UnhandledInterrupt) => errors::ERR_UNHANDLED_INTERRUPT,
             EvmFatal(ExitFatal::Other(m)) => m.as_bytes(),
             EvmFatal(_) => unreachable!(), // unused misc
-            IncorrectNonce => b"ERR_INCORRECT_NONCE",
+            IncorrectNonce => errors::ERR_INCORRECT_NONCE,
             FailedTransactionParse(e) => e.as_ref(),
-            InvalidChainId => b"ERR_INVALID_CHAIN_ID",
-            InvalidSignature => b"ERR_INVALID_ECDSA_SIGNATURE",
-            IntrinsicGasNotMet => b"ERR_INTRINSIC_GAS",
-            MaxPriorityGasFeeTooLarge => b"ERR_MAX_PRIORITY_FEE_GREATER",
+            InvalidChainId => errors::ERR_INVALID_CHAIN_ID,
+            InvalidSignature => errors::ERR_INVALID_ECDSA_SIGNATURE,
+            IntrinsicGasNotMet => errors::ERR_INTRINSIC_GAS,
+            MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
             GasPayment(e) => e.as_ref(),
-            GasOverflow => b"ERR_GAS_OVERFLOW",
+            GasOverflow => errors::ERR_GAS_OVERFLOW,
         }
     }
 }
@@ -189,7 +190,7 @@ pub struct BalanceOverflow;
 
 impl AsRef<[u8]> for BalanceOverflow {
     fn as_ref(&self) -> &[u8] {
-        b"ERR_BALANCE_OVERFLOW"
+        errors::ERR_BALANCE_OVERFLOW
     }
 }
 
@@ -209,8 +210,8 @@ impl AsRef<[u8]> for GasPaymentError {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::BalanceOverflow(overflow) => overflow.as_ref(),
-            Self::EthAmountOverflow => b"ERR_GAS_ETH_AMOUNT_OVERFLOW",
-            Self::OutOfFund => b"ERR_OUT_OF_FUND",
+            Self::EthAmountOverflow => errors::ERR_GAS_ETH_AMOUNT_OVERFLOW,
+            Self::OutOfFund => errors::ERR_OUT_OF_FUND,
         }
     }
 }
@@ -266,7 +267,7 @@ pub struct AddressParseError;
 
 impl AsRef<[u8]> for AddressParseError {
     fn as_ref(&self) -> &[u8] {
-        b"ERR_PARSE_ADDRESS"
+        errors::ERR_PARSE_ADDRESS
     }
 }
 
@@ -339,8 +340,8 @@ pub enum EngineStateError {
 impl AsRef<[u8]> for EngineStateError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::NotFound => b"ERR_STATE_NOT_FOUND",
-            Self::DeserializationFailed => b"ERR_STATE_CORRUPTED",
+            Self::NotFound => errors::ERR_STATE_NOT_FOUND,
+            Self::DeserializationFailed => errors::ERR_STATE_CORRUPTED,
         }
     }
 }
