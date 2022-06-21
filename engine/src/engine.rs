@@ -1686,7 +1686,7 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
                 // In tests we have convenience functions that can poof addresses with ETH out of nowhere.
                 #[cfg(all(not(feature = "integration-test"), feature = "contract"))]
                 {
-                    unreachable!()
+                    panic!("ERR_INVALID_ETH_SUPPLY_INCREASE");
                 }
             }
         }
