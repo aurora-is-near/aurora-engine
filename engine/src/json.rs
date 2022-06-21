@@ -1,5 +1,6 @@
 use crate::prelude::{BTreeMap, String, Vec};
 
+use crate::errors;
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
 
@@ -103,15 +104,15 @@ impl JsonValue {
 impl AsRef<[u8]> for JsonError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::NotJsonType => b"ERR_NOT_A_JSON_TYPE",
-            Self::MissingValue => b"ERR_JSON_MISSING_VALUE",
-            Self::InvalidU8 => b"ERR_FAILED_PARSE_U8",
-            Self::InvalidU64 => b"ERR_FAILED_PARSE_U64",
-            Self::InvalidU128 => b"ERR_FAILED_PARSE_U128",
-            Self::InvalidBool => b"ERR_FAILED_PARSE_BOOL",
-            Self::InvalidString => b"ERR_FAILED_PARSE_STRING",
-            Self::InvalidArray => b"ERR_FAILED_PARSE_ARRAY",
-            Self::ExpectedStringGotNumber => b"ERR_EXPECTED_STRING_GOT_NUMBER",
+            Self::NotJsonType => errors::ERR_NOT_A_JSON_TYPE,
+            Self::MissingValue => errors::ERR_JSON_MISSING_VALUE,
+            Self::InvalidU8 => errors::ERR_FAILED_PARSE_U8,
+            Self::InvalidU64 => errors::ERR_FAILED_PARSE_U64,
+            Self::InvalidU128 => errors::ERR_FAILED_PARSE_U128,
+            Self::InvalidBool => errors::ERR_FAILED_PARSE_BOOL,
+            Self::InvalidString => errors::ERR_FAILED_PARSE_STRING,
+            Self::InvalidArray => errors::ERR_FAILED_PARSE_ARRAY,
+            Self::ExpectedStringGotNumber => errors::ERR_EXPECTED_STRING_GOT_NUMBER,
             Self::OutOfRange(err) => err.as_ref(),
         }
     }
@@ -120,8 +121,8 @@ impl AsRef<[u8]> for JsonError {
 impl AsRef<[u8]> for JsonOutOfRangeError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::OutOfRangeU8 => b"ERR_OUT_OF_RANGE_U8",
-            Self::OutOfRangeU128 => b"ERR_OUT_OF_RANGE_U128",
+            Self::OutOfRangeU8 => errors::ERR_OUT_OF_RANGE_U8,
+            Self::OutOfRangeU128 => errors::ERR_OUT_OF_RANGE_U128,
         }
     }
 }

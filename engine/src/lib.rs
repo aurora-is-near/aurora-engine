@@ -26,6 +26,7 @@ pub mod engine;
 pub mod fungible_token;
 pub mod json;
 pub mod log_entry;
+pub mod errors;
 mod prelude;
 
 #[cfg(target_arch = "wasm32")]
