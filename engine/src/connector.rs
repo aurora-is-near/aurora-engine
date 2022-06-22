@@ -288,10 +288,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Internal ETH withdraw ETH logic
     pub(crate) fn internal_remove_eth(
         &mut self,
-        address: &Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
-        self.burn_eth_on_aurora(address, amount)?;
+        self.burn_eth_on_aurora(amount)?;
         self.save_ft_contract();
         Ok(())
     }
@@ -339,15 +338,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Burn ETH tokens
     fn burn_eth_on_aurora(
         &mut self,
-        address: &Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
-        sdk::log!(&format!(
-            "Burn {} ETH tokens for: {}",
-            amount,
-            address.encode()
-        ));
-        self.ft.internal_withdraw_eth_from_aurora(address, amount)
+        self.ft.internal_withdraw_eth_from_aurora(amount)
     }
 
     /// Withdraw nETH from NEAR accounts

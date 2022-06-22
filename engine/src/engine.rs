@@ -12,6 +12,7 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 
+use crate::accounting;
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::parameters::RefundCallArgs;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
@@ -1273,17 +1274,6 @@ pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
 }
 
 pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
-    let balance = get_balance(io, address);
-    // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
-    // if we cannot read the storage then there is nothing to remove.
-    EthConnectorContract::init_instance(*io)
-        .map(|mut connector| {
-            // The `unwrap` is safe here because (a) if the connector
-            // is implemented correctly then the total supply will never underflow and (b) we are passing
-            // in the balance directly so there will always be enough balance.
-            connector.internal_remove_eth(address, balance).unwrap();
-        })
-        .ok();
     io.remove_storage(&address_to_key(KeyPrefix::Balance, address));
 }
 
@@ -1595,6 +1585,7 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
     {
         let mut writes_counter: usize = 0;
         let mut code_bytes_written: usize = 0;
+        let mut accounting = accounting::Accounting::default();
         for apply in values {
             match apply {
                 Apply::Modify {
@@ -1604,11 +1595,23 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
                     storage,
                     reset_storage,
                 } => {
+                    let current_basic = self.basic(address);
+                    accounting.change(accounting::Change {
+                        new_value: basic.balance,
+                        old_value: current_basic.balance,
+                    });
+
                     let address = Address::new(address);
                     let generation = get_generation(&self.io, &address);
-                    set_nonce(&mut self.io, &address, &basic.nonce);
-                    set_balance(&mut self.io, &address, &Wei::new(basic.balance));
-                    writes_counter += 2; // 1 for nonce, 1 for balance
+
+                    if current_basic.nonce != basic.nonce {
+                        set_nonce(&mut self.io, &address, &basic.nonce);
+                        writes_counter += 1;
+                    }
+                    if current_basic.balance != basic.balance {
+                        set_balance(&mut self.io, &address, &Wei::new(basic.balance));
+                        writes_counter += 1;
+                    }
 
                     if let Some(code) = code {
                         set_code(&mut self.io, &address, &code);
@@ -1651,10 +1654,40 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
                     }
                 }
                 Apply::Delete { address } => {
+                    let current_basic = self.basic(address);
+                    accounting.remove(current_basic.balance);
+
                     let address = Address::new(address);
                     let generation = get_generation(&self.io, &address);
                     remove_account(&mut self.io, &address, generation);
                     writes_counter += 1;
+                }
+            }
+        }
+        match accounting.net() {
+            // Net loss is possible if `SELFDESTRUCT(self)` calls are made.
+            accounting::Net::Lost(amount) => {
+                sdk::log!(
+                    crate::prelude::format!("Burn {} ETH due to SELFDESTRUCT", amount).as_str()
+                );
+                // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
+                // if we cannot read the storage then there is nothing to remove.
+                EthConnectorContract::init_instance(self.io)
+                    .map(|mut connector| {
+                        // The `unwrap` is safe here because (a) if the connector
+                        // is implemented correctly then the total supply will never underflow and (b) we are passing
+                        // in the balance directly so there will always be enough balance.
+                        connector.internal_remove_eth(Wei::new(amount)).unwrap();
+                    })
+                    .ok();
+            }
+            accounting::Net::Zero => (),
+            accounting::Net::Gained(_) => {
+                // It should be impossible to gain ETH using normal EVM operations in production.
+                // In tests we have convenience functions that can poof addresses with ETH out of nowhere.
+                #[cfg(all(not(feature = "integration-test"), feature = "contract"))]
+                {
+                    panic!("ERR_INVALID_ETH_SUPPLY_INCREASE");
                 }
             }
         }
