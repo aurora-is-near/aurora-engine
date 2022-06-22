@@ -1,10 +1,12 @@
 use crate::test_utils;
 use aurora_engine::engine;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
-use aurora_engine::parameters::{FinishDepositCallArgs, InitCallArgs, NewCallArgs};
+use aurora_engine::parameters::{
+    FinishDepositCallArgs, InitCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::{Address, NEP141Wei, NearGas, Wei};
+use aurora_engine_types::types::{Address, Balance, NEP141Wei, NearGas, Wei};
 use aurora_engine_types::{account_id::AccountId, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
 use near_sdk_sim::DEFAULT_GAS;
@@ -96,7 +98,6 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
         storage: std::iter::empty(),
         reset_storage: false,
     };
-    engine.apply(std::iter::once(state_change), std::iter::empty(), false);
 
     let deposit_args = FinishDepositCallArgs {
         new_owner_id: aurora_account_id.clone(),
@@ -114,8 +115,8 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     );
     io.remove_storage(&proof_key);
 
-    aurora_engine::connector::EthConnectorContract::init_instance(io)
-        .unwrap()
+    let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io).unwrap();
+    connector
         .finish_deposit(
             aurora_account_id.clone(),
             aurora_account_id.clone(),
@@ -124,6 +125,21 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
         )
         .map_err(unsafe_to_string)
         .unwrap();
+
+    let transfer_args = NEP141FtOnTransferArgs {
+        sender_id: aurora_account_id.clone(),
+        amount: Balance::new(balance.raw().as_u128()),
+        msg: format!(
+            "aurora:{}{}",
+            hex::encode(Wei::zero().to_bytes()),
+            hex::encode(address.as_bytes())
+        ),
+    };
+    connector
+        .ft_on_transfer(&mut engine, &transfer_args)
+        .unwrap();
+
+    engine.apply(std::iter::once(state_change), std::iter::empty(), false);
 }
 
 pub fn unsafe_to_string<E: AsRef<[u8]>>(e: E) -> String {
