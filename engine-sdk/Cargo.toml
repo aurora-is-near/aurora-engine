@@ -22,3 +22,5 @@ sha2 = { version = "0.9.3", default-features = false }
 std = ["aurora-engine-types/std"]
 contract = []
 log = []
+mainnet = []
+testnet = []

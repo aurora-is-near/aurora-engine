@@ -124,7 +124,9 @@ fn test_produce_snapshot() {
             buf
         };
         assert_eq!(computed_snapshot.get(&balance_key).unwrap(), &balance_value);
-        assert_eq!(computed_snapshot.get(&nonce_key).unwrap(), &nonce_value);
+        if nonce != 0 {
+            assert_eq!(computed_snapshot.get(&nonce_key).unwrap(), &nonce_value);
+        }
     }
 
     runner.close();

@@ -292,6 +292,8 @@ impl AuroraRunner {
                 .unwrap_or_default();
             current_ft.total_eth_supply_on_near =
                 current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
+            current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
+                + NEP141Wei::new(init_balance.raw().as_u128());
             current_ft
         };
 
@@ -315,7 +317,9 @@ impl AuroraRunner {
         );
 
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
-        trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
+        if !init_nonce.is_zero() {
+            trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
+        }
         trie.insert(ft_key, ft_value.try_to_vec().unwrap());
         trie.insert(proof_key, vec![0]);
         trie.insert(

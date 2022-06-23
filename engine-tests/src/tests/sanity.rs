@@ -16,6 +16,74 @@ const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
 #[test]
+fn test_total_supply_accounting() {
+    let (mut runner, mut signer, benefactor) = initialize_transfer();
+
+    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+        "src/tests/res",
+        "target/solidity_build",
+        "self_destructor.sol",
+        "SelfDestruct",
+    );
+
+    let deploy_contract = |runner: &mut test_utils::AuroraRunner,
+                           signer: &mut test_utils::Signer|
+     -> test_utils::solidity::DeployedContract {
+        let submit_result = runner
+            .submit_with_signer(signer, |nonce| {
+                let mut deploy_tx = constructor.deploy_without_constructor(nonce);
+                deploy_tx.value = TRANSFER_AMOUNT;
+                deploy_tx
+            })
+            .unwrap();
+
+        let contract_address =
+            Address::try_from_slice(test_utils::unwrap_success_slice(&submit_result)).unwrap();
+        constructor.deployed_at(contract_address)
+    };
+
+    let get_total_supply = |runner: &mut test_utils::AuroraRunner| -> Wei {
+        let (outcome, _) = runner.call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
+        let amount: u128 = String::from_utf8(outcome.unwrap().return_data.as_value().unwrap())
+            .unwrap()
+            .replace('"', "")
+            .parse()
+            .unwrap();
+        Wei::new(U256::from(amount))
+    };
+
+    // Self-destruct with some benefactor does not reduce the total supply
+    let contract = deploy_contract(&mut runner, &mut signer);
+    let _submit_result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            contract.call_method_with_args(
+                "destruct",
+                &[ethabi::Token::Address(benefactor.raw())],
+                nonce,
+            )
+        })
+        .unwrap();
+    assert_eq!(runner.get_balance(benefactor), TRANSFER_AMOUNT);
+    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
+
+    // Self-destruct with self benefactor burns any ETH in the destroyed contract
+    let contract = deploy_contract(&mut runner, &mut signer);
+    let _submit_result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            contract.call_method_with_args(
+                "destruct",
+                &[ethabi::Token::Address(contract.address.raw())],
+                nonce,
+            )
+        })
+        .unwrap();
+    assert_eq!(
+        get_total_supply(&mut runner),
+        INITIAL_BALANCE - TRANSFER_AMOUNT
+    );
+}
+
+#[test]
 fn test_transaction_to_zero_address() {
     // Transactions that explicit list `0x0000...` as the `to` field in the transaction
     // should not be interpreted as contract creation. Previously this was the case
@@ -133,7 +201,7 @@ fn test_deploy_largest_contract() {
     );
 
     // Less than 12 NEAR Tgas
-    test_utils::assert_gas_bound(profile.all_gas(), 11);
+    test_utils::assert_gas_bound(profile.all_gas(), 10);
 }
 
 #[test]
