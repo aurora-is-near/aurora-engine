@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.1] 2022-06-23
+
+### Fixes
+
+- Fixed an issue with accounting being problematic with the total supply of ETH on Aurora as it could artificially deplete by @[birchmd]. ([#536])
+- Fixed the possibility of forging receipts to allow for withdrawals on the Rainbow Bridge by [@birchmd], [@mfornet], [@sept-en] and [@joshuajbouw]. Written by [@birchmd].
+- Fixed the ability the steal funds from those by setting a fee when receiving NEP-141 as ERC-20 by [@birchmd], [@mfornet], and [@joshuajbouw]. Written by [@joshuajbouw].
+
+[#536]: https://github.com/aurora-is-near/aurora-engine/pull/536
+
 ## [2.6.0] 2022-06-08
 
 ### Added
@@ -271,7 +281,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.1...develop
+[2.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.0...2.6.1 
 [2.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.3...2.6.0
 [2.5.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.2...2.5.3
 [2.5.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.1...2.5.2
