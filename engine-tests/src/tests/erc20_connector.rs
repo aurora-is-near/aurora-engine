@@ -297,6 +297,7 @@ fn test_ft_on_transfer_fail() {
     assert_eq!(res, format!("\"{}\"", amount.to_string()));
 }
 
+#[ignore]
 #[test]
 fn test_relayer_charge_fee() {
     let mut runner = AuroraRunner::new();

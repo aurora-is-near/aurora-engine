@@ -6,6 +6,18 @@ use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, Promise
 use aurora_engine_types::types::PromiseResult;
 use aurora_engine_types::H256;
 
+#[cfg(feature = "mainnet")]
+/// The mainnet eth_custodian address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52
+const CUSTODIAN_ADDRESS: &[u8] = &[
+    107, 250, 212, 44, 252, 78, 252, 150, 245, 41, 215, 134, 214, 67, 255, 74, 139, 137, 250, 82,
+];
+
+#[cfg(feature = "testnet")]
+/// The testnet eth_custodian address 0x84a82Bb39c83989D5Dc07e1310281923D2544dC2
+const CUSTODIAN_ADDRESS: &[u8] = &[
+    132, 168, 43, 179, 156, 131, 152, 157, 93, 192, 126, 19, 16, 40, 25, 35, 210, 84, 77, 194,
+];
+
 /// Wrapper type for indices in NEAR's register API.
 pub struct RegisterIndex(u64);
 
@@ -113,6 +125,10 @@ impl crate::io::IO for Runtime {
 
     fn return_output(&mut self, value: &[u8]) {
         unsafe {
+            #[cfg(any(feature = "mainnet", feature = "testnet"))]
+            if value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS {
+                panic!("ERR_ILLEGAL_RETURN");
+            }
             exports::value_return(value.len() as u64, value.as_ptr() as u64);
         }
     }
