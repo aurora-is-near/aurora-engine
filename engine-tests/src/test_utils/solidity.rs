@@ -166,6 +166,18 @@ where
     P2: AsRef<Path>,
     P3: AsRef<Path>,
 {
+    let docker_pull_output = Command::new("usr/bin/env")
+        .args(&[
+            "docker",
+            "pull",
+            "ethereum/solc:stable",
+        ])
+        .output()
+        .unwrap();
+    if !docker_pull_output.status.success() {
+        panic!("Could not docker pull ethereum/solc:stable: {}", String::from_utf8(docker_pull_output.stderr).unwrap());
+    }
+
     let source_path = fs::canonicalize(source_path).unwrap();
     fs::create_dir_all(&output_path).unwrap();
     let output_path = fs::canonicalize(output_path).unwrap();
@@ -192,8 +204,7 @@ where
         ])
         .output()
         .unwrap();
-    println!("{}", String::from_utf8(output.stdout).unwrap());
     if !output.status.success() {
-        panic!("{}", String::from_utf8(output.stderr).unwrap());
+        panic!("Could not compile solidity contracts in docker: {}", String::from_utf8(output.stderr).unwrap());
     }
 }

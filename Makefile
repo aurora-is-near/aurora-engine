@@ -44,7 +44,7 @@ testnet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 # test builds depend on release since `tests/test_upgrade.rs` includes `mainnet-release.wasm`
 
 test-mainnet: mainnet-test-build
-	$(CARGO) test --features mainnet-test$(ADDITIONAL_FEATURES)
+	$(CARGO) test --features mainnet-test$(ADDITIONAL_FEATURES) -- --nocapture
 mainnet-test-build: FEATURES=mainnet,integration-test,meta-call
 mainnet-test-build: mainnet-test.wasm etc/eth-contracts/artifacts/contracts/test/StateTest.sol/SelfDestruct.json
 mainnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
