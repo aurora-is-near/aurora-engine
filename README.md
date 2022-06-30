@@ -36,6 +36,7 @@ rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
 ### Prerequisites for Development
 
 - Node.js (v14+)
+- Docker
 
 ## Development
 
