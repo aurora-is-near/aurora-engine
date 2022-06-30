@@ -43,4 +43,5 @@ exclude = [
     "etc/state-migration-test",
     "etc/ft-receiver",
     "etc/benchmark-contract",
+    "etc/self-contained-5bEgfRQ",
 ]
