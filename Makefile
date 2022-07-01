@@ -44,7 +44,7 @@ testnet-debug.wasm: target/wasm32-unknown-unknown/debug/aurora_engine.wasm
 # test builds depend on release since `tests/test_upgrade.rs` includes `mainnet-release.wasm`
 
 test-mainnet: mainnet-test-build
-	$(CARGO) test --features mainnet-test$(ADDITIONAL_FEATURES)
+	$(CARGO) test --features mainnet-test$(ADDITIONAL_FEATURES) -- --nocapture
 mainnet-test-build: FEATURES=mainnet,integration-test,meta-call
 mainnet-test-build: mainnet-test.wasm etc/eth-contracts/artifacts/contracts/test/StateTest.sol/SelfDestruct.json
 mainnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
@@ -57,7 +57,7 @@ testnet-test-build: testnet-test.wasm etc/eth-contracts/artifacts/contracts/test
 testnet-test.wasm: target/wasm32-unknown-unknown/release/aurora_engine.wasm
 	cp $< $@
 
-target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find src -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
+target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock $(shell find engine -name "*.rs") etc/eth-contracts/res/EvmErc20.bin
 	RUSTFLAGS='-C link-arg=-s' $(CARGO) build \
 		--target wasm32-unknown-unknown \
 		--release \
@@ -67,7 +67,7 @@ target/wasm32-unknown-unknown/release/aurora_engine.wasm: Cargo.toml Cargo.lock 
 		--features=$(FEATURES)$(ADDITIONAL_FEATURES) \
 		-Z avoid-dev-deps
 
-target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard src/*.rs) etc/eth-contracts/res/EvmErc20.bin
+target/wasm32-unknown-unknown/debug/aurora_engine.wasm: Cargo.toml Cargo.lock $(wildcard engine/*.rs) etc/eth-contracts/res/EvmErc20.bin
 	$(CARGO) build \
 		--target wasm32-unknown-unknown \
 		-p aurora-engine \
