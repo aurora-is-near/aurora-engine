@@ -48,14 +48,18 @@ impl evm_gasometer::tracing::EventListener for TransactionTraceBuilder {
     fn event(&mut self, event: evm_gasometer::tracing::Event) {
         use evm_gasometer::tracing::Event;
         match event {
-            Event::RecordCost { cost, snapshot: _ } => {
+            Event::RecordCost { cost, snapshot } => {
                 self.current.gas_cost = EthGas::new(cost);
+                if let Some(snapshot) = snapshot {
+                    self.current.gas =
+                        EthGas::new(snapshot.gas_limit - snapshot.used_gas - snapshot.memory_gas);
+                }
             }
             Event::RecordDynamicCost {
                 gas_cost,
                 memory_gas,
                 gas_refund: _,
-                snapshot: _,
+                snapshot,
             } => {
                 // In SputnikVM memory gas is cumulative (ie this event always shows the total) gas
                 // spent on memory up to this point. But geth traces simply show how much gas each step
@@ -68,6 +72,10 @@ impl evm_gasometer::tracing::EventListener for TransactionTraceBuilder {
                 };
                 self.current_memory_gas = memory_gas;
                 self.current.gas_cost = EthGas::new(gas_cost + memory_cost_diff);
+                if let Some(snapshot) = snapshot {
+                    self.current.gas =
+                        EthGas::new(snapshot.gas_limit - snapshot.used_gas - snapshot.memory_gas);
+                }
             }
             Event::RecordRefund {
                 refund: _,

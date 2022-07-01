@@ -163,9 +163,9 @@ pub struct TraceLog {
     pub depth: Depth,
     /// Any errors that may have occurred during execution.
     pub error: Option<String>,
-    /// Gas used to execute the transaction.
+    /// Remaining (unused) gas.
     pub gas: EthGas,
-    /// Gas cost for the transaction.
+    /// Gas cost for the opcode at this step.
     pub gas_cost: EthGas,
     /// The bounded memory.
     pub memory: LogMemory,
