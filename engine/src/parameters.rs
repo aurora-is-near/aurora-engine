@@ -1,4 +1,5 @@
 use crate::admin_controlled::PausedMask;
+use crate::errors;
 use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
@@ -98,11 +99,11 @@ impl AsRef<[u8]> for TransactionStatus {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::Succeed(_) => b"SUCCESS",
-            Self::Revert(_) => b"ERR_REVERT",
-            Self::OutOfFund => b"ERR_OUT_OF_FUNDS",
-            Self::OutOfGas => b"ERR_OUT_OF_GAS",
-            Self::OutOfOffset => b"ERR_OUT_OF_OFFSET",
-            Self::CallTooDeep => b"ERR_CALL_TOO_DEEP",
+            Self::Revert(_) => errors::ERR_REVERT,
+            Self::OutOfFund => errors::ERR_OUT_OF_FUNDS,
+            Self::OutOfGas => errors::ERR_OUT_OF_GAS,
+            Self::OutOfOffset => errors::ERR_OUT_OF_OFFSET,
+            Self::CallTooDeep => errors::ERR_CALL_TOO_DEEP,
         }
     }
 }
