@@ -1,6 +1,3 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
-
 #[cfg(feature = "contract")]
 use crate::prelude::Address;
 use crate::prelude::{H256, STORAGE_PRICE_PER_BYTE};

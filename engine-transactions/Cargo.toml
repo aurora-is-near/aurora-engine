@@ -13,14 +13,13 @@ publish = false
 autobenches = false
 
 [dependencies]
-aurora-engine-types = { path = "../engine-types", default-features = false }
-aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
-aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
+aurora-engine-types = { path = "../engine-types" }
+aurora-engine-sdk = { path = "../engine-sdk" }
+aurora-engine-precompiles = { path = "../engine-precompiles" }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false }
-rlp = { version = "0.5.0", default-features = false }
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
+rlp = "0.5.0"
+hex = "0.4"
 serde = { version = "1", features = ["derive"], optional = true }
 
 [features]
-std = ["aurora-engine-types/std", "aurora-engine-precompiles/std", "evm/std", "rlp/std", "hex/std"]
 impl-serde = ["aurora-engine-types/impl-serde", "serde"]
