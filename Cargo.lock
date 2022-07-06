@@ -111,8 +111,6 @@ source = "git+https://github.com/aurora-is-near/aurora-bn.git#8f1743884061981cac
 dependencies = [
  "byteorder",
  "getrandom 0.2.7",
- "rand 0.8.5",
- "serde",
 ]
 
 [[package]]
