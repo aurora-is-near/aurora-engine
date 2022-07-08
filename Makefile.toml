@@ -1,0 +1,218 @@
+env_files = [
+    { path = ".env/mainnet.env", profile = "mainnet" },
+    { path = ".env/testnet.env", profile = "testnet" },
+    { path = ".env/local.env", profile = "local" },
+    { path = ".env/custom.env", profile = "custom" },
+    { path = ".env/local.env", profile = "development" },
+]
+
+[config]
+default_to_workspace = false
+skip_core_tasks = true
+
+[env]
+CARGO = "cargo"
+ENGINE_CARGO_TARGET = "wasm32-unknown-unknown"
+SWEEP_DAYS = 30
+
+[tasks.sweep]
+category = "Cleanup"
+install_crate = "cargo-sweep"
+command = "${CARGO}"
+args = [
+    "sweep",
+    "--time",
+    "${SWEEP_DAYS}",
+]
+
+[tasks.clean-cargo]
+category = "Cleanup"
+command = "${CARGO}"
+args = ["clean"]
+
+[tasks.clean-contracts]
+category = "Cleanup"
+script = '''
+rm -Rf etc/eth-contracts/.pnp
+rm -Rf etc/eth-contracts/artifacts
+rm -Rf etc/eth-contracts/cache
+rm -Rf etc/benchmark-contract/target
+'''
+
+[tasks.clean-bin]
+category = "Cleanup"
+script = '''
+rm -Rf bin
+'''
+
+[tasks.clean-flow]
+category = "Cleanup"
+dependencies = [
+    "clean-cargo",
+    "clean-contracts",
+    "clean-bin",
+]
+
+[tasks.clean]
+run_task = "clean-flow"
+
+[tasks.fmt]
+category = "Formatting"
+command = "${CARGO}"
+args = [
+    "fmt",
+    "--all",
+]
+
+[tasks.clippy]
+category = "Check"
+command = "${CARGO}"
+args = [
+    "clippy",
+    "--no-default-features",
+    "--features",
+    "contract",
+    "--",
+    "-D",
+    "warnings",
+]
+
+[tasks.check-fmt]
+category = "Check"
+command = "${CARGO}"
+args = [
+    "fmt",
+    "--",
+    "--check",
+]
+
+[tasks.check-contracts]
+category = "Check"
+script = '''
+cd etc/eth-contracts
+yarn
+yarn lint
+'''
+
+[tasks.check]
+category = "Check"
+dependencies = [
+    "check-contracts",
+    "check-fmt",
+    "clippy",
+]
+
+[tasks.post-engine-build-env]
+category = "Tools"
+script = '''
+echo "Environment:"
+echo "    CARGO_MAKE_PROFILE:   ${CARGO_MAKE_PROFILE}"
+echo "    IS_PROD:              ${IS_PROD}"
+echo "    CARGO_FEATURES:       ${CARGO_FEATURES}"
+echo "    WASM_FILE:            ${WASM_FILE}"
+echo "    TARGET_DIR:           ${TARGET_DIR}"
+echo "    RUSTFLAGS:            ${RUSTFLAGS}"
+echo "    Extra build args:     ${RELEASE} ${@}"
+'''
+
+[tasks.copy-engine-build]
+category = "Post"
+command = "cp"
+args = [
+    "target/wasm32-unknown-unknown/${TARGET_DIR}/aurora_engine.wasm",
+    "bin/${WASM_FILE}",
+]
+
+[tasks.make-bin-directory]
+category = "Post"
+command = "mkdir"
+args = [
+    "-p",
+    "bin",
+]
+
+[tasks.build-contracts]
+category = "Build"
+script = '''
+cd etc/eth-contracts
+yarn
+yarn build
+'''
+
+[tasks.build-engine]
+category = "Build"
+command = "${CARGO}"
+args = [
+    "build",
+    "--target",
+    "${ENGINE_CARGO_TARGET}",
+    "@@remove-empty(RELEASE)",
+    "--no-default-features",
+    "--features=${CARGO_FEATURES}",
+    "-p",
+    "aurora-engine",
+    "-Z",
+    "avoid-dev-deps",
+    "${@}",
+]
+
+[tasks.build-engine-flow]
+category = "Build"
+dependencies = [
+    "build-contracts",
+    "build-engine",
+    "make-bin-directory",
+    "copy-engine-build",
+    "post-engine-build-env",
+]
+
+[tasks.build-test]
+condition = { profiles = ["mainnet", "testnet", "custom"] }
+env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+category = "Build"
+run_task = "build-engine-flow"
+
+[tasks.build]
+condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
+env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+category = "Build"
+run_task = "build-engine-flow"
+
+[tasks.test-contracts]
+category = "Test"
+script = '''
+cd etc/eth-contracts
+yarn
+yarn test
+'''
+
+[tasks.test-workspace]
+condition = { profiles = ["mainnet", "testnet", "custom"] }
+category = "Test"
+command = "${CARGO}"
+args = [
+    "test",
+    "--features",
+    "${CARGO_FEATURES_TEST}",
+]
+
+[tasks.test-flow]
+category = "Test"
+dependencies = [
+    "build-test",
+    "test-contracts",
+    "test-workspace",
+]
+
+[tasks.test]
+category = "Test"
+run_task = "test-flow"
+
+[tasks.default]
+condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
+run_task = "build"
+
+[tasks.deploy]
+condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
+category = "Deploy"
+script = "${NEAR_CLI} deploy --acount-id${NEAR_EVM_ACCOUNT} --wasm-file=bin/${WASM_FILE}"

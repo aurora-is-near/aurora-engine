@@ -50,7 +50,6 @@ tempfile = "3.2.0"
 walrus = "0.19"
 
 [features]
-meta-call = ["aurora-engine/meta-call"]
-mainnet-test = ["aurora-engine/mainnet-test", "meta-call"]
-testnet-test = ["aurora-engine/testnet-test", "meta-call"]
+mainnet-test = []
+testnet-test = []
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]

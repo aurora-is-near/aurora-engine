@@ -2,10 +2,10 @@
 on:
   schedule:
     - cron: '27 8 * * 1,4'
-name: Scheduled_Lints
+name: Scheduled lints
 jobs:
   clippy:
-    name: Nightly_Clippy
+    name: Nightly Clippy
     runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
