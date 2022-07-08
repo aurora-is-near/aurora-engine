@@ -1,0 +1,20 @@
+[package]
+name = "engine-workspace-test"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0"
+borsh = "0.9"
+maplit = "1.0"
+near-units = "0.2.0"
+serde = "1.0"
+serde_with = "1"
+# arbitrary_precision enabled for u128 types that workspaces requires for Balance types
+serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+tokio = { version = "1.10.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3.5", features = ["env-filter"] }
+workspaces = { git="https://github.com/hskang9/workspaces-rs.git"}
