@@ -490,6 +490,11 @@ pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,
 }
 
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct PausePrecompilesCallArgs {
+    pub paused_mask: u32,
+}
+
 pub mod error {
     use crate::json::JsonError;
     use aurora_engine_types::account_id::ParseAccountError;

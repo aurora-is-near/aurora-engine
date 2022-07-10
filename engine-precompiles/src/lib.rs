@@ -34,13 +34,13 @@ use crate::xcc::CrossContractCall;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
-use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
+use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
 use evm::backend::Log;
 use evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
 
@@ -112,6 +112,13 @@ impl HardFork for Berlin {}
 
 pub struct Precompiles<'a, I, E, H> {
     pub all_precompiles: prelude::BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
+    pub paused_precompiles: prelude::BTreeSet<Address>,
+}
+
+impl<'a, I, E, H> Precompiles<'a, I, E, H> {
+    fn is_paused(&self, address: &Address) -> bool {
+        self.paused_precompiles.contains(address)
+    }
 }
 
 impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
@@ -121,9 +128,15 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
         &self,
         handle: &mut impl PrecompileHandle,
     ) -> Option<Result<executor::stack::PrecompileOutput, PrecompileFailure>> {
-        let address = handle.code_address();
+        let address = Address::new(handle.code_address());
 
-        let result = match self.all_precompiles.get(&Address::new(address))? {
+        if self.is_paused(&address) {
+            return Some(Err(PrecompileFailure::Fatal {
+                exit_status: ExitFatal::Other(prelude::Cow::Borrowed("ERR_PAUSED")),
+            }));
+        }
+
+        let result = match self.all_precompiles.get(&address)? {
             AllPrecompiles::ExitToNear(p) => process_precompile(p, handle),
             AllPrecompiles::ExitToEthereum(p) => process_precompile(p, handle),
             AllPrecompiles::PredecessorAccount(p) => process_precompile(p, handle),
@@ -132,6 +145,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
             AllPrecompiles::CrossContractCall(p) => process_handle_based_precompile(p, handle),
             AllPrecompiles::Generic(p) => process_precompile(p.as_ref(), handle),
         };
+
         Some(result.and_then(|output| post_process(output, handle)))
     }
 
@@ -354,6 +368,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
 
         Self {
             all_precompiles: generic_precompiles,
+            paused_precompiles: BTreeSet::new(),
         }
     }
 }
