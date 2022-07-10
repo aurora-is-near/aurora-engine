@@ -21,7 +21,7 @@ mod consts {
 pub struct Identity;
 
 impl Identity {
-    pub(super) const ADDRESS: Address = super::make_address(0, 4);
+    pub const ADDRESS: Address = super::make_address(0, 4);
 }
 
 impl Precompile for Identity {

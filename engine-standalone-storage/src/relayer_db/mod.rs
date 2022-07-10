@@ -213,6 +213,7 @@ mod test {
             owner_id: "aurora".parse().unwrap(),
             bridge_prover_id: "prover.bridge.near".parse().unwrap(),
             upgrade_delay_blocks: 0,
+            ..Default::default()
         };
 
         // Initialize engine and connector states in storage.

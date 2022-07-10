@@ -13,6 +13,7 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 
 use crate::accounting;
+use crate::acl::{EngineAuthorizer, EnginePrecompilesPauser, PauseFlags};
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::parameters::RefundCallArgs;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
@@ -23,7 +24,8 @@ use crate::prelude::{
     BTreeMap, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs,
     ToString, Vec, Wei, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
-use aurora_engine_precompiles::PrecompileConstructorContext;
+use aurora_engine_precompiles::account_ids::predecessor_account;
+use aurora_engine_precompiles::{prepaid_gas, PrecompileConstructorContext};
 use core::cell::RefCell;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
@@ -359,14 +361,18 @@ impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
         random_seed: H256,
         io: I,
         env: &'env E,
+        pause_flags: PauseFlags,
     ) -> Self {
+        let precompiles = Precompiles::new_london(PrecompileConstructorContext {
+            current_account_id,
+            random_seed,
+            io,
+            env,
+        });
+        let precompiles = Self::apply_pause_flags(precompiles, pause_flags);
+
         Self {
-            precompiles: Precompiles::new_london(PrecompileConstructorContext {
-                current_account_id,
-                random_seed,
-                io,
-                env,
-            }),
+            precompiles,
             gas_limit,
         }
     }
@@ -383,6 +389,31 @@ impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::stack::MemoryStackState::new(metadata, engine);
         executor::stack::StackExecutor::new_with_precompiles(state, CONFIG, &self.precompiles)
+    }
+
+    fn apply_pause_flags(
+        precompiles: Precompiles<I, E>,
+        pause_flags: PauseFlags,
+    ) -> Precompiles<I, E> {
+        Precompiles {
+            generic_precompiles: precompiles
+                .generic_precompiles
+                .into_iter()
+                .filter(|(address, _)| pause_flags.is_not_paused_by_address(address))
+                .collect(),
+            predecessor_account_id: pause_flags
+                .is_not_paused_by_address(&predecessor_account::ADDRESS)
+                .then(|| precompiles.predecessor_account_id.unwrap()),
+            ethereum_exit: pause_flags
+                .is_not_paused_by_address(&exit_to_ethereum::ADDRESS)
+                .then(|| precompiles.ethereum_exit.unwrap()),
+            near_exit: pause_flags
+                .is_not_paused_by_address(&exit_to_near::ADDRESS)
+                .then(|| precompiles.near_exit.unwrap()),
+            prepaid_gas: pause_flags
+                .is_not_paused_by_address(&prepaid_gas::ADDRESS)
+                .then(|| precompiles.prepaid_gas.unwrap()),
+        }
     }
 }
 
@@ -437,6 +468,10 @@ pub(crate) const CONFIG: &Config = &Config::london();
 
 /// Key for storing the state of the engine.
 const STATE_KEY: &[u8; 5] = b"STATE";
+/// Key for storing [PauseFlags].
+const PAUSE_FLAGS_KEY: &[u8; 11] = b"PAUSE_FLAGS";
+/// Key for storing [PermissionFlags].
+const PERMISSION_FLAGS_KEY: &[u8; 16] = b"PERMISSION_FLAGS";
 
 impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     pub fn new(
@@ -528,6 +563,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
             self.io,
             self.env,
+            PauseFlags::empty(),
         );
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy {
@@ -614,6 +650,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
             self.io,
             self.env,
+            PauseFlags::empty(),
         );
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) = executor.transact_call(
@@ -665,6 +702,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
             self.io,
             self.env,
+            PauseFlags::empty(),
         );
         let mut executor = executor_params.make_executor(self);
         let (status, result) = executor.transact_call(
@@ -1086,6 +1124,36 @@ pub fn get_state<I: IO>(io: &I) -> Result<EngineState, EngineStateError> {
 pub fn set_state<I: IO>(io: &mut I, state: EngineState) {
     io.write_storage(
         &bytes_to_key(KeyPrefix::Config, STATE_KEY),
+        &state.try_to_vec().expect("ERR_SER"),
+    );
+}
+
+pub fn get_authorizer<I: IO>(io: &I) -> Result<EngineAuthorizer, EngineStateError> {
+    match io.read_storage(&bytes_to_key(KeyPrefix::Config, PERMISSION_FLAGS_KEY)) {
+        None => Err(EngineStateError::NotFound),
+        Some(bytes) => EngineAuthorizer::try_from_slice(&bytes.to_vec())
+            .map_err(|_| EngineStateError::DeserializationFailed),
+    }
+}
+
+pub fn set_authorizer<I: IO>(io: &mut I, state: EngineAuthorizer) {
+    io.write_storage(
+        &bytes_to_key(KeyPrefix::Config, PERMISSION_FLAGS_KEY),
+        &state.try_to_vec().expect("ERR_SER"),
+    );
+}
+
+pub fn get_pauser<I: IO>(io: &I) -> Result<EnginePrecompilesPauser, EngineStateError> {
+    match io.read_storage(&bytes_to_key(KeyPrefix::Config, PAUSE_FLAGS_KEY)) {
+        None => Err(EngineStateError::NotFound),
+        Some(bytes) => EnginePrecompilesPauser::try_from_slice(&bytes.to_vec())
+            .map_err(|_| EngineStateError::DeserializationFailed),
+    }
+}
+
+pub fn set_pauser<I: IO>(io: &mut I, state: EnginePrecompilesPauser) {
+    io.write_storage(
+        &bytes_to_key(KeyPrefix::Config, PAUSE_FLAGS_KEY),
         &state.try_to_vec().expect("ERR_SER"),
     );
 }

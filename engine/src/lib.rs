@@ -19,6 +19,7 @@ pub mod parameters;
 pub mod proof;
 
 pub mod accounting;
+mod acl;
 pub mod admin_controlled;
 #[cfg_attr(feature = "contract", allow(dead_code))]
 pub mod connector;
@@ -69,16 +70,17 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
+    use crate::acl::{Authorizer, PausedPrecompilesKeeper, PermissionFlags, PermissionKeeper};
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine, EngineState};
-    use crate::errors;
     use crate::fungible_token::FungibleTokenMetadata;
     use crate::json::parse_json;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
-        StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallCallArgs, ViewCallArgs,
+        GrantPermissionsCallArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs,
+        NewCallArgs, PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
+        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
+        TransferCallCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -91,6 +93,7 @@ mod contract {
     use crate::prelude::{
         sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
     };
+    use crate::{acl, errors};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
@@ -194,6 +197,70 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn state_migration() {
         // TODO: currently we don't have migrations
+    }
+
+    /// Grants permissions to given account.
+    #[no_mangle]
+    pub extern "C" fn grant_permissions() {
+        let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        let predecessor_account_id = io.predecessor_account_id();
+
+        require_owner_only(&state, &predecessor_account_id);
+
+        let args: GrantPermissionsCallArgs = io.read_input_borsh().sdk_unwrap();
+        let mut authorizer: acl::EngineAuthorizer = engine::get_authorizer(&io).sdk_unwrap();
+        authorizer.grant_permissions(predecessor_account_id, args.permission_mask);
+        engine::set_authorizer(&mut io, authorizer);
+    }
+
+    /// Revokes permissions from given account.
+    #[no_mangle]
+    pub extern "C" fn revoke_permissions() {
+        let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        let predecessor_account_id = io.predecessor_account_id();
+
+        require_owner_only(&state, &predecessor_account_id);
+
+        let args: GrantPermissionsCallArgs = io.read_input_borsh().sdk_unwrap();
+        let mut authorizer: acl::EngineAuthorizer = engine::get_authorizer(&io).sdk_unwrap();
+        authorizer.revoke_permissions(&predecessor_account_id, args.permission_mask);
+        engine::set_authorizer(&mut io, authorizer);
+    }
+
+    /// Resumes previously [`paused`] precompiles.
+    ///
+    /// [`paused`]: crate::contract::pause_precompiles
+    #[no_mangle]
+    pub extern "C" fn resume_precompiles() {
+        let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        let predecessor_account_id = io.predecessor_account_id();
+
+        require_owner_only(&state, &predecessor_account_id);
+
+        let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
+        let mut pauser: acl::EnginePrecompilesPauser = engine::get_pauser(&io).sdk_unwrap();
+        pauser.resume_precompiles(args.paused_mask);
+        engine::set_pauser(&mut io, pauser);
+    }
+
+    /// Pauses a precompile
+    #[no_mangle]
+    pub extern "C" fn pause_precompiles() {
+        let mut io = Runtime;
+        let authorizer: acl::EngineAuthorizer = engine::get_authorizer(&io).sdk_unwrap();
+        let predecessor_account_id = io.predecessor_account_id();
+
+        if authorizer.is_authorized(&predecessor_account_id, PermissionFlags::PAUSE_PRECOMPILES) {
+            sdk::panic_utf8("ERR_UNAUTHORIZED".as_bytes());
+        }
+
+        let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
+        let mut pauser: acl::EnginePrecompilesPauser = engine::get_pauser(&io).sdk_unwrap();
+        pauser.pause_precompiles(args.paused_mask);
+        engine::set_pauser(&mut io, pauser);
     }
 
     ///

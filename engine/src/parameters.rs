@@ -487,6 +487,16 @@ pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,
 }
 
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct PausePrecompilesCallArgs {
+    pub paused_mask: u32,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct GrantPermissionsCallArgs {
+    pub permission_mask: u32,
+}
+
 impl TryFrom<JsonValue> for ResolveTransferCallArgs {
     type Error = error::ParseTypeFromJsonError;
 

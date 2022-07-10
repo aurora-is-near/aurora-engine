@@ -19,6 +19,7 @@ fn test_deploy_code() {
         owner_id: owner_id.clone(),
         bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
+        ..Default::default()
     };
     let origin = Address::new(H160([0u8; 20]));
     let storage = RwLock::new(storage::Storage::default());

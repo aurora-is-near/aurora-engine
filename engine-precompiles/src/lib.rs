@@ -109,10 +109,10 @@ pub struct Precompiles<'a, I, E> {
     pub generic_precompiles: prelude::BTreeMap<Address, Box<dyn Precompile>>,
     // Cannot be part of the generic precompiles because the `dyn` type-erasure messes with
     // with the lifetime requirements on the type parameter `I`.
-    pub near_exit: ExitToNear<I>,
-    pub ethereum_exit: ExitToEthereum<I>,
-    pub predecessor_account_id: PredecessorAccount<'a, E>,
-    pub prepaid_gas: PrepaidGas<'a, E>,
+    pub near_exit: Option<ExitToNear<I>>,
+    pub ethereum_exit: Option<ExitToEthereum<I>>,
+    pub predecessor_account_id: Option<PredecessorAccount<'a, E>>,
+    pub prepaid_gas: Option<PrepaidGas<'a, E>>,
 }
 
 impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a, I, E> {
@@ -268,10 +268,10 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
         generic_precompiles: BTreeMap<Address, Box<dyn Precompile>>,
         ctx: PrecompileConstructorContext<'a, I, E>,
     ) -> Self {
-        let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
-        let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
-        let predecessor_account_id = PredecessorAccount::new(ctx.env);
-        let prepaid_gas = PrepaidGas::new(ctx.env);
+        let near_exit = Some(ExitToNear::new(ctx.current_account_id.clone(), ctx.io));
+        let ethereum_exit = Some(ExitToEthereum::new(ctx.current_account_id, ctx.io));
+        let predecessor_account_id = Some(PredecessorAccount::new(ctx.env));
+        let prepaid_gas = Some(PrepaidGas::new(ctx.env));
 
         Self {
             generic_precompiles,
@@ -288,13 +288,25 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
         f: F,
     ) -> Option<U> {
         if address == exit_to_near::ADDRESS {
-            return Some(f(&self.near_exit));
+            return self.near_exit.as_ref().map(|v| Some(f(v))).unwrap_or(None);
         } else if address == exit_to_ethereum::ADDRESS {
-            return Some(f(&self.ethereum_exit));
+            return self
+                .ethereum_exit
+                .as_ref()
+                .map(|v| Some(f(v)))
+                .unwrap_or(None);
         } else if address == predecessor_account::ADDRESS {
-            return Some(f(&self.predecessor_account_id));
+            return self
+                .predecessor_account_id
+                .as_ref()
+                .map(|v| Some(f(v)))
+                .unwrap_or(None);
         } else if address == prepaid_gas::ADDRESS {
-            return Some(f(&self.prepaid_gas));
+            return self
+                .prepaid_gas
+                .as_ref()
+                .map(|v| Some(f(v)))
+                .unwrap_or(None);
         }
         self.generic_precompiles
             .get(&address)
