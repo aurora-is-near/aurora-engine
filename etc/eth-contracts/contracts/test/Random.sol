@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: CC0-1.0
 pragma solidity ^0.8.0;
 
+
 contract Random {
     function randomSeed() public returns (uint256) {
         bytes32[1] memory value;
