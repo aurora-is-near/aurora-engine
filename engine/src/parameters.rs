@@ -10,7 +10,6 @@ use crate::prelude::{
 use crate::proof::Proof;
 use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
 use evm::backend::Log;
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Borsh-encoded parameters for the `new` function.
@@ -457,7 +456,7 @@ impl TryFrom<JsonValue> for TransferCallArgs {
 }
 
 /// balance_of args for json invocation
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Deserialize, Serialize, BorshSerialize, BorshDeserialize)]
 pub struct BalanceOfCallArgs {
     pub account_id: AccountId,
 }

@@ -38,6 +38,7 @@ hex = "0.4"
 byte-slice-cast = "1.0"
 rjson = { git = "https://github.com/aurora-is-near/rjson", rev = "cc3da949", features = ["integer"] }
 serde = { version = "1", features = ["derive"], optional = true }
+serde_json = "1"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -46,7 +47,7 @@ rand = "0.7.3"
 
 [features]
 std = []
-contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
+contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract", "impl-serde"]
 evm_bully = []
 log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]
 tracing = ["evm/tracing"]

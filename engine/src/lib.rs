@@ -589,10 +589,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
-        let args = parameters::BalanceOfCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).sdk_unwrap(),
-        )
-        .sdk_unwrap();
+        let args: parameters::BalanceOfCallArgs =
+            serde_json::from_slice(&io.read_input().to_vec()).sdk_expect("E_PARSE");
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_balance_of(args);
