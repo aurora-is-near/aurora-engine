@@ -1,18 +1,38 @@
 use crate::fmt::Formatter;
-use crate::{Add, Display, Sub};
+use crate::{str::FromStr, Add, Display, Sub};
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
 pub const ZERO_YOCTO: Yocto = Yocto::new(0);
 
 #[derive(
-    Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
+    Serialize,
+    Deserialize,
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    BorshSerialize,
+    BorshDeserialize,
 )]
 /// A generic type for 128-bit balances, especially for NEP-141 tokens. This generic type should not be used
 /// to represent NEAR balances (`Yocto` is designed for this purpose) or for eth-connector balances (`NEP141Wei`
 /// is designed for this purpose). The reason we have specific types for NEAR and eth-connector is because of the
 /// significant role they play in our system; therefore we do not want to mix them up with generic token balances.
 pub struct Balance(u128);
+
+impl FromStr for Balance {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(u128::from_str(s)?))
+    }
+}
 
 impl Display for Balance {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
@@ -33,11 +53,29 @@ impl Balance {
 }
 
 #[derive(
-    Default, BorshSerialize, BorshDeserialize, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd,
+    Deserialize,
+    Default,
+    BorshSerialize,
+    BorshDeserialize,
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
 )]
 /// Near Yocto type which wraps an underlying u128.
 /// 1 NEAR = 10^24 yoctoNEAR
 pub struct Yocto(u128);
+
+impl FromStr for Yocto {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(u128::from_str(s)?))
+    }
+}
 
 impl Display for Yocto {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {

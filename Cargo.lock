@@ -135,7 +135,6 @@ dependencies = [
  "primitive-types",
  "rand 0.7.3",
  "ripemd160",
- "rjson",
  "rlp",
  "serde",
  "serde-aux",
@@ -3427,11 +3426,6 @@ dependencies = [
  "digest 0.9.0",
  "opaque-debug 0.3.0",
 ]
-
-[[package]]
-name = "rjson"
-version = "0.3.2"
-source = "git+https://github.com/aurora-is-near/rjson?rev=cc3da949#cc3da9495e7e520900d66d2b517539f74fff93cf"
 
 [[package]]
 name = "rkyv"

@@ -14,7 +14,6 @@ pub mod deposit_event;
 pub mod engine;
 pub mod errors;
 pub mod fungible_token;
-pub mod json;
 pub mod log_entry;
 mod prelude;
 
@@ -30,7 +29,6 @@ mod contract {
     use crate::engine::{self, Engine, EngineState};
     use crate::errors;
     use crate::fungible_token::FungibleTokenMetadata;
-    use crate::json::parse_json;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
@@ -293,10 +291,9 @@ mod contract {
         )
         .sdk_unwrap();
 
-        let args: NEP141FtOnTransferArgs = parse_json(io.read_input().to_vec().as_slice())
-            .sdk_unwrap()
-            .try_into()
-            .sdk_unwrap();
+        let args: NEP141FtOnTransferArgs =
+            serde_json::from_slice(io.read_input().to_vec().as_slice())
+                .expect_utf8(errors::ERR_FAILED_PARSE_JSON);
 
         if predecessor_account_id == current_account_id {
             EthConnectorContract::init_instance(io)
@@ -678,10 +675,16 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn storage_unregister() {
+        #[derive(serde::Deserialize)]
+        pub struct Force {
+            pub force: bool,
+        }
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
-        let force = parse_json(&io.read_input().to_vec()).and_then(|args| args.bool("force").ok());
+        let force = serde_json::from_slice(&io.read_input().to_vec())
+            .ok()
+            .and_then(|args: Force| Some(args.force));
         let maybe_promise = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_unregister(predecessor_account_id, force)
@@ -695,8 +698,8 @@ mod contract {
     pub extern "C" fn storage_withdraw() {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let args =
-            StorageWithdrawCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
+        let args: StorageWithdrawCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .expect_utf8(errors::ERR_FAILED_PARSE_JSON);
         let predecessor_account_id = io.predecessor_account_id();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
@@ -707,10 +710,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_balance_of() {
         let io = Runtime;
-        let args = parameters::StorageBalanceOfCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).sdk_unwrap(),
-        )
-        .sdk_unwrap();
+        let args: parameters::StorageBalanceOfCallArgs =
+            serde_json::from_slice(&io.read_input().to_vec())
+                .expect_utf8(errors::ERR_FAILED_PARSE_JSON);
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_balance_of(args)
@@ -774,8 +776,9 @@ mod contract {
     pub extern "C" fn ft_metadata() {
         let mut io = Runtime;
         let metadata: FungibleTokenMetadata = connector::get_metadata(&io).unwrap_or_default();
-        let json_data = crate::json::JsonValue::from(metadata);
-        io.return_output(json_data.to_string().as_bytes())
+        let json_data =
+            serde_json::to_string(&metadata).expect_utf8(&errors::ERR_SERIALIZE.as_bytes());
+        io.return_output(json_data.as_bytes())
     }
 
     #[cfg(feature = "integration-test")]

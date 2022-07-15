@@ -1,16 +1,16 @@
 use crate::connector::ZERO_ATTACHED_BALANCE;
 use crate::engine;
-use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::Wei;
 use crate::prelude::{
-    sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, NearGas,
-    PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult, PromiseWithCallbackArgs,
+    sdk, storage, vec, Address, Balance, BorshDeserialize, BorshSerialize, NearGas, PromiseAction,
+    PromiseBatchAction, PromiseCreateArgs, PromiseResult, PromiseWithCallbackArgs,
     StorageBalanceBounds, StorageUsage, String, ToString, Vec,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::types::{NEP141Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO};
+use serde::{Deserialize, Serialize};
 
 /// Gas for `resolve_transfer`: 5 TGas
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
@@ -57,7 +57,7 @@ pub struct FungibleTokenOps<I: IO> {
 
 /// Fungible token Reference hash type.
 /// Used for FungibleTokenMetadata
-#[derive(Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
 pub struct FungibleReferenceHash([u8; 32]);
 
 impl FungibleReferenceHash {
@@ -73,7 +73,7 @@ impl AsRef<[u8]> for FungibleReferenceHash {
     }
 }
 
-#[derive(Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
 pub struct FungibleTokenMetadata {
     pub spec: String,
     pub name: String,
@@ -95,42 +95,6 @@ impl Default for FungibleTokenMetadata {
             reference_hash: None,
             decimals: 18,
         }
-    }
-}
-
-impl From<FungibleTokenMetadata> for JsonValue {
-    fn from(metadata: FungibleTokenMetadata) -> Self {
-        let mut kvs = BTreeMap::new();
-        kvs.insert("spec".to_string(), JsonValue::String(metadata.spec));
-        kvs.insert("name".to_string(), JsonValue::String(metadata.name));
-        kvs.insert("symbol".to_string(), JsonValue::String(metadata.symbol));
-        kvs.insert(
-            "icon".to_string(),
-            metadata
-                .icon
-                .map(JsonValue::String)
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "reference".to_string(),
-            metadata
-                .reference
-                .map(JsonValue::String)
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "reference_hash".to_string(),
-            metadata
-                .reference_hash
-                .map(|hash| JsonValue::String(hash.encode()))
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "decimals".to_string(),
-            JsonValue::U64(metadata.decimals as u64),
-        );
-
-        JsonValue::Object(kvs)
     }
 }
 
@@ -342,8 +306,10 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let unused_amount = match promise_result {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(value) => {
-                if let Some(raw_unused_amount) =
-                    parse_json(value.as_slice()).and_then(|x| (&x).try_into().ok())
+                use crate::prelude::str::FromStr;
+                if let Some(raw_unused_amount) = serde_json::from_slice(value.as_slice())
+                    .ok()
+                    .and_then(|x: &str| u128::from_str(&x).ok())
                 {
                     let unused_amount = NEP141Wei::new(raw_unused_amount);
                     // let unused_amount = Balance::from(raw_unused_amount);

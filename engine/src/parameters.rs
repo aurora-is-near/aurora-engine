@@ -1,7 +1,6 @@
 use crate::admin_controlled::PausedMask;
 use crate::errors;
 use crate::fungible_token::FungibleTokenMetadata;
-use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     format, Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256, String, Vec,
@@ -43,8 +42,7 @@ pub struct MetaCallArgs {
 }
 
 /// Borsh-encoded log for use in a `SubmitResult`.
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct ResultLog {
     pub address: Address,
     pub topics: Vec<RawU256>,
@@ -67,8 +65,7 @@ impl From<Log> for ResultLog {
 }
 
 /// The status of a transaction.
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub enum TransactionStatus {
     Succeed(Vec<u8>),
     Revert(Vec<u8>),
@@ -110,8 +107,7 @@ impl AsRef<[u8]> for TransactionStatus {
 
 /// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
 /// and `deploy_with_input` methods.
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct SubmitResult {
     version: u8,
     pub status: TransactionStatus,
@@ -240,26 +236,14 @@ pub struct BeginBlockArgs {
 
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
     /// Balance can be for Eth on Near and for Eth to Aurora
     /// `ft_on_transfer` can be called with arbitrary NEP-141 tokens attached, therefore we do not specify a particular type Wei.
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub amount: Balance,
     pub msg: String,
-}
-
-impl TryFrom<JsonValue> for NEP141FtOnTransferArgs {
-    type Error = JsonError;
-
-    fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
-        Ok(Self {
-            sender_id: AccountId::try_from(value.string("sender_id")?)
-                .map_err(|_| JsonError::InvalidString)?,
-            amount: Balance::new(value.u128("amount")?),
-            msg: value.string("msg")?,
-        })
-    }
 }
 
 impl From<NEP141FtOnTransferArgs> for String {
@@ -373,36 +357,10 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
-impl TryFrom<JsonValue> for TransferCallCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
-        let amount = NEP141Wei::new(v.u128("amount")?);
-        let memo = v.string("memo").ok();
-        let msg = v.string("msg")?;
-        Ok(Self {
-            receiver_id,
-            amount,
-            memo,
-            msg,
-        })
-    }
-}
-
 /// storage_balance_of eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct StorageBalanceOfCallArgs {
     pub account_id: crate::prelude::account_id::AccountId,
-}
-
-impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        let account_id = AccountId::try_from(v.string("account_id")?)?;
-        Ok(Self { account_id })
-    }
 }
 
 /// storage_deposit eth-connector call args
@@ -412,29 +370,10 @@ pub struct StorageDepositCallArgs {
     pub registration_only: Option<bool>,
 }
 
-impl From<JsonValue> for StorageDepositCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            account_id: v
-                .string("account_id")
-                .map_or(None, |acc| AccountId::try_from(acc).ok()),
-            registration_only: v.bool("registration_only").ok(),
-        }
-    }
-}
-
 /// storage_withdraw eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct StorageWithdrawCallArgs {
     pub amount: Option<Yocto>,
-}
-
-impl From<JsonValue> for StorageWithdrawCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            amount: v.u128("amount").map(Yocto::new).ok(),
-        }
-    }
 }
 
 /// transfer args for json invocation
@@ -444,18 +383,6 @@ pub struct TransferCallArgs {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub amount: NEP141Wei,
     pub memo: Option<String>,
-}
-
-impl TryFrom<JsonValue> for TransferCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        Ok(Self {
-            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: NEP141Wei::new(v.u128("amount")?),
-            memo: v.string("memo").ok(),
-        })
-    }
 }
 
 /// balance_of args for json invocation
@@ -469,16 +396,6 @@ pub struct BalanceOfEthCallArgs {
     pub address: Address,
 }
 
-impl TryFrom<JsonValue> for BalanceOfCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        Ok(Self {
-            account_id: AccountId::try_from(v.string("account_id")?)?,
-        })
-    }
-}
-
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RegisterRelayerCallArgs {
     pub address: Address,
@@ -487,49 +404,6 @@ pub struct RegisterRelayerCallArgs {
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,
-}
-
-impl TryFrom<JsonValue> for ResolveTransferCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        Ok(Self {
-            sender_id: AccountId::try_from(v.string("sender_id")?)?,
-            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: NEP141Wei::new(v.u128("amount")?),
-        })
-    }
-}
-
-pub mod error {
-    use crate::json::JsonError;
-    use aurora_engine_types::account_id::ParseAccountError;
-
-    pub enum ParseTypeFromJsonError {
-        Json(JsonError),
-        InvalidAccount(ParseAccountError),
-    }
-
-    impl From<JsonError> for ParseTypeFromJsonError {
-        fn from(e: JsonError) -> Self {
-            Self::Json(e)
-        }
-    }
-
-    impl From<ParseAccountError> for ParseTypeFromJsonError {
-        fn from(e: ParseAccountError) -> Self {
-            Self::InvalidAccount(e)
-        }
-    }
-
-    impl AsRef<[u8]> for ParseTypeFromJsonError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::Json(e) => e.as_ref(),
-                Self::InvalidAccount(e) => e.as_ref(),
-            }
-        }
-    }
 }
 
 #[cfg(test)]

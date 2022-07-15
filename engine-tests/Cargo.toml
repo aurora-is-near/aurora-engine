@@ -50,6 +50,6 @@ tempfile = "3.2.0"
 walrus = "0.19"
 
 [features]
-mainnet-test = ["aurora-engine/impl-serde"]
-testnet-test = ["aurora-engine/impl-serde"]
+mainnet-test = []
+testnet-test = []
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]

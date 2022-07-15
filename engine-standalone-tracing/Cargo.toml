@@ -21,9 +21,8 @@ evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "374
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false, features = ["std", "tracing"] }
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false, features = ["std", "tracing"] }
 evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "37448b6cacd98b06282cff5a559684505c29bd2b", default-features = false, features = ["std", "tracing"] }
-serde = { version = "1", features = ["derive"], optional = true }
+serde = { version = "1", features = ["derive"] }
 
 [features]
 mainnet = []
 testnet = []
-impl-serde = ["aurora-engine-types/impl-serde", "serde"]

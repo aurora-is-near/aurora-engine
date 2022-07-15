@@ -884,13 +884,10 @@ fn test_ft_metadata() {
     let (maybe_outcome, maybe_error) = runner.call("ft_metadata", &account_id, Vec::new());
     assert!(maybe_error.is_none());
     let outcome = maybe_outcome.unwrap();
-    let json_value =
-        aurora_engine::json::parse_json(&outcome.return_data.as_value().unwrap()).unwrap();
+    let json_value: FungibleTokenMetadata =
+        serde_json::from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
-    assert_eq!(
-        json_value,
-        aurora_engine::json::JsonValue::from(FungibleTokenMetadata::default())
-    );
+    assert_eq!(json_value, FungibleTokenMetadata::default());
 }
 
 // Same as `test_eth_transfer_insufficient_balance` above, except runs through

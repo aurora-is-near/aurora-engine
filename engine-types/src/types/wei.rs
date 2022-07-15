@@ -3,7 +3,6 @@ use crate::types::balance::error;
 use crate::types::Fee;
 use crate::{str::FromStr, Add, Display, Sub, SubAssign, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
@@ -86,8 +85,7 @@ impl SubAssign<NEP141Wei> for NEP141Wei {
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Default, Debug, Clone, Copy, Eq, Deserialize, Serialize, PartialEq, Ord, PartialOrd)]
 pub struct Wei(U256);
 
 impl Wei {
