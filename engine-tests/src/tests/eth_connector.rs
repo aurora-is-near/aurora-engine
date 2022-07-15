@@ -1453,34 +1453,6 @@ fn test_ft_transfer_empty_value() {
     );
 }
 
-#[test]
-fn test_ft_transfer_wrong_u128_json_type() {
-    let (_, contract) = init(CUSTODIAN_ADDRESS);
-    call_deposit_eth_to_near(&contract, CONTRACT_ACC);
-
-    let res = contract.call(
-        CONTRACT_ACC.parse().unwrap(),
-        "ft_transfer",
-        json!({
-            "receiver_id": DEPOSITED_RECIPIENT,
-            "amount": 200,
-            "memo": "transfer memo"
-        })
-        .to_string()
-        .as_bytes(),
-        DEFAULT_GAS,
-        1,
-    );
-    let promises = res.promise_results();
-    let promise = &promises[promises.len() - 3];
-    eprintln!("{:#?}", promise.as_ref().unwrap().outcome().clone().status);
-    assert_execution_status_failure(
-        promise.as_ref().unwrap().outcome().clone().status,
-        "ERR_EXPECTED_STRING_GOT_NUMBER",
-        "Expected failure as number type can't be parsed to u128",
-    );
-}
-
 /// Bytes for a NEAR smart contract implementing `ft_on_transfer`
 fn dummy_ft_receiver_bytes() -> Vec<u8> {
     let base_path = std::path::Path::new("../etc").join("ft-receiver");

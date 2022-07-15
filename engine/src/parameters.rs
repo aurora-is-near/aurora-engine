@@ -364,9 +364,10 @@ pub struct InitCallArgs {
 pub type SetContractDataCallArgs = InitCallArgs;
 
 /// transfer eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct TransferCallCallArgs {
     pub receiver_id: AccountId,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub amount: NEP141Wei,
     pub memo: Option<String>,
     pub msg: String,
@@ -405,7 +406,7 @@ impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
 }
 
 /// storage_deposit eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct StorageDepositCallArgs {
     pub account_id: Option<AccountId>,
     pub registration_only: Option<bool>,

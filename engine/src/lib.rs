@@ -643,10 +643,8 @@ mod contract {
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
 
-        let args = TransferCallCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).expect_utf8(errors::ERR_FAILED_PARSE_JSON),
-        )
-        .sdk_unwrap();
+        let args: TransferCallCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .expect_utf8(errors::ERR_FAILED_PARSE_JSON);
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
         let promise_args = EthConnectorContract::init_instance(io)
@@ -665,7 +663,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
         let mut io = Runtime;
-        let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
+        let args: StorageDepositCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .expect_utf8(errors::ERR_FAILED_PARSE_JSON);
         let predecessor_account_id = io.predecessor_account_id();
         let amount = Yocto::new(io.attached_deposit());
         let maybe_promise = EthConnectorContract::init_instance(io)
