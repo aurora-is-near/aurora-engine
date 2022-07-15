@@ -309,7 +309,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                 use crate::prelude::str::FromStr;
                 if let Some(raw_unused_amount) = serde_json::from_slice(value.as_slice())
                     .ok()
-                    .and_then(|x: &str| u128::from_str(&x).ok())
+                    .and_then(|x: &str| u128::from_str(x).ok())
                 {
                     let unused_amount = NEP141Wei::new(raw_unused_amount);
                     // let unused_amount = Balance::from(raw_unused_amount);

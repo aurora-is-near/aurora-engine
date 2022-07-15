@@ -43,9 +43,7 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{
-        sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
-    };
+    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
@@ -684,7 +682,7 @@ mod contract {
         let predecessor_account_id = io.predecessor_account_id();
         let force = serde_json::from_slice(&io.read_input().to_vec())
             .ok()
-            .and_then(|args: Force| Some(args.force));
+            .map(|args: Force| args.force);
         let maybe_promise = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_unregister(predecessor_account_id, force)
@@ -777,7 +775,7 @@ mod contract {
         let mut io = Runtime;
         let metadata: FungibleTokenMetadata = connector::get_metadata(&io).unwrap_or_default();
         let json_data =
-            serde_json::to_string(&metadata).expect_utf8(&errors::ERR_SERIALIZE.as_bytes());
+            serde_json::to_string(&metadata).expect_utf8(errors::ERR_SERIALIZE.as_bytes());
         io.return_output(json_data.as_bytes())
     }
 
