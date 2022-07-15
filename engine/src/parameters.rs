@@ -11,6 +11,7 @@ use crate::proof::Proof;
 use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
 use evm::backend::Log;
 use serde::{Deserialize, Serialize};
+use serde_aux::prelude::deserialize_number_from_string;
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -436,9 +437,10 @@ impl From<JsonValue> for StorageWithdrawCallArgs {
 }
 
 /// transfer args for json invocation
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct TransferCallArgs {
     pub receiver_id: AccountId,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub amount: NEP141Wei,
     pub memo: Option<String>,
 }

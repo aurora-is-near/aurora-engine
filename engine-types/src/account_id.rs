@@ -1,9 +1,10 @@
 //! Guarantees all properly constructed AccountId's are valid for the NEAR network.
 //!
-//! Inpired by: https://github.com/near/nearcore/tree/master/core/account-id
+//! Inspired by: https://github.com/near/nearcore/tree/master/core/account-id
 
 use crate::{fmt, str, str::FromStr, Box, String, Vec};
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 pub const MIN_ACCOUNT_ID_LEN: usize = 2;
 pub const MAX_ACCOUNT_ID_LEN: usize = 64;
@@ -12,7 +13,18 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 ///
 /// This guarantees all properly constructed AccountId's are valid for the NEAR network.
 #[derive(
-    BorshSerialize, BorshDeserialize, Default, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd,
+    Deserialize,
+    Serialize,
+    BorshSerialize,
+    BorshDeserialize,
+    Default,
+    Eq,
+    Ord,
+    Hash,
+    Clone,
+    Debug,
+    PartialEq,
+    PartialOrd,
 )]
 pub struct AccountId(Box<str>);
 

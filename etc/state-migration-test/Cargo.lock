@@ -58,6 +58,8 @@ dependencies = [
  "ripemd160",
  "rjson",
  "rlp",
+ "serde",
+ "serde_json",
  "sha3 0.9.1",
  "wee_alloc",
 ]
@@ -113,6 +115,7 @@ dependencies = [
  "evm",
  "hex",
  "rlp",
+ "serde",
 ]
 
 [[package]]
@@ -123,6 +126,7 @@ dependencies = [
  "ethabi",
  "hex",
  "primitive-types",
+ "serde",
  "sha3 0.9.1",
 ]
 
@@ -413,6 +417,7 @@ source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=37448b6cacd98b
 dependencies = [
  "funty",
  "primitive-types",
+ "serde",
 ]
 
 [[package]]
@@ -561,6 +566,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "impl-serde"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4551f042f3438e64dbd6226b20527fc84a6e1fe65688b58746a2f53623f25f5c"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "impl-trait-for-tuples"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -570,6 +584,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "itoa"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "112c678d4050afce233f4f2852bb2eb519230b3cf12f33585275537d7e41578d"
 
 [[package]]
 name = "js-sys"
@@ -806,6 +826,7 @@ dependencies = [
  "fixed-hash",
  "impl-codec",
  "impl-rlp",
+ "impl-serde",
  "scale-info",
  "uint",
 ]
@@ -936,6 +957,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e75f6a532d0fd9f7f13144f392b6ad56a32696bfcd9c78f797f16bbb6f072d6"
 
 [[package]]
+name = "ryu"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3f6f92acf49d1b98f7a81226834412ada05458b7364277387724a237f062695"
+
+[[package]]
 name = "scale-info"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -977,6 +1004,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.82"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82c2c1fdcd807d1098552c5b9a36e425e42e9fbd7c6a37a8425f390f781f7fa7"
+dependencies = [
+ "itoa",
+ "ryu",
+ "serde",
 ]
 
 [[package]]

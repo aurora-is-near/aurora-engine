@@ -1448,7 +1448,7 @@ fn test_ft_transfer_empty_value() {
     eprintln!("{:#?}", promise.as_ref().unwrap().outcome().clone().status);
     assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
-        "ERR_FAILED_PARSE_U128",
+        "ERR_FAILED_PARSE_JSON",
         "Expected failure as empty string can't be parsed to u128",
     );
 }

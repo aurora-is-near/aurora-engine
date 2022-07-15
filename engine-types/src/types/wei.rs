@@ -1,7 +1,7 @@
 use crate::fmt::Formatter;
 use crate::types::balance::error;
 use crate::types::Fee;
-use crate::{Add, Display, Sub, SubAssign, U256};
+use crate::{str::FromStr, Add, Display, Sub, SubAssign, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -14,9 +14,28 @@ pub type WeiU256 = [u8; 32];
 
 // Type representing the NEP-141 balances of the eth-connector (ie Wei amounts that have been bridged to Near)
 #[derive(
-    Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
+    Deserialize,
+    Serialize,
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    BorshSerialize,
+    BorshDeserialize,
 )]
 pub struct NEP141Wei(u128);
+
+impl FromStr for NEP141Wei {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(u128::from_str(s)?))
+    }
+}
 
 impl Display for NEP141Wei {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {

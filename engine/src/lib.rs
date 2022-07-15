@@ -52,6 +52,7 @@ mod contract {
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
+    use aurora_engine_sdk::types::ExpectUtf8;
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
@@ -589,8 +590,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
-        let args: parameters::BalanceOfCallArgs =
-            serde_json::from_slice(&io.read_input().to_vec()).sdk_expect("E_PARSE");
+        let args: parameters::BalanceOfCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .expect_utf8(errors::ERR_FAILED_PARSE_JSON);
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_balance_of(args);
@@ -611,10 +612,8 @@ mod contract {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
-        let args = parameters::TransferCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).sdk_unwrap(),
-        )
-        .sdk_unwrap();
+        let args: parameters::TransferCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .expect_utf8(errors::ERR_FAILED_PARSE_JSON);
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_transfer(&predecessor_account_id, args)
@@ -640,13 +639,12 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
-        use sdk::types::ExpectUtf8;
         let mut io = Runtime;
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
 
         let args = TransferCallCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+            parse_json(&io.read_input().to_vec()).expect_utf8(errors::ERR_FAILED_PARSE_JSON),
         )
         .sdk_unwrap();
         let current_account_id = io.current_account_id();
