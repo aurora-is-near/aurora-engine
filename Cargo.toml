@@ -38,6 +38,7 @@ members = [
     "engine-tests",
     "engine-transactions",
     "engine-types",
+    "engine-workspace-test",
 ]
 exclude = [
     "etc/state-migration-test",
