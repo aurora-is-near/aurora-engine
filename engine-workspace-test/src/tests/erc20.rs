@@ -9,6 +9,7 @@ use aurora_engine::parameters::TransactionStatus;
 use aurora_engine_sdk as sdk;
 use bstr::ByteSlice;
 use libsecp256k1::SecretKey;
+use workspaces::network::DevAccountDeployer;
 
 const INITIAL_BALANCE: u64 = 1_000_000;
 const INITIAL_NONCE: u64 = 0;
@@ -292,15 +293,13 @@ fn initialize_erc20() -> (test_utils::AuroraRunner, Signer, Address, ERC20) {
     (runner, signer, dest_address, contract)
 }
 
-
-
-async fn start_engine() -> anyhow::Result<(Worker, Contract, Account)> {
+async fn start_engine() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
     let worker = workspaces::sandbox().await?;
     let wasm = std::fs::read(AURORA_WASM_FILEPATH)?;
     let contract = worker.dev_deploy(&wasm).await?;
-    let account = worker.dev_generate();
-    return Ok((worker, contract, account));
+    return Ok((worker.clone(), contract));
 }
+
 
 #[tokio::test]
 async fn eth_call() -> anyhow::Result<()> {
