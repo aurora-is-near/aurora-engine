@@ -5,6 +5,7 @@ use workspaces::network::Sandbox;
 use workspaces::Contract;
 
 use crate::test_utils::engine::start_engine;
+use crate::test_utils::erc20::ERC20Constructor;
 
 #[tokio::test]
 async fn get_version() -> anyhow::Result<()> {
@@ -19,6 +20,7 @@ async fn get_version() -> anyhow::Result<()> {
         .await?;
 
     println!("get_version outcome: {:#?}", outcome);
+    ERC20Constructor::deploy(&self, name, symbol, nonce);
 
     println!("Dev Account ID: {}", contract.id());
     Ok(())
