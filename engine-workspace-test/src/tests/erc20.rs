@@ -305,17 +305,16 @@ async fn start_engine() -> anyhow::Result<(Worker, Contract, Account)> {
 #[tokio::test]
 async fn eth_call() -> anyhow::Result<()> {
     // Setup workspace and aurora contract
-    let (worker, contract) = start_engine().await?;
+    let (worker, contract, account) = start_engine().await?;
 
+    let input = ERC20.deploy("TestToken", "TEST", nonce.into());
     
     let outcome = contract
-        .call(&worker, "")
-        .args(construct_input(hash, sig))?
+        .call(&worker, "submit")
+        .args(input)?
         .transact()
         .await?;
 
-    println!("get_version outcome: {:#?}", outcome);
-
-    println!("Dev Account ID: {}", contract.id());
+    
     Ok(())
 }
