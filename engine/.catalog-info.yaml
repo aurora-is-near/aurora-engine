@@ -4,6 +4,8 @@ kind: Component
 metadata:
   name: aurora-engine
   title: Aurora (engine)
+  description: |-
+    The Aurora engine
   tags:
     - contract
     - near

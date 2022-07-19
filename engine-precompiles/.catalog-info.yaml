@@ -3,6 +3,8 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: aurora-engine-precompiles
+  description: |-
+    EVM precompiles for the Aurora engine
   tags:
     - precompiles
     - contract
@@ -21,6 +23,8 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: aurora-engine-precompiles-native
+  description: |-
+    Aurora and NEAR specific precompile additions
   tags:
     - precompiles
     - contract
