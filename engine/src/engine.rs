@@ -16,6 +16,7 @@ use crate::accounting;
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::parameters::RefundCallArgs;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
+use crate::prelude::precompiles::xcc::cross_contract_call;
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
@@ -676,6 +677,14 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             Vec::new(),
         );
         status.into_result(result)
+    }
+
+    pub fn factory_propose(&mut self, code: Vec<u8>) -> H256 {
+        todo!(); // Store proposal in state. Return hash of the proposal.
+    }
+
+    pub fn factory_accept(&mut self, hash: H256) -> bool {
+        todo!(); // Find proposal, check it can only be called by admin. Update default contract and bump version.
     }
 
     fn relayer_key(account_id: &[u8]) -> Vec<u8> {
@@ -1358,6 +1367,7 @@ where
         .filter_map(|log| {
             if log.address == exit_to_near::ADDRESS.raw()
                 || log.address == exit_to_ethereum::ADDRESS.raw()
+                || log.address == cross_contract_call::ADDRESS.raw()
             {
                 if log.topics.is_empty() {
                     if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {

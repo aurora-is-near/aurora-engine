@@ -15,6 +15,7 @@ pub mod random;
 pub mod secp256k1;
 #[cfg(test)]
 mod utils;
+pub mod xcc;
 
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
 use crate::blake2::Blake2F;
@@ -28,6 +29,7 @@ use crate::prelude::{Vec, H160, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
+use crate::xcc::CrossContractCall;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
@@ -111,6 +113,7 @@ pub struct Precompiles<'a, I, E> {
     // with the lifetime requirements on the type parameter `I`.
     pub near_exit: ExitToNear<I>,
     pub ethereum_exit: ExitToEthereum<I>,
+    pub cross_contract_call: CrossContractCall<I>,
     pub predecessor_account_id: PredecessorAccount<'a, E>,
     pub prepaid_gas: PrepaidGas<'a, E>,
 }
@@ -270,6 +273,7 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
         let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
+        let cross_contract_call = CrossContractCall::new(ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);
 
@@ -277,6 +281,7 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             generic_precompiles,
             near_exit,
             ethereum_exit,
+            cross_contract_call,
             predecessor_account_id,
             prepaid_gas,
         }
@@ -291,6 +296,8 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             return Some(f(&self.near_exit));
         } else if address == exit_to_ethereum::ADDRESS {
             return Some(f(&self.ethereum_exit));
+        } else if address == xcc::cross_contract_call::ADDRESS {
+            return Some(f(&self.cross_contract_call));
         } else if address == predecessor_account::ADDRESS {
             return Some(f(&self.predecessor_account_id));
         } else if address == prepaid_gas::ADDRESS {
