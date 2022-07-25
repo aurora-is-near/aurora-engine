@@ -16,6 +16,7 @@ pub mod promise_result;
 pub mod random;
 pub mod secp256k1;
 mod utils;
+pub mod xcc;
 
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
 use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
@@ -29,6 +30,7 @@ use crate::prelude::{Vec, H160, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
+use crate::xcc::CrossContractCall;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
@@ -103,6 +105,7 @@ pub struct Precompiles<'a, I, E, H> {
     // with the lifetime requirements on the type parameter `I`.
     pub near_exit: ExitToNear<I>,
     pub ethereum_exit: ExitToEthereum<I>,
+    pub cross_contract_call: CrossContractCall<I>,
     pub predecessor_account_id: PredecessorAccount<'a, E>,
     pub prepaid_gas: PrepaidGas<'a, E>,
     pub promise_results: PromiseResult<H>,
@@ -280,6 +283,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
         let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
+        let cross_contract_call = CrossContractCall::new(ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);
         let promise_results = PromiseResult::new(ctx.promise_handler);
@@ -288,6 +292,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             generic_precompiles,
             near_exit,
             ethereum_exit,
+            cross_contract_call,
             predecessor_account_id,
             prepaid_gas,
             promise_results,
@@ -303,6 +308,8 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             return Some(f(&self.near_exit));
         } else if address == exit_to_ethereum::ADDRESS {
             return Some(f(&self.ethereum_exit));
+        } else if address == xcc::cross_contract_call::ADDRESS {
+            return Some(f(&self.cross_contract_call));
         } else if address == predecessor_account::ADDRESS {
             return Some(f(&self.predecessor_account_id));
         } else if address == prepaid_gas::ADDRESS {
