@@ -74,8 +74,8 @@ mod contract {
     use crate::fungible_token::FungibleTokenMetadata;
     use crate::json::parse_json;
     use crate::parameters::{
-        self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+        self, AddSubmitKeyArgs, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs,
+        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
         StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallCallArgs, ViewCallArgs,
     };
@@ -88,7 +88,8 @@ mod contract {
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{
-        sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
+        sdk, u256_to_arr, Address, PromiseAction, PromiseBatchAction, PromiseResult, ToString,
+        Yocto, ERR_FAILED_PARSE, H256,
     };
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -369,6 +370,23 @@ mod contract {
         }
     }
 
+    #[no_mangle]
+    pub extern "C" fn add_submit_key() {
+        let io = Runtime;
+        // Public key is passed in
+        let args: AddSubmitKeyArgs = io.read_input_borsh().sdk_unwrap();
+        let allowance = io.attached_deposit();
+        let receiver_id = io.current_account_id(); // TODO deploy and double chech this.
+        let action = PromiseAction::AddAccessKey {
+            public_key: args.public_key,
+            allowance,
+            receiver_id,
+            function_names: "submit".to_string(),
+        };
+        // io.promise_create_call();
+        todo!()
+    }
+
     ///
     /// NONMUTATIVE METHODS
     ///
@@ -392,7 +410,7 @@ mod contract {
             .map(|state| state.chain_id)
             .sdk_unwrap();
         let block_hash =
-            crate::engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
+            engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
         io.return_output(block_hash.as_bytes())
     }
 

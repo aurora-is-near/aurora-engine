@@ -8,7 +8,7 @@ use crate::prelude::{
     WeiU256,
 };
 use crate::proof::Proof;
-use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
+use aurora_engine_types::types::{Fee, NEP141Wei, PublicKey, Yocto};
 use evm::backend::Log;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -178,6 +178,12 @@ pub struct ViewCallArgs {
 #[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
 pub struct DeployErc20TokenArgs {
     pub nep141: AccountId,
+}
+
+/// Borsh-encoded parameters for the `add_submit_key` function.
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct AddSubmitKeyArgs {
+    pub public_key: PublicKey,
 }
 
 /// Borsh-encoded parameters for `get_erc20_from_nep141` function.

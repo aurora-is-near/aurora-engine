@@ -1,6 +1,7 @@
 use crate::error::{OneYoctoAttachError, PrivateCallError};
 use crate::prelude::{NearGas, H256};
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::types::Balance;
 
 pub const DEFAULT_PREPAID_GAS: NearGas = NearGas::new(300_000_000_000_000);
 
@@ -42,7 +43,7 @@ pub trait Env {
     /// Timestamp (in ns) of the current block.
     fn block_timestamp(&self) -> Timestamp;
     /// Amount of NEAR attached to current call
-    fn attached_deposit(&self) -> u128;
+    fn attached_deposit(&self) -> Balance;
     /// Random seed generated for the current block
     fn random_seed(&self) -> H256;
     /// Prepaid NEAR Gas
@@ -57,7 +58,7 @@ pub trait Env {
     }
 
     fn assert_one_yocto(&self) -> Result<(), OneYoctoAttachError> {
-        if self.attached_deposit() == 1 {
+        if self.attached_deposit() == Balance::new(1) {
             Ok(())
         } else {
             Err(OneYoctoAttachError)
@@ -74,7 +75,7 @@ pub struct Fixed {
     pub predecessor_account_id: AccountId,
     pub block_height: u64,
     pub block_timestamp: Timestamp,
-    pub attached_deposit: u128,
+    pub attached_deposit: Balance,
     pub random_seed: H256,
     pub prepaid_gas: NearGas,
 }
@@ -100,7 +101,7 @@ impl Env for Fixed {
         self.block_timestamp
     }
 
-    fn attached_deposit(&self) -> u128 {
+    fn attached_deposit(&self) -> Balance {
         self.attached_deposit
     }
 

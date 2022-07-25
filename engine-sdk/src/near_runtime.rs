@@ -3,7 +3,7 @@ use crate::prelude::NearGas;
 use crate::promise::PromiseId;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
-use aurora_engine_types::types::PromiseResult;
+use aurora_engine_types::types::{Balance, PromiseResult};
 use aurora_engine_types::H256;
 
 #[cfg(all(feature = "mainnet", not(feature = "testnet")))]
@@ -237,11 +237,11 @@ impl crate::env::Env for Runtime {
         crate::env::Timestamp::new(ns)
     }
 
-    fn attached_deposit(&self) -> u128 {
+    fn attached_deposit(&self) -> Balance {
         unsafe {
             let data = [0u8; core::mem::size_of::<u128>()];
             exports::attached_deposit(data.as_ptr() as u64);
-            u128::from_le_bytes(data)
+            Balance::new(u128::from_le_bytes(data))
         }
     }
 
@@ -343,7 +343,7 @@ impl crate::promise::PromiseHandler for Runtime {
                     let amount = amount.as_u128();
                     exports::promise_batch_action_transfer(id, &amount as *const u128 as _);
                 },
-                PromiseAction::DeployConotract { code } => unsafe {
+                PromiseAction::DeployContract { code } => unsafe {
                     let code = code.as_slice();
                     exports::promise_batch_action_deploy_contract(
                         id,
@@ -368,6 +368,27 @@ impl crate::promise::PromiseHandler for Runtime {
                         arguments.as_ptr() as _,
                         &amount as *const u128 as _,
                         gas.as_u64(),
+                    )
+                },
+                PromiseAction::AddAccessKey {
+                    public_key,
+                    allowance,
+                    receiver_id,
+                    function_names,
+                } => unsafe {
+                    let public_key = public_key.as_bytes();
+                    let receiver_id = receiver_id.as_bytes();
+                    let function_names = function_names.as_bytes();
+                    exports::promise_batch_action_add_key_with_function_call(
+                        id,
+                        public_key.len() as _,
+                        public_key.as_ptr() as _,
+                        0, // redundant value
+                        &allowance.as_u128() as *const u128 as _,
+                        receiver_id.len() as _,
+                        receiver_id.as_ptr() as _,
+                        function_names.len() as _,
+                        function_names.as_ptr() as _,
                     )
                 },
             }
@@ -416,8 +437,8 @@ impl crate::env::Env for ViewEnv {
         crate::env::Timestamp::new(ns)
     }
 
-    fn attached_deposit(&self) -> u128 {
-        1
+    fn attached_deposit(&self) -> Balance {
+        Balance::new(1)
     }
 
     fn random_seed(&self) -> H256 {
@@ -548,7 +569,7 @@ pub(crate) mod exports {
             public_key_ptr: u64,
             nonce: u64,
         );
-        fn promise_batch_action_add_key_with_function_call(
+        pub(crate) fn promise_batch_action_add_key_with_function_call(
             promise_index: u64,
             public_key_len: u64,
             public_key_ptr: u64,
