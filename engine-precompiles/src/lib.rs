@@ -272,8 +272,8 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
         ctx: PrecompileConstructorContext<'a, I, E>,
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
-        let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
-        let cross_contract_call = CrossContractCall::new(ctx.io);
+        let ethereum_exit = ExitToEthereum::new(ctx.current_account_id.clone(), ctx.io);
+        let cross_contract_call = CrossContractCall::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);
 

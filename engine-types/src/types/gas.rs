@@ -24,6 +24,14 @@ impl Sub<NearGas> for NearGas {
     }
 }
 
+impl Add<NearGas> for NearGas {
+    type Output = NearGas;
+
+    fn add(self, rhs: NearGas) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
 impl NearGas {
     /// Constructs a new `NearGas` with a given u64 value.
     pub const fn new(gas: u64) -> NearGas {
