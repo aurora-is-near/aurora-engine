@@ -64,3 +64,18 @@ pub struct RefundCallArgs {
     pub erc20_address: Option<Address>,
     pub amount: RawU256,
 }
+
+/// Args passed to the the cross contract call precompile.
+/// That precompile is used by Aurora contracts to make calls to the broader NEAR ecosystem.
+/// See https://github.com/aurora-is-near/AIPs/pull/2 for design details.
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub enum CrossContractCallArgs {
+    /// The promise is to be executed immediately (as part of the same NEAR transaction as the EVM call).
+    Eager(PromiseArgs),
+    /// The promise is to be stored in the router contract, and can be executed in a future transaction.
+    /// The purpose of this is to expand how much NEAR gas can be made available to a cross contract call.
+    /// For example, if an expensive EVM call ends with a NEAR cross contract call, then there may not be
+    /// much gas left to perform it. In this case, the promise could be `Delayed` (stored in the router)
+    /// and executed in a separate transaction with a fresh 300 Tgas available for it.
+    Delayed(PromiseArgs),
+}
