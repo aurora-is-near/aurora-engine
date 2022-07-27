@@ -5,12 +5,11 @@
 
 use crate::{Context, EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::EthGas;
+use aurora_engine_types::{types::EthGas, vec, Cow};
 use evm_core::ExitError;
-use std::borrow::Cow;
 
 mod costs {
-    use crate::prelude::types::{EthGas, NearGas};
+    use crate::prelude::types::EthGas;
 
     // TODO(#483): Determine the correct amount of gas
     pub(super) const CROSS_CONTRACT_CALL: EthGas = EthGas::new(0);
@@ -38,7 +37,7 @@ pub mod cross_contract_call {
 }
 
 impl<I: IO> Precompile for CrossContractCall<I> {
-    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
+    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::CROSS_CONTRACT_CALL)
     }
 
@@ -55,9 +54,11 @@ impl<I: IO> Precompile for CrossContractCall<I> {
             }
         }
 
-        // It's not allowed to call cross contract call precompile in static mode
+        // It's not allowed to call cross contract call precompile in static or delegate mode
         if is_static {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_STATIC")));
+        } else if context.address != cross_contract_call::ADDRESS.raw() {
+            return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
         Ok(PrecompileOutput {

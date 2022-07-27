@@ -679,11 +679,11 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         status.into_result(result)
     }
 
-    pub fn factory_propose(&mut self, code: Vec<u8>) -> H256 {
+    pub fn factory_propose(&mut self, _code: Vec<u8>) -> H256 {
         todo!(); // Store proposal in state. Return hash of the proposal.
     }
 
-    pub fn factory_accept(&mut self, hash: H256) -> bool {
+    pub fn factory_accept(&mut self, _hash: H256) -> bool {
         todo!(); // Find proposal, check it can only be called by admin. Update default contract and bump version.
     }
 
