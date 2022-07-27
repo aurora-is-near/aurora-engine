@@ -94,6 +94,7 @@ mod contract {
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
+    use aurora_engine_types::Vec;
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
@@ -315,7 +316,7 @@ mod contract {
         let io = Runtime;
         let proxy_bytecode_hash = io.read_input_arr32().sdk_unwrap();
 
-        let mut state = engine::get_state(&io).sdk_unwrap();
+        let state = engine::get_state(&io).sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
         require_owner_only(&state, &predecessor_account_id);
 
