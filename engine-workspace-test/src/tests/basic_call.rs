@@ -1,16 +1,12 @@
 use serde_json::json;
-
 use workspaces::Worker;
 use workspaces::network::Sandbox;
 use workspaces::Contract;
 
 use crate::test_utils::engine::start_engine;
-use crate::test_utils::erc20::ERC20Constructor;
 
 #[tokio::test]
 async fn get_version() -> anyhow::Result<()> {
-    //let worker = workspaces::sandbox().await?;
-    //let wasm = std::fs::read(AURORA_WASM_FILEPATH)?;
     let (worker, contract): (Worker<Sandbox>, Contract) = start_engine().await?;
 
     let outcome = contract
@@ -20,8 +16,30 @@ async fn get_version() -> anyhow::Result<()> {
         .await?;
 
     println!("get_version outcome: {:#?}", outcome);
-    ERC20Constructor::deploy(&self, name, symbol, nonce);
 
-    println!("Dev Account ID: {}", contract.id());
+    
+    println!("Dev Acc ID: {}", contract.id());
+    Ok(())
+}
+
+
+#[tokio::test]
+async fn test() -> anyhow::Result<()> {
+    let (worker, contract): (Worker<Sandbox>, Contract) = start_engine().await?;
+    
+    println!("get_version outcome: {:#?}", contract);
+
+    let a = worker.root_account();
+
+    let calling_account_id = "a";
+
+    let owner = worker.root_account();
+    let test_account = owner
+        .create_subaccount(&worker, calling_account_id)
+        .transact()
+        .await?
+        .unwrap();
+
+    println!("Dev Account ID: {:?}", test_account);
     Ok(())
 }
