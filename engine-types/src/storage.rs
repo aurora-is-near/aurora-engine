@@ -21,6 +21,7 @@ pub enum KeyPrefix {
     Generation = 0x7,
     Nep141Erc20Map = 0x8,
     Erc20Nep141Map = 0x9,
+    CrossContractCall = 0xa,
 }
 
 /// Enum used to differentiate different storage keys used by eth-connector
@@ -51,6 +52,7 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x7 => Self::Generation,
             0x8 => Self::Nep141Erc20Map,
             0x9 => Self::Erc20Nep141Map,
+            0xa => Self::CrossContractCall,
             _ => unreachable!(),
         }
     }

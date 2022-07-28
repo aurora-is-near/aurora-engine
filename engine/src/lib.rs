@@ -29,6 +29,7 @@ pub mod fungible_token;
 pub mod json;
 pub mod log_entry;
 mod prelude;
+pub mod xcc;
 
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]
@@ -95,7 +96,6 @@ mod contract {
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
-    use aurora_engine_types::Vec;
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
@@ -318,53 +318,15 @@ mod contract {
         );
     }
 
-    /// Propose new contract bytecode for proxy contracts.
-    ///
-    /// Anyone can submit a proposal. The user submitting the proposal should cover the storage
-    /// staking fee. The proposal is used when the admin invokes `factory_accept` using
-    /// the hash (sha256) of this proposal as an argument.
+    /// Updates the bytecode for user's router contracts created by the engine.
+    /// These contracts are where cross-contract calls initiated by the EVM precompile
+    /// will be sent from.
     #[no_mangle]
-    pub extern "C" fn factory_propose() {
-        let io = Runtime;
-        let proxy_bytecode: Vec<u8> = io.read_input_borsh().sdk_unwrap();
-
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let mut engine = Engine::new(
-            predecessor_address(&predecessor_account_id),
-            current_account_id,
-            io,
-            &io,
-        )
-        .sdk_unwrap();
-
-        engine.factory_propose(proxy_bytecode);
-    }
-
-    /// Accept proposed contract bytecode as the proxy contract.
-    ///
-    /// After a contract is accepted all proxies will be migrated to the new version before being
-    /// used. This process will happen lazy on demand (usage). Only `aurora` admin can invoke
-    /// this method.
-    #[no_mangle]
-    pub extern "C" fn factory_accept() {
-        let io = Runtime;
-        let proxy_bytecode_hash = io.read_input_arr32().sdk_unwrap();
-
-        let state = engine::get_state(&io).sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
-        require_owner_only(&state, &predecessor_account_id);
-
-        let current_account_id = io.current_account_id();
-        let mut engine = Engine::new(
-            predecessor_address(&predecessor_account_id),
-            current_account_id,
-            io,
-            &io,
-        )
-        .sdk_unwrap();
-
-        engine.factory_accept(H256(proxy_bytecode_hash));
+    pub extern "C" fn factory_update() {
+        let mut io = Runtime;
+        let bytes = io.read_input().to_vec();
+        let router_bytecode = crate::xcc::RouterCode(bytes);
+        crate::xcc::update_router_code(&mut io, &router_bytecode);
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.
