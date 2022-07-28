@@ -15,6 +15,7 @@ pub const VERSION_KEY: &[u8] = b"version";
 pub const CODE_KEY: &[u8] = b"router_code";
 // TODO: estimate gas
 pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(0);
+pub const INITIALIZE_GAS: NearGas = NearGas::new(0);
 
 /// Type wrapper for version of router contracts.
 #[derive(
@@ -51,57 +52,62 @@ pub fn handle_precomile_promise<I, P>(
     let sender = Address::decode(&target_account[0..40]).expect(ERR_INVALID_ACCOUNT);
     let latest_code_version = get_latest_code_version(io);
     let sender_code_version = get_code_version_of_address(io, &sender);
-    let mut promise_actions = Vec::new();
-    let mut deploy_needed = false;
-    match sender_code_version {
-        None => {
-            // Need to create the account
-            promise_actions.push(PromiseAction::CreateAccount);
-            // Then deploy the contract
+    let deploy_needed = match sender_code_version {
+        None => AddressVersionStatus::DeployNeeded {
+            create_needed: true,
+        },
+        Some(version) if version < latest_code_version => AddressVersionStatus::DeployNeeded {
+            create_needed: false,
+        },
+        Some(_version) => AddressVersionStatus::UpToDate,
+    };
+    let _promise_id = match deploy_needed {
+        AddressVersionStatus::DeployNeeded { create_needed } => {
+            let mut promise_actions = Vec::with_capacity(4);
+            if create_needed {
+                promise_actions.push(PromiseAction::CreateAccount);
+            }
             promise_actions.push(PromiseAction::DeployConotract {
                 code: get_router_code(io).0,
             });
-            deploy_needed = true;
-        }
-        Some(version) if version < latest_code_version => {
-            // Account exist, but with outdated version, so deploy new one
-            promise_actions.push(PromiseAction::DeployConotract {
-                code: get_router_code(io).0,
+            // After a deploy we call the contract's initialize function
+            promise_actions.push(PromiseAction::FunctionCall {
+                name: "initialize".into(),
+                // TODO: initialize args?
+                args: Vec::new(),
+                attached_yocto: ZERO_YOCTO,
+                gas: INITIALIZE_GAS,
             });
-            deploy_needed = true;
-        }
-        Some(_version) => {
-            // if the version match then we do not need to deploy, it already up to date
-        }
-    };
-    // Regardless of whether a deploy is needed or not, we want to make a call to the account
-    promise_actions.push(PromiseAction::FunctionCall {
-        name: promise.method,
-        args: promise.args,
-        attached_yocto: promise.attached_balance,
-        gas: promise.attached_gas,
-    });
-    let batch = PromiseBatchAction {
-        target_account_id: promise.target_account_id,
-        actions: promise_actions,
-    };
-    let promise_id = handler.promise_create_batch(&batch);
-    if deploy_needed {
-        // If a deploy was needed then we want there to be a callback here to update the version of the account
-        let args = AddressVersionUpdateArgs {
-            address: sender,
-            version: latest_code_version,
-        };
-        let callback = PromiseCreateArgs {
-            target_account_id: current_account_id.clone(),
-            method: "factory_update_address_version".into(),
-            args: args.try_to_vec().unwrap(),
-            attached_balance: ZERO_YOCTO,
-            attached_gas: VERSION_UPDATE_GAS,
-        };
+            // After the contract is deployed and initialized, we can call the method requested
+            promise_actions.push(PromiseAction::FunctionCall {
+                name: promise.method,
+                args: promise.args,
+                attached_yocto: promise.attached_balance,
+                gas: promise.attached_gas,
+            });
+            let batch = PromiseBatchAction {
+                target_account_id: promise.target_account_id,
+                actions: promise_actions,
+            };
+            let promise_id = handler.promise_create_batch(&batch);
 
-        handler.promise_attach_callback(promise_id, &callback);
-    }
+            // Add a callback here to update the version of the account
+            let args = AddressVersionUpdateArgs {
+                address: sender,
+                version: latest_code_version,
+            };
+            let callback = PromiseCreateArgs {
+                target_account_id: current_account_id.clone(),
+                method: "factory_update_address_version".into(),
+                args: args.try_to_vec().unwrap(),
+                attached_balance: ZERO_YOCTO,
+                attached_gas: VERSION_UPDATE_GAS,
+            };
+
+            handler.promise_attach_callback(promise_id, &callback)
+        }
+        AddressVersionStatus::UpToDate => handler.promise_create_call(&promise),
+    };
 }
 
 /// Read the current wasm bytecode for the router contracts
@@ -154,4 +160,10 @@ fn read_version<I: IO>(io: &I, key: &[u8]) -> Option<CodeVersion> {
         Err(ReadU32Error::MissingValue) => None,
         Err(ReadU32Error::InvalidU32) => panic!("{}", ERR_CORRUPTED_STORAGE),
     }
+}
+
+/// Private enum used for bookkeeping what actions are needed in the call to the router contract.
+enum AddressVersionStatus {
+    UpToDate,
+    DeployNeeded { create_needed: bool },
 }
