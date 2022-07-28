@@ -4,7 +4,7 @@ kind: Component
 metadata:
   name: aurora-engine-token
   description: |-
-    Aurora token deployed on the Aurora network
+    Aurora ERC-20 contract for bridged tokens
   tags:
     - contract
     - aurora
