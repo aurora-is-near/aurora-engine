@@ -555,7 +555,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(&mut self.io, handler, logs, &self.current_account_id);
+        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
 
         self.apply(values, Vec::<Log>::new(), true);
 
@@ -640,7 +640,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(&mut self.io, handler, logs, &self.current_account_id);
+        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
@@ -1358,7 +1358,7 @@ fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) 
 }
 
 fn filter_promises_from_logs<I, T, P>(
-    io: &mut I,
+    io: &I,
     handler: &mut P,
     logs: T,
     current_account_id: &AccountId,

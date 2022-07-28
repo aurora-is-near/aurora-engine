@@ -6,6 +6,7 @@ use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, Promise
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, ZERO_YOCTO};
 use aurora_engine_types::Vec;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const ERR_NO_ROUTER_CODE: &str = "ERR_MISSING_XCC_BYTECODE";
 pub const ERR_CORRUPTED_STORAGE: &str = "ERR_CORRUPTED_XCC_STORAGE";
@@ -16,7 +17,9 @@ pub const CODE_KEY: &[u8] = b"router_code";
 pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(0);
 
 /// Type wrapper for version of router contracts.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, BorshDeserialize, BorshSerialize,
+)]
 pub struct CodeVersion(pub u32);
 
 impl CodeVersion {
@@ -29,8 +32,14 @@ impl CodeVersion {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RouterCode(pub Vec<u8>);
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
+pub struct AddressVersionUpdateArgs {
+    pub address: Address,
+    pub version: CodeVersion,
+}
+
 pub fn handle_precomile_promise<I, P>(
-    io: &mut I,
+    io: &I,
     handler: &mut P,
     promise: PromiseCreateArgs,
     current_account_id: &AccountId,
@@ -79,10 +88,14 @@ pub fn handle_precomile_promise<I, P>(
     let promise_id = handler.promise_create_batch(&batch);
     if deploy_needed {
         // If a deploy was needed then we want there to be a callback here to update the version of the account
+        let args = AddressVersionUpdateArgs {
+            address: sender,
+            version: latest_code_version,
+        };
         let callback = PromiseCreateArgs {
             target_account_id: current_account_id.clone(),
-            method: "factory_update_account_version".into(),
-            args: Vec::new(), // TODO
+            method: "factory_update_address_version".into(),
+            args: args.try_to_vec().unwrap(),
             attached_balance: ZERO_YOCTO,
             attached_gas: VERSION_UPDATE_GAS,
         };
