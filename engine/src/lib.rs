@@ -324,9 +324,21 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn factory_update() {
         let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
         let bytes = io.read_input().to_vec();
         let router_bytecode = crate::xcc::RouterCode(bytes);
         crate::xcc::update_router_code(&mut io, &router_bytecode);
+    }
+
+    /// Updates the bytecode version for the given account. This is only called as a callback
+    /// when a new version of the router contract is deployed to an account.
+    #[no_mangle]
+    pub extern "C" fn factory_update_address_version() {
+        let mut io = Runtime;
+        io.assert_private_call().sdk_unwrap();
+        let args: crate::xcc::AddressVersionUpdateArgs = io.read_input_borsh().sdk_unwrap();
+        crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.
