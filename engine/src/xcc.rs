@@ -1,16 +1,22 @@
 use aurora_engine_sdk::error::ReadU32Error;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::promise::PromiseHandler;
+use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
-use aurora_engine_types::types::Address;
+use aurora_engine_types::types::{Address, NearGas, ZERO_YOCTO};
 use aurora_engine_types::Vec;
 
 pub const ERR_NO_ROUTER_CODE: &str = "ERR_MISSING_XCC_BYTECODE";
 pub const ERR_CORRUPTED_STORAGE: &str = "ERR_CORRUPTED_XCC_STORAGE";
+pub const ERR_INVALID_ACCOUNT: &str = "ERR_INVALID_XCC_ACCOUNT";
 pub const VERSION_KEY: &[u8] = b"version";
 pub const CODE_KEY: &[u8] = b"router_code";
+// TODO: estimate gas
+pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(0);
 
 /// Type wrapper for version of router contracts.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CodeVersion(pub u32);
 
 impl CodeVersion {
@@ -22,6 +28,68 @@ impl CodeVersion {
 /// Type wrapper for router bytecode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RouterCode(pub Vec<u8>);
+
+pub fn handle_precomile_promise<I, P>(
+    io: &mut I,
+    handler: &mut P,
+    promise: PromiseCreateArgs,
+    current_account_id: &AccountId,
+) where
+    P: PromiseHandler,
+    I: IO,
+{
+    let target_account: &str = promise.target_account_id.as_ref();
+    let sender = Address::decode(&target_account[0..40]).expect(ERR_INVALID_ACCOUNT);
+    let latest_code_version = get_latest_code_version(io);
+    let sender_code_version = get_code_version_of_address(io, &sender);
+    let mut promise_actions = Vec::new();
+    let mut deploy_needed = false;
+    match sender_code_version {
+        None => {
+            // Need to create the account
+            promise_actions.push(PromiseAction::CreateAccount);
+            // Then deploy the contract
+            promise_actions.push(PromiseAction::DeployConotract {
+                code: get_router_code(io).0,
+            });
+            deploy_needed = true;
+        }
+        Some(version) if version < latest_code_version => {
+            // Account exist, but with outdated version, so deploy new one
+            promise_actions.push(PromiseAction::DeployConotract {
+                code: get_router_code(io).0,
+            });
+            deploy_needed = true;
+        }
+        Some(_version) => {
+            // if the version match then we do not need to deploy, it already up to date
+        }
+    };
+    // Regardless of whether a deploy is needed or not, we want to make a call to the account
+    promise_actions.push(PromiseAction::FunctionCall {
+        name: promise.method,
+        args: promise.args,
+        attached_yocto: promise.attached_balance,
+        gas: promise.attached_gas,
+    });
+    let batch = PromiseBatchAction {
+        target_account_id: promise.target_account_id,
+        actions: promise_actions,
+    };
+    let promise_id = handler.promise_create_batch(&batch);
+    if deploy_needed {
+        // If a deploy was needed then we want there to be a callback here to update the version of the account
+        let callback = PromiseCreateArgs {
+            target_account_id: current_account_id.clone(),
+            method: "factory_update_account_version".into(),
+            args: Vec::new(), // TODO
+            attached_balance: ZERO_YOCTO,
+            attached_gas: VERSION_UPDATE_GAS,
+        };
+
+        handler.promise_attach_callback(promise_id, &callback);
+    }
+}
 
 /// Read the current wasm bytecode for the router contracts
 pub fn get_router_code<I: IO>(io: &I) -> RouterCode {

@@ -555,7 +555,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(handler, logs);
+        let logs = filter_promises_from_logs(&mut self.io, handler, logs, &self.current_account_id);
 
         self.apply(values, Vec::<Log>::new(), true);
 
@@ -640,7 +640,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(handler, logs);
+        let logs = filter_promises_from_logs(&mut self.io, handler, logs, &self.current_account_id);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
@@ -1357,16 +1357,21 @@ fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) 
     remove_all_storage(io, address, generation);
 }
 
-fn filter_promises_from_logs<T, P>(handler: &mut P, logs: T) -> Vec<ResultLog>
+fn filter_promises_from_logs<I, T, P>(
+    io: &mut I,
+    handler: &mut P,
+    logs: T,
+    current_account_id: &AccountId,
+) -> Vec<ResultLog>
 where
     T: IntoIterator<Item = Log>,
     P: PromiseHandler,
+    I: IO,
 {
     logs.into_iter()
         .filter_map(|log| {
             if log.address == exit_to_near::ADDRESS.raw()
                 || log.address == exit_to_ethereum::ADDRESS.raw()
-                || log.address == cross_contract_call::ADDRESS.raw()
             {
                 if log.topics.is_empty() {
                     if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
@@ -1386,6 +1391,12 @@ where
                     // `topics` field.
                     Some(log.into())
                 }
+            } else if log.address == cross_contract_call::ADDRESS.raw() {
+                if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
+                    crate::xcc::handle_precomile_promise(io, handler, promise, current_account_id);
+                }
+                // do not pass on these "internal logs" to caller
+                None
             } else {
                 Some(log.into())
             }
