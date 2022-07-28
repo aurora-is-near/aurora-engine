@@ -108,6 +108,22 @@ pub trait IO {
         self.write_storage_direct(key, value);
     }
 
+    /// Convenience function to read a 32-bit unsigned integer from storage
+    /// (assumes little-endian encoding).
+    fn read_u32(&self, key: &[u8]) -> Result<u32, error::ReadU32Error> {
+        let value = self
+            .read_storage(key)
+            .ok_or(error::ReadU32Error::MissingValue)?;
+
+        if value.len() != 4 {
+            return Err(error::ReadU32Error::InvalidU32);
+        }
+
+        let mut result = [0u8; 4];
+        value.copy_to_slice(&mut result);
+        Ok(u32::from_le_bytes(result))
+    }
+
     /// Convenience function to read a 64-bit unsigned integer from storage
     /// (assumes little-endian encoding).
     fn read_u64(&self, key: &[u8]) -> Result<u64, error::ReadU64Error> {
