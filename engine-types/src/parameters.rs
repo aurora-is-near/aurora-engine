@@ -29,6 +29,7 @@ pub struct PromiseWithCallbackArgs {
 
 #[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
 pub enum PromiseAction {
+    CreateAccount,
     Transfer {
         amount: Yocto,
     },

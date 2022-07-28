@@ -337,6 +337,9 @@ impl crate::promise::PromiseHandler for Runtime {
 
         for action in args.actions.iter() {
             match action {
+                PromiseAction::CreateAccount => unsafe {
+                    exports::promise_batch_action_create_account(id);
+                },
                 PromiseAction::Transfer { amount } => unsafe {
                     let amount = amount.as_u128();
                     exports::promise_batch_action_transfer(id, &amount as *const u128 as _);
@@ -511,7 +514,7 @@ pub(crate) mod exports {
         // #######################
         // # Promise API actions #
         // #######################
-        fn promise_batch_action_create_account(promise_index: u64);
+        pub(crate) fn promise_batch_action_create_account(promise_index: u64);
         pub(crate) fn promise_batch_action_deploy_contract(
             promise_index: u64,
             code_len: u64,
