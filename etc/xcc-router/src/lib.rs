@@ -4,6 +4,10 @@ use near_sdk::collections::{LazyOption, LookupMap};
 use near_sdk::json_types::U64;
 use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault, PromiseIndex};
 
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
+mod tests;
+
 const VERSION_PREFIX: &[u8] = &[0x00];
 const PARENT_PREFIX: &[u8] = &[0x01];
 const NONCE_PREFIX: &[u8] = &[0x02];
