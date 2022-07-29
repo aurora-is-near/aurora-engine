@@ -1,0 +1,12 @@
+[package]
+name = "xcc_router"
+version = "1.0.0"
+authors = ["Aurora <hello@aurora.dev>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aurora-engine-types = { path = "../../engine-types", default-features = false }
+near-sdk = "3.1.0"
