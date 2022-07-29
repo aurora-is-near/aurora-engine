@@ -44,4 +44,5 @@ exclude = [
     "etc/ft-receiver",
     "etc/benchmark-contract",
     "etc/self-contained-5bEgfRQ",
+    "etc/xcc-router",
 ]
