@@ -23,15 +23,14 @@ const ERR_DELEGATE: &str = "ERR_INVALID_IN_DELEGATE";
 const ROUTER_EXEC_NAME: &str = "execute";
 const ROUTER_SCHEDULE_NAME: &str = "schedule";
 
-mod costs {
+pub mod costs {
     use crate::prelude::types::{EthGas, NearGas};
 
     // TODO(#483): Determine the correct amount of gas
     pub(super) const CROSS_CONTRACT_CALL: EthGas = EthGas::new(0);
 
-    // TODO: Determine the correct amount of gas
-    pub(super) const ROUTER_EXEC: NearGas = NearGas::new(0);
-    pub(super) const ROUTER_SCHEDULE: NearGas = NearGas::new(0);
+    pub const ROUTER_EXEC: NearGas = NearGas::new(7_000_000_000_000);
+    pub const ROUTER_SCHEDULE: NearGas = NearGas::new(5_000_000_000_000);
 }
 
 pub struct CrossContractCall<I> {
