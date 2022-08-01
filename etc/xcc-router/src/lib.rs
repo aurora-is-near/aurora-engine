@@ -91,6 +91,8 @@ impl Router {
         let nonce = self.nonce.get().unwrap_or_default();
         self.scheduled_promises.insert(&nonce, &promise);
         self.nonce.set(&(nonce + 1));
+
+        env::log(format!("Promise scheduled at nonce {}", nonce).as_bytes());
     }
 
     /// It is intentional that this function can be called by anyone (not just the parent).
