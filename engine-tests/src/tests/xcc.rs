@@ -12,7 +12,16 @@ use std::fs;
 use std::path::Path;
 
 #[test]
-fn test_xcc_precompile() {
+fn test_xcc_precompile_eager() {
+    test_xcc_precompile_common(false)
+}
+
+#[test]
+fn test_xcc_precompile_scheduled() {
+    test_xcc_precompile_common(true)
+}
+
+fn test_xcc_precompile_common(is_scheduled: bool) {
     let aurora = deploy_evm();
     let xcc_wasm_bytes = contract_bytes();
     aurora
@@ -97,15 +106,18 @@ fn test_xcc_precompile() {
         attached_balance: Yocto::new(1),
         attached_gas: NearGas::new(100_000_000_000_000),
     };
+    let xcc_args = if is_scheduled {
+        CrossContractCallArgs::Delayed(PromiseArgs::Create(promise))
+    } else {
+        CrossContractCallArgs::Eager(PromiseArgs::Create(promise))
+    };
     let transaction = TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: 0u64.into(),
         gas_limit: u64::MAX.into(),
         to: Some(cross_contract_call::ADDRESS),
         value: Wei::zero(),
-        data: CrossContractCallArgs::Eager(PromiseArgs::Create(promise))
-            .try_to_vec()
-            .unwrap(),
+        data: xcc_args.try_to_vec().unwrap(),
     };
     let signed_transaction = test_utils::sign_transaction(
         transaction,
@@ -128,6 +140,26 @@ fn test_xcc_precompile() {
         println!("{:?}\n\n", rt.outcome(id).unwrap());
     }
     drop(rt);
+
+    if is_scheduled {
+        // The promise was only scheduled, not executed immediately. So the FT balance has not changed yet.
+        assert_eq!(
+            sim_tests::nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141_token, &aurora),
+            nep_141_supply - transfer_amount
+        );
+
+        // Now we execute the scheduled promise
+        aurora
+            .user
+            .call(
+                router_account.parse().unwrap(),
+                "execute_scheduled",
+                b"{\"nonce\": \"0\"}",
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .assert_success();
+    }
 
     assert_eq!(
         sim_tests::nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141_token, &aurora),
