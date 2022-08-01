@@ -4,7 +4,7 @@ use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
-use aurora_engine_types::types::{Address, NearGas, ZERO_YOCTO};
+use aurora_engine_types::types::{Address, NearGas, Yocto, ZERO_YOCTO};
 use aurora_engine_types::Vec;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -13,9 +13,10 @@ pub const ERR_CORRUPTED_STORAGE: &str = "ERR_CORRUPTED_XCC_STORAGE";
 pub const ERR_INVALID_ACCOUNT: &str = "ERR_INVALID_XCC_ACCOUNT";
 pub const VERSION_KEY: &[u8] = b"version";
 pub const CODE_KEY: &[u8] = b"router_code";
-// TODO: estimate gas
-pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(0);
-pub const INITIALIZE_GAS: NearGas = NearGas::new(0);
+pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(5_000_000_000_000);
+pub const INITIALIZE_GAS: NearGas = NearGas::new(5_000_000_000_000);
+/// Amount of NEAR needed to cover storage for a router contract.
+pub const STORAGE_AMOUNT: Yocto = Yocto::new(5_000_000_000_000_000_000_000_000);
 
 /// Type wrapper for version of router contracts.
 #[derive(
@@ -66,6 +67,9 @@ pub fn handle_precomile_promise<I, P>(
             let mut promise_actions = Vec::with_capacity(4);
             if create_needed {
                 promise_actions.push(PromiseAction::CreateAccount);
+                promise_actions.push(PromiseAction::Transfer {
+                    amount: STORAGE_AMOUNT,
+                });
             }
             promise_actions.push(PromiseAction::DeployConotract {
                 code: get_router_code(io).0,
@@ -73,7 +77,6 @@ pub fn handle_precomile_promise<I, P>(
             // After a deploy we call the contract's initialize function
             promise_actions.push(PromiseAction::FunctionCall {
                 name: "initialize".into(),
-                // TODO: initialize args?
                 args: Vec::new(),
                 attached_yocto: ZERO_YOCTO,
                 gas: INITIALIZE_GAS,
