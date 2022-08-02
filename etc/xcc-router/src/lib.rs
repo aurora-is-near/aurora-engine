@@ -2,24 +2,28 @@ use aurora_engine_types::parameters::{PromiseArgs, PromiseCreateArgs, PromiseWit
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LazyOption, LookupMap};
 use near_sdk::json_types::U64;
+use near_sdk::BorshStorageKey;
 use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault, PromiseIndex};
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests;
 
-const VERSION_PREFIX: &[u8] = &[0x00];
-const PARENT_PREFIX: &[u8] = &[0x01];
-const NONCE_PREFIX: &[u8] = &[0x02];
-const MAP_PREFIX: &[u8] = &[0x03];
+#[derive(BorshSerialize, BorshStorageKey)]
+enum StorageKey {
+    Version,
+    Parent,
+    Nonce,
+    Map,
+}
 
 const CURRENT_VERSION: u32 = 0;
 
-const ERR_ILLEGAL_CALLER: &[u8] = b"ERR_ILLEGAL_CALLER";
+const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-struct Router {
+pub struct Router {
     /// The account id of the Aurora Engine instance that controls this router.
     parent: LazyOption<AccountId>,
     /// The version of the router contract that was last deployed
@@ -43,27 +47,27 @@ impl Router {
         // a new version of it, again the Deploy and Initialize actions will be done in a single batch
         // by the engine.
         let caller = env::predecessor_account_id();
-        let mut parent = LazyOption::new(PARENT_PREFIX, None);
+        let mut parent = LazyOption::new(StorageKey::Parent, None);
         match parent.get() {
             None => {
                 parent.set(&caller);
             }
             Some(parent) => {
                 if caller != parent {
-                    env::panic(ERR_ILLEGAL_CALLER);
+                    env::panic_str(ERR_ILLEGAL_CALLER);
                 }
             }
         }
 
-        let mut version = LazyOption::new(VERSION_PREFIX, None);
+        let mut version = LazyOption::new(StorageKey::Version, None);
         if version.get().unwrap_or_default() != CURRENT_VERSION {
             // Future migrations would go here
 
             version.set(&CURRENT_VERSION);
         }
 
-        let nonce = LazyOption::new(NONCE_PREFIX, None);
-        let scheduled_promises = LookupMap::new(MAP_PREFIX);
+        let nonce = LazyOption::new(StorageKey::Nonce, None);
+        let scheduled_promises = LookupMap::new(StorageKey::Map);
         Self {
             parent,
             version,
@@ -92,7 +96,7 @@ impl Router {
         self.scheduled_promises.insert(&nonce, &promise);
         self.nonce.set(&(nonce + 1));
 
-        env::log(format!("Promise scheduled at nonce {}", nonce).as_bytes());
+        near_sdk::log!("Promise scheduled at nonce {}", nonce);
     }
 
     /// It is intentional that this function can be called by anyone (not just the parent).
@@ -102,7 +106,7 @@ impl Router {
     pub fn execute_scheduled(&mut self, nonce: U64) {
         let promise = match self.scheduled_promises.remove(&nonce.0) {
             Some(promise) => promise,
-            None => env::panic(b"ERR_PROMISE_NOT_FOUND"),
+            None => env::panic_str("ERR_PROMISE_NOT_FOUND"),
         };
 
         let promise_id = Router::promise_create(promise);
@@ -116,9 +120,9 @@ impl Router {
         let parent = self
             .parent
             .get()
-            .unwrap_or_else(|| env::panic(b"ERR_CONTRACT_NOT_INITIALIZED"));
+            .unwrap_or_else(|| env::panic_str("ERR_CONTRACT_NOT_INITIALIZED"));
         if caller != parent {
-            env::panic(ERR_ILLEGAL_CALLER)
+            env::panic_str(ERR_ILLEGAL_CALLER)
         }
     }
 
@@ -132,23 +136,24 @@ impl Router {
     fn cb_promise_create(promise: PromiseWithCallbackArgs) -> PromiseIndex {
         let base = Self::base_promise_create(promise.base);
         let promise = promise.callback;
+
         env::promise_then(
             base,
-            promise.target_account_id.to_string(),
-            promise.method.as_bytes(),
+            near_sdk::AccountId::new_unchecked(promise.target_account_id.to_string()),
+            promise.method.as_str(),
             &promise.args,
             promise.attached_balance.as_u128(),
-            promise.attached_gas.as_u64(),
+            promise.attached_gas.as_u64().into(),
         )
     }
 
     fn base_promise_create(promise: PromiseCreateArgs) -> PromiseIndex {
         env::promise_create(
-            promise.target_account_id.to_string(),
-            promise.method.as_bytes(),
+            near_sdk::AccountId::new_unchecked(promise.target_account_id.to_string()),
+            promise.method.as_str(),
             &promise.args,
             promise.attached_balance.as_u128(),
-            promise.attached_gas.as_u64(),
+            promise.attached_gas.as_u64().into(),
         )
     }
 }

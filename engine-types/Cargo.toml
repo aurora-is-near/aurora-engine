@@ -13,7 +13,7 @@ publish = false
 autobenches = false
 
 [dependencies]
-borsh = { version = "0.8.2", default-features = false }
+borsh = { version = "0.9", default-features = false }
 ethabi = { version = "17.1", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.11", default-features = false, features = ["rlp"] }
