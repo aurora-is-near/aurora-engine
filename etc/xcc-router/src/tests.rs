@@ -36,7 +36,7 @@ fn test_reinitialize_wrong_caller() {
     drop(contract);
 
     testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob().try_into().unwrap())
+        .predecessor_account_id(bob())
         .build());
     let _contract = Router::initialize();
 }
@@ -55,7 +55,7 @@ fn test_execute_wrong_caller() {
     };
 
     testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob().try_into().unwrap())
+        .predecessor_account_id(bob())
         .build());
     contract.execute(PromiseArgs::Create(promise));
 }
@@ -131,7 +131,7 @@ fn test_schedule_wrong_caller() {
     };
 
     testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob().try_into().unwrap())
+        .predecessor_account_id(bob())
         .build());
     contract.schedule(PromiseArgs::Create(promise));
 }
@@ -165,7 +165,7 @@ fn test_schedule_and_execute() {
     // promise executed after calling `execute_scheduled`
     // anyone can call this function
     testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob().try_into().unwrap())
+        .predecessor_account_id(bob())
         .build());
     contract.execute_scheduled(0.into());
 
@@ -182,7 +182,7 @@ fn test_schedule_and_execute() {
     validate_function_call_action(&receipt.actions, promise);
 }
 
-fn validate_function_call_action(actions: &Vec<VmAction>, promise: PromiseCreateArgs) {
+fn validate_function_call_action(actions: &[VmAction], promise: PromiseCreateArgs) {
     assert_eq!(actions.len(), 1);
     let action = &actions[0];
 
