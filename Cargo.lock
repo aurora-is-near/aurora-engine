@@ -125,7 +125,7 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
- "borsh 0.8.2",
+ "borsh 0.9.3",
  "byte-slice-cast",
  "ethabi",
  "evm",
@@ -153,7 +153,7 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
  "base64 0.13.0",
- "borsh 0.8.2",
+ "borsh 0.9.3",
  "ethabi",
  "evm",
  "evm-core",
@@ -174,7 +174,7 @@ name = "aurora-engine-sdk"
 version = "1.0.0"
 dependencies = [
  "aurora-engine-types",
- "borsh 0.8.2",
+ "borsh 0.9.3",
  "sha2 0.9.9",
  "sha3 0.9.1",
 ]
@@ -189,7 +189,7 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
- "borsh 0.8.2",
+ "borsh 0.9.3",
  "bstr",
  "byte-slice-cast",
  "criterion",
@@ -235,7 +235,7 @@ dependencies = [
 name = "aurora-engine-types"
 version = "1.0.0"
 dependencies = [
- "borsh 0.8.2",
+ "borsh 0.9.3",
  "bstr",
  "ethabi",
  "hex",
@@ -1161,7 +1161,7 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
- "borsh 0.8.2",
+ "borsh 0.9.3",
  "evm-core",
  "postgres",
  "rocksdb",
