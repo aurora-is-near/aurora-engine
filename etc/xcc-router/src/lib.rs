@@ -96,7 +96,7 @@ impl Router {
         self.scheduled_promises.insert(&nonce, &promise);
         self.nonce.set(&(nonce + 1));
 
-        env::log_str(format!("Promise scheduled at nonce {}", nonce).as_str());
+        near_sdk::log!("Promise scheduled at nonce {}", nonce);
     }
 
     /// It is intentional that this function can be called by anyone (not just the parent).
