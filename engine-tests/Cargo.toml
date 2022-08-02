@@ -22,7 +22,7 @@ aurora-engine-precompiles = { path = "../engine-precompiles", default-features =
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
 engine-standalone-storage = { path = "../engine-standalone-storage" }
 engine-standalone-tracing = { path = "../engine-standalone-tracing" }
-borsh = { version = "0.8.2", default-features = false }
+borsh = { version = "0.9.3", default-features = false }
 sha3 = { version = "0.10.2", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false, features = ["std", "tracing"] }
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false, features = ["std", "tracing"] }
@@ -35,8 +35,8 @@ ethabi = "17.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hex = { version = "0.4.3", default-features = false }
-near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07" }
-near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07" }
+near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "7a3fa3fbff84b712050370d840297df38c925d2d" }
+near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "7a3fa3fbff84b712050370d840297df38c925d2d" }
 near-crypto = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda" }
 near-vm-runner = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda", default-features = false, features = [ "wasmer2_vm", "protocol_feature_alt_bn128" ] }
 near-vm-logic = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda", default-features = false, features = [ "protocol_feature_alt_bn128" ] }

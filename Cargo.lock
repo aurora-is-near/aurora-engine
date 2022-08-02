@@ -25,12 +25,6 @@ checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
 name = "ahash"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
-
-[[package]]
-name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
@@ -113,7 +107,7 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
- "borsh 0.8.2",
+ "borsh",
  "byte-slice-cast",
  "ethabi",
  "evm",
@@ -132,7 +126,7 @@ version = "1.0.0"
 dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
- "borsh 0.8.2",
+ "borsh",
  "ethabi",
  "evm",
  "hex",
@@ -152,7 +146,7 @@ name = "aurora-engine-sdk"
 version = "1.0.0"
 dependencies = [
  "aurora-engine-types",
- "borsh 0.8.2",
+ "borsh",
  "sha2 0.10.2",
  "sha3 0.10.2",
 ]
@@ -167,7 +161,7 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
- "borsh 0.8.2",
+ "borsh",
  "bstr",
  "byte-slice-cast",
  "criterion",
@@ -213,7 +207,7 @@ dependencies = [
 name = "aurora-engine-types"
 version = "1.0.0"
 dependencies = [
- "borsh 0.8.2",
+ "borsh",
  "hex",
  "primitive-types 0.11.1",
  "rand 0.7.3",
@@ -376,35 +370,12 @@ checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
 name = "borsh"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09a7111f797cc721407885a323fb071636aee57f750b1a4ddc27397eba168a74"
-dependencies = [
- "borsh-derive 0.8.2",
- "hashbrown 0.9.1",
-]
-
-[[package]]
-name = "borsh"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15bf3650200d8bffa99015595e10f1fbd17de07abbc25bb067da79e769939bfa"
 dependencies = [
- "borsh-derive 0.9.3",
+ "borsh-derive",
  "hashbrown 0.11.2",
-]
-
-[[package]]
-name = "borsh-derive"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "307f3740906bac2c118a8122fe22681232b244f1369273e45f1156b45c43d2dd"
-dependencies = [
- "borsh-derive-internal 0.8.2",
- "borsh-schema-derive-internal 0.8.2",
- "proc-macro-crate 0.1.5",
- "proc-macro2",
- "syn",
 ]
 
 [[package]]
@@ -413,21 +384,10 @@ version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6441c552f230375d18e3cc377677914d2ca2b0d36e52129fe15450a2dce46775"
 dependencies = [
- "borsh-derive-internal 0.9.3",
- "borsh-schema-derive-internal 0.9.3",
+ "borsh-derive-internal",
+ "borsh-schema-derive-internal",
  "proc-macro-crate 0.1.5",
  "proc-macro2",
- "syn",
-]
-
-[[package]]
-name = "borsh-derive-internal"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2104c73179359431cc98e016998f2f23bc7a05bc53e79741bcba705f30047bc"
-dependencies = [
- "proc-macro2",
- "quote",
  "syn",
 ]
 
@@ -436,17 +396,6 @@ name = "borsh-derive-internal"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5449c28a7b352f2d1e592a8a28bf139bc71afb0764a14f3c02500935d8c44065"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "borsh-schema-derive-internal"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae29eb8418fcd46f723f8691a2ac06857d31179d33d2f2d91eb13967de97c728"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1114,7 +1063,7 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
- "borsh 0.8.2",
+ "borsh",
  "evm-core",
  "postgres",
  "rocksdb",
@@ -1554,20 +1503,11 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
-dependencies = [
- "ahash 0.4.7",
-]
-
-[[package]]
-name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 dependencies = [
- "ahash 0.7.6",
+ "ahash",
 ]
 
 [[package]]
@@ -1576,7 +1516,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db0d4cf898abf0081f964436dc980e96670a0f36863e4b83aaacdb65c9d7ccc3"
 dependencies = [
- "ahash 0.7.6",
+ "ahash",
 ]
 
 [[package]]
@@ -2135,7 +2075,7 @@ name = "near-account-id"
 version = "0.0.0"
 source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0dbc5812ae7de49f12dda#980bc48dc02878fea1e0dbc5812ae7de49f12dda"
 dependencies = [
- "borsh 0.9.3",
+ "borsh",
  "serde",
 ]
 
@@ -2172,7 +2112,7 @@ source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0db
 dependencies = [
  "arrayref",
  "blake2",
- "borsh 0.9.3",
+ "borsh",
  "bs58",
  "c2-chacha",
  "curve25519-dalek",
@@ -2225,7 +2165,7 @@ name = "near-pool"
 version = "0.0.0"
 source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0dbc5812ae7de49f12dda#980bc48dc02878fea1e0dbc5812ae7de49f12dda"
 dependencies = [
- "borsh 0.9.3",
+ "borsh",
  "near-crypto",
  "near-metrics",
  "near-primitives",
@@ -2238,7 +2178,7 @@ name = "near-primitives"
 version = "0.0.0"
 source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0dbc5812ae7de49f12dda#980bc48dc02878fea1e0dbc5812ae7de49f12dda"
 dependencies = [
- "borsh 0.9.3",
+ "borsh",
  "byteorder",
  "bytesize",
  "chrono",
@@ -2267,7 +2207,7 @@ version = "0.0.0"
 source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0dbc5812ae7de49f12dda#980bc48dc02878fea1e0dbc5812ae7de49f12dda"
 dependencies = [
  "base64 0.11.0",
- "borsh 0.9.3",
+ "borsh",
  "bs58",
  "derive_more",
  "near-account-id",
@@ -2300,10 +2240,10 @@ dependencies = [
 [[package]]
 name = "near-sdk"
 version = "3.1.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07#ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=7a3fa3fbff84b712050370d840297df38c925d2d#7a3fa3fbff84b712050370d840297df38c925d2d"
 dependencies = [
  "base64 0.13.0",
- "borsh 0.8.2",
+ "borsh",
  "bs58",
  "near-primitives-core",
  "near-sdk-macros",
@@ -2316,7 +2256,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-core"
 version = "3.1.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07#ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=7a3fa3fbff84b712050370d840297df38c925d2d#7a3fa3fbff84b712050370d840297df38c925d2d"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -2327,7 +2267,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-macros"
 version = "3.1.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07#ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=7a3fa3fbff84b712050370d840297df38c925d2d#7a3fa3fbff84b712050370d840297df38c925d2d"
 dependencies = [
  "near-sdk-core",
  "proc-macro2",
@@ -2338,7 +2278,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-sim"
 version = "3.2.0"
-source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07#ba2eddbfbf4484ac3e44b4c8119bbac4907d6e07"
+source = "git+https://github.com/aurora-is-near/near-sdk-rs.git?rev=7a3fa3fbff84b712050370d840297df38c925d2d#7a3fa3fbff84b712050370d840297df38c925d2d"
 dependencies = [
  "chrono",
  "funty 1.1.0",
@@ -2363,7 +2303,7 @@ name = "near-store"
 version = "0.0.0"
 source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0dbc5812ae7de49f12dda#980bc48dc02878fea1e0dbc5812ae7de49f12dda"
 dependencies = [
- "borsh 0.9.3",
+ "borsh",
  "byteorder",
  "bytesize",
  "derive_more",
@@ -2391,7 +2331,7 @@ name = "near-vm-errors"
 version = "0.0.0"
 source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0dbc5812ae7de49f12dda#980bc48dc02878fea1e0dbc5812ae7de49f12dda"
 dependencies = [
- "borsh 0.9.3",
+ "borsh",
  "near-account-id",
  "near-rpc-error-macro",
  "serde",
@@ -2403,7 +2343,7 @@ version = "0.0.0"
 source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0dbc5812ae7de49f12dda#980bc48dc02878fea1e0dbc5812ae7de49f12dda"
 dependencies = [
  "base64 0.13.0",
- "borsh 0.9.3",
+ "borsh",
  "bs58",
  "byteorder",
  "near-account-id",
@@ -2424,7 +2364,7 @@ version = "0.0.0"
 source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0dbc5812ae7de49f12dda#980bc48dc02878fea1e0dbc5812ae7de49f12dda"
 dependencies = [
  "anyhow",
- "borsh 0.9.3",
+ "borsh",
  "loupe",
  "memoffset",
  "near-cache",
@@ -2469,7 +2409,7 @@ name = "node-runtime"
 version = "0.0.0"
 source = "git+https://github.com/birchmd/nearcore.git?rev=980bc48dc02878fea1e0dbc5812ae7de49f12dda#980bc48dc02878fea1e0dbc5812ae7de49f12dda"
 dependencies = [
- "borsh 0.9.3",
+ "borsh",
  "byteorder",
  "hex",
  "near-chain-configs",
@@ -4505,7 +4445,7 @@ checksum = "5a3fac37da3c625e98708c5dd92d3f642aaf700fd077168d3d0fff277ec6a165"
 dependencies = [
  "bincode",
  "blake3",
- "borsh 0.9.3",
+ "borsh",
  "cc",
  "digest 0.8.1",
  "errno",
@@ -4548,7 +4488,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f6edd0ba6c0bcf9b279186d4dbe81649dda3e5ef38f586865943de4dcd653f8"
 dependencies = [
  "bincode",
- "borsh 0.9.3",
+ "borsh",
  "byteorder",
  "dynasm",
  "dynasmrt",
