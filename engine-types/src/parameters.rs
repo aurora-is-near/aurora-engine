@@ -10,6 +10,15 @@ pub enum PromiseArgs {
     Callback(PromiseWithCallbackArgs),
 }
 
+impl PromiseArgs {
+    pub fn total_gas(&self) -> NearGas {
+        match self {
+            Self::Create(call) => call.attached_gas,
+            Self::Callback(cb) => cb.base.attached_gas + cb.callback.attached_gas,
+        }
+    }
+}
+
 #[must_use]
 #[derive(Debug, BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq)]
 pub struct PromiseCreateArgs {
