@@ -1393,7 +1393,7 @@ where
                 }
             } else if log.address == cross_contract_call::ADDRESS.raw() {
                 if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
-                    crate::xcc::handle_precomile_promise(io, handler, promise, current_account_id);
+                    crate::xcc::handle_precompile_promise(io, handler, promise, current_account_id);
                 }
                 // do not pass on these "internal logs" to caller
                 None

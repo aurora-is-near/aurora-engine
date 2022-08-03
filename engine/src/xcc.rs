@@ -40,7 +40,7 @@ pub struct AddressVersionUpdateArgs {
     pub version: CodeVersion,
 }
 
-pub fn handle_precomile_promise<I, P>(
+pub fn handle_precompile_promise<I, P>(
     io: &I,
     handler: &mut P,
     promise: PromiseCreateArgs,
