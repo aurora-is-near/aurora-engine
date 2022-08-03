@@ -51,6 +51,17 @@ pub fn handle_precompile_promise<I, P>(
 {
     let target_account: &str = promise.target_account_id.as_ref();
     let sender = Address::decode(&target_account[0..40]).expect(ERR_INVALID_ACCOUNT);
+
+    // Confirm target_account is of the form `{address}.{aurora}`
+    // Address prefix parsed above, so only need to check `.{aurora}`
+    assert_eq!(&target_account[40..41], ".", "{}", ERR_INVALID_ACCOUNT);
+    assert_eq!(
+        &target_account[41..],
+        current_account_id.as_ref(),
+        "{}",
+        ERR_INVALID_ACCOUNT
+    );
+
     let latest_code_version = get_latest_code_version(io);
     let sender_code_version = get_code_version_of_address(io, &sender);
     let deploy_needed = match sender_code_version {
