@@ -16,7 +16,7 @@ pub const CODE_KEY: &[u8] = b"router_code";
 pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(5_000_000_000_000);
 pub const INITIALIZE_GAS: NearGas = NearGas::new(5_000_000_000_000);
 /// Amount of NEAR needed to cover storage for a router contract.
-pub const STORAGE_AMOUNT: Yocto = Yocto::new(5_000_000_000_000_000_000_000_000);
+pub const STORAGE_AMOUNT: Yocto = Yocto::new(4_000_000_000_000_000_000_000_000);
 
 /// Type wrapper for version of router contracts.
 #[derive(
