@@ -17,7 +17,7 @@ enum StorageKey {
     Map,
 }
 
-const CURRENT_VERSION: u32 = 0;
+const CURRENT_VERSION: u32 = 1;
 
 const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
 
