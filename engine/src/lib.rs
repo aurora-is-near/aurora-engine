@@ -328,7 +328,7 @@ mod contract {
         let state = engine::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let bytes = io.read_input().to_vec();
-        let router_bytecode = crate::xcc::RouterCode(bytes);
+        let router_bytecode = crate::xcc::RouterCode::new(bytes);
         crate::xcc::update_router_code(&mut io, &router_bytecode);
     }
 

@@ -5,6 +5,7 @@ use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, Yocto, ZERO_YOCTO};
+use aurora_engine_types::Cow;
 use aurora_engine_types::Vec;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -33,7 +34,17 @@ impl CodeVersion {
 
 /// Type wrapper for router bytecode.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RouterCode(pub Vec<u8>);
+pub struct RouterCode<'a>(pub Cow<'a, [u8]>);
+
+impl<'a> RouterCode<'a> {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self(Cow::Owned(bytes))
+    }
+
+    pub fn borrowed(bytes: &'a [u8]) -> Self {
+        Self(Cow::Borrowed(bytes))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
 pub struct AddressVersionUpdateArgs {
@@ -91,7 +102,7 @@ pub fn handle_precompile_promise<I, P>(
                 });
             }
             promise_actions.push(PromiseAction::DeployConotract {
-                code: get_router_code(io).0,
+                code: get_router_code(io).0.into_owned(),
             });
             // After a deploy we call the contract's initialize function
             promise_actions.push(PromiseAction::FunctionCall {
@@ -136,7 +147,7 @@ pub fn handle_precompile_promise<I, P>(
 pub fn get_router_code<I: IO>(io: &I) -> RouterCode {
     let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, CODE_KEY);
     let bytes = io.read_storage(&key).expect(ERR_NO_ROUTER_CODE).to_vec();
-    RouterCode(bytes)
+    RouterCode::new(bytes)
 }
 
 /// Set new router bytecode, and update increment the version by 1.
