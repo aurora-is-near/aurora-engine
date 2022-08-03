@@ -11,6 +11,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 pub const ERR_NO_ROUTER_CODE: &str = "ERR_MISSING_XCC_BYTECODE";
 pub const ERR_CORRUPTED_STORAGE: &str = "ERR_CORRUPTED_XCC_STORAGE";
 pub const ERR_INVALID_ACCOUNT: &str = "ERR_INVALID_XCC_ACCOUNT";
+pub const ERR_ATTACHED_NEAR: &str = "ERR_ATTACHED_XCC_NEAR";
 pub const VERSION_KEY: &[u8] = b"version";
 pub const CODE_KEY: &[u8] = b"router_code";
 pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(5_000_000_000_000);
@@ -60,6 +61,13 @@ pub fn handle_precompile_promise<I, P>(
         current_account_id.as_ref(),
         "{}",
         ERR_INVALID_ACCOUNT
+    );
+    // Confirm there is 0 NEAR attached to the promise
+    // (the precompile should not drain the engine's balance).
+    assert_eq!(
+        promise.attached_balance, ZERO_YOCTO,
+        "{}",
+        ERR_ATTACHED_NEAR
     );
 
     let latest_code_version = get_latest_code_version(io);
