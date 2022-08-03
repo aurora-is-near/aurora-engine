@@ -85,7 +85,6 @@ impl<I: IO> Precompile for CrossContractCall<I> {
 
         let sender = context.caller;
         let target_account_id = create_target_account_id(sender, self.engine_account_id.as_ref());
-        // TODO: Is it ok to use Borsh to read the input? It might not be very friendly to construct the input in Solidity...
         let args = CrossContractCallArgs::try_from_slice(input)
             .map_err(|_| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?;
         let promise = match args {
