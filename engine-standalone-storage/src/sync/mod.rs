@@ -1,4 +1,4 @@
-use aurora_engine::{connector, engine, parameters::SubmitResult};
+use aurora_engine::{connector, engine, parameters::SubmitResult, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::{
     account_id::AccountId,
@@ -366,6 +366,17 @@ fn non_submit_execute<'db>(
         }
         TransactionKind::NewEngine(args) => {
             engine::set_state(&mut io, args.clone().into());
+
+            None
+        }
+        TransactionKind::FactoryUpdate(bytecode) => {
+            let router_bytecode = xcc::RouterCode::borrowed(bytecode);
+            xcc::update_router_code(&mut io, &router_bytecode);
+
+            None
+        }
+        TransactionKind::FactoryUpdateAddressVersion(args) => {
+            xcc::set_code_version_of_address(&mut io, &args.address, args.version);
 
             None
         }
