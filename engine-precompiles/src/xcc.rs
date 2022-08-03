@@ -16,13 +16,6 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::Log;
 use evm_core::ExitError;
 
-const ERR_INVALID_INPUT: &str = "ERR_INVALID_XCC_INPUT";
-const ERR_SERIALIZE: &str = "ERR_XCC_CALL_SERIALIZE";
-const ERR_STATIC: &str = "ERR_INVALID_IN_STATIC";
-const ERR_DELEGATE: &str = "ERR_INVALID_IN_DELEGATE";
-const ROUTER_EXEC_NAME: &str = "execute";
-const ROUTER_SCHEDULE_NAME: &str = "schedule";
-
 pub mod costs {
     use crate::prelude::types::{EthGas, NearGas};
 
@@ -31,6 +24,15 @@ pub mod costs {
 
     pub const ROUTER_EXEC: NearGas = NearGas::new(7_000_000_000_000);
     pub const ROUTER_SCHEDULE: NearGas = NearGas::new(5_000_000_000_000);
+}
+
+mod consts {
+    pub(super) const ERR_INVALID_INPUT: &str = "ERR_INVALID_XCC_INPUT";
+    pub(super) const ERR_SERIALIZE: &str = "ERR_XCC_CALL_SERIALIZE";
+    pub(super) const ERR_STATIC: &str = "ERR_INVALID_IN_STATIC";
+    pub(super) const ERR_DELEGATE: &str = "ERR_INVALID_IN_DELEGATE";
+    pub(super) const ROUTER_EXEC_NAME: &str = "execute";
+    pub(super) const ROUTER_SCHEDULE_NAME: &str = "schedule";
 }
 
 pub struct CrossContractCall<I> {
@@ -78,34 +80,34 @@ impl<I: IO> Precompile for CrossContractCall<I> {
 
         // It's not allowed to call cross contract call precompile in static or delegate mode
         if is_static {
-            return Err(ExitError::Other(Cow::from(ERR_STATIC)));
+            return Err(ExitError::Other(Cow::from(consts::ERR_STATIC)));
         } else if context.address != cross_contract_call::ADDRESS.raw() {
-            return Err(ExitError::Other(Cow::from(ERR_DELEGATE)));
+            return Err(ExitError::Other(Cow::from(consts::ERR_DELEGATE)));
         }
 
         let sender = context.caller;
         let target_account_id = create_target_account_id(sender, self.engine_account_id.as_ref());
         let args = CrossContractCallArgs::try_from_slice(input)
-            .map_err(|_| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?;
+            .map_err(|_| ExitError::Other(Cow::from(consts::ERR_INVALID_INPUT)))?;
         let promise = match args {
             CrossContractCallArgs::Eager(call) => {
                 let call_gas = call.total_gas();
                 PromiseCreateArgs {
                     target_account_id,
-                    method: ROUTER_EXEC_NAME.into(),
+                    method: consts::ROUTER_EXEC_NAME.into(),
                     args: call
                         .try_to_vec()
-                        .map_err(|_| ExitError::Other(Cow::from(ERR_SERIALIZE)))?,
+                        .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,
                     attached_gas: costs::ROUTER_EXEC + call_gas,
                 }
             }
             CrossContractCallArgs::Delayed(call) => PromiseCreateArgs {
                 target_account_id,
-                method: ROUTER_SCHEDULE_NAME.into(),
+                method: consts::ROUTER_SCHEDULE_NAME.into(),
                 args: call
                     .try_to_vec()
-                    .map_err(|_| ExitError::Other(Cow::from(ERR_SERIALIZE)))?,
+                    .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                 attached_balance: ZERO_YOCTO,
                 // We don't need to add any gas to the amount need for the schedule call
                 // since the promise is not executed right away.
@@ -118,7 +120,7 @@ impl<I: IO> Precompile for CrossContractCall<I> {
             topics: Vec::new(),
             data: promise
                 .try_to_vec()
-                .map_err(|_| ExitError::Other(Cow::from(ERR_SERIALIZE)))?,
+                .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
         };
 
         Ok(PrecompileOutput {
