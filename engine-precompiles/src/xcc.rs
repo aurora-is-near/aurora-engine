@@ -8,7 +8,7 @@ use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{
     account_id::AccountId,
     format,
-    parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
+    parameters::{CrossContractCallArgs, PromiseCreateArgs},
     types::{balance::ZERO_YOCTO, EthGas},
     vec, Cow, Vec, H160,
 };
@@ -89,10 +89,7 @@ impl<I: IO> Precompile for CrossContractCall<I> {
             .map_err(|_| ExitError::Other(Cow::from(ERR_INVALID_INPUT)))?;
         let promise = match args {
             CrossContractCallArgs::Eager(call) => {
-                let call_gas = match &call {
-                    PromiseArgs::Create(call) => call.attached_gas,
-                    PromiseArgs::Callback(cb) => cb.base.attached_gas + cb.callback.attached_gas,
-                };
+                let call_gas = call.total_gas();
                 PromiseCreateArgs {
                     target_account_id,
                     method: ROUTER_EXEC_NAME.into(),
