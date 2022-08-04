@@ -20,12 +20,25 @@ pub mod costs {
     use crate::prelude::types::{EthGas, NearGas};
 
     /// Base EVM gas cost for calling this precompile.
+    /// Value obtained from the following methodology:
+    /// 1. Estimate the cost of calling this precompile in terms of NEAR gas.
+    ///    This is done by calling the precompile with inputs of different lengths
+    ///    and performing a linear regression to obtain a function
+    ///    `NEAR_gas = CROSS_CONTRACT_CALL_BASE + (input_length) * (CROSS_CONTRACT_CALL_BYTE)`.
+    /// 2. Convert the NEAR gas cost into an EVM gas cost using the conversion ratio below
+    ///    (`CROSS_CONTRACT_CALL_NEAR_GAS`).
+    ///
+    /// This process is done in the `test_xcc_eth_gas_cost` test in
+    /// `engine-tests/src/tests/xcc.rs`.
     pub const CROSS_CONTRACT_CALL_BASE: EthGas = EthGas::new(115_000);
     /// Additional EVM gas cost per bytes of input given.
+    /// See `CROSS_CONTRACT_CALL_BASE` for estimation methodology.
     pub const CROSS_CONTRACT_CALL_BYTE: EthGas = EthGas::new(2);
     /// EVM gas cost per NEAR gas attached to the created promise.
-    /// Derived from the gas report https://hackmd.io/@birchmd/Sy4piXQ29
-    /// The units on this quantity are `NEAR Gas / EVM Gas`
+    /// This value is derived from the gas report https://hackmd.io/@birchmd/Sy4piXQ29
+    /// The units on this quantity are `NEAR Gas / EVM Gas`.
+    /// The report gives a value `0.175 T(NEAR_gas) / k(EVM_gas)`. To convert the units to
+    /// `NEAR Gas / EVM Gas`, we simply multiply `0.175 * 10^12 / 10^3 = 175 * 10^6`.
     pub const CROSS_CONTRACT_CALL_NEAR_GAS: u64 = 175_000_000;
 
     pub const ROUTER_EXEC: NearGas = NearGas::new(7_000_000_000_000);
