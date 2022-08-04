@@ -19,8 +19,14 @@ use evm_core::ExitError;
 pub mod costs {
     use crate::prelude::types::{EthGas, NearGas};
 
-    // TODO(#483): Determine the correct amount of gas
-    pub(super) const CROSS_CONTRACT_CALL: EthGas = EthGas::new(0);
+    /// Base EVM gas cost for calling this precompile.
+    pub const CROSS_CONTRACT_CALL_BASE: EthGas = EthGas::new(115_000);
+    /// Additional EVM gas cost per bytes of input given.
+    pub const CROSS_CONTRACT_CALL_BYTE: EthGas = EthGas::new(2);
+    /// EVM gas cost per NEAR gas attached to the created promise.
+    /// Derived from the gas report https://hackmd.io/@birchmd/Sy4piXQ29
+    /// The units on this quantity are `NEAR Gas / EVM Gas`
+    pub const CROSS_CONTRACT_CALL_NEAR_GAS: u64 = 175_000_000;
 
     pub const ROUTER_EXEC: NearGas = NearGas::new(7_000_000_000_000);
     pub const ROUTER_SCHEDULE: NearGas = NearGas::new(5_000_000_000_000);
@@ -61,8 +67,10 @@ pub mod cross_contract_call {
 }
 
 impl<I: IO> Precompile for CrossContractCall<I> {
-    fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
-        Ok(costs::CROSS_CONTRACT_CALL)
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
+        // This only includes the cost we can easily derive without parsing the input.
+        // The other cost is added in later to avoid parsing the input more than once.
+        Ok(costs::CROSS_CONTRACT_CALL_BASE + costs::CROSS_CONTRACT_CALL_BYTE * input.len())
     }
 
     fn run(
@@ -72,11 +80,16 @@ impl<I: IO> Precompile for CrossContractCall<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        if let Some(target_gas) = target_gas {
-            if Self::required_gas(input)? > target_gas {
-                return Err(ExitError::OutOfGas);
+        let mut cost = Self::required_gas(input)?;
+        let check_cost = |cost: EthGas| -> Result<(), ExitError> {
+            if let Some(target_gas) = target_gas {
+                if cost > target_gas {
+                    return Err(ExitError::OutOfGas);
+                }
             }
-        }
+            Ok(())
+        };
+        check_cost(cost)?;
 
         // It's not allowed to call cross contract call precompile in static or delegate mode
         if is_static {
@@ -114,6 +127,8 @@ impl<I: IO> Precompile for CrossContractCall<I> {
                 attached_gas: costs::ROUTER_SCHEDULE,
             },
         };
+        cost += EthGas::new(promise.attached_gas.as_u64() / costs::CROSS_CONTRACT_CALL_NEAR_GAS);
+        check_cost(cost)?;
 
         let promise_log = Log {
             address: cross_contract_call::ADDRESS.raw(),
@@ -125,6 +140,7 @@ impl<I: IO> Precompile for CrossContractCall<I> {
 
         Ok(PrecompileOutput {
             logs: vec![promise_log],
+            cost,
             ..Default::default()
         }
         .into())

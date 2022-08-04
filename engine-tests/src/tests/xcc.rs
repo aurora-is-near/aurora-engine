@@ -3,13 +3,104 @@ use crate::tests::erc20_connector::sim_tests;
 use crate::tests::state_migration::deploy_evm;
 use aurora_engine_precompiles::xcc::{costs, cross_contract_call};
 use aurora_engine_transactions::legacy::TransactionLegacy;
-use aurora_engine_types::parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs};
-use aurora_engine_types::types::{NearGas, Wei, Yocto};
+use aurora_engine_types::parameters::{
+    CrossContractCallArgs, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
+};
+use aurora_engine_types::types::{Address, EthGas, NearGas, Wei, Yocto};
+use aurora_engine_types::U256;
 use borsh::BorshSerialize;
 use near_primitives::transaction::Action;
 use near_primitives_core::contract::ContractCode;
 use std::fs;
 use std::path::Path;
+
+#[test]
+fn test_xcc_eth_gas_cost() {
+    let mut runner = test_utils::deploy_evm();
+    runner.standalone_runner = None;
+    let xcc_wasm_bytes = contract_bytes();
+    let _ = runner.call("factory_update", "aurora", xcc_wasm_bytes);
+    let mut signer = test_utils::Signer::random();
+    runner.context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+
+    // Baseline transaction that does essentially nothing.
+    let (_, baseline) = runner
+        .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {
+            nonce,
+            gas_price: U256::zero(),
+            gas_limit: u64::MAX.into(),
+            to: Some(Address::from_array([0; 20])),
+            value: Wei::zero(),
+            data: Vec::new(),
+        })
+        .unwrap();
+
+    let mut profile_for_promise = |p: PromiseArgs| -> (u64, u64) {
+        let data = CrossContractCallArgs::Eager(p).try_to_vec().unwrap();
+        let input_length = data.len();
+        let (_, profile) = runner
+            .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {
+                nonce,
+                gas_price: U256::zero(),
+                gas_limit: u64::MAX.into(),
+                to: Some(cross_contract_call::ADDRESS),
+                value: Wei::zero(),
+                data,
+            })
+            .unwrap();
+        // Subtract off baseline transaction to isolate just precompile things
+        (
+            u64::try_from(input_length).unwrap(),
+            profile.all_gas() - baseline.all_gas(),
+        )
+    };
+
+    let promise = PromiseCreateArgs {
+        target_account_id: "some_account.near".parse().unwrap(),
+        method: "some_method".into(),
+        args: b"hello_world".to_vec(),
+        attached_balance: Yocto::new(56),
+        attached_gas: NearGas::new(0),
+    };
+    // Shorter input
+    let (x1, y1) = profile_for_promise(PromiseArgs::Create(promise.clone()));
+    // longer input
+    let (x2, y2) = profile_for_promise(PromiseArgs::Callback(PromiseWithCallbackArgs {
+        base: promise.clone(),
+        callback: promise,
+    }));
+
+    // NEAR costs (inferred from a line through (x1, y1) and (x2, y2))
+    let xcc_cost_per_byte = (y2 - y1) / (x2 - x1);
+    let xcc_base_cost = NearGas::new(y1 - xcc_cost_per_byte * x1);
+
+    // Convert to EVM cost using conversion ratio
+    let xcc_base_cost = EthGas::new(xcc_base_cost.as_u64() / costs::CROSS_CONTRACT_CALL_NEAR_GAS);
+    let xcc_cost_per_byte = xcc_cost_per_byte / costs::CROSS_CONTRACT_CALL_NEAR_GAS;
+
+    let within_5_percent = |a: u64, b: u64| -> bool {
+        let x = a.max(b);
+        let y = a.min(b);
+
+        (x - y) <= (x / 20)
+    };
+    assert!(
+        within_5_percent(
+            xcc_base_cost.as_u64(),
+            costs::CROSS_CONTRACT_CALL_BASE.as_u64()
+        ),
+        "Incorrect xcc base cost. Expected: {} Actual: {}",
+        xcc_base_cost,
+        costs::CROSS_CONTRACT_CALL_BASE
+    );
+
+    assert!(
+        within_5_percent(xcc_cost_per_byte, costs::CROSS_CONTRACT_CALL_BYTE.as_u64()),
+        "Incorrect xcc per byte cost. Expected: {} Actual: {}",
+        xcc_cost_per_byte,
+        costs::CROSS_CONTRACT_CALL_BYTE
+    );
+}
 
 #[test]
 fn test_xcc_precompile_eager() {
