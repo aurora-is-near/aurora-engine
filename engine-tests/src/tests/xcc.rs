@@ -82,7 +82,7 @@ fn test_xcc_eth_gas_cost() {
         let x = a.max(b);
         let y = a.min(b);
 
-        (x - y) <= (x / 20)
+        20 * (x - y) <= x
     };
     assert!(
         within_5_percent(
