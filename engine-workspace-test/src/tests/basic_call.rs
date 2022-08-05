@@ -3,11 +3,11 @@ use workspaces::Worker;
 use workspaces::network::Sandbox;
 use workspaces::Contract;
 
-use crate::test_utils::engine::start_engine;
+use crate::test_utils::deploy_evm;
 
 #[tokio::test]
 async fn get_version() -> anyhow::Result<()> {
-    let (worker, contract): (Worker<Sandbox>, Contract) = start_engine().await?;
+    let (worker, contract): (Worker<Sandbox>, Contract) = deploy_evm().await?;
 
     let outcome = contract
         .call(&worker, "get_version")
@@ -25,7 +25,7 @@ async fn get_version() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test() -> anyhow::Result<()> {
-    let (worker, contract): (Worker<Sandbox>, Contract) = start_engine().await?;
+    let (worker, contract): (Worker<Sandbox>, Contract) = deploy_evm().await?;
     
     println!("get_version outcome: {:#?}", contract);
 
