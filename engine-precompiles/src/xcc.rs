@@ -83,7 +83,8 @@ impl<I: IO> Precompile for CrossContractCall<I> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         // This only includes the cost we can easily derive without parsing the input.
         // The other cost is added in later to avoid parsing the input more than once.
-        Ok(costs::CROSS_CONTRACT_CALL_BASE + costs::CROSS_CONTRACT_CALL_BYTE * input.len())
+        let input_len = u64::try_from(input.len()).map_err(crate::utils::err_usize_conv)?;
+        Ok(costs::CROSS_CONTRACT_CALL_BASE + costs::CROSS_CONTRACT_CALL_BYTE * input_len)
     }
 
     fn run(
@@ -155,8 +156,7 @@ impl<I: IO> Precompile for CrossContractCall<I> {
             logs: vec![promise_log],
             cost,
             ..Default::default()
-        }
-        .into())
+        })
     }
 }
 
