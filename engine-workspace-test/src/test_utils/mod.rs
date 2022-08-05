@@ -77,6 +77,23 @@ impl Signer {
     }
 }
 
+pub(crate) struct AuroraWorkspaceRunner {
+    pub aurora_account_id: String,
+    pub chain_id: u64,
+    pub code: ContractCode,
+    pub cache: MockCompiledContractCache,
+    //pub ext: mocked_external::MockedExternalWithTrie,
+    pub context: VMContext,
+    pub wasm_config: VMConfig,
+    pub fees_config: RuntimeFeesConfig,
+    pub current_protocol_version: u32,
+    pub previous_logs: Vec<String>,
+    // Use the standalone in parallel if set. This allows checking both
+    // implementations give the same results.
+    //pub standalone_runner: Option<standalone::StandaloneRunner>,
+}
+
+
 
 
 
@@ -300,6 +317,7 @@ pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
     submit_result.gas_used
 }
 
+/* 
 pub(crate) fn validate_address_balance_and_nonce(
     runner: &AuroraRunner,
     address: Address,
@@ -309,6 +327,7 @@ pub(crate) fn validate_address_balance_and_nonce(
     assert_eq!(runner.get_balance(address), expected_balance, "balance");
     assert_eq!(runner.get_nonce(address), expected_nonce, "nonce");
 }
+*/
 
 pub(crate) fn address_from_hex(address: &str) -> Address {
     let bytes = if address.starts_with("0x") {
