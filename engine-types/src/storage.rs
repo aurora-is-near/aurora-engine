@@ -46,6 +46,7 @@ impl From<KeyPrefix> for u8 {
             Generation => 0x7,
             Nep141Erc20Map => 0x8,
             Erc20Nep141Map => 0x9,
+            CrossContractCall => 0xa,
         }
     }
 }
