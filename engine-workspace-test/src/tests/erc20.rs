@@ -79,28 +79,3 @@ async fn erc20_deploy() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn initialize_erc20() -> (test_utils::AuroraRunner, Signer, Address, ERC20) {
-    // set up Aurora runner and accounts
-    let mut runner = test_utils::deploy_evm();
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
-    let source_address = test_utils::address_from_secret_key(&source_account);
-    runner.create_address(
-        source_address,
-        Wei::new_u64(INITIAL_BALANCE),
-        INITIAL_NONCE.into(),
-    );
-    let dest_address = test_utils::address_from_secret_key(&SecretKey::random(&mut rng));
-
-    let mut signer = Signer::new(source_account);
-    signer.nonce = INITIAL_NONCE;
-    let nonce = signer.use_nonce();
-    let constructor = ERC20Constructor::load();
-    let contract = ERC20(runner.deploy_contract(
-        &signer.secret_key,
-        |c| c.deploy("TestToken", "TEST", nonce.into()),
-        constructor,
-    ));
-
-    (runner, signer, dest_address, contract)
-}
