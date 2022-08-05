@@ -52,7 +52,7 @@ fn repro_8ru7VEA() {
         block_timestamp: 1648829935343349589,
         input_path: "src/tests/res/input_8ru7VEA.hex",
         evm_gas_used: 1732181,
-        near_gas_used: 241,
+        near_gas_used: 240,
     });
 }
 
