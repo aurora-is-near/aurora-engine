@@ -11,10 +11,10 @@ use crate::prelude::U256;
 
 const AURORA_WASM_FILEPATH: &str = "../mainnet-release.wasm";
 
-const MAINNET_CHAIN_ID: u32 = 1313161556;
+pub const MAINNET_CHAIN_ID: u32 = 1313161556;
 
 
-pub async fn start_engine() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
+pub async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
     let worker = workspaces::sandbox().await?;
     let wasm = std::fs::read(AURORA_WASM_FILEPATH)?;
     let contract = worker.dev_deploy(&wasm).await?;

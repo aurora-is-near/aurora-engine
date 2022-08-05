@@ -4,4 +4,4 @@ mod basic_call;
 
 //mod eth_connector;
 
-//mod erc20;
+mod erc20;
