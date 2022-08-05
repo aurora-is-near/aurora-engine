@@ -232,6 +232,7 @@ impl evm::tracing::EventListener for CallTracer {
             }
 
             // not useful
+            evm::tracing::Event::PrecompileSubcall { .. } => (),
             evm::tracing::Event::TransactCall { .. } => (),
             evm::tracing::Event::TransactCreate { .. } => (),
             evm::tracing::Event::TransactCreate2 { .. } => (),

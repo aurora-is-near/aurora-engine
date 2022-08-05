@@ -51,7 +51,7 @@ impl Precompile for Identity {
             }
         }
 
-        Ok(PrecompileOutput::without_logs(cost, input.to_vec()).into())
+        Ok(PrecompileOutput::without_logs(cost, input.to_vec()))
     }
 }
 
