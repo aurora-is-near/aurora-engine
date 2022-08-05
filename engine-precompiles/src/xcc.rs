@@ -3,7 +3,7 @@
 //! Allow Aurora users interacting with NEAR smart contracts using cross contract call primitives.
 //! TODO: How they work (low level explanation with examples)
 
-use crate::{Context, EvmPrecompileResult, Precompile, PrecompileOutput};
+use crate::{EvmPrecompileResult, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{
     account_id::AccountId,
@@ -14,6 +14,7 @@ use aurora_engine_types::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::Log;
+use evm::executor::stack::PrecompileHandle;
 use evm_core::ExitError;
 
 pub mod costs {
@@ -79,22 +80,18 @@ pub mod cross_contract_call {
         crate::make_address(0x516cded1, 0xd16af10cad47d6d49128e2eb7d27b372);
 }
 
-impl<I: IO> Precompile for CrossContractCall<I> {
-    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
-        // This only includes the cost we can easily derive without parsing the input.
-        // The other cost is added in later to avoid parsing the input more than once.
-        let input_len = u64::try_from(input.len()).map_err(crate::utils::err_usize_conv)?;
-        Ok(costs::CROSS_CONTRACT_CALL_BASE + costs::CROSS_CONTRACT_CALL_BYTE * input_len)
-    }
+impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
+    fn run_with_handle(&self, handle: &mut impl PrecompileHandle) -> EvmPrecompileResult {
+        let input = handle.input();
+        let target_gas = handle.gas_limit().map(EthGas::new);
+        let context = handle.context();
+        let is_static = handle.is_static();
 
-    fn run(
-        &self,
-        input: &[u8],
-        target_gas: Option<EthGas>,
-        context: &Context,
-        is_static: bool,
-    ) -> EvmPrecompileResult {
-        let mut cost = Self::required_gas(input)?;
+        // This only includes the cost we can easily derive without parsing the input.
+        // This allows failing fast without wasting computation on parsing.
+        let input_len = u64::try_from(input.len()).map_err(crate::utils::err_usize_conv)?;
+        let mut cost =
+            costs::CROSS_CONTRACT_CALL_BASE + costs::CROSS_CONTRACT_CALL_BYTE * input_len;
         let check_cost = |cost: EthGas| -> Result<(), ExitError> {
             if let Some(target_gas) = target_gas {
                 if cost > target_gas {

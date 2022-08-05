@@ -72,6 +72,9 @@ pub trait Precompile {
         is_static: bool,
     ) -> EvmPrecompileResult;
 }
+pub trait HandleBasedPrecompile {
+    fn run_with_handle(&self, handle: &mut impl PrecompileHandle) -> EvmPrecompileResult;
+}
 
 /// Hard fork marker.
 pub trait HardFork {}
@@ -113,6 +116,26 @@ impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a
         handle: &mut impl PrecompileHandle,
     ) -> Option<Result<executor::stack::PrecompileOutput, executor::stack::PrecompileFailure>> {
         let address = handle.code_address();
+
+        // Special case for the xcc precompile since it needs direct access to the handler
+        if address == xcc::cross_contract_call::ADDRESS.raw() {
+            let result = self
+                .cross_contract_call
+                .run_with_handle(handle)
+                .and_then(|output| {
+                    handle.record_cost(output.cost.as_u64())?;
+                    for log in output.logs {
+                        handle.log(log.address, log.topics, log.data)?;
+                    }
+                    Ok(executor::stack::PrecompileOutput {
+                        exit_status: ExitSucceed::Returned,
+                        output: output.output,
+                    })
+                })
+                .map_err(|exit_status| executor::stack::PrecompileFailure::Error { exit_status });
+
+            return Some(result);
+        }
 
         self.precompile_action(Address::new(address), |p| {
             let input = handle.input();
@@ -299,8 +322,6 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             return Some(f(&self.near_exit));
         } else if address == exit_to_ethereum::ADDRESS {
             return Some(f(&self.ethereum_exit));
-        } else if address == xcc::cross_contract_call::ADDRESS {
-            return Some(f(&self.cross_contract_call));
         } else if address == predecessor_account::ADDRESS {
             return Some(f(&self.predecessor_account_id));
         } else if address == prepaid_gas::ADDRESS {
