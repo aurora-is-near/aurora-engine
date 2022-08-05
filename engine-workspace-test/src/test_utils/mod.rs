@@ -37,6 +37,9 @@ pub(crate) const CALL: &str = "call";
 pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
 pub(crate) mod solidity;
 pub(crate) mod erc20;
+pub(crate) mod mocked_external;
+pub(crate) mod standalone;
+pub(crate) mod standard_precompiles;
 /* 
 pub(crate) mod exit_precompile;
 pub(crate) mod mocked_external;
@@ -82,7 +85,7 @@ pub(crate) struct AuroraWorkspaceRunner {
     pub chain_id: u64,
     pub code: ContractCode,
     pub cache: MockCompiledContractCache,
-    //pub ext: mocked_external::MockedExternalWithTrie,
+    pub ext: mocked_external::MockedExternalWithTrie,
     pub context: VMContext,
     pub wasm_config: VMConfig,
     pub fees_config: RuntimeFeesConfig,
@@ -90,9 +93,62 @@ pub(crate) struct AuroraWorkspaceRunner {
     pub previous_logs: Vec<String>,
     // Use the standalone in parallel if set. This allows checking both
     // implementations give the same results.
-    //pub standalone_runner: Option<standalone::StandaloneRunner>,
+    pub standalone_runner: Option<standalone::StandaloneRunner>,
 }
 
+impl AuroraWorkspaceRunner {
+
+}
+
+
+impl Default for AuroraWorkspaceRunner {
+    fn default() -> Self {
+        let aurora_account_id = "aurora".to_string();
+        let evm_wasm_bytes = if cfg!(feature = "mainnet-test") {
+            std::fs::read("../mainnet-test.wasm").unwrap()
+        } else if cfg!(feature = "testnet-test") {
+            std::fs::read("../testnet-test.wasm").unwrap()
+        } else {
+            panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
+        };
+
+        // Fetch config (mainly costs) for the latest protocol version.
+        let runtime_config_store = RuntimeConfigStore::new(None);
+        let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
+        let wasm_config = runtime_config.wasm_config.clone();
+
+        Self {
+            aurora_account_id: aurora_account_id.clone(),
+            chain_id: 1313161556, // NEAR localnet,
+            code: ContractCode::new(evm_wasm_bytes, None),
+            cache: Default::default(),
+            ext: mocked_external::MockedExternalWithTrie::new(Default::default()),
+            context: VMContext {
+                current_account_id: as_account_id(&aurora_account_id),
+                signer_account_id: as_account_id(&aurora_account_id),
+                signer_account_pk: vec![],
+                predecessor_account_id: as_account_id(&aurora_account_id),
+                input: vec![],
+                block_index: 0,
+                block_timestamp: 0,
+                epoch_height: 0,
+                account_balance: 10u128.pow(25),
+                account_locked_balance: 0,
+                storage_usage: 100,
+                attached_deposit: 0,
+                prepaid_gas: 10u64.pow(18),
+                random_seed: vec![],
+                view_config: None,
+                output_data_receivers: vec![],
+            },
+            wasm_config,
+            fees_config: RuntimeFeesConfig::test(),
+            current_protocol_version: u32::MAX,
+            previous_logs: Default::default(),
+            standalone_runner: None,
+        }
+    }
+}
 
 
 
