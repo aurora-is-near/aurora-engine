@@ -25,8 +25,8 @@ mod v0 {
         vec::Vec,
     };
     pub use core::{
-        cmp::Ordering, fmt::Display, marker::PhantomData, mem, ops::Add, ops::Div, ops::Mul,
-        ops::Sub, ops::SubAssign,
+        cmp::Ordering, fmt::Display, marker::PhantomData, mem, ops::Add, ops::AddAssign, ops::Div,
+        ops::Mul, ops::Sub, ops::SubAssign,
     };
     pub use primitive_types::{H160, H256, U256};
 }
