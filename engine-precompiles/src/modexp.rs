@@ -123,7 +123,7 @@ impl Precompile for ModExp<Byzantium> {
         }
 
         let output = Self::run_inner(input)?;
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -163,7 +163,7 @@ impl Precompile for ModExp<Berlin> {
         }
 
         let output = Self::run_inner(input)?;
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

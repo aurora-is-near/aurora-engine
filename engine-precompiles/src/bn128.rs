@@ -124,7 +124,7 @@ impl Precompile for Bn128Add<Byzantium> {
         }
 
         let output = Self::run_inner(input, context)?;
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -152,7 +152,7 @@ impl Precompile for Bn128Add<Istanbul> {
             }
         }
         let output = Self::run_inner(input, context)?;
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -215,7 +215,7 @@ impl Precompile for Bn128Mul<Byzantium> {
         }
 
         let output = Self::run_inner(input, context)?;
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -243,7 +243,7 @@ impl Precompile for Bn128Mul<Istanbul> {
         }
 
         let output = Self::run_inner(input, context)?;
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -378,7 +378,7 @@ impl Precompile for Bn128Pair<Byzantium> {
         }
 
         let output = Self::run_inner(input, context)?;
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -409,7 +409,7 @@ impl Precompile for Bn128Pair<Istanbul> {
         }
 
         let output = Self::run_inner(input, context)?;
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

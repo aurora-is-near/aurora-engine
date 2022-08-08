@@ -32,7 +32,7 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
 use evm::backend::Log;
-use evm::executor;
+use evm::executor::{self, stack::PrecompileHandle};
 use evm::{Context, ExitError, ExitSucceed};
 
 #[derive(Debug, Default)]
@@ -52,18 +52,7 @@ impl PrecompileOutput {
     }
 }
 
-impl From<PrecompileOutput> for executor::stack::PrecompileOutput {
-    fn from(output: PrecompileOutput) -> Self {
-        executor::stack::PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            cost: output.cost.as_u64(),
-            output: output.output,
-            logs: output.logs,
-        }
-    }
-}
-
-type EvmPrecompileResult = Result<executor::stack::PrecompileOutput, ExitError>;
+type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
 pub trait Precompile {
@@ -118,15 +107,29 @@ pub struct Precompiles<'a, I, E> {
 impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a, I, E> {
     fn execute(
         &self,
-        address: prelude::H160,
-        input: &[u8],
-        gas_limit: Option<u64>,
-        context: &Context,
-        is_static: bool,
+        handle: &mut impl PrecompileHandle,
     ) -> Option<Result<executor::stack::PrecompileOutput, executor::stack::PrecompileFailure>> {
+        let address = handle.code_address();
+
         self.precompile_action(Address::new(address), |p| {
-            p.run(input, gas_limit.map(EthGas::new), context, is_static)
-                .map_err(|exit_status| executor::stack::PrecompileFailure::Error { exit_status })
+            let input = handle.input();
+            let gas_limit = handle.gas_limit();
+            let context = handle.context();
+            let is_static = handle.is_static();
+
+            match p.run(input, gas_limit.map(EthGas::new), context, is_static) {
+                Ok(output) => {
+                    handle.record_cost(output.cost.as_u64())?;
+                    for log in output.logs {
+                        handle.log(log.address, log.topics, log.data)?;
+                    }
+                    Ok(executor::stack::PrecompileOutput {
+                        exit_status: ExitSucceed::Returned,
+                        output: output.output,
+                    })
+                }
+                Err(exit_status) => Err(executor::stack::PrecompileFailure::Error { exit_status }),
+            }
         })
     }
 

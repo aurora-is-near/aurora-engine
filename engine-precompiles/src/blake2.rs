@@ -206,7 +206,7 @@ impl Precompile for Blake2F {
         let finished = input[212] != 0;
 
         let output = f(h, m, t, finished, rounds);
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

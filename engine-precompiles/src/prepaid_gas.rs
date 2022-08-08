@@ -53,7 +53,7 @@ impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
             U256::from(prepaid_gas.as_u64()).to_big_endian(&mut buf);
             buf
         };
-        Ok(PrecompileOutput::without_logs(cost, bytes).into())
+        Ok(PrecompileOutput::without_logs(cost, bytes))
     }
 }
 

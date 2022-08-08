@@ -60,7 +60,7 @@ impl Precompile for SHA256 {
         }
 
         let output = sha2::Sha256::digest(input).to_vec();
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
@@ -82,7 +82,7 @@ impl Precompile for SHA256 {
         }
 
         let output = sdk::sha256(input).as_bytes().to_vec();
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -136,7 +136,7 @@ impl Precompile for RIPEMD160 {
         // the evm works with 32-byte words.
         let mut output = vec![0u8; 32];
         output[12..].copy_from_slice(&hash);
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

@@ -14,9 +14,9 @@ autobenches = false
 
 [dependencies]
 borsh = { version = "0.8.2", default-features = false }
-ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std", default-features = false }
+ethabi = { version = "17.1", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
-primitive-types = { version = "0.10.0", default-features = false, features = ["rlp"] }
+primitive-types = { version = "0.11", default-features = false, features = ["rlp"] }
 sha3 = { version = "0.9.1", default-features = false }
 serde = { version = "1", features = ["derive"], optional = true }
 
