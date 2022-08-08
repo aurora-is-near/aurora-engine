@@ -13,7 +13,7 @@ jobs:
     runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Restore cache
         run: |
           cache-util restore cargo_git cargo_registry sccache yarn_cache

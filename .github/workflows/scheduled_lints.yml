@@ -9,7 +9,7 @@ jobs:
     runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - run: make etc/eth-contracts/res/EvmErc20.bin
       - name: Update toolchain
         run: rustup update nightly
