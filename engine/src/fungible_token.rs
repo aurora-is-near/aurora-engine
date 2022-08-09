@@ -127,7 +127,7 @@ impl From<FungibleTokenMetadata> for JsonValue {
         );
         kvs.insert(
             "decimals".to_string(),
-            JsonValue::U64(metadata.decimals as u64),
+            JsonValue::U64(u64::from(metadata.decimals)),
         );
 
         JsonValue::Object(kvs)
@@ -444,7 +444,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
 
     pub fn storage_balance_bounds(&self) -> StorageBalanceBounds {
         let required_storage_balance =
-            Yocto::new(self.account_storage_usage as u128 * sdk::storage_byte_cost() as u128);
+            Yocto::new(u128::from(self.account_storage_usage) * sdk::storage_byte_cost());
         StorageBalanceBounds {
             min: required_storage_balance,
             max: Some(required_storage_balance),
@@ -573,7 +573,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     fn account_to_key(account_id: &AccountId) -> Vec<u8> {
         let mut key = storage::bytes_to_key(
             storage::KeyPrefix::EthConnector,
-            &[storage::EthConnectorStorageId::FungibleToken as u8],
+            &[u8::from(storage::EthConnectorStorageId::FungibleToken)],
         );
         key.extend_from_slice(account_id.as_bytes());
         key
@@ -583,7 +583,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     fn get_statistic_key() -> Vec<u8> {
         storage::bytes_to_key(
             crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::EthConnectorStorageId::StatisticsAuroraAccountsCounter as u8],
+            &[u8::from(
+                crate::prelude::EthConnectorStorageId::StatisticsAuroraAccountsCounter,
+            )],
         )
     }
 }

@@ -89,13 +89,10 @@ impl JsonValue {
     #[allow(dead_code)]
     pub fn parse_u8(v: &JsonValue) -> Result<u8, JsonError> {
         match v {
-            JsonValue::U64(n) => {
-                if *n > u8::MAX as u64 {
-                    Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8))
-                } else {
-                    Ok(*n as u8)
-                }
-            }
+            JsonValue::U64(n) => match u8::try_from(*n) {
+                Ok(v) => Ok(v),
+                Err(_e) => Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8)),
+            },
             _ => Err(JsonError::InvalidU8),
         }
     }
@@ -276,7 +273,7 @@ impl core::fmt::Display for JsonValue {
 }
 
 pub fn parse_json(data: &[u8]) -> Option<JsonValue> {
-    let data_array: Vec<char> = data.iter().map(|b| *b as char).collect::<Vec<_>>();
+    let data_array: Vec<char> = data.iter().map(|b| char::from(*b)).collect::<Vec<_>>();
     let mut index = 0;
     rjson::parse::<JsonValue, JsonArray, JsonObject, JsonValue>(&*data_array, &mut index)
 }

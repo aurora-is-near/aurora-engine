@@ -1,5 +1,5 @@
 use crate::prelude::types::{Address, EthGas};
-use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
 /// Identity precompile costs.
@@ -26,8 +26,9 @@ impl Identity {
 
 impl Precompile for Identity {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
+        let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(
-            (input.len() as u64 + consts::IDENTITY_WORD_LEN - 1) / consts::IDENTITY_WORD_LEN
+            (input_len + consts::IDENTITY_WORD_LEN - 1) / consts::IDENTITY_WORD_LEN
                 * costs::IDENTITY_PER_WORD
                 + costs::IDENTITY_BASE,
         )

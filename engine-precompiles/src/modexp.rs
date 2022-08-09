@@ -1,7 +1,8 @@
-use crate::prelude::{PhantomData, Vec, U256};
-use crate::{Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput};
-
 use crate::prelude::types::{Address, EthGas};
+use crate::prelude::{PhantomData, Vec, U256};
+use crate::{
+    utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
+};
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
@@ -17,31 +18,33 @@ impl<HF: HardFork> ModExp<HF> {
 
 impl<HF: HardFork> ModExp<HF> {
     // Note: the output of this function is bounded by 2^67
-    fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> U256 {
-        #[allow(clippy::redundant_closure)]
+    fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
+        let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
+        let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
+        // #[allow(clippy::redundant_closure)]
         let exp = parse_bytes(
             bytes,
-            (base_len as usize).saturating_add(96),
-            core::cmp::min(32, exp_len as usize),
+            start.saturating_add(96),
+            core::cmp::min(32, exp_len),
             // I don't understand why I need a closure here, but doesn't compile without one
             |x| U256::from(x),
         );
 
         if exp_len <= 32 && exp.is_zero() {
-            U256::zero()
+            Ok(U256::zero())
         } else if exp_len <= 32 {
-            U256::from(exp.bits()) - U256::from(1)
+            Ok(U256::from(exp.bits()) - U256::from(1))
         } else {
             // else > 32
-            U256::from(8) * U256::from(exp_len - 32) + U256::from(exp.bits()) - U256::from(1)
+            Ok(U256::from(8) * U256::from(exp_len - 32) + U256::from(exp.bits()) - U256::from(1))
         }
     }
 
     fn run_inner(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
-        let base_len = base_len as usize;
-        let exp_len = exp_len as usize;
-        let mod_len = mod_len as usize;
+        let base_len = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
+        let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
+        let mod_len = usize::try_from(mod_len).map_err(utils::err_usize_conv)?;
 
         let base_start = 96;
         let base_end = base_len.saturating_add(base_start);
@@ -99,7 +102,7 @@ impl Precompile for ModExp<Byzantium> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
         let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
-        let iter_count = Self::calc_iter_count(exp_len, base_len, input);
+        let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
         // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
         let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
 
@@ -141,7 +144,7 @@ impl Precompile for ModExp<Berlin> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
         let mul = Self::mul_complexity(base_len, mod_len);
-        let iter_count = Self::calc_iter_count(exp_len, base_len, input);
+        let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
         // mul * iter_count bounded by 2^189 (so no overflow)
         let gas = mul * iter_count / U256::from(3);
 

@@ -1,3 +1,4 @@
+use crate::Error;
 use aurora_engine_precompiles::secp256k1::ecrecover;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::types::{Address, Wei};
@@ -44,21 +45,6 @@ impl TransactionLegacy {
     pub fn get_gas_limit(&self) -> Option<u64> {
         self.gas_limit.try_into().ok()
     }
-
-    pub fn normalize(self) -> super::NormalizedEthTransaction {
-        super::NormalizedEthTransaction {
-            address: None,
-            chain_id: None,
-            nonce: self.nonce,
-            gas_limit: self.gas_limit,
-            max_priority_fee_per_gas: self.gas_price,
-            max_fee_per_gas: self.gas_price,
-            to: self.to,
-            value: self.value,
-            data: self.data,
-            access_list: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -75,19 +61,25 @@ pub struct LegacyEthSignedTransaction {
 
 impl LegacyEthSignedTransaction {
     /// Returns sender of given signed transaction by doing ecrecover on the signature.
-    pub fn sender(&self) -> Option<Address> {
+    pub fn sender(&self) -> Result<Address, Error> {
         let mut rlp_stream = RlpStream::new();
         // See details of CHAIN_ID computation here - https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md#specification
         let (chain_id, rec_id) = match self.v {
-            0..=26 => return None,
-            27..=28 => (None, (self.v - 27) as u8),
-            29..=34 => return None,
-            _ => (Some((self.v - 35) / 2), ((self.v - 35) % 2) as u8),
+            0..=26 | 29..=34 => return Err(Error::InvalidV),
+            27..=28 => (
+                None,
+                u8::try_from(self.v - 27).map_err(|_e| Error::InvalidV)?,
+            ),
+            _ => (
+                Some((self.v - 35) / 2),
+                u8::try_from((self.v - 35) % 2).map_err(|_e| Error::InvalidV)?,
+            ),
         };
         self.transaction
             .rlp_append_unsigned(&mut rlp_stream, chain_id);
         let message_hash = sdk::keccak(rlp_stream.as_raw());
-        ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s)).ok()
+        ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s))
+            .map_err(|_e| Error::EcRecover)
     }
 
     /// Returns chain id encoded in `v` parameter of the signature if that was done, otherwise None.
