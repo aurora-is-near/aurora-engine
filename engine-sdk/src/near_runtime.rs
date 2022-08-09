@@ -6,7 +6,7 @@ use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, Promise
 use aurora_engine_types::types::PromiseResult;
 use aurora_engine_types::H256;
 
-#[cfg(feature = "mainnet")]
+#[cfg(all(feature = "mainnet", not(feature = "testnet")))]
 /// The mainnet eth_custodian address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52
 const CUSTODIAN_ADDRESS: &[u8] = &[
     107, 250, 212, 44, 252, 78, 252, 150, 245, 41, 215, 134, 214, 67, 255, 74, 139, 137, 250, 82,

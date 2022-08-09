@@ -54,9 +54,7 @@ fn erc20_mint_out_of_gas() {
     let mut mint_tx = contract.mint(dest_address, mint_amount.into(), nonce.into());
 
     // not enough gas to cover intrinsic cost
-    let intrinsic_gas = mint_tx
-        .clone()
-        .normalize()
+    let intrinsic_gas = test_utils::erc20::legacy_into_normalized_tx(mint_tx.clone())
         .intrinsic_gas(&evm::Config::istanbul())
         .unwrap();
     mint_tx.gas_limit = (intrinsic_gas - 1).into();
@@ -213,9 +211,7 @@ fn deploy_erc_20_out_of_gas() {
     let mut deploy_transaction = constructor.deploy("OutOfGas", "OOG", INITIAL_NONCE.into());
 
     // not enough gas to cover intrinsic cost
-    let intrinsic_gas = deploy_transaction
-        .clone()
-        .normalize()
+    let intrinsic_gas = test_utils::erc20::legacy_into_normalized_tx(deploy_transaction.clone())
         .intrinsic_gas(&evm::Config::istanbul())
         .unwrap();
     deploy_transaction.gas_limit = (intrinsic_gas - 1).into();

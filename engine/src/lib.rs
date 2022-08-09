@@ -4,6 +4,7 @@
     all(feature = "log", target_arch = "wasm32"),
     feature(panic_info_message)
 )]
+#![deny(clippy::as_conversions)]
 
 use aurora_engine_types::parameters::PromiseCreateArgs;
 
@@ -523,6 +524,7 @@ mod contract {
     }
 
     #[no_mangle]
+
     pub extern "C" fn withdraw() {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
@@ -536,8 +538,12 @@ mod contract {
         let result_bytes = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
         // We intentionally do not go through the `io` struct here because we must bypass
         // the check that prevents output that is accepted by the eth_custodian
+        #[allow(clippy::as_conversions)]
         unsafe {
-            exports::value_return(result_bytes.len() as u64, result_bytes.as_ptr() as u64);
+            exports::value_return(
+                u64::try_from(result_bytes.len()).sdk_expect(errors::ERR_VALUE_CONVERSION),
+                result_bytes.as_ptr() as u64,
+            );
         }
     }
 
@@ -849,7 +855,7 @@ mod contract {
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect(errors::ERR_ARGS);
         let address = Address::from_array(args.0);
         let nonce = U256::from(args.1);
-        let balance = NEP141Wei::new(args.2 as u128);
+        let balance = NEP141Wei::new(u128::from(args.2));
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {

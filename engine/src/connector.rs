@@ -677,7 +677,7 @@ impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
 }
 
 fn construct_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
-    crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[*suffix as u8])
+    crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[u8::from(*suffix)])
 }
 
 fn get_contract_data<T: BorshDeserialize, I: IO>(

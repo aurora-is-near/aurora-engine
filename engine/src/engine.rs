@@ -95,7 +95,7 @@ pub enum EngineErrorKind {
     EvmFatal(ExitFatal),
     /// Incorrect nonce.
     IncorrectNonce,
-    FailedTransactionParse(crate::prelude::transactions::ParseTransactionError),
+    FailedTransactionParse(crate::prelude::transactions::Error),
     InvalidChainId,
     InvalidSignature,
     IntrinsicGasNotMet,
@@ -878,9 +878,11 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     handler: &mut P,
 ) -> EngineResult<SubmitResult> {
     #[cfg(feature = "contract")]
-    let transaction: NormalizedEthTransaction = EthTransactionKind::try_from(transaction_bytes)
-        .map_err(EngineErrorKind::FailedTransactionParse)?
-        .into();
+    let transaction = NormalizedEthTransaction::try_from(
+        EthTransactionKind::try_from(transaction_bytes)
+            .map_err(EngineErrorKind::FailedTransactionParse)?,
+    )
+    .map_err(|_e| EngineErrorKind::InvalidSignature)?;
 
     #[cfg(not(feature = "contract"))]
     // The standalone engine must use the backwards compatible parser to reproduce the NEAR state,
@@ -895,7 +897,8 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         let tx: EthTransactionKind = adapter
             .try_parse_bytes(transaction_bytes, block_height)
             .map_err(EngineErrorKind::FailedTransactionParse)?;
-        tx.into()
+        tx.try_into()
+            .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
 
     // Validate the chain ID, if provided inside the signature:
@@ -906,9 +909,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     }
 
     // Retrieve the signer of the transaction:
-    let sender = transaction
-        .address
-        .ok_or(EngineErrorKind::InvalidSignature)?;
+    let sender = transaction.address;
 
     sdk::log!(crate::prelude::format!("signer_address {:?}", sender).as_str());
 
@@ -916,10 +917,10 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     // Check intrinsic gas is covered by transaction gas limit
     match transaction.intrinsic_gas(crate::engine::CONFIG) {
-        None => {
+        Err(_e) => {
             return Err(EngineErrorKind::GasOverflow.into());
         }
-        Some(intrinsic_gas) => {
+        Ok(intrinsic_gas) => {
             if transaction.gas_limit < intrinsic_gas.into() {
                 return Err(EngineErrorKind::IntrinsicGasNotMet.into());
             }

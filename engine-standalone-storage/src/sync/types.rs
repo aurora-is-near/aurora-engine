@@ -142,7 +142,7 @@ impl<'a> From<&'a TransactionMessage> for BorshableTransactionMessage<'a> {
 }
 
 impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
-    type Error = aurora_engine_transactions::ParseTransactionError;
+    type Error = aurora_engine_transactions::Error;
 
     fn try_from(t: BorshableTransactionMessage<'a>) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -223,7 +223,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
 }
 
 impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
-    type Error = aurora_engine_transactions::ParseTransactionError;
+    type Error = aurora_engine_transactions::Error;
 
     fn try_from(t: BorshableTransactionKind<'a>) -> Result<Self, Self::Error> {
         match t {

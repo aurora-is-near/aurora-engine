@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![deny(clippy::as_conversions)]
 
 pub mod account_ids;
 pub mod blake2;
@@ -13,7 +14,6 @@ mod prelude;
 pub mod prepaid_gas;
 pub mod random;
 pub mod secp256k1;
-#[cfg(test)]
 mod utils;
 
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
