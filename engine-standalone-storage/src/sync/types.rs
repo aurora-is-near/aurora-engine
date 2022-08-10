@@ -39,6 +39,9 @@ pub struct TransactionMessage {
     pub attached_near: u128,
     /// Details of the transaction that was executed
     pub transaction: TransactionKind,
+    /// Results from previous NEAR receipts
+    /// (only present when this transaction is a callback of another transaction).
+    pub promise_data: Vec<Option<Vec<u8>>>,
 }
 
 impl TransactionMessage {
@@ -48,7 +51,12 @@ impl TransactionMessage {
     }
 
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, std::io::Error> {
-        let borshable = BorshableTransactionMessage::try_from_slice(bytes)?;
+        let borshable = match BorshableTransactionMessage::try_from_slice(bytes) {
+            Ok(b) => b,
+            // To avoid DB migration, allow fallback on deserializing V1 messages
+            Err(_) => BorshableTransactionMessageV1::try_from_slice(bytes)
+                .map(BorshableTransactionMessage::V1)?,
+        };
         Self::try_from(borshable).map_err(|e| {
             let message = e.as_str();
             std::io::Error::new(std::io::ErrorKind::Other, message)
@@ -106,7 +114,13 @@ pub enum TransactionKind {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
-struct BorshableTransactionMessage<'a> {
+enum BorshableTransactionMessage<'a> {
+    V1(BorshableTransactionMessageV1<'a>),
+    V2(BorshableTransactionMessageV2<'a>),
+}
+
+#[derive(BorshDeserialize, BorshSerialize)]
+struct BorshableTransactionMessageV1<'a> {
     /// Hash of the block which included this transaction
     pub block_hash: [u8; 32],
     /// Receipt ID of the receipt that was actually executed on NEAR
@@ -126,9 +140,31 @@ struct BorshableTransactionMessage<'a> {
     pub transaction: BorshableTransactionKind<'a>,
 }
 
+#[derive(BorshDeserialize, BorshSerialize)]
+struct BorshableTransactionMessageV2<'a> {
+    /// Hash of the block which included this transaction
+    pub block_hash: [u8; 32],
+    /// Receipt ID of the receipt that was actually executed on NEAR
+    pub near_receipt_id: [u8; 32],
+    /// If multiple Aurora transactions are included in the same block,
+    /// this index gives the order in which they should be executed.
+    pub position: u16,
+    /// True if the transaction executed successfully on the blockchain, false otherwise.
+    pub succeeded: bool,
+    /// NEAR account that signed the transaction
+    pub signer: Cow<'a, AccountId>,
+    /// NEAR account that called the Aurora engine contract
+    pub caller: Cow<'a, AccountId>,
+    /// Amount of NEAR token attached to the transaction
+    pub attached_near: u128,
+    /// Details of the transaction that was executed
+    pub transaction: BorshableTransactionKind<'a>,
+    pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
+}
+
 impl<'a> From<&'a TransactionMessage> for BorshableTransactionMessage<'a> {
     fn from(t: &'a TransactionMessage) -> Self {
-        Self {
+        Self::V2(BorshableTransactionMessageV2 {
             block_hash: t.block_hash.0,
             near_receipt_id: t.near_receipt_id.0,
             position: t.position,
@@ -137,7 +173,8 @@ impl<'a> From<&'a TransactionMessage> for BorshableTransactionMessage<'a> {
             caller: Cow::Borrowed(&t.caller),
             attached_near: t.attached_near,
             transaction: (&t.transaction).into(),
-        }
+            promise_data: Cow::Borrowed(&t.promise_data),
+        })
     }
 }
 
@@ -145,16 +182,30 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
     type Error = aurora_engine_transactions::Error;
 
     fn try_from(t: BorshableTransactionMessage<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            block_hash: H256(t.block_hash),
-            near_receipt_id: H256(t.near_receipt_id),
-            position: t.position,
-            succeeded: t.succeeded,
-            signer: t.signer.into_owned(),
-            caller: t.caller.into_owned(),
-            attached_near: t.attached_near,
-            transaction: t.transaction.try_into()?,
-        })
+        match t {
+            BorshableTransactionMessage::V1(t) => Ok(Self {
+                block_hash: H256(t.block_hash),
+                near_receipt_id: H256(t.near_receipt_id),
+                position: t.position,
+                succeeded: t.succeeded,
+                signer: t.signer.into_owned(),
+                caller: t.caller.into_owned(),
+                attached_near: t.attached_near,
+                transaction: t.transaction.try_into()?,
+                promise_data: Vec::new(),
+            }),
+            BorshableTransactionMessage::V2(t) => Ok(Self {
+                block_hash: H256(t.block_hash),
+                near_receipt_id: H256(t.near_receipt_id),
+                position: t.position,
+                succeeded: t.succeeded,
+                signer: t.signer.into_owned(),
+                caller: t.caller.into_owned(),
+                attached_near: t.attached_near,
+                transaction: t.transaction.try_into()?,
+                promise_data: t.promise_data.into_owned(),
+            }),
+        }
     }
 }
 

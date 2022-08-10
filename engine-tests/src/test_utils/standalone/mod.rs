@@ -293,6 +293,7 @@ impl StandaloneRunner {
             caller: env.predecessor_account_id(),
             attached_near: env.attached_deposit,
             transaction: TransactionKind::Unknown,
+            promise_data: Vec::new(),
         }
     }
 
