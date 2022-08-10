@@ -371,6 +371,11 @@ fn non_submit_execute<'db>(
 
             None
         }
+        TransactionKind::FactorySetWNearAddress(address) => {
+            xcc::set_wnear_address(&mut io, address);
+
+            None
+        }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
         TransactionKind::Submit(_) => unreachable!(),
