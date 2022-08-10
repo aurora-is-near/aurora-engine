@@ -12,6 +12,7 @@ pub mod modexp;
 pub mod native;
 mod prelude;
 pub mod prepaid_gas;
+pub mod promise_result;
 pub mod random;
 pub mod secp256k1;
 mod utils;
@@ -30,10 +31,12 @@ use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
+use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
 use evm::backend::Log;
 use evm::executor::{self, stack::PrecompileHandle};
 use evm::{Context, ExitError, ExitSucceed};
+use promise_result::PromiseResult;
 
 #[derive(Debug, Default)]
 pub struct PrecompileOutput {
@@ -94,7 +97,7 @@ impl HardFork for Istanbul {}
 
 impl HardFork for Berlin {}
 
-pub struct Precompiles<'a, I, E> {
+pub struct Precompiles<'a, I, E, H> {
     pub generic_precompiles: prelude::BTreeMap<Address, Box<dyn Precompile>>,
     // Cannot be part of the generic precompiles because the `dyn` type-erasure messes with
     // with the lifetime requirements on the type parameter `I`.
@@ -102,9 +105,12 @@ pub struct Precompiles<'a, I, E> {
     pub ethereum_exit: ExitToEthereum<I>,
     pub predecessor_account_id: PredecessorAccount<'a, E>,
     pub prepaid_gas: PrepaidGas<'a, E>,
+    pub promise_results: PromiseResult<H>,
 }
 
-impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a, I, E> {
+impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
+    for Precompiles<'a, I, E, H>
+{
     fn execute(
         &self,
         handle: &mut impl PrecompileHandle,
@@ -139,16 +145,17 @@ impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a
     }
 }
 
-pub struct PrecompileConstructorContext<'a, I, E> {
+pub struct PrecompileConstructorContext<'a, I, E, H> {
     pub current_account_id: AccountId,
     pub random_seed: H256,
     pub io: I,
     pub env: &'a E,
+    pub promise_handler: H,
 }
 
-impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
+impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, H> {
     #[allow(dead_code)]
-    pub fn new_homestead(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_homestead(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -168,7 +175,7 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
     }
 
     #[allow(dead_code)]
-    pub fn new_byzantium(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_byzantium(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -198,7 +205,7 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_istanbul(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_istanbul(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -230,7 +237,7 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_berlin(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_berlin(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -262,19 +269,20 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_london(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_london(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         // no precompile changes in London HF
         Self::new_berlin(ctx)
     }
 
     fn with_generic_precompiles(
         generic_precompiles: BTreeMap<Address, Box<dyn Precompile>>,
-        ctx: PrecompileConstructorContext<'a, I, E>,
+        ctx: PrecompileConstructorContext<'a, I, E, H>,
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
         let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);
+        let promise_results = PromiseResult::new(ctx.promise_handler);
 
         Self {
             generic_precompiles,
@@ -282,6 +290,7 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             ethereum_exit,
             predecessor_account_id,
             prepaid_gas,
+            promise_results,
         }
     }
 
@@ -298,6 +307,8 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             return Some(f(&self.predecessor_account_id));
         } else if address == prepaid_gas::ADDRESS {
             return Some(f(&self.prepaid_gas));
+        } else if address == promise_result::ADDRESS {
+            return Some(f(&self.promise_results));
         }
         self.generic_precompiles
             .get(&address)

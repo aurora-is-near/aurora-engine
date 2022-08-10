@@ -32,6 +32,8 @@ impl PromiseTracker {
 }
 
 impl PromiseHandler for PromiseTracker {
+    type ReadOnly = Self;
+
     fn promise_results_count(&self) -> u64 {
         self.promise_results.len() as u64
     }
@@ -72,5 +74,14 @@ impl PromiseHandler for PromiseTracker {
 
     fn promise_return(&mut self, promise: PromiseId) {
         self.returned_promise = Some(promise);
+    }
+
+    fn read_only(&self) -> Self::ReadOnly {
+        Self {
+            internal_index: 0,
+            promise_results: self.promise_results.clone(),
+            scheduled_promises: Default::default(),
+            returned_promise: Default::default(),
+        }
     }
 }

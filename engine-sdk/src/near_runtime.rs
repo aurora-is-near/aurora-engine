@@ -260,6 +260,8 @@ impl crate::env::Env for Runtime {
 }
 
 impl crate::promise::PromiseHandler for Runtime {
+    type ReadOnly = Self;
+
     fn promise_results_count(&self) -> u64 {
         unsafe { exports::promise_results_count() }
     }
@@ -378,6 +380,10 @@ impl crate::promise::PromiseHandler for Runtime {
         unsafe {
             exports::promise_return(promise.raw());
         }
+    }
+
+    fn read_only(&self) -> Self::ReadOnly {
+        Self
     }
 }
 
