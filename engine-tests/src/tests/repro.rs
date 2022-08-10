@@ -152,7 +152,9 @@ fn repro_common<'a>(context: ReproContext<'a>) {
         .set_engine_account_id(&"aurora".parse().unwrap())
         .unwrap();
     json_snapshot::initialize_engine_state(&mut standalone.storage, snapshot).unwrap();
-    let standalone_result = standalone.submit_raw("submit", &runner.context).unwrap();
+    let standalone_result = standalone
+        .submit_raw("submit", &runner.context, &[])
+        .unwrap();
     assert_eq!(
         submit_result.try_to_vec().unwrap(),
         standalone_result.try_to_vec().unwrap()
