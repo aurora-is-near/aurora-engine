@@ -1,9 +1,9 @@
 use aurora_engine_types::parameters::{PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LazyOption, LookupMap};
-use near_sdk::json_types::U64;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::BorshStorageKey;
-use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault, PromiseIndex};
+use near_sdk::{env, near_bindgen, AccountId, Gas, PanicOnDefault, Promise, PromiseIndex};
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
@@ -20,6 +20,12 @@ enum StorageKey {
 const CURRENT_VERSION: u32 = 1;
 
 const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
+const WNEAR_WITHDRAW_GAS: Gas = Gas(5_000_000_000_000);
+const WNEAR_REGISTER_GAS: Gas = Gas(5_000_000_000_000);
+const REFUND_GAS: Gas = Gas(5_000_000_000_000);
+const WNEAR_REGISTER_AMOUNT: u128 = 1_250_000_000_000_000_000_000;
+/// Must match arora_engine_precompiles::xcc::state::STORAGE_AMOUNT
+const REFUND_AMOUNT: u128 = 2_000_000_000_000_000_000_000_000;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -33,12 +39,14 @@ pub struct Router {
     nonce: LazyOption<u64>,
     /// The storage for the scheduled promises.
     scheduled_promises: LookupMap<u64, PromiseArgs>,
+    /// Account ID for the wNEAR contract.
+    wnear_account: AccountId,
 }
 
 #[near_bindgen]
 impl Router {
     #[init(ignore_state)]
-    pub fn initialize() -> Self {
+    pub fn initialize(wnear_account: AccountId, must_register: bool) -> Self {
         // The first time this function is called there is no state and the parent is set to be
         // the predecessor account id. In subsequent calls, only the original parent is allowed to
         // call this function. The idea is that the Create, Deploy and Initialize actions are done in a single
@@ -59,6 +67,16 @@ impl Router {
             }
         }
 
+        if must_register {
+            env::promise_create(
+                wnear_account.clone(),
+                "storage_deposit",
+                b"{}",
+                WNEAR_REGISTER_AMOUNT,
+                WNEAR_REGISTER_GAS,
+            );
+        }
+
         let mut version = LazyOption::new(StorageKey::Version, None);
         if version.get().unwrap_or_default() != CURRENT_VERSION {
             // Future migrations would go here
@@ -73,6 +91,7 @@ impl Router {
             version,
             nonce,
             scheduled_promises,
+            wnear_account,
         }
     }
 
@@ -111,6 +130,47 @@ impl Router {
 
         let promise_id = Router::promise_create(promise);
         env::promise_return(promise_id)
+    }
+
+    /// The router will receive wNEAR deposits from its user. This function is to
+    /// unwrap that wNEAR into NEAR. Additionally, this function will transfer some
+    /// NEAR back to its parent, if needed. This transfer is done because the parent
+    /// must cover the storage staking cost with the router account is first created,
+    /// but the user ultimately is responsible to pay for it.
+    pub fn unwrap_and_refund_storage(&self, amount: U128, refund_needed: bool) {
+        self.require_parent_caller();
+
+        let args = format!(r#"{{"amount": "{}"}}"#, amount.0);
+        let id = env::promise_create(
+            self.wnear_account.clone(),
+            "near_withdraw",
+            args.as_bytes(),
+            1,
+            WNEAR_WITHDRAW_GAS,
+        );
+        let final_id = if refund_needed {
+            env::promise_then(
+                id,
+                env::current_account_id(),
+                "send_refund",
+                &[],
+                0,
+                REFUND_GAS,
+            )
+        } else {
+            id
+        };
+        env::promise_return(final_id);
+    }
+
+    #[private]
+    pub fn send_refund(&self) -> Promise {
+        let parent = self
+            .parent
+            .get()
+            .unwrap_or_else(|| env::panic_str("ERR_CONTRACT_NOT_INITIALIZED"));
+
+        Promise::new(parent).transfer(REFUND_AMOUNT)
     }
 }
 

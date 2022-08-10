@@ -342,6 +342,17 @@ mod contract {
         crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
     }
 
+    /// Sets the address for the wNEAR ERC-20 contract. This contract will be used by the
+    /// cross-contract calls feature to have users pay for their NEAR transactions.
+    #[no_mangle]
+    pub extern "C" fn factory_set_wnear_address() {
+        let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let address = io.read_input_arr20().sdk_unwrap();
+        crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
+    }
+
     /// Allow receiving NEP141 tokens to the EVM contract.
     ///
     /// This function returns the amount of tokens to return to the sender.

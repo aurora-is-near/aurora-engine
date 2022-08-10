@@ -73,7 +73,10 @@ pub trait Precompile {
     ) -> EvmPrecompileResult;
 }
 pub trait HandleBasedPrecompile {
-    fn run_with_handle(&self, handle: &mut impl PrecompileHandle) -> EvmPrecompileResult;
+    fn run_with_handle(
+        &self,
+        handle: &mut impl PrecompileHandle,
+    ) -> Result<PrecompileOutput, executor::stack::PrecompileFailure>;
 }
 
 /// Hard fork marker.
@@ -131,8 +134,7 @@ impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a
                         exit_status: ExitSucceed::Returned,
                         output: output.output,
                     })
-                })
-                .map_err(|exit_status| executor::stack::PrecompileFailure::Error { exit_status });
+                });
 
             return Some(result);
         }

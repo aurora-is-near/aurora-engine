@@ -17,6 +17,13 @@ impl PromiseArgs {
             Self::Callback(cb) => cb.base.attached_gas + cb.callback.attached_gas,
         }
     }
+
+    pub fn total_near(&self) -> Yocto {
+        match self {
+            Self::Create(call) => call.attached_balance,
+            Self::Callback(cb) => cb.base.attached_balance + cb.callback.attached_balance,
+        }
+    }
 }
 
 #[must_use]

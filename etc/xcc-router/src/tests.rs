@@ -6,6 +6,8 @@ use near_sdk::test_utils::test_env::{alice, bob, carol};
 use near_sdk::test_utils::{self, VMContextBuilder};
 use near_sdk::testing_env;
 
+const WNEAR_ACCOUNT: &str = "wrap.near";
+
 #[test]
 fn test_initialize() {
     let (parent, contract) = create_contract();
@@ -22,7 +24,7 @@ fn test_reinitialize() {
     contract.nonce.set(&nonce);
     drop(contract);
 
-    let contract = Router::initialize();
+    let contract = Router::initialize(WNEAR_ACCOUNT.parse().unwrap(), false);
     assert_eq!(contract.nonce.get().unwrap(), nonce);
 }
 
@@ -38,7 +40,7 @@ fn test_reinitialize_wrong_caller() {
     testing_env!(VMContextBuilder::new()
         .predecessor_account_id(bob())
         .build());
-    let _contract = Router::initialize();
+    let _contract = Router::initialize(WNEAR_ACCOUNT.parse().unwrap(), false);
 }
 
 #[test]
@@ -203,7 +205,7 @@ fn create_contract() -> (near_sdk::AccountId, Router) {
         .current_account_id(format!("some_address.{}", parent).try_into().unwrap())
         .predecessor_account_id(parent.clone())
         .build());
-    let contract = Router::initialize();
+    let contract = Router::initialize(WNEAR_ACCOUNT.parse().unwrap(), false);
 
     (parent, contract)
 }
