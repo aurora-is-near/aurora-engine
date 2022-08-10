@@ -14,7 +14,7 @@ autobenches = false
 
 [dependencies]
 aurora-engine-types = { path = "../engine-types", default-features = false }
-borsh = { version = "0.9", default-features = false }
+borsh = { version = "0.9.3", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }
 sha2 = { version = "0.9.3", default-features = false }
 
