@@ -141,7 +141,7 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
- "sha3 0.9.1",
+ "sha3 0.10.2",
  "wee_alloc",
 ]
 
@@ -165,8 +165,8 @@ dependencies = [
  "ripemd160",
  "serde",
  "serde_json",
- "sha2 0.9.9",
- "sha3 0.9.1",
+ "sha2 0.10.2",
+ "sha3 0.10.2",
 ]
 
 [[package]]
@@ -175,8 +175,8 @@ version = "1.0.0"
 dependencies = [
  "aurora-engine-types",
  "borsh 0.8.2",
- "sha2 0.9.9",
- "sha3 0.9.1",
+ "sha2 0.10.2",
+ "sha3 0.10.2",
 ]
 
 [[package]]
@@ -213,7 +213,7 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
- "sha3 0.9.1",
+ "sha3 0.10.2",
  "tempfile",
  "walrus",
 ]
@@ -243,7 +243,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_json",
- "sha3 0.9.1",
+ "sha3 0.10.2",
 ]
 
 [[package]]
