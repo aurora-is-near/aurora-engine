@@ -24,8 +24,8 @@ libsecp256k1 = { version = "0.7.0", default-features = false, features = ["stati
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.11", default-features = false, features = ["rlp"] }
 ripemd160 = { version = "0.9.1", default-features = false }
-sha2 = { version = "0.9.3", default-features = false }
-sha3 = { version = "0.9.1", default-features = false }
+sha2 = { version = "0.10.2", default-features = false }
+sha3 = { version = "0.10.2", default-features = false }
 ethabi = { version = "17.1", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 
