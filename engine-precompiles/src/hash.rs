@@ -95,8 +95,9 @@ impl RIPEMD160 {
 
     #[cfg(not(feature = "contract"))]
     fn internal_impl(input: &[u8]) -> [u8; 20] {
-        use ripemd160::Digest;
-        let hash = ripemd160::Ripemd160::digest(input);
+        use ripemd::{Digest, Ripemd160};
+
+        let hash = Ripemd160::digest(input);
         let mut output = [0u8; 20];
         output.copy_from_slice(&hash);
         output
