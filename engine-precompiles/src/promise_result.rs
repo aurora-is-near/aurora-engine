@@ -12,11 +12,13 @@ use evm::{Context, ExitError};
 /// This address is computed as: `&keccak("prepaidGas")[12..]`
 pub const ADDRESS: Address = crate::make_address(0x0a3540f7, 0x9be10ef14890e87c1a0040a68cc6af71);
 
-mod costs {
+pub mod costs {
     use crate::prelude::types::EthGas;
 
-    // TODO(#483): Determine the correct amount of gas
-    pub(super) const PROMISE_RESULT_GAS_COST: EthGas = EthGas::new(0);
+    /// This cost is always charged for calling this precompile.
+    pub const PROMISE_RESULT_BASE_COST: EthGas = EthGas::new(125);
+    /// This is the cost per byte of promise result data.
+    pub const PROMISE_RESULT_BYTE_COST: EthGas = EthGas::new(1);
 }
 
 pub struct PromiseResult<H> {
@@ -31,7 +33,9 @@ impl<H> PromiseResult<H> {
 
 impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
-        Ok(costs::PROMISE_RESULT_GAS_COST)
+        // Only gives the cost we can know without reading any promise data.
+        // This allows failing fast in the case the base cost cannot even be covered.
+        Ok(costs::PROMISE_RESULT_BASE_COST)
     }
 
     fn run(
@@ -41,21 +45,29 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
-        let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
+        let mut cost = Self::required_gas(input)?;
+        let check_cost = |cost: EthGas| -> Result<(), ExitError> {
+            if let Some(target_gas) = target_gas {
+                if cost > target_gas {
+                    return Err(ExitError::OutOfGas);
+                }
             }
-        }
+            Ok(())
+        };
+        check_cost(cost)?;
 
         let num_promises = self.handler.ro_promise_results_count();
         let n_usize = usize::try_from(num_promises).map_err(crate::utils::err_usize_conv)?;
         let mut results = Vec::with_capacity(n_usize);
         for i in 0..num_promises {
             if let Some(result) = self.handler.ro_promise_result(i) {
+                let n_bytes = u64::try_from(result.size()).map_err(crate::utils::err_usize_conv)?;
+                cost += n_bytes * costs::PROMISE_RESULT_BYTE_COST;
+                check_cost(cost)?;
                 results.push(result);
             }
         }
+
         let bytes = results
             .try_to_vec()
             .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_PROMISE_RESULT_SERIALIZATION")))?;

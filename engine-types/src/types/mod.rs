@@ -70,6 +70,15 @@ pub enum PromiseResult {
     Failed,
 }
 
+impl PromiseResult {
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Failed | Self::NotReady => 1,
+            Self::Successful(bytes) => bytes.len(),
+        }
+    }
+}
+
 /// ft_resolve_transfer result of eth-connector
 pub struct FtResolveTransferResult {
     pub amount: Balance,
