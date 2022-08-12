@@ -72,6 +72,7 @@ pub trait Precompile {
         is_static: bool,
     ) -> EvmPrecompileResult;
 }
+
 pub trait HandleBasedPrecompile {
     fn run_with_handle(
         &self,
