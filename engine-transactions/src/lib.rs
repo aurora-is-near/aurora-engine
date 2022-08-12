@@ -24,7 +24,9 @@ impl TryFrom<&[u8]> for EthTransactionKind {
     type Error = Error;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes[0] == eip_2930::TYPE_BYTE {
+        if bytes.is_empty() {
+            Err(Error::EmptyInput)
+        } else if bytes[0] == eip_2930::TYPE_BYTE {
             Ok(Self::Eip2930(eip_2930::SignedTransaction2930::decode(
                 &Rlp::new(&bytes[1..]),
             )?))
@@ -181,6 +183,7 @@ impl NormalizedEthTransaction {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Error {
     UnknownTransactionType,
+    EmptyInput,
     // Per the EIP-2718 spec 0xff is a reserved value
     ReservedSentinel,
     InvalidV,
@@ -200,6 +203,7 @@ impl Error {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::UnknownTransactionType => "ERR_UNKNOWN_TX_TYPE",
+            Self::EmptyInput => "ERR_EMPTY_TX_INPUT",
             Self::ReservedSentinel => "ERR_RESERVED_LEADING_TX_BYTE",
             Self::InvalidV => "ERR_INVALID_V",
             Self::EcRecover => "ERR_ECRECOVER",
@@ -243,4 +247,33 @@ fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
     s.to_big_endian(&mut result[32..64]);
     result[64] = v;
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, EthTransactionKind};
+    use crate::{eip_1559, eip_2930};
+
+    #[test]
+    fn test_try_parse_empty_input() {
+        assert!(matches!(
+            EthTransactionKind::try_from([].as_ref()),
+            Err(Error::EmptyInput)
+        ));
+
+        // If the first byte is present, then empty bytes will be passed in to
+        // the RLP parsing. Let's also check this is not a problem.
+        assert!(matches!(
+            EthTransactionKind::try_from([eip_1559::TYPE_BYTE].as_ref()),
+            Err(Error::RlpDecodeError(_))
+        ));
+        assert!(matches!(
+            EthTransactionKind::try_from([eip_2930::TYPE_BYTE].as_ref()),
+            Err(Error::RlpDecodeError(_))
+        ));
+        assert!(matches!(
+            EthTransactionKind::try_from([0x80].as_ref()),
+            Err(Error::RlpDecodeError(_))
+        ));
+    }
 }
