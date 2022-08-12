@@ -53,6 +53,8 @@ mod consts {
     pub(super) const ERR_DELEGATE: &str = "ERR_INVALID_IN_DELEGATE";
     pub(super) const ROUTER_EXEC_NAME: &str = "execute";
     pub(super) const ROUTER_SCHEDULE_NAME: &str = "schedule";
+    /// Solidity selector for the ERC-20 transferFrom function
+    /// https://www.4byte.directory/signatures/?bytes4_signature=0x23b872dd
     pub(super) const TRANSFER_FROM_SELECTOR: [u8; 4] = [0x23, 0xb8, 0x72, 0xdd];
 }
 
