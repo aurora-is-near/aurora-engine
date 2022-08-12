@@ -139,17 +139,19 @@ fn test_xcc_eth_gas_cost() {
     );
 
     // As a sanity check, confirm that the total EVM gas spent aligns with expectations
+    let total_gas1 = y1 + baseline.all_gas();
+    let total_gas2 = y2 + baseline.all_gas();
     assert!(
-        within_x_percent(33, evm1, y1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
+        within_x_percent(20, evm1, total_gas1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm1,
-        y1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS
+        total_gas1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS
     );
     assert!(
-        within_x_percent(33, evm2, y2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
+        within_x_percent(20, evm2, total_gas2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
-        y2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS
+        total_gas2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS
     );
 }
 
