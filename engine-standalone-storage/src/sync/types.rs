@@ -113,6 +113,21 @@ pub enum TransactionKind {
     Unknown,
 }
 
+/// This data type represents `TransactionMessage` above in the way consistent with how it is
+/// stored on disk (in the DB). This type implements borsh (de)serialization. The purpose of
+/// having a private struct for borsh, which is separate from the main `TransactionMessage`
+/// which is used in the actual logic of executing transactions,
+/// is to decouple the on-disk representation of the data from how it is used in the code.
+/// This allows us to keep the `TransactionMessage` structure clean (no need to worry about
+/// backwards compatibility with storage), hiding the complexity which is not important to
+/// the logic of processing transactions.
+///
+/// V1 is an older version of `TransactionMessage`, before the addition of `promise_data`.
+///
+/// V2 is a structurally identical message to `TransactionMessage` above.
+///
+/// For details of what the individual fields mean, see the comments on the main
+/// `TransactionMessage` type.
 #[derive(BorshDeserialize, BorshSerialize)]
 enum BorshableTransactionMessage<'a> {
     V1(BorshableTransactionMessageV1<'a>),
@@ -121,43 +136,25 @@ enum BorshableTransactionMessage<'a> {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 struct BorshableTransactionMessageV1<'a> {
-    /// Hash of the block which included this transaction
     pub block_hash: [u8; 32],
-    /// Receipt ID of the receipt that was actually executed on NEAR
     pub near_receipt_id: [u8; 32],
-    /// If multiple Aurora transactions are included in the same block,
-    /// this index gives the order in which they should be executed.
     pub position: u16,
-    /// True if the transaction executed successfully on the blockchain, false otherwise.
     pub succeeded: bool,
-    /// NEAR account that signed the transaction
     pub signer: Cow<'a, AccountId>,
-    /// NEAR account that called the Aurora engine contract
     pub caller: Cow<'a, AccountId>,
-    /// Amount of NEAR token attached to the transaction
     pub attached_near: u128,
-    /// Details of the transaction that was executed
     pub transaction: BorshableTransactionKind<'a>,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
 struct BorshableTransactionMessageV2<'a> {
-    /// Hash of the block which included this transaction
     pub block_hash: [u8; 32],
-    /// Receipt ID of the receipt that was actually executed on NEAR
     pub near_receipt_id: [u8; 32],
-    /// If multiple Aurora transactions are included in the same block,
-    /// this index gives the order in which they should be executed.
     pub position: u16,
-    /// True if the transaction executed successfully on the blockchain, false otherwise.
     pub succeeded: bool,
-    /// NEAR account that signed the transaction
     pub signer: Cow<'a, AccountId>,
-    /// NEAR account that called the Aurora engine contract
     pub caller: Cow<'a, AccountId>,
-    /// Amount of NEAR token attached to the transaction
     pub attached_near: u128,
-    /// Details of the transaction that was executed
     pub transaction: BorshableTransactionKind<'a>,
     pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
 }
