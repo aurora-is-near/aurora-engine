@@ -3,6 +3,7 @@ NEAR  = near
 FEATURES = mainnet
 # More strict clippy rules
 FEATURES_CLIPPY = contract
+RUSTC_FLAGS_BUILD = "-C link-arg=-s"
 ADDITIONAL_FEATURES =
 
 ifeq ($(evm-bully),yes)
