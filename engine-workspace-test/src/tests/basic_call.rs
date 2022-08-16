@@ -10,7 +10,7 @@ async fn get_version() -> anyhow::Result<()> {
     let (worker, contract): (Worker<Sandbox>, Contract) = deploy_evm().await?;
 
     let outcome = contract
-        .call(&worker, "get_version")
+        .call(&worker, "get_nonce")
         .args_json(json!({}))?
         .transact()
         .await?;
