@@ -97,8 +97,8 @@ pub(crate) struct AuroraWorkspaceRunner {
 }
 
 impl AuroraWorkspaceRunner {
-
-}
+    // TODO: Replace old runner methods with workspaces logic
+} 
 
 
 impl Default for AuroraWorkspaceRunner {
