@@ -57,10 +57,12 @@ impl ERC20Constructor {
         } else {
             // Contracts not already present, so download them (but only once, even
             // if multiple tests running in parallel saw `contracts_dir` does not exist).
-            DOWNLOAD_ONCE.call_once(|| {
-                let url = "https://github.com/OpenZeppelin/openzeppelin-contracts";
-                git2::Repository::clone(url, sources_dir).unwrap();
-            });
+            if !sources_dir.exists() {
+                DOWNLOAD_ONCE.call_once(|| {
+                    let url = "https://github.com/OpenZeppelin/openzeppelin-contracts";
+                    git2::Repository::clone(url, sources_dir).unwrap();
+                });
+            }
             contracts_dir
         }
     }
