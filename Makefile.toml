@@ -36,7 +36,9 @@ script = '''
 rm -Rf etc/eth-contracts/.pnp
 rm -Rf etc/eth-contracts/artifacts
 rm -Rf etc/eth-contracts/cache
-rm -Rf etc/benchmark-contract/target
+rm -Rf etc/tests/benchmark-contract/target
+rm -Rf etc/tests/ft-receiver/target
+rm -Rf etc/tests/self-contained-5bEgfRQ/target
 '''
 
 [tasks.clean-bin]

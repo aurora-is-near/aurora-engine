@@ -357,7 +357,9 @@ fn test_solidity_pure_bench() {
     );
 
     // Pure rust version of the same contract
-    let base_path = std::path::Path::new("../etc").join("benchmark-contract");
+    let base_path = std::path::Path::new("../etc")
+        .join("tests")
+        .join("benchmark-contract");
     let output_path =
         base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
     test_utils::rust::compile(base_path);

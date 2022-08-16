@@ -1483,7 +1483,9 @@ fn test_ft_transfer_wrong_u128_json_type() {
 
 /// Bytes for a NEAR smart contract implementing `ft_on_transfer`
 fn dummy_ft_receiver_bytes() -> Vec<u8> {
-    let base_path = std::path::Path::new("../etc").join("ft-receiver");
+    let base_path = std::path::Path::new("../etc")
+        .join("tests")
+        .join("ft-receiver");
     let output_path = base_path.join("target/wasm32-unknown-unknown/release/ft_receiver.wasm");
     crate::test_utils::rust::compile(base_path);
     std::fs::read(output_path).unwrap()
