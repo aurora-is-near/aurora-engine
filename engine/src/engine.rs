@@ -1387,6 +1387,9 @@ where
                 }
             } else if log.address == cross_contract_call::ADDRESS.raw() {
                 if log.topics[0] == cross_contract_call::AMOUNT_TOPIC {
+                    // NEAR balances are 128-bit, so the leading 16 bytes of the 256-bit topic
+                    // value should always be zero.
+                    assert_eq!(&log.topics[1].as_bytes()[0..16], &[0; 16]);
                     let required_near =
                         Yocto::new(U256::from_big_endian(log.topics[1].as_bytes()).low_u128());
                     if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
