@@ -2,7 +2,7 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 
 #[cfg(feature = "contract")]
-use crate::prelude::Address;
+use crate::prelude::{Address, Vec, U256};
 use crate::prelude::{H256, STORAGE_PRICE_PER_BYTE};
 pub use types::keccak;
 
@@ -45,9 +45,10 @@ pub fn log_utf8(bytes: &[u8]) {
 #[cfg(feature = "contract")]
 pub fn sha256(input: &[u8]) -> H256 {
     unsafe {
+        const REGISTER_ID: u64 = 1;
         exports::sha256(input.len() as u64, input.as_ptr() as u64, 1);
         let bytes = H256::zero();
-        exports::read_register(1, bytes.0.as_ptr() as *const u64 as u64);
+        exports::read_register(REGISTER_ID, bytes.0.as_ptr() as *const u64 as u64);
         bytes
     }
 }
@@ -70,6 +71,75 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
         exports::read_register(REGISTER_ID, bytes.as_ptr() as u64);
         bytes
     }
+}
+
+#[cfg(feature = "contract")]
+pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
+    let mut bytes = Vec::with_capacity(64 * 2 + 2); // 64 bytes per G1 + 2 positive integer bytes.
+
+    bytes.push(0); // positive sign
+    bytes.extend_from_slice(&left);
+    bytes.push(0);
+    bytes.extend_from_slice(&right);
+
+    let value_ptr = bytes.as_ptr() as u64;
+    let value_len = bytes.len() as u64;
+
+    unsafe {
+        const REGISTER_ID: u64 = 1;
+        exports::alt_bn128_g1_sum(value_len, value_ptr, REGISTER_ID);
+        let mut output = [0u8; 64];
+        exports::read_register(REGISTER_ID, output.as_ptr() as u64);
+        let x = U256::from_little_endian(&output[0..32]);
+        let y = U256::from_little_endian(&output[32..64]);
+        x.to_big_endian(&mut output[0..32]);
+        y.to_big_endian(&mut output[32..64]);
+        output
+    }
+}
+
+#[cfg(feature = "contract")]
+pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
+    let mut bytes = [0u8; 96];
+    bytes[0..64].copy_from_slice(&g1);
+    bytes[64..96].copy_from_slice(&fr);
+
+    let value_ptr = bytes.as_ptr() as u64;
+    let value_len = bytes.len() as u64;
+
+    unsafe {
+        const REGISTER_ID: u64 = 1;
+        exports::alt_bn128_g1_multiexp(value_len, value_ptr, REGISTER_ID);
+        let mut output = [0u8; 64];
+        exports::read_register(REGISTER_ID, output.as_ptr() as u64);
+        let x = U256::from_little_endian(&output[0..32]);
+        let y = U256::from_little_endian(&output[32..64]);
+        x.to_big_endian(&mut output[0..32]);
+        y.to_big_endian(&mut output[32..64]);
+        output
+    }
+}
+
+#[cfg(feature = "contract")]
+pub fn alt_bn128_pairing<I>(pairs: I) -> bool
+where
+    I: ExactSizeIterator<Item = ([u8; 64], [u8; 128])>,
+{
+    let n = pairs.len();
+    let mut bytes = Vec::with_capacity(n * 6 * 32);
+    let mut buf = [0u8; 64 + 128];
+    for (g1, g2) in pairs {
+        buf[0..64].copy_from_slice(&g1);
+        buf[64..192].copy_from_slice(&g2);
+        bytes.extend_from_slice(&buf);
+    }
+
+    let value_ptr = bytes.as_ptr() as u64;
+    let value_len = bytes.len() as u64;
+
+    let result = unsafe { exports::alt_bn128_pairing_check(value_len, value_ptr) };
+
+    result == 1
 }
 
 /// Recover address from message hash and signature.
