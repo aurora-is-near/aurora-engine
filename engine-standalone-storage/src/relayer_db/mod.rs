@@ -83,7 +83,8 @@ where
         random_seed: H256::zero(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
     };
-    let mut handler = crate::promise::Noop;
+    // We use the Noop handler here since the relayer DB does not contain any promise information.
+    let mut handler = aurora_engine_sdk::promise::Noop;
 
     while let Some(row) = rows.next()? {
         let near_tx_hash = row.near_hash;
@@ -150,6 +151,7 @@ where
             caller: env.predecessor_account_id(),
             attached_near: 0,
             transaction: crate::sync::types::TransactionKind::Submit(tx),
+            promise_data: Vec::new(),
         };
         storage.set_transaction_included(tx_hash, &tx_msg, &diff)?;
     }
@@ -256,6 +258,7 @@ mod test {
                         caller: "aurora".parse().unwrap(),
                         attached_near: 0,
                         transaction: TransactionKind::Unknown,
+                        promise_data: Vec::new(),
                     },
                     &diff,
                 )

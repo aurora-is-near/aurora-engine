@@ -268,6 +268,7 @@ fn test_transaction_index() {
         caller: "placeholder.near".parse().unwrap(),
         attached_near: 0,
         transaction: TransactionKind::Unknown,
+        promise_data: Vec::new(),
     };
     let tx_included = engine_standalone_storage::TransactionIncluded {
         block_hash,

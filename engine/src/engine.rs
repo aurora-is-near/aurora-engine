@@ -10,7 +10,7 @@ use crate::map::BijectionMap;
 use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
+use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
 
 use crate::accounting;
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
@@ -347,18 +347,19 @@ impl AsRef<[u8]> for EngineStateError {
     }
 }
 
-struct StackExecutorParams<'a, I, E> {
-    precompiles: Precompiles<'a, I, E>,
+struct StackExecutorParams<'a, I, E, H> {
+    precompiles: Precompiles<'a, I, E, H>,
     gas_limit: u64,
 }
 
-impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
+impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<'env, I, E, H> {
     fn new(
         gas_limit: u64,
         current_account_id: AccountId,
         random_seed: H256,
         io: I,
         env: &'env E,
+        ro_promise_handler: H,
     ) -> Self {
         Self {
             precompiles: Precompiles::new_london(PrecompileConstructorContext {
@@ -366,6 +367,7 @@ impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
                 random_seed,
                 io,
                 env,
+                promise_handler: ro_promise_handler,
             }),
             gas_limit,
         }
@@ -378,7 +380,7 @@ impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
         'static,
         'a,
         executor::stack::MemoryStackState<Engine<'env, I, E>>,
-        Precompiles<'env, I, E>,
+        Precompiles<'env, I, E, H>,
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::stack::MemoryStackState::new(metadata, engine);
@@ -528,6 +530,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
             self.io,
             self.env,
+            handler.read_only(),
         );
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy {
@@ -614,6 +617,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
             self.io,
             self.env,
+            handler.read_only(),
         );
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) = executor.transact_call(
@@ -665,6 +669,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
             self.io,
             self.env,
+            // View calls cannot interact with promises
+            aurora_engine_sdk::promise::Noop,
         );
         let mut executor = executor_params.make_executor(self);
         let (status, result) = executor.transact_call(

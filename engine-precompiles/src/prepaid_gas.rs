@@ -5,7 +5,7 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_types::{vec, U256};
 use evm::{Context, ExitError};
 
-/// predecessor_account_id precompile address
+/// prepaid_gas precompile address
 ///
 /// Address: `0x536822d27de53629ef1f84c60555689e9488609f`
 /// This address is computed as: `&keccak("prepaidGas")[12..]`

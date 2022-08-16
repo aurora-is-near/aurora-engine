@@ -53,6 +53,7 @@ fn test_consume_deposit_message() {
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: sync::types::TransactionKind::Deposit(proof.try_to_vec().unwrap()),
+        promise_data: Vec::new(),
     };
 
     let outcome = sync::consume_message(
@@ -84,6 +85,7 @@ fn test_consume_deposit_message() {
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: sync::types::TransactionKind::FinishDeposit(finish_deposit_args),
+        promise_data: Vec::new(),
     };
 
     let outcome = sync::consume_message(
@@ -116,6 +118,7 @@ fn test_consume_deposit_message() {
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: sync::types::TransactionKind::FtOnTransfer(ft_on_transfer_args),
+        promise_data: Vec::new(),
     };
 
     sync::consume_message(
@@ -145,6 +148,7 @@ fn test_consume_deploy_message() {
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: sync::types::TransactionKind::Deploy(input),
+        promise_data: Vec::new(),
     };
 
     sync::consume_message(
@@ -196,6 +200,7 @@ fn test_consume_deploy_erc20_message() {
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: sync::types::TransactionKind::DeployErc20(args),
+        promise_data: Vec::new(),
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
@@ -233,6 +238,7 @@ fn test_consume_deploy_erc20_message() {
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: sync::types::TransactionKind::FtOnTransfer(args),
+        promise_data: Vec::new(),
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
@@ -289,6 +295,7 @@ fn test_consume_ft_on_transfer_message() {
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: sync::types::TransactionKind::FtOnTransfer(args),
+        promise_data: Vec::new(),
     };
 
     sync::consume_message(
@@ -332,6 +339,7 @@ fn test_consume_call_message() {
             recipient_address,
             transfer_amount,
         )),
+        promise_data: Vec::new(),
     };
 
     sync::consume_message(
@@ -381,6 +389,7 @@ fn test_consume_submit_message() {
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: sync::types::TransactionKind::Submit(eth_transaction),
+        promise_data: Vec::new(),
     };
 
     sync::consume_message(

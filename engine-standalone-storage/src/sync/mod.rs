@@ -128,7 +128,9 @@ fn execute_transaction<'db>(
         TransactionKind::Submit(tx) => {
             // We can ignore promises in the standalone engine because it processes each receipt separately
             // and it is fed a stream of receipts (it does not schedule them)
-            let mut handler = crate::promise::Noop;
+            let mut handler = crate::promise::NoScheduler {
+                promise_data: &transaction_message.promise_data,
+            };
             let transaction_bytes: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
@@ -151,7 +153,13 @@ fn execute_transaction<'db>(
         }
 
         other => {
-            let result = non_submit_execute(other, io, env, relayer_address);
+            let result = non_submit_execute(
+                other,
+                io,
+                env,
+                relayer_address,
+                &transaction_message.promise_data,
+            );
             (near_receipt_id, result)
         }
     };
@@ -169,11 +177,12 @@ fn non_submit_execute<'db>(
     mut io: EngineStateAccess<'db, 'db, 'db>,
     env: env::Fixed,
     relayer_address: Address,
+    promise_data: &[Option<Vec<u8>>],
 ) -> Result<Option<TransactionExecutionResult>, error::Error> {
     let result = match transaction {
         TransactionKind::Call(args) => {
             // We can ignore promises in the standalone engine (see above)
-            let mut handler = crate::promise::Noop;
+            let mut handler = crate::promise::NoScheduler { promise_data };
             let mut engine =
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
@@ -184,7 +193,7 @@ fn non_submit_execute<'db>(
 
         TransactionKind::Deploy(input) => {
             // We can ignore promises in the standalone engine (see above)
-            let mut handler = crate::promise::Noop;
+            let mut handler = crate::promise::NoScheduler { promise_data };
             let mut engine =
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
@@ -195,7 +204,7 @@ fn non_submit_execute<'db>(
 
         TransactionKind::DeployErc20(args) => {
             // No promises can be created by `deploy_erc20_token`
-            let mut handler = crate::promise::Noop;
+            let mut handler = crate::promise::NoScheduler { promise_data };
             let result = engine::deploy_erc20_token(args.clone(), io, &env, &mut handler)?;
 
             Some(TransactionExecutionResult::DeployErc20(result))
@@ -203,7 +212,7 @@ fn non_submit_execute<'db>(
 
         TransactionKind::FtOnTransfer(args) => {
             // No promises can be created by `ft_on_transfer`
-            let mut handler = crate::promise::Noop;
+            let mut handler = crate::promise::NoScheduler { promise_data };
             let mut engine =
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
@@ -328,7 +337,7 @@ fn non_submit_execute<'db>(
                 maybe_args
                     .clone()
                     .map(|args| {
-                        let mut handler = crate::promise::Noop;
+                        let mut handler = crate::promise::NoScheduler { promise_data };
                         let engine_state = engine::get_state(&io)?;
                         let result =
                             engine::refund_on_error(io, &env, engine_state, args, &mut handler);

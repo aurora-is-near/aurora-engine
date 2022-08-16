@@ -1,5 +1,5 @@
 use crate::fmt::Formatter;
-use crate::{Add, Display, Div, Mul, Sub};
+use crate::{Add, AddAssign, Display, Div, Mul, Sub};
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -64,6 +64,12 @@ impl Add<EthGas> for EthGas {
 
     fn add(self, rhs: EthGas) -> Self::Output {
         EthGas(self.0 + rhs.0)
+    }
+}
+
+impl AddAssign<EthGas> for EthGas {
+    fn add_assign(&mut self, rhs: EthGas) {
+        self.0 += rhs.0
     }
 }
 
