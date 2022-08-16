@@ -14,8 +14,6 @@ extern crate alloc;
 extern crate core;
 
 mod map;
-#[cfg(feature = "meta-call")]
-pub mod meta_parsing;
 pub mod parameters;
 pub mod proof;
 
@@ -259,40 +257,6 @@ mod contract {
             &mut Runtime,
         );
 
-        result
-            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
-            .sdk_process();
-    }
-
-    #[cfg(feature = "meta-call")]
-    #[no_mangle]
-    pub extern "C" fn meta_call() {
-        use crate::prelude::U256;
-        let io = Runtime;
-        let input = io.read_input().to_vec();
-        let state = engine::get_state(&io).sdk_unwrap();
-        let domain_separator = crate::meta_parsing::near_erc712_domain(U256::from(state.chain_id));
-        let meta_call_args = crate::meta_parsing::parse_meta_call(
-            &domain_separator,
-            io.current_account_id().as_bytes(),
-            input,
-        )
-        .sdk_expect(errors::ERR_META_TX_PARSE);
-
-        engine::check_nonce(&io, &meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
-
-        let current_account_id = io.current_account_id();
-        let mut engine =
-            Engine::new_with_state(state, meta_call_args.sender, current_account_id, io, &io);
-        let result = engine.call(
-            &meta_call_args.sender,
-            &meta_call_args.contract_address,
-            meta_call_args.value,
-            meta_call_args.input,
-            u64::MAX, // TODO: is there a gas limit with meta calls?
-            crate::prelude::Vec::new(),
-            &mut Runtime,
-        );
         result
             .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
             .sdk_process();

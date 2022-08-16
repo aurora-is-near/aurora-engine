@@ -2,7 +2,7 @@ use crate::prelude::Borrowed;
 use core::num::TryFromIntError;
 #[cfg(test)]
 use evm::Context;
-use evm_core::ExitError;
+use evm::ExitError;
 
 #[cfg(test)]
 pub fn new_context() -> Context {

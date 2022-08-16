@@ -28,20 +28,6 @@ pub struct NewCallArgs {
     pub upgrade_delay_blocks: u64,
 }
 
-/// Borsh-encoded parameters for the `meta_call` function.
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
-pub struct MetaCallArgs {
-    pub signature: [u8; 64],
-    pub v: u8,
-    pub nonce: RawU256,
-    pub fee_amount: RawU256,
-    pub fee_address: Address,
-    pub contract_address: Address,
-    pub value: RawU256,
-    pub method_def: String,
-    pub args: Vec<u8>,
-}
-
 /// Borsh-encoded log for use in a `SubmitResult`.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

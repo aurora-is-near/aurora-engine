@@ -27,6 +27,14 @@ jobs:
         run: cargo make clippy
       - name: Run cargo clippy
         run: cargo clippy
+  udeps:
+    name: Udeps
+    runs-on: [self-hosted, heavy]
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v3
+      - name: Run udeps
+        run: cargo make udeps
   contracts:
     name: Contracts
     runs-on: [self-hosted, light]
