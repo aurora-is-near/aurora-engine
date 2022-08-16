@@ -110,7 +110,7 @@ fn test_promise_result_gas_cost() {
         let x = a.max(b);
         let y = a.min(b);
 
-        20 * (x - y) <= x
+        19 * (x - y) <= x
     };
     assert!(
         within_5_percent(base_cost.as_u64(), costs::PROMISE_RESULT_BASE_COST.as_u64()),

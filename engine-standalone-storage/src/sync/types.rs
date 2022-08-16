@@ -113,6 +113,7 @@ pub enum TransactionKind {
     FactoryUpdate(Vec<u8>),
     /// Update the version of a deployed xcc-router contract
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
+    FactorySetWNearAddress(types::Address),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -241,6 +242,7 @@ enum BorshableTransactionKind<'a> {
     NewEngine(Cow<'a, parameters::NewCallArgs>),
     FactoryUpdate(Cow<'a, Vec<u8>>),
     FactoryUpdateAddressVersion(Cow<'a, AddressVersionUpdateArgs>),
+    FactorySetWNearAddress(types::Address),
     Unknown,
 }
 
@@ -275,6 +277,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::FactoryUpdate(x) => Self::FactoryUpdate(Cow::Borrowed(x)),
             TransactionKind::FactoryUpdateAddressVersion(x) => {
                 Self::FactoryUpdateAddressVersion(Cow::Borrowed(x))
+            }
+            TransactionKind::FactorySetWNearAddress(address) => {
+                Self::FactorySetWNearAddress(*address)
             }
             TransactionKind::Unknown => Self::Unknown,
         }
@@ -323,6 +328,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::FactoryUpdate(x) => Ok(Self::FactoryUpdate(x.into_owned())),
             BorshableTransactionKind::FactoryUpdateAddressVersion(x) => {
                 Ok(Self::FactoryUpdateAddressVersion(x.into_owned()))
+            }
+            BorshableTransactionKind::FactorySetWNearAddress(address) => {
+                Ok(Self::FactorySetWNearAddress(address))
             }
             BorshableTransactionKind::Unknown => Ok(Self::Unknown),
         }

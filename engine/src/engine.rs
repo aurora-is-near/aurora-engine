@@ -22,7 +22,7 @@ use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction}
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
     BTreeMap, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs,
-    ToString, Vec, Wei, ERC20_MINT_SELECTOR, H160, H256, U256,
+    ToString, Vec, Wei, Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
 use aurora_engine_precompiles::PrecompileConstructorContext;
 use core::cell::RefCell;
@@ -243,7 +243,7 @@ impl AsRef<[u8]> for DeployErc20Error {
     }
 }
 
-pub struct ERC20Address(Address);
+pub struct ERC20Address(pub Address);
 
 impl AsRef<[u8]> for ERC20Address {
     fn as_ref(&self) -> &[u8] {
@@ -273,7 +273,7 @@ impl AsRef<[u8]> for AddressParseError {
     }
 }
 
-pub struct NEP141Account(AccountId);
+pub struct NEP141Account(pub AccountId);
 
 impl AsRef<[u8]> for NEP141Account {
     fn as_ref(&self) -> &[u8] {
@@ -1366,7 +1366,7 @@ fn filter_promises_from_logs<I, T, P>(
 where
     T: IntoIterator<Item = Log>,
     P: PromiseHandler,
-    I: IO,
+    I: IO + Copy,
 {
     logs.into_iter()
         .filter_map(|log| {
@@ -1392,8 +1392,21 @@ where
                     Some(log.into())
                 }
             } else if log.address == cross_contract_call::ADDRESS.raw() {
-                if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
-                    crate::xcc::handle_precompile_promise(io, handler, promise, current_account_id);
+                if log.topics[0] == cross_contract_call::AMOUNT_TOPIC {
+                    // NEAR balances are 128-bit, so the leading 16 bytes of the 256-bit topic
+                    // value should always be zero.
+                    assert_eq!(&log.topics[1].as_bytes()[0..16], &[0; 16]);
+                    let required_near =
+                        Yocto::new(U256::from_big_endian(log.topics[1].as_bytes()).low_u128());
+                    if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
+                        crate::xcc::handle_precompile_promise(
+                            io,
+                            handler,
+                            promise,
+                            required_near,
+                            current_account_id,
+                        );
+                    }
                 }
                 // do not pass on these "internal logs" to caller
                 None

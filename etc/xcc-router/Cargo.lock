@@ -45,7 +45,7 @@ dependencies = [
  "ethabi",
  "hex",
  "primitive-types 0.11.1",
- "sha3 0.9.1",
+ "sha3 0.10.2",
 ]
 
 [[package]]

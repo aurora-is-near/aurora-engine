@@ -1,18 +1,23 @@
+use crate::test_utils::erc20::{ERC20Constructor, ERC20};
 use crate::test_utils::{self, AuroraRunner};
 use crate::tests::erc20_connector::sim_tests;
-use crate::tests::state_migration::deploy_evm;
-use aurora_engine_precompiles::xcc::{costs, cross_contract_call};
+use crate::tests::state_migration::{deploy_evm, AuroraAccount};
+use aurora_engine_precompiles::xcc::{self, costs, cross_contract_call};
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::parameters::{
     CrossContractCallArgs, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
 };
 use aurora_engine_types::types::{Address, EthGas, NearGas, Wei, Yocto};
 use aurora_engine_types::U256;
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 use near_primitives::transaction::Action;
 use near_primitives_core::contract::ContractCode;
+use near_sdk_sim::UserAccount;
+use serde_json::json;
 use std::fs;
 use std::path::Path;
+
+const WNEAR_AMOUNT: u128 = 10 * near_sdk_sim::STORAGE_AMOUNT;
 
 #[test]
 fn test_xcc_eth_gas_cost() {
@@ -21,24 +26,49 @@ fn test_xcc_eth_gas_cost() {
     let xcc_wasm_bytes = contract_bytes();
     let _ = runner.call("factory_update", "aurora", xcc_wasm_bytes);
     let mut signer = test_utils::Signer::random();
+    let mut baseline_signer = test_utils::Signer::random();
     runner.context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    // Need to use engine's deploy!
+    let wnear_erc20 = deploy_erc20(&mut runner, &mut signer);
+    approve_erc20(
+        &wnear_erc20,
+        cross_contract_call::ADDRESS,
+        &mut runner,
+        &mut signer,
+    );
+    approve_erc20(
+        &wnear_erc20,
+        test_utils::address_from_secret_key(&baseline_signer.secret_key),
+        &mut runner,
+        &mut signer,
+    );
+    let _ = runner.call(
+        "factory_set_wnear_address",
+        "aurora",
+        wnear_erc20.0.address.as_bytes().to_vec(),
+    );
 
-    // Baseline transaction that does essentially nothing.
-    let (_, baseline) = runner
-        .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {
-            nonce,
-            gas_price: U256::zero(),
-            gas_limit: u64::MAX.into(),
-            to: Some(Address::from_array([0; 20])),
-            value: Wei::zero(),
-            data: Vec::new(),
+    // Baseline transaction is an ERC-20 transferFrom call since such a call is included as part
+    // of the precompile execution, but we want to isolate just the precompile logic itself
+    // (the EVM subcall is charged separately).
+    let (baseline_result, baseline) = runner
+        .submit_with_signer_profiled(&mut baseline_signer, |nonce| {
+            wnear_erc20.transfer_from(
+                test_utils::address_from_secret_key(&signer.secret_key),
+                Address::from_array([1u8; 20]),
+                U256::from(near_sdk_sim::STORAGE_AMOUNT),
+                nonce,
+            )
         })
         .unwrap();
+    if !baseline_result.status.is_ok() {
+        panic!("Unexpected baseline status: {:?}", baseline_result);
+    }
 
-    let mut profile_for_promise = |p: PromiseArgs| -> (u64, u64) {
+    let mut profile_for_promise = |p: PromiseArgs| -> (u64, u64, u64) {
         let data = CrossContractCallArgs::Eager(p).try_to_vec().unwrap();
         let input_length = data.len();
-        let (_, profile) = runner
+        let (submit_result, profile) = runner
             .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {
                 nonce,
                 gas_price: U256::zero(),
@@ -48,10 +78,12 @@ fn test_xcc_eth_gas_cost() {
                 data,
             })
             .unwrap();
+        assert!(submit_result.status.is_ok());
         // Subtract off baseline transaction to isolate just precompile things
         (
             u64::try_from(input_length).unwrap(),
             profile.all_gas() - baseline.all_gas(),
+            submit_result.gas_used,
         )
     };
 
@@ -60,12 +92,12 @@ fn test_xcc_eth_gas_cost() {
         method: "some_method".into(),
         args: b"hello_world".to_vec(),
         attached_balance: Yocto::new(56),
-        attached_gas: NearGas::new(0),
+        attached_gas: NearGas::new(500),
     };
     // Shorter input
-    let (x1, y1) = profile_for_promise(PromiseArgs::Create(promise.clone()));
+    let (x1, y1, evm1) = profile_for_promise(PromiseArgs::Create(promise.clone()));
     // longer input
-    let (x2, y2) = profile_for_promise(PromiseArgs::Callback(PromiseWithCallbackArgs {
+    let (x2, y2, evm2) = profile_for_promise(PromiseArgs::Callback(PromiseWithCallbackArgs {
         base: promise.clone(),
         callback: promise,
     }));
@@ -78,14 +110,15 @@ fn test_xcc_eth_gas_cost() {
     let xcc_base_cost = EthGas::new(xcc_base_cost.as_u64() / costs::CROSS_CONTRACT_CALL_NEAR_GAS);
     let xcc_cost_per_byte = xcc_cost_per_byte / costs::CROSS_CONTRACT_CALL_NEAR_GAS;
 
-    let within_5_percent = |a: u64, b: u64| -> bool {
-        let x = a.max(b);
-        let y = a.min(b);
+    let within_x_percent = |x: u64, a: u64, b: u64| -> bool {
+        let c = a.max(b);
+        let d = a.min(b);
 
-        20 * (x - y) <= x
+        (100 / x) * (c - d) <= c
     };
     assert!(
-        within_5_percent(
+        within_x_percent(
+            5,
             xcc_base_cost.as_u64(),
             costs::CROSS_CONTRACT_CALL_BASE.as_u64()
         ),
@@ -95,10 +128,30 @@ fn test_xcc_eth_gas_cost() {
     );
 
     assert!(
-        within_5_percent(xcc_cost_per_byte, costs::CROSS_CONTRACT_CALL_BYTE.as_u64()),
+        within_x_percent(
+            5,
+            xcc_cost_per_byte,
+            costs::CROSS_CONTRACT_CALL_BYTE.as_u64()
+        ),
         "Incorrect xcc per byte cost. Expected: {} Actual: {}",
         xcc_cost_per_byte,
         costs::CROSS_CONTRACT_CALL_BYTE
+    );
+
+    // As a sanity check, confirm that the total EVM gas spent aligns with expectations
+    let total_gas1 = y1 + baseline.all_gas();
+    let total_gas2 = y2 + baseline.all_gas();
+    assert!(
+        within_x_percent(20, evm1, total_gas1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
+        "Incorrect EVM gas used. Expected: {} Actual: {}",
+        evm1,
+        total_gas1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS
+    );
+    assert!(
+        within_x_percent(20, evm2, total_gas2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
+        "Incorrect EVM gas used. Expected: {} Actual: {}",
+        evm2,
+        total_gas2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS
     );
 }
 
@@ -114,6 +167,7 @@ fn test_xcc_precompile_scheduled() {
 
 fn test_xcc_precompile_common(is_scheduled: bool) {
     let aurora = deploy_evm();
+    let chain_id = AuroraRunner::default().chain_id;
     let xcc_wasm_bytes = contract_bytes();
     aurora
         .user
@@ -128,6 +182,46 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
 
     let mut signer = test_utils::Signer::random();
     let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+
+    // Setup wNEAR contract and bridge it to Aurora
+    let wnear_account = deploy_wnear(&aurora);
+    let wnear_erc20 = sim_tests::deploy_erc20_from_nep_141(&wnear_account, &aurora);
+    sim_tests::transfer_nep_141_to_erc_20(
+        &wnear_account,
+        &wnear_erc20,
+        &aurora.user,
+        signer_address,
+        WNEAR_AMOUNT,
+        &aurora,
+    );
+    aurora
+        .user
+        .call(
+            aurora.contract.account_id(),
+            "factory_set_wnear_address",
+            wnear_erc20.0.address.as_bytes(),
+            near_sdk_sim::DEFAULT_GAS,
+            0,
+        )
+        .assert_success();
+    let approve_tx = wnear_erc20.approve(
+        cross_contract_call::ADDRESS,
+        WNEAR_AMOUNT.into(),
+        signer.use_nonce().into(),
+    );
+    let signed_transaction =
+        test_utils::sign_transaction(approve_tx, Some(chain_id), &signer.secret_key);
+    aurora
+        .user
+        .call(
+            aurora.contract.account_id(),
+            "submit",
+            &rlp::encode(&signed_transaction),
+            near_sdk_sim::DEFAULT_GAS,
+            0,
+        )
+        .assert_success();
+
     let router_account = format!(
         "{}.{}",
         hex::encode(signer_address.as_bytes()),
@@ -210,27 +304,50 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
         value: Wei::zero(),
         data: xcc_args.try_to_vec().unwrap(),
     };
-    let signed_transaction = test_utils::sign_transaction(
-        transaction,
-        Some(AuroraRunner::default().chain_id),
-        &signer.secret_key,
+    let signed_transaction =
+        test_utils::sign_transaction(transaction, Some(chain_id), &signer.secret_key);
+    let engine_balance_before_xcc = get_engine_near_balance(&aurora);
+    let result = aurora.user.call(
+        aurora.contract.account_id(),
+        "submit",
+        &rlp::encode(&signed_transaction),
+        near_sdk_sim::DEFAULT_GAS,
+        0,
     );
-    aurora
-        .user
-        .call(
-            aurora.contract.account_id(),
-            "submit",
-            &rlp::encode(&signed_transaction),
-            near_sdk_sim::DEFAULT_GAS,
-            0,
-        )
-        .assert_success();
-
-    let rt = aurora.user.borrow_runtime();
-    for id in rt.last_outcomes.iter() {
-        println!("{:?}\n\n", rt.outcome(id).unwrap());
+    result.assert_success();
+    let submit_result: aurora_engine::parameters::SubmitResult = result.unwrap_borsh();
+    if !submit_result.status.is_ok() {
+        panic!("Unexpected result {:?}", submit_result);
     }
-    drop(rt);
+
+    print_outcomes(&aurora);
+    let engine_balance_after_xcc = get_engine_near_balance(&aurora);
+    assert!(
+        // engine loses less than 0.01 NEAR
+        engine_balance_after_xcc.max(engine_balance_before_xcc)
+            - engine_balance_after_xcc.min(engine_balance_before_xcc)
+            < 10_000_000_000_000_000_000_000,
+        "Engine lost too much NEAR funding xcc: Before={:?} After={:?}",
+        engine_balance_before_xcc,
+        engine_balance_after_xcc,
+    );
+    let router_balance = aurora
+        .user
+        .borrow_runtime()
+        .view_account(&router_account)
+        .unwrap()
+        .amount();
+    assert!(
+        // router loses less than 0.01 NEAR from its allocated funds
+        xcc::state::STORAGE_AMOUNT.as_u128() - router_balance < 10_000_000_000_000_000_000_000,
+        "Router lost too much NEAR: Balance={:?}",
+        router_balance,
+    );
+    // Router has no wNEAR balance because it all was unwrapped to actual NEAR
+    assert_eq!(
+        sim_tests::nep_141_balance_of(&router_account, &wnear_account, &aurora),
+        0,
+    );
 
     if is_scheduled {
         // The promise was only scheduled, not executed immediately. So the FT balance has not changed yet.
@@ -256,6 +373,22 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
         sim_tests::nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141_token, &aurora),
         nep_141_supply
     );
+}
+
+fn get_engine_near_balance(aurora: &AuroraAccount) -> u128 {
+    aurora
+        .user
+        .borrow_runtime()
+        .view_account(&aurora.contract.account_id.as_str())
+        .unwrap()
+        .amount()
+}
+
+fn print_outcomes(aurora: &AuroraAccount) {
+    let rt = aurora.user.borrow_runtime();
+    for id in rt.last_outcomes.iter() {
+        println!("{:?}=={:?}\n\n", id, rt.outcome(id).unwrap());
+    }
 }
 
 #[test]
@@ -339,12 +472,130 @@ fn deploy_router() -> AuroraRunner {
     router.context.current_account_id = "some_address.aurora".parse().unwrap();
     router.context.predecessor_account_id = "aurora".parse().unwrap();
 
-    let (maybe_outcome, maybe_error) = router.call("initialize", "aurora", Vec::new());
+    let init_args = r#"{"wnear_account": "wrap.near", "must_register": true}"#;
+    let (maybe_outcome, maybe_error) =
+        router.call("initialize", "aurora", init_args.as_bytes().to_vec());
     assert!(maybe_error.is_none());
     let outcome = maybe_outcome.unwrap();
     assert!(outcome.used_gas < aurora_engine::xcc::INITIALIZE_GAS.as_u64());
 
     router
+}
+
+fn deploy_wnear(aurora: &AuroraAccount) -> UserAccount {
+    let contract_bytes = std::fs::read("src/tests/res/w_near.wasm").unwrap();
+
+    let account_id = format!("wrap.{}", aurora.user.account_id.as_str());
+    let contract_account = aurora.user.deploy(
+        &contract_bytes,
+        account_id.parse().unwrap(),
+        5 * near_sdk_sim::STORAGE_AMOUNT,
+    );
+
+    aurora
+        .user
+        .call(
+            contract_account.account_id(),
+            "new",
+            &[],
+            near_sdk_sim::DEFAULT_GAS,
+            0,
+        )
+        .assert_success();
+
+    // Need to register Aurora contract so that it can receive tokens
+    let args = json!({
+        "account_id": &aurora.contract.account_id,
+    })
+    .to_string();
+    aurora
+        .user
+        .call(
+            contract_account.account_id(),
+            "storage_deposit",
+            args.as_bytes(),
+            near_sdk_sim::DEFAULT_GAS,
+            near_sdk_sim::STORAGE_AMOUNT,
+        )
+        .assert_success();
+
+    // Need to also register root account
+    let args = json!({
+        "account_id": &aurora.user.account_id,
+    })
+    .to_string();
+    aurora
+        .user
+        .call(
+            contract_account.account_id(),
+            "storage_deposit",
+            args.as_bytes(),
+            near_sdk_sim::DEFAULT_GAS,
+            near_sdk_sim::STORAGE_AMOUNT,
+        )
+        .assert_success();
+
+    // Mint some wNEAR for the root account to use
+    aurora
+        .user
+        .call(
+            contract_account.account_id(),
+            "near_deposit",
+            &[],
+            near_sdk_sim::DEFAULT_GAS,
+            WNEAR_AMOUNT,
+        )
+        .assert_success();
+
+    contract_account
+}
+
+fn deploy_erc20(runner: &mut AuroraRunner, signer: &mut test_utils::Signer) -> ERC20 {
+    let engine_account = runner.aurora_account_id.clone();
+    let args = aurora_engine::parameters::DeployErc20TokenArgs {
+        nep141: "wrap.near".parse().unwrap(),
+    };
+    let (maybe_output, maybe_error) = runner.call(
+        "deploy_erc20_token",
+        &engine_account,
+        args.try_to_vec().unwrap(),
+    );
+    assert!(maybe_error.is_none());
+    let output = maybe_output.unwrap();
+    let address = {
+        let bytes: Vec<u8> =
+            BorshDeserialize::try_from_slice(output.return_data.as_value().as_ref().unwrap())
+                .unwrap();
+        Address::try_from_slice(&bytes).unwrap()
+    };
+
+    let contract = ERC20(ERC20Constructor::load().0.deployed_at(address));
+    let dest_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let call_args =
+        aurora_engine::parameters::CallArgs::V1(aurora_engine::parameters::FunctionCallArgsV1 {
+            contract: address,
+            input: contract
+                .mint(dest_address, WNEAR_AMOUNT.into(), U256::zero())
+                .data,
+        });
+    let (_, maybe_error) = runner.call("call", &engine_account, call_args.try_to_vec().unwrap());
+    assert!(maybe_error.is_none());
+
+    contract
+}
+
+fn approve_erc20(
+    token: &ERC20,
+    spender: Address,
+    runner: &mut AuroraRunner,
+    signer: &mut test_utils::Signer,
+) {
+    let approve_result = runner
+        .submit_with_signer(signer, |nonce| {
+            token.approve(spender, WNEAR_AMOUNT.into(), nonce)
+        })
+        .unwrap();
+    assert!(approve_result.status.is_ok());
 }
 
 fn contract_bytes() -> Vec<u8> {
