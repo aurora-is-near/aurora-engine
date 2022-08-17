@@ -46,7 +46,7 @@ impl Address {
         Ok(Self::new(H160::from_slice(raw_addr)))
     }
 
-    pub fn from_array(array: [u8; 20]) -> Self {
+    pub const fn from_array(array: [u8; 20]) -> Self {
         Self(H160(array))
     }
 

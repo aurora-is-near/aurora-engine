@@ -1059,12 +1059,14 @@ name = "engine-standalone-storage"
 version = "0.1.0"
 dependencies = [
  "aurora-engine",
+ "aurora-engine-precompiles",
  "aurora-engine-sdk",
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
  "borsh",
  "evm-core",
+ "hex",
  "postgres",
  "rocksdb",
  "serde",
