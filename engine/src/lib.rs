@@ -143,8 +143,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
         let mut io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
-        io.return_output(state.bridge_prover_id.as_bytes());
+        let connector = EthConnectorContract::init_instance(io).sdk_unwrap();
+        io.return_output(connector.get_bridge_prover().as_bytes());
     }
 
     /// Get chain id for this contract.
