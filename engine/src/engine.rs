@@ -362,14 +362,30 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
         env: &'env E,
         ro_promise_handler: H,
     ) -> Self {
-        Self {
-            precompiles: Precompiles::new_london(PrecompileConstructorContext {
+        let precompiles = if cfg!(all(feature = "mainnet", not(feature = "integration-test"))) {
+            let mut tmp = Precompiles::new_london(PrecompileConstructorContext {
                 current_account_id,
                 random_seed,
                 io,
                 env,
                 promise_handler: ro_promise_handler,
-            }),
+            });
+            // Cross contract calls are not enabled on mainnet yet.
+            tmp.all_precompiles
+                .remove(&aurora_engine_precompiles::xcc::cross_contract_call::ADDRESS);
+            tmp
+        } else {
+            Precompiles::new_london(PrecompileConstructorContext {
+                current_account_id,
+                random_seed,
+                io,
+                env,
+                promise_handler: ro_promise_handler,
+            })
+        };
+
+        Self {
+            precompiles,
             gas_limit,
         }
     }
