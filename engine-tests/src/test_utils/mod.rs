@@ -861,3 +861,11 @@ pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
         tgas_bound,
     );
 }
+
+/// Returns true if `abs(a - b) / max(a, b) <= x / 100`. The implementation is written differently than
+/// this simpler formula to avoid floating point arithmetic.
+pub fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
+    let (larger, smaller) = if a < b { (b, a) } else { (a, b) };
+
+    (100 / x) * (larger - smaller) <= larger
+}

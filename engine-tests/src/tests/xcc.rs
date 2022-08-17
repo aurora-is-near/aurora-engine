@@ -110,14 +110,8 @@ fn test_xcc_eth_gas_cost() {
     let xcc_base_cost = EthGas::new(xcc_base_cost.as_u64() / costs::CROSS_CONTRACT_CALL_NEAR_GAS);
     let xcc_cost_per_byte = xcc_cost_per_byte / costs::CROSS_CONTRACT_CALL_NEAR_GAS;
 
-    let within_x_percent = |x: u64, a: u64, b: u64| -> bool {
-        let c = a.max(b);
-        let d = a.min(b);
-
-        (100 / x) * (c - d) <= c
-    };
     assert!(
-        within_x_percent(
+        test_utils::within_x_percent(
             5,
             xcc_base_cost.as_u64(),
             costs::CROSS_CONTRACT_CALL_BASE.as_u64()
@@ -128,7 +122,7 @@ fn test_xcc_eth_gas_cost() {
     );
 
     assert!(
-        within_x_percent(
+        test_utils::within_x_percent(
             5,
             xcc_cost_per_byte,
             costs::CROSS_CONTRACT_CALL_BYTE.as_u64()
@@ -142,13 +136,13 @@ fn test_xcc_eth_gas_cost() {
     let total_gas1 = y1 + baseline.all_gas();
     let total_gas2 = y2 + baseline.all_gas();
     assert!(
-        within_x_percent(20, evm1, total_gas1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
+        test_utils::within_x_percent(20, evm1, total_gas1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm1,
         total_gas1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS
     );
     assert!(
-        within_x_percent(20, evm2, total_gas2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
+        test_utils::within_x_percent(20, evm2, total_gas2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS

@@ -106,21 +106,19 @@ fn test_promise_result_gas_cost() {
     let base_cost = EthGas::new(base_cost.as_u64() / NEAR_GAS_PER_EVM);
     let cost_per_byte = cost_per_byte / NEAR_GAS_PER_EVM;
 
-    let within_5_percent = |a: u64, b: u64| -> bool {
-        let x = a.max(b);
-        let y = a.min(b);
-
-        19 * (x - y) <= x
-    };
     assert!(
-        within_5_percent(base_cost.as_u64(), costs::PROMISE_RESULT_BASE_COST.as_u64()),
+        test_utils::within_x_percent(
+            5,
+            base_cost.as_u64(),
+            costs::PROMISE_RESULT_BASE_COST.as_u64()
+        ),
         "Incorrect promise_result base cost. Expected: {} Actual: {}",
         base_cost,
         costs::PROMISE_RESULT_BASE_COST
     );
 
     assert!(
-        within_5_percent(cost_per_byte, costs::PROMISE_RESULT_BYTE_COST.as_u64()),
+        test_utils::within_x_percent(5, cost_per_byte, costs::PROMISE_RESULT_BYTE_COST.as_u64()),
         "Incorrect promise_result per byte cost. Expected: {} Actual: {}",
         cost_per_byte,
         costs::PROMISE_RESULT_BYTE_COST
@@ -129,13 +127,13 @@ fn test_promise_result_gas_cost() {
     let total_gas1 = y1 + baseline.all_gas();
     let total_gas2 = y2 + baseline.all_gas();
     assert!(
-        within_5_percent(evm1, total_gas1 / NEAR_GAS_PER_EVM),
+        test_utils::within_x_percent(6, evm1, total_gas1 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm1,
         total_gas1 / NEAR_GAS_PER_EVM
     );
     assert!(
-        within_5_percent(evm2, total_gas2 / NEAR_GAS_PER_EVM),
+        test_utils::within_x_percent(6, evm2, total_gas2 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / NEAR_GAS_PER_EVM
