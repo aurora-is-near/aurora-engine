@@ -619,6 +619,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .return_output(&self.ft.get_accounts_counter().to_le_bytes());
     }
 
+    pub fn get_bridge_prover(&self) -> &AccountId {
+        &self.contract.prover_account
+    }
+
     /// Save eth-connector fungible token contract data
     fn save_ft_contract(&mut self) {
         self.io.write_borsh(
