@@ -115,6 +115,34 @@ impl ERC20 {
         }
     }
 
+    pub fn transfer_from(
+        &self,
+        from: Address,
+        to: Address,
+        amount: U256,
+        nonce: U256,
+    ) -> TransactionLegacy {
+        let data = self
+            .0
+            .abi
+            .function("transferFrom")
+            .unwrap()
+            .encode_input(&[
+                ethabi::Token::Address(from.raw()),
+                ethabi::Token::Address(to.raw()),
+                ethabi::Token::Uint(amount),
+            ])
+            .unwrap();
+        TransactionLegacy {
+            nonce,
+            gas_price: Default::default(),
+            gas_limit: u64::MAX.into(),
+            to: Some(self.0.address),
+            value: Default::default(),
+            data,
+        }
+    }
+
     pub fn approve(&self, spender: Address, amount: U256, nonce: U256) -> TransactionLegacy {
         let data = self
             .0

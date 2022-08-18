@@ -16,12 +16,13 @@ use crate::accounting;
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::parameters::RefundCallArgs;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
+use crate::prelude::precompiles::xcc::cross_contract_call;
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
     BTreeMap, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs,
-    ToString, Vec, Wei, ERC20_MINT_SELECTOR, H160, H256, U256,
+    ToString, Vec, Wei, Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
 use aurora_engine_precompiles::PrecompileConstructorContext;
 use core::cell::RefCell;
@@ -242,7 +243,7 @@ impl AsRef<[u8]> for DeployErc20Error {
     }
 }
 
-pub struct ERC20Address(Address);
+pub struct ERC20Address(pub Address);
 
 impl AsRef<[u8]> for ERC20Address {
     fn as_ref(&self) -> &[u8] {
@@ -272,7 +273,7 @@ impl AsRef<[u8]> for AddressParseError {
     }
 }
 
-pub struct NEP141Account(AccountId);
+pub struct NEP141Account(pub AccountId);
 
 impl AsRef<[u8]> for NEP141Account {
     fn as_ref(&self) -> &[u8] {
@@ -361,14 +362,30 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
         env: &'env E,
         ro_promise_handler: H,
     ) -> Self {
-        Self {
-            precompiles: Precompiles::new_london(PrecompileConstructorContext {
+        let precompiles = if cfg!(all(feature = "mainnet", not(feature = "integration-test"))) {
+            let mut tmp = Precompiles::new_london(PrecompileConstructorContext {
                 current_account_id,
                 random_seed,
                 io,
                 env,
                 promise_handler: ro_promise_handler,
-            }),
+            });
+            // Cross contract calls are not enabled on mainnet yet.
+            tmp.all_precompiles
+                .remove(&aurora_engine_precompiles::xcc::cross_contract_call::ADDRESS);
+            tmp
+        } else {
+            Precompiles::new_london(PrecompileConstructorContext {
+                current_account_id,
+                random_seed,
+                io,
+                env,
+                promise_handler: ro_promise_handler,
+            })
+        };
+
+        Self {
+            precompiles,
             gas_limit,
         }
     }
@@ -554,7 +571,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(handler, logs);
+        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
 
         self.apply(values, Vec::<Log>::new(), true);
 
@@ -639,7 +656,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(handler, logs);
+        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
@@ -1356,10 +1373,16 @@ fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) 
     remove_all_storage(io, address, generation);
 }
 
-fn filter_promises_from_logs<T, P>(handler: &mut P, logs: T) -> Vec<ResultLog>
+fn filter_promises_from_logs<I, T, P>(
+    io: &I,
+    handler: &mut P,
+    logs: T,
+    current_account_id: &AccountId,
+) -> Vec<ResultLog>
 where
     T: IntoIterator<Item = Log>,
     P: PromiseHandler,
+    I: IO + Copy,
 {
     logs.into_iter()
         .filter_map(|log| {
@@ -1384,6 +1407,25 @@ where
                     // `topics` field.
                     Some(log.into())
                 }
+            } else if log.address == cross_contract_call::ADDRESS.raw() {
+                if log.topics[0] == cross_contract_call::AMOUNT_TOPIC {
+                    // NEAR balances are 128-bit, so the leading 16 bytes of the 256-bit topic
+                    // value should always be zero.
+                    assert_eq!(&log.topics[1].as_bytes()[0..16], &[0; 16]);
+                    let required_near =
+                        Yocto::new(U256::from_big_endian(log.topics[1].as_bytes()).low_u128());
+                    if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
+                        crate::xcc::handle_precompile_promise(
+                            io,
+                            handler,
+                            promise,
+                            required_near,
+                            current_account_id,
+                        );
+                    }
+                }
+                // do not pass on these "internal logs" to caller
+                None
             } else {
                 Some(log.into())
             }

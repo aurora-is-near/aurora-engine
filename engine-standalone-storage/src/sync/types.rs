@@ -1,4 +1,5 @@
 use aurora_engine::parameters;
+use aurora_engine::xcc::AddressVersionUpdateArgs;
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::{types, H256};
@@ -108,6 +109,11 @@ pub enum TransactionKind {
     NewConnector(parameters::InitCallArgs),
     /// Initialize Engine
     NewEngine(parameters::NewCallArgs),
+    /// Update xcc-router bytecode
+    FactoryUpdate(Vec<u8>),
+    /// Update the version of a deployed xcc-router contract
+    FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
+    FactorySetWNearAddress(types::Address),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -234,6 +240,9 @@ enum BorshableTransactionKind<'a> {
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
     NewConnector(Cow<'a, parameters::InitCallArgs>),
     NewEngine(Cow<'a, parameters::NewCallArgs>),
+    FactoryUpdate(Cow<'a, Vec<u8>>),
+    FactoryUpdateAddressVersion(Cow<'a, AddressVersionUpdateArgs>),
+    FactorySetWNearAddress(types::Address),
     Unknown,
 }
 
@@ -265,6 +274,13 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetConnectorData(x) => Self::SetConnectorData(Cow::Borrowed(x)),
             TransactionKind::NewConnector(x) => Self::NewConnector(Cow::Borrowed(x)),
             TransactionKind::NewEngine(x) => Self::NewEngine(Cow::Borrowed(x)),
+            TransactionKind::FactoryUpdate(x) => Self::FactoryUpdate(Cow::Borrowed(x)),
+            TransactionKind::FactoryUpdateAddressVersion(x) => {
+                Self::FactoryUpdateAddressVersion(Cow::Borrowed(x))
+            }
+            TransactionKind::FactorySetWNearAddress(address) => {
+                Self::FactorySetWNearAddress(*address)
+            }
             TransactionKind::Unknown => Self::Unknown,
         }
     }
@@ -309,6 +325,13 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::NewConnector(x) => Ok(Self::NewConnector(x.into_owned())),
             BorshableTransactionKind::NewEngine(x) => Ok(Self::NewEngine(x.into_owned())),
+            BorshableTransactionKind::FactoryUpdate(x) => Ok(Self::FactoryUpdate(x.into_owned())),
+            BorshableTransactionKind::FactoryUpdateAddressVersion(x) => {
+                Ok(Self::FactoryUpdateAddressVersion(x.into_owned()))
+            }
+            BorshableTransactionKind::FactorySetWNearAddress(address) => {
+                Ok(Self::FactorySetWNearAddress(address))
+            }
             BorshableTransactionKind::Unknown => Ok(Self::Unknown),
         }
     }

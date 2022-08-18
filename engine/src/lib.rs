@@ -28,6 +28,7 @@ pub mod fungible_token;
 pub mod json;
 pub mod log_entry;
 mod prelude;
+pub mod xcc;
 
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]
@@ -280,6 +281,40 @@ mod contract {
             predecessor_account_id.as_bytes(),
             Address::from_array(relayer_address),
         );
+    }
+
+    /// Updates the bytecode for user's router contracts created by the engine.
+    /// These contracts are where cross-contract calls initiated by the EVM precompile
+    /// will be sent from.
+    #[no_mangle]
+    pub extern "C" fn factory_update() {
+        let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let bytes = io.read_input().to_vec();
+        let router_bytecode = crate::xcc::RouterCode::new(bytes);
+        crate::xcc::update_router_code(&mut io, &router_bytecode);
+    }
+
+    /// Updates the bytecode version for the given account. This is only called as a callback
+    /// when a new version of the router contract is deployed to an account.
+    #[no_mangle]
+    pub extern "C" fn factory_update_address_version() {
+        let mut io = Runtime;
+        io.assert_private_call().sdk_unwrap();
+        let args: crate::xcc::AddressVersionUpdateArgs = io.read_input_borsh().sdk_unwrap();
+        crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
+    }
+
+    /// Sets the address for the wNEAR ERC-20 contract. This contract will be used by the
+    /// cross-contract calls feature to have users pay for their NEAR transactions.
+    #[no_mangle]
+    pub extern "C" fn factory_set_wnear_address() {
+        let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let address = io.read_input_arr20().sdk_unwrap();
+        crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.

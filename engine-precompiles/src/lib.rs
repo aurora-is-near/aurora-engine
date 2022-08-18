@@ -16,6 +16,7 @@ pub mod promise_result;
 pub mod random;
 pub mod secp256k1;
 mod utils;
+pub mod xcc;
 
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
 use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
@@ -29,14 +30,19 @@ use crate::prelude::{Vec, H160, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
+use crate::xcc::CrossContractCall;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
 use evm::backend::Log;
-use evm::executor::{self, stack::PrecompileHandle};
+use evm::executor::{
+    self,
+    stack::{PrecompileFailure, PrecompileHandle},
+};
 use evm::{Context, ExitError, ExitSucceed};
 use promise_result::PromiseResult;
+use xcc::cross_contract_call;
 
 #[derive(Debug, Default)]
 pub struct PrecompileOutput {
@@ -74,6 +80,13 @@ pub trait Precompile {
     ) -> EvmPrecompileResult;
 }
 
+pub trait HandleBasedPrecompile {
+    fn run_with_handle(
+        &self,
+        handle: &mut impl PrecompileHandle,
+    ) -> Result<PrecompileOutput, PrecompileFailure>;
+}
+
 /// Hard fork marker.
 pub trait HardFork {}
 
@@ -98,14 +111,7 @@ impl HardFork for Istanbul {}
 impl HardFork for Berlin {}
 
 pub struct Precompiles<'a, I, E, H> {
-    pub generic_precompiles: prelude::BTreeMap<Address, Box<dyn Precompile>>,
-    // Cannot be part of the generic precompiles because the `dyn` type-erasure messes with
-    // with the lifetime requirements on the type parameter `I`.
-    pub near_exit: ExitToNear<I>,
-    pub ethereum_exit: ExitToEthereum<I>,
-    pub predecessor_account_id: PredecessorAccount<'a, E>,
-    pub prepaid_gas: PrepaidGas<'a, E>,
-    pub promise_results: PromiseResult<H>,
+    pub all_precompiles: prelude::BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
 }
 
 impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
@@ -114,35 +120,58 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
     fn execute(
         &self,
         handle: &mut impl PrecompileHandle,
-    ) -> Option<Result<executor::stack::PrecompileOutput, executor::stack::PrecompileFailure>> {
+    ) -> Option<Result<executor::stack::PrecompileOutput, PrecompileFailure>> {
         let address = handle.code_address();
 
-        self.precompile_action(Address::new(address), |p| {
-            let input = handle.input();
-            let gas_limit = handle.gas_limit();
-            let context = handle.context();
-            let is_static = handle.is_static();
-
-            match p.run(input, gas_limit.map(EthGas::new), context, is_static) {
-                Ok(output) => {
-                    handle.record_cost(output.cost.as_u64())?;
-                    for log in output.logs {
-                        handle.log(log.address, log.topics, log.data)?;
-                    }
-                    Ok(executor::stack::PrecompileOutput {
-                        exit_status: ExitSucceed::Returned,
-                        output: output.output,
-                    })
-                }
-                Err(exit_status) => Err(executor::stack::PrecompileFailure::Error { exit_status }),
-            }
-        })
+        let result = match self.all_precompiles.get(&Address::new(address))? {
+            AllPrecompiles::ExitToNear(p) => process_precompile(p, handle),
+            AllPrecompiles::ExitToEthereum(p) => process_precompile(p, handle),
+            AllPrecompiles::PredecessorAccount(p) => process_precompile(p, handle),
+            AllPrecompiles::PrepaidGas(p) => process_precompile(p, handle),
+            AllPrecompiles::PromiseResult(p) => process_precompile(p, handle),
+            AllPrecompiles::CrossContractCall(p) => process_handle_based_precompile(p, handle),
+            AllPrecompiles::Generic(p) => process_precompile(p.as_ref(), handle),
+        };
+        Some(result.and_then(|output| post_process(output, handle)))
     }
 
     fn is_precompile(&self, address: prelude::H160) -> bool {
-        self.precompile_action(Address::new(address), |_| true)
-            .unwrap_or(false)
+        self.all_precompiles.contains_key(&Address::new(address))
     }
+}
+
+fn process_precompile(
+    p: &dyn Precompile,
+    handle: &mut impl PrecompileHandle,
+) -> Result<PrecompileOutput, PrecompileFailure> {
+    let input = handle.input();
+    let gas_limit = handle.gas_limit();
+    let context = handle.context();
+    let is_static = handle.is_static();
+
+    p.run(input, gas_limit.map(EthGas::new), context, is_static)
+        .map_err(|exit_status| PrecompileFailure::Error { exit_status })
+}
+
+fn process_handle_based_precompile(
+    p: &impl HandleBasedPrecompile,
+    handle: &mut impl PrecompileHandle,
+) -> Result<PrecompileOutput, PrecompileFailure> {
+    p.run_with_handle(handle)
+}
+
+fn post_process(
+    output: PrecompileOutput,
+    handle: &mut impl PrecompileHandle,
+) -> Result<executor::stack::PrecompileOutput, PrecompileFailure> {
+    handle.record_cost(output.cost.as_u64())?;
+    for log in output.logs {
+        handle.log(log.address, log.topics, log.data)?;
+    }
+    Ok(executor::stack::PrecompileOutput {
+        exit_status: ExitSucceed::Returned,
+        output: output.output,
+    })
 }
 
 pub struct PrecompileConstructorContext<'a, I, E, H> {
@@ -170,7 +199,11 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
         ];
-        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
         Self::with_generic_precompiles(map, ctx)
     }
 
@@ -200,7 +233,11 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
         ];
-        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
 
         Self::with_generic_precompiles(map, ctx)
     }
@@ -232,7 +269,11 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
         ];
-        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
 
         Self::with_generic_precompiles(map, ctx)
     }
@@ -264,7 +305,11 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
         ];
-        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
 
         Self::with_generic_precompiles(map, ctx)
     }
@@ -275,45 +320,52 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
     }
 
     fn with_generic_precompiles(
-        generic_precompiles: BTreeMap<Address, Box<dyn Precompile>>,
+        mut generic_precompiles: BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
         ctx: PrecompileConstructorContext<'a, I, E, H>,
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
-        let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
+        let ethereum_exit = ExitToEthereum::new(ctx.current_account_id.clone(), ctx.io);
+        let cross_contract_call = CrossContractCall::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);
         let promise_results = PromiseResult::new(ctx.promise_handler);
 
-        Self {
-            generic_precompiles,
-            near_exit,
-            ethereum_exit,
-            predecessor_account_id,
-            prepaid_gas,
-            promise_results,
-        }
-    }
+        generic_precompiles.insert(exit_to_near::ADDRESS, AllPrecompiles::ExitToNear(near_exit));
+        generic_precompiles.insert(
+            exit_to_ethereum::ADDRESS,
+            AllPrecompiles::ExitToEthereum(ethereum_exit),
+        );
+        generic_precompiles.insert(
+            cross_contract_call::ADDRESS,
+            AllPrecompiles::CrossContractCall(cross_contract_call),
+        );
+        generic_precompiles.insert(
+            predecessor_account::ADDRESS,
+            AllPrecompiles::PredecessorAccount(predecessor_account_id),
+        );
+        generic_precompiles.insert(
+            prepaid_gas::ADDRESS,
+            AllPrecompiles::PrepaidGas(prepaid_gas),
+        );
+        generic_precompiles.insert(
+            promise_result::ADDRESS,
+            AllPrecompiles::PromiseResult(promise_results),
+        );
 
-    fn precompile_action<U, F: FnOnce(&dyn Precompile) -> U>(
-        &self,
-        address: Address,
-        f: F,
-    ) -> Option<U> {
-        if address == exit_to_near::ADDRESS {
-            return Some(f(&self.near_exit));
-        } else if address == exit_to_ethereum::ADDRESS {
-            return Some(f(&self.ethereum_exit));
-        } else if address == predecessor_account::ADDRESS {
-            return Some(f(&self.predecessor_account_id));
-        } else if address == prepaid_gas::ADDRESS {
-            return Some(f(&self.prepaid_gas));
-        } else if address == promise_result::ADDRESS {
-            return Some(f(&self.promise_results));
+        Self {
+            all_precompiles: generic_precompiles,
         }
-        self.generic_precompiles
-            .get(&address)
-            .map(|p| f(p.as_ref()))
     }
+}
+
+pub enum AllPrecompiles<'a, I, E, H> {
+    ExitToNear(ExitToNear<I>),
+    ExitToEthereum(ExitToEthereum<I>),
+    CrossContractCall(CrossContractCall<I>),
+    PredecessorAccount(PredecessorAccount<'a, E>),
+    PrepaidGas(PrepaidGas<'a, E>),
+    PromiseResult(PromiseResult<H>),
+    Generic(Box<dyn Precompile>),
 }
 
 /// fn for making an address by concatenating the bytes from two given numbers,
