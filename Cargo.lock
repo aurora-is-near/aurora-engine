@@ -150,9 +150,8 @@ dependencies = [
  "hex",
  "libsecp256k1",
  "num",
- "primitive-types 0.11.1",
  "rand 0.7.3",
- "ripemd160",
+ "ripemd",
  "serde",
  "serde_json",
  "sha2 0.10.2",
@@ -3412,6 +3411,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79af64b4b6362ffba04eef3a4e10829718a4896dac19daa741851c86781edf95"
 dependencies = [
  "bytecheck",
+]
+
+[[package]]
+name = "ripemd"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1facec54cb5e0dc08553501fa740091086d0259ad0067e0d4103448e4cb22ed3"
+dependencies = [
+ "digest 0.10.3",
 ]
 
 [[package]]
