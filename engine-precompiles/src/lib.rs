@@ -4,8 +4,8 @@
 #![deny(clippy::as_conversions)]
 
 pub mod account_ids;
+pub mod alt_bn256;
 pub mod blake2;
-pub mod bn128;
 pub mod hash;
 pub mod identity;
 pub mod modexp;
@@ -18,8 +18,8 @@ pub mod secp256k1;
 mod utils;
 
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
+use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use crate::blake2::Blake2F;
-use crate::bn128::{Bn128Add, Bn128Mul, Bn128Pair};
 use crate::hash::{RIPEMD160, SHA256};
 use crate::identity::Identity;
 use crate::modexp::ModExp;
@@ -182,9 +182,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
             ModExp::<Byzantium>::ADDRESS,
-            Bn128Add::<Byzantium>::ADDRESS,
-            Bn128Mul::<Byzantium>::ADDRESS,
-            Bn128Pair::<Byzantium>::ADDRESS,
+            Bn256Add::<Byzantium>::ADDRESS,
+            Bn256Mul::<Byzantium>::ADDRESS,
+            Bn256Pair::<Byzantium>::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
         ];
@@ -194,9 +194,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(RIPEMD160),
             Box::new(Identity),
             Box::new(ModExp::<Byzantium>::new()),
-            Box::new(Bn128Add::<Byzantium>::new()),
-            Box::new(Bn128Mul::<Byzantium>::new()),
-            Box::new(Bn128Pair::<Byzantium>::new()),
+            Box::new(Bn256Add::<Byzantium>::new()),
+            Box::new(Bn256Mul::<Byzantium>::new()),
+            Box::new(Bn256Pair::<Byzantium>::new()),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
         ];
@@ -212,9 +212,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
             ModExp::<Byzantium>::ADDRESS,
-            Bn128Add::<Istanbul>::ADDRESS,
-            Bn128Mul::<Istanbul>::ADDRESS,
-            Bn128Pair::<Istanbul>::ADDRESS,
+            Bn256Add::<Istanbul>::ADDRESS,
+            Bn256Mul::<Istanbul>::ADDRESS,
+            Bn256Pair::<Istanbul>::ADDRESS,
             Blake2F::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
@@ -225,9 +225,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(RIPEMD160),
             Box::new(Identity),
             Box::new(ModExp::<Byzantium>::new()),
-            Box::new(Bn128Add::<Istanbul>::new()),
-            Box::new(Bn128Mul::<Istanbul>::new()),
-            Box::new(Bn128Pair::<Istanbul>::new()),
+            Box::new(Bn256Add::<Istanbul>::new()),
+            Box::new(Bn256Mul::<Istanbul>::new()),
+            Box::new(Bn256Pair::<Istanbul>::new()),
             Box::new(Blake2F),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
@@ -244,9 +244,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
             ModExp::<Berlin>::ADDRESS,
-            Bn128Add::<Istanbul>::ADDRESS,
-            Bn128Mul::<Istanbul>::ADDRESS,
-            Bn128Pair::<Istanbul>::ADDRESS,
+            Bn256Add::<Istanbul>::ADDRESS,
+            Bn256Mul::<Istanbul>::ADDRESS,
+            Bn256Pair::<Istanbul>::ADDRESS,
             Blake2F::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
@@ -257,9 +257,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(RIPEMD160),
             Box::new(Identity),
             Box::new(ModExp::<Berlin>::new()),
-            Box::new(Bn128Add::<Istanbul>::new()),
-            Box::new(Bn128Mul::<Istanbul>::new()),
-            Box::new(Bn128Pair::<Istanbul>::new()),
+            Box::new(Bn256Add::<Istanbul>::new()),
+            Box::new(Bn256Mul::<Istanbul>::new()),
+            Box::new(Bn256Pair::<Istanbul>::new()),
             Box::new(Blake2F),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
@@ -399,9 +399,9 @@ mod tests {
         assert_eq!(super::hash::RIPEMD160::ADDRESS, u8_to_address(3));
         assert_eq!(super::identity::Identity::ADDRESS, u8_to_address(4));
         assert_eq!(super::ModExp::<Byzantium>::ADDRESS, u8_to_address(5));
-        assert_eq!(super::Bn128Add::<Istanbul>::ADDRESS, u8_to_address(6));
-        assert_eq!(super::Bn128Mul::<Istanbul>::ADDRESS, u8_to_address(7));
-        assert_eq!(super::Bn128Pair::<Istanbul>::ADDRESS, u8_to_address(8));
+        assert_eq!(super::Bn256Add::<Istanbul>::ADDRESS, u8_to_address(6));
+        assert_eq!(super::Bn256Mul::<Istanbul>::ADDRESS, u8_to_address(7));
+        assert_eq!(super::Bn256Pair::<Istanbul>::ADDRESS, u8_to_address(8));
         assert_eq!(super::blake2::Blake2F::ADDRESS, u8_to_address(9));
     }
 
