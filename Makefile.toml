@@ -66,6 +66,16 @@ args = [
     "--all",
 ]
 
+[tasks.udeps]
+category = "Check"
+env = { "CARGO_MAKE_RUST_CHANNEL" = "nightly", "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
+install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.30", test_arg = ["udeps", "-h"], force = false }
+command = "${CARGO}"
+args = [
+    "udeps",
+    "--all-targets",
+]
+
 [tasks.clippy]
 category = "Check"
 command = "${CARGO}"
@@ -102,6 +112,7 @@ dependencies = [
     "check-contracts",
     "check-fmt",
     "clippy",
+    "udeps",
 ]
 
 [tasks.post-engine-build-env]

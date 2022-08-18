@@ -14,19 +14,14 @@ autobenches = false
 
 [dependencies]
 borsh = { version = "0.8.2", default-features = false }
-ethabi = { version = "17.1", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 primitive-types = { version = "0.11", default-features = false, features = ["rlp"] }
-sha3 = { version = "0.10.2", default-features = false }
 serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
-bstr = "0.2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 rand = "0.7.3"
 
 [features]
 default = ["std"]
-std = ["primitive-types/std"]
+std = ["borsh/std", "hex/std", "primitive-types/std"]
 impl-serde = ["primitive-types/impl-serde", "serde"]

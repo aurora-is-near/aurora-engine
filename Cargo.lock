@@ -119,7 +119,6 @@ dependencies = [
 name = "aurora-engine"
 version = "2.6.1"
 dependencies = [
- "aurora-bn",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
  "aurora-engine-transactions",
@@ -129,19 +128,12 @@ dependencies = [
  "byte-slice-cast",
  "ethabi",
  "evm",
- "evm-core",
  "hex",
- "libsecp256k1",
- "logos",
- "num",
- "primitive-types 0.10.1",
  "rand 0.7.3",
- "ripemd160",
  "rjson",
  "rlp",
  "serde",
  "serde_json",
- "sha3 0.10.2",
  "wee_alloc",
 ]
 
@@ -152,11 +144,9 @@ dependencies = [
  "aurora-bn",
  "aurora-engine-sdk",
  "aurora-engine-types",
- "base64 0.13.0",
  "borsh 0.8.2",
  "ethabi",
  "evm",
- "evm-core",
  "hex",
  "libsecp256k1",
  "num",
@@ -236,14 +226,10 @@ name = "aurora-engine-types"
 version = "1.0.0"
 dependencies = [
  "borsh 0.8.2",
- "bstr",
- "ethabi",
  "hex",
  "primitive-types 0.11.1",
  "rand 0.7.3",
  "serde",
- "serde_json",
- "sha3 0.10.2",
 ]
 
 [[package]]
@@ -290,12 +276,6 @@ name = "base64"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
-
-[[package]]
-name = "beef"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
 
 [[package]]
 name = "bincode"
@@ -1158,8 +1138,6 @@ dependencies = [
 name = "engine-standalone-tracing"
 version = "0.1.0"
 dependencies = [
- "aurora-engine",
- "aurora-engine-sdk",
  "aurora-engine-types",
  "evm",
  "evm-core",
@@ -2014,29 +1992,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if 1.0.0",
-]
-
-[[package]]
-name = "logos"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf8b031682c67a8e3d5446840f9573eb7fe26efe7ec8d195c9ac4c0647c502f1"
-dependencies = [
- "logos-derive",
-]
-
-[[package]]
-name = "logos-derive"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1d849148dbaf9661a6151d1ca82b13bb4c4c128146a88d05253b38d4e2f496c"
-dependencies = [
- "beef",
- "fnv",
- "proc-macro2",
- "quote",
- "regex-syntax",
- "syn",
 ]
 
 [[package]]
@@ -3110,7 +3065,6 @@ checksum = "05e4722c697a58a99d5d06a08c30821d7c082a4632198de1eaa5a6c22ef42373"
 dependencies = [
  "fixed-hash",
  "impl-codec 0.5.1",
- "impl-rlp",
  "uint",
 ]
 
