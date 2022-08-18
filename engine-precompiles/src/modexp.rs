@@ -178,12 +178,8 @@ fn parse_bytes<T, F: FnOnce(&[u8]) -> T>(input: &[u8], start: usize, size: usize
     let end = start + size;
     if end > len {
         // Pad on the right with zeros if input is too short
-        let bytes: Vec<u8> = input[start..]
-            .iter()
-            .copied()
-            .chain(core::iter::repeat(0u8))
-            .take(size)
-            .collect();
+        let mut bytes = input[start..].to_vec();
+        bytes.append(&mut vec![0u8; size - bytes.len()]);
         f(&bytes)
     } else {
         f(&input[start..end])
