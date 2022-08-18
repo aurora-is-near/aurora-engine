@@ -15,7 +15,7 @@ use aurora_engine_types::{
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::Log;
 use evm::executor::stack::{PrecompileFailure, PrecompileHandle};
-use evm_core::ExitError;
+use evm::ExitError;
 
 pub mod costs {
     use crate::prelude::types::{EthGas, NearGas};

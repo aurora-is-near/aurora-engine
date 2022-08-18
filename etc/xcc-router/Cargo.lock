@@ -42,10 +42,8 @@ name = "aurora-engine-types"
 version = "1.0.0"
 dependencies = [
  "borsh",
- "ethabi",
  "hex",
  "primitive-types 0.11.1",
- "sha3 0.10.2",
 ]
 
 [[package]]
@@ -356,40 +354,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ethabi"
-version = "17.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f186de076b3e77b8e6d73c99d1b52edc2a229e604f4b5eb6992c06c11d79d537"
-dependencies = [
- "ethereum-types",
- "hex",
- "sha3 0.10.2",
-]
-
-[[package]]
-name = "ethbloom"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11da94e443c60508eb62cf256243a64da87304c2802ac2528847f79d750007ef"
-dependencies = [
- "crunchy",
- "fixed-hash",
- "tiny-keccak",
-]
-
-[[package]]
-name = "ethereum-types"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2827b94c556145446fcce834ca86b7abf0c39a805883fe20e72c5bfdb5a0dc6"
-dependencies = [
- "ethbloom",
- "fixed-hash",
- "primitive-types 0.11.1",
- "uint",
-]
-
-[[package]]
 name = "fixed-hash"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -686,7 +650,7 @@ dependencies = [
  "ripemd",
  "serde",
  "sha2 0.10.2",
- "sha3 0.9.1",
+ "sha3",
 ]
 
 [[package]]
@@ -1054,16 +1018,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha3"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a31480366ec990f395a61b7c08122d99bd40544fdb5abcfc1b06bb29994312c"
-dependencies = [
- "digest 0.10.3",
- "keccak",
-]
-
-[[package]]
 name = "signature"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1178,15 +1132,6 @@ dependencies = [
  "libc",
  "wasi 0.10.0+wasi-snapshot-preview1",
  "winapi",
-]
-
-[[package]]
-name = "tiny-keccak"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
-dependencies = [
- "crunchy",
 ]
 
 [[package]]
