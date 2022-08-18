@@ -3,92 +3,29 @@ on:
   push:
     branches:
       - master
-name: Builds
+name: Build
 jobs:
   release:
     name: Release
     runs-on: [self-hosted, heavy]
+    strategy:
+      matrix:
+        profile: [mainnet, testnet]
     steps:
       - name: Clone the repository
         uses: actions/checkout@v3
-      - run: cargo make engine-release
-      - run: ls -lH bin/mainnet-release.wasm
-      - name: Upload the mainnet-release.wasm artifact
+      - run: cargo make --profile ${{ matrix.profile }} build
+      - run: ls -lH bin/aurora-${{ matrix.profile }}.wasm
+      - name: Upload the aurora-${{ matrix.profile }}.wasm artifact
         uses: actions/upload-artifact@v2
         with:
-          name: mainnet-release.wasm
-          path: bin/mainnet-release.wasm
+          name: aurora-${{ matrix.profile }}.wasm
+          path: bin/aurora-${{ matrix.profile }}.wasm
       - name: Update the latest release
         uses: svenstaro/upload-release-action@v2
         with:
           tag: latest
-          file: bin/mainnet-release.wasm
-          overwrite: true
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Update the latest tag
-        uses: EndBug/latest-tag@latest
-  debug:
-    name: Debug
-    runs-on: [self-hosted, heavy]
-    steps:
-      - name: Clone the repository
-        uses: actions/checkout@v3
-      - run: cargo make engine-debug
-      - run: ls -lH mainnet-debug.wasm
-      - name: Upload the mainnet-debug.wasm artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: mainnet-debug.wasm
-          path: bin/mainnet-debug.wasm
-      - name: Update the latest release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          tag: latest
-          file: bin/mainnet-debug.wasm
-          overwrite: true
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Update the latest tag
-        uses: EndBug/latest-tag@latest
-  test:
-    name: Test
-    runs-on: [self-hosted, heavy]
-    steps:
-      - name: Clone the repository
-        uses: actions/checkout@v3
-      - run: cargo make engine-test
-      - run: ls -lH mainnet-test.wasm
-      - name: Upload the mainnet-test.wasm artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: mainnet-test.wasm
-          path: bin/mainnet-test.wasm
-      - name: Update the latest release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          tag: latest
-          file: bin/mainnet-test.wasm
-          overwrite: true
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Update the latest tag
-        uses: EndBug/latest-tag@latest
-  bully:
-    name: Bully
-    runs-on: [self-hosted, heavy]
-    steps:
-      - name: Clone the repository
-        uses: actions/checkout@v3
-      - run: cargo make engine-bully
-      - run: ls -lH mainnet-bully.wasm
-      - name: Upload the mainnet-bully.wasm artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: mainnet-bully.wasm
-          path: bin/mainnet-bully.wasm
-      - name: Update the latest release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          tag: latest
-          file: bin/mainnet-bully.wasm
+          file: bin/aurora-${{ matrix.profile }}.wasm
           overwrite: true
           repo_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Update the latest tag
