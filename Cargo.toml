@@ -40,8 +40,8 @@ members = [
     "engine-types",
 ]
 exclude = [
-    "etc/state-migration-test",
-    "etc/ft-receiver",
-    "etc/benchmark-contract",
-    "etc/self-contained-5bEgfRQ",
+    "etc/tests/state-migration-test",
+    "etc/tests/ft-receiver",
+    "etc/tests/benchmark-contract",
+    "etc/tests/self-contained-5bEgfRQ",
 ]
