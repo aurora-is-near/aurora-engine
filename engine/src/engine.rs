@@ -831,19 +831,13 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             );
         }
 
-        let selector = ERC20_MINT_SELECTOR;
-        let tail = ethabi::encode(&[
-            ethabi::Token::Address(recipient.raw()),
-            ethabi::Token::Uint(U256::from(args.amount.as_u128())),
-        ]);
-
         let erc20_admin_address = current_address(current_account_id);
         unwrap_res_or_finish!(
             self.call(
                 &erc20_admin_address,
                 &erc20_token,
                 Wei::zero(),
-                [selector, tail.as_slice()].concat(),
+                setup_receive_erc20_tokens_input(args, &recipient),
                 u64::MAX,
                 Vec::new(), // TODO: are there values we should put here?
                 handler,
@@ -1015,6 +1009,16 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     result
 }
 
+pub fn setup_refund_on_error_input(amount: U256, refund_address: Address) -> Vec<u8> {
+    let selector = ERC20_MINT_SELECTOR;
+    let mint_args = ethabi::encode(&[
+        ethabi::Token::Address(refund_address.raw()),
+        ethabi::Token::Uint(amount),
+    ]);
+
+    [selector, mint_args.as_slice()].concat()
+}
+
 pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
     io: I,
     env: &E,
@@ -1032,18 +1036,13 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
             let erc20_address = erc20_address;
             let refund_address = args.recipient_address;
             let amount = U256::from_big_endian(&args.amount);
-
-            let selector = ERC20_MINT_SELECTOR;
-            let mint_args = ethabi::encode(&[
-                ethabi::Token::Address(refund_address.raw()),
-                ethabi::Token::Uint(amount),
-            ]);
+            let input = setup_refund_on_error_input(amount, refund_address);
 
             engine.call(
                 &erc20_admin_address,
                 &erc20_address,
                 Wei::zero(),
-                [selector, mint_args.as_slice()].concat(),
+                input,
                 u64::MAX,
                 Vec::new(),
                 handler,
@@ -1146,6 +1145,37 @@ pub fn refund_unused_gas<I: IO>(
     Ok(())
 }
 
+pub fn setup_receive_erc20_tokens_input(
+    args: &NEP141FtOnTransferArgs,
+    recipient: &Address,
+) -> Vec<u8> {
+    let selector = ERC20_MINT_SELECTOR;
+    let tail = ethabi::encode(&[
+        ethabi::Token::Address(recipient.raw()),
+        ethabi::Token::Uint(U256::from(args.amount.as_u128())),
+    ]);
+
+    [selector, tail.as_slice()].concat()
+}
+
+pub fn setup_deploy_erc20_input(current_account_id: &AccountId) -> Vec<u8> {
+    #[cfg(feature = "error_refund")]
+    let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20V2.bin");
+    #[cfg(not(feature = "error_refund"))]
+    let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
+
+    let erc20_admin_address = current_address(current_account_id);
+
+    let deploy_args = ethabi::encode(&[
+        ethabi::Token::String("Empty".to_string()),
+        ethabi::Token::String("EMPTY".to_string()),
+        ethabi::Token::Uint(ethabi::Uint::from(0)),
+        ethabi::Token::Address(erc20_admin_address.raw()),
+    ]);
+
+    (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec()
+}
+
 /// Used to bridge NEP-141 tokens from NEAR to Aurora. On Aurora the NEP-141 becomes an ERC-20.
 pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     args: DeployErc20TokenArgs,
@@ -1154,7 +1184,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     handler: &mut P,
 ) -> Result<Address, DeployErc20Error> {
     let current_account_id = env.current_account_id();
-    let erc20_admin_address = current_address(&current_account_id);
+    let input = setup_deploy_erc20_input(&current_account_id);
     let mut engine = Engine::new(
         aurora_engine_sdk::types::near_account_to_evm_address(
             env.predecessor_account_id().as_bytes(),
@@ -1165,23 +1195,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     )
     .map_err(DeployErc20Error::State)?;
 
-    #[cfg(feature = "error_refund")]
-    let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20V2.bin");
-    #[cfg(not(feature = "error_refund"))]
-    let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
-
-    let deploy_args = ethabi::encode(&[
-        ethabi::Token::String("Empty".to_string()),
-        ethabi::Token::String("EMPTY".to_string()),
-        ethabi::Token::Uint(ethabi::Uint::from(0)),
-        ethabi::Token::Address(erc20_admin_address.raw()),
-    ]);
-
-    let address = match Engine::deploy_code_with_input(
-        &mut engine,
-        (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec(),
-        handler,
-    ) {
+    let address = match Engine::deploy_code_with_input(&mut engine, input, handler) {
         Ok(result) => match result.status {
             TransactionStatus::Succeed(ret) => {
                 Address::new(H160(ret.as_slice().try_into().unwrap()))
