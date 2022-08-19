@@ -20,9 +20,18 @@ enum StorageKey {
 const CURRENT_VERSION: u32 = 1;
 
 const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
+/// Gas cost estimated from mainnet data. Cost seems to consistently be 3 Tgas, but we add a
+/// little more to be safe. Example:
+/// https://explorer.mainnet.near.org/transactions/3U9SKbGKM3MchLa2hLTNuYLdErcEDneJGbGv1cHZXuvE#HsHabUdJ7DRJcseNa4GQTYwm8KtbB4mqsq2AUssJWWv6
 const WNEAR_WITHDRAW_GAS: Gas = Gas(5_000_000_000_000);
+/// Gas cost estimated from mainnet data. Example:
+/// https://explorer.mainnet.near.org/transactions/5NbZ7SfrodNxeLcSkCmLAEdbZfbkk9cjqz3zSDwktKrk#D7un3c3Nxv7Ee3JpQSKiM97LbwCDFPbMo5iLoijGPXPM
 const WNEAR_REGISTER_GAS: Gas = Gas(5_000_000_000_000);
+/// Gas cost estimated from simulation tests.
 const REFUND_GAS: Gas = Gas(5_000_000_000_000);
+/// Registration amount computed from FT token source code, see
+/// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/core_impl.rs#L50
+/// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/storage_impl.rs#L101
 const WNEAR_REGISTER_AMOUNT: u128 = 1_250_000_000_000_000_000_000;
 /// Must match arora_engine_precompiles::xcc::state::STORAGE_AMOUNT
 const REFUND_AMOUNT: u128 = 2_000_000_000_000_000_000_000_000;
