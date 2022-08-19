@@ -1,7 +1,7 @@
 use crate::prelude::{sdk, BorshDeserialize, BorshSerialize, String, ToString, Vec};
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize, Clone)]
-#[cfg_attr(test, derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Proof {
     pub log_index: u64,
     pub log_entry_data: Vec<u8>,

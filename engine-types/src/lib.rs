@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
+#![deny(clippy::as_conversions)]
 
 pub mod account_id;
 pub mod parameters;
@@ -24,8 +25,8 @@ mod v0 {
         vec::Vec,
     };
     pub use core::{
-        cmp::Ordering, fmt::Display, marker::PhantomData, mem, ops::Add, ops::Div, ops::Mul,
-        ops::Sub, ops::SubAssign,
+        cmp::Ordering, fmt::Display, marker::PhantomData, mem, ops::Add, ops::AddAssign, ops::Div,
+        ops::Mul, ops::Sub, ops::SubAssign,
     };
     pub use primitive_types::{H160, H256, U256};
 }

@@ -5,6 +5,8 @@ use evm_core::Opcode;
 use serde::{Deserialize, Serialize};
 use std::ops::Index;
 
+pub mod call_tracer;
+
 /// Depth of a log.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

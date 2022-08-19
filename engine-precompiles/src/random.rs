@@ -49,7 +49,10 @@ impl Precompile for RandomSeed {
             }
         }
 
-        Ok(PrecompileOutput::without_logs(cost, self.random_seed.as_bytes().to_vec()).into())
+        Ok(PrecompileOutput::without_logs(
+            cost,
+            self.random_seed.as_bytes().to_vec(),
+        ))
     }
 }
 

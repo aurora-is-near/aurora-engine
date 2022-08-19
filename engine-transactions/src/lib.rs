@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![deny(clippy::as_conversions)]
 
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
@@ -20,10 +21,12 @@ pub enum EthTransactionKind {
 }
 
 impl TryFrom<&[u8]> for EthTransactionKind {
-    type Error = ParseTransactionError;
+    type Error = Error;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes[0] == eip_2930::TYPE_BYTE {
+        if bytes.is_empty() {
+            Err(Error::EmptyInput)
+        } else if bytes[0] == eip_2930::TYPE_BYTE {
             Ok(Self::Eip2930(eip_2930::SignedTransaction2930::decode(
                 &Rlp::new(&bytes[1..]),
             )?))
@@ -32,9 +35,9 @@ impl TryFrom<&[u8]> for EthTransactionKind {
                 &Rlp::new(&bytes[1..]),
             )?))
         } else if bytes[0] <= 0x7f {
-            Err(ParseTransactionError::UnknownTransactionType)
+            Err(Error::UnknownTransactionType)
         } else if bytes[0] == 0xff {
-            Err(ParseTransactionError::ReservedSentinel)
+            Err(Error::ReservedSentinel)
         } else {
             let legacy = legacy::LegacyEthSignedTransaction::decode(&Rlp::new(bytes))?;
             Ok(Self::Legacy(legacy))
@@ -65,7 +68,7 @@ impl<'a> From<&'a EthTransactionKind> for Vec<u8> {
 /// A normalized Ethereum transaction which can be created from older
 /// transactions.
 pub struct NormalizedEthTransaction {
-    pub address: Option<Address>,
+    pub address: Address,
     pub chain_id: Option<u64>,
     pub nonce: U256,
     pub gas_limit: U256,
@@ -77,12 +80,14 @@ pub struct NormalizedEthTransaction {
     pub access_list: Vec<AccessTuple>,
 }
 
-impl From<EthTransactionKind> for NormalizedEthTransaction {
-    fn from(kind: EthTransactionKind) -> Self {
+impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
+    type Error = Error;
+
+    fn try_from(kind: EthTransactionKind) -> Result<Self, Self::Error> {
         use EthTransactionKind::*;
-        match kind {
+        Ok(match kind {
             Legacy(tx) => Self {
-                address: tx.sender(),
+                address: tx.sender()?,
                 chain_id: tx.chain_id(),
                 nonce: tx.transaction.nonce,
                 gas_limit: tx.transaction.gas_limit,
@@ -94,7 +99,7 @@ impl From<EthTransactionKind> for NormalizedEthTransaction {
                 access_list: vec![],
             },
             Eip2930(tx) => Self {
-                address: tx.sender(),
+                address: tx.sender()?,
                 chain_id: Some(tx.transaction.chain_id),
                 nonce: tx.transaction.nonce,
                 gas_limit: tx.transaction.gas_limit,
@@ -106,7 +111,7 @@ impl From<EthTransactionKind> for NormalizedEthTransaction {
                 access_list: tx.transaction.access_list,
             },
             Eip1559(tx) => Self {
-                address: tx.sender(),
+                address: tx.sender()?,
                 chain_id: Some(tx.transaction.chain_id),
                 nonce: tx.transaction.nonce,
                 gas_limit: tx.transaction.gas_limit,
@@ -117,12 +122,12 @@ impl From<EthTransactionKind> for NormalizedEthTransaction {
                 data: tx.transaction.data,
                 access_list: tx.transaction.access_list,
             },
-        }
+        })
     }
 }
 
 impl NormalizedEthTransaction {
-    pub fn intrinsic_gas(&self, config: &evm::Config) -> Option<u64> {
+    pub fn intrinsic_gas(&self, config: &evm::Config) -> Result<u64, Error> {
         let is_contract_creation = self.to.is_none();
 
         let base_gas = if is_contract_creation {
@@ -131,40 +136,60 @@ impl NormalizedEthTransaction {
             config.gas_transaction_call
         };
 
-        let num_zero_bytes = self.data.iter().filter(|b| **b == 0).count();
-        let num_non_zero_bytes = self.data.len() - num_zero_bytes;
-
+        let num_zero_bytes = u64::try_from(self.data.iter().filter(|b| **b == 0).count())
+            .map_err(|_e| Error::IntegerConversion)?;
         let gas_zero_bytes = config
             .gas_transaction_zero_data
-            .checked_mul(num_zero_bytes as u64)?;
+            .checked_mul(num_zero_bytes)
+            .ok_or(Error::GasOverflow)?;
+
+        let data_len = u64::try_from(self.data.len()).map_err(|_e| Error::IntegerConversion)?;
+        let num_non_zero_bytes = data_len - num_zero_bytes;
         let gas_non_zero_bytes = config
             .gas_transaction_non_zero_data
-            .checked_mul(num_non_zero_bytes as u64)?;
+            .checked_mul(num_non_zero_bytes)
+            .ok_or(Error::GasOverflow)?;
 
+        let access_list_len =
+            u64::try_from(self.access_list.len()).map_err(|_e| Error::IntegerConversion)?;
         let gas_access_list_address = config
             .gas_access_list_address
-            .checked_mul(self.access_list.len() as u64)?;
-        let gas_access_list_storage = config.gas_access_list_storage_key.checked_mul(
-            self.access_list
-                .iter()
-                .map(|a| a.storage_keys.len() as u64)
-                .sum(),
-        )?;
+            .checked_mul(access_list_len)
+            .ok_or(Error::GasOverflow)?;
+
+        let gas_access_list_storage = config
+            .gas_access_list_storage_key
+            .checked_mul(
+                u64::try_from(
+                    self.access_list
+                        .iter()
+                        .map(|a| a.storage_keys.len())
+                        .sum::<usize>(),
+                )
+                .map_err(|_e| Error::IntegerConversion)?,
+            )
+            .ok_or(Error::GasOverflow)?;
 
         base_gas
             .checked_add(gas_zero_bytes)
             .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
             .and_then(|gas| gas.checked_add(gas_access_list_address))
             .and_then(|gas| gas.checked_add(gas_access_list_storage))
+            .ok_or(Error::GasOverflow)
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub enum ParseTransactionError {
+pub enum Error {
     UnknownTransactionType,
+    EmptyInput,
     // Per the EIP-2718 spec 0xff is a reserved value
     ReservedSentinel,
+    InvalidV,
+    EcRecover,
+    GasOverflow,
+    IntegerConversion,
     #[cfg_attr(feature = "serde", serde(serialize_with = "decoder_err_to_str"))]
     RlpDecodeError(DecoderError),
 }
@@ -174,23 +199,28 @@ fn decoder_err_to_str<S: serde::Serializer>(err: &DecoderError, ser: S) -> Resul
     ser.serialize_str(&format!("{:?}", err))
 }
 
-impl ParseTransactionError {
+impl Error {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::UnknownTransactionType => "ERR_UNKNOWN_TX_TYPE",
+            Self::EmptyInput => "ERR_EMPTY_TX_INPUT",
             Self::ReservedSentinel => "ERR_RESERVED_LEADING_TX_BYTE",
+            Self::InvalidV => "ERR_INVALID_V",
+            Self::EcRecover => "ERR_ECRECOVER",
+            Self::GasOverflow => "ERR_GAS_OVERFLOW",
+            Self::IntegerConversion => "ERR_INTEGER_CONVERSION",
             Self::RlpDecodeError(_) => "ERR_TX_RLP_DECODE",
         }
     }
 }
 
-impl From<DecoderError> for ParseTransactionError {
+impl From<DecoderError> for Error {
     fn from(e: DecoderError) -> Self {
         Self::RlpDecodeError(e)
     }
 }
 
-impl AsRef<[u8]> for ParseTransactionError {
+impl AsRef<[u8]> for Error {
     fn as_ref(&self) -> &[u8] {
         self.as_str().as_bytes()
     }
@@ -217,4 +247,33 @@ fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
     s.to_big_endian(&mut result[32..64]);
     result[64] = v;
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, EthTransactionKind};
+    use crate::{eip_1559, eip_2930};
+
+    #[test]
+    fn test_try_parse_empty_input() {
+        assert!(matches!(
+            EthTransactionKind::try_from([].as_ref()),
+            Err(Error::EmptyInput)
+        ));
+
+        // If the first byte is present, then empty bytes will be passed in to
+        // the RLP parsing. Let's also check this is not a problem.
+        assert!(matches!(
+            EthTransactionKind::try_from([eip_1559::TYPE_BYTE].as_ref()),
+            Err(Error::RlpDecodeError(_))
+        ));
+        assert!(matches!(
+            EthTransactionKind::try_from([eip_2930::TYPE_BYTE].as_ref()),
+            Err(Error::RlpDecodeError(_))
+        ));
+        assert!(matches!(
+            EthTransactionKind::try_from([0x80].as_ref()),
+            Err(Error::RlpDecodeError(_))
+        ));
+    }
 }

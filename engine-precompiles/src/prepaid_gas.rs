@@ -5,7 +5,7 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_types::{vec, U256};
 use evm::{Context, ExitError};
 
-/// predecessor_account_id precompile address
+/// prepaid_gas precompile address
 ///
 /// Address: `0x536822d27de53629ef1f84c60555689e9488609f`
 /// This address is computed as: `&keccak("prepaidGas")[12..]`
@@ -53,7 +53,7 @@ impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
             U256::from(prepaid_gas.as_u64()).to_big_endian(&mut buf);
             buf
         };
-        Ok(PrecompileOutput::without_logs(cost, bytes).into())
+        Ok(PrecompileOutput::without_logs(cost, bytes))
     }
 }
 

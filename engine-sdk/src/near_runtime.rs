@@ -6,7 +6,7 @@ use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, Promise
 use aurora_engine_types::types::PromiseResult;
 use aurora_engine_types::H256;
 
-#[cfg(feature = "mainnet")]
+#[cfg(all(feature = "mainnet", not(feature = "testnet")))]
 /// The mainnet eth_custodian address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52
 const CUSTODIAN_ADDRESS: &[u8] = &[
     107, 250, 212, 44, 252, 78, 252, 150, 245, 41, 215, 134, 214, 67, 255, 74, 139, 137, 250, 82,
@@ -260,6 +260,8 @@ impl crate::env::Env for Runtime {
 }
 
 impl crate::promise::PromiseHandler for Runtime {
+    type ReadOnly = Self;
+
     fn promise_results_count(&self) -> u64 {
         unsafe { exports::promise_results_count() }
     }
@@ -337,6 +339,9 @@ impl crate::promise::PromiseHandler for Runtime {
 
         for action in args.actions.iter() {
             match action {
+                PromiseAction::CreateAccount => unsafe {
+                    exports::promise_batch_action_create_account(id);
+                },
                 PromiseAction::Transfer { amount } => unsafe {
                     let amount = amount.as_u128();
                     exports::promise_batch_action_transfer(id, &amount as *const u128 as _);
@@ -378,6 +383,10 @@ impl crate::promise::PromiseHandler for Runtime {
         unsafe {
             exports::promise_return(promise.raw());
         }
+    }
+
+    fn read_only(&self) -> Self::ReadOnly {
+        Self
     }
 }
 
@@ -472,6 +481,9 @@ pub(crate) mod exports {
             malleability_flag: u64,
             register_id: u64,
         ) -> u64;
+        pub(crate) fn alt_bn128_g1_sum(value_len: u64, value_ptr: u64, register_id: u64);
+        pub(crate) fn alt_bn128_g1_multiexp(value_len: u64, value_ptr: u64, register_id: u64);
+        pub(crate) fn alt_bn128_pairing_check(value_len: u64, value_ptr: u64) -> u64;
         // #####################
         // # Miscellaneous API #
         // #####################
@@ -511,7 +523,7 @@ pub(crate) mod exports {
         // #######################
         // # Promise API actions #
         // #######################
-        fn promise_batch_action_create_account(promise_index: u64);
+        pub(crate) fn promise_batch_action_create_account(promise_index: u64);
         pub(crate) fn promise_batch_action_deploy_contract(
             promise_index: u64,
             code_len: u64,

@@ -391,7 +391,7 @@ fn test_transfer_erc20_token() {
 // Simulation tests for exit to NEAR precompile.
 // Note: `AuroraRunner` is not suitable for these tests because
 // it does not execute promises; but `near-sdk-sim` does.
-mod sim_tests {
+pub mod sim_tests {
     use crate::prelude::{Wei, WeiU256, U256};
     use crate::test_utils;
     use crate::test_utils::erc20::{ERC20Constructor, ERC20};
@@ -800,7 +800,7 @@ mod sim_tests {
             .assert_success();
     }
 
-    fn transfer_nep_141_to_erc_20(
+    pub(crate) fn transfer_nep_141_to_erc_20(
         nep_141: &near_sdk_sim::UserAccount,
         erc20: &ERC20,
         source: &near_sdk_sim::UserAccount,
@@ -865,7 +865,7 @@ mod sim_tests {
         U256::from_big_endian(&test_utils::unwrap_success(submit_result))
     }
 
-    fn deploy_erc20_from_nep_141(
+    pub(crate) fn deploy_erc20_from_nep_141(
         nep_141: &near_sdk_sim::UserAccount,
         aurora: &AuroraAccount,
     ) -> ERC20 {
@@ -879,7 +879,7 @@ mod sim_tests {
         ERC20(crate::test_utils::solidity::DeployedContract { abi, address })
     }
 
-    fn nep_141_balance_of(
+    pub fn nep_141_balance_of(
         account_id: &str,
         nep_141: &near_sdk_sim::UserAccount,
         aurora: &AuroraAccount,
@@ -902,7 +902,7 @@ mod sim_tests {
 
     /// Deploys the standard FT implementation:
     /// https://github.com/near/near-sdk-rs/blob/master/examples/fungible-token/ft/src/lib.rs
-    fn deploy_nep_141(
+    pub fn deploy_nep_141(
         nep_141_account_id: &str,
         token_owner: &str,
         amount: u128,

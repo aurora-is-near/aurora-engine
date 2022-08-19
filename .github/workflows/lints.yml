@@ -1,4 +1,3 @@
-# See: https://github.com/actions-rs/example/blob/master/.github/workflows/nightly_lints.yml
 ---
 on:
   push:
@@ -10,31 +9,39 @@ on:
 name: Lints
 jobs:
   fmt:
-    name: rustfmt
+    name: Format
     runs-on: [self-hosted, light]
     steps:
       - name: Clone the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Run cargo fmt
-        run: cargo fmt --all -- --check
+        run: cargo make check-fmt
   clippy:
     name: Clippy
     runs-on: [self-hosted, heavy]
     steps:
       - name: Clone the repository
-        uses: actions/checkout@v2
-      - run: make etc/eth-contracts/res/EvmErc20.bin
+        uses: actions/checkout@v3
+      - run: cargo make build-contracts
       - name: Run Contract cargo clippy
-        run: cargo clippy --no-default-features --features=contract -- -D warnings
+        run: cargo make clippy
       - name: Run cargo clippy
         run: cargo clippy
-
+  udeps:
+    name: Udeps
+    runs-on: [self-hosted, heavy]
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v3
+      - name: Run udeps
+        run: cargo make udeps
   contracts:
-    name: eth-contracts
+    name: Contracts
     runs-on: [self-hosted, light]
     steps:
       - name: Clone the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Run yarn lint
-        working-directory: etc/eth-contracts
-        run: yarn && yarn lint
+        run: cargo make check-contracts
+      - name: Check committed EvmErc20.bin
+        run: bash verify_evm_erc20.sh

@@ -392,7 +392,7 @@ fn load_constructor(artifact_path: PathBuf) -> solidity::ContractConstructor {
 }
 
 fn uniswap_root_path() -> PathBuf {
-    Path::new("..").join("etc").join("uniswap")
+    Path::new("../etc").join("tests").join("uniswap")
 }
 
 fn download_uniswap_artifacts() {

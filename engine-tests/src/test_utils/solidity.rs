@@ -192,8 +192,10 @@ where
         ])
         .output()
         .unwrap();
-    println!("{}", String::from_utf8(output.stdout).unwrap());
     if !output.status.success() {
-        panic!("{}", String::from_utf8(output.stderr).unwrap());
+        panic!(
+            "Could not compile solidity contracts in docker: {}",
+            String::from_utf8(output.stderr).unwrap()
+        );
     }
 }

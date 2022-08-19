@@ -1,3 +1,4 @@
+use crate::Error;
 use aurora_engine_precompiles::secp256k1::ecrecover;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::types::{Address, Wei};
@@ -86,7 +87,7 @@ pub struct SignedTransaction2930 {
 }
 
 impl SignedTransaction2930 {
-    pub fn sender(&self) -> Option<Address> {
+    pub fn sender(&self) -> Result<Address, Error> {
         let mut rlp_stream = RlpStream::new();
         rlp_stream.append(&TYPE_BYTE);
         self.transaction.rlp_append_unsigned(&mut rlp_stream);
@@ -95,7 +96,7 @@ impl SignedTransaction2930 {
             message_hash,
             &super::vrs_to_arr(self.parity, self.r, self.s),
         )
-        .ok()
+        .map_err(|_e| Error::EcRecover)
     }
 }
 

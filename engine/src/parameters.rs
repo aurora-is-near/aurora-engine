@@ -1,4 +1,5 @@
 use crate::admin_controlled::PausedMask;
+use crate::errors;
 use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue};
 use crate::prelude::account_id::AccountId;
@@ -25,20 +26,6 @@ pub struct NewCallArgs {
     pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
-}
-
-/// Borsh-encoded parameters for the `meta_call` function.
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
-pub struct MetaCallArgs {
-    pub signature: [u8; 64],
-    pub v: u8,
-    pub nonce: RawU256,
-    pub fee_amount: RawU256,
-    pub fee_address: Address,
-    pub contract_address: Address,
-    pub value: RawU256,
-    pub method_def: String,
-    pub args: Vec<u8>,
 }
 
 /// Borsh-encoded log for use in a `SubmitResult`.
@@ -98,11 +85,11 @@ impl AsRef<[u8]> for TransactionStatus {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::Succeed(_) => b"SUCCESS",
-            Self::Revert(_) => b"ERR_REVERT",
-            Self::OutOfFund => b"ERR_OUT_OF_FUNDS",
-            Self::OutOfGas => b"ERR_OUT_OF_GAS",
-            Self::OutOfOffset => b"ERR_OUT_OF_OFFSET",
-            Self::CallTooDeep => b"ERR_CALL_TOO_DEEP",
+            Self::Revert(_) => errors::ERR_REVERT,
+            Self::OutOfFund => errors::ERR_OUT_OF_FUNDS,
+            Self::OutOfGas => errors::ERR_OUT_OF_GAS,
+            Self::OutOfOffset => errors::ERR_OUT_OF_OFFSET,
+            Self::CallTooDeep => errors::ERR_CALL_TOO_DEEP,
         }
     }
 }

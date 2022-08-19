@@ -17,6 +17,21 @@ impl AsRef<[u8]> for IncorrectInputLength {
 }
 
 #[derive(Debug)]
+pub enum ReadU32Error {
+    InvalidU32,
+    MissingValue,
+}
+
+impl AsRef<[u8]> for ReadU32Error {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::InvalidU32 => b"ERR_NOT_U32",
+            Self::MissingValue => b"ERR_U32_NOT_FOUND",
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum ReadU64Error {
     InvalidU64,
     MissingValue,

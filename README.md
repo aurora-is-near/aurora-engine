@@ -15,27 +15,31 @@ documentation.
 Network | Contract ID         | Chain ID   | Version
 ------- | ------------------- | ---------- | ------
 Mainnet | [`aurora`][Mainnet] | 1313161554 | 2.6.1
-Testnet | [`aurora`][Testnet] | 1313161555 | 2.6.1
-Local   | `aurora.test.near`  | 1313161556 | 2.6.1
+Testnet | [`aurora`][Testnet] | 1313161555 | 2.7.0
+Local   | `aurora.test.near`  | 1313161556 | 2.7.0
 
 [Mainnet]: https://explorer.near.org/accounts/aurora
 [Testnet]: https://explorer.testnet.near.org/accounts/aurora
 
-## Prerequisites
+## Development
 
-### Prerequisites for Building
+### Prerequisites
 
+- Node.js (v14+)
 - Rust nightly (2021-03-25) with the WebAssembly toolchain
-- GNU Make (3.81+)
+- cargo-make
 
 ```sh
 rustup install nightly-2021-03-25
 rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
+cargo install --force cargo-make
 ```
 
 ### Prerequisites for Development
 
 - Node.js (v14+)
+- Docker
+- cargo-make
 
 ## Development
 
@@ -47,22 +51,87 @@ rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
 - [`develop`] is our bleeding-edge development branch.
   In general, kindly target all pull requests to this branch.
 
-### Building the EVM binary
+### Building & Make Commands
 
+Every task with `cargo make` must have a `--profile` argument.
+
+The current available `profile`s are:
+- `mainnet`, suitable for mainnet.
+- `testnet`, suitable for testnet.
+- `local`, suitable for local development.
+- `custom`, suitable for custom environments, see note below.
+
+A custom environment may be required depending on the circumstances. This can
+be created in the `.env` folder as `custom.env` following the structure of the
+other `.env` files. See `bin/local-custom.env` for more details.
+
+Every make most follow the following pattern, though `--profile` is not required
+for all such as cleanup:
 ```sh
-make release  # produces mainnet-release.wasm (300+ KiB)
-make -B mainnet  # produces Mainnet build
-make -B testnet  # produces Testnet build
-
-make debug    # produces mainnet-debug.wasm (1+ MiB), which includes symbols
-make -B mainnet-debug # produces Mainnet debug build
-make -B testnet-debug # produces Testnet debug build
+cargo make [--profile <profile>] <task>
 ```
 
-### Running unit & integration tests
+#### Building the engine and contracts
 
+To build the binaries there are a few commands to do such following the format.
+
+The current available build `task`s are:
+- `default`, does not need to be specified, runs `build`. Requires a `--profile`
+  argument.
+- `build`, builds all engine smart contract and produces the
+  `aurora-<profile>-test.wasm` in the `bin` folder. Requires `build-contracts`. 
+  Requires a `--profile` argument.
+- `build-test`, builds all the below using test features. Requires a `--profile`
+  argument.
+- `build-contracts`, builds all the ETH contracts.
+
+For example, the following will build the mainnet debug binary:
 ```sh
-make check
+cargo make --profile mainnet build
+```
+
+#### Running unit & integration tests
+
+To run tests, there are a few cargo make tasks we can run:
+- `test`, tests the whole cargo workspace and ETH contracts. Requires a 
+  `--profile` argument.
+- `test-workspace`, tests only the cargo workspace.
+- `test-contracts`, tests only the contracts.
+
+For example, the following will test the whole workspace and ETH contracts:
+```sh
+cargo make --profile mainnet test 
+```
+
+#### Running checks & lints
+
+To run lints and checks, the following tasks are available:
+- `check`, checks the format, clippy and ETH contracts.
+- `check-contracts`, runs yarn lints on the ETH contracts.
+- `check-fmt`, checks the workspace Rust format only.
+- `check-clippy`, checks the Rust workspace with clippy only.
+
+For example the following command will run the checks. `profile` is not required
+here:
+```
+cargo make check
+```
+
+#### Cleanup
+
+To clean up the workspace, the following tasks are available:
+- `clean`, cleans all built binaries and ETH contracts.
+- `clean-cargo`, cleans with cargo.
+- `clean-contracts`, cleans the ETH contracts.
+- `clean-bin`, cleans the binaries.
+
+Additionally, there is also but not included in the `clean` task:
+- `sweep`, sweeps the set amount of days in the ENV, default at 30 days.
+
+For example, the following command will clean everything. `profile` is not 
+required:
+```
+cargo make clean
 ```
 
 ## Deployment
@@ -85,7 +154,7 @@ npm install -g aurora-is-near/aurora-cli
 export NEAR_ENV=local
 near delete aurora.test.near test.near  # if needed
 near create-account aurora.test.near --master-account=test.near --initial-balance 1000000
-aurora install --chain 1313161556 --owner test.near mainnet-release.wasm
+aurora install --chain 1313161556 --owner test.near bin/mainnet-release.wasm
 ```
 
 ### Deploying the EVM without the CLI
@@ -94,7 +163,7 @@ aurora install --chain 1313161556 --owner test.near mainnet-release.wasm
 export NEAR_ENV=local
 near delete aurora.test.near test.near  # if needed
 near create-account aurora.test.near --master-account=test.near --initial-balance 1000000
-near deploy --account-id=aurora.test.near --wasm-file=mainnet-release.wasm
+near deploy --account-id=aurora.test.near --wasm-file=bin/mainnet-release.wasm
 aurora initialize --chain 1313161556 --owner test.near
 ```
 

@@ -70,18 +70,19 @@ pub enum PromiseResult {
     Failed,
 }
 
+impl PromiseResult {
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Failed | Self::NotReady => 1,
+            Self::Successful(bytes) => bytes.len(),
+        }
+    }
+}
+
 /// ft_resolve_transfer result of eth-connector
 pub struct FtResolveTransferResult {
     pub amount: Balance,
     pub refund_amount: Balance,
-}
-
-/// Internal errors to propagate up and format in the single place.
-pub enum ErrorKind {
-    ArgumentParseError,
-    InvalidMetaTransactionMethodName,
-    InvalidMetaTransactionFunctionArg,
-    InvalidEcRecoverSignature,
 }
 
 const HEX_ALPHABET: &[u8; 16] = b"0123456789abcdef";
@@ -90,8 +91,8 @@ const HEX_ALPHABET: &[u8; 16] = b"0123456789abcdef";
 pub fn bytes_to_hex(v: &[u8]) -> String {
     let mut result = String::new();
     for x in v {
-        result.push(HEX_ALPHABET[(x / 16) as usize] as char);
-        result.push(HEX_ALPHABET[(x % 16) as usize] as char);
+        result.push(char::from(HEX_ALPHABET[usize::from(x / 16)]));
+        result.push(char::from(HEX_ALPHABET[usize::from(x % 16)]));
     }
     result
 }

@@ -88,11 +88,40 @@ pub trait IO {
         Ok(buf)
     }
 
+    /// Convenience function to read the input into a 32-byte array.
+    fn read_input_arr32(&self) -> Result<[u8; 32], error::IncorrectInputLength> {
+        let value = self.read_input();
+
+        if value.len() != 32 {
+            return Err(error::IncorrectInputLength);
+        }
+
+        let mut buf = [0u8; 32];
+        value.copy_to_slice(&mut buf);
+        Ok(buf)
+    }
+
     /// Convenience function to store the input directly in storage under the
     /// given key (without ever loading it into memory).
     fn read_input_and_store(&mut self, key: &[u8]) {
         let value = self.read_input();
         self.write_storage_direct(key, value);
+    }
+
+    /// Convenience function to read a 32-bit unsigned integer from storage
+    /// (assumes little-endian encoding).
+    fn read_u32(&self, key: &[u8]) -> Result<u32, error::ReadU32Error> {
+        let value = self
+            .read_storage(key)
+            .ok_or(error::ReadU32Error::MissingValue)?;
+
+        if value.len() != 4 {
+            return Err(error::ReadU32Error::InvalidU32);
+        }
+
+        let mut result = [0u8; 4];
+        value.copy_to_slice(&mut result);
+        Ok(u32::from_le_bytes(result))
     }
 
     /// Convenience function to read a 64-bit unsigned integer from storage
