@@ -1,15 +1,16 @@
 use aurora_engine_types::U256;
 
+use near_primitives::account;
 use near_primitives::test_utils;
 use workspaces::network::DevAccountDeployer;
 use workspaces::network::Sandbox;
 use workspaces::types::KeyType::SECP256K1;
 use workspaces::types::SecretKey;
+use workspaces::Account;
 use workspaces::Contract;
 use workspaces::Worker;
-
-use crate::test_utils::engine::start_engine;
-use crate::test_utils::engine::MAINNET_CHAIN_ID;
+use crate::test_utils::MAINNET_CHAIN_ID;
+use crate::test_utils::deploy_evm_test;
 use crate::test_utils::erc20::ERC20Constructor;
 use crate::test_utils::sign_transaction;
 
@@ -30,30 +31,24 @@ fn pad_to_bytes32(s: &[u8]) -> Option<[u8; 32]> {
 #[tokio::test]
 async fn erc20_deploy() -> anyhow::Result<()> {
     // Start engine
-    let (worker, contract): (Worker<Sandbox>, Contract) = start_engine().await?;
+    let (worker, account): (Worker<Sandbox>, Contract) = deploy_evm_test().await?;
 
     // Build account
     let source_account_seed = "source";
     let test_account =
         libsecp256k1::SecretKey::parse(&pad_to_bytes32(source_account_seed.as_bytes()).unwrap())?;
     let test_near_account = workspaces::types::SecretKey::from_seed(SECP256K1, source_account_seed);
-    let account = worker.dev_create_account().await?;
-    let source_acount = account
-        .create_subaccount(&worker, source_account_seed)
-        .keys(test_near_account)
+    let account: Account = worker.dev_create_account().await?;
+
+    // Set account tx to submit
+    account
+        .batch(&worker, account.id())
+        .add_key(
+            test_near_account.public_key(),
+            workspaces::types::AccessKey::full_access(),
+        )
         .transact()
-        .await?
-        .unwrap();
-    let dest_account_seed = "dest";
-    let dest_account =
-        libsecp256k1::SecretKey::parse(&pad_to_bytes32(dest_account_seed.as_bytes()).unwrap())?;
-    let dest_near_account = workspaces::types::SecretKey::from_seed(SECP256K1, dest_account_seed);
-    let dest_acount = account
-        .create_subaccount(&worker, dest_account_seed)
-        .keys(dest_near_account)
-        .transact()
-        .await?
-        .unwrap();
+        .await?;
 
     // Build transaction
     let erc20_deploy = ERC20Constructor::load();
@@ -67,15 +62,14 @@ async fn erc20_deploy() -> anyhow::Result<()> {
     let encoded_tx = rlp::encode(&signed_tx).to_vec();
 
     // Encode outcome
-    let outcome = contract
-        .call(&worker, "submit")
+    let outcome = account
+        .call(&worker, account.id(), "submit")
         .args(encoded_tx)
         .transact()
         .await?;
 
     println!("submit outcome: {:#?}", outcome);
 
-    println!("Dev Account ID: {}", contract.id());
+    println!("Dev Account ID: {}", account.id());
     Ok(())
 }
-

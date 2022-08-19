@@ -14,10 +14,10 @@ const AURORA_WASM_FILEPATH: &str = "../mainnet-release.wasm";
 pub const MAINNET_CHAIN_ID: u32 = 1313161556;
 
 
-pub async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
+pub async fn deploy_evm_test() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
     let worker = workspaces::sandbox().await?;
     let wasm = std::fs::read(AURORA_WASM_FILEPATH)?;
-    let contract = worker.dev_deploy(&wasm).await?;
+    let account = worker.dev_deploy(&wasm).await?;
 
     // Record Chain metadata
     let args = NewCallArgs {
@@ -27,7 +27,7 @@ pub async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
         upgrade_delay_blocks: 1,
     };
 
-    contract
+    account
         .call(&worker, "new")
         .args(args.try_to_vec().unwrap())
         .transact()
@@ -40,11 +40,11 @@ pub async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
         metadata: FungibleTokenMetadata::default(),
     };
 
-    contract
+    account
         .call(&worker, "new_eth_connector")
         .args(init_evm.try_to_vec().unwrap())
         .transact()
         .await?;
 
-    return Ok((worker, contract));
+    return Ok((worker, account));
 }

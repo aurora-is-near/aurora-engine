@@ -25,7 +25,8 @@ use crate::prelude::transactions::{
 };
 use crate::prelude::{sdk, Address, Wei, H256, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
-
+pub mod engine;
+pub use crate::test_utils::engine::deploy_evm_test;
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
 pub fn origin() -> String {
