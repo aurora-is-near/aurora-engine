@@ -49,8 +49,7 @@ impl PrecompilesContract {
             "test_modexp",
             "test_ecadd",
             "test_ecmul",
-            // TODO(#46): ecpair uses up all the gas (by itself) for some reason, need to look into this.
-            // "test_ecpair",
+            "test_ecpair",
             "test_blake2f",
             "test_all",
         ]

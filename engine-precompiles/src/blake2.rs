@@ -103,7 +103,7 @@ fn f(mut h: [u64; 8], m: [u64; 16], t: [u64; 2], f: bool, rounds: u32) -> Vec<u8
     for i in 0..rounds {
         // Typically twelve rounds for blake2b.
         // Message word selection permutation for this round.
-        let s = &consts::SIGMA[i as usize % 10];
+        let s = &consts::SIGMA[usize::try_from(i).expect("Round can convert to usize") % 10];
         g(&mut v, 0, 4, 8, 12, m[s[0]], m[s[1]]);
         g(&mut v, 1, 5, 9, 13, m[s[2]], m[s[3]]);
         g(&mut v, 2, 6, 10, 14, m[s[4]], m[s[5]]);
@@ -206,7 +206,7 @@ impl Precompile for Blake2F {
         let finished = input[212] != 0;
 
         let output = f(h, m, t, finished, rounds);
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

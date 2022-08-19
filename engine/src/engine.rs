@@ -5,22 +5,24 @@ use evm::executor;
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::connector::EthConnectorContract;
+use crate::errors;
 use crate::map::BijectionMap;
 use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
+use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
 
 use crate::accounting;
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::prelude::parameters::RefundCallArgs;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
+use crate::prelude::precompiles::xcc::cross_contract_call;
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
     BTreeMap, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs,
-    ToString, Vec, Wei, ERC20_MINT_SELECTOR, H160, H256, U256,
+    ToString, Vec, Wei, Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
 use aurora_engine_precompiles::PrecompileConstructorContext;
 use core::cell::RefCell;
@@ -94,7 +96,7 @@ pub enum EngineErrorKind {
     EvmFatal(ExitFatal),
     /// Incorrect nonce.
     IncorrectNonce,
-    FailedTransactionParse(crate::prelude::transactions::ParseTransactionError),
+    FailedTransactionParse(crate::prelude::transactions::Error),
     InvalidChainId,
     InvalidSignature,
     IntrinsicGasNotMet,
@@ -114,31 +116,31 @@ impl EngineErrorKind {
     pub fn as_bytes(&self) -> &[u8] {
         use EngineErrorKind::*;
         match self {
-            EvmError(ExitError::StackUnderflow) => b"ERR_STACK_UNDERFLOW",
-            EvmError(ExitError::StackOverflow) => b"ERR_STACK_OVERFLOW",
-            EvmError(ExitError::InvalidJump) => b"ERR_INVALID_JUMP",
-            EvmError(ExitError::InvalidRange) => b"ERR_INVALID_RANGE",
-            EvmError(ExitError::DesignatedInvalid) => b"ERR_DESIGNATED_INVALID",
-            EvmError(ExitError::CallTooDeep) => b"ERR_CALL_TOO_DEEP",
-            EvmError(ExitError::CreateCollision) => b"ERR_CREATE_COLLISION",
-            EvmError(ExitError::CreateContractLimit) => b"ERR_CREATE_CONTRACT_LIMIT",
-            EvmError(ExitError::OutOfOffset) => b"ERR_OUT_OF_OFFSET",
-            EvmError(ExitError::OutOfGas) => b"ERR_OUT_OF_GAS",
-            EvmError(ExitError::OutOfFund) => b"ERR_OUT_OF_FUND",
+            EvmError(ExitError::StackUnderflow) => errors::ERR_STACK_UNDERFLOW,
+            EvmError(ExitError::StackOverflow) => errors::ERR_STACK_OVERFLOW,
+            EvmError(ExitError::InvalidJump) => errors::ERR_INVALID_JUMP,
+            EvmError(ExitError::InvalidRange) => errors::ERR_INVALID_RANGE,
+            EvmError(ExitError::DesignatedInvalid) => errors::ERR_DESIGNATED_INVALID,
+            EvmError(ExitError::CallTooDeep) => errors::ERR_CALL_TOO_DEEP,
+            EvmError(ExitError::CreateCollision) => errors::ERR_CREATE_COLLISION,
+            EvmError(ExitError::CreateContractLimit) => errors::ERR_CREATE_CONTRACT_LIMIT,
+            EvmError(ExitError::OutOfOffset) => errors::ERR_OUT_OF_OFFSET,
+            EvmError(ExitError::OutOfGas) => errors::ERR_OUT_OF_GAS,
+            EvmError(ExitError::OutOfFund) => errors::ERR_OUT_OF_FUND,
             EvmError(ExitError::Other(m)) => m.as_bytes(),
             EvmError(_) => unreachable!(), // unused misc
-            EvmFatal(ExitFatal::NotSupported) => b"ERR_NOT_SUPPORTED",
-            EvmFatal(ExitFatal::UnhandledInterrupt) => b"ERR_UNHANDLED_INTERRUPT",
+            EvmFatal(ExitFatal::NotSupported) => errors::ERR_NOT_SUPPORTED,
+            EvmFatal(ExitFatal::UnhandledInterrupt) => errors::ERR_UNHANDLED_INTERRUPT,
             EvmFatal(ExitFatal::Other(m)) => m.as_bytes(),
             EvmFatal(_) => unreachable!(), // unused misc
-            IncorrectNonce => b"ERR_INCORRECT_NONCE",
+            IncorrectNonce => errors::ERR_INCORRECT_NONCE,
             FailedTransactionParse(e) => e.as_ref(),
-            InvalidChainId => b"ERR_INVALID_CHAIN_ID",
-            InvalidSignature => b"ERR_INVALID_ECDSA_SIGNATURE",
-            IntrinsicGasNotMet => b"ERR_INTRINSIC_GAS",
-            MaxPriorityGasFeeTooLarge => b"ERR_MAX_PRIORITY_FEE_GREATER",
+            InvalidChainId => errors::ERR_INVALID_CHAIN_ID,
+            InvalidSignature => errors::ERR_INVALID_ECDSA_SIGNATURE,
+            IntrinsicGasNotMet => errors::ERR_INTRINSIC_GAS,
+            MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
             GasPayment(e) => e.as_ref(),
-            GasOverflow => b"ERR_GAS_OVERFLOW",
+            GasOverflow => errors::ERR_GAS_OVERFLOW,
         }
     }
 }
@@ -190,7 +192,7 @@ pub struct BalanceOverflow;
 
 impl AsRef<[u8]> for BalanceOverflow {
     fn as_ref(&self) -> &[u8] {
-        b"ERR_BALANCE_OVERFLOW"
+        errors::ERR_BALANCE_OVERFLOW
     }
 }
 
@@ -210,8 +212,8 @@ impl AsRef<[u8]> for GasPaymentError {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::BalanceOverflow(overflow) => overflow.as_ref(),
-            Self::EthAmountOverflow => b"ERR_GAS_ETH_AMOUNT_OVERFLOW",
-            Self::OutOfFund => b"ERR_OUT_OF_FUND",
+            Self::EthAmountOverflow => errors::ERR_GAS_ETH_AMOUNT_OVERFLOW,
+            Self::OutOfFund => errors::ERR_OUT_OF_FUND,
         }
     }
 }
@@ -241,7 +243,7 @@ impl AsRef<[u8]> for DeployErc20Error {
     }
 }
 
-pub struct ERC20Address(Address);
+pub struct ERC20Address(pub Address);
 
 impl AsRef<[u8]> for ERC20Address {
     fn as_ref(&self) -> &[u8] {
@@ -267,11 +269,11 @@ pub struct AddressParseError;
 
 impl AsRef<[u8]> for AddressParseError {
     fn as_ref(&self) -> &[u8] {
-        b"ERR_PARSE_ADDRESS"
+        errors::ERR_PARSE_ADDRESS
     }
 }
 
-pub struct NEP141Account(AccountId);
+pub struct NEP141Account(pub AccountId);
 
 impl AsRef<[u8]> for NEP141Account {
     fn as_ref(&self) -> &[u8] {
@@ -340,32 +342,50 @@ pub enum EngineStateError {
 impl AsRef<[u8]> for EngineStateError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::NotFound => b"ERR_STATE_NOT_FOUND",
-            Self::DeserializationFailed => b"ERR_STATE_CORRUPTED",
+            Self::NotFound => errors::ERR_STATE_NOT_FOUND,
+            Self::DeserializationFailed => errors::ERR_STATE_CORRUPTED,
         }
     }
 }
 
-struct StackExecutorParams<'a, I, E> {
-    precompiles: Precompiles<'a, I, E>,
+struct StackExecutorParams<'a, I, E, H> {
+    precompiles: Precompiles<'a, I, E, H>,
     gas_limit: u64,
 }
 
-impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
+impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<'env, I, E, H> {
     fn new(
         gas_limit: u64,
         current_account_id: AccountId,
         random_seed: H256,
         io: I,
         env: &'env E,
+        ro_promise_handler: H,
     ) -> Self {
-        Self {
-            precompiles: Precompiles::new_london(PrecompileConstructorContext {
+        let precompiles = if cfg!(all(feature = "mainnet", not(feature = "integration-test"))) {
+            let mut tmp = Precompiles::new_london(PrecompileConstructorContext {
                 current_account_id,
                 random_seed,
                 io,
                 env,
-            }),
+                promise_handler: ro_promise_handler,
+            });
+            // Cross contract calls are not enabled on mainnet yet.
+            tmp.all_precompiles
+                .remove(&aurora_engine_precompiles::xcc::cross_contract_call::ADDRESS);
+            tmp
+        } else {
+            Precompiles::new_london(PrecompileConstructorContext {
+                current_account_id,
+                random_seed,
+                io,
+                env,
+                promise_handler: ro_promise_handler,
+            })
+        };
+
+        Self {
+            precompiles,
             gas_limit,
         }
     }
@@ -377,7 +397,7 @@ impl<'env, I: IO + Copy, E: Env> StackExecutorParams<'env, I, E> {
         'static,
         'a,
         executor::stack::MemoryStackState<Engine<'env, I, E>>,
-        Precompiles<'env, I, E>,
+        Precompiles<'env, I, E, H>,
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::stack::MemoryStackState::new(metadata, engine);
@@ -527,6 +547,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
             self.io,
             self.env,
+            handler.read_only(),
         );
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy {
@@ -550,7 +571,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(handler, logs);
+        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
 
         self.apply(values, Vec::<Log>::new(), true);
 
@@ -613,6 +634,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
             self.io,
             self.env,
+            handler.read_only(),
         );
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) = executor.transact_call(
@@ -634,7 +656,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(handler, logs);
+        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
@@ -664,6 +686,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             self.env.random_seed(),
             self.io,
             self.env,
+            // View calls cannot interact with promises
+            aurora_engine_sdk::promise::Noop,
         );
         let mut executor = executor_params.make_executor(self);
         let (status, result) = executor.transact_call(
@@ -877,9 +901,11 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     handler: &mut P,
 ) -> EngineResult<SubmitResult> {
     #[cfg(feature = "contract")]
-    let transaction: NormalizedEthTransaction = EthTransactionKind::try_from(transaction_bytes)
-        .map_err(EngineErrorKind::FailedTransactionParse)?
-        .into();
+    let transaction = NormalizedEthTransaction::try_from(
+        EthTransactionKind::try_from(transaction_bytes)
+            .map_err(EngineErrorKind::FailedTransactionParse)?,
+    )
+    .map_err(|_e| EngineErrorKind::InvalidSignature)?;
 
     #[cfg(not(feature = "contract"))]
     // The standalone engine must use the backwards compatible parser to reproduce the NEAR state,
@@ -894,7 +920,8 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         let tx: EthTransactionKind = adapter
             .try_parse_bytes(transaction_bytes, block_height)
             .map_err(EngineErrorKind::FailedTransactionParse)?;
-        tx.into()
+        tx.try_into()
+            .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
 
     // Validate the chain ID, if provided inside the signature:
@@ -905,9 +932,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     }
 
     // Retrieve the signer of the transaction:
-    let sender = transaction
-        .address
-        .ok_or(EngineErrorKind::InvalidSignature)?;
+    let sender = transaction.address;
 
     sdk::log!(crate::prelude::format!("signer_address {:?}", sender).as_str());
 
@@ -915,10 +940,10 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     // Check intrinsic gas is covered by transaction gas limit
     match transaction.intrinsic_gas(crate::engine::CONFIG) {
-        None => {
+        Err(_e) => {
             return Err(EngineErrorKind::GasOverflow.into());
         }
-        Some(intrinsic_gas) => {
+        Ok(intrinsic_gas) => {
             if transaction.gas_limit < intrinsic_gas.into() {
                 return Err(EngineErrorKind::IntrinsicGasNotMet.into());
             }
@@ -1348,10 +1373,16 @@ fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) 
     remove_all_storage(io, address, generation);
 }
 
-fn filter_promises_from_logs<T, P>(handler: &mut P, logs: T) -> Vec<ResultLog>
+fn filter_promises_from_logs<I, T, P>(
+    io: &I,
+    handler: &mut P,
+    logs: T,
+    current_account_id: &AccountId,
+) -> Vec<ResultLog>
 where
     T: IntoIterator<Item = Log>,
     P: PromiseHandler,
+    I: IO + Copy,
 {
     logs.into_iter()
         .filter_map(|log| {
@@ -1376,6 +1407,25 @@ where
                     // `topics` field.
                     Some(log.into())
                 }
+            } else if log.address == cross_contract_call::ADDRESS.raw() {
+                if log.topics[0] == cross_contract_call::AMOUNT_TOPIC {
+                    // NEAR balances are 128-bit, so the leading 16 bytes of the 256-bit topic
+                    // value should always be zero.
+                    assert_eq!(&log.topics[1].as_bytes()[0..16], &[0; 16]);
+                    let required_near =
+                        Yocto::new(U256::from_big_endian(log.topics[1].as_bytes()).low_u128());
+                    if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
+                        crate::xcc::handle_precompile_promise(
+                            io,
+                            handler,
+                            promise,
+                            required_near,
+                            current_account_id,
+                        );
+                    }
+                }
+                // do not pass on these "internal logs" to caller
+                None
             } else {
                 Some(log.into())
             }

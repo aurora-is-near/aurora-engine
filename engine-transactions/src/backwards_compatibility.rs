@@ -4,7 +4,7 @@
 //! https://github.com/aurora-is-near/aurora-engine/pull/458 for more details, but external
 //! users of this library should _never_ use the adapter in this module.
 
-use crate::{EthTransactionKind, ParseTransactionError};
+use crate::{Error, EthTransactionKind};
 use aurora_engine_types::{types::Address, H160};
 
 const ZERO_ADDRESS: Option<Address> = Some(Address::new(H160::zero()));
@@ -26,7 +26,7 @@ impl EthTransactionKindAdapter {
         &self,
         bytes: &[u8],
         block_height: u64,
-    ) -> Result<EthTransactionKind, ParseTransactionError> {
+    ) -> Result<EthTransactionKind, Error> {
         let mut result = EthTransactionKind::try_from(bytes)?;
 
         // Prior to the bug fix, the zero address was always parsed as None if

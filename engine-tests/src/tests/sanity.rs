@@ -96,8 +96,8 @@ fn test_transaction_to_zero_address() {
     let tx_hex = "f8648080836691b79400000000000000000000000000000000000000008080849c8a82caa0464cada9d6a907f5537dcc0f95274a30ddaeff33276e9b3993815586293a2010a07626bd794381ba59f30e26ec6f3448d19f63bb12dcda19acda429b2fb7d3dfba";
     let tx_bytes = hex::decode(tx_hex).unwrap();
     let tx = aurora_engine_transactions::EthTransactionKind::try_from(tx_bytes.as_slice()).unwrap();
-    let normalized_tx = aurora_engine_transactions::NormalizedEthTransaction::from(tx);
-    let address = normalized_tx.address.as_ref().unwrap();
+    let normalized_tx = aurora_engine_transactions::NormalizedEthTransaction::try_from(tx).unwrap();
+    let address = normalized_tx.address;
     let sender = hex::encode(address.as_bytes());
     assert_eq!(sender.as_str(), "63eafba871e0bda44be3cde19df5aa1c0f078142");
 
@@ -110,17 +110,21 @@ fn test_transaction_to_zero_address() {
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
     context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT - 1;
-    let result = runner.submit_raw(test_utils::SUBMIT, &context).unwrap();
+    let result = runner
+        .submit_raw(test_utils::SUBMIT, &context, &[])
+        .unwrap();
     assert_eq!(result.gas_used, 53_000);
     runner.env.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT;
-    assert_eq!(runner.get_nonce(address), U256::zero());
+    assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
     context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT;
-    let result = runner.submit_raw(test_utils::SUBMIT, &context).unwrap();
+    let result = runner
+        .submit_raw(test_utils::SUBMIT, &context, &[])
+        .unwrap();
     assert_eq!(result.gas_used, 21_000);
     runner.env.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
-    assert_eq!(runner.get_nonce(address), U256::one());
+    assert_eq!(runner.get_nonce(&address), U256::one());
 }
 
 #[test]
@@ -353,7 +357,9 @@ fn test_solidity_pure_bench() {
     );
 
     // Pure rust version of the same contract
-    let base_path = std::path::Path::new("../etc").join("benchmark-contract");
+    let base_path = std::path::Path::new("../etc")
+        .join("tests")
+        .join("benchmark-contract");
     let output_path =
         base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
     test_utils::rust::compile(base_path);

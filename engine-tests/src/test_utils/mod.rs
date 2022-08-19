@@ -1,6 +1,6 @@
 use aurora_engine::parameters::ViewCallArgs;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::types::NEP141Wei;
+use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
@@ -87,6 +87,9 @@ pub(crate) struct AuroraRunner {
     // Use the standalone in parallel if set. This allows checking both
     // implementations give the same results.
     pub standalone_runner: Option<standalone::StandaloneRunner>,
+    // Empty by default. Can be set in tests if the transaction should be
+    // executed as if it was a callback.
+    pub promise_results: Vec<PromiseResult>,
 }
 
 /// Same as `AuroraRunner`, but consumes `self` on execution (thus preventing building on
@@ -188,6 +191,17 @@ impl AuroraRunner {
             input,
         );
 
+        let vm_promise_results: Vec<_> = self
+            .promise_results
+            .iter()
+            .map(|p| match p {
+                PromiseResult::Failed => near_vm_logic::types::PromiseResult::Failed,
+                PromiseResult::NotReady => near_vm_logic::types::PromiseResult::NotReady,
+                PromiseResult::Successful(bytes) => {
+                    near_vm_logic::types::PromiseResult::Successful(bytes.clone())
+                }
+            })
+            .collect();
         let (maybe_outcome, maybe_error) = match near_vm_runner::run(
             &self.code,
             method_name,
@@ -195,7 +209,7 @@ impl AuroraRunner {
             self.context.clone(),
             &self.wasm_config,
             &self.fees_config,
-            &[],
+            &vm_promise_results,
             self.current_protocol_version,
             Some(&self.cache),
         ) {
@@ -212,7 +226,7 @@ impl AuroraRunner {
                 && (method_name == SUBMIT || method_name == CALL || method_name == DEPLOY_ERC20)
             {
                 standalone_runner
-                    .submit_raw(method_name, &self.context)
+                    .submit_raw(method_name, &self.context, &self.promise_results)
                     .unwrap();
                 self.validate_standalone();
             }
@@ -520,9 +534,9 @@ impl Default for AuroraRunner {
     fn default() -> Self {
         let aurora_account_id = "aurora".to_string();
         let evm_wasm_bytes = if cfg!(feature = "mainnet-test") {
-            std::fs::read("../mainnet-test.wasm").unwrap()
+            std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap()
         } else if cfg!(feature = "testnet-test") {
-            std::fs::read("../testnet-test.wasm").unwrap()
+            std::fs::read("../bin/aurora-testnet-test.wasm").unwrap()
         } else {
             panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
         };
@@ -561,6 +575,7 @@ impl Default for AuroraRunner {
             current_protocol_version: u32::MAX,
             previous_logs: Default::default(),
             standalone_runner: None,
+            promise_results: Vec::new(),
         }
     }
 }
@@ -845,4 +860,12 @@ pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
         tgas_used,
         tgas_bound,
     );
+}
+
+/// Returns true if `abs(a - b) / max(a, b) <= x / 100`. The implementation is written differently than
+/// this simpler formula to avoid floating point arithmetic.
+pub fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
+    let (larger, smaller) = if a < b { (b, a) } else { (a, b) };
+
+    (100 / x) * (larger - smaller) <= larger
 }

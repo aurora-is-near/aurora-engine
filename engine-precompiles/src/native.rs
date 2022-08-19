@@ -30,12 +30,10 @@ mod costs {
     // TODO(#483): Determine the correct amount of gas
     pub(super) const EXIT_TO_ETHEREUM_GAS: EthGas = EthGas::new(0);
 
-    // TODO(#332): Determine the correct amount of gas
-    pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(100_000_000_000_000);
+    pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
-    // TODO(#332): Determine the correct amount of gas
     #[cfg(feature = "error_refund")]
-    pub(super) const REFUND_ON_ERROR_GAS: NearGas = NearGas::new(60_000_000_000_000);
+    pub(super) const REFUND_ON_ERROR_GAS: NearGas = NearGas::new(5_000_000_000_000);
 
     // TODO(#332): Determine the correct amount of gas
     pub(super) const WITHDRAWAL_GAS: NearGas = NearGas::new(100_000_000_000_000);
@@ -401,8 +399,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
         Ok(PrecompileOutput {
             logs: vec![promise_log, exit_event_log],
             ..Default::default()
-        }
-        .into())
+        })
     }
 }
 
@@ -573,8 +570,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         Ok(PrecompileOutput {
             logs: vec![promise_log, exit_event_log],
             ..Default::default()
-        }
-        .into())
+        })
     }
 }
 

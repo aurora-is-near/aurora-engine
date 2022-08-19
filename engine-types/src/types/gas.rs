@@ -1,5 +1,5 @@
 use crate::fmt::Formatter;
-use crate::{Add, Display, Div, Mul, Sub};
+use crate::{Add, AddAssign, Display, Div, Mul, Sub};
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -21,6 +21,14 @@ impl Sub<NearGas> for NearGas {
 
     fn sub(self, rhs: NearGas) -> Self::Output {
         Self(self.0 - rhs.0)
+    }
+}
+
+impl Add<NearGas> for NearGas {
+    type Output = NearGas;
+
+    fn add(self, rhs: NearGas) -> Self::Output {
+        Self(self.0 + rhs.0)
     }
 }
 
@@ -67,11 +75,17 @@ impl Add<EthGas> for EthGas {
     }
 }
 
-impl Div<usize> for EthGas {
+impl AddAssign<EthGas> for EthGas {
+    fn add_assign(&mut self, rhs: EthGas) {
+        self.0 += rhs.0
+    }
+}
+
+impl Div<u64> for EthGas {
     type Output = EthGas;
 
-    fn div(self, rhs: usize) -> Self::Output {
-        EthGas(self.0 / rhs as u64)
+    fn div(self, rhs: u64) -> Self::Output {
+        EthGas(self.0 / rhs)
     }
 }
 
@@ -79,7 +93,7 @@ impl Mul<EthGas> for u32 {
     type Output = EthGas;
 
     fn mul(self, rhs: EthGas) -> Self::Output {
-        EthGas(self as u64 * rhs.0)
+        EthGas(u64::from(self) * rhs.0)
     }
 }
 
@@ -87,15 +101,15 @@ impl Mul<u32> for EthGas {
     type Output = EthGas;
 
     fn mul(self, rhs: u32) -> Self::Output {
-        EthGas(self.0 * rhs as u64)
+        EthGas(self.0 * u64::from(rhs))
     }
 }
 
-impl Mul<usize> for EthGas {
+impl Mul<u64> for EthGas {
     type Output = EthGas;
 
-    fn mul(self, rhs: usize) -> Self::Output {
-        EthGas(self.0 * rhs as u64)
+    fn mul(self, rhs: u64) -> Self::Output {
+        EthGas(self.0 * rhs)
     }
 }
 

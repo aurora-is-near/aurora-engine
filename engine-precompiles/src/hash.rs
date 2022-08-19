@@ -2,7 +2,7 @@
 use crate::prelude::sdk;
 use crate::prelude::types::{Address, EthGas};
 use crate::prelude::vec;
-use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
 mod costs {
@@ -32,8 +32,9 @@ impl SHA256 {
 
 impl Precompile for SHA256 {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
+        let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(
-            (input.len() as u64 + consts::SHA256_WORD_LEN - 1) / consts::SHA256_WORD_LEN
+            (input_len + consts::SHA256_WORD_LEN - 1) / consts::SHA256_WORD_LEN
                 * costs::SHA256_PER_WORD
                 + costs::SHA256_BASE,
         )
@@ -60,7 +61,7 @@ impl Precompile for SHA256 {
         }
 
         let output = sha2::Sha256::digest(input).to_vec();
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 
     /// See: https://ethereum.github.io/yellowpaper/paper.pdf
@@ -82,7 +83,7 @@ impl Precompile for SHA256 {
         }
 
         let output = sdk::sha256(input).as_bytes().to_vec();
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 
@@ -94,8 +95,9 @@ impl RIPEMD160 {
 
     #[cfg(not(feature = "contract"))]
     fn internal_impl(input: &[u8]) -> [u8; 20] {
-        use ripemd160::Digest;
-        let hash = ripemd160::Ripemd160::digest(input);
+        use ripemd::{Digest, Ripemd160};
+
+        let hash = Ripemd160::digest(input);
         let mut output = [0u8; 20];
         output.copy_from_slice(&hash);
         output
@@ -104,8 +106,9 @@ impl RIPEMD160 {
 
 impl Precompile for RIPEMD160 {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
+        let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(
-            (input.len() as u64 + consts::RIPEMD_WORD_LEN - 1) / consts::RIPEMD_WORD_LEN
+            (input_len + consts::RIPEMD_WORD_LEN - 1) / consts::RIPEMD_WORD_LEN
                 * costs::RIPEMD160_PER_WORD
                 + costs::RIPEMD160_BASE,
         )
@@ -136,7 +139,7 @@ impl Precompile for RIPEMD160 {
         // the evm works with 32-byte words.
         let mut output = vec![0u8; 32];
         output[12..].copy_from_slice(&hash);
-        Ok(PrecompileOutput::without_logs(cost, output).into())
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

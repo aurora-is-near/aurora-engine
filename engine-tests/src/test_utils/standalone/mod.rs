@@ -2,7 +2,7 @@ use aurora_engine::engine;
 use aurora_engine::parameters::{CallArgs, DeployErc20TokenArgs, SubmitResult, TransactionStatus};
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
-use aurora_engine_types::types::{Address, NearGas, Wei};
+use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
 use borsh::BorshDeserialize;
 use engine_standalone_storage::{
@@ -43,7 +43,7 @@ impl StandaloneRunner {
             .unwrap();
         env.block_height += 1;
         let transaction_hash = H256::zero();
-        let tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash);
+        let tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, &[]);
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::init_evm(io, env, chain_id);
         });
@@ -77,7 +77,7 @@ impl StandaloneRunner {
         };
 
         env.block_height += 1;
-        let tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash);
+        let tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, &[]);
 
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::mint_evm_account(address, balance, nonce, code, io, env)
@@ -126,6 +126,7 @@ impl StandaloneRunner {
             storage,
             env,
             &mut self.cumulative_diff,
+            &[],
         )
     }
 
@@ -144,6 +145,7 @@ impl StandaloneRunner {
             storage,
             env,
             &mut self.cumulative_diff,
+            &[],
         )
     }
 
@@ -161,7 +163,7 @@ impl StandaloneRunner {
         let transaction_bytes = rlp::encode(signed_tx).to_vec();
         let transaction_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
-        let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash);
+        let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, &[]);
         tx_msg.position = transaction_position;
         tx_msg.transaction =
             TransactionKind::Submit(transaction_bytes.as_slice().try_into().unwrap());
@@ -182,6 +184,7 @@ impl StandaloneRunner {
         &mut self,
         method_name: &str,
         ctx: &near_vm_logic::VMContext,
+        promise_results: &[PromiseResult],
     ) -> Result<SubmitResult, engine::EngineError> {
         let mut env = self.env.clone();
         env.block_height = ctx.block_index;
@@ -201,11 +204,13 @@ impl StandaloneRunner {
                 storage,
                 &mut env,
                 &mut self.cumulative_diff,
+                promise_results,
             )
         } else if method_name == test_utils::CALL {
             let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::Call(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -216,7 +221,8 @@ impl StandaloneRunner {
         } else if method_name == test_utils::DEPLOY_ERC20 {
             let deploy_args = DeployErc20TokenArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::DeployErc20(deploy_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -275,6 +281,7 @@ impl StandaloneRunner {
         env: &env::Fixed,
         transaction_position: u16,
         transaction_hash: H256,
+        promise_results: &[PromiseResult],
     ) -> TransactionMessage {
         let block_hash = mocks::compute_block_hash(env.block_height);
         let block_metadata = BlockMetadata {
@@ -284,6 +291,13 @@ impl StandaloneRunner {
         storage
             .set_block_data(block_hash, env.block_height, block_metadata)
             .unwrap();
+        let promise_data = promise_results
+            .iter()
+            .map(|p| match p {
+                PromiseResult::Failed | PromiseResult::NotReady => None,
+                PromiseResult::Successful(bytes) => Some(bytes.clone()),
+            })
+            .collect();
         TransactionMessage {
             block_hash,
             near_receipt_id: transaction_hash,
@@ -293,6 +307,7 @@ impl StandaloneRunner {
             caller: env.predecessor_account_id(),
             attached_near: env.attached_deposit,
             transaction: TransactionKind::Unknown,
+            promise_data,
         }
     }
 
@@ -302,10 +317,16 @@ impl StandaloneRunner {
         storage: &'db mut Storage,
         env: &mut env::Fixed,
         cumulative_diff: &mut Diff,
+        promise_results: &[PromiseResult],
     ) -> Result<SubmitResult, engine::EngineError> {
         let transaction_hash = aurora_engine_sdk::keccak(&transaction_bytes);
-        let mut tx_msg =
-            Self::template_tx_msg(storage, env, transaction_position, transaction_hash);
+        let mut tx_msg = Self::template_tx_msg(
+            storage,
+            env,
+            transaction_position,
+            transaction_hash,
+            promise_results,
+        );
         tx_msg.transaction = TransactionKind::Submit(transaction_bytes.try_into().unwrap());
 
         let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();

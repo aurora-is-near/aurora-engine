@@ -207,6 +207,7 @@ impl evm::tracing::EventListener for TransactionTraceBuilder {
                     self.output = return_value.to_vec();
                 }
             }
+            Event::PrecompileSubcall { .. } => (),
             Event::TransactCall { .. } => (), // no useful information
             Event::TransactCreate { .. } => (), // no useful information
             Event::TransactCreate2 { .. } => (), // no useful information

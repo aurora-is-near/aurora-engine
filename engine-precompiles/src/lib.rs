@@ -1,24 +1,26 @@
 #![allow(dead_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![deny(clippy::as_conversions)]
 
 pub mod account_ids;
+pub mod alt_bn256;
 pub mod blake2;
-pub mod bn128;
 pub mod hash;
 pub mod identity;
 pub mod modexp;
 pub mod native;
 mod prelude;
 pub mod prepaid_gas;
+pub mod promise_result;
 pub mod random;
 pub mod secp256k1;
-#[cfg(test)]
 mod utils;
+pub mod xcc;
 
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
+use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use crate::blake2::Blake2F;
-use crate::bn128::{Bn128Add, Bn128Mul, Bn128Pair};
 use crate::hash::{RIPEMD160, SHA256};
 use crate::identity::Identity;
 use crate::modexp::ModExp;
@@ -28,12 +30,19 @@ use crate::prelude::{Vec, H160, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
+use crate::xcc::CrossContractCall;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
+use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
 use evm::backend::Log;
-use evm::executor;
+use evm::executor::{
+    self,
+    stack::{PrecompileFailure, PrecompileHandle},
+};
 use evm::{Context, ExitError, ExitSucceed};
+use promise_result::PromiseResult;
+use xcc::cross_contract_call;
 
 #[derive(Debug, Default)]
 pub struct PrecompileOutput {
@@ -52,18 +61,7 @@ impl PrecompileOutput {
     }
 }
 
-impl From<PrecompileOutput> for executor::stack::PrecompileOutput {
-    fn from(output: PrecompileOutput) -> Self {
-        executor::stack::PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            cost: output.cost.as_u64(),
-            output: output.output,
-            logs: output.logs,
-        }
-    }
-}
-
-type EvmPrecompileResult = Result<executor::stack::PrecompileOutput, ExitError>;
+type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
 pub trait Precompile {
@@ -80,6 +78,13 @@ pub trait Precompile {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult;
+}
+
+pub trait HandleBasedPrecompile {
+    fn run_with_handle(
+        &self,
+        handle: &mut impl PrecompileHandle,
+    ) -> Result<PrecompileOutput, PrecompileFailure>;
 }
 
 /// Hard fork marker.
@@ -105,47 +110,81 @@ impl HardFork for Istanbul {}
 
 impl HardFork for Berlin {}
 
-pub struct Precompiles<'a, I, E> {
-    pub generic_precompiles: prelude::BTreeMap<Address, Box<dyn Precompile>>,
-    // Cannot be part of the generic precompiles because the `dyn` type-erasure messes with
-    // with the lifetime requirements on the type parameter `I`.
-    pub near_exit: ExitToNear<I>,
-    pub ethereum_exit: ExitToEthereum<I>,
-    pub predecessor_account_id: PredecessorAccount<'a, E>,
-    pub prepaid_gas: PrepaidGas<'a, E>,
+pub struct Precompiles<'a, I, E, H> {
+    pub all_precompiles: prelude::BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
 }
 
-impl<'a, I: IO + Copy, E: Env> executor::stack::PrecompileSet for Precompiles<'a, I, E> {
+impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
+    for Precompiles<'a, I, E, H>
+{
     fn execute(
         &self,
-        address: prelude::H160,
-        input: &[u8],
-        gas_limit: Option<u64>,
-        context: &Context,
-        is_static: bool,
-    ) -> Option<Result<executor::stack::PrecompileOutput, executor::stack::PrecompileFailure>> {
-        self.precompile_action(Address::new(address), |p| {
-            p.run(input, gas_limit.map(EthGas::new), context, is_static)
-                .map_err(|exit_status| executor::stack::PrecompileFailure::Error { exit_status })
-        })
+        handle: &mut impl PrecompileHandle,
+    ) -> Option<Result<executor::stack::PrecompileOutput, PrecompileFailure>> {
+        let address = handle.code_address();
+
+        let result = match self.all_precompiles.get(&Address::new(address))? {
+            AllPrecompiles::ExitToNear(p) => process_precompile(p, handle),
+            AllPrecompiles::ExitToEthereum(p) => process_precompile(p, handle),
+            AllPrecompiles::PredecessorAccount(p) => process_precompile(p, handle),
+            AllPrecompiles::PrepaidGas(p) => process_precompile(p, handle),
+            AllPrecompiles::PromiseResult(p) => process_precompile(p, handle),
+            AllPrecompiles::CrossContractCall(p) => process_handle_based_precompile(p, handle),
+            AllPrecompiles::Generic(p) => process_precompile(p.as_ref(), handle),
+        };
+        Some(result.and_then(|output| post_process(output, handle)))
     }
 
     fn is_precompile(&self, address: prelude::H160) -> bool {
-        self.precompile_action(Address::new(address), |_| true)
-            .unwrap_or(false)
+        self.all_precompiles.contains_key(&Address::new(address))
     }
 }
 
-pub struct PrecompileConstructorContext<'a, I, E> {
+fn process_precompile(
+    p: &dyn Precompile,
+    handle: &mut impl PrecompileHandle,
+) -> Result<PrecompileOutput, PrecompileFailure> {
+    let input = handle.input();
+    let gas_limit = handle.gas_limit();
+    let context = handle.context();
+    let is_static = handle.is_static();
+
+    p.run(input, gas_limit.map(EthGas::new), context, is_static)
+        .map_err(|exit_status| PrecompileFailure::Error { exit_status })
+}
+
+fn process_handle_based_precompile(
+    p: &impl HandleBasedPrecompile,
+    handle: &mut impl PrecompileHandle,
+) -> Result<PrecompileOutput, PrecompileFailure> {
+    p.run_with_handle(handle)
+}
+
+fn post_process(
+    output: PrecompileOutput,
+    handle: &mut impl PrecompileHandle,
+) -> Result<executor::stack::PrecompileOutput, PrecompileFailure> {
+    handle.record_cost(output.cost.as_u64())?;
+    for log in output.logs {
+        handle.log(log.address, log.topics, log.data)?;
+    }
+    Ok(executor::stack::PrecompileOutput {
+        exit_status: ExitSucceed::Returned,
+        output: output.output,
+    })
+}
+
+pub struct PrecompileConstructorContext<'a, I, E, H> {
     pub current_account_id: AccountId,
     pub random_seed: H256,
     pub io: I,
     pub env: &'a E,
+    pub promise_handler: H,
 }
 
-impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
+impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, H> {
     #[allow(dead_code)]
-    pub fn new_homestead(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_homestead(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -160,21 +199,25 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
         ];
-        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
         Self::with_generic_precompiles(map, ctx)
     }
 
     #[allow(dead_code)]
-    pub fn new_byzantium(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_byzantium(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
             ModExp::<Byzantium>::ADDRESS,
-            Bn128Add::<Byzantium>::ADDRESS,
-            Bn128Mul::<Byzantium>::ADDRESS,
-            Bn128Pair::<Byzantium>::ADDRESS,
+            Bn256Add::<Byzantium>::ADDRESS,
+            Bn256Mul::<Byzantium>::ADDRESS,
+            Bn256Pair::<Byzantium>::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
         ];
@@ -184,27 +227,31 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             Box::new(RIPEMD160),
             Box::new(Identity),
             Box::new(ModExp::<Byzantium>::new()),
-            Box::new(Bn128Add::<Byzantium>::new()),
-            Box::new(Bn128Mul::<Byzantium>::new()),
-            Box::new(Bn128Pair::<Byzantium>::new()),
+            Box::new(Bn256Add::<Byzantium>::new()),
+            Box::new(Bn256Mul::<Byzantium>::new()),
+            Box::new(Bn256Pair::<Byzantium>::new()),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
         ];
-        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
 
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_istanbul(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_istanbul(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
             ModExp::<Byzantium>::ADDRESS,
-            Bn128Add::<Istanbul>::ADDRESS,
-            Bn128Mul::<Istanbul>::ADDRESS,
-            Bn128Pair::<Istanbul>::ADDRESS,
+            Bn256Add::<Istanbul>::ADDRESS,
+            Bn256Mul::<Istanbul>::ADDRESS,
+            Bn256Pair::<Istanbul>::ADDRESS,
             Blake2F::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
@@ -215,28 +262,32 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             Box::new(RIPEMD160),
             Box::new(Identity),
             Box::new(ModExp::<Byzantium>::new()),
-            Box::new(Bn128Add::<Istanbul>::new()),
-            Box::new(Bn128Mul::<Istanbul>::new()),
-            Box::new(Bn128Pair::<Istanbul>::new()),
+            Box::new(Bn256Add::<Istanbul>::new()),
+            Box::new(Bn256Mul::<Istanbul>::new()),
+            Box::new(Bn256Pair::<Istanbul>::new()),
             Box::new(Blake2F),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
         ];
-        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
 
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_berlin(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_berlin(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
             ModExp::<Berlin>::ADDRESS,
-            Bn128Add::<Istanbul>::ADDRESS,
-            Bn128Mul::<Istanbul>::ADDRESS,
-            Bn128Pair::<Istanbul>::ADDRESS,
+            Bn256Add::<Istanbul>::ADDRESS,
+            Bn256Mul::<Istanbul>::ADDRESS,
+            Bn256Pair::<Istanbul>::ADDRESS,
             Blake2F::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
@@ -247,59 +298,74 @@ impl<'a, I: IO + Copy, E: Env> Precompiles<'a, I, E> {
             Box::new(RIPEMD160),
             Box::new(Identity),
             Box::new(ModExp::<Berlin>::new()),
-            Box::new(Bn128Add::<Istanbul>::new()),
-            Box::new(Bn128Mul::<Istanbul>::new()),
-            Box::new(Bn128Pair::<Istanbul>::new()),
+            Box::new(Bn256Add::<Istanbul>::new()),
+            Box::new(Bn256Mul::<Istanbul>::new()),
+            Box::new(Bn256Pair::<Istanbul>::new()),
             Box::new(Blake2F),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
         ];
-        let map: BTreeMap<Address, Box<dyn Precompile>> = addresses.into_iter().zip(fun).collect();
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
 
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_london(ctx: PrecompileConstructorContext<'a, I, E>) -> Self {
+    pub fn new_london(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
         // no precompile changes in London HF
         Self::new_berlin(ctx)
     }
 
     fn with_generic_precompiles(
-        generic_precompiles: BTreeMap<Address, Box<dyn Precompile>>,
-        ctx: PrecompileConstructorContext<'a, I, E>,
+        mut generic_precompiles: BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
+        ctx: PrecompileConstructorContext<'a, I, E, H>,
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
-        let ethereum_exit = ExitToEthereum::new(ctx.current_account_id, ctx.io);
+        let ethereum_exit = ExitToEthereum::new(ctx.current_account_id.clone(), ctx.io);
+        let cross_contract_call = CrossContractCall::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);
+        let promise_results = PromiseResult::new(ctx.promise_handler);
+
+        generic_precompiles.insert(exit_to_near::ADDRESS, AllPrecompiles::ExitToNear(near_exit));
+        generic_precompiles.insert(
+            exit_to_ethereum::ADDRESS,
+            AllPrecompiles::ExitToEthereum(ethereum_exit),
+        );
+        generic_precompiles.insert(
+            cross_contract_call::ADDRESS,
+            AllPrecompiles::CrossContractCall(cross_contract_call),
+        );
+        generic_precompiles.insert(
+            predecessor_account::ADDRESS,
+            AllPrecompiles::PredecessorAccount(predecessor_account_id),
+        );
+        generic_precompiles.insert(
+            prepaid_gas::ADDRESS,
+            AllPrecompiles::PrepaidGas(prepaid_gas),
+        );
+        generic_precompiles.insert(
+            promise_result::ADDRESS,
+            AllPrecompiles::PromiseResult(promise_results),
+        );
 
         Self {
-            generic_precompiles,
-            near_exit,
-            ethereum_exit,
-            predecessor_account_id,
-            prepaid_gas,
+            all_precompiles: generic_precompiles,
         }
     }
+}
 
-    fn precompile_action<U, F: FnOnce(&dyn Precompile) -> U>(
-        &self,
-        address: Address,
-        f: F,
-    ) -> Option<U> {
-        if address == exit_to_near::ADDRESS {
-            return Some(f(&self.near_exit));
-        } else if address == exit_to_ethereum::ADDRESS {
-            return Some(f(&self.ethereum_exit));
-        } else if address == predecessor_account::ADDRESS {
-            return Some(f(&self.predecessor_account_id));
-        } else if address == prepaid_gas::ADDRESS {
-            return Some(f(&self.prepaid_gas));
-        }
-        self.generic_precompiles
-            .get(&address)
-            .map(|p| f(p.as_ref()))
-    }
+pub enum AllPrecompiles<'a, I, E, H> {
+    ExitToNear(ExitToNear<I>),
+    ExitToEthereum(ExitToEthereum<I>),
+    CrossContractCall(CrossContractCall<I>),
+    PredecessorAccount(PredecessorAccount<'a, E>),
+    PrepaidGas(PrepaidGas<'a, E>),
+    PromiseResult(PromiseResult<H>),
+    Generic(Box<dyn Precompile>),
 }
 
 /// fn for making an address by concatenating the bytes from two given numbers,
@@ -385,9 +451,9 @@ mod tests {
         assert_eq!(super::hash::RIPEMD160::ADDRESS, u8_to_address(3));
         assert_eq!(super::identity::Identity::ADDRESS, u8_to_address(4));
         assert_eq!(super::ModExp::<Byzantium>::ADDRESS, u8_to_address(5));
-        assert_eq!(super::Bn128Add::<Istanbul>::ADDRESS, u8_to_address(6));
-        assert_eq!(super::Bn128Mul::<Istanbul>::ADDRESS, u8_to_address(7));
-        assert_eq!(super::Bn128Pair::<Istanbul>::ADDRESS, u8_to_address(8));
+        assert_eq!(super::Bn256Add::<Istanbul>::ADDRESS, u8_to_address(6));
+        assert_eq!(super::Bn256Mul::<Istanbul>::ADDRESS, u8_to_address(7));
+        assert_eq!(super::Bn256Pair::<Istanbul>::ADDRESS, u8_to_address(8));
         assert_eq!(super::blake2::Blake2F::ADDRESS, u8_to_address(9));
     }
 

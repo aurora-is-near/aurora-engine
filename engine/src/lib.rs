@@ -4,6 +4,7 @@
     all(feature = "log", target_arch = "wasm32"),
     feature(panic_info_message)
 )]
+#![deny(clippy::as_conversions)]
 
 use aurora_engine_types::parameters::PromiseCreateArgs;
 
@@ -13,8 +14,6 @@ extern crate alloc;
 extern crate core;
 
 mod map;
-#[cfg(feature = "meta-call")]
-pub mod meta_parsing;
 pub mod parameters;
 pub mod proof;
 
@@ -24,10 +23,12 @@ pub mod admin_controlled;
 pub mod connector;
 pub mod deposit_event;
 pub mod engine;
+pub mod errors;
 pub mod fungible_token;
 pub mod json;
 pub mod log_entry;
 mod prelude;
+pub mod xcc;
 
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]
@@ -70,6 +71,7 @@ mod contract {
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine, EngineState};
+    use crate::errors;
     use crate::fungible_token::FungibleTokenMetadata;
     use crate::json::parse_json;
     use crate::parameters::{
@@ -99,7 +101,6 @@ mod contract {
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
-    const PROMISE_COUNT_ERR: &str = "ERR_PROMISE_COUNT";
 
     ///
     /// ADMINISTRATIVE METHODS
@@ -141,8 +142,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
         let mut io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
-        io.return_output(state.bridge_prover_id.as_bytes());
+        let connector = EthConnectorContract::init_instance(io).sdk_unwrap();
+        io.return_output(connector.get_bridge_prover().as_bytes());
     }
 
     /// Get chain id for this contract.
@@ -182,7 +183,7 @@ mod contract {
         require_owner_only(&state, &io.predecessor_account_id());
         let index = internal_get_upgrade_index();
         if io.block_height() <= index + state.upgrade_delay_blocks {
-            sdk::panic_utf8(b"ERR_NOT_ALLOWED:TOO_EARLY");
+            sdk::panic_utf8(errors::ERR_NOT_ALLOWED_TOO_EARLY);
         }
         Runtime::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
     }
@@ -213,7 +214,7 @@ mod contract {
         )
         .sdk_unwrap();
         Engine::deploy_code_with_input(&mut engine, input, &mut Runtime)
-            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
             .sdk_process();
         // TODO: charge for storage
     }
@@ -223,7 +224,7 @@ mod contract {
     pub extern "C" fn call() {
         let io = Runtime;
         let bytes = io.read_input().to_vec();
-        let args = CallArgs::deserialize(&bytes).sdk_expect("ERR_BORSH_DESERIALIZE");
+        let args = CallArgs::deserialize(&bytes).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(
             predecessor_address(&io.predecessor_account_id()),
@@ -233,7 +234,7 @@ mod contract {
         )
         .sdk_unwrap();
         Engine::call_with_args(&mut engine, args, &mut Runtime)
-            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
             .sdk_process();
         // TODO: charge for storage
     }
@@ -258,41 +259,7 @@ mod contract {
         );
 
         result
-            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
-            .sdk_process();
-    }
-
-    #[cfg(feature = "meta-call")]
-    #[no_mangle]
-    pub extern "C" fn meta_call() {
-        use crate::prelude::U256;
-        let io = Runtime;
-        let input = io.read_input().to_vec();
-        let state = engine::get_state(&io).sdk_unwrap();
-        let domain_separator = crate::meta_parsing::near_erc712_domain(U256::from(state.chain_id));
-        let meta_call_args = crate::meta_parsing::parse_meta_call(
-            &domain_separator,
-            io.current_account_id().as_bytes(),
-            input,
-        )
-        .sdk_expect("ERR_META_TX_PARSE");
-
-        engine::check_nonce(&io, &meta_call_args.sender, &meta_call_args.nonce).sdk_unwrap();
-
-        let current_account_id = io.current_account_id();
-        let mut engine =
-            Engine::new_with_state(state, meta_call_args.sender, current_account_id, io, &io);
-        let result = engine.call(
-            &meta_call_args.sender,
-            &meta_call_args.contract_address,
-            meta_call_args.value,
-            meta_call_args.input,
-            u64::MAX, // TODO: is there a gas limit with meta calls?
-            crate::prelude::Vec::new(),
-            &mut Runtime,
-        );
-        result
-            .map(|res| res.try_to_vec().sdk_expect("ERR_SERIALIZE"))
+            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
             .sdk_process();
     }
 
@@ -314,6 +281,40 @@ mod contract {
             predecessor_account_id.as_bytes(),
             Address::from_array(relayer_address),
         );
+    }
+
+    /// Updates the bytecode for user's router contracts created by the engine.
+    /// These contracts are where cross-contract calls initiated by the EVM precompile
+    /// will be sent from.
+    #[no_mangle]
+    pub extern "C" fn factory_update() {
+        let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let bytes = io.read_input().to_vec();
+        let router_bytecode = crate::xcc::RouterCode::new(bytes);
+        crate::xcc::update_router_code(&mut io, &router_bytecode);
+    }
+
+    /// Updates the bytecode version for the given account. This is only called as a callback
+    /// when a new version of the router contract is deployed to an account.
+    #[no_mangle]
+    pub extern "C" fn factory_update_address_version() {
+        let mut io = Runtime;
+        io.assert_private_call().sdk_unwrap();
+        let args: crate::xcc::AddressVersionUpdateArgs = io.read_input_borsh().sdk_unwrap();
+        crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
+    }
+
+    /// Sets the address for the wNEAR ERC-20 contract. This contract will be used by the
+    /// cross-contract calls feature to have users pay for their NEAR transactions.
+    #[no_mangle]
+    pub extern "C" fn factory_set_wnear_address() {
+        let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let address = io.read_input_arr20().sdk_unwrap();
+        crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.
@@ -365,7 +366,12 @@ mod contract {
 
         let address = engine::deploy_erc20_token(args, io, &io, &mut Runtime).sdk_unwrap();
 
-        io.return_output(&address.as_bytes().try_to_vec().sdk_expect("ERR_SERIALIZE"));
+        io.return_output(
+            &address
+                .as_bytes()
+                .try_to_vec()
+                .sdk_expect(errors::ERR_SERIALIZE),
+        );
 
         // TODO: charge for storage
     }
@@ -380,7 +386,7 @@ mod contract {
         // This function should only be called as the callback of
         // exactly one promise.
         if io.promise_results_count() != 1 {
-            sdk::panic_utf8(PROMISE_COUNT_ERR.as_bytes());
+            sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
         }
 
         if let Some(PromiseResult::Successful(_)) = io.promise_result(0) {
@@ -393,7 +399,7 @@ mod contract {
                 engine::refund_on_error(io, &io, state, args, &mut Runtime).sdk_unwrap();
 
             if !refund_result.status.is_ok() {
-                sdk::panic_utf8(b"ERR_REFUND_FAILURE");
+                sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
             }
         }
     }
@@ -409,7 +415,7 @@ mod contract {
         let current_account_id = io.current_account_id();
         let engine = Engine::new(args.sender, current_account_id, io, &env).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args).sdk_unwrap();
-        io.return_output(&result.try_to_vec().sdk_expect("ERR_SERIALIZE"));
+        io.return_output(&result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE));
     }
 
     #[no_mangle]
@@ -517,6 +523,7 @@ mod contract {
     }
 
     #[no_mangle]
+
     pub extern "C" fn withdraw() {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
@@ -527,11 +534,15 @@ mod contract {
             .sdk_unwrap()
             .withdraw_eth_from_near(&current_account_id, &predecessor_account_id, args)
             .sdk_unwrap();
-        let result_bytes = result.try_to_vec().sdk_expect("ERR_SERIALIZE");
+        let result_bytes = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
         // We intentionally do not go through the `io` struct here because we must bypass
         // the check that prevents output that is accepted by the eth_custodian
+        #[allow(clippy::as_conversions)]
         unsafe {
-            exports::value_return(result_bytes.len() as u64, result_bytes.as_ptr() as u64);
+            exports::value_return(
+                u64::try_from(result_bytes.len()).sdk_expect(errors::ERR_VALUE_CONVERSION),
+                result_bytes.as_ptr() as u64,
+            );
         }
     }
 
@@ -556,16 +567,16 @@ mod contract {
 
         // Check result from proof verification call
         if io.promise_results_count() != 1 {
-            sdk::panic_utf8(PROMISE_COUNT_ERR.as_bytes());
+            sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
         }
         let promise_result = match io.promise_result(0) {
             Some(PromiseResult::Successful(bytes)) => {
-                bool::try_from_slice(&bytes).sdk_expect("ERR_PROMISE_ENCODING")
+                bool::try_from_slice(&bytes).sdk_expect(errors::ERR_PROMISE_ENCODING)
             }
-            _ => sdk::panic_utf8(b"ERR_PROMISE_FAILED"),
+            _ => sdk::panic_utf8(errors::ERR_PROMISE_FAILED),
         };
         if !promise_result {
-            sdk::panic_utf8(b"ERR_VERIFY_PROOF");
+            sdk::panic_utf8(errors::ERR_VERIFY_PROOF);
         }
 
         let data = io.read_input_borsh().sdk_unwrap();
@@ -666,7 +677,7 @@ mod contract {
 
         io.assert_private_call().sdk_unwrap();
         if io.promise_results_count() != 1 {
-            sdk::panic_utf8(PROMISE_COUNT_ERR.as_bytes());
+            sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
         }
 
         let args: ResolveTransferCallArgs = io.read_input().to_value().sdk_unwrap();
@@ -840,10 +851,10 @@ mod contract {
         const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
 
         let mut io = Runtime;
-        let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect("ERR_ARGS");
+        let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect(errors::ERR_ARGS);
         let address = Address::from_array(args.0);
         let nonce = U256::from(args.1);
-        let balance = NEP141Wei::new(args.2 as u128);
+        let balance = NEP141Wei::new(u128::from(args.2));
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {
@@ -899,14 +910,16 @@ mod contract {
         let io = Runtime;
         match io.read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)) {
             Ok(index) => index,
-            Err(sdk::error::ReadU64Error::InvalidU64) => sdk::panic_utf8(b"ERR_INVALID_UPGRADE"),
-            Err(sdk::error::ReadU64Error::MissingValue) => sdk::panic_utf8(b"ERR_NO_UPGRADE"),
+            Err(sdk::error::ReadU64Error::InvalidU64) => {
+                sdk::panic_utf8(errors::ERR_INVALID_UPGRADE)
+            }
+            Err(sdk::error::ReadU64Error::MissingValue) => sdk::panic_utf8(errors::ERR_NO_UPGRADE),
         }
     }
 
     fn require_owner_only(state: &EngineState, predecessor_account_id: &AccountId) {
         if &state.owner_id != predecessor_account_id {
-            sdk::panic_utf8(b"ERR_NOT_ALLOWED");
+            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
         }
     }
 

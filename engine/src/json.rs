@@ -1,5 +1,6 @@
 use crate::prelude::{BTreeMap, String, Vec};
 
+use crate::errors;
 use core::convert::From;
 use rjson::{Array, Null, Object, Value};
 
@@ -88,13 +89,10 @@ impl JsonValue {
     #[allow(dead_code)]
     pub fn parse_u8(v: &JsonValue) -> Result<u8, JsonError> {
         match v {
-            JsonValue::U64(n) => {
-                if *n > u8::MAX as u64 {
-                    Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8))
-                } else {
-                    Ok(*n as u8)
-                }
-            }
+            JsonValue::U64(n) => match u8::try_from(*n) {
+                Ok(v) => Ok(v),
+                Err(_e) => Err(JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8)),
+            },
             _ => Err(JsonError::InvalidU8),
         }
     }
@@ -103,15 +101,15 @@ impl JsonValue {
 impl AsRef<[u8]> for JsonError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::NotJsonType => b"ERR_NOT_A_JSON_TYPE",
-            Self::MissingValue => b"ERR_JSON_MISSING_VALUE",
-            Self::InvalidU8 => b"ERR_FAILED_PARSE_U8",
-            Self::InvalidU64 => b"ERR_FAILED_PARSE_U64",
-            Self::InvalidU128 => b"ERR_FAILED_PARSE_U128",
-            Self::InvalidBool => b"ERR_FAILED_PARSE_BOOL",
-            Self::InvalidString => b"ERR_FAILED_PARSE_STRING",
-            Self::InvalidArray => b"ERR_FAILED_PARSE_ARRAY",
-            Self::ExpectedStringGotNumber => b"ERR_EXPECTED_STRING_GOT_NUMBER",
+            Self::NotJsonType => errors::ERR_NOT_A_JSON_TYPE,
+            Self::MissingValue => errors::ERR_JSON_MISSING_VALUE,
+            Self::InvalidU8 => errors::ERR_FAILED_PARSE_U8,
+            Self::InvalidU64 => errors::ERR_FAILED_PARSE_U64,
+            Self::InvalidU128 => errors::ERR_FAILED_PARSE_U128,
+            Self::InvalidBool => errors::ERR_FAILED_PARSE_BOOL,
+            Self::InvalidString => errors::ERR_FAILED_PARSE_STRING,
+            Self::InvalidArray => errors::ERR_FAILED_PARSE_ARRAY,
+            Self::ExpectedStringGotNumber => errors::ERR_EXPECTED_STRING_GOT_NUMBER,
             Self::OutOfRange(err) => err.as_ref(),
         }
     }
@@ -120,8 +118,8 @@ impl AsRef<[u8]> for JsonError {
 impl AsRef<[u8]> for JsonOutOfRangeError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::OutOfRangeU8 => b"ERR_OUT_OF_RANGE_U8",
-            Self::OutOfRangeU128 => b"ERR_OUT_OF_RANGE_U128",
+            Self::OutOfRangeU8 => errors::ERR_OUT_OF_RANGE_U8,
+            Self::OutOfRangeU128 => errors::ERR_OUT_OF_RANGE_U128,
         }
     }
 }
@@ -275,7 +273,7 @@ impl core::fmt::Display for JsonValue {
 }
 
 pub fn parse_json(data: &[u8]) -> Option<JsonValue> {
-    let data_array: Vec<char> = data.iter().map(|b| *b as char).collect::<Vec<_>>();
+    let data_array: Vec<char> = data.iter().map(|b| char::from(*b)).collect::<Vec<_>>();
     let mut index = 0;
     rjson::parse::<JsonValue, JsonArray, JsonObject, JsonValue>(&*data_array, &mut index)
 }

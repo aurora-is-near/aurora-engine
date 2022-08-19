@@ -7,24 +7,19 @@
 
 # IDEA
 .idea
-.run/
 # Editor backup files
 *~
 
+# ENV
+.env/custom.env
+
 # Rust artifacts
-/*.wasm
+bin/
 target/
+etc/tests/*/target/
+etc/tests/*/Cargo.lock
 
 # Solidity artifacts
 artifacts/
 cache/
 node_modules/
-etc/eth-contracts/res/
-
-# Other
-etc/state-migration-test/target/
-etc/ft-receiver/target/
-etc/self-contained-5bEgfRQ/target/
-
-node_modules/*
-cache
