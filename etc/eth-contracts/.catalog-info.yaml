@@ -1,0 +1,21 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: aurora-engine-token
+  description: |-
+    Aurora ERC-20 contract for bridged tokens
+  tags:
+    - contract
+    - aurora
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: engine-team
+  type: contract
+  lifecycle: production
+  system: aurora-engine
+  deployedAt:
+    - contract:aurora/mainnet/0x8bec47865ade3b172a928df8f990bc7f2a3b9f79
+  interactsWith: []
