@@ -1,0 +1,41 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: aurora-engine-precompiles
+  description: |-
+    EVM precompiles for the Aurora engine
+  tags:
+    - precompiles
+    - contract
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: engine-team
+  type: contract
+  lifecycle: production
+  system: aurora-engine
+  interactsWith: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: aurora-engine-precompiles-native
+  description: |-
+    Aurora and NEAR specific precompile additions
+  tags:
+    - precompiles
+    - contract
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+    backstage.io/source-location: url:https://github.com/aurora-is-near/aurora-engine/blob/master/engine-precompiles/src/native.rs
+spec:
+  owner: bridge-team
+  type: contract
+  lifecycle: production
+  system: aurora-engine
+  interactsWith: []
