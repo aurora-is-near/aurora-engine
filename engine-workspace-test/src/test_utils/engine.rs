@@ -9,7 +9,7 @@ use aurora_engine::parameters::NewCallArgs;
 use crate::test_utils::str_to_account_id;
 use crate::prelude::U256;
 
-const AURORA_WASM_FILEPATH: &str = "../mainnet-release.wasm";
+const AURORA_WASM_FILEPATH: &str = "../mainnet-test.wasm";
 
 pub const MAINNET_CHAIN_ID: u32 = 1313161556;
 
