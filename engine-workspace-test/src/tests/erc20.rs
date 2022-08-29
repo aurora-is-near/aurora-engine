@@ -31,25 +31,28 @@ fn pad_to_bytes32(s: &[u8]) -> Option<[u8; 32]> {
 #[tokio::test]
 async fn erc20_deploy() -> anyhow::Result<()> {
     // Start engine
-    let (worker, account): (Worker<Sandbox>, Contract) = deploy_evm_test().await?;
+    let (worker, contract): (Worker<Sandbox>, Contract) = deploy_evm_test().await?;
 
     // Build account
     let source_account_seed = "source";
     let test_account =
         libsecp256k1::SecretKey::parse(&pad_to_bytes32(source_account_seed.as_bytes()).unwrap())?;
     let test_near_account = workspaces::types::SecretKey::from_seed(SECP256K1, source_account_seed);
-    let account: Account = worker.dev_create_account().await?;
 
     // Set account tx to submit
-    account
-        .batch(&worker, account.id())
+    println!("{:?}", worker.root_account().id());
+    println!("{:?}", contract);
+    contract
+        .batch(&worker)
+        // Delete default root account for assigned in workspace
+        //.delete_key(worker.root_account().secret_key().public_key())
+        // Add new key for aurora transaction
         .add_key(
             test_near_account.public_key(),
             workspaces::types::AccessKey::full_access(),
         )
         .transact()
         .await?;
-
     // Build transaction
     let erc20_deploy = ERC20Constructor::load();
 
@@ -62,14 +65,14 @@ async fn erc20_deploy() -> anyhow::Result<()> {
     let encoded_tx = rlp::encode(&signed_tx).to_vec();
 
     // Encode outcome
-    let outcome = account
-        .call(&worker, account.id(), "submit")
+    let outcome = contract
+        .call(&worker, "submit")
         .args(encoded_tx)
         .transact()
         .await?;
 
     println!("submit outcome: {:#?}", outcome);
 
-    println!("Dev Account ID: {}", account.id());
+    println!("Contract Account ID: {}", contract.id());
     Ok(())
 }
