@@ -50,7 +50,7 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    test_utils::assert_gas_bound(profile.all_gas(), 33);
+    test_utils::assert_gas_bound(profile.all_gas(), 31);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         40 <= wasm_fraction && wasm_fraction <= 50,
@@ -60,7 +60,7 @@ fn test_uniswap_exact_output() {
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    test_utils::assert_gas_bound(profile.all_gas(), 18);
+    test_utils::assert_gas_bound(profile.all_gas(), 17);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         45 <= wasm_fraction && wasm_fraction <= 55,
