@@ -60,7 +60,7 @@ fn test_uniswap_exact_output() {
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    test_utils::assert_gas_bound(profile.all_gas(), 17);
+    test_utils::assert_gas_bound(profile.all_gas(), 16);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         45 <= wasm_fraction && wasm_fraction <= 55,
