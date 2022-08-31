@@ -17,7 +17,7 @@ aurora-engine-types = { path = "../engine-types", default-features = false }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
 borsh = { version = "0.9.3", default-features = false }
 bn = { version = "0.5.11", package = "zeropool-bn", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "cb9286b87eb868e921a25f9af74dc9a9f720b39e", default-features = false }
 libsecp256k1 = { version = "0.7.0", default-features = false, features = ["static-context", "hmac"] }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 ripemd = { version = "0.1.1", default-features = false }
