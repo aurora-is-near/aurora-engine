@@ -12,6 +12,8 @@ use aurora_engine_types::parameters::PromiseCreateArgs;
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
+#[cfg(not(feature = "std"))]
+extern crate dlmalloc;
 
 mod map;
 pub mod parameters;
@@ -32,7 +34,7 @@ pub mod xcc;
 
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+static ALLOC: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
 
 #[cfg(target_arch = "wasm32")]
 #[panic_handler]

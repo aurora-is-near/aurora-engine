@@ -6,7 +6,7 @@ extern crate alloc;
 use alloc::format;
 
 #[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+static ALLOC: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
 
 #[panic_handler]
 #[no_mangle]

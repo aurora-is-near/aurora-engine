@@ -109,6 +109,7 @@ dependencies = [
  "base64 0.13.0",
  "borsh",
  "byte-slice-cast",
+ "dlmalloc",
  "ethabi",
  "evm",
  "hex",
@@ -117,7 +118,6 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
- "wee_alloc",
 ]
 
 [[package]]
@@ -982,6 +982,15 @@ dependencies = [
  "block-buffer 0.10.2",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "dlmalloc"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "203540e710bfadb90e5e29930baf5d10270cec1f43ab34f46f78b147b2de715a"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
