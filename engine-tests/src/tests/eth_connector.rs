@@ -660,6 +660,193 @@ fn test_deposit_with_0x_prefix() {
     assert_eq!(address_balance, deposit_amount);
 }
 
+fn generate_dummy_proof(message: String, deposit_amount: u128, log_index: u64) -> Proof {
+    use aurora_engine::deposit_event::TokenMessageData;
+
+    let eth_custodian_address: Address = Address::decode(&CUSTODIAN_ADDRESS.to_string()).unwrap();
+
+    let fee: Fee = Fee::new(NEP141Wei::new(0));
+    let token_message_data =
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+            .unwrap();
+
+    let deposit_event = aurora_engine::deposit_event::DepositedEvent {
+        eth_custodian_address,
+        sender: Address::zero(),
+        token_message_data,
+        amount: NEP141Wei::new(deposit_amount),
+        fee,
+    };
+
+    let event_schema = ethabi::Event {
+        name: aurora_engine::deposit_event::DEPOSITED_EVENT.into(),
+        inputs: aurora_engine::deposit_event::DepositedEvent::event_params(),
+        anonymous: false,
+    };
+    let log_entry = aurora_engine::log_entry::LogEntry {
+        address: eth_custodian_address.raw(),
+        topics: vec![
+            event_schema.signature(),
+            // the sender is not important
+            crate::prelude::H256::zero(),
+        ],
+        data: ethabi::encode(&[
+            ethabi::Token::String(message),
+            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
+        ]),
+    };
+    Proof {
+        log_index,
+        // Only this field matters for the purpose of this test
+        log_entry_data: rlp::encode(&log_entry).to_vec(),
+        receipt_index: 1,
+        receipt_data: Vec::new(),
+        header_data: Vec::new(),
+        proof: Vec::new(),
+    }
+}
+
+#[test]
+fn test_deposit_eth_to_near_account() {
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+
+    let deposit_amount = 17;
+
+    let user_account_id = "some_user.root";
+    let _user_account = master_account.create_user(
+        user_account_id.parse().unwrap(),
+        to_yocto("100"), // initial balance
+    );
+    let proof = generate_dummy_proof(user_account_id.to_string(), deposit_amount, 1);
+
+    let res = master_account.call(
+        contract.account_id(),
+        "deposit",
+        &proof.try_to_vec().unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    let promises = res.promise_results();
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success()
+    }
+    res.assert_success();
+
+    let aurora_balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(aurora_balance, 0);
+    let user_account_balance =
+        get_eth_on_near_balance(&master_account, user_account_id, CONTRACT_ACC);
+    assert_eq!(user_account_balance, deposit_amount);
+}
+
+#[test]
+fn test_deposit_eth_with_empty_custom_connector_account() {
+    // In this test we make an ETH deposit using the message format for targeting
+    // an Aurora address, but use a different NEAR account than the Aurora Engine.
+    // The result is that the ETH is correctly minted to the Engine, but then an
+    // error occurs when it tries to transfer those funds because the listed NEAR
+    // account does no implement `ft_on_transfer`.
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+
+    let deposit_amount = 17;
+
+    let user_account_id = "some_user.root";
+    let _user_account = master_account.create_user(
+        user_account_id.parse().unwrap(),
+        to_yocto("100"), // initial balance
+    );
+
+    let recipient_address = Address::from_array([10u8; 20]);
+    let recipient_address_encoded = recipient_address.encode();
+    let message = [user_account_id, ":", "0x", &recipient_address_encoded].concat();
+    let proof = generate_dummy_proof(message, deposit_amount, 1);
+    let res = master_account.call(
+        contract.account_id(),
+        "deposit",
+        &proof.try_to_vec().unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    let promises = res.promise_results();
+    res.assert_success();
+
+    let promise = &promises[promises.len() - 5];
+    assert_execution_status_failure(
+        promise.as_ref().unwrap().outcome().clone().status,
+        format!(
+            r#"CompilationError(CodeDoesNotExist {{ account_id: AccountId("{}") }}"#,
+            user_account_id
+        )
+        .as_str(),
+        "Expected failure in `ft_on_transfer` call, but deposit succeeded",
+    );
+
+    let user_account_balance =
+        get_eth_on_near_balance(&master_account, user_account_id, CONTRACT_ACC);
+    assert_eq!(user_account_balance, 0);
+    let aurora_balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(aurora_balance, deposit_amount);
+    let address_balance = get_eth_balance(&master_account, recipient_address, CONTRACT_ACC);
+    assert_eq!(address_balance, 0);
+}
+
+#[test]
+fn test_deposit_eth_with_custom_connector_account() {
+    // In this test we make an ETH deposit using the message format for targeting
+    // an Aurora address, but use a different NEAR account than the Aurora Engine.
+    // Additionally, the target account implements `ft_on_transfer` so that it can
+    // receive the ETH perform some action with it. This is safe because the ETH is
+    // minted in the Engine first, then transferred to the target account using
+    // `ft_transfer_call`.
+    let (master_account, contract) = init(CUSTODIAN_ADDRESS);
+
+    let deposit_amount = 17;
+
+    let user_account_id = "some_user.root";
+    let _user_account = master_account.deploy(
+        &dummy_ft_receiver_bytes(),
+        user_account_id.parse().unwrap(),
+        to_yocto("100"), // initial balance
+    );
+
+    let recipient_address = Address::from_array([10u8; 20]);
+    let recipient_address_encoded = recipient_address.encode();
+    let message = [user_account_id, ":", "0x", &recipient_address_encoded].concat();
+    let proof = generate_dummy_proof(message, deposit_amount, 1);
+    let res = master_account.call(
+        contract.account_id(),
+        "deposit",
+        &proof.try_to_vec().unwrap(),
+        DEFAULT_GAS,
+        0,
+    );
+    let promises = res.promise_results();
+    for p in promises.iter() {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        if p.executor_id().as_str() == user_account_id {
+            // The ft_on_transfer implementation in the user's account generates this log.
+            assert_eq!(
+                p.logs().first().map(|s| s.as_str()),
+                Some("in 17 tokens from @eth_connector.root ft_on_transfer, msg = some_user.root:00000000000000000000000000000000000000000000000000000000000000000a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"),
+            );
+        }
+        p.assert_success()
+    }
+    res.assert_success();
+
+    let user_account_balance =
+        get_eth_on_near_balance(&master_account, user_account_id, CONTRACT_ACC);
+    assert_eq!(user_account_balance, deposit_amount);
+    let aurora_balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(aurora_balance, 0);
+    let address_balance = get_eth_balance(&master_account, recipient_address, CONTRACT_ACC);
+    assert_eq!(address_balance, 0);
+}
+
 #[test]
 fn test_deposit_with_same_proof() {
     let (_master_account, contract) = init(CUSTODIAN_ADDRESS);
