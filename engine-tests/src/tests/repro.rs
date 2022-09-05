@@ -126,7 +126,7 @@ fn repro_Emufid2() {
         block_timestamp: 1662118048636713538,
         input_path: "src/tests/res/input_Emufid2.hex",
         evm_gas_used: 1_156_364,
-        near_gas_used: 328,
+        near_gas_used: 327,
     });
 }
 
