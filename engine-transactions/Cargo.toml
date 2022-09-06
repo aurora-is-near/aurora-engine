@@ -24,5 +24,5 @@ serde = { version = "1", features = ["derive"], optional = true }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 
 [features]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "evm/std", "rlp/std", "hex/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "evm/std", "rlp/std"]
 impl-serde = ["aurora-engine-types/impl-serde", "serde"]
