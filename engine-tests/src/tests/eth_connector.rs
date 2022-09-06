@@ -696,6 +696,7 @@ fn generate_dummy_proof(message: String, deposit_amount: u128, log_index: u64) -
             ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
         ]),
     };
+
     Proof {
         log_index,
         // Only this field matters for the purpose of this test
@@ -744,11 +745,11 @@ fn test_deposit_eth_to_near_account() {
 
 #[test]
 fn test_deposit_eth_with_empty_custom_connector_account() {
-    // In this test we make an ETH deposit using the message format for targeting
+    // In this, test we make an ETH deposit using the message format for targeting
     // an Aurora address, but use a different NEAR account than the Aurora Engine.
     // The result is that the ETH is correctly minted to the Engine, but then an
     // error occurs when it tries to transfer those funds because the listed NEAR
-    // account does no implement `ft_on_transfer`.
+    // account does not implement `ft_on_transfer`.
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
 
     let deposit_amount = 17;
@@ -795,10 +796,10 @@ fn test_deposit_eth_with_empty_custom_connector_account() {
 
 #[test]
 fn test_deposit_eth_with_custom_connector_account() {
-    // In this test we make an ETH deposit using the message format for targeting
+    // In this test, we make an ETH deposit using the message format for targeting
     // an Aurora address, but use a different NEAR account than the Aurora Engine.
     // Additionally, the target account implements `ft_on_transfer` so that it can
-    // receive the ETH perform some action with it. This is safe because the ETH is
+    // receive the ETH and perform some action with it. This is safe because the ETH is
     // minted in the Engine first, then transferred to the target account using
     // `ft_transfer_call`.
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
@@ -828,7 +829,7 @@ fn test_deposit_eth_with_custom_connector_account() {
         assert!(p.is_some());
         let p = p.as_ref().unwrap();
         if p.executor_id().as_str() == user_account_id {
-            // The ft_on_transfer implementation in the user's account generates this log.
+            // The `ft_on_transfer` implementation in the user's account generates this log.
             assert_eq!(
                 p.logs().first().map(|s| s.as_str()),
                 Some("in 17 tokens from @eth_connector.root ft_on_transfer, msg = some_user.root:00000000000000000000000000000000000000000000000000000000000000000a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"),
