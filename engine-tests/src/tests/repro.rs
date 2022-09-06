@@ -111,6 +111,25 @@ fn repro_D98vwmi() {
     });
 }
 
+/// This test reproduces a transaction from testnet:
+/// https://explorer.testnet.near.org/transactions/Emufid2pv2UpxrZae4NyowF2N2ZHvYEPq16LsQc7Uoc6
+/// It hit the gas limit at the time of its execution (engine v2.7.0).
+/// The transaction is some kind of multi-step token swap. The user says it should be similar
+/// to this transaction on Polygon:
+/// https://mumbai.polygonscan.com/tx/0xd9ab182692c74a873f0c444854ed1045edbb32a252b561677042276143a024b7
+#[allow(non_snake_case)]
+#[test]
+fn repro_Emufid2() {
+    repro_common(ReproContext {
+        snapshot_path: "src/tests/res/aurora_state_Emufid2.json",
+        block_index: 99197180,
+        block_timestamp: 1662118048636713538,
+        input_path: "src/tests/res/input_Emufid2.hex",
+        evm_gas_used: 1_156_364,
+        near_gas_used: 327,
+    });
+}
+
 fn repro_common<'a>(context: ReproContext<'a>) {
     let ReproContext {
         snapshot_path,
