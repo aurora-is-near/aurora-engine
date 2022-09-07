@@ -6,6 +6,7 @@
 pub mod account_ids;
 pub mod alt_bn256;
 pub mod blake2;
+pub mod erc20;
 pub mod hash;
 pub mod identity;
 pub mod modexp;
@@ -80,10 +81,10 @@ pub trait Precompile {
     ) -> EvmPrecompileResult;
 }
 
-pub trait HandleBasedPrecompile {
+pub trait HandleBasedPrecompile<'config> {
     fn run_with_handle(
         &self,
-        handle: &mut impl PrecompileHandle,
+        handle: &mut impl PrecompileHandle<'config>,
     ) -> Result<PrecompileOutput, PrecompileFailure>;
 }
 
@@ -114,12 +115,12 @@ pub struct Precompiles<'a, I, E, H> {
     pub all_precompiles: prelude::BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
 }
 
-impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
-    for Precompiles<'a, I, E, H>
+impl<'a, 'config, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler>
+    executor::stack::PrecompileSet<'config> for Precompiles<'a, I, E, H>
 {
     fn execute(
         &self,
-        handle: &mut impl PrecompileHandle,
+        handle: &mut impl PrecompileHandle<'config>,
     ) -> Option<Result<executor::stack::PrecompileOutput, PrecompileFailure>> {
         let address = handle.code_address();
 
@@ -130,6 +131,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
             AllPrecompiles::PrepaidGas(p) => process_precompile(p, handle),
             AllPrecompiles::PromiseResult(p) => process_precompile(p, handle),
             AllPrecompiles::CrossContractCall(p) => process_handle_based_precompile(p, handle),
+            AllPrecompiles::Erc20(p) => process_handle_based_precompile(p, handle),
             AllPrecompiles::Generic(p) => process_precompile(p.as_ref(), handle),
         };
         Some(result.and_then(|output| post_process(output, handle)))
@@ -140,9 +142,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
     }
 }
 
-fn process_precompile(
+fn process_precompile<'config>(
     p: &dyn Precompile,
-    handle: &mut impl PrecompileHandle,
+    handle: &mut impl PrecompileHandle<'config>,
 ) -> Result<PrecompileOutput, PrecompileFailure> {
     let input = handle.input();
     let gas_limit = handle.gas_limit();
@@ -153,16 +155,16 @@ fn process_precompile(
         .map_err(|exit_status| PrecompileFailure::Error { exit_status })
 }
 
-fn process_handle_based_precompile(
-    p: &impl HandleBasedPrecompile,
-    handle: &mut impl PrecompileHandle,
+fn process_handle_based_precompile<'config>(
+    p: &impl HandleBasedPrecompile<'config>,
+    handle: &mut impl PrecompileHandle<'config>,
 ) -> Result<PrecompileOutput, PrecompileFailure> {
     p.run_with_handle(handle)
 }
 
-fn post_process(
+fn post_process<'config>(
     output: PrecompileOutput,
-    handle: &mut impl PrecompileHandle,
+    handle: &mut impl PrecompileHandle<'config>,
 ) -> Result<executor::stack::PrecompileOutput, PrecompileFailure> {
     handle.record_cost(output.cost.as_u64())?;
     for log in output.logs {
@@ -366,6 +368,7 @@ pub enum AllPrecompiles<'a, I, E, H> {
     PrepaidGas(PrepaidGas<'a, E>),
     PromiseResult(PromiseResult<H>),
     Generic(Box<dyn Precompile>),
+    Erc20(erc20::Erc20),
 }
 
 /// fn for making an address by concatenating the bytes from two given numbers,

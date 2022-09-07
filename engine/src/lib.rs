@@ -27,6 +27,7 @@ pub mod errors;
 pub mod fungible_token;
 pub mod json;
 pub mod log_entry;
+pub mod native_contracts;
 mod prelude;
 pub mod xcc;
 
@@ -199,6 +200,18 @@ mod contract {
     ///
     /// MUTATIVE METHODS
     ///
+
+    #[no_mangle]
+    pub extern "C" fn register_native_contract() {
+        let mut io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+
+        let input: (Address, crate::native_contracts::ContractType) =
+            io.read_input_borsh().sdk_unwrap();
+        aurora_engine_sdk::log!(&crate::prelude::format!("Register native {:?}", input));
+        crate::native_contracts::insert_native_contract(&mut io, input.0, input.1);
+    }
 
     /// Deploy code into the EVM.
     #[no_mangle]

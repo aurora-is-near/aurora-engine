@@ -88,10 +88,10 @@ pub mod cross_contract_call {
         crate::make_h256(0x72657175697265645f6e656172, 0x72657175697265645f6e656172);
 }
 
-impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
+impl<'config, I: IO> HandleBasedPrecompile<'config> for CrossContractCall<I> {
     fn run_with_handle(
         &self,
-        handle: &mut impl PrecompileHandle,
+        handle: &mut impl PrecompileHandle<'config>,
     ) -> Result<PrecompileOutput, PrecompileFailure> {
         let input = handle.input();
         let target_gas = handle.gas_limit().map(EthGas::new);

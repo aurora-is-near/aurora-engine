@@ -24,7 +24,7 @@ base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
 borsh = { version = "0.9.3", default-features = false }
 byte-slice-cast = { version = "1.0", default-features = false }
 ethabi = { version = "17.1", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", rev = "cb9286b87eb868e921a25f9af74dc9a9f720b39e", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 rjson = { git = "https://github.com/aurora-is-near/rjson", rev = "cc3da949", default-features = false, features = ["integer"] }
 rlp = { version = "0.5.0", default-features = false }

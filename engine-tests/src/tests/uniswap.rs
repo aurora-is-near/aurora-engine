@@ -10,6 +10,7 @@ use crate::test_utils::{
 };
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::H160;
+use borsh::BorshSerialize;
 use libsecp256k1::SecretKey;
 use rand::SeedableRng;
 
@@ -28,7 +29,7 @@ fn test_uniswap_input_multihop() {
     let mut context = UniswapTestContext::new("uniswap");
 
     // evm_gas = 970k
-    // near total gas = 122 Tgas
+    // near total gas = 106 Tgas
 
     let tokens = context.create_tokens(10, MINT_AMOUNT.into());
     for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {
@@ -38,7 +39,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    assert_eq!(122, profile.all_gas() / 1_000_000_000_000);
+    assert_eq!(106, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
@@ -49,7 +50,7 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    test_utils::assert_gas_bound(profile.all_gas(), 33);
+    test_utils::assert_gas_bound(profile.all_gas(), 31);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         40 <= wasm_fraction && wasm_fraction <= 50,
@@ -59,7 +60,7 @@ fn test_uniswap_exact_output() {
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    test_utils::assert_gas_bound(profile.all_gas(), 18);
+    test_utils::assert_gas_bound(profile.all_gas(), 16);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         45 <= wasm_fraction && wasm_fraction <= 55,
@@ -390,6 +391,20 @@ impl UniswapTestContext {
             .submit_transaction(&signer.secret_key, mint_tx)
             .unwrap();
         assert!(result.status.is_ok(), "Minting ERC-20 tokens failed");
+
+        let (maybe_outcome, maybe_error) = runner.call(
+            "register_native_contract",
+            "aurora",
+            (
+                contract.0.address,
+                aurora_engine::native_contracts::ContractType::Erc20,
+            )
+                .try_to_vec()
+                .unwrap(),
+        );
+        assert!(maybe_error.is_none());
+        let outcome = maybe_outcome.unwrap();
+        println!("{:?}", outcome.logs);
 
         contract
     }

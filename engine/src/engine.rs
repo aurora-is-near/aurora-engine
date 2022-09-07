@@ -362,7 +362,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
         env: &'env E,
         ro_promise_handler: H,
     ) -> Self {
-        let precompiles = if cfg!(all(feature = "mainnet", not(feature = "integration-test"))) {
+        let mut precompiles = if cfg!(all(feature = "mainnet", not(feature = "integration-test"))) {
             let mut tmp = Precompiles::new_london(PrecompileConstructorContext {
                 current_account_id,
                 random_seed,
@@ -383,6 +383,19 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
                 promise_handler: ro_promise_handler,
             })
         };
+        // Insert the native contracts
+        for (contract, kind) in crate::native_contracts::read_native_contracts(&io) {
+            match kind {
+                crate::native_contracts::ContractType::Erc20 => {
+                    precompiles.all_precompiles.insert(
+                        contract,
+                        aurora_engine_precompiles::AllPrecompiles::Erc20(
+                            aurora_engine_precompiles::erc20::Erc20,
+                        ),
+                    );
+                }
+            }
+        }
 
         Self {
             precompiles,
