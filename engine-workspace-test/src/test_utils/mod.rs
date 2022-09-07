@@ -14,7 +14,7 @@ use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
 use workspaces::{Worker, Contract};
-use workspaces::network::{Sandbox, DevAccountDeployer};
+use workspaces::network::{Sandbox};
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
@@ -181,11 +181,11 @@ impl ExecutionProfile {
     }
 }
 
-const AURORA_WASM_FILEPATH: &str = "../mainnet-release.wasm";
+const AURORA_WASM_FILEPATH: &str = "../mainnet-test.wasm";
 
 pub const MAINNET_CHAIN_ID: u32 = 1313161556;
 
-pub(crate) async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
+pub async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
     let worker = workspaces::sandbox().await?;
     let wasm = std::fs::read(AURORA_WASM_FILEPATH)?;
     let contract = worker.dev_deploy(&wasm).await?;
@@ -199,10 +199,10 @@ pub(crate) async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> 
     };
 
     contract
-        .call(&worker, "new")
+        .call( "new")
         .args(args.try_to_vec().unwrap())
         .transact()
-        .await?;
+        .await;
 
     // Setup new eth connector
     let init_evm = InitCallArgs {
@@ -212,10 +212,10 @@ pub(crate) async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> 
     };
 
     contract
-        .call(&worker, "new_eth_connector")
+        .call( "new_eth_connector")
         .args(init_evm.try_to_vec().unwrap())
         .transact()
-        .await?;
+        .await;
 
     return Ok((worker, contract));
 }

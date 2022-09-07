@@ -2,7 +2,6 @@ use aurora_engine_types::U256;
 
 use near_primitives::account;
 use near_primitives::test_utils;
-use workspaces::network::DevAccountDeployer;
 use workspaces::network::Sandbox;
 use workspaces::types::KeyType::SECP256K1;
 use workspaces::types::SecretKey;
@@ -31,28 +30,20 @@ fn pad_to_bytes32(s: &[u8]) -> Option<[u8; 32]> {
 #[tokio::test]
 async fn erc20_deploy() -> anyhow::Result<()> {
     // Start engine
-    let (worker, contract): (Worker<Sandbox>, Contract) = deploy_evm_test().await?;
+    let (mut worker, mut contract): (Worker<Sandbox>, Contract) = deploy_evm_test().await?;
 
     // Build account
     let source_account_seed = "source";
-    let test_account =
+    let source_secp_sk =
         libsecp256k1::SecretKey::parse(&pad_to_bytes32(source_account_seed.as_bytes()).unwrap())?;
-    let test_near_account = workspaces::types::SecretKey::from_seed(SECP256K1, source_account_seed);
+    let source_near_sk = workspaces::types::SecretKey::from_seed(SECP256K1, source_account_seed);
 
     // Set account tx to submit
-    println!("{:?}", worker.root_account().id());
-    println!("{:?}", contract);
-    contract
-        .batch(&worker)
-        // Delete default root account for assigned in workspace
-        //.delete_key(worker.root_account().secret_key().public_key())
-        // Add new key for aurora transaction
-        .add_key(
-            test_near_account.public_key(),
-            workspaces::types::AccessKey::full_access(),
-        )
-        .transact()
-        .await?;
+    contract.as_account_mut().set_secret_key(source_near_sk.clone());
+    let contract_sk =  contract.as_account().secret_key();
+    println!("{:?} == {:?}", contract_sk, source_near_sk);
+
+    
     // Build transaction
     let erc20_deploy = ERC20Constructor::load();
 
@@ -60,13 +51,13 @@ async fn erc20_deploy() -> anyhow::Result<()> {
 
     // Sign transaction
 
-    let signed_tx = sign_transaction(transaction, Some(MAINNET_CHAIN_ID.into()), &test_account);
+    let signed_tx = sign_transaction(transaction, Some(MAINNET_CHAIN_ID.into()), &source_secp_sk);
 
     let encoded_tx = rlp::encode(&signed_tx).to_vec();
 
     // Encode outcome
     let outcome = contract
-        .call(&worker, "submit")
+        .call("submit")
         .args(encoded_tx)
         .transact()
         .await?;
