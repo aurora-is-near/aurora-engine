@@ -3,15 +3,15 @@ use workspaces::Worker;
 use workspaces::network::Sandbox;
 use workspaces::Contract;
 
-use crate::test_utils::deploy_evm;
+use crate::test_utils::{deploy_evm, deploy_evm_test};
 
 #[tokio::test]
 async fn get_version() -> anyhow::Result<()> {
     let (worker, contract): (Worker<Sandbox>, Contract) = deploy_evm().await?;
 
     let outcome = contract
-        .call(&worker, "get_nonce")
-        .args_json(json!({}))?
+        .call( "get_version")
+        .args_json(json!({}))
         .transact()
         .await?;
 
@@ -34,12 +34,7 @@ async fn test() -> anyhow::Result<()> {
     let calling_account_id = "a";
 
     let owner = worker.root_account();
-    let test_account = owner
-        .create_subaccount(&worker, calling_account_id)
-        .transact()
-        .await?
-        .unwrap();
 
-    println!("Dev Account ID: {:?}", test_account);
+    println!("Dev Account ID: {:?}", owner);
     Ok(())
 }

@@ -17,7 +17,7 @@ pub const MAINNET_CHAIN_ID: u32 = 1313161556;
 pub async fn deploy_evm_test() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
     let worker = workspaces::sandbox().await?;
     let wasm = std::fs::read(AURORA_WASM_FILEPATH)?;
-    let account = worker.dev_deploy(&wasm).await?;
+    let contract = worker.dev_deploy(&wasm).await?;
 
     // Record Chain metadata
     let args = NewCallArgs {
@@ -27,11 +27,11 @@ pub async fn deploy_evm_test() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
         upgrade_delay_blocks: 1,
     };
 
-    account
-        .call(&worker, "new")
+    contract
+        .call( "new")
         .args(args.try_to_vec().unwrap())
         .transact()
-        .await?;
+        .await;
 
     // Setup new eth connector
     let init_evm = InitCallArgs {
@@ -40,11 +40,11 @@ pub async fn deploy_evm_test() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
         metadata: FungibleTokenMetadata::default(),
     };
 
-    account
-        .call(&worker, "new_eth_connector")
+    contract
+        .call( "new_eth_connector")
         .args(init_evm.try_to_vec().unwrap())
         .transact()
-        .await?;
+        .await;
 
-    return Ok((worker, account));
+    return Ok((worker, contract));
 }
