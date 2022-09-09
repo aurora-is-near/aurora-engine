@@ -204,6 +204,7 @@ pub async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
         .transact()
         .await;
 
+    worker.fast_forward(1).await?;
     // Setup new eth connector
     let init_evm = InitCallArgs {
         prover_account: str_to_account_id("prover.near"),
@@ -216,6 +217,8 @@ pub async fn deploy_evm() -> anyhow::Result<(Worker<Sandbox>, Contract)> {
         .args(init_evm.try_to_vec().unwrap())
         .transact()
         .await;
+
+    worker.fast_forward(1).await?;
 
     return Ok((worker, contract));
 }

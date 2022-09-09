@@ -1,5 +1,6 @@
 use aurora_engine_types::U256;
 
+use libsecp256k1::PublicKey;
 use near_primitives::account;
 use near_primitives::test_utils;
 use workspaces::network::Sandbox;
@@ -30,20 +31,34 @@ fn pad_to_bytes32(s: &[u8]) -> Option<[u8; 32]> {
 #[tokio::test]
 async fn erc20_deploy() -> anyhow::Result<()> {
     // Start engine
-    let (mut worker, mut contract): (Worker<Sandbox>, Contract) = deploy_evm_test().await?;
+    let (worker, contract): (Worker<Sandbox>, Contract) = deploy_evm_test().await?;
 
     // Build account
     let source_account_seed = "source";
     let source_secp_sk =
         libsecp256k1::SecretKey::parse(&pad_to_bytes32(source_account_seed.as_bytes()).unwrap())?;
     let source_near_sk = workspaces::types::SecretKey::from_seed(SECP256K1, source_account_seed);
-
-    // Set account tx to submit
-    contract.as_account_mut().set_secret_key(source_near_sk.clone());
-    let contract_sk =  contract.as_account().secret_key();
-    println!("{:?} == {:?}", contract_sk, source_near_sk);
-
     
+    // Set account tx to submit
+    contract
+    .batch()
+    // Add new full access key for aurora transaction
+    .add_key(
+        source_near_sk.public_key(),
+        workspaces::types::AccessKey::full_access(),
+    )
+    .transact()
+    .await?;
+
+    worker.fast_forward(1).await?;
+    
+    let contract_sk = contract.as_account().secret_key();
+    let source_secp_pk_ser =  PublicKey::from_secret_key(&source_secp_sk).serialize().to_ascii_lowercase();
+    let source_secp_pk_str = String::from_utf8_lossy(&source_secp_pk_ser);
+    println!("{:?}", contract.id());
+    println!("{:?} == {:?}", contract_sk, source_near_sk);
+    println!("{:?} == {:?}", contract_sk.public_key(), source_secp_pk_str);
+
     // Build transaction
     let erc20_deploy = ERC20Constructor::load();
 
@@ -65,5 +80,6 @@ async fn erc20_deploy() -> anyhow::Result<()> {
     println!("submit outcome: {:#?}", outcome);
 
     println!("Contract Account ID: {}", contract.id());
+    
     Ok(())
 }
