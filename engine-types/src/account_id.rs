@@ -26,6 +26,10 @@ impl AccountId {
         self.as_ref().as_bytes()
     }
 
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.as_bytes().to_vec()
+    }
+
     pub fn validate(account_id: &str) -> Result<(), ParseAccountError> {
         if account_id.len() < MIN_ACCOUNT_ID_LEN {
             Err(ParseAccountError::TooShort)
@@ -135,7 +139,7 @@ impl From<AccountId> for Box<str> {
 
 impl From<AccountId> for Vec<u8> {
     fn from(account_id: AccountId) -> Vec<u8> {
-        account_id.as_bytes().to_vec()
+        account_id.to_vec()
     }
 }
 
@@ -172,6 +176,9 @@ impl fmt::Display for ParseAccountError {
         write!(f, "{}", msg)
     }
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for ParseAccountError {}
 
 #[cfg(test)]
 mod tests {

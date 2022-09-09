@@ -237,7 +237,7 @@ enum AddressVersionStatus {
 
 fn withdraw_to_near_args(recipient: &AccountId, amount: Yocto) -> Vec<u8> {
     let args = ethabi::encode(&[
-        ethabi::Token::Bytes(recipient.as_bytes().to_vec()),
+        ethabi::Token::Bytes(recipient.to_vec()),
         ethabi::Token::Uint(U256::from(amount.as_u128())),
     ]);
     [&WITHDRAW_TO_NEAR_SELECTOR, args.as_slice()].concat()
@@ -272,7 +272,7 @@ mod tests {
         };
         let expected_tx_data = withdraw_function
             .encode_input(&[
-                ethabi::Token::Bytes(recipient.as_bytes().to_vec()),
+                ethabi::Token::Bytes(recipient.to_vec()),
                 ethabi::Token::Uint(U256::from(amount.as_u128())),
             ])
             .unwrap();

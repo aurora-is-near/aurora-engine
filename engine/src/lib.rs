@@ -366,6 +366,8 @@ mod contract {
 
         let address = engine::deploy_erc20_token(args, io, &io, &mut Runtime).sdk_unwrap();
 
+        // TODO: Check if the .as_bytes.try_to_vec and Borsh impl on Address is
+        // necessary here. &address.to_vec should be sufficient.
         io.return_output(
             &address
                 .as_bytes()
@@ -426,8 +428,7 @@ mod contract {
         let chain_id = engine::get_state(&io)
             .map(|state| state.chain_id)
             .sdk_unwrap();
-        let block_hash =
-            crate::engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
+        let block_hash = engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
         io.return_output(block_hash.as_bytes())
     }
 
@@ -523,7 +524,6 @@ mod contract {
     }
 
     #[no_mangle]
-
     pub extern "C" fn withdraw() {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();

@@ -1,0 +1,3 @@
+[submodule "engine-tests-workspace/etc/openzeppelin-contracts"]
+	path = engine-tests-workspace/etc/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts.git

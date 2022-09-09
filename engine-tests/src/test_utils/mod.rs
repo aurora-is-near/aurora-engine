@@ -486,9 +486,9 @@ impl AuroraRunner {
     // Used in `get_balance` and `get_nonce`. This function exists to avoid code duplication
     // since the contract's `get_nonce` and `get_balance` have the same type signature.
     fn getter_method_call(&self, method_name: &str, address: Address) -> Vec<u8> {
-        let (outcome, maybe_error) =
-            self.one_shot()
-                .call(method_name, "getter", address.as_bytes().to_vec());
+        let (outcome, maybe_error) = self
+            .one_shot()
+            .call(method_name, "getter", address.to_vec());
         assert!(maybe_error.is_none());
         outcome.unwrap().return_data.as_value().unwrap()
     }

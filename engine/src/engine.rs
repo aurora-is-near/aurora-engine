@@ -933,7 +933,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     check_nonce(&io, &sender, &transaction.nonce)?;
 
     // Check intrinsic gas is covered by transaction gas limit
-    match transaction.intrinsic_gas(crate::engine::CONFIG) {
+    match transaction.intrinsic_gas(CONFIG) {
         Err(_e) => {
             return Err(EngineErrorKind::GasOverflow.into());
         }

@@ -79,6 +79,13 @@ impl TransactionStatus {
             || *self == TransactionStatus::OutOfOffset
             || *self == TransactionStatus::CallTooDeep
     }
+
+    pub fn unwrap(self) -> Vec<u8> {
+        match self {
+            TransactionStatus::Succeed(v) | TransactionStatus::Revert(v) => v,
+            _ => panic!("Transaction is not successful or a revert"),
+        }
+    }
 }
 
 impl AsRef<[u8]> for TransactionStatus {
@@ -120,6 +127,10 @@ impl SubmitResult {
             gas_used,
             logs,
         }
+    }
+
+    pub fn unwrap(self) -> Vec<u8> {
+        self.status.unwrap()
     }
 }
 

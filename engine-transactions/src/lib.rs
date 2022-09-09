@@ -2,8 +2,12 @@
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![deny(clippy::as_conversions)]
 
+use crate::eip_1559::SignedTransaction1559;
+use crate::eip_2930::SignedTransaction2930;
+use crate::legacy::LegacyEthSignedTransaction;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
+use core::fmt::{Display, Formatter};
 use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 
@@ -80,48 +84,72 @@ pub struct NormalizedEthTransaction {
     pub access_list: Vec<AccessTuple>,
 }
 
+impl TryFrom<LegacyEthSignedTransaction> for NormalizedEthTransaction {
+    type Error = Error;
+
+    fn try_from(tx: LegacyEthSignedTransaction) -> Result<Self, Self::Error> {
+        Ok(NormalizedEthTransaction {
+            address: tx.sender()?,
+            chain_id: tx.chain_id(),
+            nonce: tx.transaction.nonce,
+            gas_limit: tx.transaction.gas_limit,
+            max_priority_fee_per_gas: tx.transaction.gas_price,
+            max_fee_per_gas: tx.transaction.gas_price,
+            to: tx.transaction.to,
+            value: tx.transaction.value,
+            data: tx.transaction.data,
+            access_list: vec![],
+        })
+    }
+}
+
+impl TryFrom<SignedTransaction2930> for NormalizedEthTransaction {
+    type Error = Error;
+
+    fn try_from(tx: SignedTransaction2930) -> Result<Self, Self::Error> {
+        Ok(Self {
+            address: tx.sender()?,
+            chain_id: Some(tx.transaction.chain_id),
+            nonce: tx.transaction.nonce,
+            gas_limit: tx.transaction.gas_limit,
+            max_priority_fee_per_gas: tx.transaction.gas_price,
+            max_fee_per_gas: tx.transaction.gas_price,
+            to: tx.transaction.to,
+            value: tx.transaction.value,
+            data: tx.transaction.data,
+            access_list: tx.transaction.access_list,
+        })
+    }
+}
+
+impl TryFrom<SignedTransaction1559> for NormalizedEthTransaction {
+    type Error = Error;
+
+    fn try_from(tx: SignedTransaction1559) -> Result<Self, Self::Error> {
+        Ok(Self {
+            address: tx.sender()?,
+            chain_id: Some(tx.transaction.chain_id),
+            nonce: tx.transaction.nonce,
+            gas_limit: tx.transaction.gas_limit,
+            max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
+            max_fee_per_gas: tx.transaction.max_fee_per_gas,
+            to: tx.transaction.to,
+            value: tx.transaction.value,
+            data: tx.transaction.data,
+            access_list: tx.transaction.access_list,
+        })
+    }
+}
+
 impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
     type Error = Error;
 
     fn try_from(kind: EthTransactionKind) -> Result<Self, Self::Error> {
         use EthTransactionKind::*;
         Ok(match kind {
-            Legacy(tx) => Self {
-                address: tx.sender()?,
-                chain_id: tx.chain_id(),
-                nonce: tx.transaction.nonce,
-                gas_limit: tx.transaction.gas_limit,
-                max_priority_fee_per_gas: tx.transaction.gas_price,
-                max_fee_per_gas: tx.transaction.gas_price,
-                to: tx.transaction.to,
-                value: tx.transaction.value,
-                data: tx.transaction.data,
-                access_list: vec![],
-            },
-            Eip2930(tx) => Self {
-                address: tx.sender()?,
-                chain_id: Some(tx.transaction.chain_id),
-                nonce: tx.transaction.nonce,
-                gas_limit: tx.transaction.gas_limit,
-                max_priority_fee_per_gas: tx.transaction.gas_price,
-                max_fee_per_gas: tx.transaction.gas_price,
-                to: tx.transaction.to,
-                value: tx.transaction.value,
-                data: tx.transaction.data,
-                access_list: tx.transaction.access_list,
-            },
-            Eip1559(tx) => Self {
-                address: tx.sender()?,
-                chain_id: Some(tx.transaction.chain_id),
-                nonce: tx.transaction.nonce,
-                gas_limit: tx.transaction.gas_limit,
-                max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
-                max_fee_per_gas: tx.transaction.max_fee_per_gas,
-                to: tx.transaction.to,
-                value: tx.transaction.value,
-                data: tx.transaction.data,
-                access_list: tx.transaction.access_list,
-            },
+            Legacy(tx) => tx.try_into()?,
+            Eip2930(tx) => tx.try_into()?,
+            Eip1559(tx) => tx.try_into()?,
         })
     }
 }
@@ -225,6 +253,15 @@ impl AsRef<[u8]> for Error {
         self.as_str().as_bytes()
     }
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for Error {}
 
 fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, DecoderError> {
     let value = rlp.at(index)?;

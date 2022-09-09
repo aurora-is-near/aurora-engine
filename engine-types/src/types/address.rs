@@ -1,6 +1,8 @@
 use crate::{format, String, H160};
 use borsh::maybestd::io;
 use borsh::{BorshDeserialize, BorshSerialize};
+use core::fmt::Formatter;
+use core::fmt::{Debug, Display};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +41,10 @@ impl Address {
         self.0.as_bytes()
     }
 
+    pub fn to_vec(self) -> Vec<u8> {
+        self.0.as_bytes().to_vec()
+    }
+
     pub fn try_from_slice(raw_addr: &[u8]) -> Result<Self, error::AddressError> {
         if raw_addr.len() != 20 {
             return Err(error::AddressError::IncorrectLength);
@@ -52,6 +58,12 @@ impl Address {
 
     pub const fn zero() -> Self {
         Address::new(H160([0u8; 20]))
+    }
+}
+
+impl Display for Address {
+    fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
+        Debug::fmt(&self.0, f)
     }
 }
 
@@ -172,4 +184,7 @@ pub mod error {
             write!(f, "{}", msg)
         }
     }
+
+    #[cfg(feature = "std")]
+    impl std::error::Error for AddressError {}
 }

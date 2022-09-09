@@ -57,7 +57,7 @@ impl<'a, E: Env> Precompile for PredecessorAccount<'a, E> {
         let predecessor_account_id = self.env.predecessor_account_id();
         Ok(PrecompileOutput::without_logs(
             cost,
-            predecessor_account_id.as_bytes().to_vec(),
+            predecessor_account_id.to_vec(),
         ))
     }
 }
@@ -100,7 +100,7 @@ impl Precompile for CurrentAccount {
 
         Ok(PrecompileOutput::without_logs(
             cost,
-            self.current_account_id.as_bytes().to_vec(),
+            self.current_account_id.to_vec(),
         ))
     }
 }

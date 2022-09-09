@@ -45,7 +45,7 @@ fn test_xcc_eth_gas_cost() {
     let _ = runner.call(
         "factory_set_wnear_address",
         "aurora",
-        wnear_erc20.0.address.as_bytes().to_vec(),
+        wnear_erc20.0.address.to_vec(),
     );
 
     // Baseline transaction is an ERC-20 transferFrom call since such a call is included as part
