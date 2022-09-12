@@ -1,7 +1,7 @@
 use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::test_utils;
-use crate::tests::state_migration;
+// use crate::tests::state_migration;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{SubmitResult, TransactionStatus};
 use aurora_engine_sdk as sdk;
@@ -904,98 +904,98 @@ fn test_ft_metadata() {
 // has more production logic, in particular, state revert on contract panic.
 // TODO: should be able to generalize the `call` backend of `AuroraRunner` so that this
 //       test does not need to be written twice.
-#[test]
-fn test_eth_transfer_insufficient_balance_sim() {
-    let (aurora, mut signer, address) = initialize_evm_sim();
-
-    // Run transaction which will fail (transfer more than current balance)
-    let nonce = signer.use_nonce();
-    let tx = test_utils::transfer(
-        Address::new(H160([1; 20])),
-        INITIAL_BALANCE + INITIAL_BALANCE,
-        nonce.into(),
-    );
-    let signed_tx = test_utils::sign_transaction(
-        tx,
-        Some(test_utils::AuroraRunner::default().chain_id),
-        &signer.secret_key,
-    );
-    let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
-    let result: SubmitResult = call_result.unwrap_borsh();
-    assert_eq!(result.status, TransactionStatus::OutOfFund);
-
-    // validate post-state
-    assert_eq!(
-        query_address_sim(&address, "get_nonce", &aurora),
-        U256::from(INITIAL_NONCE + 1),
-    );
-    assert_eq!(
-        query_address_sim(&address, "get_balance", &aurora),
-        INITIAL_BALANCE.raw(),
-    );
-}
+// #[test]
+// fn test_eth_transfer_insufficient_balance_sim() {
+//     let (aurora, mut signer, address) = initialize_evm_sim();
+//
+//     // Run transaction which will fail (transfer more than current balance)
+//     let nonce = signer.use_nonce();
+//     let tx = test_utils::transfer(
+//         Address::new(H160([1; 20])),
+//         INITIAL_BALANCE + INITIAL_BALANCE,
+//         nonce.into(),
+//     );
+//     let signed_tx = test_utils::sign_transaction(
+//         tx,
+//         Some(test_utils::AuroraRunner::default().chain_id),
+//         &signer.secret_key,
+//     );
+//     let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
+//     let result: SubmitResult = call_result.unwrap_borsh();
+//     assert_eq!(result.status, TransactionStatus::OutOfFund);
+//
+//     // validate post-state
+//     assert_eq!(
+//         query_address_sim(&address, "get_nonce", &aurora),
+//         U256::from(INITIAL_NONCE + 1),
+//     );
+//     assert_eq!(
+//         query_address_sim(&address, "get_balance", &aurora),
+//         INITIAL_BALANCE.raw(),
+//     );
+// }
 
 // Same as `test_eth_transfer_charging_gas_not_enough_balance` but run through `near-sdk-sim`.
-#[test]
-fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
-    let (aurora, mut signer, address) = initialize_evm_sim();
-
-    // Run transaction which will fail (not enough balance to cover gas)
-    let nonce = signer.use_nonce();
-    let mut tx = test_utils::transfer(Address::new(H160([1; 20])), TRANSFER_AMOUNT, nonce.into());
-    tx.gas_limit = 3_000_000.into();
-    tx.gas_price = GAS_PRICE.into();
-    let signed_tx = test_utils::sign_transaction(
-        tx,
-        Some(test_utils::AuroraRunner::default().chain_id),
-        &signer.secret_key,
-    );
-    let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
-    let result: SubmitResult = call_result.unwrap_borsh();
-    assert_eq!(result.status, TransactionStatus::OutOfFund);
-
-    // validate post-state
-    assert_eq!(
-        query_address_sim(&address, "get_nonce", &aurora),
-        U256::from(INITIAL_NONCE + 1),
-    );
-    assert_eq!(
-        query_address_sim(&address, "get_balance", &aurora),
-        INITIAL_BALANCE.raw(),
-    );
-}
-
-fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, Address) {
-    let aurora = state_migration::deploy_evm();
-    let signer = test_utils::Signer::random();
-    let address = test_utils::address_from_secret_key(&signer.secret_key);
-
-    let args = (address, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
-    aurora
-        .call("mint_account", &args.try_to_vec().unwrap())
-        .assert_success();
-
-    // validate pre-state
-    assert_eq!(
-        query_address_sim(&address, "get_nonce", &aurora),
-        U256::from(INITIAL_NONCE),
-    );
-    assert_eq!(
-        query_address_sim(&address, "get_balance", &aurora),
-        INITIAL_BALANCE.raw(),
-    );
-
-    (aurora, signer, address)
-}
-
-fn query_address_sim(
-    address: &Address,
-    method: &str,
-    aurora: &state_migration::AuroraAccount,
-) -> U256 {
-    let x = aurora.call(method, address.as_bytes());
-    match &x.outcome().status {
-        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
-        other => panic!("Unexpected outcome: {:?}", other),
-    }
-}
+// #[test]
+// fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
+//     let (aurora, mut signer, address) = initialize_evm_sim();
+//
+//     // Run transaction which will fail (not enough balance to cover gas)
+//     let nonce = signer.use_nonce();
+//     let mut tx = test_utils::transfer(Address::new(H160([1; 20])), TRANSFER_AMOUNT, nonce.into());
+//     tx.gas_limit = 3_000_000.into();
+//     tx.gas_price = GAS_PRICE.into();
+//     let signed_tx = test_utils::sign_transaction(
+//         tx,
+//         Some(test_utils::AuroraRunner::default().chain_id),
+//         &signer.secret_key,
+//     );
+//     let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
+//     let result: SubmitResult = call_result.unwrap_borsh();
+//     assert_eq!(result.status, TransactionStatus::OutOfFund);
+//
+//     // validate post-state
+//     assert_eq!(
+//         query_address_sim(&address, "get_nonce", &aurora),
+//         U256::from(INITIAL_NONCE + 1),
+//     );
+//     assert_eq!(
+//         query_address_sim(&address, "get_balance", &aurora),
+//         INITIAL_BALANCE.raw(),
+//     );
+// }
+//
+// fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, Address) {
+//     let aurora = state_migration::deploy_evm();
+//     let signer = test_utils::Signer::random();
+//     let address = test_utils::address_from_secret_key(&signer.secret_key);
+//
+//     let args = (address, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
+//     aurora
+//         .call("mint_account", &args.try_to_vec().unwrap())
+//         .assert_success();
+//
+//     // validate pre-state
+//     assert_eq!(
+//         query_address_sim(&address, "get_nonce", &aurora),
+//         U256::from(INITIAL_NONCE),
+//     );
+//     assert_eq!(
+//         query_address_sim(&address, "get_balance", &aurora),
+//         INITIAL_BALANCE.raw(),
+//     );
+//
+//     (aurora, signer, address)
+// }
+//
+// fn query_address_sim(
+//     address: &Address,
+//     method: &str,
+//     aurora: &state_migration::AuroraAccount,
+// ) -> U256 {
+//     let x = aurora.call(method, address.as_bytes());
+//     match &x.outcome().status {
+//         near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
+//         other => panic!("Unexpected outcome: {:?}", other),
+//     }
+// }

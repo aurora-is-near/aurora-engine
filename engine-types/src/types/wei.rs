@@ -16,6 +16,7 @@ pub type WeiU256 = [u8; 32];
 #[derive(
     Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
 )]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NEP141Wei(u128);
 
 impl Display for NEP141Wei {

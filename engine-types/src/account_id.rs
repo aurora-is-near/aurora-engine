@@ -4,6 +4,8 @@
 
 use crate::{fmt, str, str::FromStr, Box, String, Vec};
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 pub const MIN_ACCOUNT_ID_LEN: usize = 2;
 pub const MAX_ACCOUNT_ID_LEN: usize = 64;
@@ -14,6 +16,7 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 #[derive(
     BorshSerialize, BorshDeserialize, Default, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd,
 )]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AccountId(Box<str>);
 
 impl AccountId {
@@ -24,6 +27,10 @@ impl AccountId {
 
     pub fn as_bytes(&self) -> &[u8] {
         self.as_ref().as_bytes()
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 
     pub fn to_vec(&self) -> Vec<u8> {

@@ -159,7 +159,7 @@ impl NormalizedEthTransaction {
         let is_contract_creation = self.to.is_none();
 
         let base_gas = if is_contract_creation {
-            config.gas_transaction_create
+            config.gas_transaction_create // 21000
         } else {
             config.gas_transaction_call
         };
@@ -255,7 +255,7 @@ impl AsRef<[u8]> for Error {
 }
 
 impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }

@@ -1,7 +1,8 @@
-use aurora_engine::parameters::ViewCallArgs;
+use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::types::{NEP141Wei, PromiseResult};
+use aurora_engine_types::types::{NEP141Wei, PromiseResult, WeiU256};
 use borsh::{BorshDeserialize, BorshSerialize};
+use ethabi::Token;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
 use near_primitives::version::PROTOCOL_VERSION;
@@ -13,6 +14,8 @@ use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
+use serde_json::json;
+use sha3::Digest;
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
@@ -21,7 +24,7 @@ use crate::prelude::transactions::{
     eip_2930::{self, SignedTransaction2930, Transaction2930},
     legacy::{LegacyEthSignedTransaction, TransactionLegacy},
 };
-use crate::prelude::{sdk, Address, Wei, H256, U256};
+use crate::prelude::{sdk, Address, Balance, Wei, H256, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
@@ -33,6 +36,9 @@ pub fn origin() -> String {
 pub(crate) const SUBMIT: &str = "submit";
 pub(crate) const CALL: &str = "call";
 pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
+pub(crate) const DEFAULT_GAS: u64 = 300_000_000_000_000;
+const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
+const INITIAL_NONCE: u64 = 0;
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
@@ -71,6 +77,36 @@ impl Signer {
         self.nonce += 1;
         nonce
     }
+}
+
+pub struct CallResult {
+    outcome: Option<VMOutcome>,
+    error: Option<VMError>,
+}
+
+impl CallResult {
+    fn check_ok(&self) {
+        assert!(self.error.is_none());
+    }
+
+    fn value(&self) -> Vec<u8> {
+        self.outcome
+            .as_ref()
+            .unwrap()
+            .return_data
+            .clone()
+            .as_value()
+            .unwrap()
+    }
+
+    fn submit_result(&self) -> SubmitResult {
+        SubmitResult::try_from_slice(self.value().as_slice()).unwrap()
+    }
+}
+
+pub struct EthereumAddress {
+    pub secret_key: SecretKey,
+    pub address: Address,
 }
 
 pub(crate) struct AuroraRunner {
@@ -147,6 +183,168 @@ impl<'a> OneShotAuroraRunner<'a> {
 }
 
 impl AuroraRunner {
+    pub fn new() -> Self {
+        deploy_evm()
+    }
+
+    pub fn make_call(
+        &mut self,
+        method_name: &str,
+        caller_account_id: String,
+        input: Vec<u8>,
+    ) -> CallResult {
+        let (outcome, error) = self.call(method_name, &caller_account_id, input);
+        CallResult { outcome, error }
+    }
+
+    pub fn make_call_with_signer(
+        &mut self,
+        method_name: &str,
+        caller_account_id: String,
+        signer_account_id: String,
+        input: Vec<u8>,
+    ) -> CallResult {
+        let (outcome, error) =
+            self.call_with_signer(method_name, &caller_account_id, &signer_account_id, input);
+        CallResult { outcome, error }
+    }
+
+    pub fn evm_call(&mut self, contract: Address, input: Vec<u8>, origin: String) -> CallResult {
+        self.make_call(
+            "call",
+            origin,
+            CallArgs::V2(FunctionCallArgsV2 {
+                contract,
+                value: WeiU256::default(),
+                input,
+            })
+            .try_to_vec()
+            .unwrap(),
+        )
+    }
+
+    pub fn evm_submit(&mut self, input: LegacyEthSignedTransaction, origin: String) -> CallResult {
+        self.make_call("submit", origin, rlp::encode(&input).to_vec())
+    }
+
+    pub fn deploy_erc20_token(&mut self, nep141: &String) -> Address {
+        let result = self.make_call("deploy_erc20_token", origin(), nep141.try_to_vec().unwrap());
+
+        result.check_ok();
+
+        let raw_address: [u8; 20] = Vec::<u8>::try_from_slice(result.value().as_slice())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        Address::try_from_slice(&raw_address).unwrap()
+    }
+
+    pub fn create_account(&mut self) -> EthereumAddress {
+        let mut rng = rand::thread_rng();
+        let source_account = SecretKey::random(&mut rng);
+        let source_address = address_from_secret_key(&source_account);
+        self.create_address(source_address, INITIAL_BALANCE.into(), INITIAL_NONCE.into());
+        EthereumAddress {
+            secret_key: source_account,
+            address: source_address.into(),
+        }
+    }
+
+    pub fn balance_of(&mut self, token: Address, target: Address, origin: String) -> U256 {
+        let input = build_input("balanceOf(address)", &[Token::Address(target.raw())]);
+        let result = self.evm_call(token, input, origin);
+        result.check_ok();
+        let output = unwrap_success(result.submit_result());
+        U256::from_big_endian(output.as_slice())
+    }
+
+    pub fn mint(
+        &mut self,
+        token: Address,
+        target: Address,
+        amount: u64,
+        origin: String,
+    ) -> CallResult {
+        let input = build_input(
+            "mint(address,uint256)",
+            &[
+                Token::Address(target.raw()),
+                Token::Uint(U256::from(amount).into()),
+            ],
+        );
+        let result = self.evm_call(token, input, origin);
+        result.check_ok();
+        result
+    }
+
+    #[allow(dead_code)]
+    pub fn admin(&mut self, token: Address, origin: String) -> CallResult {
+        let input = build_input("admin()", &[]);
+        let result = self.evm_call(token, input, origin);
+        result.check_ok();
+        result
+    }
+
+    pub fn transfer_erc20(
+        &mut self,
+        token: Address,
+        sender: SecretKey,
+        receiver: Address,
+        amount: u64,
+        origin: String,
+    ) -> CallResult {
+        // transfer(address recipient, uint256 amount)
+        let input = build_input(
+            "transfer(address,uint256)",
+            &[
+                Token::Address(receiver.raw()),
+                Token::Uint(U256::from(amount)),
+            ],
+        );
+
+        let input = create_eth_transaction(Some(token.into()), Wei::zero(), input, None, &sender);
+
+        let result = self.evm_submit(input, origin); // create_eth_transaction()
+        result.check_ok();
+        result
+    }
+
+    pub fn ft_on_transfer(
+        &mut self,
+        nep141: String,
+        sender_id: String,
+        relayer_id: String,
+        amount: Balance,
+        msg: String,
+    ) -> String {
+        let res = self.make_call_with_signer(
+            "ft_on_transfer",
+            nep141,
+            relayer_id,
+            json!({
+                "sender_id": sender_id,
+                "amount": amount.to_string(),
+                "msg": msg
+            })
+            .to_string()
+            .into_bytes(),
+        );
+        res.check_ok();
+        String::from_utf8(res.value()).unwrap()
+    }
+
+    pub fn register_relayer(
+        &mut self,
+        relayer_account_id: String,
+        relayer_address: Address,
+    ) -> CallResult {
+        self.make_call(
+            "register_relayer",
+            relayer_account_id,
+            relayer_address.try_to_vec().unwrap(),
+        )
+    }
+
     pub fn one_shot(&self) -> OneShotAuroraRunner {
         OneShotAuroraRunner {
             base: &self,
@@ -868,4 +1066,24 @@ pub fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
     let (larger, smaller) = if a < b { (b, a) } else { (a, b) };
 
     (100 / x) * (larger - smaller) <= larger
+}
+
+fn keccak256(input: &[u8]) -> Vec<u8> {
+    sha3::Keccak256::digest(input).to_vec()
+}
+
+fn get_selector(str_selector: &str) -> Vec<u8> {
+    keccak256(str_selector.as_bytes())[..4].to_vec()
+}
+
+fn build_input(str_selector: &str, inputs: &[Token]) -> Vec<u8> {
+    let sel = get_selector(str_selector);
+    let inputs = ethabi::encode(inputs);
+    [sel.as_slice(), inputs.as_slice()].concat().to_vec()
+}
+
+fn create_ethereum_address() -> Address {
+    let mut rng = rand::thread_rng();
+    let source_account = SecretKey::random(&mut rng);
+    address_from_secret_key(&source_account)
 }

@@ -455,11 +455,13 @@ impl TryFrom<JsonValue> for TransferCallArgs {
 
 /// balance_of args for json invocation
 #[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BalanceOfCallArgs {
     pub account_id: AccountId,
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BalanceOfEthCallArgs {
     pub address: Address,
 }

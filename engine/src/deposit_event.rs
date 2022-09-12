@@ -218,6 +218,7 @@ impl EthEvent {
 }
 
 /// Data that was emitted by Deposited event.
+#[derive(Debug)]
 pub struct DepositedEvent {
     pub eth_custodian_address: Address,
     pub sender: Address,

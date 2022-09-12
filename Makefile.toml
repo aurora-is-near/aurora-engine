@@ -206,7 +206,7 @@ command = "${CARGO}"
 args = [
     "test",
     "--package",
-    "aurora-engine-tests-workspace",
+    "aurora-engine-tests",
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",

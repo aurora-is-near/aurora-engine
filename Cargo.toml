@@ -36,10 +36,8 @@ members = [
     "engine-standalone-storage",
     "engine-standalone-tracing",
     "engine-tests",
-    "engine-tests-workspace",
     "engine-transactions",
     "engine-types",
-    "engine-workspace-test",
 ]
 exclude = [
     "etc/tests/state-migration-test",
@@ -47,5 +45,4 @@ exclude = [
     "etc/tests/benchmark-contract",
     "etc/tests/self-contained-5bEgfRQ",
     "etc/xcc-router",
-    "engine-workspace-test",
 ]

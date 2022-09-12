@@ -9,60 +9,6 @@ use libsecp256k1::SecretKey;
 use near_vm_logic::VMOutcome;
 use near_vm_runner::VMError;
 use serde_json::json;
-use sha3::Digest;
-
-const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
-const INITIAL_NONCE: u64 = 0;
-
-pub struct CallResult {
-    outcome: Option<VMOutcome>,
-    error: Option<VMError>,
-}
-
-impl CallResult {
-    fn check_ok(&self) {
-        assert!(self.error.is_none());
-    }
-
-    fn value(&self) -> Vec<u8> {
-        self.outcome
-            .as_ref()
-            .unwrap()
-            .return_data
-            .clone()
-            .as_value()
-            .unwrap()
-    }
-
-    fn submit_result(&self) -> SubmitResult {
-        SubmitResult::try_from_slice(self.value().as_slice()).unwrap()
-    }
-}
-
-fn keccak256(input: &[u8]) -> Vec<u8> {
-    sha3::Keccak256::digest(input).to_vec()
-}
-
-fn get_selector(str_selector: &str) -> Vec<u8> {
-    keccak256(str_selector.as_bytes())[..4].to_vec()
-}
-
-fn build_input(str_selector: &str, inputs: &[Token]) -> Vec<u8> {
-    let sel = get_selector(str_selector);
-    let inputs = ethabi::encode(inputs);
-    [sel.as_slice(), inputs.as_slice()].concat().to_vec()
-}
-
-fn create_ethereum_address() -> Address {
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
-    test_utils::address_from_secret_key(&source_account)
-}
-
-pub struct EthereumAddress {
-    pub secret_key: SecretKey,
-    pub address: Address,
-}
 
 impl test_utils::AuroraRunner {
     pub fn new() -> Self {
@@ -865,6 +811,7 @@ pub mod sim_tests {
         U256::from_big_endian(&test_utils::unwrap_success(submit_result))
     }
 
+    // Call Aurora here.
     pub(crate) fn deploy_erc20_from_nep_141(
         nep_141: &near_sdk_sim::UserAccount,
         aurora: &AuroraAccount,

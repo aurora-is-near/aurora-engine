@@ -13,10 +13,9 @@ publish = false
 autobenches = false
 
 [dependencies]
-
-[dev-dependencies]
-aurora-engine = { path = "../engine", default-features = false, features = ["std", "tracing"] }
-aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
+anyhow = "1.0"
+aurora-engine = { path = "../engine", default-features = false, features = ["std", "tracing", "impl-serde"] }
+aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std", "impl-serde"] }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false, features = ["std"] }
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
@@ -35,19 +34,23 @@ ethabi = "17.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hex = { version = "0.4.3", default-features = false }
-near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "7a3fa3fbff84b712050370d840297df38c925d2d" }
-near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "7a3fa3fbff84b712050370d840297df38c925d2d" }
-near-crypto = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda" }
-near-vm-runner = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda", default-features = false, features = [ "wasmer2_vm", "protocol_feature_alt_bn128" ] }
-near-vm-logic = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda", default-features = false, features = [ "protocol_feature_alt_bn128" ] }
-near-primitives-core = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda", features = [ "protocol_feature_alt_bn128" ] }
-near-primitives = { git = "https://github.com/birchmd/nearcore.git", rev = "980bc48dc02878fea1e0dbc5812ae7de49f12dda", default-features = false, features = [ "nightly_protocol" ] }
+near-sdk = { git = "https://github.com/near/near-sdk-rs.git", tag = "4.0.0" }
+near-crypto = { git = "https://github.com/near/nearcore.git",tag = "1.28.1" }
+near-vm-errors = { git = "https://github.com/near/nearcore.git", tag = "1.28.1", default-features = false }
+near-vm-runner = { git = "https://github.com/near/nearcore.git", tag = "1.28.1", default-features = false, features = ["wasmer2_vm"] }
+near-vm-logic = { git = "https://github.com/near/nearcore.git", tag = "1.28.1", default-features = false }
+near-primitives-core = { git = "https://github.com/near/nearcore.git", tag = "1.28.1" }
+near-primitives = { git = "https://github.com/near/nearcore.git", tag = "1.28.1", default-features = false, features = ["nightly_protocol"] }
+near-units = "0.2.0"
 libsecp256k1 = { version = "0.7.0", default-features = false }
 rand = "0.8.5"
 criterion = "0.3.4"
 git2 = "0.13"
 tempfile = "3.2.0"
+tokio = { version = "1.10.0", features = ["full"] }
 walrus = "0.19"
+aurora-workspace = { git = "https://github.com/aurora-is-near/aurora-workspace.git", features = ["deposit-withdraw"], rev = "cc90b3c53ffe8b988563c31ba02ce281e65ec0ba" }
+workspaces = { git = "https://github.com/near/workspaces-rs.git", rev = "5311791a5a1654d1ba45fd318ed967abce25999d" }
 
 [features]
 mainnet-test = []

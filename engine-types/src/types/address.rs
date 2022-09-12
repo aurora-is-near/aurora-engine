@@ -1,4 +1,4 @@
-use crate::{format, String, H160};
+use crate::{format, String, Vec, H160};
 use borsh::maybestd::io;
 use borsh::{BorshDeserialize, BorshSerialize};
 use core::fmt::Formatter;
