@@ -1,30 +1,32 @@
 # ETH connector
 
-## Build
-1. For production set in the Makefile
-    ```   
-       FEATURES = contract
-    ```
-    1.1. For **development and testing** set in the Makefile
-    ```
-       FEATURES = contract,integration-test
-    ```
-2. Build release: `$ make release`
-3. Run tests: `$ cargo test` 
-4. Deploying process is common for Aurora itself. Please reference [README.md](../README.md)
+Aurora ETH connector is implementation for [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToken/Core).
 
-## Initialize eth-conenctor
-With `near-cli` run:
-```
-$ near call <NEAR_ACC> new_eth_connector '{"prover_account": "<PROVER_NEAR_ACCOUNT>", "eth_custodian_address": "<ETH_ADDRESS>"}' --account-id <NEAR_ACC>
+It has two basic accounts entities:
+* Aurora on NEAR
+* Aurora on ETH
 
-```
+This means that there are two types of `total supply`:
+* total_eth_supply_on_near
+* total_eth_supply_on_aurora
 
-## ETH connector specific methods
+Eth-Connector logic can be divided into three large groups:
+1. NEP-141 specific logic
+2. Eth-Connector specific logic
+3. Admin Controlled specific logic
+
+## ETH connector methods
+
 * new_eth_connector (call once)
-* deposit (mutable)
-* withdraw (mutable, payable)
-* finish_deposit (private, mutable)
+    > Initialize Eth Connector. Called once.
+
+* verify_log_entry (integration-test, view)
+   > Used for integrations tests only.
+
+#### NEP-141 specific logic
+
+For more details see: [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToken/Core).
+
 * ft_total_supply (view)
 * ft_total_eth_supply_on_near (view)
 * ft_total_eth_supply_on_aurora (view)
@@ -33,10 +35,57 @@ $ near call <NEAR_ACC> new_eth_connector '{"prover_account": "<PROVER_NEAR_ACCOU
 * ft_transfer (mutable, payable)
 * ft_resolve_transfer (private, mutable)
 * ft_transfer_call (mutable, payable)
-* ft_on_transfer (private, mutable)
+* ft_on_transfer (mutable)
 * storage_deposit (mutable)
 * storage_withdraw (mutable, payable)
 * storage_balance_of (view)
+* ft_metadata (view)
+
+#### Eth-Connector specific logic
+
+* deposit (mutable)
+   > Arguments: (proof: Proof)
+
+* withdraw (mutable, payable)
+   > Withdraw from NEAR accounts.
+   > Arguments: (recipient_address: Address, amount: NEP141Wei) 
+
+* finish_deposit (private, mutable)
+
+#### Admin Controlled specific logic
+
+* get_accounts_counter (view)
+* get_paused_flags (view)
+* set_paused_flags (mutable, private)
+
+## ETH connector specific source files
+
+* `fungible_token.rs`
+* `connector.rs`
+* `admin_controlled.rs`
+* `deposit_event.rs`
+* `log_entry.rs`
+* `proof.rs`
+
+## Build
+1. For production set in the Makefile
+    ```   
+       FEATURES = contract
+    ```
+   1.1. For **development and testing** set in the Makefile
+    ```
+       FEATURES = contract,integration-test
+    ```
+2. Build release: `$ make release`
+3. Run tests: `$ cargo test`
+4. Deploying process is common for Aurora itself. Please reference [README.md](../README.md)
+
+## Initialize eth-connector
+With `near-cli` run:
+```
+$ near call <NEAR_ACC> new_eth_connector '{"prover_account": "<PROVER_NEAR_ACCOUNT>", "eth_custodian_address": "<ETH_ADDRESS>"}' --account-id <NEAR_ACC>
+
+```
 
 ## Ethereum specific flow
 Follow by [this instruction](https://github.com/aurora-is-near/eth-connector/blob/master/README.md).
