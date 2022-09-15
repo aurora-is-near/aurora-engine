@@ -3,12 +3,12 @@
 Aurora ETH connector is implementation for [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToken/Core).
 
 It has two basic accounts entities:
-* Aurora on NEAR
-* Aurora on ETH
+* Aurora on NEAR (`balance_of`)
+* Aurora on ETH (`balance_of_eth`)
 
 This means that there are two types of `total supply`:
-* total_eth_supply_on_near
-* total_eth_supply_on_aurora
+* `total_eth_supply_on_near`
+* `total_eth_supply_on_aurora`
 
 Eth-Connector logic can be divided into three large groups:
 1. NEP-141 specific logic
@@ -44,13 +44,31 @@ For more details see: [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToke
 #### Eth-Connector specific logic
 
 * deposit (mutable)
+   > Deposit logic:
+   > - fetch proof
+   > - Prepare token message data for Finish Deposit
+   > - Invoke promise - Verify proof log entry data by Custodian
+   > - Invoke promise Finish Deposit with Token message data
    > Arguments: (proof: Proof)
 
 * withdraw (mutable, payable)
    > Withdraw from NEAR accounts.
+   > 
    > Arguments: (recipient_address: Address, amount: NEP141Wei) 
 
 * finish_deposit (private, mutable)
+   > Finish deposit logic 
+   > - Check is Verify proof log entry data success
+   > - If msg is set
+   >   - Mint amount for Owner
+   >   - Record Proof
+   >   - Call ft_transfer_call for receiver_id
+   > - else
+   >   - Mint amount for Owner
+   >   - Mint fee for relayer
+   >   - Record Proof
+   > 
+   > Arguments: (deposit_call: FinishDepositCallArgs, [callback] verify_log_result: bool)
 
 #### Admin Controlled specific logic
 
