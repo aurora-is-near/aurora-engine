@@ -34,12 +34,24 @@ For more details see: [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToke
 * ft_balance_of_eth (view)
 * ft_transfer (mutable, payable)
 * ft_resolve_transfer (private, mutable)
-* ft_transfer_call (mutable, payable)
-* ft_on_transfer (mutable)
 * storage_deposit (mutable)
 * storage_withdraw (mutable, payable)
 * storage_balance_of (view)
 * ft_metadata (view)
+
+* ft_transfer_call (mutable, payable)
+   > - Verify message data if `sender_id == receiver_id ` before `ft_on_transfer` call to avoid verification panics
+   >   - Fetch transfer message
+   >   - Check is transfer amount > fee
+   >   - Check overflow for recipient  `balance_of_eth_on_aurora` before process `ft_on_transfer`
+   >   - Check overflow for `total_eth_supply_on_aurora` before process `ft_on_transfer`
+   > - if sender_id != receiver_id
+   >   - `transfer_eth_on_near` from `sender_id` to `receiver_id`
+   > - Call `ft_on_transfer`
+* ft_on_transfer (mutable)
+   > - Fetch transfer message
+   > - mint_eth_on_aurora for `recipient`
+   > - if `fee` exist mint_eth_on_aurora for `relayer`
 
 #### Eth-Connector specific logic
 
@@ -49,6 +61,7 @@ For more details see: [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToke
    > - Prepare token message data for Finish Deposit
    > - Invoke promise - Verify proof log entry data by Custodian
    > - Invoke promise Finish Deposit with Token message data
+   > 
    > Arguments: (proof: Proof)
 
 * withdraw (mutable, payable)
