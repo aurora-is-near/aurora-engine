@@ -49,7 +49,7 @@ pub enum PromiseAction {
     Transfer {
         amount: Yocto,
     },
-    DeployConotract {
+    DeployContract {
         code: Vec<u8>,
     },
     FunctionCall {
@@ -57,6 +57,12 @@ pub enum PromiseAction {
         args: Vec<u8>,
         attached_yocto: Yocto,
         gas: NearGas,
+    },
+    AddAccessKey {
+        public_key: PublicKey,
+        allowance: Balance,
+        receiver_id: AccountId,
+        function_names: String,
     },
 }
 

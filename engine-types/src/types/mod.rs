@@ -5,12 +5,14 @@ pub mod address;
 pub mod balance;
 pub mod fee;
 pub mod gas;
+pub mod public_key;
 pub mod wei;
 
 pub use address::*;
 pub use balance::*;
 pub use fee::*;
 pub use gas::*;
+pub use public_key::*;
 pub use wei::*;
 
 pub type RawU256 = [u8; 32];
