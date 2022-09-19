@@ -3,6 +3,8 @@ use std::collections::HashMap;
 
 // TODO: change the parsing data structure to be more efficient with struct methods
 
+// TODO: make TransactionTestJSON to AddressLessThan20 for identifying each test json file
+
 #[derive(Debug, Deserialize)]
 pub struct TransactionTestJson {
     #[serde(flatten)]
