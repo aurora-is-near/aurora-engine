@@ -1,23 +1,32 @@
 use serde::Deserialize;
 use std::collections::HashMap;
-use crate::test_utils::read_file;
-use std::path::Path;
+use crate::ttjson::read_file;
 
+pub type TTOk = HashMap<String, TransactionTestOk>;
 
+#[derive(Debug, Deserialize)]
+pub struct TransactionTestJsonOk {
+    #[serde(flatten)]
+    pub json: TTOk,
+}
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct AddressMoreThan20 {
+pub struct TransactionTestOk {
+    /// General information for the test
+    #[serde(alias = "_info")]
     pub info: TransactonTestInfo,
-    pub result: HashMap<String, Result>,
+    /// Result of the transaction
+    pub result: HashMap<String, TtResultOk>,
+    /// Encoded TX bytes to feed to Aurora VM
     pub txbytes: String
 }
 
-impl AddressMoreThan20 {
-    pub fn new() -> Self {
-        let json_str = read_file("TransactionTests/ttAddress/AddressMoreThan20.json".to_string());
-        let tt: TransactionTestJson = serde_json::from_str(&json_str).unwrap();
-        let input = tt.AddressMoreThan20.get("AddressMoreThan20").unwrap();
-        AddressMoreThan20 {
+impl TransactionTestOk{
+    pub fn new(path: String, test_name: String) -> Self {
+        let json_str = read_file(path);
+        let tt: TransactionTestJsonOk = serde_json::from_str(&json_str).unwrap();
+        let input = tt.json.get(&test_name).unwrap();
+        TransactionTestOk {
             info: input.clone().info,
             result: input.clone().result,
             txbytes: input.clone().txbytes
@@ -28,7 +37,7 @@ impl AddressMoreThan20 {
         &self.info
     }
 
-    pub fn result(&self, network: String) -> &Result {
+    pub fn result(&self, network: String) -> &TtResultOk {
         &self.result.get(&network).unwrap()
     }
 
@@ -37,34 +46,18 @@ impl AddressMoreThan20 {
     }
 }
 
-//// JSON parsing type
-
-#[derive(Debug, Deserialize)]
-pub struct TransactionTestJson {
-    #[serde(flatten)]
-    pub AddressMoreThan20: HashMap<String, TransactionTest>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct TransactionTest {
-    /// General information for the test
-    #[serde(alias = "_info")]
-    pub info: TransactonTestInfo,
-    /// Result of the transaction
-    pub result: HashMap<String, Result>,
-    /// Encoded TX bytes to feed to Aurora VM
-    pub txbytes: String
-}
 
 // TODO: set result for London hard fork only
 #[derive(Debug, Clone, Deserialize)]
-pub struct Result {
+pub struct TtResultOk {
     /// Exception on expected error
-    #[serde(alias = "exception")]
-    pub exception: String,
+    #[serde(alias = "hash")]
+    pub hash: String,
     /// Consumed Gas in hexadecimal notation
     #[serde(alias = "intrinsicGas")]
-    pub intrinsic_gas: String
+    pub intrinsic_gas: String,
+    #[serde(alias = "sender")]
+    pub sender: String
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -88,5 +81,4 @@ pub struct TransactonTestInfo {
     #[serde(alias = "sourceHash")]
     pub source_hash : String
 }
-
 
