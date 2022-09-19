@@ -1,0 +1,56 @@
+{
+    "TransactionWithRvaluePrefixed00BigInt" : {
+        "_info" : {
+            "comment" : "",
+            "filling-rpc-server" : "evm version 1.10.13-unstable-291393c2",
+            "filling-tool-version" : "retesteth-0.2.0-memory+commit.093d78f6.Linux.g++",
+            "generatedTestHash" : "3e49b472066f8d29bdef38d42bd1be198c11e799461542efe348d2fcebfcc251",
+            "lllcversion" : "Version: 0.5.14-develop.2021.10.5+commit.401d5358.Linux.g++",
+            "source" : "src/TransactionTestsFiller/ttRSValue/TransactionWithRvaluePrefixed00BigIntFiller.json",
+            "sourceHash" : "f1811a5098d1b59bc673b43ea237948b092195e7dcd863c053017adb5fb53b9d"
+        },
+        "result" : {
+            "Berlin" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            },
+            "Byzantium" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            },
+            "Constantinople" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            },
+            "ConstantinopleFix" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            },
+            "EIP150" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            },
+            "EIP158" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            },
+            "Frontier" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            },
+            "Homestead" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            },
+            "Istanbul" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            },
+            "London" : {
+                "exception" : "LeadingZerosR",
+                "intrinsicGas" : "0x00"
+            }
+        },
+        "txbytes" : "0xf85f800182520894095e7baea6a6c7c4c2dfeb977efac326af552d870b801ba00000000000000000000000000000000ebaaedce6af48a03bbfd25e8cd0364141a01fffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804"
+    }
+}

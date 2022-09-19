@@ -1,0 +1,56 @@
+{
+    "TRANSCT__RandomByteAtRLP_6" : {
+        "_info" : {
+            "comment" : "",
+            "filling-rpc-server" : "evm version 1.10.13-unstable-291393c2",
+            "filling-tool-version" : "retesteth-0.2.0-memory+commit.093d78f6.Linux.g++",
+            "generatedTestHash" : "79d5f0e724b95eff7a6647fdaea889b30678fe0d1b0770b8e6eab4d2bd5e9c78",
+            "lllcversion" : "Version: 0.5.14-develop.2021.10.5+commit.401d5358.Linux.g++",
+            "source" : "src/TransactionTestsFiller/ttWrongRLP/TRANSCT__RandomByteAtRLP_6Copier.json",
+            "sourceHash" : "5a7ee7c1e4be297e2d646f3366dd24b2485b0087d78dd003272baaaac0ea5e88"
+        },
+        "result" : {
+            "Berlin" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            },
+            "Byzantium" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            },
+            "Constantinople" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            },
+            "ConstantinopleFix" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            },
+            "EIP150" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            },
+            "EIP158" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            },
+            "Frontier" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            },
+            "Homestead" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            },
+            "Istanbul" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            },
+            "London" : {
+                "exception" : "RLP_Error_RLP_Size",
+                "intrinsicGas" : "0x00"
+            }
+        },
+        "txbytes" : "0xf86103018207d094b94f5374fce5edbc8e2a8697c15331677e6ebf0b0a8255441ca098ff921201554726367d2be8cef804a7ff89ccf285ebc57dff8ae4c44b9c19ac4aa08887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a3"
+    }
+}

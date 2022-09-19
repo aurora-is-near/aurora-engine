@@ -1,0 +1,56 @@
+{
+    "WrongVRSTestIncorrectSize" : {
+        "_info" : {
+            "comment" : "",
+            "filling-rpc-server" : "evm version 1.10.13-unstable-291393c2",
+            "filling-tool-version" : "retesteth-0.2.0-memory+commit.093d78f6.Linux.g++",
+            "generatedTestHash" : "d866223ae0685d15f0527f3ffd695ca0fe52a4884bdf7d81ba99533a87b466f3",
+            "lllcversion" : "Version: 0.5.14-develop.2021.10.5+commit.401d5358.Linux.g++",
+            "source" : "src/TransactionTestsFiller/ttSignature/WrongVRSTestIncorrectSizeFiller.json",
+            "sourceHash" : "6fd80a750fd12dc0338c2589d0c70ef9f3e19364cb2548027564b421a9c09037"
+        },
+        "result" : {
+            "Berlin" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            },
+            "Byzantium" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            },
+            "Constantinople" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            },
+            "ConstantinopleFix" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            },
+            "EIP150" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            },
+            "EIP158" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            },
+            "Frontier" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            },
+            "Homestead" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            },
+            "Istanbul" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            },
+            "London" : {
+                "exception" : "InvalidVRS",
+                "intrinsicGas" : "0x00"
+            }
+        },
+        "txbytes" : "0xf863800182520894b94f5374fce5edbc8e2a8697c15331677e6ebf0b0a801ca298ff921201554726367d2be8c804a7ff89ccf285ebc57dff8ae4c44b9c19ac4a02c3a28887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a302c3"
+    }
+}

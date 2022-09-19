@@ -42,6 +42,7 @@ members = [
 exclude = [
     "etc/tests/state-migration-test",
     "etc/tests/ft-receiver",
+    "etc/eth-test",
     "etc/tests/benchmark-contract",
     "etc/tests/self-contained-5bEgfRQ",
     "etc/xcc-router",

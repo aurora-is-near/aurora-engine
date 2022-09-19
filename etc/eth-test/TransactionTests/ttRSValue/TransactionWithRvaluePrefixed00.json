@@ -1,0 +1,66 @@
+{
+    "TransactionWithRvaluePrefixed00" : {
+        "_info" : {
+            "comment" : "",
+            "filling-rpc-server" : "evm version 1.10.13-unstable-291393c2",
+            "filling-tool-version" : "retesteth-0.2.0-memory+commit.093d78f6.Linux.g++",
+            "generatedTestHash" : "a9d232abfbae93d9142523a99195caea76fd95575efb42204bd28e2a4b0599ea",
+            "lllcversion" : "Version: 0.5.14-develop.2021.10.5+commit.401d5358.Linux.g++",
+            "source" : "src/TransactionTestsFiller/ttRSValue/TransactionWithRvaluePrefixed00Filler.json",
+            "sourceHash" : "9f32cf412d7266d9c6c9e3db90680c797b06cba95fea7bf2e67154ade2576cf5"
+        },
+        "result" : {
+            "Berlin" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            },
+            "Byzantium" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            },
+            "Constantinople" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            },
+            "ConstantinopleFix" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            },
+            "EIP150" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            },
+            "EIP158" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            },
+            "Frontier" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            },
+            "Homestead" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            },
+            "Istanbul" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            },
+            "London" : {
+                "hash" : "0x9f8de48be7398c8fa787bef9c201c0dc73fb8b3764f9ecfaaa5c88e30f267941",
+                "intrinsicGas" : "0x5208",
+                "sender" : "0x59805be0fb22cec65ee107f39f51d2a54cf8c522"
+            }
+        },
+        "txbytes" : "0xf850800182520894095e7baea6a6c7c4c2dfeb977efac326af552d870b801b910ebaaedce6af48a03bbfd25e8cd0364141a01fffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804"
+    }
+}
