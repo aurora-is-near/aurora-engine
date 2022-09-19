@@ -4,14 +4,14 @@ use crate::ttjson::read_file;
 
 pub type TTErr = HashMap<String, TransactionTestErr>;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct TransactionTestJsonErr {
     #[serde(flatten)]
     pub json: TTErr,
 }
 
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct TransactionTestErr {
     /// General information for the test
     #[serde(alias = "_info")]
@@ -48,7 +48,7 @@ impl TransactionTestErr{
 }
 
 // TODO: set result for London hard fork only
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct TtResultErr {
     /// Exception on expected error
     #[serde(alias = "exception")]
@@ -58,7 +58,7 @@ pub struct TtResultErr {
     pub intrinsic_gas: String
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct TransactonTestInfo {
     /// Comment for explanation
     pub comment : String,
