@@ -1,6 +1,7 @@
 use crate::test_utils::AddressLessThan20Prefixed0;
 use crate::test_utils::AddressLessThan20;
 use crate::test_utils::AddressMoreThan20;
+use crate::test_utils::AddressMoreThan20PrefixedBy0;
 use std::fs::read_to_string;
 use std::path::Path;
 
@@ -30,5 +31,14 @@ fn test_address_more_than_20() -> Result<(), std::io::Error>  {
     println!("{:?}", address_more_than_20.info());
     println!("{:?}", address_more_than_20.result("London".to_string()));
     println!("{:?}", address_more_than_20.txbytes()); 
+    Ok(())
+}
+
+#[test]
+fn test_address_more_than_20_prefixed_by_0() -> Result<(), std::io::Error>  {
+    let address_more_than_20_prefixed_by_0 = AddressMoreThan20PrefixedBy0::new();
+    println!("{:?}", address_more_than_20_prefixed_by_0.info());
+    println!("{:?}", address_more_than_20_prefixed_by_0.result("London".to_string()));
+    println!("{:?}", address_more_than_20_prefixed_by_0.txbytes()); 
     Ok(())
 }
