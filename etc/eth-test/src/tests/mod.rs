@@ -1,20 +1,34 @@
-use crate::test_utils::TransactionTestJson;
+use crate::test_utils::AddressLessThan20Prefixed0;
+use crate::test_utils::AddressLessThan20;
+use crate::test_utils::AddressMoreThan20;
 use std::fs::read_to_string;
 use std::path::Path;
 
-fn parse_test_transaction(json_str: String) -> Result<TransactionTestJson, std::io::Error>{
-   serde_json::from_str(&json_str).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-}
 
-fn read_file(path: String) -> Result<String, std::io::Error> {
-    return read_to_string(path);
+
+#[test]
+fn test_address_less_than_20() -> Result<(), std::io::Error>  {
+    let address_less_than_20 = AddressLessThan20::new();
+    println!("{:?}", address_less_than_20.info());
+    println!("{:?}", address_less_than_20.result("London".to_string()));
+    println!("{:?}", address_less_than_20.txbytes());
+    Ok(())
 }
 
 #[test]
-fn test_parsing() -> Result<(), std::io::Error> {
-    let json_str = read_file("TransactionTests/ttAddress/AddressLessThan20.json".to_string())?;
-    println!("{:?}", json_str);
-    let tt = parse_test_transaction(json_str)?;
-    println!("{:?}", tt);
+fn test_address_less_than_20_prefixed() -> Result<(), std::io::Error>  {
+    let address_less_than_20_prefixed = AddressLessThan20Prefixed0::new();
+    println!("{:?}", address_less_than_20_prefixed.info());
+    println!("{:?}", address_less_than_20_prefixed.result("London".to_string()));
+    println!("{:?}", address_less_than_20_prefixed.txbytes()); 
+    Ok(())
+}
+
+#[test]
+fn test_address_more_than_20() -> Result<(), std::io::Error>  {
+    let address_more_than_20 = AddressMoreThan20::new();
+    println!("{:?}", address_more_than_20.info());
+    println!("{:?}", address_more_than_20.result("London".to_string()));
+    println!("{:?}", address_more_than_20.txbytes()); 
     Ok(())
 }
