@@ -46,6 +46,7 @@ fn test_dataTx_bcValidBlockTest() -> Result<(), std::io::Error> {
     Ok(())
 }
 
+// Tests on the test data json file where it provides inconsistent results for different networks
 
 #[test]
 fn test_dataTx_bcValidBlockTestFrontier() -> Result<(), std::io::Error> {
@@ -64,4 +65,5 @@ fn test_dataTx_bcValidBlockTestFrontierOnOtherNewtork() -> Result<(), std::io::E
     println!("{:?}", data_tx_bc_valid_block_test_frontier.txbytes()); 
     Ok(())
 }
+
 
