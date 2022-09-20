@@ -7,30 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.7.0] 2022-08-19
-
-### Added
-- Get promise results precompile at address on `testnet` `0x0a3540f79be10ef14890e87c1a0040a68cc6af71` by [@birchmd]. ([#575])
-- Cross-contract calls to NEAR contracts are now available for `testnet` by [@birchmd] and [@mfornet]. ([#560])
-
-### Changes
-- Use NEAR host functions for alt bn256 precompile by [@birchmd], [@joshuajbouw], and [@RomanHodulak]. ([#540])
-
-### Fixes
-- Fixed an issue where a transaction can panic on an empty input by [@birchmd]. ([#573])
-- Return the correct value while using the `get_bridge_prover` method by [@birchmd]. ([#581])
-
-[#575]: https://github.com/aurora-is-near/aurora-engine/pull/575
-[#560]: https://github.com/aurora-is-near/aurora-engine/pull/560
-[#540]: https://github.com/aurora-is-near/aurora-engine/pull/540
-[#573]: https://github.com/aurora-is-near/aurora-engine/pull/573
-[#581]: https://github.com/aurora-is-near/aurora-engine/pull/581
-
 ## [2.6.1] 2022-06-23
 
 ### Fixes
 
-- Fixed an issue with accounting being problematic with the total supply of ETH on Aurora as it could artificially deplete by [@birchmd]. ([#536])
+- Fixed an issue with accounting being problematic with the total supply of ETH on Aurora as it could artificially deplete by @[birchmd]. ([#536])
 - Fixed the possibility of forging receipts to allow for withdrawals on the Rainbow Bridge by [@birchmd], [@mfornet], [@sept-en] and [@joshuajbouw]. Written by [@birchmd].
 - Fixed the ability the steal funds from those by setting a fee when receiving NEP-141 as ERC-20 by [@birchmd], [@mfornet], and [@joshuajbouw]. Written by [@joshuajbouw].
 
@@ -300,8 +281,7 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.7.0...develop
-[2.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.1...2.7.0
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.1...develop
 [2.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.0...2.6.1 
 [2.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.3...2.6.0
 [2.5.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.2...2.5.3

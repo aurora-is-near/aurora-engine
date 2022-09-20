@@ -1,0 +1,22 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: aurora-engine
+  title: Aurora (engine)
+  description: |-
+    The Aurora engine
+  tags:
+    - contract
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: engine-team
+  type: contract
+  lifecycle: production
+  system: aurora-engine
+  deployedAt:
+    - contract:near/mainnet/aurora
+  interactsWith: []
