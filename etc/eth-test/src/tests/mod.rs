@@ -39,7 +39,7 @@ fn test_address_more_than_20_prefixed_by_0() -> Result<(), std::io::Error>  {
 
 #[test]
 fn test_data_test_enough_gas()-> Result<(), std::io::Error> {
-    let data_test_enough_gas = TransactionTestOk::new("TransactionTests/ttData/DataTestEnoughGas.json".to_string(), "DataTestEnoughGAS".to_string());
+    let data_test_enough_gas = TransactionTestOk::new("TransactionTests/ttData/DataTestEnoughGAS.json".to_string(), "DataTestEnoughGAS".to_string());
     println!("{:?}", data_test_enough_gas.info());
     println!("{:?}", data_test_enough_gas.result("London".to_string()));
     println!("{:?}", data_test_enough_gas.txbytes()); 
