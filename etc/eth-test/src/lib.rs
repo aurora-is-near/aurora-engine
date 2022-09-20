@@ -1,4 +1,4 @@
 #[cfg(test)]
-pub mod ttjson;
+pub mod transaction_test;
 #[cfg(test)]
 mod tests;
