@@ -1,7 +1,7 @@
 # Ethereum Transaction Test Parser
 ---
 
-*This project is Rust typings for [ethereum test](https://github.com/ethereum/tests) for feeding inputs to EVM for rust developers*
+*This project is Rust JSON parser for [ethereum test](https://github.com/ethereum/tests) for feeding inputs to EVM*
 
 ## Getting started
 
