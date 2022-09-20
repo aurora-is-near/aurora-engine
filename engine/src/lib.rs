@@ -561,44 +561,6 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn finish_deposit() {
-        let mut io = Runtime;
-        io.assert_private_call().sdk_unwrap();
-
-        // Check result from proof verification call
-        if io.promise_results_count() != 1 {
-            sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
-        }
-        let promise_result = match io.promise_result(0) {
-            Some(PromiseResult::Successful(bytes)) => {
-                bool::try_from_slice(&bytes).sdk_expect(errors::ERR_PROMISE_ENCODING)
-            }
-            _ => sdk::panic_utf8(errors::ERR_PROMISE_FAILED),
-        };
-        if !promise_result {
-            sdk::panic_utf8(errors::ERR_VERIFY_PROOF);
-        }
-
-        let data = io.read_input_borsh().sdk_unwrap();
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let maybe_promise_args = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .finish_deposit(
-                predecessor_account_id,
-                current_account_id,
-                data,
-                io.prepaid_gas(),
-            )
-            .sdk_unwrap();
-
-        if let Some(promise_args) = maybe_promise_args {
-            let promise_id = io.promise_create_with_callback(&promise_args);
-            io.promise_return(promise_id);
-        }
-    }
-
-    #[no_mangle]
     pub extern "C" fn is_used_proof() {
         let mut io = Runtime;
         let args: IsUsedProofCallArgs = io.read_input_borsh().sdk_unwrap();
@@ -669,23 +631,6 @@ mod contract {
             .sdk_unwrap()
             .ft_transfer(&predecessor_account_id, args)
             .sdk_unwrap();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn ft_resolve_transfer() {
-        let io = Runtime;
-
-        io.assert_private_call().sdk_unwrap();
-        if io.promise_results_count() != 1 {
-            sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
-        }
-
-        let args: ResolveTransferCallArgs = io.read_input().to_value().sdk_unwrap();
-        let promise_result = io.promise_result(0).sdk_unwrap();
-
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_resolve_transfer(args, promise_result);
     }
 
     #[no_mangle]

@@ -17,7 +17,7 @@ use crate::prelude::{
 };
 use crate::prelude::{PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs};
 use crate::proof::Proof;
-use aurora_engine_sdk::env::Env;
+use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
@@ -440,6 +440,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         args: ResolveTransferCallArgs,
         promise_result: PromiseResult,
     ) {
+        let ft_resolve_transfer_call = PromiseCreateArgs {
+            target_account_id: current_account_id,
+            method: "ft_resolve_transfer".to_string(),
+            args: data,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        };
+
         let amount = self.ft.ft_resolve_transfer(
             promise_result,
             &args.sender_id,
