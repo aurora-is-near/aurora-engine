@@ -14,6 +14,9 @@ use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandl
 
 use crate::accounting;
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
+use crate::pausables::{
+    EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
+};
 use crate::prelude::parameters::RefundCallArgs;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
 use crate::prelude::precompiles::xcc::cross_contract_call;
@@ -26,6 +29,7 @@ use crate::prelude::{
 };
 use aurora_engine_precompiles::PrecompileConstructorContext;
 use core::cell::RefCell;
+use core::iter::once;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -354,36 +358,7 @@ struct StackExecutorParams<'a, I, E, H> {
 }
 
 impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<'env, I, E, H> {
-    fn new(
-        gas_limit: u64,
-        current_account_id: AccountId,
-        random_seed: H256,
-        io: I,
-        env: &'env E,
-        ro_promise_handler: H,
-    ) -> Self {
-        let precompiles = if cfg!(all(feature = "mainnet", not(feature = "integration-test"))) {
-            let mut tmp = Precompiles::new_london(PrecompileConstructorContext {
-                current_account_id,
-                random_seed,
-                io,
-                env,
-                promise_handler: ro_promise_handler,
-            });
-            // Cross contract calls are not enabled on mainnet yet.
-            tmp.all_precompiles
-                .remove(&aurora_engine_precompiles::xcc::cross_contract_call::ADDRESS);
-            tmp
-        } else {
-            Precompiles::new_london(PrecompileConstructorContext {
-                current_account_id,
-                random_seed,
-                io,
-                env,
-                promise_handler: ro_promise_handler,
-            })
-        };
-
+    fn new(gas_limit: u64, precompiles: Precompiles<'env, I, E, H>) -> Self {
         Self {
             precompiles,
             gas_limit,
@@ -541,14 +516,10 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(
-            gas_limit,
-            self.current_account_id.clone(),
-            self.env.random_seed(),
-            self.io,
-            self.env,
-            handler.read_only(),
-        );
+        let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
+        let precompiles = self.create_precompiles(pause_flags, handler);
+
+        let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
         let address = executor.create_address(CreateScheme::Legacy {
             caller: origin.raw(),
@@ -628,14 +599,10 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let executor_params = StackExecutorParams::new(
-            gas_limit,
-            self.current_account_id.clone(),
-            self.env.random_seed(),
-            self.io,
-            self.env,
-            handler.read_only(),
-        );
+        let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
+        let precompiles = self.create_precompiles(pause_flags, handler);
+
+        let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) = executor.transact_call(
             origin.raw(),
@@ -680,15 +647,12 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         input: Vec<u8>,
         gas_limit: u64,
     ) -> Result<TransactionStatus, EngineErrorKind> {
-        let executor_params = StackExecutorParams::new(
-            gas_limit,
-            self.current_account_id.clone(),
-            self.env.random_seed(),
-            self.io,
-            self.env,
-            // View calls cannot interact with promises
-            aurora_engine_sdk::promise::Noop,
-        );
+        // View calls cannot interact with promises
+        let mut handler = aurora_engine_sdk::promise::Noop;
+        let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
+        let precompiles = self.create_precompiles(pause_flags, &mut handler);
+
+        let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
         let (status, result) = executor.transact_call(
             origin.raw(),
@@ -882,6 +846,57 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         // TODO(marX)
         // Everything succeed so return "0"
         self.io.return_output(b"\"0\"");
+    }
+
+    fn create_precompiles<P: PromiseHandler>(
+        &self,
+        pause_flags: PrecompileFlags,
+        handler: &mut P,
+    ) -> Precompiles<'env, I, E, P::ReadOnly> {
+        let current_account_id = self.current_account_id.clone();
+        let random_seed = self.env.random_seed();
+        let io = self.io;
+        let env = self.env;
+        let ro_promise_handler = handler.read_only();
+
+        let precompiles = if cfg!(all(feature = "mainnet", not(feature = "integration-test"))) {
+            let mut tmp = Precompiles::new_london(PrecompileConstructorContext {
+                current_account_id,
+                random_seed,
+                io,
+                env,
+                promise_handler: ro_promise_handler,
+            });
+            // Cross contract calls are not enabled on mainnet yet.
+            tmp.all_precompiles
+                .remove(&aurora_engine_precompiles::xcc::cross_contract_call::ADDRESS);
+            tmp
+        } else {
+            Precompiles::new_london(PrecompileConstructorContext {
+                current_account_id,
+                random_seed,
+                io,
+                env,
+                promise_handler: ro_promise_handler,
+            })
+        };
+
+        Self::apply_pause_flags_to_precompiles(precompiles, pause_flags)
+    }
+
+    fn apply_pause_flags_to_precompiles<H: ReadOnlyPromiseHandler>(
+        precompiles: Precompiles<'env, I, E, H>,
+        pause_flags: PrecompileFlags,
+    ) -> Precompiles<'env, I, E, H> {
+        Precompiles {
+            paused_precompiles: precompiles
+                .all_precompiles
+                .keys()
+                .filter(|address| pause_flags.is_paused_by_address(address))
+                .copied()
+                .collect(),
+            all_precompiles: precompiles.all_precompiles,
+        }
     }
 }
 
@@ -1111,6 +1126,13 @@ pub fn set_state<I: IO>(io: &mut I, state: EngineState) {
         &bytes_to_key(KeyPrefix::Config, STATE_KEY),
         &state.try_to_vec().expect("ERR_SER"),
     );
+}
+
+pub fn get_authorizer() -> EngineAuthorizer {
+    // TODO: a temporary account until the engine adapts std with near-plugins
+    let account = AccountId::new("aurora").expect("Failed to parse account from string");
+
+    EngineAuthorizer::from_accounts(once(account))
 }
 
 pub fn refund_unused_gas<I: IO>(

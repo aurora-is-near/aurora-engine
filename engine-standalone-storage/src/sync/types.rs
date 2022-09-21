@@ -1,5 +1,6 @@
 use crate::Storage;
 use aurora_engine::parameters;
+use aurora_engine::parameters::PausePrecompilesCallArgs;
 use aurora_engine::xcc::AddressVersionUpdateArgs;
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -77,6 +78,10 @@ pub enum TransactionKind {
     Submit(EthTransactionKind),
     /// Ethereum transaction triggered by a NEAR account
     Call(parameters::CallArgs),
+    /// Administrative method that makes a subset of precompiles paused
+    PausePrecompiles(PausePrecompilesCallArgs),
+    /// Administrative method that resumes previously paused subset of precompiles
+    ResumePrecompiles(PausePrecompilesCallArgs),
     /// Input here represents the EVM code used to create the new contract
     Deploy(Vec<u8>),
     /// New bridged token
@@ -332,6 +337,8 @@ impl TransactionKind {
                 Self::no_evm_execution("factory_set_wnear_address")
             }
             TransactionKind::Unknown => Self::no_evm_execution("unknown"),
+            Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
+            Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
         }
     }
 
@@ -494,6 +501,8 @@ enum BorshableTransactionKind<'a> {
     FactoryUpdate(Cow<'a, Vec<u8>>),
     FactoryUpdateAddressVersion(Cow<'a, AddressVersionUpdateArgs>),
     FactorySetWNearAddress(types::Address),
+    PausePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
+    ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
 }
 
@@ -533,6 +542,8 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
                 Self::FactorySetWNearAddress(*address)
             }
             TransactionKind::Unknown => Self::Unknown,
+            TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
+            TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
         }
     }
 }
@@ -584,6 +595,12 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::FactorySetWNearAddress(address))
             }
             BorshableTransactionKind::Unknown => Ok(Self::Unknown),
+            BorshableTransactionKind::PausePrecompiles(x) => {
+                Ok(Self::PausePrecompiles(x.into_owned()))
+            }
+            BorshableTransactionKind::ResumePrecompiles(x) => {
+                Ok(Self::ResumePrecompiles(x.into_owned()))
+            }
         }
     }
 }

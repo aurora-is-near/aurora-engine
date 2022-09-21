@@ -11,6 +11,7 @@ mod ghsa_3p69_m8gg_fwmf;
 mod meta_parsing;
 mod multisender;
 mod one_inch;
+mod pausable_precompiles;
 mod prepaid_gas_precompile;
 mod promise_results_precompile;
 mod random;
