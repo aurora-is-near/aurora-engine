@@ -14,6 +14,7 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 #[derive(
     BorshSerialize, BorshDeserialize, Default, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccountId(Box<str>);
 
 impl AccountId {
