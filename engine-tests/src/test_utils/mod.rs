@@ -33,6 +33,9 @@ pub fn origin() -> String {
 pub(crate) const SUBMIT: &str = "submit";
 pub(crate) const CALL: &str = "call";
 pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
+pub(crate) const PAUSE_PRECOMPILES: &str = "pause_precompiles";
+pub(crate) const PAUSED_PRECOMPILES: &str = "paused_precompiles";
+pub(crate) const RESUME_PRECOMPILES: &str = "resume_precompiles";
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
@@ -223,7 +226,11 @@ impl AuroraRunner {
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             if maybe_error.is_none()
-                && (method_name == SUBMIT || method_name == CALL || method_name == DEPLOY_ERC20)
+                && (method_name == SUBMIT
+                    || method_name == CALL
+                    || method_name == DEPLOY_ERC20
+                    || method_name == PAUSE_PRECOMPILES
+                    || method_name == RESUME_PRECOMPILES)
             {
                 standalone_runner
                     .submit_raw(method_name, &self.context, &self.promise_results)
@@ -582,7 +589,7 @@ impl Default for AuroraRunner {
 
 /// Wrapper around `ProfileData` to still include the wasm gas usage
 /// (which was removed in https://github.com/near/nearcore/pull/4438).
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct ExecutionProfile {
     pub host_breakdown: ProfileData,
     wasm_gas: u64,

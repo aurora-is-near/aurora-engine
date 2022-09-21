@@ -27,6 +27,7 @@ pub mod errors;
 pub mod fungible_token;
 pub mod json;
 pub mod log_entry;
+pub mod pausables;
 mod prelude;
 pub mod xcc;
 
@@ -71,17 +72,21 @@ mod contract {
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine, EngineState};
-    use crate::errors;
     use crate::fungible_token::FungibleTokenMetadata;
     use crate::json::parse_json;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
-        StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallCallArgs, ViewCallArgs,
+        PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
+        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
+        TransferCallCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
+    use crate::pausables::{
+        Authorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PausedPrecompilesManager,
+        PrecompileFlags,
+    };
     use crate::prelude::account_id::AccountId;
     use crate::prelude::parameters::RefundCallArgs;
     use crate::prelude::sdk::types::{
@@ -91,6 +96,7 @@ mod contract {
     use crate::prelude::{
         sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
     };
+    use crate::{errors, pausables};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
@@ -194,6 +200,49 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn state_migration() {
         // TODO: currently we don't have migrations
+    }
+
+    /// Resumes previously [`paused`] precompiles.
+    ///
+    /// [`paused`]: crate::contract::pause_precompiles
+    #[no_mangle]
+    pub extern "C" fn resume_precompiles() {
+        let io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        let predecessor_account_id = io.predecessor_account_id();
+
+        require_owner_only(&state, &predecessor_account_id);
+
+        let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
+        let flags = PrecompileFlags::from_bits_truncate(args.paused_mask);
+        let mut pauser = EnginePrecompilesPauser::from_io(io);
+        pauser.resume_precompiles(flags);
+    }
+
+    /// Pauses a precompile.
+    #[no_mangle]
+    pub extern "C" fn pause_precompiles() {
+        let io = Runtime;
+        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer();
+
+        if !authorizer.is_authorized(&io.predecessor_account_id()) {
+            sdk::panic_utf8("ERR_UNAUTHORIZED".as_bytes());
+        }
+
+        let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
+        let flags = PrecompileFlags::from_bits_truncate(args.paused_mask);
+        let mut pauser = EnginePrecompilesPauser::from_io(io);
+        pauser.pause_precompiles(flags);
+    }
+
+    /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
+    /// 0-bit means not paused.
+    #[no_mangle]
+    pub extern "C" fn paused_precompiles() {
+        let mut io = Runtime;
+        let pauser = EnginePrecompilesPauser::from_io(io);
+        let data = pauser.paused().bits().to_le_bytes();
+        io.return_output(&data[..]);
     }
 
     ///

@@ -6,10 +6,11 @@ use crate::{
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
-pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
+#[derive(Default)]
+pub struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
-    pub(super) const ADDRESS: Address = super::make_address(0, 5);
+    pub const ADDRESS: Address = super::make_address(0, 5);
 
     pub fn new() -> Self {
         Self(Default::default())

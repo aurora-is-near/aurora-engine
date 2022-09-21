@@ -167,10 +167,11 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
     })
 }
 
-pub(super) struct Bn256Add<HF: HardFork>(PhantomData<HF>);
+#[derive(Default)]
+pub struct Bn256Add<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> Bn256Add<HF> {
-    pub(super) const ADDRESS: Address = super::make_address(0, 6);
+    pub const ADDRESS: Address = super::make_address(0, 6);
 
     pub fn new() -> Self {
         Self(Default::default())
@@ -269,10 +270,11 @@ impl Precompile for Bn256Add<Istanbul> {
     }
 }
 
-pub(super) struct Bn256Mul<HF: HardFork>(PhantomData<HF>);
+#[derive(Default)]
+pub struct Bn256Mul<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> Bn256Mul<HF> {
-    pub(super) const ADDRESS: Address = super::make_address(0, 7);
+    pub const ADDRESS: Address = super::make_address(0, 7);
 
     pub fn new() -> Self {
         Self(Default::default())
@@ -374,10 +376,11 @@ impl Precompile for Bn256Mul<Istanbul> {
     }
 }
 
-pub(super) struct Bn256Pair<HF: HardFork>(PhantomData<HF>);
+#[derive(Default)]
+pub struct Bn256Pair<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> Bn256Pair<HF> {
-    pub(super) const ADDRESS: Address = super::make_address(0, 8);
+    pub const ADDRESS: Address = super::make_address(0, 8);
 
     pub fn new() -> Self {
         Self(Default::default())
