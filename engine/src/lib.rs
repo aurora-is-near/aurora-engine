@@ -67,7 +67,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::{BorshDeserialize, BorshSerialize};
+    use borsh::BorshSerialize;
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine, EngineState};
@@ -77,8 +77,8 @@ mod contract {
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
-        StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallCallArgs, ViewCallArgs,
+        PauseEthConnectorCallArgs, SetContractDataCallArgs, StorageDepositCallArgs,
+        StorageWithdrawCallArgs, TransferCallCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -620,17 +620,19 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer() {
-        let io = Runtime;
+        let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
-        let args = parameters::TransferCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).sdk_unwrap(),
-        )
-        .sdk_unwrap();
-        EthConnectorContract::init_instance(io)
+        let input = io.read_input().to_vec();
+        let args =
+            parameters::TransferCallArgs::try_from(parse_json(&input).sdk_unwrap()).sdk_unwrap();
+
+        let promise_arg = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_transfer(&predecessor_account_id, args)
+            .ft_transfer(&predecessor_account_id, args, input)
             .sdk_unwrap();
+        let peomise_id = io.promise_create_call(&promise_arg);
+        io.promise_return(peomise_id);
     }
 
     #[no_mangle]

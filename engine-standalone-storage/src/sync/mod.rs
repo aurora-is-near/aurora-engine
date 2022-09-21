@@ -251,9 +251,11 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::FtTransfer(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_transfer(&env.predecessor_account_id, args.clone())?;
+        TransactionKind::FtTransfer(_args) => {
+            // TODO: fix it
+            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            // let input: Vec<u8> = Vec::new();
+            // connector.ft_transfer(&env.predecessor_account_id, args.clone(), input)?;
 
             None
         }

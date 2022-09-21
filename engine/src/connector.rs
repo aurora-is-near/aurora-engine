@@ -417,21 +417,18 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Transfer between NEAR accounts
     pub fn ft_transfer(
         &mut self,
-        predecessor_account_id: &AccountId,
-        args: TransferCallArgs,
-    ) -> Result<(), fungible_token::error::TransferError> {
-        self.ft.internal_transfer_eth_on_near(
-            predecessor_account_id,
-            &args.receiver_id,
-            args.amount,
-            &args.memo,
-        )?;
-        self.save_ft_contract();
-        sdk::log!(&format!(
-            "Transfer amount {} to {} success with memo: {:?}",
-            args.amount, args.receiver_id, args.memo
-        ));
-        Ok(())
+        _predecessor_account_id: &AccountId,
+        _args: TransferCallArgs,
+        data: Vec<u8>,
+    ) -> Result<PromiseCreateArgs, fungible_token::error::TransferError> {
+        let ft_transfer_call = PromiseCreateArgs {
+            target_account_id: AccountId::new("test").unwrap(),
+            method: "ft_transfer".to_string(),
+            args: data,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        };
+        Ok(ft_transfer_call)
     }
 
     /// FT resolve transfer logic
@@ -440,14 +437,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         args: ResolveTransferCallArgs,
         promise_result: PromiseResult,
     ) {
-        let ft_resolve_transfer_call = PromiseCreateArgs {
-            target_account_id: current_account_id,
-            method: "ft_resolve_transfer".to_string(),
-            args: data,
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: DEFAULT_PREPAID_GAS,
-        };
-
         let amount = self.ft.ft_resolve_transfer(
             promise_result,
             &args.sender_id,
