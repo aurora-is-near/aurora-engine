@@ -116,15 +116,15 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     io.remove_storage(&proof_key);
 
     let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io).unwrap();
-    connector
-        .finish_deposit(
-            aurora_account_id.clone(),
-            aurora_account_id.clone(),
-            deposit_args,
-            NearGas::new(DEFAULT_GAS),
-        )
-        .map_err(unsafe_to_string)
-        .unwrap();
+    // connector
+    //     .finish_deposit(
+    //         aurora_account_id.clone(),
+    //         aurora_account_id.clone(),
+    //         deposit_args,
+    //         NearGas::new(DEFAULT_GAS),
+    //     )
+    //     .map_err(unsafe_to_string)
+    //     .unwrap();
 
     let transfer_args = NEP141FtOnTransferArgs {
         sender_id: aurora_account_id.clone(),

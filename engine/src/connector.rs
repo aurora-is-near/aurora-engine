@@ -1,21 +1,20 @@
 use crate::admin_controlled::{AdminControlled, PausedMask};
-use crate::deposit_event::{DepositedEvent, FtTransferMessageData, TokenMessageData};
+use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
-    BalanceOfCallArgs, BalanceOfEthCallArgs, FinishDepositCallArgs, InitCallArgs,
-    NEP141FtOnTransferArgs, PauseEthConnectorCallArgs, ResolveTransferCallArgs,
-    SetContractDataCallArgs, StorageBalanceOfCallArgs, StorageDepositCallArgs,
-    StorageWithdrawCallArgs, TransferCallArgs, TransferCallCallArgs, WithdrawResult,
+    BalanceOfCallArgs, BalanceOfEthCallArgs, InitCallArgs, NEP141FtOnTransferArgs,
+    PauseEthConnectorCallArgs, SetContractDataCallArgs, StorageBalanceOfCallArgs,
+    StorageDepositCallArgs, StorageWithdrawCallArgs, WithdrawResult,
 };
 use crate::prelude::{
     address::error::AddressError, NEP141Wei, Wei, U256, ZERO_NEP141_WEI, ZERO_WEI,
 };
 use crate::prelude::{
     format, sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
-    KeyPrefix, NearGas, PromiseResult, ToString, Vec, WithdrawCallArgs, Yocto, ERR_FAILED_PARSE,
+    KeyPrefix, NearGas, ToString, Vec, WithdrawCallArgs, Yocto, ERR_FAILED_PARSE,
 };
-use crate::prelude::{PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs};
+use crate::prelude::{PromiseBatchAction, PromiseCreateArgs};
 use crate::proof::Proof;
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -121,168 +120,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Deposit all types of tokens
-    pub fn deposit(
-        &self,
-        raw_proof: Vec<u8>,
-        current_account_id: AccountId,
-        predecessor_account_id: AccountId,
-    ) -> Result<PromiseWithCallbackArgs, error::DepositError> {
-        // Check is current account owner
-        let is_owner = current_account_id == predecessor_account_id;
-        // Check is current flow paused. If it's owner account just skip it.
-        self.assert_not_paused(PAUSE_DEPOSIT, is_owner)
-            .map_err(|_| error::DepositError::Paused)?;
-
-        sdk::log!("[Deposit tokens]");
-
-        // Get incoming deposit arguments
-        let proof: Proof =
-            Proof::try_from_slice(&raw_proof).map_err(|_| error::DepositError::ProofParseFailed)?;
-        // Fetch event data from Proof
-        let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data)
-            .map_err(error::DepositError::EventParseFailed)?;
-
-        sdk::log!(&format!(
-            "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
-            event.sender.encode(),
-            event.token_message_data.get_recipient(),
-            event.amount,
-            event.fee
-        ));
-
-        sdk::log!(&format!(
-            "Event's address {}, custodian address {}",
-            event.eth_custodian_address.encode(),
-            self.contract.eth_custodian_address.encode(),
-        ));
-
-        if event.eth_custodian_address != self.contract.eth_custodian_address {
-            return Err(error::DepositError::CustodianAddressMismatch);
-        }
-
-        if NEP141Wei::new(event.fee.as_u128()) >= event.amount {
-            return Err(error::DepositError::InsufficientAmountForFee);
-        }
-
-        // Verify proof data with cross-contract call to prover account
-        sdk::log!(&format!(
-            "Deposit verify_log_entry for prover: {}",
-            self.contract.prover_account,
-        ));
-
-        // Do not skip bridge call. This is only used for development and diagnostics.
-        let skip_bridge_call = false.try_to_vec().unwrap();
-        let mut proof_to_verify = raw_proof;
-        proof_to_verify.extend(skip_bridge_call);
-
-        let verify_call = PromiseCreateArgs {
-            target_account_id: self.contract.prover_account.clone(),
-            method: "verify_log_entry".to_string(),
-            args: proof_to_verify,
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_VERIFY_LOG_ENTRY,
-        };
-
-        // Finalize deposit
-        let data = match event.token_message_data {
-            // Deposit to NEAR accounts
-            TokenMessageData::Near(account_id) => FinishDepositCallArgs {
-                new_owner_id: account_id,
-                amount: event.amount,
-                proof_key: proof.get_key(),
-                relayer_id: predecessor_account_id,
-                fee: event.fee,
-                msg: None,
-            }
-            .try_to_vec()
-            .unwrap(),
-            // Deposit to Eth accounts
-            // fee is being minted in the `ft_on_transfer` callback method
-            TokenMessageData::Eth {
-                receiver_id,
-                message,
-            } => {
-                // Transfer to self and then transfer ETH in `ft_on_transfer`
-                // address - is NEAR account
-                let transfer_data = TransferCallCallArgs {
-                    receiver_id,
-                    amount: event.amount,
-                    memo: None,
-                    msg: message.encode(),
-                }
-                .try_to_vec()
-                .unwrap();
-
-                // Send to self - current account id
-                FinishDepositCallArgs {
-                    new_owner_id: current_account_id.clone(),
-                    amount: event.amount,
-                    proof_key: proof.get_key(),
-                    relayer_id: predecessor_account_id,
-                    fee: event.fee,
-                    msg: Some(transfer_data),
-                }
-                .try_to_vec()
-                .unwrap()
-            }
-        };
-
-        let finish_call = PromiseCreateArgs {
-            target_account_id: current_account_id,
-            method: "finish_deposit".to_string(),
+    pub fn deposit(&self, data: Vec<u8>) -> Result<PromiseCreateArgs, error::DepositError> {
+        Ok(PromiseCreateArgs {
+            target_account_id: AccountId::new("test").unwrap(),
+            method: "deposit".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FINISH_DEPOSIT,
-        };
-        Ok(PromiseWithCallbackArgs {
-            base: verify_call,
-            callback: finish_call,
         })
-    }
-
-    /// Finish deposit (private method)
-    /// NOTE: we should `record_proof` only after `mint` operation. The reason
-    /// is that in this case we only calculate the amount to be credited but
-    /// do not save it, however, if an error occurs during the calculation,
-    /// this will happen before `record_proof`. After that contract will save.
-    pub fn finish_deposit(
-        &mut self,
-        predecessor_account_id: AccountId,
-        current_account_id: AccountId,
-        data: FinishDepositCallArgs,
-        prepaid_gas: NearGas,
-    ) -> Result<Option<PromiseWithCallbackArgs>, error::FinishDepositError> {
-        sdk::log!(&format!("Finish deposit with the amount: {}", data.amount));
-
-        // Mint tokens to recipient minus fee
-        if let Some(msg) = data.msg {
-            // Mint - calculate new balances
-            self.mint_eth_on_near(data.new_owner_id, data.amount)?;
-            // Store proof only after `mint` calculations
-            self.record_proof(&data.proof_key)?;
-            // Save new contract data
-            self.save_ft_contract();
-            let transfer_call_args = TransferCallCallArgs::try_from_slice(&msg).unwrap();
-            let promise = self.ft_transfer_call(
-                predecessor_account_id,
-                current_account_id,
-                transfer_call_args,
-                prepaid_gas,
-            )?;
-            Ok(Some(promise))
-        } else {
-            // Mint - calculate new balances
-            self.mint_eth_on_near(
-                data.new_owner_id.clone(),
-                data.amount - NEP141Wei::new(data.fee.as_u128()),
-            )?;
-            self.mint_eth_on_near(data.relayer_id, NEP141Wei::new(data.fee.as_u128()))?;
-            // Store proof only after `mint` calculations
-            self.record_proof(&data.proof_key)?;
-            // Save new contract data
-            self.save_ft_contract();
-            Ok(None)
-        }
     }
 
     /// Internal ETH withdraw ETH logic
@@ -292,18 +137,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<(), fungible_token::error::WithdrawError> {
         self.burn_eth_on_aurora(amount)?;
         self.save_ft_contract();
-        Ok(())
-    }
-
-    /// Record used proof as hash key
-    fn record_proof(&mut self, key: &str) -> Result<(), error::ProofUsed> {
-        sdk::log!(&format!("Record proof: {}", key));
-
-        if self.is_used_event(key) {
-            return Err(error::ProofUsed);
-        }
-
-        self.save_used_event(key);
         Ok(())
     }
 
@@ -417,39 +250,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Transfer between NEAR accounts
     pub fn ft_transfer(
         &mut self,
-        _predecessor_account_id: &AccountId,
-        _args: TransferCallArgs,
         data: Vec<u8>,
     ) -> Result<PromiseCreateArgs, fungible_token::error::TransferError> {
-        let ft_transfer_call = PromiseCreateArgs {
+        Ok(PromiseCreateArgs {
             target_account_id: AccountId::new("test").unwrap(),
             method: "ft_transfer".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: DEFAULT_PREPAID_GAS,
-        };
-        Ok(ft_transfer_call)
-    }
-
-    /// FT resolve transfer logic
-    pub fn ft_resolve_transfer(
-        &mut self,
-        args: ResolveTransferCallArgs,
-        promise_result: PromiseResult,
-    ) {
-        let amount = self.ft.ft_resolve_transfer(
-            promise_result,
-            &args.sender_id,
-            &args.receiver_id,
-            args.amount,
-        );
-        sdk::log!(&format!(
-            "Resolve transfer from {} to {} success",
-            args.sender_id, args.receiver_id
-        ));
-        // `ft_resolve_transfer` can change `total_supply` so we should save the contract
-        self.save_ft_contract();
-        self.io.return_output(format!("\"{}\"", amount).as_bytes());
+        })
     }
 
     /// FT transfer call from sender account (invoker account) to receiver
@@ -458,63 +267,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// We allow empty messages for cases when `receiver_id =! current_account_id`
     pub fn ft_transfer_call(
         &mut self,
-        predecessor_account_id: AccountId,
-        current_account_id: AccountId,
-        args: TransferCallCallArgs,
-        prepaid_gas: NearGas,
-    ) -> Result<PromiseWithCallbackArgs, error::FtTransferCallError> {
-        sdk::log!(&format!(
-            "Transfer call to {} amount {}",
-            args.receiver_id, args.amount,
-        ));
-
-        // Verify message data before `ft_on_transfer` call to avoid verification panics
-        // It's allowed empty message if `receiver_id =! current_account_id`
-        if args.receiver_id == current_account_id {
-            let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
-                .map_err(error::FtTransferCallError::MessageParseFailed)?;
-            // Check is transfer amount > fee
-            if message_data.fee.as_u128() >= args.amount.as_u128() {
-                return Err(error::FtTransferCallError::InsufficientAmountForFee);
-            }
-
-            // Additional check overflow before process `ft_on_transfer`
-            // But don't check overflow for relayer
-            // Note: It can't overflow because the total supply doesn't change during transfer.
-            let amount_for_check = self
-                .ft
-                .internal_unwrap_balance_of_eth_on_aurora(&message_data.recipient);
-            if amount_for_check
-                .checked_add(Wei::from(args.amount))
-                .is_none()
-            {
-                return Err(error::FtTransferCallError::Transfer(
-                    fungible_token::error::TransferError::BalanceOverflow,
-                ));
-            }
-            if self
-                .ft
-                .total_eth_supply_on_aurora
-                .checked_add(Wei::from(args.amount))
-                .is_none()
-            {
-                return Err(error::FtTransferCallError::Transfer(
-                    fungible_token::error::TransferError::TotalSupplyOverflow,
-                ));
-            }
-        }
-
-        self.ft
-            .ft_transfer_call(
-                predecessor_account_id,
-                args.receiver_id,
-                args.amount,
-                &args.memo,
-                args.msg,
-                current_account_id,
-                prepaid_gas,
-            )
-            .map_err(Into::into)
+        data: Vec<u8>,
+    ) -> Result<PromiseCreateArgs, error::FtTransferCallError> {
+        Ok(PromiseCreateArgs {
+            target_account_id: AccountId::new("test").unwrap(),
+            method: "ft_transfer_call".to_string(),
+            args: data,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        })
     }
 
     /// FT storage deposit logic

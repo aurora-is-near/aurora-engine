@@ -232,21 +232,22 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::FtTransferCall(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector.ft_transfer_call(
-                env.predecessor_account_id.clone(),
-                env.current_account_id.clone(),
-                args.clone(),
-                env.prepaid_gas,
-            )?;
-
-            Some(TransactionExecutionResult::Promise(promise_args))
+        TransactionKind::FtTransferCall(_args) => {
+            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            // let promise_args = connector.ft_transfer_call(
+            //     env.predecessor_account_id.clone(),
+            //     env.current_account_id.clone(),
+            //     args.clone(),
+            //     env.prepaid_gas,
+            // )?;
+            //
+            // Some(TransactionExecutionResult::Promise(promise_args))
+            None
         }
 
-        TransactionKind::ResolveTransfer(args, promise_result) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_resolve_transfer(args.clone(), promise_result.clone());
+        TransactionKind::ResolveTransfer(_args, _promise_result) => {
+            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            // connector.ft_resolve_transfer(args.clone(), promise_result.clone());
 
             None
         }
@@ -271,27 +272,29 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::Deposit(raw_proof) => {
-            let connector_contract = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector_contract.deposit(
-                raw_proof.clone(),
-                env.current_account_id(),
-                env.predecessor_account_id(),
-            )?;
-
-            Some(TransactionExecutionResult::Promise(promise_args))
+        TransactionKind::Deposit(_raw_proof) => {
+            // let connector_contract = connector::EthConnectorContract::init_instance(io)?;
+            // let promise_args = connector_contract.deposit(
+            //     raw_proof.clone(),
+            //     env.current_account_id(),
+            //     env.predecessor_account_id(),
+            // )?;
+            //
+            // Some(TransactionExecutionResult::Promise(promise_args))
+            None
         }
 
-        TransactionKind::FinishDeposit(finish_args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let maybe_promise_args = connector.finish_deposit(
-                env.predecessor_account_id(),
-                env.current_account_id(),
-                finish_args.clone(),
-                env.prepaid_gas,
-            )?;
-
-            maybe_promise_args.map(TransactionExecutionResult::Promise)
+        TransactionKind::FinishDeposit(_finish_args) => {
+            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            // let maybe_promise_args = connector.finish_deposit(
+            //     env.predecessor_account_id(),
+            //     env.current_account_id(),
+            //     finish_args.clone(),
+            //     env.prepaid_gas,
+            // )?;
+            //
+            // maybe_promise_args.map(TransactionExecutionResult::Promise)
+            None
         }
 
         TransactionKind::StorageDeposit(args) => {

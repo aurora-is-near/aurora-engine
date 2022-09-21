@@ -78,7 +78,7 @@ mod contract {
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, SetContractDataCallArgs, StorageDepositCallArgs,
-        StorageWithdrawCallArgs, TransferCallCallArgs, ViewCallArgs,
+        StorageWithdrawCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -549,14 +549,12 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deposit() {
         let mut io = Runtime;
-        let raw_proof = io.read_input().to_vec();
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
+        let input = io.read_input().to_vec();
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .deposit(raw_proof, current_account_id, predecessor_account_id)
+            .deposit(input)
             .sdk_unwrap();
-        let promise_id = io.promise_create_with_callback(&promise_args);
+        let promise_id = io.promise_create_call(&promise_args);
         io.promise_return(promise_id);
     }
 
@@ -622,14 +620,10 @@ mod contract {
     pub extern "C" fn ft_transfer() {
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
         let input = io.read_input().to_vec();
-        let args =
-            parameters::TransferCallArgs::try_from(parse_json(&input).sdk_unwrap()).sdk_unwrap();
-
         let promise_arg = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_transfer(&predecessor_account_id, args, input)
+            .ft_transfer(input)
             .sdk_unwrap();
         let peomise_id = io.promise_create_call(&promise_arg);
         io.promise_return(peomise_id);
@@ -637,27 +631,15 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
-        use sdk::types::ExpectUtf8;
         let mut io = Runtime;
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
-
-        let args = TransferCallCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-        )
-        .sdk_unwrap();
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
+        let input = io.read_input().to_vec();
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_transfer_call(
-                predecessor_account_id,
-                current_account_id,
-                args,
-                io.prepaid_gas(),
-            )
+            .ft_transfer_call(input)
             .sdk_unwrap();
-        let promise_id = io.promise_create_with_callback(&promise_args);
+        let promise_id = io.promise_create_call(&promise_args);
         io.promise_return(promise_id);
     }
 
