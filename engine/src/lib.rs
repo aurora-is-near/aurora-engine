@@ -596,14 +596,13 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of() {
-        let io = Runtime;
-        let args = parameters::BalanceOfCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).sdk_unwrap(),
-        )
-        .sdk_unwrap();
-        EthConnectorContract::init_instance(io)
+        let mut io = Runtime;
+        let input = io.read_input().to_vec();
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_balance_of(args);
+            .ft_balance_of(input);
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
@@ -697,6 +696,16 @@ mod contract {
             .sdk_unwrap()
             .storage_balance_of(args)
     }
+
+    #[no_mangle]
+    pub extern "C" fn get_eth_connector_contract_account() {
+        let mut io = Runtime;
+        let data: &[u8] = &[];
+        io.return_output(data);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_eth_connector_contract_account() {}
 
     #[no_mangle]
     pub extern "C" fn get_paused_flags() {

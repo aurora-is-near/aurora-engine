@@ -3,9 +3,9 @@ use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
-    BalanceOfCallArgs, BalanceOfEthCallArgs, InitCallArgs, NEP141FtOnTransferArgs,
-    PauseEthConnectorCallArgs, SetContractDataCallArgs, StorageBalanceOfCallArgs,
-    StorageDepositCallArgs, StorageWithdrawCallArgs, WithdrawResult,
+    BalanceOfEthCallArgs, InitCallArgs, NEP141FtOnTransferArgs, PauseEthConnectorCallArgs,
+    SetContractDataCallArgs, StorageBalanceOfCallArgs, StorageDepositCallArgs,
+    StorageWithdrawCallArgs, WithdrawResult,
 };
 use crate::prelude::{
     address::error::AddressError, NEP141Wei, Wei, U256, ZERO_NEP141_WEI, ZERO_WEI,
@@ -220,14 +220,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return balance of nETH (ETH on Near)
-    pub fn ft_balance_of(&mut self, args: BalanceOfCallArgs) {
-        let balance = self.ft.ft_balance_of(&args.account_id);
-        sdk::log!(&format!(
-            "Balance of nETH [{}]: {}",
-            args.account_id, balance
-        ));
-
-        self.io.return_output(format!("\"{}\"", balance).as_bytes());
+    pub fn ft_balance_of(&self, input: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: AccountId::new("test").unwrap(),
+            method: "ft_balance_of".to_string(),
+            args: input,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        }
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
