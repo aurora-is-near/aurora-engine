@@ -14,7 +14,6 @@ use crate::prelude::{
     KeyPrefix, NearGas, ToString, Vec, WithdrawCallArgs, Yocto, ERR_FAILED_PARSE,
 };
 use crate::prelude::{PromiseBatchAction, PromiseCreateArgs};
-use crate::proof::Proof;
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
@@ -119,14 +118,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Deposit all types of tokens
-    pub fn deposit(&self, data: Vec<u8>) -> Result<PromiseCreateArgs, error::DepositError> {
-        Ok(PromiseCreateArgs {
+    pub fn deposit(&self, data: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
             target_account_id: AccountId::new("test").unwrap(),
             method: "deposit".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FINISH_DEPOSIT,
-        })
+        }
     }
 
     /// Internal ETH withdraw ETH logic
@@ -371,9 +370,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Get accounts counter for statistics.
     /// It represents total unique accounts (all-time, including accounts which now have zero balance).
-    pub fn get_accounts_counter(&mut self) {
-        self.io
-            .return_output(&self.ft.get_accounts_counter().to_le_bytes());
+    pub fn get_accounts_counter(&mut self) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: AccountId::new("test").unwrap(),
+            method: "get_accounts_counter".to_string(),
+            args: Vec::new(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+        }
     }
 
     pub fn get_bridge_prover(&self) -> &AccountId {
@@ -400,14 +404,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         self.io.write_borsh(&self.used_event_key(key), &0u8);
     }
 
-    /// Check is event of proof already used
-    fn is_used_event(&self, key: &str) -> bool {
-        self.io.storage_has_key(&self.used_event_key(key))
-    }
-
     /// Checks whether the provided proof was already used
-    pub fn is_used_proof(&self, proof: Proof) -> bool {
-        self.is_used_event(&proof.get_key())
+    pub fn is_used_proof(&self, data: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: AccountId::new("test").unwrap(),
+            method: "is_used_proof".to_string(),
+            args: data,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+        }
     }
 
     /// Get Eth connector paused flags

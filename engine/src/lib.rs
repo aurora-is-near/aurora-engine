@@ -76,8 +76,8 @@ mod contract {
     use crate::json::parse_json;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, ViewCallArgs,
+        InitCallArgs, NEP141FtOnTransferArgs, NewCallArgs, StorageDepositCallArgs,
+        StorageWithdrawCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -516,12 +516,9 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn set_eth_connector_contract_data() {
-        let mut io = Runtime;
+        let io = Runtime;
         // Only the owner can set the EthConnector contract data
         io.assert_private_call().sdk_unwrap();
-
-        let args: SetContractDataCallArgs = io.read_input_borsh().sdk_unwrap();
-        connector::set_contract_data(&mut io, args).sdk_unwrap();
     }
 
     #[no_mangle]
@@ -553,8 +550,7 @@ mod contract {
         let input = io.read_input().to_vec();
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .deposit(input)
-            .sdk_unwrap();
+            .deposit(input);
         let promise_id = io.promise_create_call(&promise_args);
         io.promise_return(promise_id);
     }
@@ -562,13 +558,12 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn is_used_proof() {
         let mut io = Runtime;
-        let args: IsUsedProofCallArgs = io.read_input_borsh().sdk_unwrap();
-
-        let is_used_proof = EthConnectorContract::init_instance(io)
+        let input = io.read_input().to_vec();
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .is_used_proof(args.proof);
-        let res = is_used_proof.try_to_vec().unwrap();
-        io.return_output(&res[..]);
+            .is_used_proof(input);
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
@@ -730,10 +725,12 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn get_accounts_counter() {
-        let io = Runtime;
-        EthConnectorContract::init_instance(io)
+        let mut io = Runtime;
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_accounts_counter();
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
