@@ -56,7 +56,7 @@ fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
 pub struct ECRecover;
 
 impl ECRecover {
-    pub(super) const ADDRESS: Address = super::make_address(0, 1);
+    pub const ADDRESS: Address = super::make_address(0, 1);
 }
 
 impl Precompile for ECRecover {
