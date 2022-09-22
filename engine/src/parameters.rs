@@ -468,6 +468,11 @@ pub struct RegisterRelayerCallArgs {
     pub address: Address,
 }
 
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct SetEthConnectorContractAccountArgs {
+    pub account: AccountId,
+}
+
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,

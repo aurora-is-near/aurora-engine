@@ -69,6 +69,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 mod contract {
     use borsh::BorshSerialize;
 
+    use crate::admin_controlled::AdminControlled;
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine, EngineState};
     use crate::errors;
@@ -76,8 +77,9 @@ mod contract {
     use crate::json::parse_json;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, NEP141FtOnTransferArgs, NewCallArgs, StorageDepositCallArgs,
-        StorageWithdrawCallArgs, ViewCallArgs,
+        InitCallArgs, NEP141FtOnTransferArgs, NewCallArgs, SetContractDataCallArgs,
+        SetEthConnectorContractAccountArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
+        ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -516,9 +518,12 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn set_eth_connector_contract_data() {
-        let io = Runtime;
+        let mut io = Runtime;
         // Only the owner can set the EthConnector contract data
         io.assert_private_call().sdk_unwrap();
+
+        let args: SetContractDataCallArgs = io.read_input_borsh().sdk_unwrap();
+        connector::set_contract_data(&mut io, args).sdk_unwrap();
     }
 
     #[no_mangle]
@@ -703,14 +708,22 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_eth_connector_contract_account() {
         let mut io = Runtime;
-        let data: &[u8] = &[];
-        io.return_output(data);
+        let account = EthConnectorContract::init_instance(io)
+            .sdk_unwrap()
+            .get_eth_connector_contract_account();
+        let data = account.try_to_vec().expect(ERR_FAILED_PARSE);
+        io.return_output(&data[..]);
     }
 
     #[no_mangle]
     pub extern "C" fn set_eth_connector_contract_account() {
         let io = Runtime;
         io.assert_private_call().sdk_unwrap();
+
+        let args: SetEthConnectorContractAccountArgs = io.read_input_borsh().sdk_unwrap();
+        EthConnectorContract::init_instance(io)
+            .sdk_unwrap()
+            .set_eth_connector_contract_account(args.account);
     }
 
     #[no_mangle]

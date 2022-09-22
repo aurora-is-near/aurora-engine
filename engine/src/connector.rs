@@ -120,7 +120,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Deposit all types of tokens
     pub fn deposit(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
-            target_account_id: AccountId::new("test").unwrap(),
+            target_account_id: self.get_eth_connector_contract_account(),
             method: "deposit".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
@@ -204,7 +204,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
     pub fn ft_total_eth_supply_on_near(&mut self) -> PromiseCreateArgs {
         PromiseCreateArgs {
-            target_account_id: AccountId::new("test").unwrap(),
+            target_account_id: self.get_eth_connector_contract_account(),
             method: "ft_total_eth_supply_on_near".to_string(),
             args: Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
@@ -215,7 +215,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
     pub fn ft_total_eth_supply_on_aurora(&mut self) -> PromiseCreateArgs {
         PromiseCreateArgs {
-            target_account_id: AccountId::new("test").unwrap(),
+            target_account_id: self.get_eth_connector_contract_account(),
             method: "ft_total_eth_supply_on_aurora".to_string(),
             args: Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
@@ -226,7 +226,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Return balance of nETH (ETH on Near)
     pub fn ft_balance_of(&self, input: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
-            target_account_id: AccountId::new("test").unwrap(),
+            target_account_id: self.get_eth_connector_contract_account(),
             method: "ft_balance_of".to_string(),
             args: input,
             attached_balance: ZERO_ATTACHED_BALANCE,
@@ -237,7 +237,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Return balance of ETH (ETH in Aurora EVM)
     pub fn ft_balance_of_eth_on_aurora(&mut self, input: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
-            target_account_id: AccountId::new("test").unwrap(),
+            target_account_id: self.get_eth_connector_contract_account(),
             method: "ft_balance_of_eth_on_aurora".to_string(),
             args: input,
             attached_balance: ZERO_ATTACHED_BALANCE,
@@ -251,7 +251,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         data: Vec<u8>,
     ) -> Result<PromiseCreateArgs, fungible_token::error::TransferError> {
         Ok(PromiseCreateArgs {
-            target_account_id: AccountId::new("test").unwrap(),
+            target_account_id: self.get_eth_connector_contract_account(),
             method: "ft_transfer".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
@@ -268,7 +268,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         data: Vec<u8>,
     ) -> Result<PromiseCreateArgs, error::FtTransferCallError> {
         Ok(PromiseCreateArgs {
-            target_account_id: AccountId::new("test").unwrap(),
+            target_account_id: self.get_eth_connector_contract_account(),
             method: "ft_transfer_call".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
@@ -372,7 +372,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// It represents total unique accounts (all-time, including accounts which now have zero balance).
     pub fn get_accounts_counter(&mut self) -> PromiseCreateArgs {
         PromiseCreateArgs {
-            target_account_id: AccountId::new("test").unwrap(),
+            target_account_id: self.get_eth_connector_contract_account(),
             method: "get_accounts_counter".to_string(),
             args: Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
@@ -407,7 +407,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Checks whether the provided proof was already used
     pub fn is_used_proof(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
-            target_account_id: AccountId::new("test").unwrap(),
+            target_account_id: self.get_eth_connector_contract_account(),
             method: "is_used_proof".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
