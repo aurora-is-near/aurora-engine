@@ -227,6 +227,7 @@ pub struct BeginBlockArgs {
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
     /// Balance can be for Eth on Near and for Eth to Aurora
@@ -287,6 +288,7 @@ pub struct WithdrawResult {
 
 /// Fungible token storage balance
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StorageBalance {
     pub total: Yocto,
     pub available: Yocto,
@@ -363,6 +365,7 @@ pub type SetContractDataCallArgs = InitCallArgs;
 
 /// transfer eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TransferCallCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
@@ -405,6 +408,7 @@ impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
 
 /// storage_deposit eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StorageDepositCallArgs {
     pub account_id: Option<AccountId>,
     pub registration_only: Option<bool>,
@@ -423,6 +427,7 @@ impl From<JsonValue> for StorageDepositCallArgs {
 
 /// storage_withdraw eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StorageWithdrawCallArgs {
     pub amount: Option<Yocto>,
 }

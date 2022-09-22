@@ -1,6 +1,8 @@
 use crate::fmt::Formatter;
 use crate::{Add, Display, Sub};
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
 pub const ZERO_YOCTO: Yocto = Yocto::new(0);
@@ -8,6 +10,7 @@ pub const ZERO_YOCTO: Yocto = Yocto::new(0);
 #[derive(
     Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
 )]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 /// A generic type for 128-bit balances, especially for NEP-141 tokens. This generic type should not be used
 /// to represent NEAR balances (`Yocto` is designed for this purpose) or for eth-connector balances (`NEP141Wei`
 /// is designed for this purpose). The reason we have specific types for NEAR and eth-connector is because of the
@@ -35,6 +38,7 @@ impl Balance {
 #[derive(
     Default, BorshSerialize, BorshDeserialize, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd,
 )]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 /// Near Yocto type which wraps an underlying u128.
 /// 1 NEAR = 10^24 yoctoNEAR
 pub struct Yocto(u128);

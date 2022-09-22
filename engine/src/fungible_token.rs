@@ -11,6 +11,8 @@ use crate::prelude::{
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::types::{NEP141Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// Gas for `resolve_transfer`: 5 TGas
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
@@ -58,6 +60,7 @@ pub struct FungibleTokenOps<I: IO> {
 /// Fungible token Reference hash type.
 /// Used for FungibleTokenMetadata
 #[derive(Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FungibleReferenceHash([u8; 32]);
 
 impl FungibleReferenceHash {
@@ -74,6 +77,7 @@ impl AsRef<[u8]> for FungibleReferenceHash {
 }
 
 #[derive(Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FungibleTokenMetadata {
     pub spec: String,
     pub name: String,

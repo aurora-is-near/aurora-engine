@@ -312,6 +312,8 @@ mod contract {
             .sdk_process();
     }
 
+    /// Necessary for a relayer to call in order to receive ETH gas to
+    /// accommodate for their spent NEAR gas or any other costs.
     #[no_mangle]
     pub extern "C" fn register_relayer() {
         let io = Runtime;
