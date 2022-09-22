@@ -60,6 +60,7 @@ pub enum EthConnectorStorageId {
     PausedMask = 0x3,
     StatisticsAuroraAccountsCounter = 0x4,
     FungibleTokenMetadata = 0x5,
+    EthConnectorAccount = 0x6,
 }
 
 impl From<EthConnectorStorageId> for u8 {
@@ -72,6 +73,7 @@ impl From<EthConnectorStorageId> for u8 {
             PausedMask => 0x3,
             StatisticsAuroraAccountsCounter => 0x4,
             FungibleTokenMetadata => 0x5,
+            EthConnectorAccount => 0x6,
         }
     }
 }

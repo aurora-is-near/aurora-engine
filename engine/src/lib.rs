@@ -77,8 +77,7 @@ mod contract {
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, SetContractDataCallArgs, StorageDepositCallArgs,
-        StorageWithdrawCallArgs, ViewCallArgs,
+        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -500,6 +499,9 @@ mod contract {
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 
+    ///
+    /// ETH-CONNECTOR
+    ///
     #[no_mangle]
     pub extern "C" fn new_eth_connector() {
         let io = Runtime;
@@ -523,7 +525,6 @@ mod contract {
     }
 
     #[no_mangle]
-
     pub extern "C" fn withdraw() {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
@@ -572,26 +573,32 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_total_supply() {
-        let io = Runtime;
-        EthConnectorContract::init_instance(io)
+        let mut io = Runtime;
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_near();
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_near() {
-        let io = Runtime;
-        EthConnectorContract::init_instance(io)
+        let mut io = Runtime;
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_near();
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_aurora() {
-        let io = Runtime;
-        EthConnectorContract::init_instance(io)
+        let mut io = Runtime;
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_aurora();
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
@@ -607,12 +614,13 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
-        let io = Runtime;
-        let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
-        EthConnectorContract::init_instance(io)
+        let mut io = Runtime;
+        let input = io.read_input().to_vec();
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_balance_of_eth_on_aurora(args)
-            .sdk_unwrap();
+            .ft_balance_of_eth_on_aurora(input);
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
@@ -624,8 +632,8 @@ mod contract {
             .sdk_unwrap()
             .ft_transfer(input)
             .sdk_unwrap();
-        let peomise_id = io.promise_create_call(&promise_arg);
-        io.promise_return(peomise_id);
+        let promise_id = io.promise_create_call(&promise_arg);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
@@ -705,7 +713,10 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn set_eth_connector_contract_account() {}
+    pub extern "C" fn set_eth_connector_contract_account() {
+        let io = Runtime;
+        io.assert_private_call().sdk_unwrap();
+    }
 
     #[no_mangle]
     pub extern "C" fn get_paused_flags() {
@@ -718,47 +729,11 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn set_paused_flags() {
-        let io = Runtime;
-        io.assert_private_call().sdk_unwrap();
-
-        let args: PauseEthConnectorCallArgs = io.read_input_borsh().sdk_unwrap();
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .set_paused_flags(args);
-    }
-
-    #[no_mangle]
     pub extern "C" fn get_accounts_counter() {
         let io = Runtime;
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_accounts_counter();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_erc20_from_nep141() {
-        let mut io = Runtime;
-        let args: GetErc20FromNep141CallArgs = io.read_input_borsh().sdk_unwrap();
-
-        io.return_output(
-            engine::get_erc20_from_nep141(&io, &args.nep141)
-                .sdk_unwrap()
-                .as_slice(),
-        );
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_nep141_from_erc20() {
-        let mut io = Runtime;
-        let erc20_address: crate::engine::ERC20Address =
-            io.read_input().to_vec().try_into().sdk_unwrap();
-        io.return_output(
-            engine::nep141_erc20_map(io)
-                .lookup_right(&erc20_address)
-                .sdk_expect("ERC20_NOT_FOUND")
-                .as_ref(),
-        );
     }
 
     #[no_mangle]
@@ -837,6 +812,31 @@ mod contract {
                 base: verify_call,
                 callback: finish_call,
             },
+        );
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_erc20_from_nep141() {
+        let mut io = Runtime;
+        let args: GetErc20FromNep141CallArgs = io.read_input_borsh().sdk_unwrap();
+
+        io.return_output(
+            engine::get_erc20_from_nep141(&io, &args.nep141)
+                .sdk_unwrap()
+                .as_slice(),
+        );
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_nep141_from_erc20() {
+        let mut io = Runtime;
+        let erc20_address: crate::engine::ERC20Address =
+            io.read_input().to_vec().try_into().sdk_unwrap();
+        io.return_output(
+            engine::nep141_erc20_map(io)
+                .lookup_right(&erc20_address)
+                .sdk_expect("ERC20_NOT_FOUND")
+                .as_ref(),
         );
     }
 

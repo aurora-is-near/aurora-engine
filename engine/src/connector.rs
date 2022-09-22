@@ -3,15 +3,14 @@ use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
-    BalanceOfEthCallArgs, InitCallArgs, NEP141FtOnTransferArgs, PauseEthConnectorCallArgs,
-    SetContractDataCallArgs, StorageBalanceOfCallArgs, StorageDepositCallArgs,
-    StorageWithdrawCallArgs, WithdrawResult,
+    InitCallArgs, NEP141FtOnTransferArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs,
+    StorageBalanceOfCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, WithdrawResult,
 };
 use crate::prelude::{
     address::error::AddressError, NEP141Wei, Wei, U256, ZERO_NEP141_WEI, ZERO_WEI,
 };
 use crate::prelude::{
-    format, sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
+    sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, WithdrawCallArgs, Yocto, ERR_FAILED_PARSE,
 };
 use crate::prelude::{PromiseBatchAction, PromiseCreateArgs};
@@ -204,19 +203,25 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
-    pub fn ft_total_eth_supply_on_near(&mut self) {
-        let total_supply = self.ft.ft_total_eth_supply_on_near();
-        sdk::log!(&format!("Total ETH supply on NEAR: {}", total_supply));
-        self.io
-            .return_output(format!("\"{}\"", total_supply).as_bytes());
+    pub fn ft_total_eth_supply_on_near(&mut self) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: AccountId::new("test").unwrap(),
+            method: "ft_total_eth_supply_on_near".to_string(),
+            args: Vec::new(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        }
     }
 
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
-    pub fn ft_total_eth_supply_on_aurora(&mut self) {
-        let total_supply = self.ft.ft_total_eth_supply_on_aurora();
-        sdk::log!(&format!("Total ETH supply on Aurora: {}", total_supply));
-        self.io
-            .return_output(format!("\"{}\"", total_supply).as_bytes());
+    pub fn ft_total_eth_supply_on_aurora(&mut self) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: AccountId::new("test").unwrap(),
+            method: "ft_total_eth_supply_on_aurora".to_string(),
+            args: Vec::new(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        }
     }
 
     /// Return balance of nETH (ETH on Near)
@@ -231,20 +236,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
-    pub fn ft_balance_of_eth_on_aurora(
-        &mut self,
-        args: BalanceOfEthCallArgs,
-    ) -> Result<(), crate::prelude::types::balance::error::BalanceOverflowError> {
-        let balance = self
-            .ft
-            .internal_unwrap_balance_of_eth_on_aurora(&args.address);
-        sdk::log!(&format!(
-            "Balance of ETH [{}]: {}",
-            args.address.encode(),
-            balance
-        ));
-        self.io.return_output(format!("\"{}\"", balance).as_bytes());
-        Ok(())
+    pub fn ft_balance_of_eth_on_aurora(&mut self, input: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: AccountId::new("test").unwrap(),
+            method: "ft_balance_of_eth_on_aurora".to_string(),
+            args: input,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        }
     }
 
     /// Transfer between NEAR accounts
@@ -434,6 +433,17 @@ impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
         self.io.write_borsh(
             &construct_contract_key(&EthConnectorStorageId::PausedMask),
             &self.paused_mask,
+        );
+    }
+
+    fn get_eth_connector_contract_account(&self) -> AccountId {
+        get_contract_data(&self.io, &EthConnectorStorageId::EthConnectorAccount).unwrap()
+    }
+
+    fn set_eth_connector_contract_account(&mut self, account: AccountId) {
+        self.io.write_borsh(
+            &construct_contract_key(&EthConnectorStorageId::EthConnectorAccount),
+            &account,
         );
     }
 }

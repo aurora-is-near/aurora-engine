@@ -1,3 +1,5 @@
+use aurora_engine_types::account_id::AccountId;
+
 pub type PausedMask = u8;
 
 pub const ERR_PAUSED: &str = "ERR_PAUSED";
@@ -24,6 +26,10 @@ pub trait AdminControlled {
             Ok(())
         }
     }
+
+    fn get_eth_connector_contract_account(&self) -> AccountId;
+
+    fn set_eth_connector_contract_account(&mut self, account: AccountId);
 }
 
 pub struct PausedError;
