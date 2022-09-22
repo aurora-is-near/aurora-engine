@@ -238,7 +238,7 @@ mod contract {
     /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
     /// 0-bit means not paused.
     #[no_mangle]
-    pub extern "C" fn paused_precompiles() {
+    pub extern "C" fn get_paused_precompiles() {
         let mut io = Runtime;
         let pauser = EnginePrecompilesPauser::from_io(io);
         let data = pauser.paused().bits().to_le_bytes();

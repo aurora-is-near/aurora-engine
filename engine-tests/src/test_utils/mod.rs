@@ -34,7 +34,7 @@ pub(crate) const SUBMIT: &str = "submit";
 pub(crate) const CALL: &str = "call";
 pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
 pub(crate) const PAUSE_PRECOMPILES: &str = "pause_precompiles";
-pub(crate) const PAUSED_PRECOMPILES: &str = "paused_precompiles";
+pub(crate) const PAUSED_PRECOMPILES: &str = "get_paused_precompiles";
 pub(crate) const RESUME_PRECOMPILES: &str = "resume_precompiles";
 
 pub(crate) mod erc20;
