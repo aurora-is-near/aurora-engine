@@ -264,14 +264,14 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::Withdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.withdraw_eth_from_near(
-                &env.current_account_id,
-                &env.predecessor_account_id,
-                args.clone(),
-            )?;
-
+        TransactionKind::Withdraw(_args) => {
+            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            // connector.withdraw_eth_from_near(
+            //     &env.current_account_id,
+            //     &env.predecessor_account_id,
+            //     args.clone(),
+            // )?;
+            //
             None
         }
 

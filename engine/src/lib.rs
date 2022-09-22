@@ -576,25 +576,13 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn withdraw() {
-        let io = Runtime;
-        io.assert_one_yocto().sdk_unwrap();
-        let args = io.read_input_borsh().sdk_unwrap();
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let result = EthConnectorContract::init_instance(io)
+        let mut io = Runtime;
+        let input = io.read_input().to_vec();
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .withdraw_eth_from_near(&current_account_id, &predecessor_account_id, args)
-            .sdk_unwrap();
-        let result_bytes = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
-        // We intentionally do not go through the `io` struct here because we must bypass
-        // the check that prevents output that is accepted by the eth_custodian
-        #[allow(clippy::as_conversions)]
-        unsafe {
-            exports::value_return(
-                u64::try_from(result_bytes.len()).sdk_expect(errors::ERR_VALUE_CONVERSION),
-                result_bytes.as_ptr() as u64,
-            );
-        }
+            .withdraw_eth_from_near(input);
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
@@ -678,8 +666,7 @@ mod contract {
         let input = io.read_input().to_vec();
         let promise_arg = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_transfer(input)
-            .sdk_unwrap();
+            .ft_transfer(input);
         let promise_id = io.promise_create_call(&promise_arg);
         io.promise_return(promise_id);
     }
@@ -692,8 +679,7 @@ mod contract {
         let input = io.read_input().to_vec();
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_transfer_call(input)
-            .sdk_unwrap();
+            .ft_transfer_call(input);
         let promise_id = io.promise_create_call(&promise_args);
         io.promise_return(promise_id);
     }
@@ -777,11 +763,11 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_paused_flags() {
         let mut io = Runtime;
-        let paused_flags = EthConnectorContract::init_instance(io)
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_paused_flags();
-        let data = paused_flags.try_to_vec().expect(ERR_FAILED_PARSE);
-        io.return_output(&data[..]);
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
@@ -921,12 +907,6 @@ mod contract {
 
     fn predecessor_address(predecessor_account_id: &AccountId) -> Address {
         near_account_to_evm_address(predecessor_account_id.as_bytes())
-    }
-
-    mod exports {
-        extern "C" {
-            pub(crate) fn value_return(value_len: u64, value_ptr: u64);
-        }
     }
 }
 

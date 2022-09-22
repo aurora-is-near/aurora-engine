@@ -4,14 +4,14 @@ use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
     InitCallArgs, NEP141FtOnTransferArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs,
-    StorageBalanceOfCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, WithdrawResult,
+    StorageBalanceOfCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
 };
 use crate::prelude::{
     address::error::AddressError, NEP141Wei, Wei, U256, ZERO_NEP141_WEI, ZERO_WEI,
 };
 use crate::prelude::{
     sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
-    KeyPrefix, NearGas, ToString, Vec, WithdrawCallArgs, Yocto, ERR_FAILED_PARSE,
+    KeyPrefix, NearGas, ToString, Vec, Yocto, ERR_FAILED_PARSE,
 };
 use crate::prelude::{PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
@@ -176,29 +176,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Withdraw nETH from NEAR accounts
     /// NOTE: it should be without any log data
-    pub fn withdraw_eth_from_near(
-        &mut self,
-        current_account_id: &AccountId,
-        predecessor_account_id: &AccountId,
-        args: WithdrawCallArgs,
-    ) -> Result<WithdrawResult, error::WithdrawError> {
-        // Check is current account id is owner
-        let is_owner = current_account_id == predecessor_account_id;
-        // Check is current flow paused. If it's owner just skip asserrion.
-        self.assert_not_paused(PAUSE_WITHDRAW, is_owner)
-            .map_err(|_| error::WithdrawError::Paused)?;
-
-        // Burn tokens to recipient
-        self.ft
-            .internal_withdraw_eth_from_near(predecessor_account_id, args.amount)?;
-        // Save new contract data
-        self.save_ft_contract();
-
-        Ok(WithdrawResult {
-            recipient_id: args.recipient_address,
-            amount: args.amount,
-            eth_custodian_address: self.contract.eth_custodian_address,
-        })
+    pub fn withdraw_eth_from_near(&self, data: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: self.get_eth_connector_contract_account(),
+            method: "withdraw".to_string(),
+            args: data,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+        }
     }
 
     /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
@@ -246,34 +231,28 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Transfer between NEAR accounts
-    pub fn ft_transfer(
-        &mut self,
-        data: Vec<u8>,
-    ) -> Result<PromiseCreateArgs, fungible_token::error::TransferError> {
-        Ok(PromiseCreateArgs {
+    pub fn ft_transfer(&self, data: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "ft_transfer".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: DEFAULT_PREPAID_GAS,
-        })
+        }
     }
 
     /// FT transfer call from sender account (invoker account) to receiver
     /// We starting early checking for message data to avoid `ft_on_transfer` call panics
     /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
     /// We allow empty messages for cases when `receiver_id =! current_account_id`
-    pub fn ft_transfer_call(
-        &mut self,
-        data: Vec<u8>,
-    ) -> Result<PromiseCreateArgs, error::FtTransferCallError> {
-        Ok(PromiseCreateArgs {
+    pub fn ft_transfer_call(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "ft_transfer_call".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: DEFAULT_PREPAID_GAS,
-        })
+        }
     }
 
     /// FT storage deposit logic
@@ -416,8 +395,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Get Eth connector paused flags
-    pub fn get_paused_flags(&self) -> PausedMask {
-        self.get_paused()
+    pub fn get_paused_flags(&self) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: self.get_eth_connector_contract_account(),
+            method: "get_paused_flags".to_string(),
+            args: Vec::new(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        }
     }
 
     /// Set Eth connector paused flags
