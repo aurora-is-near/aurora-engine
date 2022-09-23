@@ -4,10 +4,7 @@ use aurora_engine::pausables::{
 use aurora_engine::{connector, engine, parameters::SubmitResult, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::{
-    account_id::AccountId,
-    parameters::PromiseWithCallbackArgs,
-    types::{Address, Yocto},
-    H256,
+    account_id::AccountId, parameters::PromiseWithCallbackArgs, types::Address, H256,
 };
 
 pub mod types;
@@ -300,27 +297,27 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::StorageDeposit(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _ = connector.storage_deposit(
-                env.predecessor_account_id,
-                Yocto::new(env.attached_deposit),
-                args.clone(),
-            )?;
+        TransactionKind::StorageDeposit(_args) => {
+            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            // let _ = connector.storage_deposit(
+            //     env.predecessor_account_id,
+            //     Yocto::new(env.attached_deposit),
+            //     args.clone(),
+            // )?;
 
             None
         }
 
-        TransactionKind::StorageUnregister(force) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
+        TransactionKind::StorageUnregister(_force) => {
+            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            // let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
 
             None
         }
 
-        TransactionKind::StorageWithdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
+        TransactionKind::StorageWithdraw(_args) => {
+            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            // connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
 
             None
         }

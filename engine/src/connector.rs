@@ -4,8 +4,8 @@ use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
     InitCallArgs, NEP141FtOnTransferArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs,
-    StorageBalanceOfCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
 };
+use crate::prelude::PromiseCreateArgs;
 use crate::prelude::{
     address::error::AddressError, NEP141Wei, Wei, U256, ZERO_NEP141_WEI, ZERO_WEI,
 };
@@ -13,7 +13,6 @@ use crate::prelude::{
     sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, Yocto, ERR_FAILED_PARSE,
 };
-use crate::prelude::{PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
@@ -256,62 +255,47 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// FT storage deposit logic
-    pub fn storage_deposit(
-        &mut self,
-        predecessor_account_id: AccountId,
-        amount: Yocto,
-        args: StorageDepositCallArgs,
-    ) -> Result<Option<PromiseBatchAction>, fungible_token::error::StorageFundingError> {
-        let account_id = args
-            .account_id
-            .unwrap_or_else(|| predecessor_account_id.clone());
-        let (res, maybe_promise) = self.ft.storage_deposit(
-            predecessor_account_id,
-            &account_id,
-            amount,
-            args.registration_only,
-        )?;
-        self.save_ft_contract();
-        self.io.return_output(&res.to_json_bytes());
-        Ok(maybe_promise)
+    pub fn storage_deposit(&self, data: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: self.get_eth_connector_contract_account(),
+            method: "storage_deposit".to_string(),
+            args: data,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        }
     }
 
     /// FT storage unregister
-    pub fn storage_unregister(
-        &mut self,
-        account_id: AccountId,
-        force: Option<bool>,
-    ) -> Result<Option<PromiseBatchAction>, fungible_token::error::StorageFundingError> {
-        let promise = match self.ft.internal_storage_unregister(account_id, force) {
-            Ok((_, p)) => {
-                self.io.return_output(b"true");
-                Some(p)
-            }
-            Err(fungible_token::error::StorageFundingError::NotRegistered) => {
-                self.io.return_output(b"false");
-                None
-            }
-            Err(other) => return Err(other),
-        };
-        Ok(promise)
+    pub fn storage_unregister(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: self.get_eth_connector_contract_account(),
+            method: "storage_unregister".to_string(),
+            args: data,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        }
     }
 
     /// FT storage withdraw
-    pub fn storage_withdraw(
-        &mut self,
-        account_id: &AccountId,
-        args: StorageWithdrawCallArgs,
-    ) -> Result<(), fungible_token::error::StorageFundingError> {
-        let res = self.ft.storage_withdraw(account_id, args.amount)?;
-        self.save_ft_contract();
-        self.io.return_output(&res.to_json_bytes());
-        Ok(())
+    pub fn storage_withdraw(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: self.get_eth_connector_contract_account(),
+            method: "storage_withdraw".to_string(),
+            args: data,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        }
     }
 
     /// Get balance of storage
-    pub fn storage_balance_of(&mut self, args: StorageBalanceOfCallArgs) {
-        self.io
-            .return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
+    pub fn storage_balance_of(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: self.get_eth_connector_contract_account(),
+            method: "storage_balance_of".to_string(),
+            args: data,
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: DEFAULT_PREPAID_GAS,
+        }
     }
 
     /// ft_on_transfer callback function

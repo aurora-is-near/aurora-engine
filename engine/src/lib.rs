@@ -75,14 +75,13 @@ mod contract {
     use crate::engine::{self, Engine, EngineState};
     use crate::fungible_token::FungibleTokenMetadata;
     use crate::json::parse_json;
-    use crate::parameters::{
-        self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PausePrecompilesCallArgs,
-        SetContractDataCallArgs, SetEthConnectorContractAccountArgs, StorageDepositCallArgs,
-        StorageWithdrawCallArgs, ViewCallArgs,
-    };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
+    use crate::parameters::{
+        CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs,
+        NEP141FtOnTransferArgs, NewCallArgs, PausePrecompilesCallArgs, SetContractDataCallArgs,
+        SetEthConnectorContractAccountArgs, ViewCallArgs,
+    };
     use crate::pausables::{
         Authorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PausedPrecompilesManager,
         PrecompileFlags,
@@ -94,7 +93,7 @@ mod contract {
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{
-        sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
+        sdk, u256_to_arr, Address, PromiseResult, ToString, ERR_FAILED_PARSE, H256,
     };
     use crate::{errors, pausables};
     use aurora_engine_sdk::env::Env;
@@ -687,56 +686,47 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
         let mut io = Runtime;
-        let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
-        let predecessor_account_id = io.predecessor_account_id();
-        let amount = Yocto::new(io.attached_deposit());
-        let maybe_promise = EthConnectorContract::init_instance(io)
+        let input = io.read_input().to_vec();
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .storage_deposit(predecessor_account_id, amount, args)
-            .sdk_unwrap();
-        if let Some(promise) = maybe_promise {
-            io.promise_create_batch(&promise);
-        }
+            .storage_deposit(input);
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn storage_unregister() {
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
-        let force = parse_json(&io.read_input().to_vec()).and_then(|args| args.bool("force").ok());
-        let maybe_promise = EthConnectorContract::init_instance(io)
+        let input = io.read_input().to_vec();
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .storage_unregister(predecessor_account_id, force)
-            .sdk_unwrap();
-        if let Some(promise) = maybe_promise {
-            io.promise_create_batch(&promise);
-        }
+            .storage_unregister(input);
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn storage_withdraw() {
-        let io = Runtime;
+        let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let args =
-            StorageWithdrawCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
-        let predecessor_account_id = io.predecessor_account_id();
-        EthConnectorContract::init_instance(io)
+        let input = io.read_input().to_vec();
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .storage_withdraw(&predecessor_account_id, args)
-            .sdk_unwrap()
+            .storage_withdraw(input);
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn storage_balance_of() {
-        let io = Runtime;
-        let args = parameters::StorageBalanceOfCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).sdk_unwrap(),
-        )
-        .sdk_unwrap();
-        EthConnectorContract::init_instance(io)
+        let mut io = Runtime;
+        let input = io.read_input().to_vec();
+        let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .storage_balance_of(args)
+            .storage_balance_of(input);
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     #[no_mangle]
