@@ -108,7 +108,7 @@ pub enum TransactionKind {
     /// FT storage standard method
     StorageWithdraw(parameters::StorageWithdrawCallArgs),
     /// Admin only method
-    SetPausedFlags(parameters::PauseEthConnectorCallArgs),
+    SetPausedFlags(Vec<u8>),
     /// Ad entry mapping from address to relayer NEAR account
     RegisterRelayer(types::Address),
     /// Called if exist precompiles fail
@@ -492,7 +492,7 @@ enum BorshableTransactionKind<'a> {
     StorageDeposit(Cow<'a, parameters::StorageDepositCallArgs>),
     StorageUnregister(Option<bool>),
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
-    SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
+    SetPausedFlags(Cow<'a, Vec<u8>>),
     RegisterRelayer(Cow<'a, types::Address>),
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),

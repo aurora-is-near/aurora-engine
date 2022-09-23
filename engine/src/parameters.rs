@@ -1,4 +1,3 @@
-use crate::admin_controlled::PausedMask;
 use crate::errors;
 use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue};
@@ -487,12 +486,6 @@ pub struct RegisterRelayerCallArgs {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct SetEthConnectorContractAccountArgs {
     pub account: AccountId,
-}
-
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct PauseEthConnectorCallArgs {
-    pub paused_mask: PausedMask,
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]

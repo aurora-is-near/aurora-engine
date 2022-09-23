@@ -1,14 +1,10 @@
-use crate::admin_controlled::{AdminControlled, PausedMask};
+use crate::admin_controlled::AdminControlled;
 use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
-use crate::parameters::{
-    InitCallArgs, NEP141FtOnTransferArgs, PauseEthConnectorCallArgs, SetContractDataCallArgs,
-};
+use crate::parameters::{InitCallArgs, NEP141FtOnTransferArgs, SetContractDataCallArgs};
 use crate::prelude::PromiseCreateArgs;
-use crate::prelude::{
-    address::error::AddressError, NEP141Wei, Wei, U256, ZERO_NEP141_WEI, ZERO_WEI,
-};
+use crate::prelude::{address::error::AddressError, Wei, U256, ZERO_WEI};
 use crate::prelude::{
     sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, Yocto, ERR_FAILED_PARSE,
@@ -23,14 +19,6 @@ pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
 pub const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 /// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
 // Note: Is 40Tgas always enough?
-const GAS_FOR_VERIFY_LOG_ENTRY: NearGas = NearGas::new(40_000_000_000_000);
-
-/// Admin control flow flag indicates that all control flow unpause (unblocked).
-pub const UNPAUSE_ALL: PausedMask = 0;
-/// Admin control flow flag indicates that the deposit is paused.
-pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
-/// Admin control flow flag indicates that withdrawal is paused.
-pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 
 /// Eth-connector contract data. It's stored in the storage.
 /// Contains:
@@ -39,9 +27,7 @@ pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 /// * paused_mask - admin control flow data
 /// * io - I/O trait handler
 pub struct EthConnectorContract<I: IO> {
-    contract: EthConnector,
     ft: FungibleTokenOps<I>,
-    paused_mask: PausedMask,
     io: I,
 }
 
@@ -60,10 +46,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Used as single point of contract access for various contract actions
     pub fn init_instance(io: I) -> Result<Self, error::StorageReadError> {
         Ok(Self {
-            contract: get_contract_data(&io, &EthConnectorStorageId::Contract)?,
             ft: get_contract_data::<FungibleToken, I>(&io, &EthConnectorStorageId::FungibleToken)?
                 .ops(io),
-            paused_mask: get_contract_data(&io, &EthConnectorStorageId::PausedMask)?,
             io,
         })
     }
@@ -72,9 +56,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Used only once for first time initialization.
     /// Initialized contract data stored in the storage.
     pub fn create_contract(
-        mut io: I,
+        io: I,
         owner_id: AccountId,
-        args: InitCallArgs,
+        _args: InitCallArgs,
     ) -> Result<(), error::InitContractError> {
         // Check is it already initialized
         let contract_key_exists =
@@ -85,33 +69,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         sdk::log!("[init contract]");
 
-        let contract_data = set_contract_data(
-            &mut io,
-            SetContractDataCallArgs {
-                prover_account: args.prover_account,
-                eth_custodian_address: args.eth_custodian_address,
-                metadata: args.metadata,
-            },
-        )
-        .map_err(error::InitContractError::InvalidCustodianAddress)?;
-
         let mut ft = FungibleTokenOps::new(io);
         // Register FT account for current contract
         ft.internal_register_account(&owner_id);
 
-        let paused_mask = UNPAUSE_ALL;
-        io.write_borsh(
-            &construct_contract_key(&EthConnectorStorageId::PausedMask),
-            &paused_mask,
-        );
-
-        Self {
-            contract: contract_data,
-            ft,
-            paused_mask,
-            io,
-        }
-        .save_ft_contract();
+        Self { ft, io }.save_ft_contract();
 
         Ok(())
     }
@@ -135,20 +97,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         self.burn_eth_on_aurora(amount)?;
         self.save_ft_contract();
         Ok(())
-    }
-
-    ///  Mint nETH tokens
-    fn mint_eth_on_near(
-        &mut self,
-        owner_id: AccountId,
-        amount: NEP141Wei,
-    ) -> Result<(), fungible_token::error::DepositError> {
-        sdk::log!(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
-
-        if self.ft.get_account_eth_balance(&owner_id).is_none() {
-            self.ft.accounts_insert(&owner_id, ZERO_NEP141_WEI);
-        }
-        self.ft.internal_deposit_eth_to_near(&owner_id, amount)
     }
 
     ///  Mint ETH tokens
@@ -343,8 +291,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    pub fn get_bridge_prover(&self) -> &AccountId {
-        &self.contract.prover_account
+    pub fn get_bridge_prover(&self) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: self.get_eth_connector_contract_account(),
+            method: "get_bridge_prover".to_string(),
+            args: Vec::new(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+        }
     }
 
     /// Save eth-connector fungible token contract data
@@ -353,18 +307,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             &construct_contract_key(&EthConnectorStorageId::FungibleToken),
             &self.ft.data(),
         );
-    }
-
-    /// Generate key for used events from Proof
-    fn used_event_key(&self, key: &str) -> Vec<u8> {
-        let mut v = construct_contract_key(&EthConnectorStorageId::UsedEvent).to_vec();
-        v.extend_from_slice(key.as_bytes());
-        v
-    }
-
-    /// Save already used event proof as hash key
-    fn save_used_event(&mut self, key: &str) {
-        self.io.write_borsh(&self.used_event_key(key), &0u8);
     }
 
     /// Checks whether the provided proof was already used
@@ -388,28 +330,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             attached_gas: DEFAULT_PREPAID_GAS,
         }
     }
-
-    /// Set Eth connector paused flags
-    pub fn set_paused_flags(&mut self, args: PauseEthConnectorCallArgs) {
-        self.set_paused(args.paused_mask);
-    }
 }
 
 impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
-    /// Get current admin paused status
-    fn get_paused(&self) -> PausedMask {
-        self.paused_mask
-    }
-
-    /// Set admin paused status
-    fn set_paused(&mut self, paused_mask: PausedMask) {
-        self.paused_mask = paused_mask;
-        self.io.write_borsh(
-            &construct_contract_key(&EthConnectorStorageId::PausedMask),
-            &self.paused_mask,
-        );
-    }
-
     fn get_eth_connector_contract_account(&self) -> AccountId {
         get_contract_data(&self.io, &EthConnectorStorageId::EthConnectorAccount).unwrap()
     }
@@ -497,7 +420,6 @@ pub mod error {
 
     #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum DepositError {
-        Paused,
         ProofParseFailed,
         EventParseFailed(deposit_event::error::ParseError),
         CustodianAddressMismatch,
@@ -508,7 +430,6 @@ pub mod error {
     impl AsRef<[u8]> for DepositError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::Paused => crate::admin_controlled::ERR_PAUSED.as_bytes(),
                 Self::ProofParseFailed => super::ERR_FAILED_PARSE.as_bytes(),
                 Self::EventParseFailed(e) => e.as_ref(),
                 Self::CustodianAddressMismatch => errors::ERR_WRONG_EVENT_ADDRESS,
@@ -553,7 +474,6 @@ pub mod error {
 
     #[derive(Debug)]
     pub enum WithdrawError {
-        Paused,
         FT(fungible_token::error::WithdrawError),
     }
 
@@ -566,7 +486,6 @@ pub mod error {
     impl AsRef<[u8]> for WithdrawError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::Paused => crate::admin_controlled::ERR_PAUSED.as_bytes(),
                 Self::FT(e) => e.as_ref(),
             }
         }

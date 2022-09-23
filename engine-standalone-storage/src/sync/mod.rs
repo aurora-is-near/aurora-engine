@@ -210,24 +210,24 @@ fn non_submit_execute<'db>(
             Some(TransactionExecutionResult::DeployErc20(result))
         }
 
-        TransactionKind::FtOnTransfer(args) => {
+        TransactionKind::FtOnTransfer(_args) => {
             // No promises can be created by `ft_on_transfer`
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
-
-            if env.predecessor_account_id == env.current_account_id {
-                connector::EthConnectorContract::init_instance(io)?
-                    .ft_on_transfer(&engine, args)?;
-            } else {
-                engine.receive_erc20_tokens(
-                    &env.predecessor_account_id,
-                    &env.signer_account_id,
-                    args,
-                    &env.current_account_id,
-                    &mut handler,
-                );
-            }
+            // let mut handler = crate::promise::NoScheduler { promise_data };
+            // let mut engine =
+            //     engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
+            //
+            // if env.predecessor_account_id == env.current_account_id {
+            //     connector::EthConnectorContract::init_instance(io)?
+            //         .ft_on_transfer(&engine, args)?;
+            // } else {
+            //     engine.receive_erc20_tokens(
+            //         &env.predecessor_account_id,
+            //         &env.signer_account_id,
+            //         args,
+            //         &env.current_account_id,
+            //         &mut handler,
+            //     );
+            // }
 
             None
         }
@@ -322,9 +322,9 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::SetPausedFlags(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.set_paused_flags(args.clone());
+        TransactionKind::SetPausedFlags(_args) => {
+            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            // connector.set_paused_flags(args.clone());
 
             None
         }
@@ -360,12 +360,12 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::NewConnector(args) => {
-            connector::EthConnectorContract::create_contract(
-                io,
-                env.current_account_id,
-                args.clone(),
-            )?;
+        TransactionKind::NewConnector(_args) => {
+            // connector::EthConnectorContract::create_contract(
+            //     io,
+            //     env.current_account_id,
+            //     args.clone(),
+            // )?;
 
             None
         }

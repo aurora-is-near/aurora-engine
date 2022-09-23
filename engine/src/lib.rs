@@ -147,8 +147,11 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
         let mut io = Runtime;
-        let connector = EthConnectorContract::init_instance(io).sdk_unwrap();
-        io.return_output(connector.get_bridge_prover().as_bytes());
+        let promise_args = EthConnectorContract::init_instance(io)
+            .sdk_unwrap()
+            .get_bridge_prover();
+        let promise_id = io.promise_create_call(&promise_args);
+        io.promise_return(promise_id);
     }
 
     /// Get chain id for this contract.
@@ -363,46 +366,6 @@ mod contract {
         require_owner_only(&state, &io.predecessor_account_id());
         let address = io.read_input_arr20().sdk_unwrap();
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
-    }
-
-    /// Allow receiving NEP141 tokens to the EVM contract.
-    ///
-    /// This function returns the amount of tokens to return to the sender.
-    /// Either all tokens are transferred tokens are returned in case of an
-    /// error, or no token is returned if tx was successful.
-    #[no_mangle]
-    pub extern "C" fn ft_on_transfer() {
-        let io = Runtime;
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let mut engine = Engine::new(
-            predecessor_address(&predecessor_account_id),
-            current_account_id.clone(),
-            io,
-            &io,
-        )
-        .sdk_unwrap();
-
-        let args: NEP141FtOnTransferArgs = parse_json(io.read_input().to_vec().as_slice())
-            .sdk_unwrap()
-            .try_into()
-            .sdk_unwrap();
-
-        if predecessor_account_id == current_account_id {
-            EthConnectorContract::init_instance(io)
-                .sdk_unwrap()
-                .ft_on_transfer(&engine, &args)
-                .sdk_unwrap();
-        } else {
-            let signer_account_id = io.signer_account_id();
-            engine.receive_erc20_tokens(
-                &predecessor_account_id,
-                &signer_account_id,
-                &args,
-                &current_account_id,
-                &mut Runtime,
-            );
-        }
     }
 
     /// Deploy ERC20 token mapped to a NEP141
@@ -681,6 +644,46 @@ mod contract {
             .ft_transfer_call(input);
         let promise_id = io.promise_create_call(&promise_args);
         io.promise_return(promise_id);
+    }
+
+    /// Allow receiving NEP141 tokens to the EVM contract.
+    ///
+    /// This function returns the amount of tokens to return to the sender.
+    /// Either all tokens are transferred tokens are returned in case of an
+    /// error, or no token is returned if tx was successful.
+    #[no_mangle]
+    pub extern "C" fn ft_on_transfer() {
+        let io = Runtime;
+        let current_account_id = io.current_account_id();
+        let predecessor_account_id = io.predecessor_account_id();
+        let mut engine = Engine::new(
+            predecessor_address(&predecessor_account_id),
+            current_account_id.clone(),
+            io,
+            &io,
+        )
+        .sdk_unwrap();
+
+        let args: NEP141FtOnTransferArgs = parse_json(io.read_input().to_vec().as_slice())
+            .sdk_unwrap()
+            .try_into()
+            .sdk_unwrap();
+
+        if predecessor_account_id == current_account_id {
+            EthConnectorContract::init_instance(io)
+                .sdk_unwrap()
+                .ft_on_transfer(&engine, &args)
+                .sdk_unwrap();
+        } else {
+            let signer_account_id = io.signer_account_id();
+            engine.receive_erc20_tokens(
+                &predecessor_account_id,
+                &signer_account_id,
+                &args,
+                &current_account_id,
+                &mut Runtime,
+            );
+        }
     }
 
     #[no_mangle]
