@@ -455,9 +455,100 @@ const fn make_h256(x: u128, y: u128) -> prelude::H256 {
 #[cfg(test)]
 mod tests {
     use crate::prelude::H160;
-    use crate::{prelude, Byzantium, Istanbul};
+    use crate::{
+        prelude, AllPrecompiles, Byzantium, Context, EvmPrecompileResult, ExitError, Istanbul,
+        Precompile, PrecompileOutput, Precompiles,
+    };
+    use aurora_engine_sdk::env::Fixed;
+    use aurora_engine_sdk::promise::Noop;
+    use aurora_engine_test_doubles::io::StoragePointer;
+    use aurora_engine_types::types::EthGas;
+    use evm::executor::stack::{PrecompileFailure, PrecompileHandle, PrecompileSet};
+    use evm::{ExitFatal, ExitReason, Transfer};
     use prelude::types::Address;
     use rand::Rng;
+
+    struct MockPrecompile;
+
+    impl Precompile for MockPrecompile {
+        fn required_gas(input: &[u8]) -> Result<EthGas, ExitError>
+        where
+            Self: Sized,
+        {
+            Ok(EthGas::new(0))
+        }
+
+        fn run(
+            &self,
+            input: &[u8],
+            target_gas: Option<EthGas>,
+            context: &Context,
+            is_static: bool,
+        ) -> EvmPrecompileResult {
+            Ok(PrecompileOutput::default())
+        }
+    }
+
+    struct MockPrecompileHandle {
+        code_address: H160,
+    }
+
+    impl MockPrecompileHandle {
+        pub fn new(code_address: H160) -> Self {
+            Self { code_address }
+        }
+    }
+
+    impl PrecompileHandle for MockPrecompileHandle {
+        fn call(
+            &mut self,
+            to: H160,
+            transfer: Option<Transfer>,
+            input: Vec<u8>,
+            gas_limit: Option<u64>,
+            is_static: bool,
+            context: &Context,
+        ) -> (ExitReason, Vec<u8>) {
+            unimplemented!()
+        }
+
+        fn record_cost(&mut self, cost: u64) -> Result<(), ExitError> {
+            unimplemented!()
+        }
+
+        fn remaining_gas(&self) -> u64 {
+            unimplemented!()
+        }
+
+        fn log(
+            &mut self,
+            address: H160,
+            topics: Vec<aurora_engine_types::H256>,
+            data: Vec<u8>,
+        ) -> Result<(), ExitError> {
+            unimplemented!()
+        }
+
+        fn code_address(&self) -> H160 {
+            self.code_address
+        }
+
+        fn input(&self) -> &[u8] {
+            unimplemented!()
+        }
+
+        fn context(&self) -> &Context {
+            unimplemented!()
+        }
+
+        fn is_static(&self) -> bool {
+            unimplemented!()
+        }
+
+        fn gas_limit(&self) -> Option<u64> {
+            unimplemented!()
+        }
+    }
 
     #[test]
     fn test_precompile_addresses() {
@@ -484,6 +575,37 @@ mod tests {
             let (x, y) = split_address(address);
             assert_eq!(address, super::make_address(x, y))
         }
+    }
+
+    #[test]
+    fn test_paused_precompiles_throws_error() {
+        let precompile_address = Address::default();
+        let precompile: AllPrecompiles<StoragePointer, Fixed, Noop> =
+            AllPrecompiles::Generic(Box::new(MockPrecompile));
+
+        let precompiles: Precompiles<StoragePointer, Fixed, Noop> = Precompiles {
+            all_precompiles: {
+                let mut map = prelude::BTreeMap::new();
+                map.insert(precompile_address, precompile);
+                map
+            },
+            paused_precompiles: {
+                let mut set = prelude::BTreeSet::new();
+                set.insert(precompile_address);
+                set
+            },
+        };
+        let mut precompile_handle = MockPrecompileHandle::new(precompile_address.raw());
+
+        let result = precompiles
+            .execute(&mut precompile_handle)
+            .expect("result must contain error but is empty");
+        let actual_failure = result.expect_err("result must contain failure but is successful");
+        let expected_failure = PrecompileFailure::Fatal {
+            exit_status: ExitFatal::Other(prelude::Cow::Borrowed("ERR_PAUSED")),
+        };
+
+        assert_eq!(expected_failure, actual_failure);
     }
 
     fn u8_to_address(x: u8) -> Address {

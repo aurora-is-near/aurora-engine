@@ -352,7 +352,19 @@ impl AsRef<[u8]> for EngineStateError {
     }
 }
 
-struct StackExecutorParams<'a, I, E, H> {
+// trait StackExecutorFactory<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> {
+//     fn make_executor<'a>(
+//         &'a self,
+//         engine: &'a Engine<'env, I, E>,
+//     ) -> executor::stack::StackExecutor<
+//         'static,
+//         'a,
+//         executor::stack::MemoryStackState<Engine<'env, I, E>>,
+//         Precompiles<'env, I, E, H>,
+//     >;
+// }
+
+pub struct StackExecutorParams<'a, I, E, H> {
     precompiles: Precompiles<'a, I, E, H>,
     gas_limit: u64,
 }
@@ -636,7 +648,19 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let origin = &args.sender;
         let contract = &args.address;
         let value = U256::from_big_endian(&args.amount);
-        self.view(origin, contract, Wei::new(value), args.input, u64::MAX)
+        // View calls cannot interact with promises
+        let mut handler = aurora_engine_sdk::promise::Noop;
+        let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
+        let precompiles = self.create_precompiles(pause_flags, &mut handler);
+
+        let executor_params = StackExecutorParams::new(u64::MAX, precompiles);
+        self.view(
+            origin,
+            contract,
+            Wei::new(value),
+            args.input,
+            &executor_params,
+        )
     }
 
     pub fn view(
@@ -645,21 +669,15 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         contract: &Address,
         value: Wei,
         input: Vec<u8>,
-        gas_limit: u64,
+        executor_params: &StackExecutorParams<I, E, aurora_engine_sdk::promise::Noop>,
     ) -> Result<TransactionStatus, EngineErrorKind> {
-        // View calls cannot interact with promises
-        let mut handler = aurora_engine_sdk::promise::Noop;
-        let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-        let precompiles = self.create_precompiles(pause_flags, &mut handler);
-
-        let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
         let (status, result) = executor.transact_call(
             origin.raw(),
             contract.raw(),
             value.raw(),
             input,
-            gas_limit,
+            executor_params.gas_limit,
             Vec::new(),
         );
         status.into_result(result)
@@ -1782,4 +1800,87 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use aurora_engine_precompiles::make_address;
+    use aurora_engine_sdk::env::Fixed;
+    use aurora_engine_sdk::promise::Noop;
+    use aurora_engine_test_doubles::io::{Storage, StoragePointer};
+    use sha3::{Digest, Keccak256};
+    use std::sync::RwLock;
+
+    #[test]
+    fn test_view_call_to_nothing_successfully_returns_nothing() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        set_balance(&mut io, &origin, &Wei::new_u64(22000));
+        let engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id,
+            io,
+            &env,
+        );
+
+        let contract = make_address(1, 1);
+        let value = Wei::new_u64(1000);
+        let input = vec![];
+        let gas_limit = u64::MAX;
+        let executor_params = StackExecutorParams::new(
+            gas_limit,
+            Precompiles {
+                all_precompiles: Default::default(),
+                paused_precompiles: Default::default(),
+            },
+        );
+
+        let expected_status = TransactionStatus::Succeed(Vec::new());
+        let actual_status = engine
+            .view(&origin, &contract, value, input, &executor_params)
+            .unwrap();
+
+        assert_eq!(expected_status, actual_status);
+    }
+
+    #[test]
+    fn test_deploying_empty_code_succeeds() {
+        fn create_legacy_address(address: H160, nonce: U256) -> H160 {
+            let mut stream = rlp::RlpStream::new_list(2);
+            stream.append(&address);
+            stream.append(&nonce);
+            H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into()
+        }
+
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let io = StoragePointer(&storage);
+        let mut engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id,
+            io,
+            &env,
+        );
+
+        let input = vec![];
+        let mut handler = Noop;
+
+        let actual_result = engine.deploy_code_with_input(input, &mut handler).unwrap();
+
+        let nonce = U256::zero();
+        let expected_address = create_legacy_address(origin.raw(), nonce).0.to_vec();
+        let expected_status = TransactionStatus::Succeed(expected_address);
+        let expected_gas_used = 53000;
+        let expected_logs = Vec::new();
+        let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
+
+        assert_eq!(expected_result, actual_result);
+    }
+}
