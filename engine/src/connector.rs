@@ -105,11 +105,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         owner_id: Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
-        sdk::log!(&format!(
-            "Mint {} ETH tokens for: {}",
-            amount,
-            owner_id.encode()
-        ));
         self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
     }
 
@@ -403,7 +398,7 @@ pub mod error {
 
     const PROOF_EXIST: &[u8; 15] = errors::ERR_PROOF_EXIST;
 
-    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+    #[derive(Debug)]
     pub enum StorageReadError {
         KeyNotFound,
         BorshDeserialize,
