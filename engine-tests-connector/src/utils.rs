@@ -170,6 +170,7 @@ impl TestContract {
     pub async fn call_deposit_eth_to_near(&self) -> anyhow::Result<()> {
         let proof: Proof = self.get_proof(PROOF_DATA_NEAR);
         let res = self.deposit_with_proof(&proof).await?;
+        println!("{:#?}", res);
         assert!(res.is_success());
         Ok(())
     }
@@ -356,11 +357,11 @@ pub fn get_contract_and_compile() -> Vec<u8> {
 
     let output = Command::new("cargo")
         .current_dir(contract_path.clone())
-        .args(&["make", "--profile", "mainnet", "build"])
+        .args(&["make", "--profile", "mainnet", "build-test"])
         .output()
         .unwrap();
     if !output.status.success() {
         panic!("{}", String::from_utf8(output.stderr).unwrap());
     }
-    std::fs::read(contract_path.join("bin/aurora-eth-connector-mainnet.wasm")).unwrap()
+    std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
 }
