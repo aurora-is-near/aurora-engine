@@ -254,8 +254,11 @@ impl TestContract {
             .engine_contract
             .call("is_used_proof")
             .args_borsh(proof)
-            .view()
+            .gas(DEFAULT_GAS)
+            .transact()
             .await?
+            .into_result()
+            .unwrap()
             .borsh::<bool>()
             .unwrap();
         Ok(res)
@@ -265,8 +268,11 @@ impl TestContract {
         let res = self
             .engine_contract
             .call("ft_total_eth_supply_on_near")
-            .view()
+            .gas(DEFAULT_GAS)
+            .transact()
             .await?
+            .into_result()
+            .unwrap()
             .json::<U128>()
             .unwrap();
         Ok(res)
@@ -282,8 +288,11 @@ impl TestContract {
             .engine_contract
             .call("ft_balance_of")
             .args_json((account,))
-            .view()
+            .gas(DEFAULT_GAS)
+            .transact()
             .await?
+            .into_result()
+            .unwrap()
             .json::<U128>()
             .unwrap();
         Ok(res)
@@ -303,8 +312,11 @@ impl TestContract {
             .engine_contract
             .call("ft_balance_of_eth")
             .args_json((address,))
-            .view()
+            .gas(DEFAULT_GAS)
+            .transact()
             .await?
+            .into_result()
+            .unwrap()
             .json::<String>()?;
         Ok(res.parse().unwrap())
     }
@@ -316,13 +328,15 @@ impl TestContract {
 
     pub async fn total_supply(&self) -> anyhow::Result<U128> {
         let res = self
-            .eth_connector_contract
+            .engine_contract
             .call("ft_total_supply")
-            .view()
+            .gas(DEFAULT_GAS)
+            .transact()
             .await?
+            .into_result()
+            .unwrap()
             .json::<U128>()
             .unwrap();
-
         Ok(res)
     }
 
@@ -333,10 +347,13 @@ impl TestContract {
 
     pub async fn total_eth_supply_on_aurora(&self) -> anyhow::Result<u128> {
         let res = self
-            .eth_connector_contract
+            .engine_contract
             .call("ft_total_eth_supply_on_aurora")
-            .view()
+            .gas(DEFAULT_GAS)
+            .transact()
             .await?
+            .into_result()
+            .unwrap()
             .json::<String>()?;
         Ok(res.parse().unwrap())
     }

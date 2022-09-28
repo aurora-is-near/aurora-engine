@@ -87,5 +87,20 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
 async fn test_ft_transfer() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
     contract.call_deposit_eth_to_near().await?;
+
+    contract
+        .assert_eth_on_near_balance(
+            &contract.eth_connector_contract.id(),
+            DEPOSITED_AMOUNT - DEPOSITED_FEE,
+        )
+        .await?;
+
+    contract
+        .assert_total_eth_supply_on_near(DEPOSITED_AMOUNT)
+        .await?;
+    contract.assert_total_eth_supply_on_aurora(0).await?;
+    contract.assert_total_supply(DEPOSITED_AMOUNT).await?;
+
+    //println!("{:?}", contract.total_supply().await?.0);
     Ok(())
 }

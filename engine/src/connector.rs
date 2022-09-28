@@ -18,6 +18,9 @@ pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
 /// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
 pub const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 pub const GAS_FOR_DEPOSIT: NearGas = NearGas::new(120_000_000_000_000);
+pub const GAS_FOR_FT_TRANSFER: NearGas = NearGas::new(50_000_000_000_000);
+pub const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(100_000_000_000_000);
+pub const VIEW_CALL_GAS: NearGas = NearGas::new(15_000_000_000_000);
 /// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
 // Note: Is 40Tgas always enough?
 
@@ -135,7 +138,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "ft_total_eth_supply_on_near".to_string(),
             args: Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: DEFAULT_PREPAID_GAS,
+            attached_gas: VIEW_CALL_GAS,
         }
     }
 
@@ -146,7 +149,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "ft_total_eth_supply_on_aurora".to_string(),
             args: Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: DEFAULT_PREPAID_GAS,
+            attached_gas: VIEW_CALL_GAS,
         }
     }
 
@@ -157,7 +160,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "ft_balance_of".to_string(),
             args: input,
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: DEFAULT_PREPAID_GAS,
+            attached_gas: VIEW_CALL_GAS,
         }
     }
 
@@ -168,7 +171,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "ft_balance_of_eth_on_aurora".to_string(),
             args: input,
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: DEFAULT_PREPAID_GAS,
+            attached_gas: VIEW_CALL_GAS,
         }
     }
 
@@ -179,7 +182,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "ft_transfer".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: DEFAULT_PREPAID_GAS,
+            attached_gas: GAS_FOR_FT_TRANSFER,
         }
     }
 
@@ -193,7 +196,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "ft_transfer_call".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: DEFAULT_PREPAID_GAS,
+            attached_gas: GAS_FOR_FT_TRANSFER_CALL,
         }
     }
 
