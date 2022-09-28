@@ -26,3 +26,31 @@ impl rlp::Encodable for LogEntry {
         stream.append(&self.data);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rlp::{Decodable, Encodable, Rlp, RlpStream};
+
+    #[test]
+    fn test_roundtrip_rlp_encoding() {
+        let address = H160::from_low_u64_le(32u64);
+        let topics = vec![H256::zero()];
+        let data = vec![0u8, 1u8, 2u8, 3u8];
+        let expected_log_entry = LogEntry {
+            address,
+            topics,
+            data,
+        };
+
+        let mut stream = RlpStream::new();
+
+        expected_log_entry.rlp_append(&mut stream);
+
+        let bytes = stream.out();
+        let rlp = Rlp::new(bytes.as_ref());
+        let actual_log_entry = LogEntry::decode(&rlp).unwrap();
+
+        assert_eq!(expected_log_entry, actual_log_entry);
+    }
+}

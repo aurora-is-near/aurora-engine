@@ -1,6 +1,7 @@
-use crate::test_utils::standalone::mocks::{promise, storage};
 use aurora_engine::engine;
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
+use aurora_engine_test_doubles::io::{Storage, StoragePointer};
+use aurora_engine_test_doubles::promise::PromiseTracker;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use std::sync::RwLock;
@@ -21,8 +22,8 @@ fn test_deploy_code() {
         upgrade_delay_blocks: 0,
     };
     let origin = Address::new(H160([0u8; 20]));
-    let storage = RwLock::new(storage::Storage::default());
-    let io = storage::StoragePointer(&storage);
+    let storage = RwLock::new(Storage::default());
+    let io = StoragePointer(&storage);
     let env = aurora_engine_sdk::env::Fixed {
         signer_account_id: owner_id.clone(),
         current_account_id: owner_id.clone(),
@@ -33,7 +34,7 @@ fn test_deploy_code() {
         random_seed: H256::zero(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
     };
-    let mut handler = promise::PromiseTracker::default();
+    let mut handler = PromiseTracker::default();
     let mut engine = engine::Engine::new_with_state(state, origin, owner_id, io, &env);
     let code_to_deploy = vec![1, 2, 3, 4, 5, 6];
     let result = engine.deploy_code(
