@@ -4,8 +4,10 @@ use crate::tests::erc20_connector::sim_tests;
 use crate::tests::state_migration::{deploy_evm, AuroraAccount};
 use aurora_engine_precompiles::xcc::{self, costs, cross_contract_call};
 use aurora_engine_transactions::legacy::TransactionLegacy;
+use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::{
-    CrossContractCallArgs, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
+    CrossContractCallArgs, NearPromise, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
+    SimpleNearPromise,
 };
 use aurora_engine_types::types::{Address, EthGas, NearGas, Wei, Yocto};
 use aurora_engine_types::U256;
@@ -159,62 +161,89 @@ fn test_xcc_precompile_scheduled() {
     test_xcc_precompile_common(true)
 }
 
-fn test_xcc_precompile_common(is_scheduled: bool) {
-    let aurora = deploy_evm();
-    let chain_id = AuroraRunner::default().chain_id;
-    let xcc_wasm_bytes = contract_bytes();
-    aurora
-        .user
-        .call(
-            aurora.contract.account_id(),
-            "factory_update",
-            &xcc_wasm_bytes,
-            near_sdk_sim::DEFAULT_GAS,
-            0,
-        )
-        .assert_success();
-
-    let mut signer = test_utils::Signer::random();
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
-
-    // Setup wNEAR contract and bridge it to Aurora
-    let wnear_account = deploy_wnear(&aurora);
-    let wnear_erc20 = sim_tests::deploy_erc20_from_nep_141(&wnear_account, &aurora);
-    sim_tests::transfer_nep_141_to_erc_20(
-        &wnear_account,
-        &wnear_erc20,
-        &aurora.user,
+/// This test uses the XCC feature where the promise has many nested callbacks.
+/// The contract it uses is one which computes Fibonacci numbers in an inefficient way.
+/// The contract has two functions: `seed` and `accumulate`.
+/// The `seed` function always returns `{"a": "0", "b": "1"}`.
+/// The `accumulate` function performs one step of the Fibonacci recursion relation using
+/// a promise result (i.e. result from prior call) as input.
+/// Therefore, we can compute Fibonacci numbers by creating a long chain of callbacks.
+/// For example, to compute the 6th number:
+/// `seed.then(accumulate).then(accumulate).then(accumulate).then(accumulate).then(accumulate)`.
+#[test]
+fn test_xcc_multiple_callbacks() {
+    let XccTestContext {
+        aurora,
+        mut signer,
         signer_address,
-        WNEAR_AMOUNT,
-        &aurora,
+        chain_id,
+        ..
+    } = init_xcc();
+
+    // 1. Deploy Fibonacci contract
+    let fib_contract_bytes = {
+        let base_path = Path::new("..").join("etc").join("tests").join("fibonacci");
+        let output_path =
+            base_path.join("target/wasm32-unknown-unknown/release/fibonacci_on_near.wasm");
+        test_utils::rust::compile(base_path);
+        fs::read(output_path).unwrap()
+    };
+    let fib_account_id = format!("fib.{}", aurora.user.account_id.as_str());
+    let _fib_account = aurora.user.deploy(
+        &fib_contract_bytes,
+        fib_account_id.parse().unwrap(),
+        near_sdk_sim::STORAGE_AMOUNT,
     );
-    aurora
-        .user
-        .call(
-            aurora.contract.account_id(),
-            "factory_set_wnear_address",
-            wnear_erc20.0.address.as_bytes(),
-            near_sdk_sim::DEFAULT_GAS,
-            0,
-        )
-        .assert_success();
-    let approve_tx = wnear_erc20.approve(
-        cross_contract_call::ADDRESS,
-        WNEAR_AMOUNT.into(),
-        signer.use_nonce().into(),
+
+    // 2. Create XCC account, schedule Fibonacci call
+    let n = 6;
+    let promise = make_fib_promise(n, &fib_account_id.parse().unwrap());
+    let xcc_args = CrossContractCallArgs::Delayed(PromiseArgs::Recursive(promise));
+    let _result = submit_xcc_transaction(xcc_args, &aurora, &mut signer, chain_id);
+
+    // 3. Make Fibonacci call
+    let router_account = format!(
+        "{}.{}",
+        hex::encode(signer_address.as_bytes()),
+        aurora.contract.account_id.as_str()
     );
-    let signed_transaction =
-        test_utils::sign_transaction(approve_tx, Some(chain_id), &signer.secret_key);
-    aurora
-        .user
-        .call(
-            aurora.contract.account_id(),
-            "submit",
-            &rlp::encode(&signed_transaction),
-            near_sdk_sim::DEFAULT_GAS,
-            0,
-        )
-        .assert_success();
+    let result = aurora.user.call(
+        router_account.parse().unwrap(),
+        "execute_scheduled",
+        b"{\"nonce\": \"0\"}",
+        near_sdk_sim::DEFAULT_GAS,
+        0,
+    );
+    result.assert_success();
+
+    // 4. Check the result is correct
+    let fib_numbers: [u8; 8] = [0, 1, 1, 2, 3, 5, 8, 13];
+    let output = result.unwrap_json_value();
+    let get_number = |field_name: &str| -> u8 {
+        output
+            .as_object()
+            .unwrap()
+            .get(field_name)
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap()
+    };
+    let a = get_number("a");
+    let b = get_number("b");
+    assert_eq!(a, fib_numbers[n]);
+    assert_eq!(b, fib_numbers[n + 1]);
+}
+
+fn test_xcc_precompile_common(is_scheduled: bool) {
+    let XccTestContext {
+        aurora,
+        mut signer,
+        signer_address,
+        chain_id,
+        wnear_account,
+    } = init_xcc();
 
     let router_account = format!(
         "{}.{}",
@@ -290,29 +319,8 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
     } else {
         CrossContractCallArgs::Eager(PromiseArgs::Create(promise))
     };
-    let transaction = TransactionLegacy {
-        nonce: signer.use_nonce().into(),
-        gas_price: 0u64.into(),
-        gas_limit: u64::MAX.into(),
-        to: Some(cross_contract_call::ADDRESS),
-        value: Wei::zero(),
-        data: xcc_args.try_to_vec().unwrap(),
-    };
-    let signed_transaction =
-        test_utils::sign_transaction(transaction, Some(chain_id), &signer.secret_key);
     let engine_balance_before_xcc = get_engine_near_balance(&aurora);
-    let result = aurora.user.call(
-        aurora.contract.account_id(),
-        "submit",
-        &rlp::encode(&signed_transaction),
-        near_sdk_sim::DEFAULT_GAS,
-        0,
-    );
-    result.assert_success();
-    let submit_result: aurora_engine::parameters::SubmitResult = result.unwrap_borsh();
-    if !submit_result.status.is_ok() {
-        panic!("Unexpected result {:?}", submit_result);
-    }
+    let _result = submit_xcc_transaction(xcc_args, &aurora, &mut signer, chain_id);
 
     print_outcomes(&aurora);
     let engine_balance_after_xcc = get_engine_near_balance(&aurora);
@@ -367,6 +375,112 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
         sim_tests::nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141_token, &aurora),
         nep_141_supply
     );
+}
+
+/// Deploys the EVM, sets xcc router code, deploys wnear contract, bridges wnear into EVM, and calls `factory_set_wnear_address`
+fn init_xcc() -> XccTestContext {
+    let aurora = deploy_evm();
+    let chain_id = AuroraRunner::default().chain_id;
+    let xcc_wasm_bytes = contract_bytes();
+    aurora
+        .user
+        .call(
+            aurora.contract.account_id(),
+            "factory_update",
+            &xcc_wasm_bytes,
+            near_sdk_sim::DEFAULT_GAS,
+            0,
+        )
+        .assert_success();
+
+    let mut signer = test_utils::Signer::random();
+    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+
+    // Setup wNEAR contract and bridge it to Aurora
+    let wnear_account = deploy_wnear(&aurora);
+    let wnear_erc20 = sim_tests::deploy_erc20_from_nep_141(&wnear_account, &aurora);
+    sim_tests::transfer_nep_141_to_erc_20(
+        &wnear_account,
+        &wnear_erc20,
+        &aurora.user,
+        signer_address,
+        WNEAR_AMOUNT,
+        &aurora,
+    );
+    aurora
+        .user
+        .call(
+            aurora.contract.account_id(),
+            "factory_set_wnear_address",
+            wnear_erc20.0.address.as_bytes(),
+            near_sdk_sim::DEFAULT_GAS,
+            0,
+        )
+        .assert_success();
+    let approve_tx = wnear_erc20.approve(
+        cross_contract_call::ADDRESS,
+        WNEAR_AMOUNT.into(),
+        signer.use_nonce().into(),
+    );
+    let signed_transaction =
+        test_utils::sign_transaction(approve_tx, Some(chain_id), &signer.secret_key);
+    aurora
+        .user
+        .call(
+            aurora.contract.account_id(),
+            "submit",
+            &rlp::encode(&signed_transaction),
+            near_sdk_sim::DEFAULT_GAS,
+            0,
+        )
+        .assert_success();
+
+    XccTestContext {
+        aurora,
+        signer,
+        signer_address,
+        chain_id,
+        wnear_account,
+    }
+}
+
+struct XccTestContext {
+    pub aurora: AuroraAccount,
+    pub signer: test_utils::Signer,
+    pub signer_address: Address,
+    pub chain_id: u64,
+    pub wnear_account: UserAccount,
+}
+
+fn submit_xcc_transaction(
+    xcc_args: CrossContractCallArgs,
+    aurora: &AuroraAccount,
+    signer: &mut test_utils::Signer,
+    chain_id: u64,
+) -> near_sdk_sim::ExecutionResult {
+    let transaction = TransactionLegacy {
+        nonce: signer.use_nonce().into(),
+        gas_price: 0u64.into(),
+        gas_limit: u64::MAX.into(),
+        to: Some(cross_contract_call::ADDRESS),
+        value: Wei::zero(),
+        data: xcc_args.try_to_vec().unwrap(),
+    };
+    let signed_transaction =
+        test_utils::sign_transaction(transaction, Some(chain_id), &signer.secret_key);
+    let result = aurora.user.call(
+        aurora.contract.account_id(),
+        "submit",
+        &rlp::encode(&signed_transaction),
+        near_sdk_sim::DEFAULT_GAS,
+        0,
+    );
+    result.assert_success();
+    let submit_result: aurora_engine::parameters::SubmitResult = result.unwrap_borsh();
+    if !submit_result.status.is_ok() {
+        panic!("Unexpected result {:?}", submit_result);
+    }
+    result
 }
 
 fn get_engine_near_balance(aurora: &AuroraAccount) -> u128 {
@@ -597,4 +711,29 @@ fn contract_bytes() -> Vec<u8> {
     let output_path = base_path.join("target/wasm32-unknown-unknown/release/xcc_router.wasm");
     test_utils::rust::compile(base_path);
     fs::read(output_path).unwrap()
+}
+
+fn make_fib_promise(n: usize, account_id: &AccountId) -> NearPromise {
+    if n == 0 {
+        NearPromise::Simple(SimpleNearPromise::Create(PromiseCreateArgs {
+            target_account_id: account_id.clone(),
+            method: "seed".into(),
+            args: Vec::new(),
+            attached_balance: Yocto::new(0),
+            attached_gas: NearGas::new(5_000_000_000_000),
+        }))
+    } else {
+        let base = make_fib_promise(n - 1, account_id);
+        let callback = SimpleNearPromise::Create(PromiseCreateArgs {
+            target_account_id: account_id.clone(),
+            method: "accumulate".into(),
+            args: Vec::new(),
+            attached_balance: Yocto::new(0),
+            attached_gas: NearGas::new(5_000_000_000_000),
+        });
+        NearPromise::Then {
+            base: Box::new(base),
+            callback,
+        }
+    }
 }
