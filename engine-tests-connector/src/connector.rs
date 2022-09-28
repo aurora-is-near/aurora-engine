@@ -41,3 +41,19 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_ft_transfer() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    let proof = contract.get_proof(PROOF_DATA_NEAR);
+    let res = contract
+        .engine_contract
+        .call("deposit")
+        .args_borsh(proof)
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?;
+    println!("{:#?}", res);
+    assert!(res.is_success());
+    Ok(())
+}

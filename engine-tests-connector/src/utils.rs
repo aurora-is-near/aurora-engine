@@ -1,4 +1,5 @@
 use aurora_engine::fungible_token::FungibleTokenMetadata;
+use aurora_engine::parameters::SetEthConnectorContractAccountArgs;
 use aurora_engine::proof::Proof;
 use aurora_engine_types::types::Address;
 use near_sdk::serde_json::json;
@@ -89,21 +90,52 @@ impl TestContract {
         let metadata = FungibleTokenMetadata::default();
         let account_with_access_right: AccountId = engine_contract.id().clone();
         // Init eth-connector
+        let metadata = json!({
+            "spec": metadata.spec,
+            "name": metadata.name,
+            "symbol": metadata.symbol,
+            "icon": metadata.icon,
+            "reference": metadata.reference,
+            "decimals": metadata.decimals,
+        });
         let res = eth_connector_contract
             .call("new")
             .args_json(json!({
                 "prover_account": prover_account,
                 "eth_custodian_address": eth_custodian_address,
-                "metadata": json!({
-                    "spec": metadata.spec,
-                    "name": metadata.name,
-                    "symbol": metadata.symbol,
-                    "icon": metadata.icon,
-                    "reference": metadata.reference,
-                    "decimals": metadata.decimals,
-                }),
+                "metadata": metadata,
                 "account_with_access_right": account_with_access_right,
             }))
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?;
+        assert!(res.is_success());
+
+        let chain_id = [0u8; 32];
+        let res = engine_contract
+            .call("new")
+            .args_borsh((chain_id, engine_contract.id(), engine_contract.id(), 1_u64))
+            .gas(DEFAULT_GAS)
+            //.deposit(2_000_000_000_000_000)
+            .transact()
+            .await?;
+        assert!(res.is_success());
+
+        let metadata = FungibleTokenMetadata::default();
+        let res = engine_contract
+            .call("new_eth_connector")
+            .args_borsh((prover_account, eth_custodian_address, metadata))
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?;
+        assert!(res.is_success());
+
+        let acc = SetEthConnectorContractAccountArgs {
+            account: eth_connector_contract.id().parse().unwrap(),
+        };
+        let res = engine_contract
+            .call("set_eth_connector_contract_account")
+            .args_borsh(acc)
             .gas(DEFAULT_GAS)
             .transact()
             .await?;
@@ -170,7 +202,6 @@ impl TestContract {
     pub async fn call_deposit_eth_to_near(&self) -> anyhow::Result<()> {
         let proof: Proof = self.get_proof(PROOF_DATA_NEAR);
         let res = self.deposit_with_proof(&proof).await?;
-        println!("{:#?}", res);
         assert!(res.is_success());
         Ok(())
     }

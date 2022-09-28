@@ -27,7 +27,6 @@ pub const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 /// * paused_mask - admin control flow data
 /// * io - I/O trait handler
 pub struct EthConnectorContract<I: IO> {
-    ft: FungibleTokenOps<I>,
     io: I,
 }
 
@@ -45,11 +44,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Load contract data from storage and init I/O handler.
     /// Used as single point of contract access for various contract actions
     pub fn init_instance(io: I) -> Result<Self, error::StorageReadError> {
-        Ok(Self {
-            ft: get_contract_data::<FungibleToken, I>(&io, &EthConnectorStorageId::FungibleToken)?
-                .ops(io),
-            io,
-        })
+        Ok(Self { io })
     }
 
     /// Create contract data - init eth-connector contract specific data.
@@ -60,26 +55,26 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         owner_id: AccountId,
         _args: InitCallArgs,
     ) -> Result<(), error::InitContractError> {
-        // Check is it already initialized
-        let contract_key_exists =
-            io.storage_has_key(&construct_contract_key(&EthConnectorStorageId::Contract));
-        if contract_key_exists {
-            return Err(error::InitContractError::AlreadyInitialized);
-        }
-
+        // // Check is it already initialized
+        // let contract_key_exists =
+        //     io.storage_has_key(&construct_contract_key(&EthConnectorStorageId::Contract));
+        // if contract_key_exists {
+        //     return Err(error::InitContractError::AlreadyInitialized);
+        // }
         sdk::log!("[init contract]");
 
-        let mut ft = FungibleTokenOps::new(io);
+        // let mut ft = FungibleTokenOps::new(io);
         // Register FT account for current contract
-        ft.internal_register_account(&owner_id);
-
-        Self { ft, io }.save_ft_contract();
+        // ft.internal_register_account(&owner_id);
+        //
+        // Self { ft, io }.save_ft_contract();
 
         Ok(())
     }
 
     /// Deposit all types of tokens
     pub fn deposit(&self, data: Vec<u8>) -> PromiseCreateArgs {
+        sdk::log!("Call Deposit");
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "deposit".to_string(),
@@ -94,8 +89,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         &mut self,
         amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
-        self.burn_eth_on_aurora(amount)?;
-        self.save_ft_contract();
+        // TODO: fix it
+        // self.burn_eth_on_aurora(amount)?;
+        // self.save_ft_contract();
         Ok(())
     }
 
@@ -105,7 +101,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         owner_id: Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
-        self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
+        // TODO: fix it
+        // self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
+        Ok(())
     }
 
     /// Burn ETH tokens
@@ -113,7 +111,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         &mut self,
         amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
-        self.ft.internal_withdraw_eth_from_aurora(amount)
+        //self.ft.internal_withdraw_eth_from_aurora(amount)
+        Ok(())
     }
 
     /// Withdraw nETH from NEAR accounts
@@ -258,18 +257,18 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (wei_fee, relayer) {
             (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
-                self.mint_eth_on_aurora(
-                    message_data.recipient,
-                    Wei::new(U256::from(args.amount.as_u128())) - fee,
-                )?;
-                self.mint_eth_on_aurora(evm_relayer_address, fee)?;
+                // TODO: fix it
+                // self.mint_eth_on_aurora(
+                //     message_data.recipient,
+                //     Wei::new(U256::from(args.amount.as_u128())) - fee,
+                // )?;
+                // self.mint_eth_on_aurora(evm_relayer_address, fee)?;
             }
             _ => self.mint_eth_on_aurora(
                 message_data.recipient,
                 Wei::new(U256::from(args.amount.as_u128())),
             )?,
         }
-        self.save_ft_contract();
         self.io.return_output("\"0\"".as_bytes());
         Ok(())
     }
@@ -294,14 +293,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FINISH_DEPOSIT,
         }
-    }
-
-    /// Save eth-connector fungible token contract data
-    fn save_ft_contract(&mut self) {
-        self.io.write_borsh(
-            &construct_contract_key(&EthConnectorStorageId::FungibleToken),
-            &self.ft.data(),
-        );
     }
 
     /// Checks whether the provided proof was already used
