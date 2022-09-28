@@ -1,11 +1,20 @@
 use crate::utils::*;
+use near_sdk::json_types::U128;
 use near_sdk::ONE_YOCTO;
 use workspaces::AccountId;
 
 #[tokio::test]
 async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
-    contract.call_deposit_eth_to_near().await?;
+    let proof = contract.get_proof(PROOF_DATA_NEAR);
+    let res = contract
+        .eth_connector_contract
+        .call("deposit")
+        .args_borsh(proof)
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?;
+    assert!(res.is_success());
 
     let transfer_amount = 70;
     let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
@@ -19,24 +28,56 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .await?;
     assert!(res.is_success());
 
-    let balance = contract.get_eth_on_near_balance(&receiver_id).await?;
+    let balance = contract
+        .eth_connector_contract
+        .call("ft_balance_of")
+        .args_json((&receiver_id,))
+        .view()
+        .await?
+        .json::<U128>()
+        .unwrap();
+
     assert_eq!(
         balance.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
     );
 
     let balance = contract
-        .get_eth_on_near_balance(&contract.eth_connector_contract.id())
-        .await?;
+        .eth_connector_contract
+        .call("ft_balance_of")
+        .args_json((&contract.eth_connector_contract.id(),))
+        .view()
+        .await?
+        .json::<U128>()
+        .unwrap();
     assert_eq!(balance.0, DEPOSITED_FEE - transfer_amount as u128);
 
-    let balance = contract.total_supply().await?;
+    let balance = contract
+        .eth_connector_contract
+        .call("ft_total_supply")
+        .view()
+        .await?
+        .json::<U128>()
+        .unwrap();
     assert_eq!(balance.0, DEPOSITED_AMOUNT);
 
-    let balance = contract.total_eth_supply_on_aurora().await?;
+    let balance: u128 = contract
+        .eth_connector_contract
+        .call("ft_total_eth_supply_on_aurora")
+        .view()
+        .await?
+        .json::<String>()?
+        .parse()
+        .unwrap();
     assert_eq!(balance, 0);
 
-    let balance = contract.total_eth_supply_on_near().await?;
+    let balance = contract
+        .eth_connector_contract
+        .call("ft_total_eth_supply_on_near")
+        .view()
+        .await?
+        .json::<U128>()
+        .unwrap();
     assert_eq!(balance.0, DEPOSITED_AMOUNT);
 
     Ok(())
@@ -45,15 +86,6 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
 #[tokio::test]
 async fn test_ft_transfer() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
-    let proof = contract.get_proof(PROOF_DATA_NEAR);
-    let res = contract
-        .engine_contract
-        .call("deposit")
-        .args_borsh(proof)
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?;
-    println!("{:#?}", res);
-    assert!(res.is_success());
+    contract.call_deposit_eth_to_near().await?;
     Ok(())
 }
