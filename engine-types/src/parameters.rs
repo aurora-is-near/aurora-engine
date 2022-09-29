@@ -187,7 +187,7 @@ pub enum PromiseAction {
     Transfer {
         amount: Yocto,
     },
-    DeployConotract {
+    DeployContract {
         code: Vec<u8>,
     },
     FunctionCall {

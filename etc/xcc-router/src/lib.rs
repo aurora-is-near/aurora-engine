@@ -279,7 +279,7 @@ impl Router {
                 PromiseAction::Transfer { amount } => {
                     env::promise_batch_action_transfer(id, amount.as_u128())
                 }
-                PromiseAction::DeployConotract { code } => {
+                PromiseAction::DeployContract { code } => {
                     env::promise_batch_action_deploy_contract(id, code)
                 }
                 PromiseAction::FunctionCall {

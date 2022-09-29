@@ -348,7 +348,7 @@ impl crate::promise::PromiseHandler for Runtime {
                     let amount = amount.as_u128();
                     exports::promise_batch_action_transfer(id, &amount as *const u128 as _);
                 },
-                PromiseAction::DeployConotract { code } => unsafe {
+                PromiseAction::DeployContract { code } => unsafe {
                     let code = code.as_slice();
                     exports::promise_batch_action_deploy_contract(
                         id,
