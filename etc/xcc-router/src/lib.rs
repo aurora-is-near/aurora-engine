@@ -1,6 +1,6 @@
 use aurora_engine_types::parameters::{
-    NearPromise, NearPublicKey, PromiseAction, PromiseArgs, PromiseCreateArgs,
-    PromiseWithCallbackArgs, SimpleNearPromise,
+    NearPromise, PromiseAction, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
+    SimpleNearPromise,
 };
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LazyOption, LookupMap};
@@ -272,6 +272,12 @@ impl Router {
         }
     }
 
+    #[cfg(not(feature = "all-promise-actions"))]
+    fn add_batch_actions(_id: PromiseIndex, _actions: &[PromiseAction]) {
+        unimplemented!("NEAR batch transactions are not supported. Please file an issue at https://github.com/aurora-is-near/aurora-engine")
+    }
+
+    #[cfg(feature = "all-promise-actions")]
     fn add_batch_actions(id: PromiseIndex, actions: &[PromiseAction]) {
         for action in actions.iter() {
             match action {
@@ -334,10 +340,15 @@ impl Router {
     }
 }
 
-fn to_sdk_pk(key: &NearPublicKey) -> near_sdk::PublicKey {
+#[cfg(feature = "all-promise-actions")]
+fn to_sdk_pk(key: &aurora_engine_types::parameters::NearPublicKey) -> near_sdk::PublicKey {
     let (curve_type, key_bytes): (near_sdk::CurveType, &[u8]) = match key {
-        NearPublicKey::Ed25519(bytes) => (near_sdk::CurveType::ED25519, bytes),
-        NearPublicKey::Secp256k1(bytes) => (near_sdk::CurveType::SECP256K1, bytes),
+        aurora_engine_types::parameters::NearPublicKey::Ed25519(bytes) => {
+            (near_sdk::CurveType::ED25519, bytes)
+        }
+        aurora_engine_types::parameters::NearPublicKey::Secp256k1(bytes) => {
+            (near_sdk::CurveType::SECP256K1, bytes)
+        }
     };
     let mut data = Vec::with_capacity(1 + key_bytes.len());
     data.push(curve_type as u8);
