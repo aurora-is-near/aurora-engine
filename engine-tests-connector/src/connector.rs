@@ -147,16 +147,38 @@ async fn test_withdraw_eth_from_near() -> anyhow::Result<()> {
     assert_eq!(data.amount, withdraw_amount);
     assert_eq!(data.eth_custodian_address, custodian_addr);
 
-    let balance = contract
-        .get_eth_on_near_balance(&contract.engine_contract.id())
+    contract
+        .assert_eth_on_near_balance(
+            &contract.engine_contract.id(),
+            DEPOSITED_FEE - withdraw_amount.as_u128(),
+        )
         .await?;
-    assert_eq!(balance.0, DEPOSITED_FEE - withdraw_amount.as_u128());
+    contract
+        .assert_eth_on_near_balance(&receiver_id, DEPOSITED_AMOUNT - DEPOSITED_FEE)
+        .await?;
+    contract
+        .assert_total_supply(DEPOSITED_AMOUNT - withdraw_amount.as_u128())
+        .await?;
+    Ok(())
+}
 
-    let balance = contract.get_eth_on_near_balance(&receiver_id).await?;
-    assert_eq!(balance.0, DEPOSITED_AMOUNT - DEPOSITED_FEE as u128);
+#[tokio::test]
+async fn test_deposit_eth_to_near_balance_total_supply() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+    contract.assert_proof_was_used(PROOF_DATA_NEAR).await?;
 
-    let balance = contract.total_supply().await?;
-    assert_eq!(balance.0, DEPOSITED_AMOUNT - withdraw_amount.as_u128());
-
+    let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
+    contract
+        .assert_eth_on_near_balance(&contract.engine_contract.id(), DEPOSITED_FEE)
+        .await?;
+    contract
+        .assert_eth_on_near_balance(&receiver_id, DEPOSITED_AMOUNT - DEPOSITED_FEE)
+        .await?;
+    contract.assert_total_eth_supply_on_aurora(0).await?;
+    contract
+        .assert_total_eth_supply_on_near(DEPOSITED_AMOUNT)
+        .await?;
+    contract.assert_total_supply(DEPOSITED_AMOUNT).await?;
     Ok(())
 }

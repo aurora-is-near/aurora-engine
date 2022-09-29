@@ -81,7 +81,6 @@ impl TestContract {
     }
 
     pub async fn new() -> anyhow::Result<TestContract> {
-        use std::str::FromStr;
         let (engine_contract, eth_connector_contract, root_account) =
             Self::deploy_aurora_contract().await?;
 
