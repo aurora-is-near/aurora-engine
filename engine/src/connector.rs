@@ -18,6 +18,7 @@ pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
 /// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
 pub const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 pub const GAS_FOR_DEPOSIT: NearGas = NearGas::new(120_000_000_000_000);
+pub const GAS_FOR_WITHDRAW: NearGas = NearGas::new(20_000_000_000_000);
 pub const GAS_FOR_FT_TRANSFER: NearGas = NearGas::new(50_000_000_000_000);
 pub const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(100_000_000_000_000);
 pub const VIEW_CALL_GAS: NearGas = NearGas::new(15_000_000_000_000);
@@ -126,8 +127,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "withdraw".to_string(),
             args: data,
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+            attached_balance: Yocto::new(1),
+            attached_gas: GAS_FOR_WITHDRAW,
         }
     }
 

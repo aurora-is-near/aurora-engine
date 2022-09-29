@@ -539,6 +539,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn withdraw() {
         let mut io = Runtime;
+        io.assert_one_yocto().sdk_unwrap();
         let input = io.read_input().to_vec();
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
