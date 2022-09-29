@@ -182,3 +182,28 @@ async fn test_deposit_eth_to_near_balance_total_supply() -> anyhow::Result<()> {
     contract.assert_total_supply(DEPOSITED_AMOUNT).await?;
     Ok(())
 }
+
+// NOTE: We don't test relayer fee
+#[tokio::test]
+async fn test_deposit_eth_to_aurora_balance_total_supply() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_aurora().await?;
+    contract.assert_proof_was_used(PROOF_DATA_ETH).await?;
+
+    // NOTE: Relayer FEE not calculated
+    // assert_eq!(balance, DEPOSITED_EVM_AMOUNT - DEPOSITED_EVM_FEE);
+    contract
+        .assert_eth_balance(
+            &validate_eth_address(RECIPIENT_ETH_ADDRESS),
+            DEPOSITED_EVM_AMOUNT,
+        )
+        .await?;
+    contract.assert_total_supply(DEPOSITED_EVM_AMOUNT).await?;
+    contract
+        .assert_total_eth_supply_on_near(DEPOSITED_EVM_AMOUNT)
+        .await?;
+    contract
+        .assert_total_eth_supply_on_aurora(DEPOSITED_EVM_AMOUNT)
+        .await?;
+    Ok(())
+}

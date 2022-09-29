@@ -169,7 +169,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_balance_of_eth_on_aurora(&mut self, input: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
-            method: "ft_balance_of_eth_on_aurora".to_string(),
+            method: "ft_balance_of_eth".to_string(),
             args: input,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: VIEW_CALL_GAS,
@@ -307,7 +307,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "is_used_proof".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+            attached_gas: VIEW_CALL_GAS,
         }
     }
 
