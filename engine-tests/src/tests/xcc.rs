@@ -181,23 +181,11 @@ fn test_xcc_multiple_callbacks() {
     } = init_xcc();
 
     // 1. Deploy Fibonacci contract
-    let fib_contract_bytes = {
-        let base_path = Path::new("..").join("etc").join("tests").join("fibonacci");
-        let output_path =
-            base_path.join("target/wasm32-unknown-unknown/release/fibonacci_on_near.wasm");
-        test_utils::rust::compile(base_path);
-        fs::read(output_path).unwrap()
-    };
-    let fib_account_id = format!("fib.{}", aurora.user.account_id.as_str());
-    let _fib_account = aurora.user.deploy(
-        &fib_contract_bytes,
-        fib_account_id.parse().unwrap(),
-        near_sdk_sim::STORAGE_AMOUNT,
-    );
+    let fib_account_id = deploy_fibonacci(&aurora);
 
     // 2. Create XCC account, schedule Fibonacci call
     let n = 6;
-    let promise = make_fib_promise(n, &fib_account_id.parse().unwrap());
+    let promise = make_fib_promise(n, &fib_account_id);
     let xcc_args = CrossContractCallArgs::Delayed(PromiseArgs::Recursive(promise));
     let _result = submit_xcc_transaction(xcc_args, &aurora, &mut signer, chain_id);
 
@@ -217,8 +205,77 @@ fn test_xcc_multiple_callbacks() {
     result.assert_success();
 
     // 4. Check the result is correct
-    let fib_numbers: [u8; 8] = [0, 1, 1, 2, 3, 5, 8, 13];
     let output = result.unwrap_json_value();
+    check_fib_result(output, n);
+}
+
+/// This test is similar to `test_xcc_multiple_callbacks`, but instead of computing
+/// Fibonacci numbers through repeated callbacks, it uses the `And` promise combinator.
+#[test]
+fn test_xcc_and_combinator() {
+    let XccTestContext {
+        aurora,
+        mut signer,
+        signer_address,
+        chain_id,
+        ..
+    } = init_xcc();
+
+    // 1. Deploy Fibonacci contract
+    let fib_account_id = deploy_fibonacci(&aurora);
+
+    // 2. Create XCC account, schedule Fibonacci call
+    let n = 6;
+    let promise = NearPromise::Then {
+        base: Box::new(NearPromise::And(vec![
+            NearPromise::Simple(SimpleNearPromise::Create(PromiseCreateArgs {
+                target_account_id: fib_account_id.clone(),
+                method: "fib".into(),
+                args: format!(r#"{{"n": {}}}"#, n - 1).into_bytes(),
+                attached_balance: Yocto::new(0),
+                attached_gas: NearGas::new(10_000_000_000_000_u64 * n),
+            })),
+            NearPromise::Simple(SimpleNearPromise::Create(PromiseCreateArgs {
+                target_account_id: fib_account_id.clone(),
+                method: "fib".into(),
+                args: format!(r#"{{"n": {}}}"#, n - 2).into_bytes(),
+                attached_balance: Yocto::new(0),
+                attached_gas: NearGas::new(10_000_000_000_000_u64 * n),
+            })),
+        ])),
+        callback: SimpleNearPromise::Create(PromiseCreateArgs {
+            target_account_id: fib_account_id.clone(),
+            method: "sum".into(),
+            args: Vec::new(),
+            attached_balance: Yocto::new(0),
+            attached_gas: NearGas::new(5_000_000_000_000),
+        }),
+    };
+    let xcc_args = CrossContractCallArgs::Delayed(PromiseArgs::Recursive(promise));
+    let _result = submit_xcc_transaction(xcc_args, &aurora, &mut signer, chain_id);
+
+    // 3. Make Fibonacci call
+    let router_account = format!(
+        "{}.{}",
+        hex::encode(signer_address.as_bytes()),
+        aurora.contract.account_id.as_str()
+    );
+    let result = aurora.user.call(
+        router_account.parse().unwrap(),
+        "execute_scheduled",
+        b"{\"nonce\": \"0\"}",
+        near_sdk_sim::DEFAULT_GAS,
+        0,
+    );
+    result.assert_success();
+
+    // 4. Check the result is correct
+    let output = result.unwrap_json_value();
+    check_fib_result(output, usize::try_from(n).unwrap());
+}
+
+fn check_fib_result(output: serde_json::Value, n: usize) {
+    let fib_numbers: [u8; 8] = [0, 1, 1, 2, 3, 5, 8, 13];
     let get_number = |field_name: &str| -> u8 {
         output
             .as_object()
@@ -571,6 +628,23 @@ fn test_xcc_exec_gas() {
         }
         other => panic!("Unexpected action {:?}", other),
     };
+}
+
+fn deploy_fibonacci(aurora: &AuroraAccount) -> AccountId {
+    let fib_contract_bytes = {
+        let base_path = Path::new("..").join("etc").join("tests").join("fibonacci");
+        let output_path =
+            base_path.join("target/wasm32-unknown-unknown/release/fibonacci_on_near.wasm");
+        test_utils::rust::compile(base_path);
+        fs::read(output_path).unwrap()
+    };
+    let fib_account_id = format!("fib.{}", aurora.user.account_id.as_str());
+    let _fib_account = aurora.user.deploy(
+        &fib_contract_bytes,
+        fib_account_id.parse().unwrap(),
+        near_sdk_sim::STORAGE_AMOUNT,
+    );
+    fib_account_id.parse().unwrap()
 }
 
 fn deploy_router() -> AuroraRunner {
