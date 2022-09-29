@@ -196,7 +196,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "ft_transfer_call".to_string(),
             args: data,
-            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_balance: Yocto::new(1),
             attached_gas: GAS_FOR_FT_TRANSFER_CALL,
         }
     }

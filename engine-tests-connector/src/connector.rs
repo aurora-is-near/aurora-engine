@@ -1,6 +1,8 @@
 use crate::utils::*;
 use aurora_engine::parameters::WithdrawResult;
 use aurora_engine_types::types::NEP141Wei;
+use aurora_engine_types::U256;
+use byte_slice_cast::AsByteSlice;
 use near_sdk::json_types::U128;
 use near_sdk::ONE_YOCTO;
 use workspaces::AccountId;
@@ -204,6 +206,75 @@ async fn test_deposit_eth_to_aurora_balance_total_supply() -> anyhow::Result<()>
         .await?;
     contract
         .assert_total_eth_supply_on_aurora(DEPOSITED_EVM_AMOUNT)
+        .await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+
+    let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
+    let balance = contract.get_eth_on_near_balance(&receiver_id).await?;
+    assert_eq!(balance.0, DEPOSITED_AMOUNT - DEPOSITED_FEE);
+
+    let balance = contract
+        .get_eth_on_near_balance(&contract.engine_contract.id())
+        .await?;
+    assert_eq!(balance.0, DEPOSITED_FEE);
+
+    let transfer_amount: U128 = 50.into();
+    let fee: u128 = 30;
+    let mut msg = U256::from(fee).as_byte_slice().to_vec();
+    msg.append(
+        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
+            .as_bytes()
+            .to_vec(),
+    );
+
+    let message = [CONTRACT_ACC, hex::encode(msg).as_str()].join(":");
+    let memo: Option<String> = None;
+    let res = contract
+        .engine_contract
+        .call("ft_transfer_call")
+        .args_json((
+            contract.eth_connector_contract.id(),
+            transfer_amount,
+            memo,
+            message,
+        ))
+        .gas(DEFAULT_GAS)
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+
+    let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
+    contract
+        .assert_eth_on_near_balance(&receiver_id, DEPOSITED_AMOUNT - DEPOSITED_FEE)
+        .await?;
+    contract
+        .assert_eth_on_near_balance(&contract.eth_connector_contract.id(), transfer_amount.0)
+        .await?;
+    contract
+        .assert_eth_on_near_balance(
+            &contract.engine_contract.id(),
+            DEPOSITED_FEE - transfer_amount.0,
+        )
+        .await?;
+    contract
+        .assert_eth_balance(
+            &validate_eth_address(RECIPIENT_ETH_ADDRESS),
+            transfer_amount.0,
+        )
+        .await?;
+    contract.assert_total_supply(DEPOSITED_AMOUNT).await?;
+    contract
+        .assert_total_eth_supply_on_near(DEPOSITED_AMOUNT)
+        .await?;
+    contract
+        .assert_total_eth_supply_on_aurora(transfer_amount.0)
         .await?;
     Ok(())
 }

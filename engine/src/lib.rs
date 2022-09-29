@@ -669,21 +669,20 @@ mod contract {
             .sdk_unwrap()
             .try_into()
             .sdk_unwrap();
-
         if predecessor_account_id == current_account_id {
             EthConnectorContract::init_instance(io)
                 .sdk_unwrap()
                 .ft_on_transfer(&engine, &args)
                 .sdk_unwrap();
         } else {
-            let signer_account_id = io.signer_account_id();
-            engine.receive_erc20_tokens(
-                &predecessor_account_id,
-                &signer_account_id,
-                &args,
-                &current_account_id,
-                &mut Runtime,
-            );
+            // let signer_account_id = io.signer_account_id();
+            // engine.receive_erc20_tokens(
+            //     &predecessor_account_id,
+            //     &signer_account_id,
+            //     &args,
+            //     &current_account_id,
+            //     &mut Runtime,
+            // );
         }
     }
 
