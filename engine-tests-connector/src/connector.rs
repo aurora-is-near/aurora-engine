@@ -88,19 +88,35 @@ async fn test_ft_transfer() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
     contract.call_deposit_eth_to_near().await?;
 
+    let transfer_amount = 70;
+    let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
+    let res = contract
+        .engine_contract
+        .call("ft_transfer")
+        .args_json((&receiver_id, transfer_amount.to_string(), "transfer memo"))
+        .gas(DEFAULT_GAS)
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+
     contract
         .assert_eth_on_near_balance(
-            &contract.eth_connector_contract.id(),
-            DEPOSITED_AMOUNT - DEPOSITED_FEE,
+            &receiver_id,
+            DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128,
         )
         .await?;
-
+    contract
+        .assert_eth_on_near_balance(
+            &contract.engine_contract.id(),
+            DEPOSITED_FEE - transfer_amount as u128,
+        )
+        .await?;
     contract
         .assert_total_eth_supply_on_near(DEPOSITED_AMOUNT)
         .await?;
     contract.assert_total_eth_supply_on_aurora(0).await?;
     contract.assert_total_supply(DEPOSITED_AMOUNT).await?;
 
-    //println!("{:?}", contract.total_supply().await?.0);
     Ok(())
 }
