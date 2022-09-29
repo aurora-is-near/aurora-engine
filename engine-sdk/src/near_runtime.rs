@@ -20,6 +20,16 @@ const CUSTODIAN_ADDRESS: &[u8] = &[
     132, 168, 43, 179, 156, 131, 152, 157, 93, 192, 126, 19, 16, 40, 25, 35, 210, 84, 77, 194,
 ];
 
+macro_rules! unsafe_feature_gated {
+    ($feature_name:literal, $code:block) => {
+        if cfg!(feature = $feature_name) {
+            unsafe { $code }
+        } else {
+            unimplemented!("Not implemented without feature {}", $feature_name)
+        }
+    };
+}
+
 /// Wrapper type for indices in NEAR's register API.
 pub struct RegisterIndex(u64);
 
@@ -375,68 +385,78 @@ impl crate::promise::PromiseHandler for Runtime {
                         gas.as_u64(),
                     )
                 },
-                PromiseAction::Stake { amount, public_key } => unsafe {
-                    let amount = amount.as_u128();
-                    let pk: RawPublicKey = public_key.into();
-                    let pk_bytes = pk.as_bytes();
-                    exports::promise_batch_action_stake(
-                        id,
-                        &amount as *const u128 as _,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                    )
-                },
-                PromiseAction::AddFullAccessKey { public_key, nonce } => unsafe {
-                    let pk: RawPublicKey = public_key.into();
-                    let pk_bytes = pk.as_bytes();
-                    exports::promise_batch_action_add_key_with_full_access(
-                        id,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                        *nonce,
-                    )
-                },
+                PromiseAction::Stake { amount, public_key } => {
+                    unsafe_feature_gated!("all-promise-actions", {
+                        let amount = amount.as_u128();
+                        let pk: RawPublicKey = public_key.into();
+                        let pk_bytes = pk.as_bytes();
+                        exports::promise_batch_action_stake(
+                            id,
+                            &amount as *const u128 as _,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                        )
+                    });
+                }
+                PromiseAction::AddFullAccessKey { public_key, nonce } => {
+                    unsafe_feature_gated!("all-promise-actions", {
+                        let pk: RawPublicKey = public_key.into();
+                        let pk_bytes = pk.as_bytes();
+                        exports::promise_batch_action_add_key_with_full_access(
+                            id,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                            *nonce,
+                        )
+                    });
+                }
                 PromiseAction::AddFunctionCallKey {
                     public_key,
                     nonce,
                     allowance,
                     receiver_id,
                     function_names,
-                } => unsafe {
-                    let pk: RawPublicKey = public_key.into();
-                    let pk_bytes = pk.as_bytes();
-                    let allowance = allowance.as_u128();
-                    let receiver_id = receiver_id.as_bytes();
-                    let function_names = function_names.as_bytes();
-                    exports::promise_batch_action_add_key_with_function_call(
-                        id,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                        *nonce,
-                        &allowance as *const u128 as _,
-                        receiver_id.len() as _,
-                        receiver_id.as_ptr() as _,
-                        function_names.len() as _,
-                        function_names.as_ptr() as _,
-                    )
-                },
-                PromiseAction::DeleteKey { public_key } => unsafe {
-                    let pk: RawPublicKey = public_key.into();
-                    let pk_bytes = pk.as_bytes();
-                    exports::promise_batch_action_delete_key(
-                        id,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                    )
-                },
-                PromiseAction::DeleteAccount { beneficiary_id } => unsafe {
-                    let beneficiary_id = beneficiary_id.as_bytes();
-                    exports::promise_batch_action_delete_key(
-                        id,
-                        beneficiary_id.len() as _,
-                        beneficiary_id.as_ptr() as _,
-                    )
-                },
+                } => {
+                    unsafe_feature_gated!("all-promise-actions", {
+                        let pk: RawPublicKey = public_key.into();
+                        let pk_bytes = pk.as_bytes();
+                        let allowance = allowance.as_u128();
+                        let receiver_id = receiver_id.as_bytes();
+                        let function_names = function_names.as_bytes();
+                        exports::promise_batch_action_add_key_with_function_call(
+                            id,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                            *nonce,
+                            &allowance as *const u128 as _,
+                            receiver_id.len() as _,
+                            receiver_id.as_ptr() as _,
+                            function_names.len() as _,
+                            function_names.as_ptr() as _,
+                        )
+                    });
+                }
+                PromiseAction::DeleteKey { public_key } => {
+                    unsafe_feature_gated!("all-promise-actions", {
+                        let pk: RawPublicKey = public_key.into();
+                        let pk_bytes = pk.as_bytes();
+                        exports::promise_batch_action_delete_key(
+                            id,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                        )
+                    });
+                }
+                PromiseAction::DeleteAccount { beneficiary_id } => {
+                    unsafe_feature_gated!("all-promise-actions", {
+                        let beneficiary_id = beneficiary_id.as_bytes();
+                        exports::promise_batch_action_delete_key(
+                            id,
+                            beneficiary_id.len() as _,
+                            beneficiary_id.as_ptr() as _,
+                        )
+                    });
+                }
             }
         }
 
