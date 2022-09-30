@@ -22,7 +22,7 @@ aurora-engine-precompiles = { path = "../engine-precompiles", default-features =
 borsh = { version = "0.9.3" }
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false }
 hex = "0.4.3"
-rocksdb = { version = "0.18.0", default-features = false }
+rocksdb = { version = "0.19.0", default-features = false }
 postgres = "0.19.2"
 serde = "1.0.130"
 serde_json = "1.0.72"
