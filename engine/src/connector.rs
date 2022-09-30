@@ -1,10 +1,8 @@
 use crate::admin_controlled::AdminControlled;
-use crate::deposit_event::FtTransferMessageData;
-use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{InitCallArgs, NEP141FtOnTransferArgs, SetContractDataCallArgs};
 use crate::prelude::PromiseCreateArgs;
-use crate::prelude::{address::error::AddressError, Wei, U256, ZERO_WEI};
+use crate::prelude::{address::error::AddressError, Wei};
 use crate::prelude::{
     sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, Yocto, ERR_FAILED_PARSE,
@@ -56,8 +54,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Used only once for first time initialization.
     /// Initialized contract data stored in the storage.
     pub fn create_contract(
-        io: I,
-        owner_id: AccountId,
+        _io: I,
+        _owner_id: AccountId,
         _args: InitCallArgs,
     ) -> Result<(), error::InitContractError> {
         // // Check is it already initialized
@@ -92,7 +90,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Internal ETH withdraw ETH logic
     pub(crate) fn internal_remove_eth(
         &mut self,
-        amount: Wei,
+        _amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         // TODO: fix it
         // self.burn_eth_on_aurora(amount)?;
@@ -100,21 +98,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
-    ///  Mint ETH tokens
-    fn mint_eth_on_aurora(
-        &mut self,
-        owner_id: Address,
-        amount: Wei,
-    ) -> Result<(), fungible_token::error::DepositError> {
-        // TODO: fix it
-        // self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
-        Ok(())
-    }
-
     /// Burn ETH tokens
+    #[allow(dead_code)]
     fn burn_eth_on_aurora(
         &mut self,
-        amount: Wei,
+        _amount: Wei,
     ) -> Result<(), fungible_token::error::WithdrawError> {
         //self.ft.internal_withdraw_eth_from_aurora(amount)
         Ok(())
@@ -243,39 +231,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: DEFAULT_PREPAID_GAS,
         }
-    }
-
-    /// ft_on_transfer callback function
-    pub fn ft_on_transfer<'env, E: Env>(
-        &mut self,
-        engine: &Engine<'env, I, E>,
-        args: &NEP141FtOnTransferArgs,
-    ) -> Result<(), error::FtTransferCallError> {
-        sdk::log!("Call ft_on_transfer");
-        // Parse message with specific rules
-        let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
-            .map_err(error::FtTransferCallError::MessageParseFailed)?;
-
-        // Special case when predecessor_account_id is current_account_id
-        let wei_fee = Wei::from(message_data.fee);
-        // Mint fee to relayer
-        let relayer = engine.get_relayer(message_data.relayer.as_bytes());
-        match (wei_fee, relayer) {
-            (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
-                // TODO: fix it
-                // self.mint_eth_on_aurora(
-                //     message_data.recipient,
-                //     Wei::new(U256::from(args.amount.as_u128())) - fee,
-                // )?;
-                // self.mint_eth_on_aurora(evm_relayer_address, fee)?;
-            }
-            _ => self.mint_eth_on_aurora(
-                message_data.recipient,
-                Wei::new(U256::from(args.amount.as_u128())),
-            )?,
-        }
-        self.io.return_output("\"0\"".as_bytes());
-        Ok(())
     }
 
     /// Get accounts counter for statistics.

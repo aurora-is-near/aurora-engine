@@ -657,7 +657,7 @@ mod contract {
         let io = Runtime;
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let mut engine = Engine::new(
+        let _engine = Engine::new(
             predecessor_address(&predecessor_account_id),
             current_account_id.clone(),
             io,
@@ -665,15 +665,12 @@ mod contract {
         )
         .sdk_unwrap();
 
-        let args: NEP141FtOnTransferArgs = parse_json(io.read_input().to_vec().as_slice())
+        let _args: NEP141FtOnTransferArgs = parse_json(io.read_input().to_vec().as_slice())
             .sdk_unwrap()
             .try_into()
             .sdk_unwrap();
         if predecessor_account_id == current_account_id {
-            EthConnectorContract::init_instance(io)
-                .sdk_unwrap()
-                .ft_on_transfer(&engine, &args)
-                .sdk_unwrap();
+            // TODO: should be in aurora-eth-connector
         } else {
             // let signer_account_id = io.signer_account_id();
             // engine.receive_erc20_tokens(

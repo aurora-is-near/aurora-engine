@@ -278,3 +278,128 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
         .await?;
     Ok(())
 }
+
+#[tokio::test]
+async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+
+    let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
+    let balance = contract.get_eth_on_near_balance(&receiver_id).await?;
+    assert_eq!(balance.0, DEPOSITED_AMOUNT - DEPOSITED_FEE);
+
+    let balance = contract
+        .get_eth_on_near_balance(&contract.engine_contract.id())
+        .await?;
+    assert_eq!(balance.0, DEPOSITED_FEE);
+
+    let transfer_amount: U128 = 50.into();
+    let memo: Option<String> = None;
+    let message = "";
+    // Send to Aurora contract with wrong message should failed
+    let res = contract
+        .engine_contract
+        .call("ft_transfer_call")
+        .args_json((
+            contract.eth_connector_contract.id(),
+            transfer_amount,
+            &memo,
+            message,
+        ))
+        .gas(DEFAULT_GAS)
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    println!("{:#?}", res);
+    assert!(res.is_failure());
+    contract.assert_error_message(res, "ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT");
+
+    // Assert balances remain unchanged
+    let balance = contract.get_eth_on_near_balance(&receiver_id).await?;
+    assert_eq!(balance.0, DEPOSITED_AMOUNT - DEPOSITED_FEE);
+    let balance = contract
+        .get_eth_on_near_balance(&contract.eth_connector_contract.id())
+        .await?;
+    assert_eq!(balance.0, DEPOSITED_FEE - transfer_amount.0);
+    let balance = contract
+        .get_eth_on_near_balance(&contract.engine_contract.id())
+        .await?;
+    assert_eq!(balance.0, transfer_amount.0);
+
+    // Sending to random account should not change balances
+    let some_acc = AccountId::try_from("some-test-acc".to_string()).unwrap();
+    let res = contract
+        .engine_contract
+        .call("ft_transfer_call")
+        .args_json((&some_acc, transfer_amount, memo, message))
+        .gas(DEFAULT_GAS)
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    println!("{:#?}", res);
+    assert!(res.is_success());
+
+    // some-test-acc does not implement `ft_on_transfer` therefore the call fails and the transfer is reverted.
+    let balance = contract.get_eth_on_near_balance(&receiver_id).await?;
+    assert_eq!(balance.0, DEPOSITED_AMOUNT - DEPOSITED_FEE);
+    let balance = contract.get_eth_on_near_balance(&some_acc).await?;
+    assert_eq!(balance.0, 0);
+    let balance = contract
+        .get_eth_on_near_balance(&contract.eth_connector_contract.id())
+        .await?;
+    assert_eq!(balance.0, DEPOSITED_FEE - transfer_amount.0);
+    let balance = contract
+        .get_eth_on_near_balance(&contract.engine_contract.id())
+        .await?;
+    assert_eq!(balance.0, transfer_amount.0);
+
+    /* TODO: add dummy contract
+    // Sending to external receiver with empty message should be success
+    let dummy_ft_receiver = master_account.deploy(
+        &dummy_ft_receiver_bytes(),
+        "ft-rec.root".parse().unwrap(),
+        near_sdk_sim::STORAGE_AMOUNT,
+    );
+    let res = recipient_account.call(
+        CONTRACT_ACC.parse().unwrap(),
+        "ft_transfer_call",
+        json!({
+            "receiver_id": dummy_ft_receiver.account_id(),
+            "amount": transfer_amount.to_string(),
+            "msg": "",
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+    res.assert_success();
+
+    let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE - transfer_amount);
+    let balance = get_eth_on_near_balance(
+        &master_account,
+        dummy_ft_receiver.account_id().as_ref(),
+        CONTRACT_ACC,
+    );
+    assert_eq!(balance, transfer_amount);
+    let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
+    assert_eq!(balance, DEPOSITED_FEE);
+    */
+
+    let balance = contract
+        .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS))
+        .await?;
+    assert_eq!(balance, 0);
+
+    let balance = contract.total_supply().await?;
+    assert_eq!(balance.0, DEPOSITED_AMOUNT);
+
+    let balance = contract.total_eth_supply_on_near().await?;
+    assert_eq!(balance.0, DEPOSITED_AMOUNT);
+
+    let balance = contract.total_eth_supply_on_aurora().await?;
+    assert_eq!(balance, 0);
+
+    Ok(())
+}
