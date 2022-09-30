@@ -1,4 +1,6 @@
 #[cfg(test)]
 mod connector;
 #[cfg(test)]
-pub mod utils;
+pub(crate) mod rust;
+#[cfg(test)]
+pub(crate) mod utils;

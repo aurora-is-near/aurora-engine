@@ -1,13 +1,13 @@
 use crate::admin_controlled::AdminControlled;
-use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
-use crate::parameters::{InitCallArgs, NEP141FtOnTransferArgs, SetContractDataCallArgs};
+use crate::fungible_token::{self, FungibleTokenMetadata};
+use crate::parameters::{InitCallArgs, SetContractDataCallArgs};
 use crate::prelude::PromiseCreateArgs;
 use crate::prelude::{address::error::AddressError, Wei};
 use crate::prelude::{
     sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, Yocto, ERR_FAILED_PARSE,
 };
-use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
+use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
