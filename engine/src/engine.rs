@@ -1175,7 +1175,7 @@ pub fn setup_deploy_erc20_input(current_account_id: &AccountId) -> Vec<u8> {
         ethabi::Token::Address(erc20_admin_address.raw()),
     ]);
 
-    (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec()
+    ([erc20_contract, deploy_args.as_slice()].concat()).to_vec()
 }
 
 /// Used to bridge NEP-141 tokens from NEAR to Aurora. On Aurora the NEP-141 becomes an ERC-20.

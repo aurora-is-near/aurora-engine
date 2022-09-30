@@ -256,7 +256,7 @@ impl core::fmt::Display for JsonValue {
 pub fn parse_json(data: &[u8]) -> Option<JsonValue> {
     let data_array: Vec<char> = data.iter().map(|b| char::from(*b)).collect::<Vec<_>>();
     let mut index = 0;
-    rjson::parse::<JsonValue, JsonArray, JsonObject, JsonValue>(&*data_array, &mut index)
+    rjson::parse::<JsonValue, JsonArray, JsonObject, JsonValue>(&data_array, &mut index)
 }
 
 #[cfg(test)]

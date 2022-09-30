@@ -14,7 +14,7 @@ pub enum EngineStorageValue<'a> {
 impl<'a> AsRef<[u8]> for EngineStorageValue<'a> {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::Slice(slice) => *slice,
+            Self::Slice(slice) => slice,
             Self::Vec(bytes) => bytes,
         }
     }

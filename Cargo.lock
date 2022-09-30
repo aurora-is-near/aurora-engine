@@ -136,7 +136,6 @@ dependencies = [
  "ethabi",
  "evm",
  "hex",
- "rand 0.7.3",
  "rjson",
  "rlp",
  "serde",
