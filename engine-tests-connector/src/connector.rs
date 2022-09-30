@@ -50,7 +50,6 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .await?
         .json::<U128>()
         .unwrap();
-
     assert_eq!(
         balance.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
@@ -83,7 +82,6 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .json::<String>()?
         .parse()
         .unwrap();
-    assert_eq!(balance, 0);
 
     let balance = contract
         .eth_connector_contract
@@ -93,7 +91,6 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .json::<U128>()
         .unwrap();
     assert_eq!(balance.0, DEPOSITED_AMOUNT);
-
     Ok(())
 }
 
