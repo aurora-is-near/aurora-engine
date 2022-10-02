@@ -100,7 +100,7 @@ pub fn handle_precompile_promise<I, P>(
                     amount: STORAGE_AMOUNT,
                 });
             }
-            promise_actions.push(PromiseAction::DeployConotract {
+            promise_actions.push(PromiseAction::DeployContract {
                 code: get_router_code(io).0.into_owned(),
             });
             // After a deploy we call the contract's initialize function

@@ -1,4 +1,7 @@
-use aurora_engine_types::parameters::{PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs};
+use aurora_engine_types::parameters::{
+    NearPromise, PromiseAction, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
+    SimpleNearPromise,
+};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LazyOption, LookupMap};
 use near_sdk::json_types::{U128, U64};
@@ -197,14 +200,15 @@ impl Router {
 
     fn promise_create(promise: PromiseArgs) -> PromiseIndex {
         match promise {
-            PromiseArgs::Create(call) => Self::base_promise_create(call),
-            PromiseArgs::Callback(cb) => Self::cb_promise_create(cb),
+            PromiseArgs::Create(call) => Self::base_promise_create(&call),
+            PromiseArgs::Callback(cb) => Self::cb_promise_create(&cb),
+            PromiseArgs::Recursive(p) => Self::recursive_promise_create(&p),
         }
     }
 
-    fn cb_promise_create(promise: PromiseWithCallbackArgs) -> PromiseIndex {
-        let base = Self::base_promise_create(promise.base);
-        let promise = promise.callback;
+    fn cb_promise_create(promise: &PromiseWithCallbackArgs) -> PromiseIndex {
+        let base = Self::base_promise_create(&promise.base);
+        let promise = &promise.callback;
 
         env::promise_then(
             base,
@@ -216,7 +220,7 @@ impl Router {
         )
     }
 
-    fn base_promise_create(promise: PromiseCreateArgs) -> PromiseIndex {
+    fn base_promise_create(promise: &PromiseCreateArgs) -> PromiseIndex {
         env::promise_create(
             near_sdk::AccountId::new_unchecked(promise.target_account_id.to_string()),
             promise.method.as_str(),
@@ -225,4 +229,131 @@ impl Router {
             promise.attached_gas.as_u64().into(),
         )
     }
+
+    fn recursive_promise_create(promise: &NearPromise) -> PromiseIndex {
+        match promise {
+            NearPromise::Simple(x) => match x {
+                SimpleNearPromise::Create(call) => Self::base_promise_create(call),
+                SimpleNearPromise::Batch(batch) => {
+                    let target =
+                        near_sdk::AccountId::new_unchecked(batch.target_account_id.to_string());
+                    let id = env::promise_batch_create(&target);
+                    Self::add_batch_actions(id, &batch.actions);
+                    id
+                }
+            },
+            NearPromise::Then { base, callback } => {
+                let base_index = Self::recursive_promise_create(base);
+                match callback {
+                    SimpleNearPromise::Create(call) => env::promise_then(
+                        base_index,
+                        near_sdk::AccountId::new_unchecked(call.target_account_id.to_string()),
+                        call.method.as_str(),
+                        &call.args,
+                        call.attached_balance.as_u128(),
+                        call.attached_gas.as_u64().into(),
+                    ),
+                    SimpleNearPromise::Batch(batch) => {
+                        let target =
+                            near_sdk::AccountId::new_unchecked(batch.target_account_id.to_string());
+                        let id = env::promise_batch_then(base_index, &target);
+                        Self::add_batch_actions(id, &batch.actions);
+                        id
+                    }
+                }
+            }
+            NearPromise::And(promises) => {
+                let indices: Vec<PromiseIndex> = promises
+                    .iter()
+                    .map(Self::recursive_promise_create)
+                    .collect();
+                env::promise_and(&indices)
+            }
+        }
+    }
+
+    #[cfg(not(feature = "all-promise-actions"))]
+    fn add_batch_actions(_id: PromiseIndex, _actions: &[PromiseAction]) {
+        unimplemented!("NEAR batch transactions are not supported. Please file an issue at https://github.com/aurora-is-near/aurora-engine")
+    }
+
+    #[cfg(feature = "all-promise-actions")]
+    fn add_batch_actions(id: PromiseIndex, actions: &[PromiseAction]) {
+        for action in actions.iter() {
+            match action {
+                PromiseAction::CreateAccount => env::promise_batch_action_create_account(id),
+                PromiseAction::Transfer { amount } => {
+                    env::promise_batch_action_transfer(id, amount.as_u128())
+                }
+                PromiseAction::DeployContract { code } => {
+                    env::promise_batch_action_deploy_contract(id, code)
+                }
+                PromiseAction::FunctionCall {
+                    name,
+                    args,
+                    attached_yocto,
+                    gas,
+                } => env::promise_batch_action_function_call(
+                    id,
+                    name,
+                    args,
+                    attached_yocto.as_u128(),
+                    gas.as_u64().into(),
+                ),
+                PromiseAction::Stake { amount, public_key } => {
+                    env::promise_batch_action_stake(id, amount.as_u128(), &to_sdk_pk(public_key))
+                }
+                PromiseAction::AddFullAccessKey { public_key, nonce } => {
+                    env::promise_batch_action_add_key_with_full_access(
+                        id,
+                        &to_sdk_pk(public_key),
+                        *nonce,
+                    )
+                }
+                PromiseAction::AddFunctionCallKey {
+                    public_key,
+                    nonce,
+                    allowance,
+                    receiver_id,
+                    function_names,
+                } => {
+                    let receiver_id = near_sdk::AccountId::new_unchecked(receiver_id.to_string());
+                    env::promise_batch_action_add_key_with_function_call(
+                        id,
+                        &to_sdk_pk(public_key),
+                        *nonce,
+                        allowance.as_u128(),
+                        &receiver_id,
+                        function_names,
+                    )
+                }
+                PromiseAction::DeleteKey { public_key } => {
+                    env::promise_batch_action_delete_key(id, &to_sdk_pk(public_key))
+                }
+                PromiseAction::DeleteAccount { beneficiary_id } => {
+                    let beneficiary_id =
+                        near_sdk::AccountId::new_unchecked(beneficiary_id.to_string());
+                    env::promise_batch_action_delete_account(id, &beneficiary_id)
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "all-promise-actions")]
+fn to_sdk_pk(key: &aurora_engine_types::parameters::NearPublicKey) -> near_sdk::PublicKey {
+    let (curve_type, key_bytes): (near_sdk::CurveType, &[u8]) = match key {
+        aurora_engine_types::parameters::NearPublicKey::Ed25519(bytes) => {
+            (near_sdk::CurveType::ED25519, bytes)
+        }
+        aurora_engine_types::parameters::NearPublicKey::Secp256k1(bytes) => {
+            (near_sdk::CurveType::SECP256K1, bytes)
+        }
+    };
+    let mut data = Vec::with_capacity(1 + key_bytes.len());
+    data.push(curve_type as u8);
+    data.extend_from_slice(key_bytes);
+
+    // Unwrap should be safe because we only encode valid public keys
+    data.try_into().unwrap()
 }

@@ -22,5 +22,6 @@ sha2 = { version = "0.10.2", default-features = false }
 std = ["aurora-engine-types/std", "borsh/std", "sha3/std", "sha2/std"]
 contract = []
 log = []
+all-promise-actions = []
 mainnet = []
 testnet = []

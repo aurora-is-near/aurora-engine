@@ -1433,6 +1433,9 @@ where
                                 let base_id = schedule_promise(handler, &promise.base);
                                 schedule_promise_callback(handler, base_id, &promise.callback)
                             }
+                            PromiseArgs::Recursive(_) => {
+                                unreachable!("Exit precompiles do not produce recursive promises")
+                            }
                         };
                     }
                     // do not pass on these "internal logs" to caller
