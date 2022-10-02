@@ -213,6 +213,20 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
+    ///  Mint ETH tokens
+    fn mint_eth_on_aurora(
+        &mut self,
+        owner_id: Address,
+        amount: Wei,
+    ) -> Result<(), fungible_token::error::DepositError> {
+        sdk::log!(&format!(
+            "Mint {} ETH tokens for: {}",
+            amount,
+            owner_id.encode()
+        ));
+        self.internal_deposit_eth_to_aurora(owner_id, amount)
+    }
+
     /// Internal ETH deposit to Aurora
     pub fn internal_deposit_eth_to_aurora(
         &mut self,
