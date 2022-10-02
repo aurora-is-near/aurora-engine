@@ -1,14 +1,20 @@
 use crate::admin_controlled::AdminControlled;
 use crate::fungible_token::{self, FungibleTokenMetadata};
-use crate::parameters::{InitCallArgs, SetContractDataCallArgs};
-use crate::prelude::PromiseCreateArgs;
+use crate::parameters::{
+    BalanceOfEthCallArgs, InitCallArgs, NEP141FtOnTransferArgs, SetContractDataCallArgs,
+};
 use crate::prelude::{address::error::AddressError, Wei};
+use crate::prelude::{PromiseCreateArgs, U256};
+
+use crate::deposit_event::FtTransferMessageData;
+use crate::engine::Engine;
 use crate::prelude::{
-    sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
+    format, sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, Yocto, ERR_FAILED_PARSE,
 };
-use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
+use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::types::ZERO_WEI;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -154,14 +160,71 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
-    pub fn ft_balance_of_eth_on_aurora(&mut self, input: Vec<u8>) -> PromiseCreateArgs {
-        PromiseCreateArgs {
-            target_account_id: self.get_eth_connector_contract_account(),
-            method: "ft_balance_of_eth".to_string(),
-            args: input,
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: VIEW_CALL_GAS,
+    /// Return balance of ETH (ETH in Aurora EVM)
+    pub fn ft_balance_of_eth_on_aurora(
+        &mut self,
+        args: BalanceOfEthCallArgs,
+    ) -> Result<(), crate::prelude::types::balance::error::BalanceOverflowError> {
+        let balance = self.internal_unwrap_balance_of_eth_on_aurora(&args.address);
+        sdk::log!(&format!(
+            "Balance of ETH [{}]: {}",
+            args.address.encode(),
+            balance
+        ));
+        self.io.return_output(format!("\"{}\"", balance).as_bytes());
+        Ok(())
+    }
+
+    /// Balance of ETH (ETH on Aurora)
+    pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: &Address) -> Wei {
+        crate::engine::get_balance(&self.io, address)
+    }
+
+    /// ft_on_transfer callback function
+    pub fn ft_on_transfer<'env, E: Env>(
+        &mut self,
+        engine: &Engine<'env, I, E>,
+        args: &NEP141FtOnTransferArgs,
+    ) -> Result<(), error::FtTransferCallError> {
+        sdk::log!("Call ft_on_transfer");
+        // Parse message with specific rules
+        let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
+            .map_err(error::FtTransferCallError::MessageParseFailed)?;
+
+        // Special case when predecessor_account_id is current_account_id
+        let wei_fee = Wei::from(message_data.fee);
+        // Mint fee to relayer
+        let relayer = engine.get_relayer(message_data.relayer.as_bytes());
+        match (wei_fee, relayer) {
+            (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
+                self.mint_eth_on_aurora(
+                    message_data.recipient,
+                    Wei::new(U256::from(args.amount.as_u128())) - fee,
+                )?;
+                self.mint_eth_on_aurora(evm_relayer_address, fee)?;
+            }
+            _ => self.mint_eth_on_aurora(
+                message_data.recipient,
+                Wei::new(U256::from(args.amount.as_u128())),
+            )?,
         }
+        //self.save_ft_contract();
+        self.io.return_output("\"0\"".as_bytes());
+        Ok(())
+    }
+
+    /// Internal ETH deposit to Aurora
+    pub fn internal_deposit_eth_to_aurora(
+        &mut self,
+        address: Address,
+        amount: Wei,
+    ) -> Result<(), error::DepositError> {
+        let balance = self.internal_unwrap_balance_of_eth_on_aurora(&address);
+        let new_balance = balance
+            .checked_add(amount)
+            .ok_or(error::DepositError::BalanceOverflow)?;
+        crate::engine::set_balance(&mut self.io, &address, &new_balance);
+        Ok(())
     }
 
     /// Transfer between NEAR accounts

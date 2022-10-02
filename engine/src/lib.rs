@@ -613,13 +613,12 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
-        let mut io = Runtime;
-        let input = io.read_input().to_vec();
-        let promise_args = EthConnectorContract::init_instance(io)
+        let io = Runtime;
+        let args: crate::parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
+        EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_balance_of_eth_on_aurora(input);
-        let promise_id = io.promise_create_call(&promise_args);
-        io.promise_return(promise_id);
+            .ft_balance_of_eth_on_aurora(args)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
@@ -657,7 +656,7 @@ mod contract {
         let io = Runtime;
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let _engine = Engine::new(
+        let mut engine = Engine::new(
             predecessor_address(&predecessor_account_id),
             current_account_id.clone(),
             io,
@@ -665,21 +664,25 @@ mod contract {
         )
         .sdk_unwrap();
 
-        let _args: NEP141FtOnTransferArgs = parse_json(io.read_input().to_vec().as_slice())
+        let args: NEP141FtOnTransferArgs = parse_json(io.read_input().to_vec().as_slice())
             .sdk_unwrap()
             .try_into()
             .sdk_unwrap();
+
         if predecessor_account_id == current_account_id {
-            // TODO: should be in aurora-eth-connector
+            EthConnectorContract::init_instance(io)
+                .sdk_unwrap()
+                .ft_on_transfer(&engine, &args)
+                .sdk_unwrap();
         } else {
-            // let signer_account_id = io.signer_account_id();
-            // engine.receive_erc20_tokens(
-            //     &predecessor_account_id,
-            //     &signer_account_id,
-            //     &args,
-            //     &current_account_id,
-            //     &mut Runtime,
-            // );
+            let signer_account_id = io.signer_account_id();
+            engine.receive_erc20_tokens(
+                &predecessor_account_id,
+                &signer_account_id,
+                &args,
+                &current_account_id,
+                &mut Runtime,
+            );
         }
     }
 
