@@ -52,8 +52,8 @@ impl PromiseHandler for PromiseTracker {
     fn promise_attach_callback(
         &mut self,
         base: PromiseId,
-        callback: &aurora_engine_types::parameters::PromiseCreateArgs,
-    ) -> aurora_engine_sdk::promise::PromiseId {
+        callback: &PromiseCreateArgs,
+    ) -> PromiseId {
         let id = self.take_id();
         self.scheduled_promises.insert(
             id,

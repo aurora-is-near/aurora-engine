@@ -1,5 +1,5 @@
 [package]
-name = "xcc_router"
+name = "fibonacci_on_near"
 version = "1.0.0"
 authors = ["Aurora <hello@aurora.dev>"]
 edition = "2021"
@@ -15,9 +15,5 @@ debug = false
 panic = "abort"
 
 [dependencies]
-aurora-engine-types = { path = "../../engine-types", default-features = false }
 near-sdk = "4.0.0"
-
-[features]
-default = []
-all-promise-actions = []
+serde = "1"
