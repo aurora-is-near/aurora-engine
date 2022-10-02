@@ -5,7 +5,7 @@ use aurora_engine_types::account_id::AccountId;
 pub const DEFAULT_PREPAID_GAS: NearGas = NearGas::new(300_000_000_000_000);
 
 /// Timestamp represented by the number of nanoseconds since the Unix Epoch.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Timestamp(u64);
 
 impl Timestamp {
@@ -67,7 +67,7 @@ pub trait Env {
 
 /// Fully in-memory implementation of the blockchain environment with
 /// fixed values for all the fields.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Fixed {
     pub signer_account_id: AccountId,
     pub current_account_id: AccountId,

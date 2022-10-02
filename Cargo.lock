@@ -104,6 +104,7 @@ version = "2.7.0"
 dependencies = [
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
+ "aurora-engine-test-doubles",
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",
@@ -154,12 +155,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-test-doubles"
+version = "1.0.0"
+dependencies = [
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "evm",
+ "evm-gasometer",
+ "evm-runtime",
+]
+
+[[package]]
 name = "aurora-engine-tests"
 version = "1.0.0"
 dependencies = [
  "aurora-engine",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
+ "aurora-engine-test-doubles",
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",

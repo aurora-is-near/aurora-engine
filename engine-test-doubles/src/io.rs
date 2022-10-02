@@ -22,10 +22,10 @@ impl StorageIntermediate for Value {
 pub struct Storage {
     input: Vec<u8>,
     output: Vec<u8>,
-    // TODO: write a real storage backend
     kv_store: HashMap<Vec<u8>, Vec<u8>>,
 }
 
+/// In-memory implementation of [IO].
 #[derive(Debug, Clone, Copy)]
 pub struct StoragePointer<'a>(pub &'a RwLock<Storage>);
 

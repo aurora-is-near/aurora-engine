@@ -31,6 +31,7 @@ opt-level = 3
 resolver = "2"
 members = [
     "engine",
+    "engine-test-doubles",
     "engine-precompiles",
     "engine-sdk",
     "engine-standalone-storage",
