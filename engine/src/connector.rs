@@ -145,7 +145,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         sdk::log!(&format!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
             event.sender.encode(),
-            event.token_message_data.get_recipient(),
+            event.token_message_data.recipient(),
             event.amount,
             event.fee
         ));
@@ -189,7 +189,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             TokenMessageData::Near(account_id) => FinishDepositCallArgs {
                 new_owner_id: account_id,
                 amount: event.amount,
-                proof_key: proof.get_key(),
+                proof_key: proof.key(),
                 relayer_id: predecessor_account_id,
                 fee: event.fee,
                 msg: None,
@@ -217,7 +217,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 FinishDepositCallArgs {
                     new_owner_id: current_account_id.clone(),
                     amount: event.amount,
-                    proof_key: proof.get_key(),
+                    proof_key: proof.key(),
                     relayer_id: predecessor_account_id,
                     fee: event.fee,
                     msg: Some(transfer_data),
@@ -650,7 +650,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Checks whether the provided proof was already used
     pub fn is_used_proof(&self, proof: Proof) -> bool {
-        self.is_used_event(&proof.get_key())
+        self.is_used_event(&proof.key())
     }
 
     /// Get Eth connector paused flags
