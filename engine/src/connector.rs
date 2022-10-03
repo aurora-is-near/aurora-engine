@@ -8,9 +8,10 @@ use crate::prelude::{PromiseCreateArgs, U256};
 
 use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
+use crate::fungible_token::error::DepositError;
 use crate::prelude::{
     format, sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
-    KeyPrefix, NearGas, ToString, Vec, Yocto, ERR_FAILED_PARSE,
+    KeyPrefix, NearGas, ToString, Vec, Yocto,
 };
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -214,11 +215,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     ///  Mint ETH tokens
-    fn mint_eth_on_aurora(
-        &mut self,
-        owner_id: Address,
-        amount: Wei,
-    ) -> Result<(), fungible_token::error::DepositError> {
+    fn mint_eth_on_aurora(&mut self, owner_id: Address, amount: Wei) -> Result<(), DepositError> {
         sdk::log!(&format!(
             "Mint {} ETH tokens for: {}",
             amount,
@@ -232,11 +229,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         &mut self,
         address: Address,
         amount: Wei,
-    ) -> Result<(), error::DepositError> {
+    ) -> Result<(), DepositError> {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(&address);
         let new_balance = balance
             .checked_add(amount)
-            .ok_or(error::DepositError::BalanceOverflow)?;
+            .ok_or(DepositError::BalanceOverflow)?;
         crate::engine::set_balance(&mut self.io, &address, &new_balance);
         Ok(())
     }
@@ -422,7 +419,7 @@ pub mod error {
     use aurora_engine_types::types::balance::error::BalanceOverflowError;
 
     use crate::deposit_event::error::ParseOnTransferMessageError;
-    use crate::{deposit_event, fungible_token};
+    use crate::fungible_token;
 
     const PROOF_EXIST: &[u8; 15] = errors::ERR_PROOF_EXIST;
 
@@ -437,27 +434,6 @@ pub mod error {
             match self {
                 Self::KeyNotFound => errors::ERR_CONNECTOR_STORAGE_KEY_NOT_FOUND,
                 Self::BorshDeserialize => errors::ERR_FAILED_DESERIALIZE_CONNECTOR_DATA,
-            }
-        }
-    }
-
-    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
-    pub enum DepositError {
-        ProofParseFailed,
-        EventParseFailed(deposit_event::error::ParseError),
-        CustodianAddressMismatch,
-        InsufficientAmountForFee,
-        InvalidAddress(AddressError),
-    }
-
-    impl AsRef<[u8]> for DepositError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::ProofParseFailed => super::ERR_FAILED_PARSE.as_bytes(),
-                Self::EventParseFailed(e) => e.as_ref(),
-                Self::CustodianAddressMismatch => errors::ERR_WRONG_EVENT_ADDRESS,
-                Self::InsufficientAmountForFee => super::ERR_NOT_ENOUGH_BALANCE_FOR_FEE.as_bytes(),
-                Self::InvalidAddress(e) => e.as_ref(),
             }
         }
     }

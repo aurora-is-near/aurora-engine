@@ -445,7 +445,7 @@ pub mod error {
         Engine(engine::EngineError),
         DeployErc20(engine::DeployErc20Error),
         FtOnTransfer(connector::error::FtTransferCallError),
-        Deposit(connector::error::DepositError),
+        Deposit(fungible_token::error::DepositError),
         FinishDeposit(connector::error::FinishDepositError),
         FtTransfer(fungible_token::error::TransferError),
         FtWithdraw(connector::error::WithdrawError),
@@ -479,8 +479,8 @@ pub mod error {
         }
     }
 
-    impl From<connector::error::DepositError> for Error {
-        fn from(e: connector::error::DepositError) -> Self {
+    impl From<fungible_token::error::DepositError> for Error {
+        fn from(e: fungible_token::error::DepositError) -> Self {
             Self::Deposit(e)
         }
     }
