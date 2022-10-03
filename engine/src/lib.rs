@@ -351,6 +351,12 @@ mod contract {
     pub extern "C" fn factory_update_address_version() {
         let mut io = Runtime;
         io.assert_private_call().sdk_unwrap();
+        let check_deploy: Result<(), &[u8]> = match io.promise_result(0) {
+            Some(PromiseResult::Successful(_)) => Ok(()),
+            Some(_) => Err(b"ERR_ROUTER_DEPLOY_FAILED"),
+            None => Err(b"ERR_ROUTER_UPDATE_NOT_CALLBACK"),
+        };
+        check_deploy.sdk_unwrap();
         let args: crate::xcc::AddressVersionUpdateArgs = io.read_input_borsh().sdk_unwrap();
         crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
     }
