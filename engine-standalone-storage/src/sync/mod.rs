@@ -225,7 +225,6 @@ fn non_submit_execute<'db>(
             } else {
                 engine.receive_erc20_tokens(
                     &env.predecessor_account_id,
-                    &env.signer_account_id,
                     args,
                     &env.current_account_id,
                     &mut handler,
