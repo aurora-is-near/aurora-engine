@@ -29,11 +29,11 @@ impl<'a> PromiseHandler for NoScheduler<'a> {
         Some(result)
     }
 
-    fn promise_create_call(&mut self, _args: &PromiseCreateArgs) -> PromiseId {
+    unsafe fn promise_create_call(&mut self, _args: &PromiseCreateArgs) -> PromiseId {
         PromiseId::new(0)
     }
 
-    fn promise_attach_callback(
+    unsafe fn promise_attach_callback(
         &mut self,
         _base: PromiseId,
         _callback: &PromiseCreateArgs,
@@ -41,7 +41,7 @@ impl<'a> PromiseHandler for NoScheduler<'a> {
         PromiseId::new(0)
     }
 
-    fn promise_create_batch(&mut self, _args: &PromiseBatchAction) -> PromiseId {
+    unsafe fn promise_create_batch(&mut self, _args: &PromiseBatchAction) -> PromiseId {
         PromiseId::new(0)
     }
 

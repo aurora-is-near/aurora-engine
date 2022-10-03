@@ -1428,10 +1428,19 @@ where
                 if log.topics.is_empty() {
                     if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
                         match promise {
-                            PromiseArgs::Create(promise) => schedule_promise(handler, &promise),
+                            PromiseArgs::Create(promise) => {
+                                // Safety: this promise creation is safe because it does not come from
+                                // users directly. The exit precompiles only create promises which we
+                                // are able to execute without violating any security invariants.
+                                unsafe { schedule_promise(handler, &promise) }
+                            }
                             PromiseArgs::Callback(promise) => {
-                                let base_id = schedule_promise(handler, &promise.base);
-                                schedule_promise_callback(handler, base_id, &promise.callback)
+                                // Safety: This is safe because the promise data comes from our own
+                                // exit precompiles. See note above.
+                                unsafe {
+                                    let base_id = schedule_promise(handler, &promise.base);
+                                    schedule_promise_callback(handler, base_id, &promise.callback)
+                                }
                             }
                             PromiseArgs::Recursive(_) => {
                                 unreachable!("Exit precompiles do not produce recursive promises")
@@ -1472,7 +1481,10 @@ where
         .collect()
 }
 
-fn schedule_promise<P: PromiseHandler>(handler: &mut P, promise: &PromiseCreateArgs) -> PromiseId {
+unsafe fn schedule_promise<P: PromiseHandler>(
+    handler: &mut P,
+    promise: &PromiseCreateArgs,
+) -> PromiseId {
     sdk::log!(&crate::prelude::format!(
         "call_contract {}.{}",
         promise.target_account_id,
@@ -1481,7 +1493,7 @@ fn schedule_promise<P: PromiseHandler>(handler: &mut P, promise: &PromiseCreateA
     handler.promise_create_call(promise)
 }
 
-fn schedule_promise_callback<P: PromiseHandler>(
+unsafe fn schedule_promise_callback<P: PromiseHandler>(
     handler: &mut P,
     base_id: PromiseId,
     promise: &PromiseCreateArgs,
