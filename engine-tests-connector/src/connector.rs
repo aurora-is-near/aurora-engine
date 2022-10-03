@@ -249,7 +249,7 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
         .engine_contract
         .call("ft_transfer_call")
         .args_json((
-            contract.eth_connector_contract.id(),
+            contract.engine_contract.id(),
             transfer_amount,
             memo,
             message,
@@ -266,22 +266,18 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
         DEPOSITED_AMOUNT - DEPOSITED_FEE,
     );
     assert_eq!(
-        contract.get_eth_on_near_balance(&receiver_id).await?.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE,
-    );
-    assert_eq!(
         contract
             .get_eth_on_near_balance(&contract.eth_connector_contract.id())
             .await?
             .0,
-        transfer_amount.0,
+        0,
     );
     assert_eq!(
         contract
             .get_eth_on_near_balance(&contract.engine_contract.id())
             .await?
             .0,
-        DEPOSITED_FEE - transfer_amount.0,
+        DEPOSITED_FEE,
     );
     assert_eq!(
         contract
@@ -291,9 +287,9 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_EVM_AMOUNT,
+        DEPOSITED_AMOUNT,
     );
-    assert_eq!(contract.total_supply().await?.0, DEPOSITED_EVM_AMOUNT,);
+    assert_eq!(contract.total_supply().await?.0, DEPOSITED_AMOUNT);
     Ok(())
 }
 
@@ -330,7 +326,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
         .engine_contract
         .call("ft_transfer_call")
         .args_json((
-            contract.eth_connector_contract.id(),
+            contract.engine_contract.id(),
             transfer_amount,
             &memo,
             message,
@@ -339,7 +335,6 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    println!("{:#?}", res.receipt_outcomes());
     assert!(contract.check_error_message(res, "ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT"));
 
     // Assert balances remain unchanged

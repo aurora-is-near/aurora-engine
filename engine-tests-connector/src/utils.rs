@@ -56,13 +56,13 @@ impl TestContract {
 
         let root_account = Account::from_secret_key(root, sk, &worker);
         let eth_connector = root_account
-            .create_subaccount("eth_connector")
+            .create_subaccount("aurora_eth_connector")
             .initial_balance(near_units::parse_near!("15 N"))
             .transact()
             .await?
             .into_result()?;
         let engine = root_account
-            .create_subaccount("engine")
+            .create_subaccount("eth_connector")
             .initial_balance(near_units::parse_near!("15 N"))
             .transact()
             .await?
@@ -208,6 +208,7 @@ impl TestContract {
     pub async fn call_deposit_eth_to_aurora(&self) -> anyhow::Result<()> {
         let proof: Proof = serde_json::from_str(PROOF_DATA_ETH).unwrap();
         let res = self.deposit_with_proof(&proof).await?;
+        //println!("{:#?}", res);
         assert!(res.is_success());
         Ok(())
     }
@@ -226,7 +227,14 @@ impl TestContract {
     }
 
     pub fn check_error_message(&self, res: ExecutionFinalResult, error_msg: &str) -> bool {
-        format!("{:?}", res).contains(error_msg)
+        let mut is_failure = false;
+        for out in res.receipt_outcomes() {
+            is_failure = out.is_failure();
+            if is_failure {
+                return format!("{:?}", res).contains(error_msg);
+            }
+        }
+        is_failure
     }
 
     pub async fn call_is_used_proof(&self, proof: &str) -> anyhow::Result<bool> {
@@ -274,32 +282,28 @@ impl TestContract {
         Ok(res)
     }
 
-    pub async fn assert_eth_on_near_balance(
-        &self,
-        account: &AccountId,
-        balance: u128,
-    ) -> anyhow::Result<()> {
-        assert_eq!(balance, self.get_eth_on_near_balance(account).await?.0);
-        Ok(())
-    }
-
     pub async fn get_eth_balance(&self, address: &Address) -> anyhow::Result<u128> {
+        use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+        #[derive(BorshSerialize, BorshDeserialize)]
+        pub struct BalanceOfEthCallArgs {
+            pub address: Address,
+        }
+        let args = BalanceOfEthCallArgs {
+            address: address.clone(),
+        }
+        .try_to_vec()
+        .unwrap();
+
         let res = self
             .engine_contract
             .call("ft_balance_of_eth")
-            .args_json((address,))
+            .args(args)
             .gas(DEFAULT_GAS)
             .transact()
-            .await?
-            .into_result()
-            .unwrap()
-            .json::<String>()?;
+            .await?;
+        //println!("{:#?}", res);
+        let res = res.into_result().unwrap().json::<String>()?;
         Ok(res.parse().unwrap())
-    }
-
-    pub async fn assert_eth_balance(&self, address: &Address, balance: u128) -> anyhow::Result<()> {
-        assert_eq!(balance, self.get_eth_balance(address).await?);
-        Ok(())
     }
 
     pub async fn total_supply(&self) -> anyhow::Result<U128> {

@@ -205,7 +205,7 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-    "test_ft_transfer", 
+#    "test_ft_transfer",
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",
