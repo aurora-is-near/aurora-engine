@@ -225,26 +225,8 @@ impl TestContract {
             .await?)
     }
 
-    pub async fn assert_proof_was_used(&self, proof: &str) -> anyhow::Result<()> {
-        let is_used_proof = self.call_is_used_proof(proof).await?;
-        assert!(
-            is_used_proof,
-            "Expected not to fail because the proof should have been already used",
-        );
-        Ok(())
-    }
-
-    pub fn assert_error_message(&self, res: ExecutionFinalResult, error_msg: &str) {
-        assert!(format!("{:?}", res).contains(error_msg));
-    }
-
-    pub async fn assert_proof_was_not_used(&self, proof: &str) -> anyhow::Result<()> {
-        let is_used_proof = self.call_is_used_proof(proof).await?;
-        assert!(
-            !is_used_proof,
-            "Expected not to fail because the proof should not have been already used",
-        );
-        Ok(())
+    pub fn check_error_message(&self, res: ExecutionFinalResult, error_msg: &str) -> bool {
+        format!("{:?}", res).contains(error_msg)
     }
 
     pub async fn call_is_used_proof(&self, proof: &str) -> anyhow::Result<bool> {
@@ -341,24 +323,6 @@ impl TestContract {
 
     pub async fn assert_total_supply(&self, balance: u128) -> anyhow::Result<()> {
         assert_eq!(balance, self.total_supply().await?.0);
-        Ok(())
-    }
-
-    pub async fn total_eth_supply_on_aurora(&self) -> anyhow::Result<u128> {
-        let res = self
-            .engine_contract
-            .call("ft_total_eth_supply_on_aurora")
-            .gas(DEFAULT_GAS)
-            .transact()
-            .await?
-            .into_result()
-            .unwrap()
-            .json::<String>()?;
-        Ok(res.parse().unwrap())
-    }
-
-    pub async fn assert_total_eth_supply_on_aurora(&self, balance: u128) -> anyhow::Result<()> {
-        assert_eq!(balance, self.total_eth_supply_on_aurora().await?);
         Ok(())
     }
 }
