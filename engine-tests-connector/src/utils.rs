@@ -259,11 +259,6 @@ impl TestContract {
         Ok(res)
     }
 
-    pub async fn assert_total_eth_supply_on_near(&self, balance: u128) -> anyhow::Result<()> {
-        assert_eq!(balance, self.total_eth_supply_on_near().await?.0);
-        Ok(())
-    }
-
     pub async fn get_eth_on_near_balance(&self, account: &AccountId) -> anyhow::Result<U128> {
         let res = self
             .engine_contract
@@ -319,11 +314,6 @@ impl TestContract {
             .json::<U128>()
             .unwrap();
         Ok(res)
-    }
-
-    pub async fn assert_total_supply(&self, balance: u128) -> anyhow::Result<()> {
-        assert_eq!(balance, self.total_supply().await?.0);
-        Ok(())
     }
 }
 
