@@ -617,7 +617,7 @@ pub mod sim_tests {
             aurora,
         } = test_exit_to_near_eth_common();
         let exit_account_id = "any.near".to_owned();
-        println!("#1");
+        println!("#4");
         // Make the ft_transfer call fail by draining the Aurora account
         let transfer_args = json!({
             "receiver_id": "tmp.near",
@@ -634,7 +634,7 @@ pub mod sim_tests {
                 1,
             )
             .assert_success();
-
+        println!("#5");
         // call exit to near
         let input = super::build_input(
             "withdrawEthToNear(bytes)",
@@ -647,6 +647,7 @@ pub mod sim_tests {
             Some(chain_id),
             &signer.secret_key,
         );
+        println!("#6");
         aurora.call("submit", &rlp::encode(&tx)).assert_success();
 
         // check balances
@@ -654,6 +655,7 @@ pub mod sim_tests {
             nep_141_balance_of(exit_account_id.as_str(), &aurora.contract, &aurora),
             0
         );
+        println!("#7");
         #[cfg(feature = "error_refund")]
         assert_eq!(
             eth_balance_of(signer_address, &aurora),
@@ -680,15 +682,25 @@ pub mod sim_tests {
                     .unwrap(),
             )
             .assert_success();
-        let _ = deploy_aurora_eth_connector(&aurora);
-        // assert_eq!(
-        //     nep_141_balance_of(
-        //         aurora.contract.account_id.as_str(),
-        //         &aurora.contract,
-        //         &aurora,
-        //     ),
-        //     INITIAL_ETH_BALANCE as u128
-        // );
+        println!("#0");
+        let nep141_contract = deploy_aurora_eth_connector(&aurora);
+        println!("#1");
+        let balance: u64 = nep141_contract
+            .call(
+                nep141_contract.account_id(),
+                "ft_balance_of",
+                json!({ "account_id": nep141_contract.account_id() })
+                    .to_string()
+                    .as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .unwrap_json_value()
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_eq!(balance, 400);
         println!("#2");
         assert_eq!(
             eth_balance_of(signer_address, &aurora),
@@ -1030,7 +1042,7 @@ pub mod sim_tests {
         });
         let init_args = json!( {
             "prover_account": AccountId::new(AURORA_ETH_CONNECTOR).unwrap(),
-            "eth_custodian_address": "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+            "eth_custodian_address": "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_string(),
             "metadata": metadata,
             "account_with_access_right": AccountId::new(&aurora.contract.account_id.to_string())
                 .unwrap(),
@@ -1047,12 +1059,10 @@ pub mod sim_tests {
             )
             .assert_success();
 
-        //let acc = contract_account.account_id();
         let proof: Proof = serde_json::from_str(PROOF_DATA_NEAR).unwrap();
-        aurora
-            .contract
+        contract_account
             .call(
-                aurora.contract.account_id(),
+                contract_account.account_id(),
                 "deposit",
                 &proof.try_to_vec().unwrap(),
                 near_sdk_sim::DEFAULT_GAS,
