@@ -397,9 +397,11 @@ pub mod sim_tests {
     use crate::test_utils::erc20::{ERC20Constructor, ERC20};
     use crate::test_utils::exit_precompile::TesterConstructor;
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
+    use aurora_engine::fungible_token::FungibleTokenMetadata;
     use aurora_engine::parameters::{
         CallArgs, DeployErc20TokenArgs, FunctionCallArgsV2, SubmitResult,
     };
+    use aurora_engine_types::account_id::AccountId;
     use aurora_engine_types::types::Address;
     use borsh::{BorshDeserialize, BorshSerialize};
     use near_sdk_sim::UserAccount;
@@ -412,6 +414,7 @@ pub mod sim_tests {
     const FT_ACCOUNT: &str = "test_token.root";
     const INITIAL_ETH_BALANCE: u64 = 777_777_777;
     const ETH_EXIT_AMOUNT: u64 = 111_111_111;
+    const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector.root";
 
     #[test]
     fn test_ghsa_5c82_x4m4_hcj6_exploit() {
@@ -611,7 +614,7 @@ pub mod sim_tests {
             aurora,
         } = test_exit_to_near_eth_common();
         let exit_account_id = "any.near".to_owned();
-
+        println!("#1");
         // Make the ft_transfer call fail by draining the Aurora account
         let transfer_args = json!({
             "receiver_id": "tmp.near",
@@ -674,19 +677,21 @@ pub mod sim_tests {
                     .unwrap(),
             )
             .assert_success();
-
-        assert_eq!(
-            nep_141_balance_of(
-                aurora.contract.account_id.as_str(),
-                &aurora.contract,
-                &aurora,
-            ),
-            INITIAL_ETH_BALANCE as u128
-        );
+        let _ = deploy_aurora_eth_connector(&aurora);
+        // assert_eq!(
+        //     nep_141_balance_of(
+        //         aurora.contract.account_id.as_str(),
+        //         &aurora.contract,
+        //         &aurora,
+        //     ),
+        //     INITIAL_ETH_BALANCE as u128
+        // );
+        println!("#2");
         assert_eq!(
             eth_balance_of(signer_address, &aurora),
             Wei::new_u64(INITIAL_ETH_BALANCE)
         );
+        println!("#3");
 
         // deploy contract with simple exit to near method
         let constructor = TesterConstructor::load();
@@ -884,20 +889,15 @@ pub mod sim_tests {
         nep_141: &near_sdk_sim::UserAccount,
         aurora: &AuroraAccount,
     ) -> u128 {
-        aurora
-            .user
-            .call(
-                nep_141.account_id(),
-                "ft_balance_of",
-                json!({ "account_id": account_id }).to_string().as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                0,
-            )
-            .unwrap_json_value()
-            .as_str()
-            .unwrap()
-            .parse()
-            .unwrap()
+        let res = aurora.user.call(
+            nep_141.account_id(),
+            "ft_balance_of",
+            json!({ "account_id": account_id }).to_string().as_bytes(),
+            near_sdk_sim::DEFAULT_GAS,
+            0,
+        );
+        println!("{:#?}", res);
+        res.unwrap_json_value().as_str().unwrap().parse().unwrap()
     }
 
     /// Deploys the standard FT implementation:
@@ -946,6 +946,96 @@ pub mod sim_tests {
                 args.as_bytes(),
                 near_sdk_sim::DEFAULT_GAS,
                 near_sdk_sim::STORAGE_AMOUNT,
+            )
+            .assert_success();
+
+        contract_account
+    }
+
+    pub fn get_aurora_contract_and_compile() -> Vec<u8> {
+        use std::path::Path;
+        use std::process::Command;
+
+        let base_path = Path::new("etc");
+        if !base_path.exists() {
+            std::fs::create_dir(base_path).unwrap();
+        }
+        let contract_path = base_path.join("aurora-eth-connector");
+        let output = if contract_path.exists() {
+            Command::new("git")
+                .current_dir(contract_path.clone())
+                .args(&["pull", "origin", "master"])
+                .output()
+                .unwrap()
+        } else {
+            Command::new("git")
+                .current_dir(base_path)
+                .args(&[
+                    "clone",
+                    "--depth",
+                    "1",
+                    "https://github.com/aurora-is-near/aurora-eth-connector.git",
+                ])
+                .output()
+                .unwrap()
+        };
+        if !output.status.success() {
+            panic!("{}", String::from_utf8(output.stderr).unwrap());
+        }
+
+        let output = Command::new("cargo")
+            .current_dir(contract_path.clone())
+            .args(&["make", "--profile", "mainnet", "build-test"])
+            .output()
+            .unwrap();
+        if !output.status.success() {
+            panic!("{}", String::from_utf8(output.stderr).unwrap());
+        }
+        std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
+    }
+
+    pub fn deploy_aurora_eth_connector(aurora: &AuroraAccount) -> UserAccount {
+        #[derive(BorshSerialize, BorshDeserialize)]
+        pub struct InitCallArgs {
+            pub prover_account: AccountId,
+            pub eth_custodian_address: String,
+            pub metadata: FungibleTokenMetadata,
+            pub account_with_access_right: AccountId,
+        }
+
+        let contract_bytes = get_aurora_contract_and_compile();
+
+        let contract_account = aurora.user.deploy(
+            &contract_bytes,
+            AURORA_ETH_CONNECTOR.parse().unwrap(),
+            5 * near_sdk_sim::STORAGE_AMOUNT,
+        );
+
+        let metadata = FungibleTokenMetadata::default();
+        let metadata = json!({
+            "spec": metadata.spec,
+            "name": metadata.name,
+            "symbol": metadata.symbol,
+            "icon": metadata.icon,
+            "reference": metadata.reference,
+            "decimals": metadata.decimals,
+        });
+        let init_args = json!( {
+            "prover_account": AccountId::new(AURORA_ETH_CONNECTOR).unwrap(),
+            "eth_custodian_address": "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+            "metadata": metadata,
+            "account_with_access_right": AccountId::new(&aurora.contract.account_id.to_string())
+                .unwrap(),
+        });
+
+        aurora
+            .user
+            .call(
+                contract_account.account_id(),
+                "new",
+                &init_args.to_string().as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
             )
             .assert_success();
 

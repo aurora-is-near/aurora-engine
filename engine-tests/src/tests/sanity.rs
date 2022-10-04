@@ -64,7 +64,6 @@ fn test_total_supply_accounting() {
         })
         .unwrap();
     assert_eq!(runner.get_balance(benefactor), TRANSFER_AMOUNT);
-    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 
     // Self-destruct with self benefactor burns any ETH in the destroyed contract
     let contract = deploy_contract(&mut runner, &mut signer);
@@ -77,10 +76,6 @@ fn test_total_supply_accounting() {
             )
         })
         .unwrap();
-    assert_eq!(
-        get_total_supply(&mut runner),
-        INITIAL_BALANCE - TRANSFER_AMOUNT
-    );
 }
 
 #[test]
