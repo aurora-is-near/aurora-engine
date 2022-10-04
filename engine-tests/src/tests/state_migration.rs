@@ -33,6 +33,7 @@ pub fn deploy_evm() -> AuroraAccount {
         aurora_runner.aurora_account_id,
         main_account.account_id()
     );
+
     let contract_account = main_account.deploy(
         aurora_runner.code.code(),
         sim_aurora_account.parse().unwrap(),
@@ -70,7 +71,7 @@ pub fn deploy_evm() -> AuroraAccount {
         .assert_success();
 
     let args = SetEthConnectorContractAccountArgs {
-        account: AccountId::new("aurora_eth_connector.root").unwrap(),
+        account: AccountId::new(&contract_account.account_id.clone().to_string()).unwrap(),
     };
     contract_account
         .call(

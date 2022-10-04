@@ -816,38 +816,6 @@ mod contract {
             reset_storage: false,
         };
         engine.apply(core::iter::once(state_change), core::iter::empty(), false);
-
-        // Call "finish_deposit" to mint the corresponding
-        // nETH NEP-141 tokens as well
-        let aurora_account_id = io.current_account_id();
-        let args = crate::parameters::FinishDepositCallArgs {
-            new_owner_id: aurora_account_id.clone(),
-            amount: balance,
-            proof_key: crate::prelude::String::new(),
-            relayer_id: aurora_account_id.clone(),
-            fee: 0.into(),
-            msg: None,
-        };
-        let verify_call = aurora_engine_types::parameters::PromiseCreateArgs {
-            target_account_id: aurora_account_id.clone(),
-            method: "verify_log_entry".to_string(),
-            args: crate::prelude::Vec::new(),
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_VERIFY,
-        };
-        let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
-            target_account_id: aurora_account_id,
-            method: "finish_deposit".to_string(),
-            args: args.try_to_vec().unwrap(),
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_FINISH,
-        };
-        io.promise_create_with_callback(
-            &aurora_engine_types::parameters::PromiseWithCallbackArgs {
-                base: verify_call,
-                callback: finish_call,
-            },
-        );
     }
 
     #[no_mangle]
