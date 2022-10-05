@@ -20,10 +20,10 @@ const CUSTODIAN_ADDRESS: &[u8] = &[
     132, 168, 43, 179, 156, 131, 152, 157, 93, 192, 126, 19, 16, 40, 25, 35, 210, 84, 77, 194,
 ];
 
-macro_rules! unsafe_feature_gated {
+macro_rules! feature_gated {
     ($feature_name:literal, $code:block) => {
         if cfg!(feature = $feature_name) {
-            unsafe { $code }
+            $code
         } else {
             unimplemented!("Not implemented without feature {}", $feature_name)
         }
@@ -292,14 +292,14 @@ impl crate::promise::PromiseHandler for Runtime {
         }
     }
 
-    fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
+    unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
         let account_id = args.target_account_id.as_bytes();
         let method_name = args.method.as_bytes();
         let arguments = args.args.as_slice();
         let amount = args.attached_balance.as_u128();
         let gas = args.attached_gas.as_u64();
 
-        let id = unsafe {
+        let id = {
             exports::promise_create(
                 account_id.len() as _,
                 account_id.as_ptr() as _,
@@ -314,7 +314,7 @@ impl crate::promise::PromiseHandler for Runtime {
         PromiseId::new(id)
     }
 
-    fn promise_attach_callback(
+    unsafe fn promise_attach_callback(
         &mut self,
         base: PromiseId,
         callback: &PromiseCreateArgs,
@@ -325,7 +325,7 @@ impl crate::promise::PromiseHandler for Runtime {
         let amount = callback.attached_balance.as_u128();
         let gas = callback.attached_gas.as_u64();
 
-        let id = unsafe {
+        let id = {
             exports::promise_then(
                 base.raw(),
                 account_id.len() as _,
@@ -342,36 +342,34 @@ impl crate::promise::PromiseHandler for Runtime {
         PromiseId::new(id)
     }
 
-    fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
+    unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
         let account_id = args.target_account_id.as_bytes();
 
-        let id = unsafe {
-            exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _)
-        };
+        let id = { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) };
 
         for action in args.actions.iter() {
             match action {
-                PromiseAction::CreateAccount => unsafe {
+                PromiseAction::CreateAccount => {
                     exports::promise_batch_action_create_account(id);
-                },
-                PromiseAction::Transfer { amount } => unsafe {
+                }
+                PromiseAction::Transfer { amount } => {
                     let amount = amount.as_u128();
                     exports::promise_batch_action_transfer(id, &amount as *const u128 as _);
-                },
-                PromiseAction::DeployContract { code } => unsafe {
+                }
+                PromiseAction::DeployContract { code } => {
                     let code = code.as_slice();
                     exports::promise_batch_action_deploy_contract(
                         id,
                         code.len() as _,
                         code.as_ptr() as _,
                     );
-                },
+                }
                 PromiseAction::FunctionCall {
                     name,
                     gas,
                     attached_yocto,
                     args,
-                } => unsafe {
+                } => {
                     let method_name = name.as_bytes();
                     let arguments = args.as_slice();
                     let amount = attached_yocto.as_u128();
@@ -384,9 +382,9 @@ impl crate::promise::PromiseHandler for Runtime {
                         &amount as *const u128 as _,
                         gas.as_u64(),
                     )
-                },
+                }
                 PromiseAction::Stake { amount, public_key } => {
-                    unsafe_feature_gated!("all-promise-actions", {
+                    feature_gated!("all-promise-actions", {
                         let amount = amount.as_u128();
                         let pk: RawPublicKey = public_key.into();
                         let pk_bytes = pk.as_bytes();
@@ -399,7 +397,7 @@ impl crate::promise::PromiseHandler for Runtime {
                     });
                 }
                 PromiseAction::AddFullAccessKey { public_key, nonce } => {
-                    unsafe_feature_gated!("all-promise-actions", {
+                    feature_gated!("all-promise-actions", {
                         let pk: RawPublicKey = public_key.into();
                         let pk_bytes = pk.as_bytes();
                         exports::promise_batch_action_add_key_with_full_access(
@@ -417,7 +415,7 @@ impl crate::promise::PromiseHandler for Runtime {
                     receiver_id,
                     function_names,
                 } => {
-                    unsafe_feature_gated!("all-promise-actions", {
+                    feature_gated!("all-promise-actions", {
                         let pk: RawPublicKey = public_key.into();
                         let pk_bytes = pk.as_bytes();
                         let allowance = allowance.as_u128();
@@ -437,7 +435,7 @@ impl crate::promise::PromiseHandler for Runtime {
                     });
                 }
                 PromiseAction::DeleteKey { public_key } => {
-                    unsafe_feature_gated!("all-promise-actions", {
+                    feature_gated!("all-promise-actions", {
                         let pk: RawPublicKey = public_key.into();
                         let pk_bytes = pk.as_bytes();
                         exports::promise_batch_action_delete_key(
@@ -448,7 +446,7 @@ impl crate::promise::PromiseHandler for Runtime {
                     });
                 }
                 PromiseAction::DeleteAccount { beneficiary_id } => {
-                    unsafe_feature_gated!("all-promise-actions", {
+                    feature_gated!("all-promise-actions", {
                         let beneficiary_id = beneficiary_id.as_bytes();
                         exports::promise_batch_action_delete_key(
                             id,
