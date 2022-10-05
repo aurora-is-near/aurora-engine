@@ -20,6 +20,15 @@ pub const DEPOSITED_EVM_FEE: u128 = 200;
 pub const DEPOSITED_EVM_AMOUNT: u128 = 10200;
 pub const CONTRACT_ACC: &str = "eth_connector.root";
 
+pub type PausedMask = u8;
+
+/// Admin control flow flag indicates that all control flow unpause (unblocked).
+pub const UNPAUSE_ALL: PausedMask = 0;
+/// Admin control flow flag indicates that the deposit is paused.
+pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
+/// Admin control flow flag indicates that withdrawal is paused.
+pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
+
 pub struct TestContract {
     pub engine_contract: Contract,
     pub eth_connector_contract: Contract,

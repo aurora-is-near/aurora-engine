@@ -205,7 +205,7 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-#    "connector",
+    "test_admin_controlled_only_admin_can_pause",
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",
