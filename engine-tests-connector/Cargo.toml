@@ -29,3 +29,5 @@ ethabi = "17.1"
 rlp = { version = "0.5.0", default-features = false }
 
 [features]
+mainnet-test = []
+testnet-test = []

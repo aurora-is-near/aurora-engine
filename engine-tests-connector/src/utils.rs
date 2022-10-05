@@ -193,7 +193,6 @@ impl TestContract {
     pub async fn call_deposit_eth_to_aurora(&self) -> anyhow::Result<()> {
         let proof: Proof = serde_json::from_str(PROOF_DATA_ETH).unwrap();
         let res = self.deposit_with_proof(&proof).await?;
-        //println!("{:#?}", res);
         assert!(res.is_success());
         Ok(())
     }
@@ -286,7 +285,6 @@ impl TestContract {
             .gas(DEFAULT_GAS)
             .transact()
             .await?;
-        //println!("{:#?}", res);
         let res = res.into_result().unwrap().json::<String>()?;
         Ok(res.parse().unwrap())
     }

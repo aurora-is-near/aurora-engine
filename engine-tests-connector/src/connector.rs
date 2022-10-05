@@ -6,6 +6,7 @@ use aurora_engine_types::{
     H256, U256,
 };
 use byte_slice_cast::AsByteSlice;
+use near_sdk::json_types::U64;
 use near_sdk::{json_types::U128, ONE_YOCTO};
 use workspaces::AccountId;
 
@@ -727,6 +728,19 @@ async fn test_admin_controlled_admin_can_perform_actions_when_paused() -> anyhow
         .await?;
     assert!(res.is_success());
 
+    // 2nd deposit call when paused, but the admin is calling it - should succeed
+    // NB: We can use `PROOF_DATA_ETH` this will be just a different proof but the same deposit
+    // method which should be paused
+    let proof_str: Proof = near_sdk::serde_json::from_str(PROOF_DATA_ETH).unwrap();
+    let res = contract
+        .eth_connector_contract
+        .call("deposit")
+        .args_borsh(proof_str)
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+
     let res = contract
         .eth_connector_contract
         .call("set_paused_flags")
@@ -736,14 +750,31 @@ async fn test_admin_controlled_admin_can_perform_actions_when_paused() -> anyhow
         .await?;
     assert!(res.is_success());
 
-    // 2nd deposit call when paused, but the admin is calling it - should succeed
-    // NB: We can use `PROOF_DATA_ETH` this will be just a different proof but the same deposit
-    // method which should be paused
-    contract.call_deposit_eth_to_aurora().await?;
+    let transfer_amount: U128 = 5000.into();
+    let res = contract
+        .engine_contract
+        .call("ft_transfer")
+        .args_json((
+            &contract.eth_connector_contract.id(),
+            transfer_amount,
+            "transfer memo",
+        ))
+        .gas(DEFAULT_GAS)
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+    assert_eq!(
+        contract
+            .get_eth_on_near_balance(contract.eth_connector_contract.id())
+            .await?
+            .0,
+        5000
+    );
 
     // 2nd withdraw call when paused, but the admin is calling it - should succeed
     let res = contract
-        .engine_contract
+        .eth_connector_contract
         .call("withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
         .gas(DEFAULT_GAS)
@@ -764,16 +795,6 @@ async fn test_admin_controlled_admin_can_perform_actions_when_paused() -> anyhow
 async fn test_deposit_pausability() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
     let user_acc = contract.create_sub_account("eth_recipient").await?;
-
-    // Set access right
-    let res = contract
-        .eth_connector_contract
-        .call("set_access_right")
-        .args_json((user_acc.id(),))
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?;
-    assert!(res.is_success());
 
     // 1st deposit call - should succeed
     let res = contract
@@ -832,31 +853,19 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
     );
     Ok(())
 }
-/*
+
 #[tokio::test]
 async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
-    use aurora_eth_connector::admin_controlled::{PAUSE_WITHDRAW, UNPAUSE_ALL};
-
     let contract = TestContract::new().await?;
     let user_acc = contract.create_sub_account("eth_recipient").await?;
 
     contract.call_deposit_eth_to_near().await?;
 
-    // Set access right
-    let res = contract
-        .contract
-        .call("set_access_right")
-        .args_json((user_acc.id(),))
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-
     let recipient_addr: Address = validate_eth_address(RECIPIENT_ETH_ADDRESS);
     let withdraw_amount: NEP141Wei = NEP141Wei::new(100);
     // 1st withdraw - should succeed
     let res = user_acc
-        .call(contract.contract.id(), "withdraw")
+        .call(contract.engine_contract.id(), "withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
@@ -872,7 +881,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
 
     // Pause withdraw
     let res = contract
-        .contract
+        .eth_connector_contract
         .call("set_paused_flags")
         .args_borsh(PAUSE_WITHDRAW)
         .gas(DEFAULT_GAS)
@@ -882,18 +891,18 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
 
     // 2nd withdraw - should fail
     let res = user_acc
-        .call(contract.contract.id(), "withdraw")
+        .call(contract.engine_contract.id(), "withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "WithdrawErrorPaused");
+    assert!(contract.check_error_message(res, "WithdrawErrorPaused"));
 
     // Unpause all
     let res = contract
-        .contract
+        .eth_connector_contract
         .call("set_paused_flags")
         .args_borsh(UNPAUSE_ALL)
         .gas(DEFAULT_GAS)
@@ -902,7 +911,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     assert!(res.is_success());
 
     let res = user_acc
-        .call(contract.contract.id(), "withdraw")
+        .call(contract.engine_contract.id(), "withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
@@ -915,7 +924,6 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     assert_eq!(data.recipient_id, recipient_addr);
     assert_eq!(data.amount, withdraw_amount);
     assert_eq!(data.eth_custodian_address, custodian_addr);
-
     Ok(())
 }
 
@@ -925,14 +933,14 @@ async fn test_get_accounts_counter() -> anyhow::Result<()> {
     contract.call_deposit_eth_to_near().await?;
 
     let res = contract
-        .contract
+        .engine_contract
         .call("get_accounts_counter")
-        .view()
+        .gas(DEFAULT_GAS)
+        .transact()
         .await?
         .borsh::<U64>()
         .unwrap();
     assert_eq!(res.0, 2);
-
     Ok(())
 }
 
@@ -942,9 +950,10 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
     contract.call_deposit_eth_to_near().await?;
 
     let res = contract
-        .contract
+        .engine_contract
         .call("get_accounts_counter")
-        .view()
+        .gas(DEFAULT_GAS)
+        .transact()
         .await?
         .borsh::<U64>()
         .unwrap();
@@ -953,7 +962,7 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
     let transfer_amount = 70;
     let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
     let res = contract
-        .contract
+        .engine_contract
         .call("ft_transfer")
         .args_json((&receiver_id, transfer_amount.to_string(), "transfer memo"))
         .gas(DEFAULT_GAS)
@@ -962,33 +971,32 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
         .await?;
     assert!(res.is_success());
 
-    let balance = contract.get_eth_on_near_balance(&receiver_id).await?;
     assert_eq!(
-        balance.0,
+        contract.get_eth_on_near_balance(&receiver_id).await?.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
     );
-
-    let balance = contract
-        .get_eth_on_near_balance(&contract.contract.id())
-        .await?;
-    assert_eq!(balance.0, DEPOSITED_FEE - transfer_amount as u128);
-
-    let balance = contract.total_supply().await?;
-    assert_eq!(balance.0, DEPOSITED_AMOUNT);
-
-    let balance = contract.total_eth_supply_on_aurora().await?;
-    assert_eq!(balance, 0);
-    assert_eq!(contract.total_eth_supply_on_near().await?.0, DEPOSITED_AMOUNT);
+    assert_eq!(
+        contract
+            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .await?
+            .0,
+        DEPOSITED_FEE - transfer_amount as u128
+    );
+    assert_eq!(contract.total_supply().await?.0, DEPOSITED_AMOUNT);
+    assert_eq!(
+        contract.total_eth_supply_on_near().await?.0,
+        DEPOSITED_AMOUNT
+    );
 
     let res = contract
-        .contract
+        .engine_contract
         .call("get_accounts_counter")
-        .view()
+        .gas(DEFAULT_GAS)
+        .transact()
         .await?
         .borsh::<U64>()
         .unwrap();
     assert_eq!(res.0, 2);
-
     Ok(())
 }
 
@@ -1000,28 +1008,28 @@ async fn test_deposit_to_near_with_zero_fee() -> anyhow::Result<()> {
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
     assert!(res.is_success());
-    contract.assert_proof_was_used(proof_str).await?;
+    assert!(contract.call_is_used_proof(proof_str).await?);
 
     let deposited_amount = 3000;
     let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
 
-    let balance = contract.get_eth_on_near_balance(&receiver_id).await?;
-    assert_eq!(balance.0, deposited_amount);
+    assert_eq!(
+        contract.get_eth_on_near_balance(&receiver_id).await?.0,
+        deposited_amount
+    );
+    assert_eq!(
+        contract
+            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .await?
+            .0,
+        0
+    );
 
-    let balance = contract
-        .get_eth_on_near_balance(&contract.contract.id())
-        .await?;
-    assert_eq!(balance.0, 0);
-
-    let balance = contract.total_supply().await?;
-    assert_eq!(balance.0, deposited_amount);
-
-    let balance = contract.total_eth_supply_on_aurora().await?;
-    assert_eq!(balance, 0);
-
-    let balance = contract.total_eth_supply_on_near().await?;
-    assert_eq!(balance.0, deposited_amount);
-
+    assert_eq!(contract.total_supply().await?.0, deposited_amount);
+    assert_eq!(
+        contract.total_eth_supply_on_near().await?.0,
+        deposited_amount
+    );
     Ok(())
 }
 
@@ -1033,27 +1041,23 @@ async fn test_deposit_to_aurora_with_zero_fee() -> anyhow::Result<()> {
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
     assert!(res.is_success());
-    contract.assert_proof_was_used(proof_str).await?;
+    assert!(contract.call_is_used_proof(proof_str).await?);
 
     let deposited_amount = 2000;
-
-    let balance = contract
-        .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS))
-        .await?;
-    assert_eq!(balance, deposited_amount);
-
-    let balance = contract.total_supply().await?;
-    assert_eq!(balance.0, deposited_amount);
-
-    let balance = contract.total_eth_supply_on_aurora().await?;
-    assert_eq!(balance, deposited_amount);
-
-    let balance = contract.total_eth_supply_on_near().await?;
-    assert_eq!(balance.0, deposited_amount);
-
+    assert_eq!(
+        contract
+            .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS))
+            .await?,
+        deposited_amount
+    );
+    assert_eq!(contract.total_supply().await?.0, deposited_amount);
+    assert_eq!(
+        contract.total_eth_supply_on_near().await?.0,
+        deposited_amount
+    );
     Ok(())
 }
-
+/*
 #[tokio::test]
 async fn test_deposit_to_near_amount_less_fee() -> anyhow::Result<()> {
     let contract =
@@ -1063,8 +1067,8 @@ async fn test_deposit_to_near_amount_less_fee() -> anyhow::Result<()> {
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
-    contract.assert_proof_was_not_used(proof_str).await?;
+    assert!(contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"));
+    assert!(!contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
 
@@ -1077,8 +1081,8 @@ async fn test_deposit_to_aurora_amount_less_fee() -> anyhow::Result<()> {
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
-    contract.assert_proof_was_not_used(proof_str).await?;
+    assert!(contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"));
+    assert!(!contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
 
@@ -1091,8 +1095,8 @@ async fn test_deposit_to_near_amount_zero_fee_non_zero() -> anyhow::Result<()> {
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
-    contract.assert_proof_was_not_used(proof_str).await?;
+    assert!( contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"));
+    assert!(!contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
 
@@ -1105,8 +1109,8 @@ async fn test_deposit_to_aurora_amount_zero_fee_non_zero() -> anyhow::Result<()>
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
-    contract.assert_proof_was_not_used(proof_str).await?;
+    assert!( contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"));
+    assert!(!contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
 
@@ -1119,8 +1123,8 @@ async fn test_deposit_to_near_amount_equal_fee_non_zero() -> anyhow::Result<()> 
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
-    contract.assert_proof_was_not_used(proof_str).await?;
+    assert!( contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"));
+    assert!(contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
 
@@ -1133,8 +1137,8 @@ async fn test_deposit_to_aurora_amount_equal_fee_non_zero() -> anyhow::Result<()
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE");
-    contract.assert_proof_was_not_used(proof_str).await?;
+    assert!( contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"));
+    assert!(contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
 
@@ -1154,7 +1158,7 @@ async fn test_ft_transfer_max_value() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "ERR_NOT_ENOUGH_BALANCE");
+    assert!( contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE"));
     Ok(())
 }
 
@@ -1174,7 +1178,7 @@ async fn test_ft_transfer_empty_value() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "cannot parse integer from empty string");
+    assert!( contract.check_error_message(res, "cannot parse integer from empty string"));
     Ok(())
 }
 
@@ -1194,7 +1198,7 @@ async fn test_ft_transfer_wrong_u128_json_type() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    contract.assert_error_message(res, "invalid type: integer `200`, expected a string");
+    assert!( contract.check_error_message(res, "invalid type: integer `200`, expected a string"));
     Ok(())
 }
 
