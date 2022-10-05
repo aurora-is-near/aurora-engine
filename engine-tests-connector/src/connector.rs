@@ -1,10 +1,12 @@
 use crate::utils::*;
-use aurora_engine::parameters::WithdrawResult;
-use aurora_engine_types::types::NEP141Wei;
-use aurora_engine_types::U256;
+use aurora_engine::deposit_event::{DepositedEvent, TokenMessageData, DEPOSITED_EVENT};
+use aurora_engine::{log_entry, parameters::WithdrawResult, proof::Proof};
+use aurora_engine_types::{
+    types::{Address, Fee, NEP141Wei},
+    H256, U256,
+};
 use byte_slice_cast::AsByteSlice;
-use near_sdk::json_types::U128;
-use near_sdk::ONE_YOCTO;
+use near_sdk::{json_types::U128, ONE_YOCTO};
 use workspaces::AccountId;
 
 /// Bytes for a NEAR smart contract implementing `ft_on_transfer`
@@ -444,5 +446,98 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
         contract.total_eth_supply_on_near().await?.0,
         DEPOSITED_AMOUNT
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_deposit_with_0x_prefix() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+
+    let eth_custodian_address: Address = Address::decode(&CUSTODIAN_ADDRESS.to_string()).unwrap();
+    let recipient_address = Address::from_array([10u8; 20]);
+    let deposit_amount = 17;
+    let recipient_address_encoded = recipient_address.encode();
+
+    // Note the 0x prefix before the deposit address.
+    let message = [CONTRACT_ACC, ":", "0x", &recipient_address_encoded].concat();
+    let fee: Fee = Fee::new(NEP141Wei::new(0));
+    let token_message_data =
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+            .unwrap();
+
+    let deposit_event = DepositedEvent {
+        eth_custodian_address,
+        sender: Address::zero(),
+        token_message_data,
+        amount: NEP141Wei::new(deposit_amount),
+        fee,
+    };
+
+    let event_schema = ethabi::Event {
+        name: DEPOSITED_EVENT.into(),
+        inputs: DepositedEvent::event_params(),
+        anonymous: false,
+    };
+    let log_entry = log_entry::LogEntry {
+        address: eth_custodian_address.raw(),
+        topics: vec![
+            event_schema.signature(),
+            // the sender is not important
+            H256::zero(),
+        ],
+        data: ethabi::encode(&[
+            ethabi::Token::String(message),
+            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
+        ]),
+    };
+    let proof = Proof {
+        log_index: 1,
+        // Only this field matters for the purpose of this test
+        log_entry_data: rlp::encode(&log_entry).to_vec(),
+        receipt_index: 1,
+        receipt_data: Vec::new(),
+        header_data: Vec::new(),
+        proof: Vec::new(),
+    };
+
+    let res = contract.deposit_with_proof(&proof).await?;
+    assert!(res.is_success());
+
+    let balance = contract
+        .get_eth_on_near_balance(&contract.engine_contract.id())
+        .await?;
+    assert_eq!(balance.0, deposit_amount);
+
+    let balance = contract.get_eth_balance(&recipient_address).await?;
+    assert_eq!(balance, deposit_amount);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_deposit_with_same_proof() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    assert!(!contract.call_is_used_proof(PROOF_DATA_NEAR).await?);
+    contract.call_deposit_eth_to_near().await?;
+    assert!(contract.call_is_used_proof(PROOF_DATA_NEAR).await?);
+
+    let res = contract
+        .deposit_with_proof(&contract.get_proof(PROOF_DATA_NEAR))
+        .await?;
+    assert!(res.is_failure());
+    assert!(contract.check_error_message(res, "ERR_PROOF_EXIST"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_deposit_wrong_custodian_address() -> anyhow::Result<()> {
+    let contract =
+        TestContract::new_with_custodian("0000000000000000000000000000000000000001").await?;
+    let res = contract
+        .deposit_with_proof(&contract.get_proof(PROOF_DATA_NEAR))
+        .await?;
+    assert!(res.is_failure());
+    assert!(contract.check_error_message(res, "ERR_WRONG_EVENT_ADDRESS"));
+    assert!(!contract.call_is_used_proof(PROOF_DATA_NEAR).await?);
     Ok(())
 }

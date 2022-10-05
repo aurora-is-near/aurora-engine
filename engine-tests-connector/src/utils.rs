@@ -81,11 +81,14 @@ impl TestContract {
     }
 
     pub async fn new() -> anyhow::Result<TestContract> {
+        Ok(Self::new_with_custodian(CUSTODIAN_ADDRESS).await?)
+    }
+
+    pub async fn new_with_custodian(eth_custodian_address: &str) -> anyhow::Result<TestContract> {
         let (engine_contract, eth_connector_contract, root_account) =
             Self::deploy_aurora_contract().await?;
 
         let prover_account: AccountId = eth_connector_contract.id().clone();
-        let eth_custodian_address = CUSTODIAN_ADDRESS;
         let metadata = FungibleTokenMetadata::default();
         let account_with_access_right: AccountId = engine_contract.id().clone();
         // Init eth-connector
@@ -150,34 +153,7 @@ impl TestContract {
     pub fn get_proof(&self, proof: &str) -> Proof {
         serde_json::from_str(proof).unwrap()
     }
-    /*
-            pub async fn new_with_custodian(eth_custodian_address: &str) -> anyhow::Result<TestContract> {
-                use std::str::FromStr;
-                let (contract, root_account) = Self::deploy_aurora_contract().await?;
 
-                let prover_account: AccountId = contract.id().clone();
-                let metadata = FungibleTokenMetadata::default();
-                let account_with_access_right: AccountId = AccountId::from_str(CONTRACT_ACC).unwrap();
-                // Init eth-connector
-                let res = contract
-                    .call("new")
-                    .args_json(json!({
-                        "prover_account": prover_account,
-                        "account_with_access_right": account_with_access_right,
-                        "eth_custodian_address": eth_custodian_address,
-                        "metadata": metadata,
-                    }))
-                    .gas(DEFAULT_GAS)
-                    .transact()
-                    .await?;
-                assert!(res.is_success());
-
-                Ok(Self {
-                    contract,
-                    root_account,
-                })
-            }
-    */
     pub async fn create_sub_account(&self, name: &str) -> anyhow::Result<Account> {
         Ok(self
             .root_account
