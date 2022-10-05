@@ -20,9 +20,9 @@ impl StorageIntermediate for Value {
 
 #[derive(Debug, Default)]
 pub struct Storage {
-    input: Vec<u8>,
-    output: Vec<u8>,
-    kv_store: HashMap<Vec<u8>, Vec<u8>>,
+    pub input: Vec<u8>,
+    pub output: Vec<u8>,
+    pub kv_store: HashMap<Vec<u8>, Vec<u8>>,
 }
 
 /// In-memory implementation of [IO].
