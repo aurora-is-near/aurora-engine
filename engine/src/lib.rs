@@ -603,7 +603,10 @@ mod contract {
             .sdk_unwrap()
             .deposit(raw_proof, current_account_id, predecessor_account_id)
             .sdk_unwrap();
-        let promise_id = io.promise_create_with_callback(&promise_args);
+        // Safety: this call is safe because it comes from the eth-connector, not users.
+        // The call is to verify the user-supplied proof for the deposit, with `finish_deposit`
+        // as a callback.
+        let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -640,7 +643,10 @@ mod contract {
             .sdk_unwrap();
 
         if let Some(promise_args) = maybe_promise_args {
-            let promise_id = io.promise_create_with_callback(&promise_args);
+            // Safety: this call is safe because it comes from the eth-connector, not users.
+            // The call will be to the Engine's ft_transfer_call`, which is needed as part
+            // of the bridge flow (if depositing ETH to an Aurora address).
+            let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
             io.promise_return(promise_id);
         }
     }
@@ -757,7 +763,9 @@ mod contract {
                 io.prepaid_gas(),
             )
             .sdk_unwrap();
-        let promise_id = io.promise_create_with_callback(&promise_args);
+        // Safety: this call is safe. It is required by the NEP-141 spec that `ft_transfer_call`
+        // creates a call to another contract's `ft_on_transfer` method.
+        let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -772,7 +780,9 @@ mod contract {
             .storage_deposit(predecessor_account_id, amount, args)
             .sdk_unwrap();
         if let Some(promise) = maybe_promise {
-            io.promise_create_batch(&promise);
+            // Safety: This call is safe. It is only a transfer back to the user in the case
+            // that they over paid for their deposit.
+            unsafe { io.promise_create_batch(&promise) };
         }
     }
 
@@ -787,7 +797,8 @@ mod contract {
             .storage_unregister(predecessor_account_id, force)
             .sdk_unwrap();
         if let Some(promise) = maybe_promise {
-            io.promise_create_batch(&promise);
+            // Safety: This call is safe. It is only a transfer back to the user for their deposit.
+            unsafe { io.promise_create_batch(&promise) };
         }
     }
 
@@ -941,12 +952,15 @@ mod contract {
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FINISH,
         };
-        io.promise_create_with_callback(
-            &aurora_engine_types::parameters::PromiseWithCallbackArgs {
-                base: verify_call,
-                callback: finish_call,
-            },
-        );
+        // Safety: this call is safe because it is only used in integration tests.
+        unsafe {
+            io.promise_create_with_callback(
+                &aurora_engine_types::parameters::PromiseWithCallbackArgs {
+                    base: verify_call,
+                    callback: finish_call,
+                },
+            )
+        };
     }
 
     ///
