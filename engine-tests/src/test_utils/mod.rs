@@ -400,6 +400,25 @@ impl AuroraRunner {
         }
     }
 
+    pub fn submit_transaction_raw(
+        &mut self,
+        input: Vec<u8>,
+    ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
+        let calling_account_id = "some-account.near";
+
+        let (output, maybe_err) = self.one_shot().call(SUBMIT, calling_account_id, input);
+
+        if let Some(err) = maybe_err {
+            Err(err)
+        } else {
+            let output = output.unwrap();
+            let profile = ExecutionProfile::new(&output);
+            let submit_result =
+                SubmitResult::try_from_slice(&output.return_data.as_value().unwrap()).unwrap();
+            Ok((submit_result, profile))
+        }
+    }
+
     pub fn deploy_contract<F: FnOnce(&T) -> TransactionLegacy, T: Into<ContractConstructor>>(
         &mut self,
         account: &SecretKey,

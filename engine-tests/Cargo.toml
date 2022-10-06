@@ -48,6 +48,8 @@ criterion = "0.3.4"
 git2 = "0.13"
 tempfile = "3.2.0"
 walrus = "0.19"
+eth-json-test = {path = "../etc/eth-json-test"}
+rustc-hex = "2.1.0"
 
 [features]
 mainnet-test = []
