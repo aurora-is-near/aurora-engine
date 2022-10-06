@@ -205,11 +205,11 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-    "test_get_accounts_counter",
+    "test_access_rights",
     "-p",
     "aurora-engine-tests-connector",
-#    "--features",
-#    "${CARGO_FEATURES_TEST}",
+    "--features",
+    "${CARGO_FEATURES_TEST}",
     "--",
     "--nocapture",
 ]
