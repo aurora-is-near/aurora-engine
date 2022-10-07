@@ -2130,7 +2130,8 @@ mod tests {
             attached_balance: Default::default(),
             attached_gas: Default::default(),
         };
-        let actual_id = schedule_promise(&mut promise_tracker, &args);
+        // This is safe because it's just a test
+        let actual_id = unsafe { schedule_promise(&mut promise_tracker, &args) };
         let actual_scheduled_promises = promise_tracker.scheduled_promises;
         let expected_scheduled_promises = {
             let mut map = HashMap::new();
@@ -2155,7 +2156,8 @@ mod tests {
             attached_gas: Default::default(),
         };
         let base_id = PromiseId::new(6);
-        let actual_id = schedule_promise_callback(&mut promise_tracker, base_id, &args);
+        // This is safe because it's just a test
+        let actual_id = unsafe { schedule_promise_callback(&mut promise_tracker, base_id, &args) };
         let actual_scheduled_promises = promise_tracker.scheduled_promises;
         let expected_scheduled_promises = {
             let mut map = HashMap::new();

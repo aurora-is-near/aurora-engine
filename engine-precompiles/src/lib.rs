@@ -502,7 +502,7 @@ mod tests {
         struct MockPrecompile;
 
         impl Precompile for MockPrecompile {
-            fn required_gas(input: &[u8]) -> Result<EthGas, ExitError>
+            fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError>
             where
                 Self: Sized,
             {
@@ -511,10 +511,10 @@ mod tests {
 
             fn run(
                 &self,
-                input: &[u8],
-                target_gas: Option<EthGas>,
-                context: &Context,
-                is_static: bool,
+                _input: &[u8],
+                _target_gas: Option<EthGas>,
+                _context: &Context,
+                _is_static: bool,
             ) -> EvmPrecompileResult {
                 Ok(PrecompileOutput::default())
             }
@@ -533,17 +533,17 @@ mod tests {
         impl PrecompileHandle for MockPrecompileHandle {
             fn call(
                 &mut self,
-                to: H160,
-                transfer: Option<Transfer>,
-                input: Vec<u8>,
-                gas_limit: Option<u64>,
-                is_static: bool,
-                context: &Context,
+                _to: H160,
+                _transfer: Option<Transfer>,
+                _input: Vec<u8>,
+                _gas_limit: Option<u64>,
+                _is_static: bool,
+                _context: &Context,
             ) -> (ExitReason, Vec<u8>) {
                 unimplemented!()
             }
 
-            fn record_cost(&mut self, cost: u64) -> Result<(), ExitError> {
+            fn record_cost(&mut self, _cost: u64) -> Result<(), ExitError> {
                 unimplemented!()
             }
 
@@ -553,9 +553,9 @@ mod tests {
 
             fn log(
                 &mut self,
-                address: H160,
-                topics: Vec<aurora_engine_types::H256>,
-                data: Vec<u8>,
+                _address: H160,
+                _topics: Vec<aurora_engine_types::H256>,
+                _data: Vec<u8>,
             ) -> Result<(), ExitError> {
                 unimplemented!()
             }
