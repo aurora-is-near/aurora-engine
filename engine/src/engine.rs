@@ -380,7 +380,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct GasPaymentResult {
     pub prepaid_amount: Wei,
     pub effective_gas_price: U256,
@@ -389,7 +389,7 @@ pub struct GasPaymentResult {
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
-#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
 pub struct EngineState {
     /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],

@@ -15,7 +15,7 @@ pub type EventParams = Vec<EventParam>;
 /// On-transfer message. Used for `ft_transfer_call` and  `ft_on_transfer` functions.
 /// Message parsed from input args with `parse_on_transfer_message`.
 #[derive(BorshSerialize, BorshDeserialize)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub struct FtTransferMessageData {
     pub relayer: AccountId,
     pub recipient: Address,
@@ -112,7 +112,7 @@ impl FtTransferMessageData {
 /// The message parsed from event `recipient` field - `log_entry_data`
 /// after fetching proof `log_entry_data`
 #[derive(BorshSerialize, BorshDeserialize)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub enum TokenMessageData {
     /// Deposit no NEAR account
     Near(AccountId),
@@ -210,7 +210,7 @@ impl EthEvent {
 }
 
 /// Data that was emitted by Deposited event.
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub struct DepositedEvent {
     pub eth_custodian_address: Address,
     pub sender: Address,
