@@ -242,7 +242,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_transfer(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
-            method: "ft_transfer".to_string(),
+            method: "engine_ft_transfer".to_string(),
             args: data,
             attached_balance: Yocto::new(1),
             attached_gas: GAS_FOR_FT_TRANSFER,

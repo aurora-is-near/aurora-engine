@@ -93,16 +93,13 @@ mod contract {
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{
-        sdk, u256_to_arr, Address, PromiseResult, ToString, ERR_FAILED_PARSE, H256,
+        format, sdk, u256_to_arr, Address, PromiseResult, ToString, ERR_FAILED_PARSE, H256,
     };
     use crate::{errors, pausables};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
-
-    #[cfg(feature = "integration-test")]
-    use crate::prelude::NearGas;
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -623,9 +620,37 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer() {
+        use crate::parameters::{EngineTransferCallArgs, TransferCallArgs};
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let input = io.read_input().to_vec();
+        let predecessor_account_id = io.predecessor_account_id();
+        let args = TransferCallArgs::try_from(parse_json(&io.read_input().to_vec()).sdk_unwrap())
+            .sdk_unwrap();
+        let input = EngineTransferCallArgs {
+            sender_id: predecessor_account_id,
+            receiver_id: args.receiver_id,
+            amount: args.amount,
+            memo: args.memo,
+        };
+        let input = if let Some(memo) = input.memo {
+            format!(
+                "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?} }}",
+                input.sender_id.to_string(),
+                input.receiver_id.to_string(),
+                input.amount.to_string(),
+                memo
+            )
+        } else {
+            format!(
+                "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?} }}",
+                input.sender_id.to_string(),
+                input.receiver_id.to_string(),
+                input.amount.to_string(),
+            )
+        }
+        .as_bytes()
+        .to_vec();
+
         let promise_arg = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_transfer(input);
@@ -792,13 +817,10 @@ mod contract {
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn mint_account() {
-        use crate::connector::ZERO_ATTACHED_BALANCE;
         use crate::prelude::{NEP141Wei, U256};
         use evm::backend::ApplyBackend;
-        const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
-        const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
 
-        let mut io = Runtime;
+        let io = Runtime;
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect(errors::ERR_ARGS);
         let address = Address::from_array(args.0);
         let nonce = U256::from(args.1);

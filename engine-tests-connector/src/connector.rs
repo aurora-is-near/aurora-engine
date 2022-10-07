@@ -7,6 +7,7 @@ use aurora_engine_types::{
 };
 use byte_slice_cast::AsByteSlice;
 use near_sdk::json_types::U64;
+use near_sdk::serde_json::json;
 use near_sdk::{json_types::U128, ONE_YOCTO};
 use workspaces::AccountId;
 
@@ -1209,12 +1210,15 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
 
     let transfer_amount: U128 = 70.into();
     let user_acc = contract.create_sub_account("eth_recipient").await?;
-    //let new_recipient = contract.create_sub_account("new_recipient").await?;
 
     let res = contract
         .engine_contract
         .call("ft_transfer")
-        .args_json((&user_acc.id(), transfer_amount, "transfer memo"))
+        .args_json(json!({
+            "receiver_id": &user_acc.id(),
+            "amount": transfer_amount,
+            "memo": "transfer memo"
+        }))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
@@ -1241,16 +1245,16 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
     let transfer_amount2: U128 = 1000.into();
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer")
-        .args_json((
-            &contract.engine_contract.id(),
-            transfer_amount2,
-            "transfer memo",
-        ))
+        .args_json(json!({
+            "receiver_id": &contract.engine_contract.id(),
+            "amount": transfer_amount2,
+            "memo": "transfer memo"
+        }))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    println!("{:#?}", res);
+
     assert!(res.is_success());
     assert_eq!(
         contract

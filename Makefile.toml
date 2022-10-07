@@ -205,7 +205,7 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-    "test_access_rights",
+    "test_ft_transfer_user",
     "-p",
     "aurora-engine-tests-connector",
     "--features",
