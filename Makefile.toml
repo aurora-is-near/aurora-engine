@@ -205,7 +205,7 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-    "test_ft_transfer_user",
+#    "test_deposit_to_near_amount_equal_fee_non_zero",
     "-p",
     "aurora-engine-tests-connector",
     "--features",
