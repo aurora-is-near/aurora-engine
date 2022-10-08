@@ -1420,3 +1420,44 @@ async fn test_access_rights() -> anyhow::Result<()> {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn test_withdraw_from_user() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+    let user_acc = contract.create_sub_account("eth_recipient").await?;
+
+    let withdraw_amount = NEP141Wei::new(130);
+    let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
+    let res = user_acc
+        .call(contract.engine_contract.id(), "withdraw")
+        .args_borsh((recipient_addr, withdraw_amount))
+        .gas(DEFAULT_GAS)
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+
+    let data: WithdrawResult = res.borsh()?;
+    let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
+    assert_eq!(data.recipient_id, recipient_addr);
+    assert_eq!(data.amount, withdraw_amount);
+    assert_eq!(data.eth_custodian_address, custodian_addr);
+
+    assert_eq!(
+        contract
+            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .await?
+            .0,
+        DEPOSITED_FEE,
+    );
+    assert_eq!(
+        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
+        DEPOSITED_AMOUNT - DEPOSITED_FEE - withdraw_amount.as_u128()
+    );
+    assert_eq!(
+        contract.total_supply().await?.0,
+        DEPOSITED_AMOUNT - withdraw_amount.as_u128(),
+    );
+    Ok(())
+}
