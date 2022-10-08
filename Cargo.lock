@@ -226,6 +226,7 @@ dependencies = [
  "bitflags",
  "borsh",
  "byte-slice-cast",
+ "digest 0.10.3",
  "ethabi",
  "evm",
  "hex 0.4.3",
@@ -234,6 +235,7 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
+ "sha3 0.10.2",
  "test-case",
  "wee_alloc",
 ]
@@ -243,6 +245,7 @@ name = "aurora-engine-precompiles"
 version = "1.0.0"
 dependencies = [
  "aurora-engine-sdk",
+ "aurora-engine-test-doubles",
  "aurora-engine-types",
  "borsh",
  "ethabi",

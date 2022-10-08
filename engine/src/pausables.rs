@@ -174,84 +174,10 @@ impl<I: IO> PausedPrecompilesManager for EnginePrecompilesPauser<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use std::iter::once;
+    use std::sync::RwLock;
     use test_case::test_case;
-
-    struct MockStorage {
-        key: Vec<u8>,
-        value: Option<MockValue>,
-    }
-
-    impl MockStorage {
-        pub fn new(key: Vec<u8>) -> Self {
-            Self { key, value: None }
-        }
-    }
-
-    impl IO for MockStorage {
-        type StorageValue = MockValue;
-
-        fn read_input(&self) -> Self::StorageValue {
-            unimplemented!()
-        }
-
-        fn return_output(&mut self, _value: &[u8]) {
-            unimplemented!()
-        }
-
-        fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
-            match self.key.as_slice() == key {
-                true => self.value.as_ref().map(Clone::clone),
-                false => None,
-            }
-        }
-
-        fn storage_has_key(&self, _key: &[u8]) -> bool {
-            unimplemented!()
-        }
-
-        fn write_storage(&mut self, key: &[u8], value: &[u8]) -> Option<Self::StorageValue> {
-            match self.key.as_slice() == key {
-                true => {
-                    let old_value = self.value.as_ref().map(Clone::clone);
-
-                    self.value = Some(MockValue(value.to_vec()));
-
-                    old_value
-                }
-                false => None,
-            }
-        }
-
-        fn write_storage_direct(
-            &mut self,
-            _key: &[u8],
-            _value: Self::StorageValue,
-        ) -> Option<Self::StorageValue> {
-            unimplemented!()
-        }
-
-        fn remove_storage(&mut self, _key: &[u8]) -> Option<Self::StorageValue> {
-            unimplemented!()
-        }
-    }
-
-    #[derive(Clone)]
-    pub struct MockValue(Vec<u8>);
-
-    impl StorageIntermediate for MockValue {
-        fn len(&self) -> usize {
-            self.0.len()
-        }
-
-        fn is_empty(&self) -> bool {
-            self.0.is_empty()
-        }
-
-        fn copy_to_slice(&self, buffer: &mut [u8]) {
-            buffer.copy_from_slice(&self.0)
-        }
-    }
 
     #[test_case(PrecompileFlags::EXIT_TO_ETHEREUM, exit_to_ethereum::ADDRESS)]
     #[test_case(PrecompileFlags::EXIT_TO_NEAR, exit_to_near::ADDRESS)]
@@ -272,8 +198,8 @@ mod tests {
 
     #[test]
     fn test_pausing_precompile_marks_it_as_paused() {
-        let key = EnginePrecompilesPauser::<MockStorage>::storage_key();
-        let io = MockStorage::new(key);
+        let storage = RwLock::new(Storage::default());
+        let io = StoragePointer(&storage);
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         let flags = PrecompileFlags::EXIT_TO_NEAR;
 
@@ -284,8 +210,8 @@ mod tests {
 
     #[test]
     fn test_resuming_precompile_removes_its_mark_as_paused() {
-        let key = EnginePrecompilesPauser::<MockStorage>::storage_key();
-        let io = MockStorage::new(key);
+        let storage = RwLock::new(Storage::default());
+        let io = StoragePointer(&storage);
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         let flags = PrecompileFlags::EXIT_TO_NEAR;
         pauser.pause_precompiles(flags);
@@ -313,8 +239,9 @@ mod tests {
 
     #[test]
     fn test_no_precompile_is_paused_if_storage_contains_too_few_bytes() {
-        let key = EnginePrecompilesPauser::<MockStorage>::storage_key();
-        let mut io = MockStorage::new(key.clone());
+        let key = EnginePrecompilesPauser::<StoragePointer>::storage_key();
+        let storage = RwLock::new(Storage::default());
+        let mut io = StoragePointer(&storage);
         io.write_storage(key.as_slice(), &[7u8]);
         let pauser = EnginePrecompilesPauser::from_io(io);
 

@@ -352,7 +352,7 @@ impl AsRef<[u8]> for EngineStateError {
     }
 }
 
-struct StackExecutorParams<'a, I, E, H> {
+pub struct StackExecutorParams<'a, I, E, H> {
     precompiles: Precompiles<'a, I, E, H>,
     gas_limit: u64,
 }
@@ -380,7 +380,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct GasPaymentResult {
     pub prepaid_amount: Wei,
     pub effective_gas_price: U256,
@@ -389,7 +389,7 @@ pub struct GasPaymentResult {
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
-#[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Debug)]
 pub struct EngineState {
     /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],
@@ -636,7 +636,19 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let origin = &args.sender;
         let contract = &args.address;
         let value = U256::from_big_endian(&args.amount);
-        self.view(origin, contract, Wei::new(value), args.input, u64::MAX)
+        // View calls cannot interact with promises
+        let mut handler = aurora_engine_sdk::promise::Noop;
+        let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
+        let precompiles = self.create_precompiles(pause_flags, &mut handler);
+
+        let executor_params = StackExecutorParams::new(u64::MAX, precompiles);
+        self.view(
+            origin,
+            contract,
+            Wei::new(value),
+            args.input,
+            &executor_params,
+        )
     }
 
     pub fn view(
@@ -645,21 +657,15 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         contract: &Address,
         value: Wei,
         input: Vec<u8>,
-        gas_limit: u64,
+        executor_params: &StackExecutorParams<I, E, aurora_engine_sdk::promise::Noop>,
     ) -> Result<TransactionStatus, EngineErrorKind> {
-        // View calls cannot interact with promises
-        let mut handler = aurora_engine_sdk::promise::Noop;
-        let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-        let precompiles = self.create_precompiles(pause_flags, &mut handler);
-
-        let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
         let (status, result) = executor.transact_call(
             origin.raw(),
             contract.raw(),
             value.raw(),
             input,
-            gas_limit,
+            executor_params.gas_limit,
             Vec::new(),
         );
         status.into_result(result)
@@ -736,7 +742,6 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     pub fn receive_erc20_tokens<P: PromiseHandler>(
         &mut self,
         token: &AccountId,
-        relayer_account_id: &AccountId,
         args: &NEP141FtOnTransferArgs,
         current_account_id: &AccountId,
         handler: &mut P,
@@ -744,23 +749,18 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
 
-        // Parse message to determine recipient and fee
-        let (recipient, fee) = {
+        // Parse message to determine recipient
+        let recipient = {
             // Message format:
             //      Recipient of the transaction - 40 characters (Address in hex)
-            //      Fee to be paid in ETH (Optional) - 64 characters (Encoded in big endian / hex)
             let message = args.msg.as_bytes();
             assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
 
-            let recipient = Address::new(H160(unwrap_res_or_finish!(
+            Address::new(H160(unwrap_res_or_finish!(
                 hex::decode(&message[..40]).unwrap().as_slice().try_into(),
                 output_on_fail,
                 self.io
-            )));
-
-            let fee = U256::zero();
-
-            (recipient, fee)
+            )))
         };
 
         let erc20_token = Address::from_array(unwrap_res_or_finish!(
@@ -774,26 +774,6 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             output_on_fail,
             self.io
         ));
-
-        if fee != U256::from(0) {
-            let relayer_address = unwrap_res_or_finish!(
-                self.get_relayer(relayer_account_id.as_bytes()).ok_or(()),
-                output_on_fail,
-                self.io
-            );
-
-            unwrap_res_or_finish!(
-                self.transfer(
-                    recipient,
-                    relayer_address,
-                    Wei::new_u64(fee.as_u64()),
-                    u64::MAX,
-                    handler,
-                ),
-                output_on_fail,
-                self.io
-            );
-        }
 
         let erc20_admin_address = current_address(current_account_id);
         unwrap_res_or_finish!(
@@ -1428,10 +1408,19 @@ where
                 if log.topics.is_empty() {
                     if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
                         match promise {
-                            PromiseArgs::Create(promise) => schedule_promise(handler, &promise),
+                            PromiseArgs::Create(promise) => {
+                                // Safety: this promise creation is safe because it does not come from
+                                // users directly. The exit precompiles only create promises which we
+                                // are able to execute without violating any security invariants.
+                                unsafe { schedule_promise(handler, &promise) }
+                            }
                             PromiseArgs::Callback(promise) => {
-                                let base_id = schedule_promise(handler, &promise.base);
-                                schedule_promise_callback(handler, base_id, &promise.callback)
+                                // Safety: This is safe because the promise data comes from our own
+                                // exit precompiles. See note above.
+                                unsafe {
+                                    let base_id = schedule_promise(handler, &promise.base);
+                                    schedule_promise_callback(handler, base_id, &promise.callback)
+                                }
                             }
                             PromiseArgs::Recursive(_) => {
                                 unreachable!("Exit precompiles do not produce recursive promises")
@@ -1472,7 +1461,10 @@ where
         .collect()
 }
 
-fn schedule_promise<P: PromiseHandler>(handler: &mut P, promise: &PromiseCreateArgs) -> PromiseId {
+unsafe fn schedule_promise<P: PromiseHandler>(
+    handler: &mut P,
+    promise: &PromiseCreateArgs,
+) -> PromiseId {
     sdk::log!(&crate::prelude::format!(
         "call_contract {}.{}",
         promise.target_account_id,
@@ -1481,7 +1473,7 @@ fn schedule_promise<P: PromiseHandler>(handler: &mut P, promise: &PromiseCreateA
     handler.promise_create_call(promise)
 }
 
-fn schedule_promise_callback<P: PromiseHandler>(
+unsafe fn schedule_promise_callback<P: PromiseHandler>(
     handler: &mut P,
     base_id: PromiseId,
     promise: &PromiseCreateArgs,
@@ -1785,4 +1777,613 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::parameters::{FunctionCallArgsV1, FunctionCallArgsV2};
+    use aurora_engine_precompiles::make_address;
+    use aurora_engine_sdk::env::Fixed;
+    use aurora_engine_sdk::promise::Noop;
+    use aurora_engine_test_doubles::io::{Storage, StoragePointer};
+    use aurora_engine_test_doubles::promise::PromiseTracker;
+    use aurora_engine_types::types::RawU256;
+    use sha3::{Digest, Keccak256};
+    use std::sync::RwLock;
+
+    #[test]
+    fn test_view_call_to_empty_contract_without_input_returns_empty_data() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id,
+            io,
+            &env,
+        );
+
+        let contract = make_address(1, 1);
+        let value = Wei::new_u64(1000);
+        let input = vec![];
+        let args = ViewCallArgs {
+            sender: origin,
+            address: contract,
+            amount: RawU256::from(value.raw()),
+            input,
+        };
+        let actual_status = engine.view_with_args(args).unwrap();
+        let expected_status = TransactionStatus::Succeed(Vec::new());
+
+        assert_eq!(expected_status, actual_status);
+    }
+
+    #[test]
+    fn test_deploying_code_with_empty_input_succeeds() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let io = StoragePointer(&storage);
+        let mut engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id,
+            io,
+            &env,
+        );
+
+        let input = vec![];
+        let mut handler = Noop;
+
+        let actual_result = engine.deploy_code_with_input(input, &mut handler).unwrap();
+
+        let nonce = U256::zero();
+        let expected_address = create_legacy_address(origin.raw(), nonce).0.to_vec();
+        let expected_status = TransactionStatus::Succeed(expected_address);
+        let expected_gas_used = 53000;
+        let expected_logs = Vec::new();
+        let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_call_to_empty_contract_returns_empty_data() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let mut engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id,
+            io,
+            &env,
+        );
+
+        let input = Vec::<u8>::new();
+        let mut handler = Noop;
+        let contract = make_address(1, 1);
+        let value = Wei::new_u64(1000);
+        let args = CallArgs::V2(FunctionCallArgsV2 {
+            contract,
+            value: RawU256::from(value.raw()),
+            input,
+        });
+        let actual_result = engine.call_with_args(args, &mut handler).unwrap();
+
+        let expected_data = Vec::new();
+        let expected_status = TransactionStatus::Succeed(expected_data);
+        let expected_gas_used = 21000;
+        let expected_logs = Vec::new();
+        let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_call_with_empty_balance_fails_with_out_of_funds_error() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let io = StoragePointer(&storage);
+        let mut engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id,
+            io,
+            &env,
+        );
+
+        let input = Vec::<u8>::new();
+        let mut handler = Noop;
+        let contract = make_address(1, 1);
+        let value = Wei::new_u64(1000);
+        let args = CallArgs::V2(FunctionCallArgsV2 {
+            contract,
+            value: RawU256::from(value.raw()),
+            input,
+        });
+        let actual_result = engine.call_with_args(args, &mut handler).unwrap();
+
+        let expected_status = TransactionStatus::OutOfFund;
+        let expected_gas_used = 21000;
+        let expected_logs = Vec::new();
+        let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_transfer_moves_balance_from_sender_to_recipient() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let mut engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id,
+            io,
+            &env,
+        );
+
+        let gas_limit = u64::MAX;
+        let mut handler = Noop;
+        let receiver = make_address(1, 1);
+        let value = Wei::new_u64(1000);
+        let actual_result = engine
+            .transfer(origin, receiver, value, gas_limit, &mut handler)
+            .unwrap();
+
+        let expected_data = Vec::new();
+        let expected_status = TransactionStatus::Succeed(expected_data);
+        let expected_gas_used = 21000;
+        let expected_logs = Vec::new();
+        let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_call_with_v1_args_to_empty_contract_returns_empty_data() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let mut engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id,
+            io,
+            &env,
+        );
+
+        let input = Vec::<u8>::new();
+        let mut handler = Noop;
+        let contract = make_address(1, 1);
+        let args = CallArgs::V1(FunctionCallArgsV1 { contract, input });
+        let actual_result = engine.call_with_args(args, &mut handler).unwrap();
+
+        let expected_data = Vec::new();
+        let expected_status = TransactionStatus::Succeed(expected_data);
+        let expected_gas_used = 21000;
+        let expected_logs = Vec::new();
+        let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_registering_relayer_succeeds() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let mut engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id,
+            io,
+            &env,
+        );
+
+        let account_id = AccountId::new("relayer").unwrap();
+        let expected_relayer_address = make_address(1, 1);
+        engine.register_relayer(account_id.as_bytes(), expected_relayer_address);
+        let actual_relayer_address = engine.get_relayer(account_id.as_bytes()).unwrap();
+
+        assert_eq!(expected_relayer_address, actual_relayer_address);
+    }
+
+    #[test]
+    fn test_registering_token_succeeds() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        set_balance(&mut io, &origin, &Wei::new_u64(22000));
+        let mut engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id.clone(),
+            io,
+            &env,
+        );
+
+        let receiver = make_address(6, 6);
+        let erc20_token = make_address(4, 5);
+        let nep141_token = AccountId::new("testcoin").unwrap();
+        let args = NEP141FtOnTransferArgs {
+            sender_id: Default::default(),
+            amount: Default::default(),
+            msg: receiver.encode(),
+        };
+        let mut handler = Noop;
+        engine
+            .register_token(erc20_token, nep141_token.clone())
+            .unwrap();
+        engine.receive_erc20_tokens(&nep141_token, &args, &current_account_id, &mut handler);
+
+        let storage_read = storage.read().unwrap();
+        let actual_output = std::str::from_utf8(storage_read.output.as_slice()).unwrap();
+        let expected_output = "\"0\"";
+
+        assert_eq!(expected_output, actual_output);
+    }
+
+    #[test]
+    fn test_deploying_token_succeeds() {
+        let env = Fixed::default();
+        let origin = aurora_engine_sdk::types::near_account_to_evm_address(
+            env.predecessor_account_id().as_bytes(),
+        );
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        set_state(&mut io, EngineState::default());
+
+        let nep141_token = AccountId::new("testcoin").unwrap();
+        let mut handler = Noop;
+        let args = DeployErc20TokenArgs {
+            nep141: nep141_token,
+        };
+        let nonce = U256::zero();
+        let expected_address = Address::new(create_legacy_address(origin.raw(), nonce));
+        let actual_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
+
+        assert_eq!(expected_address, actual_address);
+    }
+
+    #[test]
+    fn test_gas_charge_for_empty_transaction_is_zero() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let mut engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id.clone(),
+            io,
+            &env,
+        );
+
+        let transaction = NormalizedEthTransaction {
+            address: Default::default(),
+            chain_id: None,
+            nonce: Default::default(),
+            gas_limit: U256::MAX,
+            max_priority_fee_per_gas: Default::default(),
+            max_fee_per_gas: U256::MAX,
+            to: None,
+            value: Default::default(),
+            data: vec![],
+            access_list: vec![],
+        };
+        let actual_result = engine.charge_gas(&origin, &transaction).unwrap();
+
+        let expected_result = GasPaymentResult {
+            prepaid_amount: Wei::zero(),
+            effective_gas_price: U256::zero(),
+            priority_fee_per_gas: U256::zero(),
+        };
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_scheduling_promise_creates_it() {
+        use aurora_engine_test_doubles::promise::PromiseArgs;
+        use std::collections::HashMap;
+
+        let mut promise_tracker = PromiseTracker::default();
+        let args = PromiseCreateArgs {
+            target_account_id: Default::default(),
+            method: "".to_string(),
+            args: vec![],
+            attached_balance: Default::default(),
+            attached_gas: Default::default(),
+        };
+        // This is safe because it's just a test
+        let actual_id = unsafe { schedule_promise(&mut promise_tracker, &args) };
+        let actual_scheduled_promises = promise_tracker.scheduled_promises;
+        let expected_scheduled_promises = {
+            let mut map = HashMap::new();
+            map.insert(actual_id.raw(), PromiseArgs::Create(args));
+            map
+        };
+
+        assert_eq!(expected_scheduled_promises, actual_scheduled_promises);
+    }
+
+    #[test]
+    fn test_scheduling_promise_callback_adds_it() {
+        use aurora_engine_test_doubles::promise::PromiseArgs;
+        use std::collections::HashMap;
+
+        let mut promise_tracker = PromiseTracker::default();
+        let args = PromiseCreateArgs {
+            target_account_id: Default::default(),
+            method: "".to_string(),
+            args: vec![],
+            attached_balance: Default::default(),
+            attached_gas: Default::default(),
+        };
+        let base_id = PromiseId::new(6);
+        // This is safe because it's just a test
+        let actual_id = unsafe { schedule_promise_callback(&mut promise_tracker, base_id, &args) };
+        let actual_scheduled_promises = promise_tracker.scheduled_promises;
+        let expected_scheduled_promises = {
+            let mut map = HashMap::new();
+            map.insert(
+                actual_id.raw(),
+                PromiseArgs::Callback {
+                    base: base_id,
+                    callback: args,
+                },
+            );
+            map
+        };
+
+        assert_eq!(expected_scheduled_promises, actual_scheduled_promises);
+    }
+
+    #[test]
+    fn test_loading_original_storage_loads_stored_value() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        let engine = Engine::new_with_state(
+            EngineState::default(),
+            origin.clone(),
+            current_account_id.clone(),
+            io,
+            &env,
+        );
+
+        let expected_value = H256::from_low_u64_le(64);
+        let index = H256::zero();
+        let generation = get_generation(&mut io, &origin);
+        set_storage(&mut io, &origin, &index, &expected_value, generation);
+        let actual_value = engine.original_storage(origin.raw(), index).unwrap();
+
+        assert_eq!(expected_value, actual_value);
+    }
+
+    #[test]
+    fn test_loading_engine_from_storage_loads_stored_state() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        let expected_state = EngineState::default();
+        set_state(&mut io, expected_state.clone());
+        let engine = Engine::new(origin.clone(), current_account_id.clone(), io, &env).unwrap();
+        let actual_state = engine.state;
+
+        assert_eq!(expected_state, actual_state);
+    }
+
+    #[test]
+    fn test_refund_transfer_eth_back_from_precompile_address() {
+        let recipient_address = make_address(1, 1);
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        let expected_state = EngineState::default();
+        let refund_amount = Wei::new_u64(1000);
+        add_balance(&mut io, &exit_to_near::ADDRESS, refund_amount).unwrap();
+        set_state(&mut io, expected_state.clone());
+        let args = RefundCallArgs {
+            recipient_address,
+            erc20_address: None,
+            amount: RawU256::from(refund_amount.raw()),
+        };
+        let mut handler = Noop;
+        let actual_result = refund_on_error(io, &env, expected_state, args, &mut handler).unwrap();
+        let expected_result =
+            SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 25800, Vec::new());
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_refund_remint_burned_erc20_tokens() {
+        let origin = Address::zero();
+        let env = Fixed::default();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        let expected_state = EngineState::default();
+        set_state(&mut io, expected_state.clone());
+        let value = Wei::new_u64(1000);
+        let args = RefundCallArgs {
+            recipient_address: Default::default(),
+            erc20_address: Some(origin.clone()),
+            amount: RawU256::from(value.raw()),
+        };
+        let mut handler = Noop;
+        let actual_result = refund_on_error(io, &env, expected_state, args, &mut handler).unwrap();
+        let expected_result =
+            SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 21344, Vec::new());
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_refund_free_effective_gas_does_nothing() {
+        let origin = Address::zero();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        let expected_state = EngineState::default();
+        set_state(&mut io, expected_state.clone());
+        let relayer = make_address(1, 1);
+        let gas_result = GasPaymentResult {
+            prepaid_amount: Default::default(),
+            effective_gas_price: U256::zero(),
+            priority_fee_per_gas: U256::zero(),
+        };
+
+        refund_unused_gas(&mut io, &origin, 1000, gas_result, &relayer).unwrap();
+    }
+
+    #[test]
+    fn test_refund_gas_pays_expected_amount() {
+        let origin = Address::zero();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+        let expected_state = EngineState::default();
+        set_state(&mut io, expected_state.clone());
+        let relayer = make_address(1, 1);
+        let gas_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(8000),
+            effective_gas_price: Wei::new_u64(1).raw(),
+            priority_fee_per_gas: U256::zero(),
+        };
+        let gas_used = 4000;
+
+        refund_unused_gas(&mut io, &origin, gas_used, gas_result, &relayer).unwrap();
+
+        let actual_refund = get_balance(&io, &origin);
+        let expected_refund = Wei::new_u64(gas_used);
+
+        assert_eq!(expected_refund, actual_refund);
+    }
+
+    #[test]
+    fn test_check_nonce_with_increment_succeeds() {
+        let origin = Address::zero();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+
+        increment_nonce(&mut io, &origin);
+        check_nonce(&io, &origin, &U256::from(1u64)).unwrap();
+    }
+
+    #[test]
+    fn test_check_nonce_without_increment_fails() {
+        let origin = Address::zero();
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+
+        increment_nonce(&mut io, &origin);
+        let actual_error_kind = check_nonce(&io, &origin, &U256::from(0u64)).unwrap_err();
+        let actual_error_kind = std::str::from_utf8(actual_error_kind.as_bytes()).unwrap();
+        let expected_error_kind = std::str::from_utf8(errors::ERR_INCORRECT_NONCE).unwrap();
+
+        assert_eq!(expected_error_kind, actual_error_kind);
+    }
+
+    #[test]
+    fn test_missing_engine_state_is_not_found() {
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let io = StoragePointer(&storage);
+
+        let actual_error = get_state(&io).unwrap_err();
+        let actual_error = std::str::from_utf8(actual_error.as_ref()).unwrap();
+        let expected_error = std::str::from_utf8(errors::ERR_STATE_NOT_FOUND).unwrap();
+
+        assert_eq!(expected_error, actual_error);
+    }
+
+    #[test]
+    fn test_empty_engine_state_is_corrupted() {
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let mut io = StoragePointer(&storage);
+
+        io.write_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY), &[]);
+        let actual_error = get_state(&io).unwrap_err();
+        let actual_error = std::str::from_utf8(actual_error.as_ref()).unwrap();
+        let expected_error = std::str::from_utf8(errors::ERR_STATE_CORRUPTED).unwrap();
+
+        assert_eq!(expected_error, actual_error);
+    }
+
+    #[test]
+    fn test_filtering_promises_from_logs_with_none_keeps_all() {
+        let storage = Storage::default();
+        let storage = RwLock::new(storage);
+        let io = StoragePointer(&storage);
+        let current_account_id = AccountId::default();
+        let mut handler = Noop;
+        let logs = vec![Log {
+            address: Default::default(),
+            topics: vec![],
+            data: vec![],
+        }];
+
+        let actual_logs = filter_promises_from_logs(&io, &mut handler, logs, &current_account_id);
+        let expected_logs = vec![ResultLog {
+            address: Default::default(),
+            topics: vec![],
+            data: vec![],
+        }];
+
+        assert_eq!(expected_logs, actual_logs);
+    }
+
+    fn create_legacy_address(address: H160, nonce: U256) -> H160 {
+        let mut stream = rlp::RlpStream::new_list(2);
+        stream.append(&address);
+        stream.append(&nonce);
+        H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into()
+    }
+}

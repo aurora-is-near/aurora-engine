@@ -12,6 +12,9 @@ jobs:
       matrix:
         profile: [mainnet, testnet]
     steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
       - run: cargo make --profile ${{ matrix.profile }} build

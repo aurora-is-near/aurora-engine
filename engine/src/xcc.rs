@@ -123,7 +123,11 @@ pub fn handle_precompile_promise<I, P>(
                 target_account_id: promise.target_account_id.clone(),
                 actions: promise_actions,
             };
-            let promise_id = handler.promise_create_batch(&batch);
+            // Safety: This batch creation is safe because it only acts on the router sub-account
+            // (not the main engine account), and the actions performed are only (1) create it
+            // for the first time and/or (2) deploy the code from our storage (i.e. the deployed
+            // code is controlled by us, not the user).
+            let promise_id = unsafe { handler.promise_create_batch(&batch) };
             // Add a callback here to update the version of the account
             let args = AddressVersionUpdateArgs {
                 address: sender,
@@ -137,7 +141,10 @@ pub fn handle_precompile_promise<I, P>(
                 attached_gas: VERSION_UPDATE_GAS,
             };
 
-            Some(handler.promise_attach_callback(promise_id, &callback))
+            // Safety: A call from the engine to the engine's `factory_update_address_version`
+            // method is safe because that method only writes the specific router sub-account
+            // metadata that has just been deployed above.
+            unsafe { Some(handler.promise_attach_callback(promise_id, &callback)) }
         }
         AddressVersionStatus::UpToDate => None,
     };
@@ -163,9 +170,16 @@ pub fn handle_precompile_promise<I, P>(
             attached_balance: ZERO_YOCTO,
             attached_gas: WITHDRAW_GAS,
         };
-        let id = match setup_id {
-            None => handler.promise_create_call(&withdraw_call),
-            Some(setup_id) => handler.promise_attach_callback(setup_id, &withdraw_call),
+        // Safety: This promise is safe. Even though this is a call from the engine account to
+        // itself invoking the `call` method (which could be dangerous), the argument to `call`
+        // is controlled entirely by us (not any user). This call will only execute the wnear
+        // exit precompile, and only for the necessary amount. Note that this amount will always
+        // be present, otherwise the user's call to the xcc precompile would have failed.
+        let id = unsafe {
+            match setup_id {
+                None => handler.promise_create_call(&withdraw_call),
+                Some(setup_id) => handler.promise_attach_callback(setup_id, &withdraw_call),
+            }
         };
         let refund_needed = match deploy_needed {
             AddressVersionStatus::DeployNeeded { create_needed } => create_needed,
@@ -183,12 +197,22 @@ pub fn handle_precompile_promise<I, P>(
             attached_balance: ZERO_YOCTO,
             attached_gas: UNWRAP_AND_REFUND_GAS,
         };
-        Some(handler.promise_attach_callback(id, &unwrap_call))
+        // Safety: This call is safe because the router's `unwrap_and_refund_storage` method
+        // does not violate any security invariants. It only interacts with the wrap.near contract
+        // to obtain NEAR from WNEAR.
+        unsafe { Some(handler.promise_attach_callback(id, &unwrap_call)) }
     };
     // 3. Finally we can do the call the user wanted to do.
-    let _promise_id = match withdraw_id {
-        None => handler.promise_create_call(&promise),
-        Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, &promise),
+
+    // Safety: this call is safe because the promise comes from the XCC precompile, not the
+    // user directly. The XCC precompile will only construct promises that target the `execute`
+    // and `schedule` methods of the user's router contract. Therefore, the user cannot have
+    // the engine make arbitrary calls.
+    let _promise_id = unsafe {
+        match withdraw_id {
+            None => handler.promise_create_call(&promise),
+            Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, &promise),
+        }
     };
 }
 

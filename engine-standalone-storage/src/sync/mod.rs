@@ -228,7 +228,6 @@ fn non_submit_execute<'db>(
             //         &mut handler,
             //     );
             // }
-
             None
         }
 

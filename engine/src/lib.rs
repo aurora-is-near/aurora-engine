@@ -147,7 +147,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_bridge_prover();
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -350,6 +350,12 @@ mod contract {
     pub extern "C" fn factory_update_address_version() {
         let mut io = Runtime;
         io.assert_private_call().sdk_unwrap();
+        let check_deploy: Result<(), &[u8]> = match io.promise_result(0) {
+            Some(PromiseResult::Successful(_)) => Ok(()),
+            Some(_) => Err(b"ERR_ROUTER_DEPLOY_FAILED"),
+            None => Err(b"ERR_ROUTER_UPDATE_NOT_CALLBACK"),
+        };
+        check_deploy.sdk_unwrap();
         let args: crate::xcc::AddressVersionUpdateArgs = io.read_input_borsh().sdk_unwrap();
         crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
     }
@@ -558,7 +564,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .withdraw_eth_from_near(input);
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -569,7 +575,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .deposit(input);
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -580,7 +586,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .is_used_proof(input);
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -590,7 +596,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_near();
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -600,7 +606,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_near();
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -610,7 +616,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_aurora();
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -621,7 +627,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_balance_of(input);
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -665,7 +671,7 @@ mod contract {
         let promise_arg = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_transfer(input);
-        let promise_id = io.promise_create_call(&promise_arg);
+        let promise_id = unsafe { io.promise_create_call(&promise_arg) };
         io.promise_return(promise_id);
     }
 
@@ -706,7 +712,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_transfer_call(input);
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -737,10 +743,8 @@ mod contract {
         if predecessor_account_id == eth_connector.get_eth_connector_contract_account() {
             eth_connector.ft_on_transfer(&engine, &args).sdk_unwrap();
         } else {
-            let signer_account_id = io.signer_account_id();
             engine.receive_erc20_tokens(
                 &predecessor_account_id,
-                &signer_account_id,
                 &args,
                 &current_account_id,
                 &mut Runtime,
@@ -755,7 +759,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_deposit(input);
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -767,7 +771,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_unregister(input);
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -779,7 +783,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_withdraw(input);
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -790,7 +794,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_balance_of(input);
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -821,7 +825,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_paused_flags();
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -831,7 +835,7 @@ mod contract {
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_accounts_counter();
-        let promise_id = io.promise_create_call(&promise_args);
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
 
