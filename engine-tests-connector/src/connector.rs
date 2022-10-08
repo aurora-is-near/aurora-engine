@@ -260,12 +260,12 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
     let res = contract
         .engine_contract
         .call("ft_transfer_call")
-        .args_json((
-            contract.engine_contract.id(),
-            transfer_amount,
-            memo,
-            message,
-        ))
+        .args_json(json!({
+            "receiver_id": contract.engine_contract.id(),
+            "amount": transfer_amount,
+            "memo": memo,
+            "msg": message,
+        }))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
@@ -337,12 +337,12 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     let res = contract
         .engine_contract
         .call("ft_transfer_call")
-        .args_json((
-            contract.engine_contract.id(),
-            transfer_amount,
-            &memo,
-            message,
-        ))
+        .args_json(json!({
+            "receiver_id": contract.engine_contract.id(),
+            "amount":transfer_amount,
+            "memo": &memo,
+            "msg": message,
+        }))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
@@ -374,7 +374,12 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     let res = contract
         .engine_contract
         .call("ft_transfer_call")
-        .args_json((&some_acc, transfer_amount, &memo, message))
+        .args_json(json!({
+            "receiver_id": &some_acc,
+            "amount": transfer_amount,
+            "memo": &memo,
+            "msg": message
+        }))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
@@ -413,7 +418,12 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     let res = contract
         .engine_contract
         .call("ft_transfer_call")
-        .args_json((&dummy_contract.id(), transfer_amount, &memo, message))
+        .args_json(json!({
+            "receiver_id": &dummy_contract.id(),
+            "amount": transfer_amount,
+            "memo": &memo,
+            "msg": message
+        }))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
@@ -585,12 +595,12 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
     let res = contract
         .engine_contract
         .call("ft_transfer_call")
-        .args_json((
-            contract.engine_contract.id(),
-            transfer_amount,
-            memo,
-            message,
-        ))
+        .args_json(json!({
+            "receiver_id": contract.engine_contract.id(),
+            "amount": transfer_amount,
+            "memo": memo,
+            "msg": message,
+        }))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
@@ -641,12 +651,12 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
     let res = contract
         .engine_contract
         .call("ft_transfer_call")
-        .args_json((
-            contract.engine_contract.id(),
-            transfer_amount,
-            memo,
-            message,
-        ))
+        .args_json(json!({
+            "receiver_id": contract.engine_contract.id(),
+            "amount": transfer_amount,
+            "memo": memo,
+            "msg": message,
+        }))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
@@ -785,7 +795,11 @@ async fn test_admin_controlled_admin_can_perform_actions_when_paused() -> anyhow
     let res = contract
         .eth_connector_contract
         .call("withdraw")
-        .args_borsh((recipient_addr, withdraw_amount))
+        .args_borsh((
+            contract.eth_connector_contract.id(),
+            recipient_addr,
+            withdraw_amount,
+        ))
         .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
@@ -1121,7 +1135,6 @@ async fn test_deposit_to_aurora_amount_zero_fee_non_zero() -> anyhow::Result<()>
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    println!("{:#?} ", res);
     assert!(res.is_failure());
     assert!(contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"));
     assert!(!contract.call_is_used_proof(proof_str).await?);
@@ -1279,7 +1292,6 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-
     assert!(res.is_success());
     assert_eq!(
         contract
@@ -1317,7 +1329,6 @@ async fn test_access_rights() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    println!("\n#1 {:#?}", res);
     assert!(res.is_success());
 
     assert_eq!(
@@ -1344,7 +1355,6 @@ async fn test_access_rights() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    println!("\n#2 {:#?}", res);
     assert!(res.is_failure());
     assert!(contract.check_error_message(res, "ERR_ACCESS_RIGHT"));
 
@@ -1369,11 +1379,10 @@ async fn test_access_rights() -> anyhow::Result<()> {
         .gas(DEFAULT_GAS)
         .transact()
         .await?;
-    println!("\n#3 {:#?}", res);
     assert!(res.is_success());
 
     let res = contract
-        .engine_contract
+        .eth_connector_contract
         .call("get_access_right")
         .gas(DEFAULT_GAS)
         .transact()
@@ -1392,7 +1401,6 @@ async fn test_access_rights() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    println!("\n#5 {:#?}", res);
     assert!(res.is_success());
 
     assert_eq!(

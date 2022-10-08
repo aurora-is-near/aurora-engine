@@ -535,9 +535,26 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn withdraw() {
+        use crate::prelude::{NEP141Wei, WithdrawCallArgs};
+
+        #[derive(BorshSerialize)]
+        pub struct EngineWithdrawCallArgs {
+            pub sender_id: AccountId,
+            pub recipient_address: Address,
+            pub amount: NEP141Wei,
+        }
+
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let input = io.read_input().to_vec();
+        let args: WithdrawCallArgs = io.read_input_borsh().sdk_unwrap();
+        let input = EngineWithdrawCallArgs {
+            sender_id: io.predecessor_account_id(),
+            recipient_address: args.recipient_address,
+            amount: args.amount,
+        }
+        .try_to_vec()
+        .unwrap();
+
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .withdraw_eth_from_near(input);
@@ -620,32 +637,26 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer() {
-        use crate::parameters::{EngineTransferCallArgs, TransferCallArgs};
+        use crate::parameters::TransferCallArgs;
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
+        let predecessor_account_id = io.predecessor_account_id().to_string();
         let args = TransferCallArgs::try_from(parse_json(&io.read_input().to_vec()).sdk_unwrap())
             .sdk_unwrap();
-        let input = EngineTransferCallArgs {
-            sender_id: predecessor_account_id,
-            receiver_id: args.receiver_id,
-            amount: args.amount,
-            memo: args.memo,
-        };
-        let input = if let Some(memo) = input.memo {
+        let input = if let Some(memo) = args.memo {
             format!(
                 "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?} }}",
-                input.sender_id.to_string(),
-                input.receiver_id.to_string(),
-                input.amount.to_string(),
+                predecessor_account_id,
+                args.receiver_id.to_string(),
+                args.amount.to_string(),
                 memo
             )
         } else {
             format!(
                 "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?} }}",
-                input.sender_id.to_string(),
-                input.receiver_id.to_string(),
-                input.amount.to_string(),
+                predecessor_account_id,
+                args.receiver_id.to_string(),
+                args.amount.to_string(),
             )
         }
         .as_bytes()
@@ -660,10 +671,38 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
+        use crate::parameters::TransferCallCallArgs;
+        use aurora_engine_sdk::types::ExpectUtf8;
+
         let mut io = Runtime;
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
-        let input = io.read_input().to_vec();
+        let predecessor_account_id = io.predecessor_account_id().to_string();
+        let args = TransferCallCallArgs::try_from(
+            parse_json(&io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
+        )
+        .sdk_unwrap();
+        let input = if let Some(memo) = args.memo {
+            format!(
+                "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?},  \"msg\": {:?} }}",
+                predecessor_account_id,
+                args.receiver_id.to_string(),
+                args.amount.to_string(),
+                memo,
+                args.msg
+            )
+        } else {
+            format!(
+                "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"msg\": {:?} }}",
+                predecessor_account_id,
+                args.receiver_id.to_string(),
+                args.amount.to_string(),
+                args.msg
+            )
+        }
+        .as_bytes()
+        .to_vec();
+
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_transfer_call(input);

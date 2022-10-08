@@ -443,16 +443,6 @@ pub struct TransferCallArgs {
     pub memo: Option<String>,
 }
 
-/// transfer args for json invocation
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct EngineTransferCallArgs {
-    pub sender_id: AccountId,
-    pub receiver_id: AccountId,
-    pub amount: NEP141Wei,
-    pub memo: Option<String>,
-}
-
 impl TryFrom<JsonValue> for TransferCallArgs {
     type Error = error::ParseTypeFromJsonError;
 
