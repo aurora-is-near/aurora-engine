@@ -3,6 +3,7 @@ use aurora_engine::pausables::{
 };
 use aurora_engine::{connector, engine, parameters::SubmitResult, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
+use aurora_engine_types::parameters::EngineWithdrawCallArgs;
 use aurora_engine_types::{
     account_id::AccountId, parameters::PromiseWithCallbackArgs, types::Address, H256,
 };
@@ -260,40 +261,23 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::Withdraw(_args) => {
-            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            // connector.withdraw_eth_from_near(
-            //     &env.current_account_id,
-            //     &env.predecessor_account_id,
-            //     args.clone(),
-            // )?;
-            //
+        TransactionKind::Withdraw(args) => {
+            let input = EngineWithdrawCallArgs {
+                sender_id: env.predecessor_account_id(),
+                recipient_address: args.recipient_address,
+                amount: args.amount,
+            }
+            .try_to_vec()?;
+
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            connector.withdraw_eth_from_near(input)?;
             None
         }
 
-        TransactionKind::Deposit(_raw_proof) => {
-            // let connector_contract = connector::EthConnectorContract::init_instance(io)?;
-            // let promise_args = connector_contract.deposit(
-            //     raw_proof.clone(),
-            //     env.current_account_id(),
-            //     env.predecessor_account_id(),
-            // )?;
-            //
-            // Some(TransactionExecutionResult::Promise(promise_args))
-            None
-        }
-
-        TransactionKind::FinishDeposit(_finish_args) => {
-            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            // let maybe_promise_args = connector.finish_deposit(
-            //     env.predecessor_account_id(),
-            //     env.current_account_id(),
-            //     finish_args.clone(),
-            //     env.prepaid_gas,
-            // )?;
-            //
-            // maybe_promise_args.map(TransactionExecutionResult::Promise)
-            None
+        TransactionKind::Deposit(args) => {
+            let connector_contract = connector::EthConnectorContract::init_instance(io)?;
+            let promise_args = connector_contract.deposit(args.clone())?;
+            Some(TransactionExecutionResult::Promise(promise_args))
         }
 
         TransactionKind::StorageDeposit(_args) => {

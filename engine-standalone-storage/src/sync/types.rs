@@ -93,8 +93,6 @@ pub enum TransactionKind {
     /// This can change balances on aurora in the case that `receiver_id == aurora`.
     /// Example: https://explorer.mainnet.near.org/transactions/DH6iNvXCt5n5GZBZPV1A6sLmMf1EsKcxXE4uqk1cShzj
     FtTransferCall(parameters::TransferCallCallArgs),
-    /// FinishDeposit-type receipts are created by calls to `deposit`
-    FinishDeposit(parameters::FinishDepositCallArgs),
     /// ResolveTransfer-type receipts are created by calls to ft_on_transfer
     ResolveTransfer(parameters::ResolveTransferCallArgs, types::PromiseResult),
     /// ft_transfer (related to eth-connector)
@@ -317,7 +315,6 @@ impl TransactionKind {
             }
             Self::Deposit(_) => Self::no_evm_execution("deposit"),
             Self::FtTransferCall(_) => Self::no_evm_execution("ft_transfer_call"),
-            Self::FinishDeposit(_) => Self::no_evm_execution("finish_deposit"),
             Self::ResolveTransfer(_, _) => Self::no_evm_execution("resolve_transfer"),
             Self::FtTransfer(_) => Self::no_evm_execution("ft_transfer"),
             TransactionKind::Withdraw(_) => Self::no_evm_execution("withdraw"),
@@ -482,7 +479,6 @@ enum BorshableTransactionKind<'a> {
     FtOnTransfer(Cow<'a, parameters::NEP141FtOnTransferArgs>),
     Deposit(Cow<'a, Vec<u8>>),
     FtTransferCall(Cow<'a, parameters::TransferCallCallArgs>),
-    FinishDeposit(Cow<'a, parameters::FinishDepositCallArgs>),
     ResolveTransfer(
         Cow<'a, parameters::ResolveTransferCallArgs>,
         Cow<'a, types::PromiseResult>,
@@ -519,7 +515,6 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::FtOnTransfer(x) => Self::FtOnTransfer(Cow::Borrowed(x)),
             TransactionKind::Deposit(x) => Self::Deposit(Cow::Borrowed(x)),
             TransactionKind::FtTransferCall(x) => Self::FtTransferCall(Cow::Borrowed(x)),
-            TransactionKind::FinishDeposit(x) => Self::FinishDeposit(Cow::Borrowed(x)),
             TransactionKind::ResolveTransfer(x, y) => {
                 Self::ResolveTransfer(Cow::Borrowed(x), Cow::Borrowed(y))
             }
@@ -566,7 +561,6 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::FtOnTransfer(x) => Ok(Self::FtOnTransfer(x.into_owned())),
             BorshableTransactionKind::Deposit(x) => Ok(Self::Deposit(x.into_owned())),
             BorshableTransactionKind::FtTransferCall(x) => Ok(Self::FtTransferCall(x.into_owned())),
-            BorshableTransactionKind::FinishDeposit(x) => Ok(Self::FinishDeposit(x.into_owned())),
             BorshableTransactionKind::ResolveTransfer(x, y) => {
                 Ok(Self::ResolveTransfer(x.into_owned(), y.into_owned()))
             }

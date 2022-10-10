@@ -541,14 +541,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn withdraw() {
-        use crate::prelude::{NEP141Wei, WithdrawCallArgs};
-
-        #[derive(BorshSerialize)]
-        pub struct EngineWithdrawCallArgs {
-            pub sender_id: AccountId,
-            pub recipient_address: Address,
-            pub amount: NEP141Wei,
-        }
+        use crate::prelude::{EngineWithdrawCallArgs, NEP141Wei, WithdrawCallArgs};
 
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();

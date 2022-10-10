@@ -241,6 +241,13 @@ pub struct WithdrawCallArgs {
     pub amount: NEP141Wei,
 }
 
+#[derive(BorshSerialize)]
+pub struct EngineWithdrawCallArgs {
+    pub sender_id: AccountId,
+    pub recipient_address: Address,
+    pub amount: NEP141Wei,
+}
+
 /// withdraw NEAR eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct RefundCallArgs {

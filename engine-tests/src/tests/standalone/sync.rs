@@ -76,28 +76,6 @@ fn test_consume_deposit_message() {
     // Now executing aurora callbacks, so predecessor_account_id = current_account_id
     runner.env.predecessor_account_id = runner.env.current_account_id.clone();
 
-    let transaction_message = sync::types::TransactionMessage {
-        block_hash: block_message.hash,
-        near_receipt_id: H256([0x22; 32]),
-        position: 1,
-        succeeded: true,
-        signer: runner.env.signer_account_id(),
-        caller: runner.env.predecessor_account_id(),
-        attached_near: 0,
-        transaction: sync::types::TransactionKind::FinishDeposit(finish_deposit_args),
-        promise_data: Vec::new(),
-    };
-
-    let outcome = sync::consume_message(
-        &mut runner.storage,
-        sync::types::Message::Transaction(Box::new(transaction_message)),
-    )
-    .unwrap();
-    let outcome = match outcome {
-        sync::ConsumeMessageOutcome::TransactionIncluded(outcome) => outcome,
-        other => panic!("Unexpected outcome {:?}", other),
-    };
-
     let ft_on_transfer_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
             let bytes = promise_args.base.args;
