@@ -1,9 +1,6 @@
 use crate::test_utils;
 use aurora_engine::engine;
-use aurora_engine::fungible_token::FungibleTokenMetadata;
-use aurora_engine::parameters::{
-    FinishDepositCallArgs, InitCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-};
+use aurora_engine::parameters::{FinishDepositCallArgs, NEP141FtOnTransferArgs, NewCallArgs};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::types::{Address, Balance, NEP141Wei, Wei};
@@ -56,12 +53,6 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
     };
 
     engine::set_state(&mut io, new_args.into());
-
-    let connector_args = InitCallArgs {
-        prover_account: test_utils::str_to_account_id("prover.near"),
-        eth_custodian_address: ETH_CUSTODIAN_ADDRESS.encode(),
-        metadata: FungibleTokenMetadata::default(),
-    };
 }
 
 pub fn mint_evm_account<I: IO + Copy, E: Env>(
@@ -87,7 +78,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
         reset_storage: false,
     };
 
-    let deposit_args = FinishDepositCallArgs {
+    let _deposit_args = FinishDepositCallArgs {
         new_owner_id: aurora_account_id.clone(),
         amount: NEP141Wei::new(balance.raw().as_u128()),
         proof_key: String::new(),
@@ -103,7 +94,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     );
     io.remove_storage(&proof_key);
 
-    let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io).unwrap();
+    let _connector = aurora_engine::connector::EthConnectorContract::init_instance(io).unwrap();
     // connector
     //     .finish_deposit(
     //         aurora_account_id.clone(),
@@ -114,7 +105,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     //     .map_err(unsafe_to_string)
     //     .unwrap();
 
-    let transfer_args = NEP141FtOnTransferArgs {
+    let _transfer_args = NEP141FtOnTransferArgs {
         sender_id: aurora_account_id.clone(),
         amount: Balance::new(balance.raw().as_u128()),
         msg: format!(
@@ -131,6 +122,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     engine.apply(std::iter::once(state_change), std::iter::empty(), false);
 }
 
+#[allow(dead_code)]
 pub fn unsafe_to_string<E: AsRef<[u8]>>(e: E) -> String {
     String::from_utf8(e.as_ref().to_vec()).unwrap()
 }

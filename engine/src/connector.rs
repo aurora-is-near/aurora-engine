@@ -119,17 +119,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
-    pub fn ft_total_eth_supply_on_aurora(&mut self) -> PromiseCreateArgs {
-        PromiseCreateArgs {
-            target_account_id: self.get_eth_connector_contract_account(),
-            method: "ft_total_eth_supply_on_aurora".to_string(),
-            args: Vec::new(),
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: VIEW_CALL_GAS,
-        }
-    }
-
     /// Return balance of nETH (ETH on Near)
     pub fn ft_balance_of(&self, input: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {

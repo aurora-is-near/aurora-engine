@@ -219,17 +219,6 @@ fn total_eth_supply_on_near(master_account: &UserAccount, contract: &str) -> u12
     val.parse().unwrap()
 }
 
-fn total_eth_supply_on_aurora(master_account: &UserAccount, contract: &str) -> u128 {
-    let balance = master_account.view(
-        contract.parse().unwrap(),
-        "ft_total_eth_supply_on_aurora",
-        &[],
-    );
-    let val_str = String::from_utf8(balance.unwrap()).unwrap();
-    let val = &val_str[1..val_str.len() - 1];
-    val.parse().unwrap()
-}
-
 #[test]
 fn test_deposit_eth_to_near_balance_total_supply() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);

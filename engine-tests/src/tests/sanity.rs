@@ -42,16 +42,6 @@ fn test_total_supply_accounting() {
         constructor.deployed_at(contract_address)
     };
 
-    let get_total_supply = |runner: &mut test_utils::AuroraRunner| -> Wei {
-        let (outcome, _) = runner.call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
-        let amount: u128 = String::from_utf8(outcome.unwrap().return_data.as_value().unwrap())
-            .unwrap()
-            .replace('"', "")
-            .parse()
-            .unwrap();
-        Wei::new(U256::from(amount))
-    };
-
     // Self-destruct with some benefactor does not reduce the total supply
     let contract = deploy_contract(&mut runner, &mut signer);
     let _submit_result = runner

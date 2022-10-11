@@ -253,10 +253,6 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         self.total_eth_supply_on_near
     }
 
-    pub fn ft_total_eth_supply_on_aurora(&self) -> Wei {
-        self.total_eth_supply_on_aurora
-    }
-
     pub fn ft_balance_of(&self, account_id: &AccountId) -> NEP141Wei {
         self.get_account_eth_balance(account_id)
             .unwrap_or(ZERO_NEP141_WEI)

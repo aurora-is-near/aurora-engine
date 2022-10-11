@@ -603,16 +603,6 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_total_eth_supply_on_aurora() {
-        let mut io = Runtime;
-        let promise_args = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_total_eth_supply_on_aurora();
-        let promise_id = unsafe { io.promise_create_call(&promise_args) };
-        io.promise_return(promise_id);
-    }
-
-    #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         let mut io = Runtime;
         let input = io.read_input().to_vec();

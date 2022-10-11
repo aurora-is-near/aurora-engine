@@ -472,7 +472,7 @@ enum BorshableTransactionKind<'a> {
     DeployErc20(Cow<'a, parameters::DeployErc20TokenArgs>),
     FtOnTransfer(Cow<'a, parameters::NEP141FtOnTransferArgs>),
     Deposit(Cow<'a, Vec<u8>>),
-    FtTransferCall(Cow<'a, parameters::TransferCallCallArgs>),,
+    FtTransferCall(Cow<'a, parameters::TransferCallCallArgs>),
     FtTransfer(Cow<'a, parameters::TransferCallArgs>),
     Withdraw(Cow<'a, aurora_engine_types::parameters::WithdrawCallArgs>),
     StorageDeposit(Cow<'a, parameters::StorageDepositCallArgs>),
