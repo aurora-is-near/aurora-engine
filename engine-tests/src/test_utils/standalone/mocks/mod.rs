@@ -6,10 +6,9 @@ use aurora_engine::parameters::{
 };
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::{Address, Balance, NEP141Wei, NearGas, Wei};
+use aurora_engine_types::types::{Address, Balance, NEP141Wei, Wei};
 use aurora_engine_types::{account_id::AccountId, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
-use near_sdk_sim::DEFAULT_GAS;
 
 pub mod block;
 
@@ -63,10 +62,6 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
         eth_custodian_address: ETH_CUSTODIAN_ADDRESS.encode(),
         metadata: FungibleTokenMetadata::default(),
     };
-
-    aurora_engine::connector::EthConnectorContract::create_contract()
-        .map_err(unsafe_to_string)
-        .unwrap();
 }
 
 pub fn mint_evm_account<I: IO + Copy, E: Env>(

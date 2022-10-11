@@ -93,8 +93,6 @@ pub enum TransactionKind {
     /// This can change balances on aurora in the case that `receiver_id == aurora`.
     /// Example: https://explorer.mainnet.near.org/transactions/DH6iNvXCt5n5GZBZPV1A6sLmMf1EsKcxXE4uqk1cShzj
     FtTransferCall(parameters::TransferCallCallArgs),
-    /// ResolveTransfer-type receipts are created by calls to ft_on_transfer
-    ResolveTransfer(parameters::ResolveTransferCallArgs, types::PromiseResult),
     /// ft_transfer (related to eth-connector)
     FtTransfer(parameters::TransferCallArgs),
     /// Function to take ETH out of Aurora
@@ -105,8 +103,6 @@ pub enum TransactionKind {
     StorageUnregister(Option<bool>),
     /// FT storage standard method
     StorageWithdraw(parameters::StorageWithdrawCallArgs),
-    /// Admin only method
-    SetPausedFlags(Vec<u8>),
     /// Ad entry mapping from address to relayer NEAR account
     RegisterRelayer(types::Address),
     /// Called if exist precompiles fail
@@ -315,13 +311,11 @@ impl TransactionKind {
             }
             Self::Deposit(_) => Self::no_evm_execution("deposit"),
             Self::FtTransferCall(_) => Self::no_evm_execution("ft_transfer_call"),
-            Self::ResolveTransfer(_, _) => Self::no_evm_execution("resolve_transfer"),
             Self::FtTransfer(_) => Self::no_evm_execution("ft_transfer"),
             TransactionKind::Withdraw(_) => Self::no_evm_execution("withdraw"),
             TransactionKind::StorageDeposit(_) => Self::no_evm_execution("storage_deposit"),
             TransactionKind::StorageUnregister(_) => Self::no_evm_execution("storage_unregister"),
             TransactionKind::StorageWithdraw(_) => Self::no_evm_execution("storage_withdraw"),
-            TransactionKind::SetPausedFlags(_) => Self::no_evm_execution("set_paused_flags"),
             TransactionKind::RegisterRelayer(_) => Self::no_evm_execution("register_relayer"),
             TransactionKind::SetConnectorData(_) => Self::no_evm_execution("set_connector_data"),
             TransactionKind::NewConnector(_) => Self::no_evm_execution("new_connector"),
@@ -478,17 +472,12 @@ enum BorshableTransactionKind<'a> {
     DeployErc20(Cow<'a, parameters::DeployErc20TokenArgs>),
     FtOnTransfer(Cow<'a, parameters::NEP141FtOnTransferArgs>),
     Deposit(Cow<'a, Vec<u8>>),
-    FtTransferCall(Cow<'a, parameters::TransferCallCallArgs>),
-    ResolveTransfer(
-        Cow<'a, parameters::ResolveTransferCallArgs>,
-        Cow<'a, types::PromiseResult>,
-    ),
+    FtTransferCall(Cow<'a, parameters::TransferCallCallArgs>),,
     FtTransfer(Cow<'a, parameters::TransferCallArgs>),
     Withdraw(Cow<'a, aurora_engine_types::parameters::WithdrawCallArgs>),
     StorageDeposit(Cow<'a, parameters::StorageDepositCallArgs>),
     StorageUnregister(Option<bool>),
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
-    SetPausedFlags(Cow<'a, Vec<u8>>),
     RegisterRelayer(Cow<'a, types::Address>),
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
@@ -515,15 +504,11 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::FtOnTransfer(x) => Self::FtOnTransfer(Cow::Borrowed(x)),
             TransactionKind::Deposit(x) => Self::Deposit(Cow::Borrowed(x)),
             TransactionKind::FtTransferCall(x) => Self::FtTransferCall(Cow::Borrowed(x)),
-            TransactionKind::ResolveTransfer(x, y) => {
-                Self::ResolveTransfer(Cow::Borrowed(x), Cow::Borrowed(y))
-            }
             TransactionKind::FtTransfer(x) => Self::FtTransfer(Cow::Borrowed(x)),
             TransactionKind::Withdraw(x) => Self::Withdraw(Cow::Borrowed(x)),
             TransactionKind::StorageDeposit(x) => Self::StorageDeposit(Cow::Borrowed(x)),
             TransactionKind::StorageUnregister(x) => Self::StorageUnregister(*x),
             TransactionKind::StorageWithdraw(x) => Self::StorageWithdraw(Cow::Borrowed(x)),
-            TransactionKind::SetPausedFlags(x) => Self::SetPausedFlags(Cow::Borrowed(x)),
             TransactionKind::RegisterRelayer(x) => Self::RegisterRelayer(Cow::Borrowed(x)),
             TransactionKind::RefundOnError(x) => Self::RefundOnError(Cow::Borrowed(x)),
             TransactionKind::SetConnectorData(x) => Self::SetConnectorData(Cow::Borrowed(x)),
@@ -561,9 +546,6 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::FtOnTransfer(x) => Ok(Self::FtOnTransfer(x.into_owned())),
             BorshableTransactionKind::Deposit(x) => Ok(Self::Deposit(x.into_owned())),
             BorshableTransactionKind::FtTransferCall(x) => Ok(Self::FtTransferCall(x.into_owned())),
-            BorshableTransactionKind::ResolveTransfer(x, y) => {
-                Ok(Self::ResolveTransfer(x.into_owned(), y.into_owned()))
-            }
             BorshableTransactionKind::FtTransfer(x) => Ok(Self::FtTransfer(x.into_owned())),
             BorshableTransactionKind::Withdraw(x) => Ok(Self::Withdraw(x.into_owned())),
             BorshableTransactionKind::StorageDeposit(x) => Ok(Self::StorageDeposit(x.into_owned())),
@@ -571,7 +553,6 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::StorageWithdraw(x) => {
                 Ok(Self::StorageWithdraw(x.into_owned()))
             }
-            BorshableTransactionKind::SetPausedFlags(x) => Ok(Self::SetPausedFlags(x.into_owned())),
             BorshableTransactionKind::RegisterRelayer(x) => {
                 Ok(Self::RegisterRelayer(x.into_owned()))
             }

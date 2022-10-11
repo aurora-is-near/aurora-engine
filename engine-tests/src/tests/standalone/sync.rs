@@ -2,7 +2,7 @@ use aurora_engine::deposit_event::TokenMessageData;
 use aurora_engine_sdk::env::{Env, Timestamp};
 use aurora_engine_types::types::{Address, Balance, Fee, NEP141Wei, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshSerialize;
 use engine_standalone_storage::sync;
 
 use crate::test_utils::{self, standalone::StandaloneRunner};
@@ -71,7 +71,7 @@ fn test_consume_deposit_message() {
 
     let ft_on_transfer_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
-            let bytes = promise_args.base.args;
+            let bytes = promise_args.args;
             let json = aurora_engine::json::parse_json(&bytes).unwrap();
             aurora_engine::parameters::NEP141FtOnTransferArgs::try_from(json)
                 .ok()

@@ -3,10 +3,8 @@ use aurora_engine::pausables::{
 };
 use aurora_engine::{connector, engine, parameters::SubmitResult, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
-use aurora_engine_types::parameters::EngineWithdrawCallArgs;
-use aurora_engine_types::{
-    account_id::AccountId, parameters::PromiseWithCallbackArgs, types::Address, H256,
-};
+use aurora_engine_types::parameters::{EngineWithdrawCallArgs, PromiseCreateArgs};
+use aurora_engine_types::{account_id::AccountId, types::Address, H256};
 
 pub mod types;
 
@@ -211,29 +209,28 @@ fn non_submit_execute<'db>(
             Some(TransactionExecutionResult::DeployErc20(result))
         }
 
-        TransactionKind::FtOnTransfer(_args) => {
+        TransactionKind::FtOnTransfer(args) => {
             // No promises can be created by `ft_on_transfer`
-            // let mut handler = crate::promise::NoScheduler { promise_data };
-            // let mut engine =
-            //     engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
-            //
-            // if env.predecessor_account_id == env.current_account_id {
-            //     connector::EthConnectorContract::init_instance(io)?
-            //         .ft_on_transfer(&engine, args)?;
-            // } else {
-            //     engine.receive_erc20_tokens(
-            //         &env.predecessor_account_id,
-            //         &env.signer_account_id,
-            //         args,
-            //         &env.current_account_id,
-            //         &mut handler,
-            //     );
-            // }
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let mut engine =
+                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
+
+            if env.predecessor_account_id == env.current_account_id {
+                connector::EthConnectorContract::init_instance(io)?
+                    .ft_on_transfer(&engine, args)?;
+            } else {
+                engine.receive_erc20_tokens(
+                    &env.predecessor_account_id,
+                    args,
+                    &env.current_account_id,
+                    &mut handler,
+                );
+            }
             None
         }
 
         TransactionKind::FtTransferCall(args) => {
-            let input = if let Some(memo) = args.memo {
+            let input = if let Some(memo) = args.clone().memo {
                 format!(
                     "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?},  \"msg\": {:?} }}",
                     env.predecessor_account_id,
@@ -252,23 +249,16 @@ fn non_submit_execute<'db>(
                 )
             }.as_bytes().to_vec();
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector.ft_transfer_call(input)?;
+            let promise_args = connector.ft_transfer_call(input);
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
-        TransactionKind::ResolveTransfer(_args, _promise_result) => {
-            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            // connector.ft_resolve_transfer(args.clone(), promise_result.clone());
-
-            None
-        }
-
         TransactionKind::FtTransfer(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let input = if let Some(memo) = args.memo {
+            let connector = connector::EthConnectorContract::init_instance(io)?;
+            let input = if let Some(memo) = args.clone(). memo {
                 format!(
                     "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?} }}",
-                    predecessor_account_id,
+                    env.predecessor_account_id,
                     args.receiver_id.to_string(),
                     args.amount.to_string(),
                     memo
@@ -276,31 +266,33 @@ fn non_submit_execute<'db>(
             } else {
                 format!(
                     "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?} }}",
-                    predecessor_account_id,
+                    env.predecessor_account_id,
                     args.receiver_id.to_string(),
                     args.amount.to_string(),
                 )
             }.as_bytes().to_vec();
-            connector.ft_transfer(input)?;
-            None
+            let promise_args = connector.ft_transfer(input);
+            Some(TransactionExecutionResult::Promise(promise_args))
         }
 
         TransactionKind::Withdraw(args) => {
+            use borsh::BorshSerialize;
             let input = EngineWithdrawCallArgs {
                 sender_id: env.predecessor_account_id(),
                 recipient_address: args.recipient_address,
                 amount: args.amount,
             }
-            .try_to_vec()?;
+            .try_to_vec()
+            .map_err(|_| error::Error::FtWithdraw(connector::error::WithdrawError::ParseArgs))?;
 
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.withdraw_eth_from_near(input)?;
-            None
+            let connector = connector::EthConnectorContract::init_instance(io)?;
+            let promise_args = connector.withdraw_eth_from_near(input);
+            Some(TransactionExecutionResult::Promise(promise_args))
         }
 
         TransactionKind::Deposit(args) => {
             let connector_contract = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector_contract.deposit(args.clone())?;
+            let promise_args = connector_contract.deposit(args.clone());
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
@@ -325,13 +317,6 @@ fn non_submit_execute<'db>(
         TransactionKind::StorageWithdraw(_args) => {
             // let mut connector = connector::EthConnectorContract::init_instance(io)?;
             // connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
-
-            None
-        }
-
-        TransactionKind::SetPausedFlags(_args) => {
-            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            // connector.set_paused_flags(args.clone());
 
             None
         }
@@ -367,10 +352,7 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::NewConnector(_args) => {
-            connector::EthConnectorContract::create_contract()?;
-            None
-        }
+        TransactionKind::NewConnector(_args) => None,
         TransactionKind::NewEngine(args) => {
             engine::set_state(&mut io, args.clone().into());
 
@@ -435,7 +417,7 @@ pub struct TransactionIncludedOutcome {
 pub enum TransactionExecutionResult {
     Submit(engine::EngineResult<SubmitResult>),
     DeployErc20(Address),
-    Promise(PromiseWithCallbackArgs),
+    Promise(PromiseCreateArgs),
 }
 
 pub mod error {
@@ -475,7 +457,7 @@ pub mod error {
         }
     }
 
-    impl From<connector::error::FtTransferzCallError> for Error {
+    impl From<connector::error::FtTransferCallError> for Error {
         fn from(e: connector::error::FtTransferCallError) -> Self {
             Self::FtOnTransfer(e)
         }

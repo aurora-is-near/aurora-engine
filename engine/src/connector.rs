@@ -1,8 +1,6 @@
 use crate::admin_controlled::AdminControlled;
 use crate::fungible_token::{self, FungibleTokenMetadata};
-use crate::parameters::{
-    BalanceOfEthCallArgs, InitCallArgs, NEP141FtOnTransferArgs, SetContractDataCallArgs,
-};
+use crate::parameters::{BalanceOfEthCallArgs, NEP141FtOnTransferArgs, SetContractDataCallArgs};
 use crate::prelude::{address::error::AddressError, Wei};
 use crate::prelude::{PromiseCreateArgs, U256};
 
@@ -457,6 +455,7 @@ pub mod error {
     #[derive(Debug)]
     pub enum WithdrawError {
         FT(fungible_token::error::WithdrawError),
+        ParseArgs,
     }
 
     impl From<fungible_token::error::WithdrawError> for WithdrawError {
@@ -469,6 +468,7 @@ pub mod error {
         fn as_ref(&self) -> &[u8] {
             match self {
                 Self::FT(e) => e.as_ref(),
+                Self::ParseArgs => b"ERR_PARSE_ARGS",
             }
         }
     }

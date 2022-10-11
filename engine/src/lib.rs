@@ -78,7 +78,7 @@ mod contract {
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
-        CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs,
+        CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         NEP141FtOnTransferArgs, NewCallArgs, PausePrecompilesCallArgs, SetContractDataCallArgs,
         SetEthConnectorContractAccountArgs, ViewCallArgs,
     };
@@ -522,11 +522,10 @@ mod contract {
         let io = Runtime;
         // Only the owner can initialize the EthConnector
         io.assert_private_call().sdk_unwrap();
-
-        let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
-        let owner_id = io.current_account_id();
-
-        EthConnectorContract::create_contract().sdk_unwrap();
+        //
+        // let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
+        // let owner_id = io.current_account_id();
+        // EthConnectorContract::create_contract().sdk_unwrap();
     }
 
     #[no_mangle]
@@ -541,7 +540,7 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn withdraw() {
-        use crate::prelude::{EngineWithdrawCallArgs, NEP141Wei, WithdrawCallArgs};
+        use crate::prelude::{EngineWithdrawCallArgs, WithdrawCallArgs};
 
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
