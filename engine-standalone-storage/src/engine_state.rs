@@ -14,7 +14,7 @@ pub enum EngineStorageValue<'a> {
 impl<'a> AsRef<[u8]> for EngineStorageValue<'a> {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::Slice(slice) => *slice,
+            Self::Slice(slice) => slice,
             Self::Vec(bytes) => bytes,
         }
     }
@@ -98,9 +98,11 @@ impl<'db, 'input: 'db, 'output: 'db> IO for EngineStateAccess<'db, 'input, 'outp
 
         let opt = self.construct_engine_read(key);
         let mut iter = self.db.iterator_opt(rocksdb::IteratorMode::End, opt);
-        let value = iter
-            .next()
-            .map(|(_, value)| DiffValue::try_from_bytes(&value).unwrap())?;
+        let value = iter.next().and_then(|maybe_elem| {
+            maybe_elem
+                .ok()
+                .map(|(_, value)| DiffValue::try_from_bytes(&value).unwrap())
+        })?;
         value.take_value().map(EngineStorageValue::Vec)
     }
 
