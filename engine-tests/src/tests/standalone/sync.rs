@@ -66,13 +66,6 @@ fn test_consume_deposit_message() {
         other => panic!("Unexpected outcome {:?}", other),
     };
 
-    let finish_deposit_args = match outcome.maybe_result.unwrap().unwrap() {
-        sync::TransactionExecutionResult::Promise(promise_args) => {
-            let bytes = promise_args.callback.args;
-            aurora_engine::parameters::FinishDepositCallArgs::try_from_slice(&bytes).unwrap()
-        }
-        other => panic!("Unexpected result {:?}", other),
-    };
     // Now executing aurora callbacks, so predecessor_account_id = current_account_id
     runner.env.predecessor_account_id = runner.env.current_account_id.clone();
 

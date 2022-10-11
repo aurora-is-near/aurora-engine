@@ -60,25 +60,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Create contract data - init eth-connector contract specific data.
     /// Used only once for first time initialization.
     /// Initialized contract data stored in the storage.
-    pub fn create_contract(
-        _io: I,
-        _owner_id: AccountId,
-        _args: InitCallArgs,
-    ) -> Result<(), error::InitContractError> {
-        // // Check is it already initialized
-        // let contract_key_exists =
-        //     io.storage_has_key(&construct_contract_key(&EthConnectorStorageId::Contract));
-        // if contract_key_exists {
-        //     return Err(error::InitContractError::AlreadyInitialized);
-        // }
-        sdk::log!("[init contract]");
-
-        // let mut ft = FungibleTokenOps::new(io);
-        // Register FT account for current contract
-        // ft.internal_register_account(&owner_id);
-        //
-        // Self { ft, io }.save_ft_contract();
-
+    pub fn create_contract() -> Result<(), error::InitContractError> {
+        // NOTE: do nothing
         Ok(())
     }
 

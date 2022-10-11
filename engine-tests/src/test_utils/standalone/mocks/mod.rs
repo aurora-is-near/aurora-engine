@@ -64,13 +64,9 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
         metadata: FungibleTokenMetadata::default(),
     };
 
-    aurora_engine::connector::EthConnectorContract::create_contract(
-        io,
-        env.current_account_id(),
-        connector_args,
-    )
-    .map_err(unsafe_to_string)
-    .unwrap();
+    aurora_engine::connector::EthConnectorContract::create_contract()
+        .map_err(unsafe_to_string)
+        .unwrap();
 }
 
 pub fn mint_evm_account<I: IO + Copy, E: Env>(

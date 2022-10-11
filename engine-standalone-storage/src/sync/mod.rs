@@ -232,17 +232,28 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::FtTransferCall(_args) => {
-            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            // let promise_args = connector.ft_transfer_call(
-            //     env.predecessor_account_id.clone(),
-            //     env.current_account_id.clone(),
-            //     args.clone(),
-            //     env.prepaid_gas,
-            // )?;
-            //
-            // Some(TransactionExecutionResult::Promise(promise_args))
-            None
+        TransactionKind::FtTransferCall(args) => {
+            let input = if let Some(memo) = args.memo {
+                format!(
+                    "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?},  \"msg\": {:?} }}",
+                    env.predecessor_account_id,
+                    args.receiver_id.to_string(),
+                    args.amount.to_string(),
+                    memo,
+                    args.msg
+                )
+            } else {
+                format!(
+                    "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"msg\": {:?} }}",
+                    env.predecessor_account_id,
+                    args.receiver_id.to_string(),
+                    args.amount.to_string(),
+                    args.msg
+                )
+            }.as_bytes().to_vec();
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let promise_args = connector.ft_transfer_call(input)?;
+            Some(TransactionExecutionResult::Promise(promise_args))
         }
 
         TransactionKind::ResolveTransfer(_args, _promise_result) => {
@@ -252,12 +263,25 @@ fn non_submit_execute<'db>(
             None
         }
 
-        TransactionKind::FtTransfer(_args) => {
-            // TODO: fix it
-            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            // let input: Vec<u8> = Vec::new();
-            // connector.ft_transfer(&env.predecessor_account_id, args.clone(), input)?;
-
+        TransactionKind::FtTransfer(args) => {
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let input = if let Some(memo) = args.memo {
+                format!(
+                    "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?} }}",
+                    predecessor_account_id,
+                    args.receiver_id.to_string(),
+                    args.amount.to_string(),
+                    memo
+                )
+            } else {
+                format!(
+                    "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?} }}",
+                    predecessor_account_id,
+                    args.receiver_id.to_string(),
+                    args.amount.to_string(),
+                )
+            }.as_bytes().to_vec();
+            connector.ft_transfer(input)?;
             None
         }
 
@@ -344,12 +368,7 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::NewConnector(_args) => {
-            // connector::EthConnectorContract::create_contract(
-            //     io,
-            //     env.current_account_id,
-            //     args.clone(),
-            // )?;
-
+            connector::EthConnectorContract::create_contract()?;
             None
         }
         TransactionKind::NewEngine(args) => {
@@ -456,7 +475,7 @@ pub mod error {
         }
     }
 
-    impl From<connector::error::FtTransferCallError> for Error {
+    impl From<connector::error::FtTransferzCallError> for Error {
         fn from(e: connector::error::FtTransferCallError) -> Self {
             Self::FtOnTransfer(e)
         }

@@ -526,7 +526,7 @@ mod contract {
         let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
         let owner_id = io.current_account_id();
 
-        EthConnectorContract::create_contract(io, owner_id, args).sdk_unwrap();
+        EthConnectorContract::create_contract().sdk_unwrap();
     }
 
     #[no_mangle]
@@ -642,6 +642,7 @@ mod contract {
         let predecessor_account_id = io.predecessor_account_id().to_string();
         let args = TransferCallArgs::try_from(parse_json(&io.read_input().to_vec()).sdk_unwrap())
             .sdk_unwrap();
+        // TODO: refactor with serde_json?
         let input = if let Some(memo) = args.memo {
             format!(
                 "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?} }}",
@@ -681,6 +682,7 @@ mod contract {
             parse_json(&io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
         )
         .sdk_unwrap();
+        // TODO: refactor with serde_json?
         let input = if let Some(memo) = args.memo {
             format!(
                 "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?},  \"msg\": {:?} }}",

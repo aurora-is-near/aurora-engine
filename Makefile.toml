@@ -205,9 +205,9 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-#    "test_admin_controlled_admin_can_perform_actions_when_paused", 
-    "-p",
-    "aurora-engine-tests-connector",
+    "standalone", 
+#    "-p",
+#    "aurora-engine-tests-connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",
