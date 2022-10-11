@@ -57,7 +57,7 @@ impl AccountId {
             }
 
             (!last_char_is_separator)
-                .then(|| ())
+                .then_some(())
                 .ok_or(ParseAccountError::Invalid)
         }
     }

@@ -82,17 +82,14 @@ impl Storage {
         opt.set_iterate_lower_bound(lower_bound);
 
         let mut iter = self.db.iterator_opt(mode, opt);
-        iter.next()
-            .map(|(key, value)| {
-                let block_height = {
-                    let mut buf = [0u8; 8];
-                    buf.copy_from_slice(&key[prefix_len..]);
-                    u64::from_be_bytes(buf)
-                };
-                let block_hash = H256::from_slice(&value);
-                (block_hash, block_height)
-            })
-            .ok_or(error::Error::NoBlockAtHeight(0))
+        let (key, value) = iter.next().ok_or(error::Error::NoBlockAtHeight(0))??;
+        let block_height = {
+            let mut buf = [0u8; 8];
+            buf.copy_from_slice(&key[prefix_len..]);
+            u64::from_be_bytes(buf)
+        };
+        let block_hash = H256::from_slice(&value);
+        Ok((block_hash, block_height))
     }
 
     pub fn get_block_hash_by_height(&self, block_height: u64) -> Result<H256, error::Error> {
@@ -254,7 +251,8 @@ impl Storage {
         let n = db_key_prefix.len();
         let iter = self.db.prefix_iterator(&db_key_prefix);
         let mut result = Vec::with_capacity(100);
-        for (k, v) in iter {
+        for maybe_elem in iter {
+            let (k, v) = maybe_elem?;
             if k.len() < n || k[0..n] != db_key_prefix {
                 break;
             }

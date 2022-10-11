@@ -380,7 +380,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct GasPaymentResult {
     pub prepaid_amount: Wei,
     pub effective_gas_price: U256,
@@ -389,7 +389,7 @@ pub struct GasPaymentResult {
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
-#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
 pub struct EngineState {
     /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],
@@ -1175,7 +1175,7 @@ pub fn setup_deploy_erc20_input(current_account_id: &AccountId) -> Vec<u8> {
         ethabi::Token::Address(erc20_admin_address.raw()),
     ]);
 
-    (&[erc20_contract, deploy_args.as_slice()].concat()).to_vec()
+    ([erc20_contract, deploy_args.as_slice()].concat()).to_vec()
 }
 
 /// Used to bridge NEP-141 tokens from NEAR to Aurora. On Aurora the NEP-141 becomes an ERC-20.

@@ -4,7 +4,7 @@ use aurora_engine_types::parameters::{PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::types::PromiseResult;
 use std::collections::HashMap;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PromiseArgs {
     Create(PromiseCreateArgs),
     #[allow(dead_code)]
