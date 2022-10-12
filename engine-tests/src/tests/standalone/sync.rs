@@ -3,6 +3,7 @@ use aurora_engine_sdk::env::{Env, Timestamp};
 use aurora_engine_types::types::{Address, Balance, Fee, NEP141Wei, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use borsh::BorshSerialize;
+use byte_slice_cast::AsByteSlice;
 use engine_standalone_storage::sync;
 
 use crate::test_utils::{self, standalone::StandaloneRunner};
@@ -69,13 +70,26 @@ fn test_consume_deposit_message() {
     // Now executing aurora callbacks, so predecessor_account_id = current_account_id
     runner.env.predecessor_account_id = runner.env.current_account_id.clone();
 
+    let fee: u128 = 30;
+    let mut msg = U256::from(fee).as_byte_slice().to_vec();
+    msg.append(&mut recipient_address.as_bytes().to_vec());
+    let message = [
+        runner.env.current_account_id.clone().to_string().as_str(),
+        hex::encode(msg).as_str(),
+    ]
+    .join(":");
+
+    let deposited_on_transfer = 100_u64;
     let ft_on_transfer_args = match outcome.maybe_result.unwrap().unwrap() {
-        sync::TransactionExecutionResult::Promise(promise_args) => {
-            let bytes = promise_args.args;
-            let json = aurora_engine::json::parse_json(&bytes).unwrap();
-            aurora_engine::parameters::NEP141FtOnTransferArgs::try_from(json)
-                .ok()
-                .unwrap()
+        sync::TransactionExecutionResult::Promise(_promise_args) => {
+            // NOTE: in that case cross-contact call can't return result
+            // let json = aurora_engine::json::parse_json(&bytes).unwrap();
+            // aurora_engine::parameters::NEP141FtOnTransferArgs::try_from(json).ok().unwrap()
+            aurora_engine::parameters::NEP141FtOnTransferArgs {
+                sender_id: runner.env.current_account_id.clone(),
+                amount: Balance::new(deposited_on_transfer as u128),
+                msg: message,
+            }
         }
         other => panic!("Unexpected result {:?}", other),
     };
@@ -98,7 +112,10 @@ fn test_consume_deposit_message() {
     )
     .unwrap();
 
-    assert_eq!(runner.get_balance(&recipient_address), deposit_amount);
+    assert_eq!(
+        runner.get_balance(&recipient_address),
+        Wei::new_u64(deposited_on_transfer)
+    );
 
     runner.close()
 }

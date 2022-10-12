@@ -1,3 +1,4 @@
+use aurora_engine::admin_controlled::AdminControlled;
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
@@ -291,7 +292,8 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::Deposit(args) => {
-            let connector_contract = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector_contract = connector::EthConnectorContract::init_instance(io)?;
+            connector_contract.set_eth_connector_contract_account(env.current_account_id);
             let promise_args = connector_contract.deposit(args.clone());
             Some(TransactionExecutionResult::Promise(promise_args))
         }

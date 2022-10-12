@@ -1,6 +1,6 @@
 use aurora_engine::parameters::{SetEthConnectorContractAccountArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::types::{NEP141Wei, PromiseResult};
+use aurora_engine_types::types::PromiseResult;
 use borsh::{BorshDeserialize, BorshSerialize};
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
@@ -14,7 +14,7 @@ use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
 
-use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
+use crate::prelude::fungible_token::FungibleTokenMetadata;
 use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
@@ -306,17 +306,6 @@ impl AuroraRunner {
             crate::prelude::storage::KeyPrefix::EthConnector,
             &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
         );
-        let ft_value = {
-            let mut current_ft: FungibleToken = trie
-                .get(&ft_key)
-                .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
-                .unwrap_or_default();
-            current_ft.total_eth_supply_on_near =
-                current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
-            current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
-                + NEP141Wei::new(init_balance.raw().as_u128());
-            current_ft
-        };
 
         let aurora_balance_key = [
             ft_key.as_slice(),
@@ -341,7 +330,6 @@ impl AuroraRunner {
         if !init_nonce.is_zero() {
             trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         }
-        trie.insert(ft_key, ft_value.try_to_vec().unwrap());
         trie.insert(proof_key, vec![0]);
         trie.insert(
             aurora_balance_key,
