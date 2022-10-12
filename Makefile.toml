@@ -206,8 +206,7 @@ command = "${CARGO}"
 args = [
     "test",
 ##    "test_consume_deposit_message",
-#    "test_1inch_liquidity_protocol",
-    "--verbose",
+#    "test_withdraw_from_user",
     "-p",
     "aurora-engine-tests-connector",
     "--features",
