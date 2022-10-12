@@ -76,8 +76,9 @@ impl TestContract {
             .transact()
             .await?
             .into_result()?;
+        let engine_cotract_bytes = get_engine_contract();
         let engine_contract = engine
-            .deploy(&include_bytes!("../../bin/aurora-mainnet-test.wasm")[..])
+            .deploy(&engine_cotract_bytes[..])
             .await?
             .into_result()?;
 
@@ -351,4 +352,14 @@ pub fn get_contract_and_compile() -> Vec<u8> {
         panic!("{}", String::from_utf8(output.stderr).unwrap());
     }
     std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
+}
+
+fn get_engine_contract() -> Vec<u8> {
+    if cfg!(feature = "mainnet-test") {
+        std::fs::read("../../bin/aurora-mainnet-test.wasm").unwrap()
+    } else if cfg!(feature = "testnet-test") {
+        std::fs::read("../../bin/aurora-testnet-test.wasm").unwrap()
+    } else {
+        panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
+    }
 }

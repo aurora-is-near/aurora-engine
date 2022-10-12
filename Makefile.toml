@@ -207,6 +207,7 @@ args = [
     "test",
 ##    "test_consume_deposit_message",
 #    "test_1inch_liquidity_protocol",
+    "--verbose",
     "-p",
     "aurora-engine-tests-connector",
     "--features",
