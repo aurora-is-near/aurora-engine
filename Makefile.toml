@@ -205,10 +205,10 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-#    "test_consume_deposit_message",
+##    "test_consume_deposit_message",
 #    "test_1inch_liquidity_protocol",
-#    "-p",
-#    "aurora-engine-tests-connector",
+    "-p",
+    "aurora-engine-tests-connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",

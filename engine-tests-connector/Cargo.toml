@@ -19,7 +19,6 @@ aurora-engine = { path = "../engine", default-features = false, features = ["std
 aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std", "impl-serde"] }
 byte-slice-cast = { version = "1.0", default-features = false }
 near-sdk = "4.0"
-near-primitives = "0.5"
 near-units = "0.2"
 tokio = { version = "1.14", features = ["full"] }
 workspaces = "0.5"
