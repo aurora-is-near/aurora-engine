@@ -340,7 +340,17 @@ pub fn get_contract_and_compile() -> Vec<u8> {
             .unwrap()
     };
     if !output.status.success() {
-        panic!("{}", String::from_utf8(output.stderr).unwrap());
+        let entry = Command::new("git")
+            .current_dir(contract_path.clone())
+            .args(&["status"])
+            .output()
+            .unwrap();
+        panic!(
+            "{}\nGIT STATUS: {} [{:?}]\n\n",
+            String::from_utf8(output.stderr).unwrap(),
+            String::from_utf8(entry.stdout).unwrap(),
+            entry.status.success()
+        );
     }
 
     let output = Command::new("cargo")
