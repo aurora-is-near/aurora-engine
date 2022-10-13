@@ -738,11 +738,30 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
+        use crate::parameters::StorageDepositCallArgs;
         let mut io = Runtime;
-        let input = io.read_input().to_vec();
+        let predecessor_account_id = io.predecessor_account_id();
+        let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
+        let input = format!("\"sender_id\": {:?}", predecessor_account_id);
+        let input = if let Some(account_id) = args.account_id {
+            format!("{}, \"account_id\": {:?}", input, account_id.to_string())
+        } else {
+            input
+        };
+        let input = if let Some(registration_only) = args.registration_only {
+            format!(
+                "{}, \"registration_only\": {:?}",
+                input,
+                registration_only.to_string()
+            )
+        } else {
+            input
+        };
+        let input = format!("{{ {} }}", input).as_bytes().to_vec();
+
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .storage_deposit(input);
+            .storage_deposit(input, io.attached_deposit());
         let promise_id = unsafe { io.promise_create_call(&promise_args) };
         io.promise_return(promise_id);
     }
@@ -751,7 +770,17 @@ mod contract {
     pub extern "C" fn storage_unregister() {
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let input = io.read_input().to_vec();
+        let predecessor_account_id = io.predecessor_account_id();
+        let force = parse_json(&io.read_input().to_vec()).and_then(|args| args.bool("force").ok());
+
+        let input = format!("\"sender_id\": {:?}", predecessor_account_id);
+        let input = if let Some(force) = force {
+            format!("{}, \"force\": {:?}", input, force)
+        } else {
+            input
+        };
+        let input = format!("{{ {} }}", input).as_bytes().to_vec();
+
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_unregister(input);
@@ -761,9 +790,20 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn storage_withdraw() {
+        use crate::parameters::StorageWithdrawCallArgs;
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let input = io.read_input().to_vec();
+        let predecessor_account_id = io.predecessor_account_id();
+        let args =
+            StorageWithdrawCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
+        let input = format!("\"sender_id\": {:?}", predecessor_account_id);
+        let input = if let Some(amount) = args.amount {
+            format!("{}, \"amount\": {:?}", input, amount.as_u128())
+        } else {
+            input
+        };
+        let input = format!("{{ {} }}", input).as_bytes().to_vec();
+
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_withdraw(input);

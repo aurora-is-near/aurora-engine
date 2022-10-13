@@ -298,29 +298,54 @@ fn non_submit_execute<'db>(
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
-        TransactionKind::StorageDeposit(_args) => {
-            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            // let _ = connector.storage_deposit(
-            //     env.predecessor_account_id,
-            //     Yocto::new(env.attached_deposit),
-            //     args.clone(),
-            // )?;
+        TransactionKind::StorageDeposit(args) => {
+            let connector = connector::EthConnectorContract::init_instance(io)?;
 
-            None
+            let input = format!("\"sender_id\": {:?}", env.predecessor_account_id());
+            let input = if let Some(account_id) = args.account_id.clone() {
+                format!("{}, \"account_id\": {:?}", input, account_id.to_string())
+            } else {
+                input
+            };
+            let input = if let Some(registration_only) = args.registration_only {
+                format!(
+                    "{}, \"registration_only\": {:?}",
+                    input,
+                    registration_only.to_string()
+                )
+            } else {
+                input
+            };
+            let input = format!("{{ {} }}", input).as_bytes().to_vec();
+
+            let promise_args = connector.storage_deposit(input, env.attached_deposit);
+            Some(TransactionExecutionResult::Promise(promise_args))
         }
 
-        TransactionKind::StorageUnregister(_force) => {
-            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            // let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
-
-            None
+        TransactionKind::StorageUnregister(force) => {
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let input = format!("\"sender_id\": {:?}", env.predecessor_account_id);
+            let input = if let Some(force) = force {
+                format!("{}, \"force\": {:?}", input, force)
+            } else {
+                input
+            };
+            let input = format!("{{ {} }}", input).as_bytes().to_vec();
+            let promise_args = connector.storage_unregister(input);
+            Some(TransactionExecutionResult::Promise(promise_args))
         }
 
-        TransactionKind::StorageWithdraw(_args) => {
-            // let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            // connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
-
-            None
+        TransactionKind::StorageWithdraw(args) => {
+            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let input = format!("\"sender_id\": {:?}", env.predecessor_account_id);
+            let input = if let Some(amount) = args.amount {
+                format!("{}, \"amount\": {:?}", input, amount.as_u128())
+            } else {
+                input
+            };
+            let input = format!("{{ {} }}", input).as_bytes().to_vec();
+            let promise_args = connector.storage_withdraw(input);
+            Some(TransactionExecutionResult::Promise(promise_args))
         }
 
         TransactionKind::RegisterRelayer(evm_address) => {

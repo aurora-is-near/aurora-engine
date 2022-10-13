@@ -234,12 +234,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// FT storage deposit logic
-    pub fn storage_deposit(&self, data: Vec<u8>) -> PromiseCreateArgs {
+    pub fn storage_deposit(&self, data: Vec<u8>, attached_deposit: u128) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "storage_deposit".to_string(),
             args: data,
-            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_balance: Yocto::new(attached_deposit),
             attached_gas: DEFAULT_PREPAID_GAS,
         }
     }

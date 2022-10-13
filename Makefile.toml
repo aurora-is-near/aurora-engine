@@ -157,7 +157,6 @@ category = "Build"
 command = "${CARGO}"
 args = [
     "build",
-    "--verbose",
     "--target",
     "${ENGINE_CARGO_TARGET}",
     "@@remove-empty(RELEASE)",
@@ -206,8 +205,9 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-    "-p",
-    "aurora-engine-tests-connector",
+    "test_exit_to_near_eth_refund",
+#    "-p",
+#    "aurora-engine-tests-connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",
@@ -235,7 +235,7 @@ fi
 cargo make --profile mainnet build-test
 '''
 
-[tasks.test-flow]
+[tasks.test]
 category = "Test"
 dependencies = [
     "build-aurora-eth-connector",
@@ -243,10 +243,6 @@ dependencies = [
     "test-contracts",
     "test-workspace",
 ]
-
-[tasks.test]
-category = "Test"
-run_task = "test-flow"
 
 [tasks.default]
 condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
