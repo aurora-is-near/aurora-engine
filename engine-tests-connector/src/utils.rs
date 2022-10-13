@@ -83,7 +83,7 @@ impl TestContract {
             .into_result()?;
 
         let eth_connector_contract = eth_connector
-            .deploy(&get_contract_and_compile()[..])
+            .deploy(&get_eth_connector_contract()[..])
             .await?
             .into_result()?;
 
@@ -315,52 +315,8 @@ pub fn validate_eth_address(address: &str) -> Address {
     Address::decode(address).unwrap()
 }
 
-pub fn get_contract_and_compile() -> Vec<u8> {
-    let base_path = Path::new("etc");
-    if !base_path.exists() {
-        std::fs::create_dir(base_path).unwrap();
-    }
-    let contract_path = base_path.join("aurora-eth-connector");
-    let output = if contract_path.exists() {
-        Command::new("git")
-            .current_dir(contract_path.clone())
-            .args(&["pull", "origin", "master"])
-            .output()
-            .unwrap()
-    } else {
-        Command::new("git")
-            .current_dir(base_path)
-            .args(&[
-                "clone",
-                "--depth",
-                "1",
-                "https://github.com/aurora-is-near/aurora-eth-connector.git",
-            ])
-            .output()
-            .unwrap()
-    };
-    if !output.status.success() {
-        let entry = Command::new("git")
-            .current_dir(contract_path.clone())
-            .args(&["status"])
-            .output()
-            .unwrap();
-        panic!(
-            "{}\nGIT STATUS: {} [{:?}]\n\n",
-            String::from_utf8(output.stderr).unwrap(),
-            String::from_utf8(entry.stdout).unwrap(),
-            entry.status.success()
-        );
-    }
-
-    let output = Command::new("cargo")
-        .current_dir(contract_path.clone())
-        .args(&["make", "--profile", "mainnet", "build-test"])
-        .output()
-        .unwrap();
-    if !output.status.success() {
-        panic!("{}", String::from_utf8(output.stderr).unwrap());
-    }
+pub fn get_eth_connector_contract() -> Vec<u8> {
+    let contract_path = Path::new("etc/aurora-eth-connector");
     std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
 }
 
