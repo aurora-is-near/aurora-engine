@@ -226,6 +226,7 @@ if [ -d $AURORA_ETH_CONNECTOR_DIR ]; then
   echo "Pull Aurora Eth-Connector repo"
   git pull origin master
 else
+  mkdir $AURORA_ETH_CONNECTOR_ETC || true
   cd $AURORA_ETH_CONNECTOR_ETC
   echo "Clone Aurora Eth-Connector repo: "$AURORA_ETH_CONNECTOR_REPO
   git clone --depth 1 $AURORA_ETH_CONNECTOR_REPO
