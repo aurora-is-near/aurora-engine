@@ -206,9 +206,6 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-    "--verbose",
-##    "test_consume_deposit_message",
-#    "test_withdraw_from_user",
     "-p",
     "aurora-engine-tests-connector",
     "--features",
