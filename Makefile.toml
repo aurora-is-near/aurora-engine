@@ -157,6 +157,7 @@ category = "Build"
 command = "${CARGO}"
 args = [
     "build",
+    "--verbose",
     "--target",
     "${ENGINE_CARGO_TARGET}",
     "@@remove-empty(RELEASE)",
