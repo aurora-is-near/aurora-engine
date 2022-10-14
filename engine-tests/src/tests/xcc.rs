@@ -134,9 +134,14 @@ fn test_xcc_eth_gas_cost() {
         costs::CROSS_CONTRACT_CALL_BYTE
     );
 
-    // As a sanity check, confirm that the total EVM gas spent aligns with expectations
-    let total_gas1 = y1 + baseline.all_gas();
-    let total_gas2 = y2 + baseline.all_gas();
+    // As a sanity check, confirm that the total EVM gas spent aligns with expectations.
+    // The additional gas added is the amount attached to the XCC call (this is "used", but not
+    // "burnt").
+    let total_gas1 = y1 + baseline.all_gas() + costs::ROUTER_EXEC_BASE.as_u64();
+    let total_gas2 = y2
+        + baseline.all_gas()
+        + costs::ROUTER_EXEC_BASE.as_u64()
+        + costs::ROUTER_EXEC_PER_CALLBACK.as_u64();
     assert!(
         test_utils::within_x_percent(20, evm1, total_gas1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
         "Incorrect EVM gas used. Expected: {} Actual: {}",

@@ -42,7 +42,7 @@ pub mod costs {
     /// `NEAR Gas / EVM Gas`, we simply multiply `0.175 * 10^12 / 10^3 = 175 * 10^6`.
     pub const CROSS_CONTRACT_CALL_NEAR_GAS: u64 = 175_000_000;
 
-    pub const ROUTER_EXEC_BASE: NearGas = NearGas::new(3_000_000_000_000);
+    pub const ROUTER_EXEC_BASE: NearGas = NearGas::new(7_000_000_000_000);
     pub const ROUTER_EXEC_PER_CALLBACK: NearGas = NearGas::new(12_000_000_000_000);
     pub const ROUTER_SCHEDULE: NearGas = NearGas::new(5_000_000_000_000);
 }
