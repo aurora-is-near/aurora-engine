@@ -9,7 +9,7 @@ use aurora_engine_types::{
     account_id::AccountId,
     format,
     parameters::{CrossContractCallArgs, PromiseCreateArgs},
-    types::{balance::ZERO_YOCTO, Address, EthGas},
+    types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
     vec, Cow, Vec, H160, H256, U256,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -42,7 +42,8 @@ pub mod costs {
     /// `NEAR Gas / EVM Gas`, we simply multiply `0.175 * 10^12 / 10^3 = 175 * 10^6`.
     pub const CROSS_CONTRACT_CALL_NEAR_GAS: u64 = 175_000_000;
 
-    pub const ROUTER_EXEC: NearGas = NearGas::new(7_000_000_000_000);
+    pub const ROUTER_EXEC_BASE: NearGas = NearGas::new(3_000_000_000_000);
+    pub const ROUTER_EXEC_PER_CALLBACK: NearGas = NearGas::new(12_000_000_000_000);
     pub const ROUTER_SCHEDULE: NearGas = NearGas::new(5_000_000_000_000);
 }
 
@@ -130,6 +131,9 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
             CrossContractCallArgs::Eager(call) => {
                 let call_gas = call.total_gas();
                 let attached_near = call.total_near();
+                let callback_count = call.promise_count() - 1;
+                let router_exec_cost = costs::ROUTER_EXEC_BASE
+                    + NearGas::new(callback_count * costs::ROUTER_EXEC_PER_CALLBACK.as_u64());
                 let promise = PromiseCreateArgs {
                     target_account_id,
                     method: consts::ROUTER_EXEC_NAME.into(),
@@ -137,7 +141,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                         .try_to_vec()
                         .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,
-                    attached_gas: costs::ROUTER_EXEC + call_gas,
+                    attached_gas: router_exec_cost + call_gas,
                 };
                 (promise, attached_near)
             }
