@@ -401,7 +401,8 @@ pub mod sim_tests {
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
     use aurora_engine::fungible_token::FungibleTokenMetadata;
     use aurora_engine::parameters::{
-        CallArgs, DeployErc20TokenArgs, FunctionCallArgsV2, SubmitResult,
+        CallArgs, DeployErc20TokenArgs, FunctionCallArgsV2, SetEthConnectorContractAccountArgs,
+        SubmitResult,
     };
     use aurora_engine::proof::Proof;
     use aurora_engine_types::account_id::AccountId;
@@ -418,6 +419,7 @@ pub mod sim_tests {
     const INITIAL_ETH_BALANCE: u64 = 777_777_777;
     const ETH_EXIT_AMOUNT: u64 = 111_111_111;
     const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector.root";
+    const ETH_CONNECTOR_DEPOSITED_RECIPIENT: &str = "eth_recipient.root";
 
     #[test]
     fn test_ghsa_5c82_x4m4_hcj6_exploit() {
@@ -617,24 +619,26 @@ pub mod sim_tests {
             aurora,
         } = test_exit_to_near_eth_common();
         let exit_account_id = "any.near".to_owned();
-        println!("#4");
+
         // Make the ft_transfer call fail by draining the Aurora account
         let transfer_args = json!({
             "receiver_id": "tmp.near",
-            "amount": format!("{:?}", INITIAL_ETH_BALANCE),
+            "amount": "200",
             "memo": "null",
         });
-        aurora
-            .contract
-            .call(
-                aurora.contract.account_id(),
-                "ft_transfer",
-                transfer_args.to_string().as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                1,
-            )
-            .assert_success();
-        println!("#5");
+        let res = aurora.contract.call(
+            aurora.contract.account_id(),
+            "ft_transfer",
+            transfer_args.to_string().as_bytes(),
+            near_sdk_sim::DEFAULT_GAS,
+            1,
+        );
+        res.assert_success();
+        assert_eq!(
+            nep_141_balance_of("tmp.near", &aurora.contract, &aurora),
+            200
+        );
+
         // call exit to near
         let input = super::build_input(
             "withdrawEthToNear(bytes)",
@@ -657,10 +661,7 @@ pub mod sim_tests {
         );
         println!("#7");
         #[cfg(feature = "error_refund")]
-        assert_eq!(
-            eth_balance_of(signer_address, &aurora),
-            Wei::new_u64(INITIAL_ETH_BALANCE)
-        );
+        assert_eq!(eth_balance_of(signer_address, &aurora), Wei::new_u64(100));
         // If the refund feature is not enabled then there is no refund in the EVM
         #[cfg(not(feature = "error_refund"))]
         assert_eq!(
@@ -682,31 +683,12 @@ pub mod sim_tests {
                     .unwrap(),
             )
             .assert_success();
-        println!("#0");
-        let nep141_contract = deploy_aurora_eth_connector(&aurora);
-        println!("#1");
-        let balance: u64 = nep141_contract
-            .call(
-                nep141_contract.account_id(),
-                "ft_balance_of",
-                json!({ "account_id": nep141_contract.account_id() })
-                    .to_string()
-                    .as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                0,
-            )
-            .unwrap_json_value()
-            .as_str()
-            .unwrap()
-            .parse()
-            .unwrap();
-        assert_eq!(balance, 400);
-        println!("#2");
+        let _nep141_contract = deploy_aurora_eth_connector(&aurora);
+
         assert_eq!(
             eth_balance_of(signer_address, &aurora),
             Wei::new_u64(INITIAL_ETH_BALANCE)
         );
-        println!("#3");
 
         // deploy contract with simple exit to near method
         let constructor = TesterConstructor::load();
@@ -974,43 +956,7 @@ pub mod sim_tests {
 
     pub fn get_aurora_contract_and_compile() -> Vec<u8> {
         use std::path::Path;
-        use std::process::Command;
-
-        let base_path = Path::new("etc");
-        if !base_path.exists() {
-            std::fs::create_dir(base_path).unwrap();
-        }
-        let contract_path = base_path.join("aurora-eth-connector");
-        let output = if contract_path.exists() {
-            Command::new("git")
-                .current_dir(contract_path.clone())
-                .args(&["pull", "origin", "master"])
-                .output()
-                .unwrap()
-        } else {
-            Command::new("git")
-                .current_dir(base_path)
-                .args(&[
-                    "clone",
-                    "--depth",
-                    "1",
-                    "https://github.com/aurora-is-near/aurora-eth-connector.git",
-                ])
-                .output()
-                .unwrap()
-        };
-        if !output.status.success() {
-            panic!("{}", String::from_utf8(output.stderr).unwrap());
-        }
-
-        let output = Command::new("cargo")
-            .current_dir(contract_path.clone())
-            .args(&["make", "--profile", "mainnet", "build-test"])
-            .output()
-            .unwrap();
-        if !output.status.success() {
-            panic!("{}", String::from_utf8(output.stderr).unwrap());
-        }
+        let contract_path = Path::new("../engine-tests-connector/etc/aurora-eth-connector");
         std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
     }
 
@@ -1048,8 +994,7 @@ pub mod sim_tests {
                 .unwrap(),
         });
 
-        aurora
-            .contract
+        contract_account
             .call(
                 contract_account.account_id(),
                 "new",
@@ -1059,16 +1004,67 @@ pub mod sim_tests {
             )
             .assert_success();
 
-        let proof: Proof = serde_json::from_str(PROOF_DATA_NEAR).unwrap();
-        contract_account
+        let args = SetEthConnectorContractAccountArgs {
+            account: AccountId::new(&contract_account.account_id.clone().to_string()).unwrap(),
+        };
+        aurora
+            .contract
             .call(
-                contract_account.account_id(),
+                aurora.contract.account_id.clone(),
+                "set_eth_connector_contract_account",
+                &args.try_to_vec().unwrap(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .assert_success();
+
+        let proof: Proof = serde_json::from_str(PROOF_DATA_NEAR).unwrap();
+        aurora
+            .contract
+            .call(
+                aurora.contract.account_id(),
                 "deposit",
                 &proof.try_to_vec().unwrap(),
                 near_sdk_sim::DEFAULT_GAS,
                 0,
             )
             .assert_success();
+
+        let balance: u64 = aurora
+            .contract
+            .call(
+                aurora.contract.account_id(),
+                "ft_balance_of",
+                json!({ "account_id": ETH_CONNECTOR_DEPOSITED_RECIPIENT })
+                    .to_string()
+                    .as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .unwrap_json_value()
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_eq!(balance, 800000);
+
+        let balance: u64 = aurora
+            .contract
+            .call(
+                aurora.contract.account_id(),
+                "ft_balance_of",
+                json!({ "account_id": aurora.contract.account_id() })
+                    .to_string()
+                    .as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .unwrap_json_value()
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_eq!(balance, 400);
 
         contract_account
     }

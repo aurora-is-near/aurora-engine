@@ -127,7 +127,6 @@ impl TestContract {
             .call("new")
             .args_borsh((chain_id, engine_contract.id(), engine_contract.id(), 1_u64))
             .gas(DEFAULT_GAS)
-            //.deposit(2_000_000_000_000_000)
             .transact()
             .await?;
         assert!(res.is_success());

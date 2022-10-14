@@ -1,7 +1,6 @@
 use crate::prelude::U256;
 use crate::test_utils::{self, str_to_account_id, AuroraRunner};
-use aurora_engine::parameters::{InitCallArgs, NewCallArgs, SetEthConnectorContractAccountArgs};
-use aurora_engine_types::account_id::AccountId;
+use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
 use std::fs;
@@ -70,18 +69,6 @@ pub fn deploy_evm() -> AuroraAccount {
         )
         .assert_success();
 
-    let args = SetEthConnectorContractAccountArgs {
-        account: AccountId::new(&contract_account.account_id.clone().to_string()).unwrap(),
-    };
-    contract_account
-        .call(
-            contract_account.account_id.clone(),
-            "set_eth_connector_contract_account",
-            &args.try_to_vec().unwrap(),
-            near_sdk_sim::DEFAULT_GAS,
-            0,
-        )
-        .assert_success();
     AuroraAccount {
         user: main_account,
         contract: contract_account,
