@@ -578,9 +578,10 @@ pub mod sim_tests {
             "withdrawEthToNear(bytes)",
             &[ethabi::Token::Bytes(exit_account_id.as_bytes().to_vec())],
         );
+        let exit_amount = 50;
         let tx = test_utils::create_eth_transaction(
             Some(tester_address),
-            Wei::new_u64(ETH_EXIT_AMOUNT),
+            Wei::new_u64(exit_amount),
             input,
             Some(chain_id),
             &signer.secret_key,
@@ -594,11 +595,11 @@ pub mod sim_tests {
                 &aurora.contract,
                 &aurora,
             ),
-            (INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT) as u128
+            (400 - exit_amount) as u128
         );
         assert_eq!(
             nep_141_balance_of(exit_account_id.as_str(), &aurora.contract, &aurora),
-            ETH_EXIT_AMOUNT as u128
+            exit_amount as u128
         );
         assert_eq!(
             eth_balance_of(signer_address, &aurora),
