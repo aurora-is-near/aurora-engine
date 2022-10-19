@@ -152,7 +152,7 @@ impl<'a> OneShotAuroraRunner<'a> {
 impl AuroraRunner {
     pub fn one_shot(&self) -> OneShotAuroraRunner {
         OneShotAuroraRunner {
-            base: &self,
+            base: self,
             ext: self.ext.clone(),
             context: self.context.clone(),
         }
@@ -309,7 +309,7 @@ impl AuroraRunner {
         let ft_value = {
             let mut current_ft: FungibleToken = trie
                 .get(&ft_key)
-                .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
+                .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
                 .unwrap_or_default();
             current_ft.total_eth_supply_on_near =
                 current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
@@ -326,7 +326,7 @@ impl AuroraRunner {
         let aurora_balance_value = {
             let mut current_balance: u128 = trie
                 .get(&aurora_balance_key)
-                .map(|bytes| u128::try_from_slice(&bytes).unwrap())
+                .map(|bytes| u128::try_from_slice(bytes).unwrap())
                 .unwrap_or_default();
             current_balance += init_balance.raw().as_u128();
             current_balance
@@ -811,8 +811,8 @@ pub(crate) fn validate_address_balance_and_nonce(
 }
 
 pub(crate) fn address_from_hex(address: &str) -> Address {
-    let bytes = if address.starts_with("0x") {
-        hex::decode(&address[2..]).unwrap()
+    let bytes = if let Some(address) = address.strip_prefix("0x") {
+        hex::decode(address).unwrap()
     } else {
         hex::decode(address).unwrap()
     };
@@ -838,7 +838,7 @@ pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {
 
 pub fn unwrap_success_slice(result: &SubmitResult) -> &[u8] {
     match &result.status {
-        TransactionStatus::Succeed(ret) => &ret,
+        TransactionStatus::Succeed(ret) => ret,
         other => panic!("Unexpected status: {:?}", other),
     }
 }

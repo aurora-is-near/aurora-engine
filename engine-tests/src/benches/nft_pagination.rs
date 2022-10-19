@@ -28,7 +28,7 @@ pub(crate) fn measure_gas_usage(
     ));
 
     // mint NFTs
-    let data: String = std::iter::repeat('0').take(data_size).collect();
+    let data = "0".repeat(data_size);
     for i in 0..total_tokens {
         let result = runner
             .submit_with_signer(&mut source_account, |nonce| {
