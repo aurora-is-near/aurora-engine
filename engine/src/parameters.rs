@@ -581,7 +581,7 @@ mod tests {
         // Using old input format (not wrapped into call args enum) - raw data structure with legacy arguments.
         let input_bytes = legacy_input.try_to_vec().unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
+        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input)));
 
         // Using old input format (not wrapped into call args enum) - raw data structure with new argument (`value` field).
         // Data structures with new arguments allowed only in new input format for future extensibility reason.

@@ -230,7 +230,7 @@ mod test {
                 .set_block_data(block_hash, block_height, block_metadata)
                 .unwrap();
             let result = storage.with_engine_access(block_height, 0, &[], |io| {
-                let mut local_io = io.clone();
+                let mut local_io = io;
                 engine::set_state(&mut local_io, engine_state.clone());
                 connector::EthConnectorContract::create_contract(
                     io,

@@ -105,7 +105,7 @@ fn test_1_inch_limit_order_deploy() {
     // at least 45% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        50 <= wasm_fraction && wasm_fraction <= 60,
+        (50..=60).contains(&wasm_fraction),
         "{}% is not between 50% and 60%",
         wasm_fraction
     );

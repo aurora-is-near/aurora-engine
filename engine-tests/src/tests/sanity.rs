@@ -289,16 +289,14 @@ fn test_is_contract() {
     };
 
     // Should return false for accounts that don't exist
-    assert_eq!(
-        call_contract(Address::from_array([1; 20]), &mut runner, &mut signer),
-        false,
-    );
+    assert!(!call_contract(
+        Address::from_array([1; 20]),
+        &mut runner,
+        &mut signer
+    ));
 
     // Should return false for accounts that don't have contract code
-    assert_eq!(
-        call_contract(signer_address, &mut runner, &mut signer),
-        false,
-    );
+    assert!(!call_contract(signer_address, &mut runner, &mut signer),);
 
     // Should return true for contracts
     let erc20_constructor = test_utils::erc20::ERC20Constructor::load();
@@ -308,10 +306,7 @@ fn test_is_contract() {
         |c| c.deploy("TOKEN_A", "TA", nonce.into()),
         erc20_constructor,
     );
-    assert_eq!(
-        call_contract(token_a.address, &mut runner, &mut signer),
-        true,
-    );
+    assert!(call_contract(token_a.address, &mut runner, &mut signer),);
 }
 
 #[test]
@@ -995,7 +990,7 @@ fn query_address_sim(
 ) -> U256 {
     let x = aurora.call(method, address.as_bytes());
     match &x.outcome().status {
-        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
+        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(b),
         other => panic!("Unexpected outcome: {:?}", other),
     }
 }

@@ -30,7 +30,7 @@ evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "
 evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false, features = ["std", "tracing"] }
 rlp = { version = "0.5.0", default-features = false }
 base64 = "0.13.0"
-bstr = "0.2"
+bstr = "1.0.1"
 byte-slice-cast = { version = "1.0", default-features = false }
 ethabi = "17.1"
 serde = { version = "1", features = ["derive"] }
@@ -46,8 +46,8 @@ near-primitives-core = { git = "https://github.com/birchmd/nearcore.git", rev = 
 near-primitives = { git = "https://github.com/birchmd/nearcore.git", rev = "6033903be2037d67510188450f289b2d6e033f04", default-features = false, features = [ "nightly_protocol" ] }
 libsecp256k1 = { version = "0.7.0", default-features = false }
 rand = "0.8.5"
-criterion = "0.3.4"
-git2 = "0.13"
+criterion = "0.4.0"
+git2 = "0.15"
 tempfile = "3.2.0"
 walrus = "0.19"
 

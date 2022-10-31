@@ -44,8 +44,10 @@ fn test_produce_snapshot() {
         "src/tests/res/contract.aurora.block51077328.json",
     )
     .unwrap();
-    let mut runner = standalone::StandaloneRunner::default();
-    runner.chain_id = 1313161554;
+    let mut runner = standalone::StandaloneRunner {
+        chain_id: 1313161554,
+        ..Default::default()
+    };
     runner
         .storage
         .set_engine_account_id(&"aurora".parse().unwrap())
@@ -94,7 +96,7 @@ fn test_produce_snapshot() {
     for entry in snapshot.result.values {
         let key = base64::decode(entry.key).unwrap();
         // skip the eth-connector keys; they were changed by minting the new account
-        if &key[0..3] == &[7, 6, 1] {
+        if key[0..3] == [7, 6, 1] {
             continue;
         }
         let value = base64::decode(entry.value).unwrap();

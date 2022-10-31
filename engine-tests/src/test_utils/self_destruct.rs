@@ -173,7 +173,7 @@ impl SelfDestruct {
             .unwrap();
 
         let input = CallArgs::V2(FunctionCallArgsV2 {
-            contract: self.contract.address.into(),
+            contract: self.contract.address,
             value: WeiU256::default(),
             input: data.to_vec(),
         })

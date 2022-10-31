@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn test_make_address() {
         for i in 0..u8::MAX {
-            assert_eq!(super::make_address(0, i as u128), u8_to_address(i));
+            assert_eq!(super::make_address(0, i.into()), u8_to_address(i));
         }
 
         let mut rng = rand::thread_rng();

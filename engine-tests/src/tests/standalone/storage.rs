@@ -198,9 +198,7 @@ fn test_block_index() {
     let missing_block_height = block_height + 1;
     let missing_block_hash = H256([32u8; 32]);
     match storage.get_block_hash_by_height(missing_block_height) {
-        Err(engine_standalone_storage::Error::NoBlockAtHeight(h)) if h == missing_block_height => {
-            () // ok
-        }
+        Err(engine_standalone_storage::Error::NoBlockAtHeight(h)) if h == missing_block_height => {}
         other => panic!("Unexpected response: {:?}", other),
     }
     match storage.get_block_height_by_hash(missing_block_hash) {
@@ -233,7 +231,7 @@ fn test_block_index() {
     let prev_height = block_height - 1;
     let prev_hash = H256([0xbb; 32]);
     storage
-        .set_block_data(prev_hash, prev_height, block_metadata.clone())
+        .set_block_data(prev_hash, prev_height, block_metadata)
         .unwrap();
 
     // check earliest+latest blocks are still correct
@@ -313,10 +311,7 @@ fn test_transaction_index() {
     let missing_tx_hash = H256([13u8; 32]);
     match storage.get_transaction_data(missing_tx_hash) {
         Err(engine_standalone_storage::Error::TransactionHashNotFound(h))
-            if h == missing_tx_hash =>
-        {
-            () // ok
-        }
+            if h == missing_tx_hash => {}
         other => panic!("Unexpected response: {:?}", other),
     }
     match storage.get_transaction_by_position(tx_not_included) {
