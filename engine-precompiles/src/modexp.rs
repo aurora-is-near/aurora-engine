@@ -419,13 +419,13 @@ mod tests {
     #[test]
     fn test_modexp() {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
-            let input = hex::decode(&test.input).unwrap();
+            let input = hex::decode(test.input).unwrap();
 
             let res = ModExp::<Byzantium>::new()
                 .run(&input, Some(*test_gas), &new_context(), false)
                 .unwrap()
                 .output;
-            let expected = hex::decode(&test.expected).unwrap();
+            let expected = hex::decode(test.expected).unwrap();
             assert_eq!(res, expected, "{}", test.name);
         }
     }
@@ -433,7 +433,7 @@ mod tests {
     #[test]
     fn test_byzantium_modexp_gas() {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
-            let input = hex::decode(&test.input).unwrap();
+            let input = hex::decode(test.input).unwrap();
 
             let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);
@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn test_berlin_modexp_gas() {
         for (test, test_gas) in TESTS.iter().zip(BERLIN_GAS.iter()) {
-            let input = hex::decode(&test.input).unwrap();
+            let input = hex::decode(test.input).unwrap();
 
             let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);

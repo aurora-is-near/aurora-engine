@@ -1798,13 +1798,8 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let engine = Engine::new_with_state(
-            EngineState::default(),
-            origin.clone(),
-            current_account_id,
-            io,
-            &env,
-        );
+        let engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let contract = make_address(1, 1);
         let value = Wei::new_u64(1000);
@@ -1829,13 +1824,8 @@ mod tests {
         let storage = Storage::default();
         let storage = RwLock::new(storage);
         let io = StoragePointer(&storage);
-        let mut engine = Engine::new_with_state(
-            EngineState::default(),
-            origin.clone(),
-            current_account_id,
-            io,
-            &env,
-        );
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let input = vec![];
         let mut handler = Noop;
@@ -1861,13 +1851,8 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine = Engine::new_with_state(
-            EngineState::default(),
-            origin.clone(),
-            current_account_id,
-            io,
-            &env,
-        );
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let input = Vec::<u8>::new();
         let mut handler = Noop;
@@ -1897,13 +1882,8 @@ mod tests {
         let storage = Storage::default();
         let storage = RwLock::new(storage);
         let io = StoragePointer(&storage);
-        let mut engine = Engine::new_with_state(
-            EngineState::default(),
-            origin.clone(),
-            current_account_id,
-            io,
-            &env,
-        );
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let input = Vec::<u8>::new();
         let mut handler = Noop;
@@ -1933,13 +1913,8 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine = Engine::new_with_state(
-            EngineState::default(),
-            origin.clone(),
-            current_account_id,
-            io,
-            &env,
-        );
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let gas_limit = u64::MAX;
         let mut handler = Noop;
@@ -1967,13 +1942,8 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine = Engine::new_with_state(
-            EngineState::default(),
-            origin.clone(),
-            current_account_id,
-            io,
-            &env,
-        );
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let input = Vec::<u8>::new();
         let mut handler = Noop;
@@ -1999,13 +1969,8 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine = Engine::new_with_state(
-            EngineState::default(),
-            origin.clone(),
-            current_account_id,
-            io,
-            &env,
-        );
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let account_id = AccountId::new("relayer").unwrap();
         let expected_relayer_address = make_address(1, 1);
@@ -2026,7 +1991,7 @@ mod tests {
         set_balance(&mut io, &origin, &Wei::new_u64(22000));
         let mut engine = Engine::new_with_state(
             EngineState::default(),
-            origin.clone(),
+            origin,
             current_account_id.clone(),
             io,
             &env,
@@ -2086,13 +2051,8 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine = Engine::new_with_state(
-            EngineState::default(),
-            origin.clone(),
-            current_account_id.clone(),
-            io,
-            &env,
-        );
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let transaction = NormalizedEthTransaction {
             address: Default::default(),
@@ -2182,17 +2142,12 @@ mod tests {
         let storage = Storage::default();
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
-        let engine = Engine::new_with_state(
-            EngineState::default(),
-            origin.clone(),
-            current_account_id.clone(),
-            io,
-            &env,
-        );
+        let engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let expected_value = H256::from_low_u64_le(64);
         let index = H256::zero();
-        let generation = get_generation(&mut io, &origin);
+        let generation = get_generation(&io, &origin);
         set_storage(&mut io, &origin, &index, &expected_value, generation);
         let actual_value = engine.original_storage(origin.raw(), index).unwrap();
 
@@ -2209,7 +2164,7 @@ mod tests {
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         set_state(&mut io, expected_state.clone());
-        let engine = Engine::new(origin.clone(), current_account_id.clone(), io, &env).unwrap();
+        let engine = Engine::new(origin, current_account_id, io, &env).unwrap();
         let actual_state = engine.state;
 
         assert_eq!(expected_state, actual_state);
@@ -2251,7 +2206,7 @@ mod tests {
         let value = Wei::new_u64(1000);
         let args = RefundCallArgs {
             recipient_address: Default::default(),
-            erc20_address: Some(origin.clone()),
+            erc20_address: Some(origin),
             amount: RawU256::from(value.raw()),
         };
         let mut handler = Noop;
@@ -2269,7 +2224,7 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        set_state(&mut io, expected_state.clone());
+        set_state(&mut io, expected_state);
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
             prepaid_amount: Default::default(),
@@ -2287,7 +2242,7 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        set_state(&mut io, expected_state.clone());
+        set_state(&mut io, expected_state);
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
             prepaid_amount: Wei::new_u64(8000),

@@ -72,6 +72,6 @@ fn test_account_id_precompiles() {
 
 fn unwrap_ethabi_string(result: &SubmitResult) -> String {
     let bytes = test_utils::unwrap_success_slice(result);
-    let mut tokens = ethabi::decode(&[ethabi::ParamType::String], &bytes).unwrap();
+    let mut tokens = ethabi::decode(&[ethabi::ParamType::String], bytes).unwrap();
     tokens.pop().unwrap().into_string().unwrap()
 }

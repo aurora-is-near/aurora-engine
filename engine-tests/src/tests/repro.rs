@@ -130,7 +130,7 @@ fn repro_Emufid2() {
     });
 }
 
-fn repro_common<'a>(context: ReproContext<'a>) {
+fn repro_common(context: ReproContext) {
     let ReproContext {
         snapshot_path,
         block_index,

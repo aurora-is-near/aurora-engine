@@ -244,7 +244,7 @@ fn test_xcc_and_combinator() {
             })),
         ])),
         callback: SimpleNearPromise::Create(PromiseCreateArgs {
-            target_account_id: fib_account_id.clone(),
+            target_account_id: fib_account_id,
             method: "sum".into(),
             args: Vec::new(),
             attached_balance: Yocto::new(0),
@@ -544,7 +544,7 @@ fn get_engine_near_balance(aurora: &AuroraAccount) -> u128 {
     aurora
         .user
         .borrow_runtime()
-        .view_account(&aurora.contract.account_id.as_str())
+        .view_account(aurora.contract.account_id.as_str())
         .unwrap()
         .amount()
 }
@@ -571,7 +571,7 @@ fn test_xcc_schedule_gas() {
     let (maybe_outcome, maybe_error) = router.call(
         "schedule",
         "aurora",
-        PromiseArgs::Create(promise.clone()).try_to_vec().unwrap(),
+        PromiseArgs::Create(promise).try_to_vec().unwrap(),
     );
     assert!(maybe_error.is_none());
     let outcome = maybe_outcome.unwrap();
@@ -648,8 +648,10 @@ fn deploy_fibonacci(aurora: &AuroraAccount) -> AccountId {
 }
 
 fn deploy_router() -> AuroraRunner {
-    let mut router = AuroraRunner::default();
-    router.code = ContractCode::new(contract_bytes(), None);
+    let mut router = AuroraRunner {
+        code: ContractCode::new(contract_bytes(), None),
+        ..Default::default()
+    };
 
     router.context.current_account_id = "some_address.aurora".parse().unwrap();
     router.context.predecessor_account_id = "aurora".parse().unwrap();

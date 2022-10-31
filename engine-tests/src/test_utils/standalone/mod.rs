@@ -45,7 +45,7 @@ impl StandaloneRunner {
             .unwrap();
         env.block_height += 1;
         let transaction_hash = H256::zero();
-        let tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, &[]);
+        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::init_evm(io, env, chain_id);
         });
@@ -79,7 +79,7 @@ impl StandaloneRunner {
         };
 
         env.block_height += 1;
-        let tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, &[]);
+        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
 
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::mint_evm_account(address, balance, nonce, code, io, env)
@@ -142,7 +142,7 @@ impl StandaloneRunner {
         env.block_height += 1;
 
         Self::internal_submit_transaction(
-            &transaction_bytes,
+            transaction_bytes,
             0,
             storage,
             env,
@@ -165,17 +165,18 @@ impl StandaloneRunner {
         let transaction_bytes = rlp::encode(signed_tx).to_vec();
         let transaction_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
-        let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, &[]);
+        let mut tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
         tx_msg.position = transaction_position;
         tx_msg.transaction =
             TransactionKind::Submit(transaction_bytes.as_slice().try_into().unwrap());
         let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
 
         match outcome.maybe_result.as_ref().unwrap().as_ref().unwrap() {
-            sync::TransactionExecutionResult::Submit(result) => match result.as_ref() {
-                Err(e) => return Err(e.clone()),
-                Ok(_) => (),
-            },
+            sync::TransactionExecutionResult::Submit(result) => {
+                if let Err(e) = result.as_ref() {
+                    return Err(e.clone());
+                }
+            }
             _ => unreachable!(),
         };
 
@@ -359,7 +360,7 @@ impl StandaloneRunner {
         cumulative_diff: &mut Diff,
         promise_results: &[PromiseResult],
     ) -> Result<SubmitResult, engine::EngineError> {
-        let transaction_hash = aurora_engine_sdk::keccak(&transaction_bytes);
+        let transaction_hash = aurora_engine_sdk::keccak(transaction_bytes);
         let mut tx_msg = Self::template_tx_msg(
             storage,
             env,
