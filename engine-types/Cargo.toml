@@ -19,7 +19,7 @@ primitive-types = { version = "0.11", default-features = false, features = ["rlp
 serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
-rand = "0.7.3"
+rand = "0.8.5"
 
 [features]
 default = ["std"]
