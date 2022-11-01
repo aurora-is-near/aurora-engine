@@ -357,7 +357,7 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
         sim_tests::nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141_token, &aurora),
         nep_141_supply - transfer_amount
     );
-
+    /*
     // 4. Use xcc precompile to send those tokens back
     let args = serde_json::json!({
         "receiver_id": ft_owner.account_id.as_str(),
@@ -431,7 +431,7 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
     assert_eq!(
         sim_tests::nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141_token, &aurora),
         nep_141_supply
-    );
+    );*/
 }
 
 /// Deploys the EVM, sets xcc router code, deploys wnear contract, bridges wnear into EVM, and calls `factory_set_wnear_address`

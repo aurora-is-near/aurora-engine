@@ -625,21 +625,19 @@ pub mod sim_tests {
         // Make the ft_transfer call fail by draining the Aurora account
         let transfer_args = json!({
             "receiver_id": "tmp.near",
-            "amount": "200",
+            "amount": format!("{:?}", INITIAL_ETH_BALANCE),
             "memo": "null",
         });
-        let res = aurora.contract.call(
-            aurora.contract.account_id(),
-            "ft_transfer",
-            transfer_args.to_string().as_bytes(),
-            near_sdk_sim::DEFAULT_GAS,
-            1,
-        );
-        res.assert_success();
-        assert_eq!(
-            nep_141_balance_of("tmp.near", &aurora.contract, &aurora),
-            200
-        );
+        aurora
+            .contract
+            .call(
+                aurora.contract.account_id(),
+                "ft_transfer",
+                transfer_args.to_string().as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                1,
+            )
+            .assert_success();
 
         // call exit to near
         let input = super::build_input(
@@ -660,6 +658,7 @@ pub mod sim_tests {
             nep_141_balance_of(exit_account_id.as_str(), &aurora.contract, &aurora),
             0
         );
+
         #[cfg(feature = "error_refund")]
         assert_eq!(eth_balance_of(signer_address, &aurora), Wei::new_u64(100));
         // If the refund feature is not enabled then there is no refund in the EVM

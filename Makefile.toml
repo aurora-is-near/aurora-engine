@@ -205,7 +205,7 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-    "test_exit_to_near_eth",
+#    "test_xcc_precompile_eager",
 #    "-p",
 #    "aurora-engine-tests-connector",
     "--features",
