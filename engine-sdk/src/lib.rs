@@ -187,7 +187,7 @@ pub fn log(_data: &str) {
 macro_rules! log {
     ($($args:tt)*) => {
         #[cfg(feature = "log")]
-        $crate::log(&crate::prelude::format!("{}", format_args!($($args)*)))
+        $crate::log(&$crate::prelude::format!("{}", format_args!($($args)*)))
     };
 }
 
