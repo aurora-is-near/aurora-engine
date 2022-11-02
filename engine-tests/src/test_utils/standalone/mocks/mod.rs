@@ -114,6 +114,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
             hex::encode(address.as_bytes())
         ),
     };
+
     // TODO: fix it
     // connector
     //     .ft_on_transfer(&mut engine, &transfer_args)

@@ -85,9 +85,9 @@ fn check_wasm_ecrecover(
 
 fn construct_input(hash: &[u8], sig: &[u8]) -> Vec<u8> {
     let mut buf = [0u8; 128];
-    (&mut buf[0..32]).copy_from_slice(hash);
+    (buf[0..32]).copy_from_slice(hash);
     buf[63] = sig[64];
-    (&mut buf[64..128]).copy_from_slice(&sig[0..64]);
+    (buf[64..128]).copy_from_slice(&sig[0..64]);
 
     buf.to_vec()
 }

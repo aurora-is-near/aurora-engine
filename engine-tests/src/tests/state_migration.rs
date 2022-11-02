@@ -41,7 +41,7 @@ pub fn deploy_evm() -> AuroraAccount {
     let prover_account = str_to_account_id("prover.near");
     let new_args = NewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(aurora_runner.chain_id)),
-        owner_id: str_to_account_id(main_account.account_id.clone().as_str()),
+        owner_id: str_to_account_id(main_account.account_id.as_str()),
         bridge_prover_id: prover_account.clone(),
         upgrade_delay_blocks: 1,
     };

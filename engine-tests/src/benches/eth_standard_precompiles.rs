@@ -29,7 +29,7 @@ pub(crate) fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
     ));
 
     let test_names = PrecompilesContract::all_method_names();
-    let bench_ids: Vec<_> = test_names.iter().map(BenchmarkId::from_parameter).collect();
+    let bench_ids = test_names.iter().map(BenchmarkId::from_parameter);
 
     // create testing transactions
     let transactions: Vec<_> = test_names

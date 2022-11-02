@@ -208,7 +208,7 @@ fn test_consume_deploy_erc20_message() {
 
     runner.env.block_height += 1;
     runner.env.signer_account_id = "some_account.near".parse().unwrap();
-    runner.env.predecessor_account_id = token.clone();
+    runner.env.predecessor_account_id = token;
     test_utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
     let block_hash = test_utils::standalone::mocks::compute_block_hash(runner.env.block_height);
 

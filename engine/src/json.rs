@@ -454,11 +454,11 @@ mod tests {
     fn test_json_type_bool() {
         let json = parse_json(r#"{"foo": true}"#.as_bytes()).unwrap();
         let val = json.bool("foo").ok().unwrap();
-        assert_eq!(val, true);
+        assert!(val);
 
         let json = parse_json(r#"{"foo": false}"#.as_bytes()).unwrap();
         let val = json.bool("foo").ok().unwrap();
-        assert_eq!(val, false);
+        assert!(!val);
 
         let expected_err = std::str::from_utf8(errors::ERR_FAILED_PARSE_BOOL).unwrap();
         let json = parse_json(r#"{"foo": "true"}"#.as_bytes()).unwrap();

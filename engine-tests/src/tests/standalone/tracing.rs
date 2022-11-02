@@ -20,10 +20,8 @@ fn test_evm_tracing_with_storage() {
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = test_utils::Signer::random();
     let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
-    let sender_address =
-        Address::decode(&"304ee8ae14eceb3a544dff53a27eb1bb1aaa471f".to_string()).unwrap();
-    let weth_address =
-        Address::decode(&"c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2".to_string()).unwrap();
+    let sender_address = Address::decode("304ee8ae14eceb3a544dff53a27eb1bb1aaa471f").unwrap();
+    let weth_address = Address::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap();
 
     // Initialize EVM
     runner.init_evm_with_chain_id(1);

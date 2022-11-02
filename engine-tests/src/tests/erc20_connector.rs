@@ -111,7 +111,7 @@ impl test_utils::AuroraRunner {
         self.make_call("submit", origin, rlp::encode(&input).to_vec())
     }
 
-    pub fn deploy_erc20_token(&mut self, nep141: &String) -> Address {
+    pub fn deploy_erc20_token(&mut self, nep141: &str) -> Address {
         let result = self.make_call("deploy_erc20_token", origin(), nep141.try_to_vec().unwrap());
 
         result.check_ok();
@@ -127,10 +127,10 @@ impl test_utils::AuroraRunner {
         let mut rng = rand::thread_rng();
         let source_account = SecretKey::random(&mut rng);
         let source_address = test_utils::address_from_secret_key(&source_account);
-        self.create_address(source_address, INITIAL_BALANCE.into(), INITIAL_NONCE.into());
+        self.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
         EthereumAddress {
             secret_key: source_account,
-            address: source_address.into(),
+            address: source_address,
         }
     }
 
@@ -153,7 +153,7 @@ impl test_utils::AuroraRunner {
             "mint(address,uint256)",
             &[
                 Token::Address(target.raw()),
-                Token::Uint(U256::from(amount).into()),
+                Token::Uint(U256::from(amount)),
             ],
         );
         let result = self.evm_call(token, input, origin);
@@ -186,7 +186,7 @@ impl test_utils::AuroraRunner {
             ],
         );
 
-        let input = create_eth_transaction(Some(token.into()), Wei::zero(), input, None, &sender);
+        let input = create_eth_transaction(Some(token), Wei::zero(), input, None, &sender);
 
         let result = self.evm_submit(input, origin); // create_eth_transaction()
         result.check_ok();
@@ -233,13 +233,13 @@ impl test_utils::AuroraRunner {
 #[test]
 fn test_deploy_erc20_token() {
     let mut runner = AuroraRunner::new();
-    runner.deploy_erc20_token(&"tt.testnet".to_string());
+    runner.deploy_erc20_token("tt.testnet");
 }
 
 #[test]
 fn test_mint() {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let token = runner.deploy_erc20_token("tt.testnet");
     let address = runner.create_account().address;
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(0));
@@ -252,7 +252,7 @@ fn test_mint() {
 #[test]
 fn test_mint_not_admin() {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let token = runner.deploy_erc20_token("tt.testnet");
     let address = runner.create_account().address;
     let balance = runner.balance_of(token, address, origin());
     assert_eq!(balance, U256::from(0));
@@ -296,7 +296,7 @@ fn test_ft_on_transfer_fail() {
     let res = runner.ft_on_transfer(nep141, alice.clone(), alice, amount, recipient.encode());
 
     // Transaction should fail so it must return everything
-    assert_eq!(res, format!("\"{}\"", amount.to_string()));
+    assert_eq!(res, format!("\"{}\"", amount));
 }
 
 #[ignore]
@@ -312,7 +312,7 @@ fn test_relayer_charge_fee() {
     let token = runner.deploy_erc20_token(&nep141);
     let recipient = runner.create_account().address;
 
-    let recipient_balance = runner.get_balance(recipient.into());
+    let recipient_balance = runner.get_balance(recipient);
     assert_eq!(recipient_balance, INITIAL_BALANCE);
 
     let relayer = create_ethereum_address();
@@ -334,7 +334,7 @@ fn test_relayer_charge_fee() {
         recipient.encode() + &hex::encode(fee_encoded),
     );
 
-    let recipient_balance_end = runner.get_balance(recipient.into());
+    let recipient_balance_end = runner.get_balance(recipient);
     assert_eq!(
         recipient_balance_end,
         Wei::new_u64(INITIAL_BALANCE.raw().as_u64() - fee)
@@ -349,7 +349,7 @@ fn test_relayer_charge_fee() {
 #[test]
 fn test_transfer_erc20_token() {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let token = runner.deploy_erc20_token("tt.testnet");
     let peer0 = runner.create_account();
     let peer1 = runner.create_account();
 

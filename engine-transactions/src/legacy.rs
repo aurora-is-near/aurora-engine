@@ -193,7 +193,7 @@ mod tests {
         assert_eq!(tx_2.transaction.to, Some(address_from_arr(&[0u8; 20])));
 
         // otherwise, tx_1 and tx_2 are identical.
-        let mut tx_2_mod = tx_2.clone();
+        let mut tx_2_mod = tx_2;
         tx_2_mod.transaction.to = None;
         assert_eq!(tx_1.transaction, tx_2_mod.transaction);
     }
