@@ -989,7 +989,7 @@ pub mod sim_tests {
             "prover_account": AccountId::new(AURORA_ETH_CONNECTOR).unwrap(),
             "eth_custodian_address": "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_string(),
             "metadata": metadata,
-            "account_with_access_right": AccountId::new(&aurora.contract.account_id.to_string())
+            "account_with_access_right": AccountId::new(aurora.contract.account_id.as_ref())
                 .unwrap(),
         });
 
@@ -997,14 +997,14 @@ pub mod sim_tests {
             .call(
                 contract_account.account_id(),
                 "new",
-                &init_args.to_string().as_bytes(),
+                init_args.to_string().as_bytes(),
                 near_sdk_sim::DEFAULT_GAS,
                 0,
             )
             .assert_success();
 
         let args = SetEthConnectorContractAccountArgs {
-            account: AccountId::new(&contract_account.account_id.clone().to_string()).unwrap(),
+            account: AccountId::new(contract_account.account_id.as_ref()).unwrap(),
         };
         aurora
             .contract
@@ -1075,7 +1075,7 @@ fn create_test_proof(deposit_amount: u64, recipient_id: &str, custodian_address:
     use aurora_engine::deposit_event::TokenMessageData;
     use aurora_engine_types::types::{Fee, NEP141Wei};
 
-    let eth_custodian_address: Address = Address::decode(&custodian_address.to_string()).unwrap();
+    let eth_custodian_address: Address = Address::decode(custodian_address).unwrap();
 
     let message = recipient_id.to_string();
     let fee: Fee = Fee::new(NEP141Wei::new(0));

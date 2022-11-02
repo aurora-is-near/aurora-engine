@@ -120,7 +120,7 @@ async fn test_ft_transfer() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE - transfer_amount as u128,
@@ -159,7 +159,7 @@ async fn test_withdraw_eth_from_near() -> anyhow::Result<()> {
 
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE - withdraw_amount.as_u128(),
@@ -187,7 +187,7 @@ async fn test_deposit_eth_to_near_balance_total_supply() -> anyhow::Result<()> {
     let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE
@@ -240,7 +240,7 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE,
@@ -279,14 +279,14 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.eth_connector_contract.id())
+            .get_eth_on_near_balance(contract.eth_connector_contract.id())
             .await?
             .0,
         0,
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE,
@@ -317,14 +317,14 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE,
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.eth_connector_contract.id())
+            .get_eth_on_near_balance(contract.eth_connector_contract.id())
             .await?
             .0,
         0,
@@ -356,14 +356,14 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.eth_connector_contract.id())
+            .get_eth_on_near_balance(contract.eth_connector_contract.id())
             .await?
             .0,
         0
@@ -394,14 +394,14 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     assert_eq!(contract.get_eth_on_near_balance(&some_acc).await?.0, 0);
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.eth_connector_contract.id())
+            .get_eth_on_near_balance(contract.eth_connector_contract.id())
             .await?
             .0,
         0
@@ -436,21 +436,21 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&dummy_contract.id())
+            .get_eth_on_near_balance(dummy_contract.id())
             .await?
             .0,
         transfer_amount.0
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE - transfer_amount.0
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.eth_connector_contract.id())
+            .get_eth_on_near_balance(contract.eth_connector_contract.id())
             .await?
             .0,
         0
@@ -473,7 +473,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
 async fn test_deposit_with_0x_prefix() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
 
-    let eth_custodian_address: Address = Address::decode(&CUSTODIAN_ADDRESS.to_string()).unwrap();
+    let eth_custodian_address: Address = Address::decode(CUSTODIAN_ADDRESS).unwrap();
     let recipient_address = Address::from_array([10u8; 20]);
     let deposit_amount = 17;
     let recipient_address_encoded = recipient_address.encode();
@@ -525,7 +525,7 @@ async fn test_deposit_with_0x_prefix() -> anyhow::Result<()> {
     assert!(res.is_success());
 
     let balance = contract
-        .get_eth_on_near_balance(&contract.engine_contract.id())
+        .get_eth_on_near_balance(contract.engine_contract.id())
         .await?;
     assert_eq!(balance.0, deposit_amount);
 
@@ -574,7 +574,7 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE
@@ -613,7 +613,7 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE
@@ -671,7 +671,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE
@@ -1004,7 +1004,7 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE - transfer_amount as u128
@@ -1046,7 +1046,7 @@ async fn test_deposit_to_near_with_zero_fee() -> anyhow::Result<()> {
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         0
@@ -1264,12 +1264,12 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
     assert!(res.is_success());
 
     assert_eq!(
-        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount.0,
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE - transfer_amount.0,
@@ -1295,13 +1295,13 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
     assert!(res.is_success());
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE - transfer_amount.0 + transfer_amount2.0,
     );
     assert_eq!(
-        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount.0 - transfer_amount2.0,
     );
     Ok(())
@@ -1332,12 +1332,12 @@ async fn test_access_rights() -> anyhow::Result<()> {
     assert!(res.is_success());
 
     assert_eq!(
-        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount1.0
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE - transfer_amount1.0
@@ -1359,12 +1359,12 @@ async fn test_access_rights() -> anyhow::Result<()> {
     assert!(contract.check_error_message(res, "ERR_ACCESS_RIGHT"));
 
     assert_eq!(
-        contract.get_eth_on_near_balance(&user_acc.id(),).await?.0,
+        contract.get_eth_on_near_balance(user_acc.id(),).await?.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount1.0
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE - transfer_amount1.0
@@ -1404,12 +1404,12 @@ async fn test_access_rights() -> anyhow::Result<()> {
     assert!(res.is_success());
 
     assert_eq!(
-        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount1.0 - transfer_amount2.0,
     );
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE - transfer_amount1.0
@@ -1446,13 +1446,13 @@ async fn test_withdraw_from_user() -> anyhow::Result<()> {
 
     assert_eq!(
         contract
-            .get_eth_on_near_balance(&contract.engine_contract.id())
+            .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
         DEPOSITED_FEE,
     );
     assert_eq!(
-        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE - withdraw_amount.as_u128()
     );
     assert_eq!(

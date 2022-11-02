@@ -90,7 +90,7 @@ impl TestContract {
     }
 
     pub async fn new() -> anyhow::Result<TestContract> {
-        Ok(Self::new_with_custodian(CUSTODIAN_ADDRESS).await?)
+        Self::new_with_custodian(CUSTODIAN_ADDRESS).await
     }
 
     pub async fn new_with_custodian(eth_custodian_address: &str) -> anyhow::Result<TestContract> {
@@ -271,11 +271,9 @@ impl TestContract {
         pub struct BalanceOfEthCallArgs {
             pub address: Address,
         }
-        let args = BalanceOfEthCallArgs {
-            address: address.clone(),
-        }
-        .try_to_vec()
-        .unwrap();
+        let args = BalanceOfEthCallArgs { address: *address }
+            .try_to_vec()
+            .unwrap();
 
         let res = self
             .engine_contract

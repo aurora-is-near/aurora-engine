@@ -106,7 +106,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     //     .unwrap();
 
     let _transfer_args = NEP141FtOnTransferArgs {
-        sender_id: aurora_account_id.clone(),
+        sender_id: aurora_account_id,
         amount: Balance::new(balance.raw().as_u128()),
         msg: format!(
             "aurora:{}{}",
