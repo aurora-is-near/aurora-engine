@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v3
       - name: Restore cache
         run: |
-          cache-util restore cargo_git cargo_registry sccache yarn_cache
+          cache-util restore cargo_git cargo_registry yarn_cache
           cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
       - name: Build contracts
         run: cargo make build-contracts
@@ -39,7 +39,7 @@ jobs:
         run: cargo make --profile testnet test-workspace
       - name: Save cache
         run: |
-          cache-util save cargo_git cargo_registry sccache yarn_cache
+          cache-util save cargo_git cargo_registry yarn_cache
           cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
 env:
   CARGO_TERM_COLOR: always

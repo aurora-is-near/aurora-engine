@@ -185,9 +185,9 @@ pub fn log(_data: &str) {
 
 #[macro_export]
 macro_rules! log {
-    ($e: expr) => {
+    ($($args:tt)*) => {
         #[cfg(feature = "log")]
-        $crate::log($e)
+        $crate::log(&aurora_engine_types::format!("{}", format_args!($($args)*)))
     };
 }
 
