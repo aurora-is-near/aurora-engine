@@ -32,7 +32,7 @@ mod costs {
 
     /// Value determined experimentally based on tests and mainnet data. Example:
     /// https://explorer.mainnet.near.org/transactions/5CD7NrqWpK3H8MAAU4mYEPuuWz9AqR9uJkkZJzw5b8PM#D1b5NVRrAsJKUX2ZGs3poKViu1Rgt4RJZXtTfMgdxH4S
-    pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(60_000_000_000_000);
+    pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(100_000_000_000_000);
 
     /// Value determined experimentally based on tests.
     /// (No mainnet data available since this feature is not enabled)

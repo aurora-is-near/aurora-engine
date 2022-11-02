@@ -208,8 +208,8 @@ args = [
 #    "aurora-engine-tests-connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
-    "--",
-    "--nocapture",
+#    "--",
+#    "--nocapture",
 ]
 
 [tasks.build-aurora-eth-connector]
