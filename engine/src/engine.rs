@@ -923,7 +923,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     // Retrieve the signer of the transaction:
     let sender = transaction.address;
 
-    sdk::log!(crate::prelude::format!("signer_address {:?}", sender).as_str());
+    sdk::log!("signer_address {:?}", sender);
 
     check_nonce(&io, &sender, &transaction.nonce)?;
 
@@ -1207,7 +1207,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
         Err(e) => return Err(DeployErc20Error::Engine(e)),
     };
 
-    sdk::log!(crate::prelude::format!("Deployed ERC-20 in Aurora at: {:#?}", address).as_str());
+    sdk::log!("Deployed ERC-20 in Aurora at: {:#?}", address);
     engine
         .register_token(address, args.nep141)
         .map_err(DeployErc20Error::Register)?;
@@ -1465,11 +1465,11 @@ unsafe fn schedule_promise<P: PromiseHandler>(
     handler: &mut P,
     promise: &PromiseCreateArgs,
 ) -> PromiseId {
-    sdk::log!(&crate::prelude::format!(
+    sdk::log!(
         "call_contract {}.{}",
         promise.target_account_id,
         promise.method
-    ));
+    );
     handler.promise_create_call(promise)
 }
 
@@ -1478,11 +1478,11 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
     base_id: PromiseId,
     promise: &PromiseCreateArgs,
 ) -> PromiseId {
-    sdk::log!(&crate::prelude::format!(
+    sdk::log!(
         "callback_call_contract {}.{}",
         promise.target_account_id,
         promise.method
-    ));
+    );
     handler.promise_attach_callback(base_id, promise)
 }
 
@@ -1688,12 +1688,7 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
                     if let Some(code) = code {
                         set_code(&mut self.io, &address, &code);
                         code_bytes_written = code.len();
-                        sdk::log!(crate::prelude::format!(
-                            "code_write_at_address {:?} {}",
-                            address,
-                            code_bytes_written,
-                        )
-                        .as_str());
+                        sdk::log!("code_write_at_address {:?} {}", address, code_bytes_written);
                     }
 
                     let next_generation = if reset_storage {
@@ -1739,9 +1734,7 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
         match accounting.net() {
             // Net loss is possible if `SELFDESTRUCT(self)` calls are made.
             accounting::Net::Lost(amount) => {
-                sdk::log!(
-                    crate::prelude::format!("Burn {} ETH due to SELFDESTRUCT", amount).as_str()
-                );
+                sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
                 // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
                 // if we cannot read the storage then there is nothing to remove.
                 EthConnectorContract::init_instance(self.io)
@@ -1771,8 +1764,11 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
         if code_bytes_written > 0 {
             writes_counter += 1;
         }
-        sdk::log!(crate::prelude::format!("total_writes_count {}", writes_counter).as_str());
-        sdk::log!(crate::prelude::format!("total_written_bytes {}", total_bytes).as_str());
+        sdk::log!(
+            "total_writes_count {}\ntotal_written_bytes {}",
+            writes_counter,
+            total_bytes
+        );
     }
 }
 
