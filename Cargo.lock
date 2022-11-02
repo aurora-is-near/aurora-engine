@@ -270,7 +270,7 @@ dependencies = [
  "hex 0.4.3",
  "libsecp256k1",
  "num",
- "rand 0.7.3",
+ "rand 0.8.5",
  "ripemd",
  "serde",
  "serde_json",
@@ -378,7 +378,7 @@ dependencies = [
  "borsh",
  "hex 0.4.3",
  "primitive-types 0.11.1",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
 ]
 

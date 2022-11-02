@@ -137,11 +137,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         args: BalanceOfEthCallArgs,
     ) -> Result<(), crate::prelude::types::balance::error::BalanceOverflowError> {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(&args.address);
-        sdk::log!(&format!(
-            "Balance of ETH [{}]: {}",
-            args.address.encode(),
-            balance
-        ));
+        sdk::log!("Balance of ETH [{}]: {}", args.address.encode(), balance);
         self.io.return_output(format!("\"{}\"", balance).as_bytes());
         Ok(())
     }
@@ -186,11 +182,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     ///  Mint ETH tokens
     fn mint_eth_on_aurora(&mut self, owner_id: Address, amount: Wei) -> Result<(), DepositError> {
-        sdk::log!(&format!(
-            "Mint {} ETH tokens for: {}",
-            amount,
-            owner_id.encode()
-        ));
+        sdk::log!("Mint {} ETH tokens for: {}", amount, owner_id.encode());
         self.internal_deposit_eth_to_aurora(owner_id, amount)
     }
 

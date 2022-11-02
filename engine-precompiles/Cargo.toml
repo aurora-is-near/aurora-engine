@@ -30,7 +30,7 @@ hex = { version = "0.4", default-features = false, features = ["alloc"] }
 aurora-engine-test-doubles = { path = "../engine-test-doubles" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rand = "0.7.3"
+rand = "0.8.5"
 
 [features]
 default = ["std"]
