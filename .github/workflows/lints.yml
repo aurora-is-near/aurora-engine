@@ -58,4 +58,4 @@ jobs:
       - name: Run yarn lint
         run: cargo make check-contracts
       - name: Check committed EvmErc20.bin
-        run: bash verify_evm_erc20.sh
+        run: bash scripts/verify_evm_erc20.sh
