@@ -204,13 +204,12 @@ command = "${CARGO}"
 args = [
     "test",
 #    "test_xcc_precompile_eager",
-    "test_exit_to_near_eth",
 #    "-p",
 #    "aurora-engine-tests-connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
-    "--",
-    "--nocapture",
+#    "--",
+#    "--nocapture",
 ]
 
 [tasks.build-aurora-eth-connector]

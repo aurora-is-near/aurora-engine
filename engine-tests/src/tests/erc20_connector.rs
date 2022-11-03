@@ -956,11 +956,6 @@ pub mod sim_tests {
     pub fn get_aurora_eth_connector_contract() -> Vec<u8> {
         use std::path::Path;
         let contract_path = Path::new("../engine-tests-connector/etc/aurora-eth-connector");
-        println!(
-            "{:?} [{:?}]",
-            contract_path.join("bin/aurora-eth-connector-test.wasm"),
-            std::env::current_dir(),
-        );
         std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
     }
 
