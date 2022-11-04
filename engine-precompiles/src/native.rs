@@ -2,7 +2,6 @@ use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::{
     format,
     parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
-    sdk,
     sdk::io::{StorageIntermediate, IO},
     storage::{bytes_to_key, KeyPrefix},
     types::{Address, Yocto},
@@ -13,10 +12,12 @@ use crate::prelude::{
     parameters::{PromiseWithCallbackArgs, RefundCallArgs},
     types,
 };
+use borsh::BorshDeserialize;
 
 use crate::prelude::types::EthGas;
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::storage::EthConnectorStorageId;
 use evm::backend::Log;
 use evm::{Context, ExitError};
 
@@ -33,7 +34,7 @@ mod costs {
 
     /// Value determined experimentally based on tests and mainnet data. Example:
     /// https://explorer.mainnet.near.org/transactions/5CD7NrqWpK3H8MAAU4mYEPuuWz9AqR9uJkkZJzw5b8PM#D1b5NVRrAsJKUX2ZGs3poKViu1Rgt4RJZXtTfMgdxH4S
-    pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(60_000_000_000_000);
+    pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
     /// Value determined experimentally based on tests.
     /// (No mainnet data available since this feature is not enabled)
@@ -227,19 +228,23 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
 }
 
 fn get_eth_connector_contract_address<I: IO>(io: &I) -> Result<AccountId, ExitError> {
-    use aurora_engine_types::storage::EthConnectorStorageId;
-    AccountId::try_from(
-        io.read_storage(
-            bytes_to_key(
-                KeyPrefix::EthConnector,
-                &[u8::from(EthConnectorStorageId::EthConnectorAccount)],
-            )
-            .as_slice(),
-        )
-        .map(|s| s.to_vec())
-        .ok_or(ExitError::Other(Cow::Borrowed(ERR_TARGET_TOKEN_NOT_FOUND)))?,
-    )
-    .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
+    get_contract_data(io, &EthConnectorStorageId::EthConnectorAccount)
+}
+
+fn get_contract_data<T: BorshDeserialize, I: IO>(
+    io: &I,
+    suffix: &EthConnectorStorageId,
+) -> Result<T, ExitError> {
+    io.read_storage(&construct_contract_key(suffix))
+        .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
+        .and_then(|x| {
+            x.to_value()
+                .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
+        })
+}
+
+fn construct_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
+    bytes_to_key(KeyPrefix::EthConnector, &[u8::from(*suffix)])
 }
 
 impl<I: IO> Precompile for ExitToNear<I> {
@@ -288,7 +293,6 @@ impl<I: IO> Precompile for ExitToNear<I> {
         let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input);
-        let current_account_id = self.current_account_id.clone();
         #[cfg(feature = "error_refund")]
         let refund_on_error_target = current_account_id.clone();
 
@@ -300,7 +304,6 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
                 let eth_contract_address = get_eth_connector_contract_address(&self.io)?;
-                //let eth_contract_address = current_account_id;
 
                 if let Ok(dest_account) = AccountId::try_from(input) {
                     (
@@ -308,7 +311,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
-                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                            r#"{{"receiver_id":  "{}", "amount": "{}", "memo": null}}"#,
                             dest_account,
                             context.apparent_value.as_u128()
                         ),
@@ -369,7 +372,9 @@ impl<I: IO> Precompile for ExitToNear<I> {
                     )));
                 }
             }
-            _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
+            _ => {
+                return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG")));
+            }
         };
 
         #[cfg(feature = "error_refund")]
