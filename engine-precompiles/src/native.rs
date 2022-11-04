@@ -2,6 +2,7 @@ use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::{
     format,
     parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
+    sdk,
     sdk::io::{StorageIntermediate, IO},
     storage::{bytes_to_key, KeyPrefix},
     types::{Address, Yocto},
@@ -225,6 +226,22 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
 }
 
+fn get_eth_connector_contract_address<I: IO>(io: &I) -> Result<AccountId, ExitError> {
+    use aurora_engine_types::storage::EthConnectorStorageId;
+    AccountId::try_from(
+        io.read_storage(
+            bytes_to_key(
+                KeyPrefix::EthConnector,
+                &[u8::from(EthConnectorStorageId::EthConnectorAccount)],
+            )
+            .as_slice(),
+        )
+        .map(|s| s.to_vec())
+        .ok_or(ExitError::Other(Cow::Borrowed(ERR_TARGET_TOKEN_NOT_FOUND)))?,
+    )
+    .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
+}
+
 impl<I: IO> Precompile for ExitToNear<I> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
@@ -282,9 +299,12 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 // Input slice format:
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
+                let eth_contract_address = get_eth_connector_contract_address(&self.io)?;
+                //let eth_contract_address = current_account_id;
+
                 if let Ok(dest_account) = AccountId::try_from(input) {
                     (
-                        current_account_id,
+                        eth_contract_address,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
