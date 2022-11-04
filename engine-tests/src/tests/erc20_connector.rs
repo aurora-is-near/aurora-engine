@@ -586,10 +586,8 @@ pub mod sim_tests {
             Some(chain_id),
             &signer.secret_key,
         );
-        let res = aurora.call("submit", &rlp::encode(&tx));
-        println!("{:#?}", res);
-        println!("{:#?}", aurora.contract.account_id);
-        res.assert_success();
+        aurora.call("submit", &rlp::encode(&tx)).assert_success();
+
         // check balances
         assert_eq!(
             nep_141_balance_of(

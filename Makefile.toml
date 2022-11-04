@@ -203,7 +203,6 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-#    "test_xcc_precompile_eager",
     "--features",
     "${CARGO_FEATURES_TEST}",
 #    "--",

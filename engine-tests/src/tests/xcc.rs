@@ -385,7 +385,7 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
         // engine loses less than 0.01 NEAR
         engine_balance_after_xcc.max(engine_balance_before_xcc)
             - engine_balance_after_xcc.min(engine_balance_before_xcc)
-            < /*10_000_000_000_000_000_000_000*/2_000_000_000_000_000_000_000_000,
+            < 10_000_000_000_000_000_000_000,
         "Engine lost too much NEAR funding xcc: Before={:?} After={:?} Eq={:?}",
         engine_balance_before_xcc,
         engine_balance_after_xcc,
