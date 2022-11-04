@@ -103,8 +103,8 @@ pub fn handle_precompile_promise<I, P>(
             promise_actions.push(PromiseAction::DeployContract {
                 code: get_router_code(io).0.into_owned(),
             });
-            // After a deploy we call the contract's initialize function
-            let wnear_address = state::get_wnear_address(io);
+            // After the deployment we call the contract's initialize function
+            let wnear_address = get_wnear_address(io);
             let wnear_account = crate::engine::nep141_erc20_map(*io)
                 .lookup_right(&crate::engine::ERC20Address(wnear_address))
                 .unwrap();

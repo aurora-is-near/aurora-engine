@@ -49,7 +49,7 @@ impl Runtime {
     const GAS_FOR_STATE_MIGRATION: NearGas = NearGas::new(100_000_000_000_000);
 
     /// Deploy code from given key in place of the current contract.
-    /// Not implemented in terms of higher level traits (eg IO) for efficiency reasons.
+    /// Not implemented in terms of higher level traits (e.g. IO) for efficiency reasons.
     pub fn self_deploy(code_key: &[u8]) {
         unsafe {
             // Load current account id into register 0.
@@ -107,7 +107,7 @@ impl StorageIntermediate for RegisterIndex {
         unsafe {
             let result = exports::register_len(self.0);
             // By convention, an unused register will return a length of U64::MAX
-            // (see https://nomicon.io/RuntimeSpec/Components/BindingsSpec/RegistersAPI.html).
+            // (see https://nomicon.io/RuntimeSpec/Components/BindingsSpec/RegistersAPI).
             if result < u64::MAX {
                 result as usize
             } else {

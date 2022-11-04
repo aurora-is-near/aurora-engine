@@ -1,7 +1,7 @@
 use crate::prelude::{Address, U256};
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor};
 use crate::test_utils::{
-    self, origin, AuroraRunner, Signer, PAUSED_PRECOMPILES, PAUSE_PRECOMPILES, RESUME_PRECOMPILES,
+    self, AuroraRunner, Signer, ORIGIN, PAUSED_PRECOMPILES, PAUSE_PRECOMPILES, RESUME_PRECOMPILES,
 };
 use aurora_engine::parameters::{PausePrecompilesCallArgs, TransactionStatus};
 use aurora_engine_types::types::Wei;
@@ -149,7 +149,7 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
         )
         .into();
 
-    runner.mint(token, tester.contract.address, 1_000_000_000, origin());
+    runner.mint(token, tester.contract.address, 1_000_000_000, ORIGIN);
 
     (runner, signer, token, tester)
 }

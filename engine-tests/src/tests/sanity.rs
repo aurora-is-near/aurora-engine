@@ -821,8 +821,8 @@ fn test_block_hash() {
         let number = crate::prelude::U256::from(runner.chain_id);
         crate::prelude::u256_to_arr(&number)
     };
-    let account_id = runner.aurora_account_id;
-    let block_hash = aurora_engine::engine::compute_block_hash(chain_id, 10, account_id.as_bytes());
+    let account_id = runner.aurora_account_id.as_bytes();
+    let block_hash = aurora_engine::engine::compute_block_hash(chain_id, 10, account_id);
 
     assert_eq!(
         hex::encode(block_hash.0).as_str(),

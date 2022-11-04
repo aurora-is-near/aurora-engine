@@ -26,10 +26,7 @@ use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
-pub fn origin() -> String {
-    "aurora".to_string()
-}
-
+pub(crate) const ORIGIN: &str = "aurora";
 pub(crate) const SUBMIT: &str = "submit";
 pub(crate) const CALL: &str = "call";
 pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
@@ -539,7 +536,6 @@ impl AuroraRunner {
 
 impl Default for AuroraRunner {
     fn default() -> Self {
-        let aurora_account_id = "aurora".to_string();
         let evm_wasm_bytes = if cfg!(feature = "mainnet-test") {
             std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap()
         } else if cfg!(feature = "testnet-test") {
@@ -554,16 +550,16 @@ impl Default for AuroraRunner {
         let wasm_config = runtime_config.wasm_config.clone();
 
         Self {
-            aurora_account_id: aurora_account_id.clone(),
+            aurora_account_id: ORIGIN.to_string(),
             chain_id: 1313161556, // NEAR localnet,
             code: ContractCode::new(evm_wasm_bytes, None),
             cache: Default::default(),
             ext: mocked_external::MockedExternalWithTrie::new(Default::default()),
             context: VMContext {
-                current_account_id: as_account_id(&aurora_account_id),
-                signer_account_id: as_account_id(&aurora_account_id),
+                current_account_id: as_account_id(ORIGIN),
+                signer_account_id: as_account_id(ORIGIN),
                 signer_account_pk: vec![],
-                predecessor_account_id: as_account_id(&aurora_account_id),
+                predecessor_account_id: as_account_id(ORIGIN),
                 input: vec![],
                 block_index: 0,
                 block_timestamp: 0,
@@ -803,7 +799,7 @@ pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
 pub(crate) fn validate_address_balance_and_nonce(
     runner: &AuroraRunner,
     address: Address,
-    expected_balance: crate::prelude::Wei,
+    expected_balance: Wei,
     expected_nonce: U256,
 ) {
     assert_eq!(runner.get_balance(address), expected_balance, "balance");

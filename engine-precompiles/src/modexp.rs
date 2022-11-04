@@ -22,7 +22,6 @@ impl<HF: HardFork> ModExp<HF> {
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
         let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
         let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
-        // #[allow(clippy::redundant_closure)]
         let exp = parse_bytes(
             bytes,
             start.saturating_add(96),
@@ -202,7 +201,6 @@ fn saturating_round(x: U256) -> u64 {
 fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
     let parse = |start: usize| -> u64 {
         // I don't understand why I need a closure here, but doesn't compile without one
-        #[allow(clippy::redundant_closure)]
         saturating_round(parse_bytes(input, start, 32, |x| U256::from(x)))
     };
     let base_len = parse(0);

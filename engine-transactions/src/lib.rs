@@ -45,8 +45,8 @@ impl TryFrom<&[u8]> for EthTransactionKind {
     }
 }
 
-impl<'a> From<&'a EthTransactionKind> for Vec<u8> {
-    fn from(tx: &'a EthTransactionKind) -> Self {
+impl From<&EthTransactionKind> for Vec<u8> {
+    fn from(tx: &EthTransactionKind) -> Self {
         let mut stream = rlp::RlpStream::new();
         match &tx {
             EthTransactionKind::Legacy(tx) => {
@@ -200,7 +200,7 @@ fn decoder_err_to_str<S: serde::Serializer>(err: &DecoderError, ser: S) -> Resul
 }
 
 impl Error {
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::UnknownTransactionType => "ERR_UNKNOWN_TX_TYPE",
             Self::EmptyInput => "ERR_EMPTY_TX_INPUT",
