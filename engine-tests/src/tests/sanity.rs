@@ -419,6 +419,41 @@ fn test_revert_during_contract_deploy() {
 }
 
 #[test]
+fn test_call_too_deep_error() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+        "src/tests/res",
+        "target/solidity_build",
+        "CallTooDeep.sol",
+        "CallTooDeep",
+    );
+
+    let nonce = signer.use_nonce();
+    let contract = runner.deploy_contract(
+        &signer.secret_key,
+        |c| c.deploy_without_constructor(nonce.into()),
+        constructor,
+    );
+
+    let result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            contract.call_method_without_args("test", nonce)
+        })
+        .unwrap();
+
+    // It is counter-intuitive that this returns a `Revert` instead of `CallTooDeep`.
+    // The reason this is the case is because it is only the last call that triggers the
+    // `CallTooDeep` exit status, while the one before only sees that the call it made failed
+    // and therefore reverts. As a result, the `CallTooDeep` exit status is not actually
+    // visible to users.
+    match result.status {
+        TransactionStatus::Revert(_) => (),
+        other => panic!("Unexpected status {:?}", other),
+    }
+}
+
+#[test]
 fn test_timestamp() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
