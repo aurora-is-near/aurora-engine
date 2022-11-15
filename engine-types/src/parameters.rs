@@ -13,6 +13,15 @@ pub enum PromiseArgs {
 }
 
 impl PromiseArgs {
+    /// Counts the total number of promises this call creates (including callbacks).
+    pub fn promise_count(&self) -> u64 {
+        match self {
+            Self::Create(_) => 1,
+            Self::Callback(_) => 2,
+            Self::Recursive(p) => p.promise_count(),
+        }
+    }
+
     pub fn total_gas(&self) -> NearGas {
         match self {
             Self::Create(call) => call.attached_gas,
@@ -91,6 +100,14 @@ pub enum NearPromise {
 }
 
 impl NearPromise {
+    pub fn promise_count(&self) -> u64 {
+        match self {
+            Self::Simple(_) => 1,
+            Self::Then { base, .. } => base.promise_count() + 1,
+            Self::And(ps) => ps.iter().map(Self::promise_count).sum(),
+        }
+    }
+
     pub fn total_gas(&self) -> NearGas {
         match self {
             Self::Simple(x) => x.total_gas(),

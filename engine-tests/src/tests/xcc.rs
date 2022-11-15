@@ -134,9 +134,14 @@ fn test_xcc_eth_gas_cost() {
         costs::CROSS_CONTRACT_CALL_BYTE
     );
 
-    // As a sanity check, confirm that the total EVM gas spent aligns with expectations
-    let total_gas1 = y1 + baseline.all_gas();
-    let total_gas2 = y2 + baseline.all_gas();
+    // As a sanity check, confirm that the total EVM gas spent aligns with expectations.
+    // The additional gas added is the amount attached to the XCC call (this is "used", but not
+    // "burnt").
+    let total_gas1 = y1 + baseline.all_gas() + costs::ROUTER_EXEC_BASE.as_u64();
+    let total_gas2 = y2
+        + baseline.all_gas()
+        + costs::ROUTER_EXEC_BASE.as_u64()
+        + costs::ROUTER_EXEC_PER_CALLBACK.as_u64();
     assert!(
         test_utils::within_x_percent(20, evm1, total_gas1 / costs::CROSS_CONTRACT_CALL_NEAR_GAS),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
@@ -371,10 +376,21 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
         attached_balance: Yocto::new(1),
         attached_gas: NearGas::new(100_000_000_000_000),
     };
+    let callback = PromiseCreateArgs {
+        target_account_id: nep_141_token.account_id.as_str().parse().unwrap(),
+        method: "ft_balance_of".into(),
+        args: format!("{{\"account_id\":\"{}\"}}", router_account).into_bytes(),
+        attached_balance: Yocto::new(0),
+        attached_gas: NearGas::new(2_000_000_000_000),
+    };
+    let promise_args = PromiseArgs::Callback(PromiseWithCallbackArgs {
+        base: promise,
+        callback,
+    });
     let xcc_args = if is_scheduled {
-        CrossContractCallArgs::Delayed(PromiseArgs::Create(promise))
+        CrossContractCallArgs::Delayed(promise_args)
     } else {
-        CrossContractCallArgs::Eager(PromiseArgs::Create(promise))
+        CrossContractCallArgs::Eager(promise_args)
     };
     let engine_balance_before_xcc = get_engine_near_balance(&aurora);
     let _result = submit_xcc_transaction(xcc_args, &aurora, &mut signer, chain_id);
@@ -589,6 +605,17 @@ fn test_xcc_schedule_gas() {
 fn test_xcc_exec_gas() {
     let mut router = deploy_router();
 
+    let create_promise_chain =
+        |base_promise: &PromiseCreateArgs, callback_count: usize| -> NearPromise {
+            let mut result = NearPromise::Simple(SimpleNearPromise::Create(base_promise.clone()));
+            for _ in 0..callback_count {
+                result = NearPromise::Then {
+                    base: Box::new(result),
+                    callback: SimpleNearPromise::Create(base_promise.clone()),
+                };
+            }
+            result
+        };
     let promise = PromiseCreateArgs {
         target_account_id: "some_account.near".parse().unwrap(),
         method: "some_method".into(),
@@ -597,37 +624,44 @@ fn test_xcc_exec_gas() {
         attached_gas: NearGas::new(100_000_000_000_000),
     };
 
-    let (maybe_outcome, maybe_error) = router.call(
-        "execute",
-        "aurora",
-        PromiseArgs::Create(promise.clone()).try_to_vec().unwrap(),
-    );
-    assert!(maybe_error.is_none());
-    let outcome = maybe_outcome.unwrap();
+    for callback_count in 0..5 {
+        let x = create_promise_chain(&promise, callback_count);
+        let args = PromiseArgs::Recursive(x);
 
-    assert!(
-        outcome.burnt_gas < costs::ROUTER_EXEC.as_u64(),
-        "{:?} not less than {:?}",
-        outcome.burnt_gas,
-        costs::ROUTER_EXEC
-    );
-    assert_eq!(outcome.action_receipts.len(), 1);
-    assert_eq!(
-        outcome.action_receipts[0].0.as_str(),
-        promise.target_account_id.as_ref()
-    );
-    let receipt = &outcome.action_receipts[0].1;
-    assert_eq!(receipt.actions.len(), 1);
-    let action = &receipt.actions[0];
-    match action {
-        Action::FunctionCall(function_call) => {
-            assert_eq!(function_call.method_name, promise.method);
-            assert_eq!(function_call.args, promise.args);
-            assert_eq!(function_call.deposit, promise.attached_balance.as_u128());
-            assert_eq!(function_call.gas, promise.attached_gas.as_u64());
+        let (maybe_outcome, maybe_error) =
+            router.call("execute", "aurora", args.try_to_vec().unwrap());
+        assert!(maybe_error.is_none());
+        let outcome = maybe_outcome.unwrap();
+
+        let callback_count = args.promise_count() - 1;
+        let router_exec_cost = costs::ROUTER_EXEC_BASE
+            + NearGas::new(callback_count * costs::ROUTER_EXEC_PER_CALLBACK.as_u64());
+        assert!(
+            outcome.burnt_gas < router_exec_cost.as_u64(),
+            "{:?} not less than {:?}",
+            outcome.burnt_gas,
+            router_exec_cost
+        );
+
+        assert_eq!(outcome.action_receipts.len(), args.promise_count() as usize);
+        for (target_account_id, receipt) in outcome.action_receipts {
+            assert_eq!(
+                target_account_id.as_str(),
+                promise.target_account_id.as_ref()
+            );
+            assert_eq!(receipt.actions.len(), 1);
+            let action = &receipt.actions[0];
+            match action {
+                Action::FunctionCall(function_call) => {
+                    assert_eq!(function_call.method_name, promise.method);
+                    assert_eq!(function_call.args, promise.args);
+                    assert_eq!(function_call.deposit, promise.attached_balance.as_u128());
+                    assert_eq!(function_call.gas, promise.attached_gas.as_u64());
+                }
+                other => panic!("Unexpected action {:?}", other),
+            };
         }
-        other => panic!("Unexpected action {:?}", other),
-    };
+    }
 }
 
 fn deploy_fibonacci(aurora: &AuroraAccount) -> AccountId {
