@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] 2022-11-15
+
+### Added
+
+- New functions `pause_precompiles` and `resume_precompiles` to allow pausing/unpausing the exit precompiles on Aurora by [@RomanHodulak]. ([#588])
+
+### Fixes
+
+- Update to latest SputnikVM by [@birchmd] (fixes some security issues including a potential call stack overflow and incorrect `is_static` indicator in exit precompiles). ([#628])
+- Minor fixes for the XCC functionality by [@birchmd]. ([#610] [#616] [#622])
+
+[#588]: https://github.com/aurora-is-near/aurora-engine/pull/588
+[#610]: https://github.com/aurora-is-near/aurora-engine/pull/610
+[#616]: https://github.com/aurora-is-near/aurora-engine/pull/616
+[#622]: https://github.com/aurora-is-near/aurora-engine/pull/622
+[#628]: https://github.com/aurora-is-near/aurora-engine/pull/628
+
 ## [2.7.0] 2022-08-19
 
 ### Added
@@ -300,7 +317,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.7.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.8.0...develop
+[2.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.7.0...2.8.0
 [2.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.1...2.7.0
 [2.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.0...2.6.1 
 [2.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.3...2.6.0
