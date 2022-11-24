@@ -84,10 +84,21 @@ The current available build `task`s are:
 - `build-test`, builds all the below using test features. Requires a `--profile`
   argument.
 - `build-contracts`, builds all the ETH contracts.
+- `build-docker`, builds the `aurora-<profile>-test.wasm` in the `bin` folder using docker build environment. The purpose of this task is to produce reproducible binaries.
 
 For example, the following will build the mainnet debug binary:
 ```sh
 cargo make --profile mainnet build
+```
+
+#### Verifying binary hash
+
+To verify that a deployed binary matches the source code, you may want build it reproducibly and then check that their hashes match. The motivation behind that is to prevent malicious code from being deployed.
+
+Run these commands to produce the binary hash:
+```sh
+cargo make --profile <profile> build-docker
+shasum -a 256 bin/aurora-<profile>.wasm
 ```
 
 #### Running unit & integration tests
