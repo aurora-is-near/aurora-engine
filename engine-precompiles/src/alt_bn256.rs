@@ -2,6 +2,7 @@ use crate::prelude::types::{Address, EthGas};
 use crate::prelude::{Borrowed, PhantomData, Vec};
 use crate::utils;
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
+use bn::Group;
 use evm::{Context, ExitError};
 
 /// bn128 costs.
@@ -151,7 +152,7 @@ impl HostFnEncode for bn::G2 {
 
 /// Reads the `x` and `y` points from an input at a given position.
 fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
-    use bn::{AffineG1, Fq, Group, G1};
+    use bn::{AffineG1, Fq, G1};
 
     let px = Fq::from_slice(&input[pos..(pos + consts::SCALAR_LEN)])
         .map_err(|_e| ExitError::Other(Borrowed("ERR_FQ_INCORRECT")))?;
@@ -430,16 +431,26 @@ impl<HF: HardFork> Bn256Pair<HF> {
                 )
                 .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_BBX")))?;
 
-                let g1_a = bn::AffineG1::new(ax, ay)
-                    .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))?
-                    .into();
+                let g1_a = {
+                    if ax.is_zero() && ay.is_zero() {
+                        bn::G1::zero()
+                    } else {
+                        bn::AffineG1::new(ax, ay)
+                            .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))?
+                            .into()
+                    }
+                };
                 let g1_b = {
                     let ba = bn::Fq2::new(bax, bay);
                     let bb = bn::Fq2::new(bbx, bby);
 
-                    bn::AffineG2::new(ba, bb)
-                        .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_B")))?
-                        .into()
+                    if ba.is_zero() && bb.is_zero() {
+                        bn::G2::zero()
+                    } else {
+                        bn::AffineG2::new(ba, bb)
+                            .map_err(|_e| ExitError::Other(Borrowed("ERR_BN128_INVALID_B")))?
+                            .into()
+                    }
                 };
                 vals.push((g1_a, g1_b))
             }
@@ -841,5 +852,26 @@ mod tests {
             res,
             Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN",)))
         ));
+
+        // on curve
+        let input = hex::decode(
+            "\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
+        let expected =
+            hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
+                .unwrap();
+
+        let res = Bn256Pair::<Byzantium>::new()
+            .run(&input, Some(EthGas::new(260_000)), &new_context(), false)
+            .unwrap()
+            .output;
+        assert_eq!(res, expected);
     }
 }
