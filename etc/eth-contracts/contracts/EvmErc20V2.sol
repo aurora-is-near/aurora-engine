@@ -17,6 +17,7 @@ contract EvmErc20V2 is ERC20, AdminControlled, IExit {
     string private _symbol;
     uint8 private _decimals;
 
+    // slither-disable-next-line shadowing-local
     constructor (string memory metadata_name, string memory metadata_symbol, uint8 metadata_decimals, address admin)
         ERC20(metadata_name, metadata_symbol)
         AdminControlled(admin, 0)
@@ -38,6 +39,7 @@ contract EvmErc20V2 is ERC20, AdminControlled, IExit {
         return _decimals;
     }
 
+    // slither-disable-next-line events-maths
     function setMetadata(string memory metadata_name, string memory metadata_symbol, uint8 metadata_decimals) external onlyAdmin {
         _name = metadata_name;
         _symbol = metadata_symbol;
