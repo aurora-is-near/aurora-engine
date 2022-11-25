@@ -25,14 +25,14 @@ engine-standalone-storage = { path = "../engine-standalone-storage" }
 engine-standalone-tracing = { path = "../engine-standalone-tracing" }
 borsh = { version = "0.9.3", default-features = false }
 sha3 = { version = "0.10.2", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.0-aurora", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.0-aurora", default-features = false, features = ["std", "tracing"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.0-aurora", default-features = false, features = ["std", "tracing"] }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.1-aurora", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.1-aurora", default-features = false, features = ["std", "tracing"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.1-aurora", default-features = false, features = ["std", "tracing"] }
 rlp = { version = "0.5.0", default-features = false }
 base64 = "0.13.0"
 bstr = "1.0.1"
 byte-slice-cast = { version = "1.0", default-features = false }
-ethabi = "17.1"
+ethabi = "18.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hex = { version = "0.4.3", default-features = false }
