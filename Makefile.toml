@@ -207,7 +207,7 @@ run_task = "build-engine-flow-docker"
 [tasks.build-docker]
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -it nearprotocol/contract-builder:master-b8fc60809b907543d909ee75fcc1bd7b68cbe2fd-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
+docker run --volume $PWD:/host -w /host -i nearprotocol/contract-builder:master-b8fc60809b907543d909ee75fcc1bd7b68cbe2fd-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
 '''
 
 [tasks.test-contracts]
