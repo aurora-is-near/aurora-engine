@@ -127,7 +127,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
