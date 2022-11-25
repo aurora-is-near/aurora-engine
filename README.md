@@ -26,12 +26,9 @@ Local   | `aurora.test.near`  | 1313161556 | 2.7.0
 ### Prerequisites
 
 - Node.js (v14+)
-- Rust nightly (2021-03-25) with the WebAssembly toolchain
 - cargo-make
 
 ```sh
-rustup install nightly-2021-03-25
-rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
 cargo install --force cargo-make
 ```
 
