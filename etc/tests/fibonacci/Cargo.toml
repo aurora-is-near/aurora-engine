@@ -1,0 +1,19 @@
+[package]
+name = "fibonacci_on_near"
+version = "1.0.0"
+authors = ["Aurora <hello@aurora.dev>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+
+[dependencies]
+near-sdk = "4.0.0"
+serde = "1"

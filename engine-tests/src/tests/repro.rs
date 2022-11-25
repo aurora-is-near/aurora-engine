@@ -27,7 +27,7 @@ fn repro_GdASJ3KESs() {
         block_timestamp: 1645717564644206730,
         input_path: "src/tests/res/input_GdASJ3KESs.hex",
         evm_gas_used: 706713,
-        near_gas_used: 132,
+        near_gas_used: 131,
     });
 }
 
@@ -52,7 +52,7 @@ fn repro_8ru7VEA() {
         block_timestamp: 1648829935343349589,
         input_path: "src/tests/res/input_8ru7VEA.hex",
         evm_gas_used: 1732181,
-        near_gas_used: 240,
+        near_gas_used: 239,
     });
 }
 
@@ -72,7 +72,7 @@ fn repro_FRcorNv() {
         block_timestamp: 1650960438774745116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1239721,
-        near_gas_used: 196,
+        near_gas_used: 194,
     });
 }
 
@@ -89,7 +89,7 @@ fn repro_5bEgfRQ() {
         block_timestamp: 1651073772931594646,
         input_path: "src/tests/res/input_5bEgfRQ.hex",
         evm_gas_used: 6_414_105,
-        near_gas_used: 695,
+        near_gas_used: 701,
     });
 }
 
@@ -107,11 +107,30 @@ fn repro_D98vwmi() {
         block_timestamp: 1651753443421003245,
         input_path: "src/tests/res/input_D98vwmi.hex",
         evm_gas_used: 1_035_348,
-        near_gas_used: 198,
+        near_gas_used: 195,
     });
 }
 
-fn repro_common<'a>(context: ReproContext<'a>) {
+/// This test reproduces a transaction from testnet:
+/// https://explorer.testnet.near.org/transactions/Emufid2pv2UpxrZae4NyowF2N2ZHvYEPq16LsQc7Uoc6
+/// It hit the gas limit at the time of its execution (engine v2.7.0).
+/// The transaction is some kind of multi-step token swap. The user says it should be similar
+/// to this transaction on Polygon:
+/// https://mumbai.polygonscan.com/tx/0xd9ab182692c74a873f0c444854ed1045edbb32a252b561677042276143a024b7
+#[allow(non_snake_case)]
+#[test]
+fn repro_Emufid2() {
+    repro_common(ReproContext {
+        snapshot_path: "src/tests/res/aurora_state_Emufid2.json",
+        block_index: 99197180,
+        block_timestamp: 1662118048636713538,
+        input_path: "src/tests/res/input_Emufid2.hex",
+        evm_gas_used: 1_156_364,
+        near_gas_used: 330,
+    });
+}
+
+fn repro_common(context: ReproContext) {
     let ReproContext {
         snapshot_path,
         block_index,

@@ -2,7 +2,9 @@ use crate::io::StorageIntermediate;
 use crate::prelude::NearGas;
 use crate::promise::PromiseId;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
+use aurora_engine_types::parameters::{
+    NearPublicKey, PromiseAction, PromiseBatchAction, PromiseCreateArgs,
+};
 use aurora_engine_types::types::PromiseResult;
 use aurora_engine_types::H256;
 
@@ -17,6 +19,16 @@ const CUSTODIAN_ADDRESS: &[u8] = &[
 const CUSTODIAN_ADDRESS: &[u8] = &[
     132, 168, 43, 179, 156, 131, 152, 157, 93, 192, 126, 19, 16, 40, 25, 35, 210, 84, 77, 194,
 ];
+
+macro_rules! feature_gated {
+    ($feature_name:literal, $code:block) => {
+        if cfg!(feature = $feature_name) {
+            $code
+        } else {
+            unimplemented!("Not implemented without feature {}", $feature_name)
+        }
+    };
+}
 
 /// Wrapper type for indices in NEAR's register API.
 pub struct RegisterIndex(u64);
@@ -280,14 +292,14 @@ impl crate::promise::PromiseHandler for Runtime {
         }
     }
 
-    fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
+    unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
         let account_id = args.target_account_id.as_bytes();
         let method_name = args.method.as_bytes();
         let arguments = args.args.as_slice();
         let amount = args.attached_balance.as_u128();
         let gas = args.attached_gas.as_u64();
 
-        let id = unsafe {
+        let id = {
             exports::promise_create(
                 account_id.len() as _,
                 account_id.as_ptr() as _,
@@ -302,7 +314,7 @@ impl crate::promise::PromiseHandler for Runtime {
         PromiseId::new(id)
     }
 
-    fn promise_attach_callback(
+    unsafe fn promise_attach_callback(
         &mut self,
         base: PromiseId,
         callback: &PromiseCreateArgs,
@@ -313,7 +325,7 @@ impl crate::promise::PromiseHandler for Runtime {
         let amount = callback.attached_balance.as_u128();
         let gas = callback.attached_gas.as_u64();
 
-        let id = unsafe {
+        let id = {
             exports::promise_then(
                 base.raw(),
                 account_id.len() as _,
@@ -330,36 +342,34 @@ impl crate::promise::PromiseHandler for Runtime {
         PromiseId::new(id)
     }
 
-    fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
+    unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
         let account_id = args.target_account_id.as_bytes();
 
-        let id = unsafe {
-            exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _)
-        };
+        let id = { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) };
 
         for action in args.actions.iter() {
             match action {
-                PromiseAction::CreateAccount => unsafe {
+                PromiseAction::CreateAccount => {
                     exports::promise_batch_action_create_account(id);
-                },
-                PromiseAction::Transfer { amount } => unsafe {
+                }
+                PromiseAction::Transfer { amount } => {
                     let amount = amount.as_u128();
                     exports::promise_batch_action_transfer(id, &amount as *const u128 as _);
-                },
-                PromiseAction::DeployConotract { code } => unsafe {
+                }
+                PromiseAction::DeployContract { code } => {
                     let code = code.as_slice();
                     exports::promise_batch_action_deploy_contract(
                         id,
                         code.len() as _,
                         code.as_ptr() as _,
                     );
-                },
+                }
                 PromiseAction::FunctionCall {
                     name,
                     gas,
                     attached_yocto,
                     args,
-                } => unsafe {
+                } => {
                     let method_name = name.as_bytes();
                     let arguments = args.as_slice();
                     let amount = attached_yocto.as_u128();
@@ -372,7 +382,79 @@ impl crate::promise::PromiseHandler for Runtime {
                         &amount as *const u128 as _,
                         gas.as_u64(),
                     )
-                },
+                }
+                PromiseAction::Stake { amount, public_key } => {
+                    feature_gated!("all-promise-actions", {
+                        let amount = amount.as_u128();
+                        let pk: RawPublicKey = public_key.into();
+                        let pk_bytes = pk.as_bytes();
+                        exports::promise_batch_action_stake(
+                            id,
+                            &amount as *const u128 as _,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                        )
+                    });
+                }
+                PromiseAction::AddFullAccessKey { public_key, nonce } => {
+                    feature_gated!("all-promise-actions", {
+                        let pk: RawPublicKey = public_key.into();
+                        let pk_bytes = pk.as_bytes();
+                        exports::promise_batch_action_add_key_with_full_access(
+                            id,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                            *nonce,
+                        )
+                    });
+                }
+                PromiseAction::AddFunctionCallKey {
+                    public_key,
+                    nonce,
+                    allowance,
+                    receiver_id,
+                    function_names,
+                } => {
+                    feature_gated!("all-promise-actions", {
+                        let pk: RawPublicKey = public_key.into();
+                        let pk_bytes = pk.as_bytes();
+                        let allowance = allowance.as_u128();
+                        let receiver_id = receiver_id.as_bytes();
+                        let function_names = function_names.as_bytes();
+                        exports::promise_batch_action_add_key_with_function_call(
+                            id,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                            *nonce,
+                            &allowance as *const u128 as _,
+                            receiver_id.len() as _,
+                            receiver_id.as_ptr() as _,
+                            function_names.len() as _,
+                            function_names.as_ptr() as _,
+                        )
+                    });
+                }
+                PromiseAction::DeleteKey { public_key } => {
+                    feature_gated!("all-promise-actions", {
+                        let pk: RawPublicKey = public_key.into();
+                        let pk_bytes = pk.as_bytes();
+                        exports::promise_batch_action_delete_key(
+                            id,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                        )
+                    });
+                }
+                PromiseAction::DeleteAccount { beneficiary_id } => {
+                    feature_gated!("all-promise-actions", {
+                        let beneficiary_id = beneficiary_id.as_bytes();
+                        exports::promise_batch_action_delete_key(
+                            id,
+                            beneficiary_id.len() as _,
+                            beneficiary_id.as_ptr() as _,
+                        )
+                    });
+                }
             }
         }
 
@@ -387,6 +469,40 @@ impl crate::promise::PromiseHandler for Runtime {
 
     fn read_only(&self) -> Self::ReadOnly {
         Self
+    }
+}
+
+/// Similar to NearPublicKey, except the first byte includes
+/// the curve identifier.
+enum RawPublicKey {
+    Ed25519([u8; 33]),
+    Secp256k1([u8; 65]),
+}
+
+impl RawPublicKey {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Ed25519(bytes) => bytes,
+            Self::Secp256k1(bytes) => bytes,
+        }
+    }
+}
+
+impl<'a> From<&'a NearPublicKey> for RawPublicKey {
+    fn from(key: &'a NearPublicKey) -> Self {
+        match key {
+            NearPublicKey::Ed25519(bytes) => {
+                let mut buf = [0u8; 33];
+                buf[1..33].copy_from_slice(bytes);
+                Self::Ed25519(buf)
+            }
+            NearPublicKey::Secp256k1(bytes) => {
+                let mut buf = [0u8; 65];
+                buf[0] = 0x01;
+                buf[1..65].copy_from_slice(bytes);
+                Self::Secp256k1(buf)
+            }
+        }
     }
 }
 
@@ -539,19 +655,19 @@ pub(crate) mod exports {
             gas: u64,
         );
         pub(crate) fn promise_batch_action_transfer(promise_index: u64, amount_ptr: u64);
-        fn promise_batch_action_stake(
+        pub(crate) fn promise_batch_action_stake(
             promise_index: u64,
             amount_ptr: u64,
             public_key_len: u64,
             public_key_ptr: u64,
         );
-        fn promise_batch_action_add_key_with_full_access(
+        pub(crate) fn promise_batch_action_add_key_with_full_access(
             promise_index: u64,
             public_key_len: u64,
             public_key_ptr: u64,
             nonce: u64,
         );
-        fn promise_batch_action_add_key_with_function_call(
+        pub(crate) fn promise_batch_action_add_key_with_function_call(
             promise_index: u64,
             public_key_len: u64,
             public_key_ptr: u64,
@@ -562,12 +678,12 @@ pub(crate) mod exports {
             method_names_len: u64,
             method_names_ptr: u64,
         );
-        fn promise_batch_action_delete_key(
+        pub(crate) fn promise_batch_action_delete_key(
             promise_index: u64,
             public_key_len: u64,
             public_key_ptr: u64,
         );
-        fn promise_batch_action_delete_account(
+        pub(crate) fn promise_batch_action_delete_account(
             promise_index: u64,
             beneficiary_id_len: u64,
             beneficiary_id_ptr: u64,

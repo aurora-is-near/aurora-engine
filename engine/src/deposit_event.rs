@@ -15,7 +15,7 @@ pub type EventParams = Vec<EventParam>;
 /// On-transfer message. Used for `ft_transfer_call` and  `ft_on_transfer` functions.
 /// Message parsed from input args with `parse_on_transfer_message`.
 #[derive(BorshSerialize, BorshDeserialize)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub struct FtTransferMessageData {
     pub relayer: AccountId,
     pub recipient: Address,
@@ -85,12 +85,6 @@ impl FtTransferMessageData {
         fee: Fee,
         recipient: String,
     ) -> Result<Self, ParseEventMessageError> {
-        // The first data section should contain fee data.
-        // Pay attention, that for compatibility reasons we used U256 type
-        // it means 32 bytes for fee data
-        let mut data = U256::from(fee.as_u128()).as_byte_slice().to_vec();
-
-        // Check message length.
         let address = if recipient.len() == 42 {
             recipient
                 .strip_prefix("0x")
@@ -101,12 +95,10 @@ impl FtTransferMessageData {
         } else {
             recipient
         };
+
         let recipient_address =
             Address::decode(&address).map_err(ParseEventMessageError::EthAddressValidationError)?;
-        // Second data section should contain Eth address
-        data.extend(recipient_address.as_bytes());
-        // Add `:` separator between relayer_id and data message
-        //Ok([relayer_account_id.as_ref(), &hex::encode(data)].join(":"))
+
         Ok(Self {
             relayer: relayer_account_id.clone(),
             recipient: recipient_address,
@@ -120,7 +112,7 @@ impl FtTransferMessageData {
 /// The message parsed from event `recipient` field - `log_entry_data`
 /// after fetching proof `log_entry_data`
 #[derive(BorshSerialize, BorshDeserialize)]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub enum TokenMessageData {
     /// Deposit no NEAR account
     Near(AccountId),
@@ -168,7 +160,7 @@ impl TokenMessageData {
     }
 
     // Get recipient account id from Eth part of Token message data
-    pub fn get_recipient(&self) -> AccountId {
+    pub fn recipient(&self) -> AccountId {
         match self {
             Self::Near(acc) => acc.clone(),
             Self::Eth {
@@ -218,6 +210,7 @@ impl EthEvent {
 }
 
 /// Data that was emitted by Deposited event.
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub struct DepositedEvent {
     pub eth_custodian_address: Address,
     pub sender: Address,
@@ -324,7 +317,6 @@ pub mod error {
         TooManyParts,
         InvalidAccount,
         EthAddressValidationError(AddressError),
-        ParseMessageError(ParseOnTransferMessageError),
     }
 
     impl AsRef<[u8]> for ParseEventMessageError {
@@ -333,7 +325,6 @@ pub mod error {
                 Self::TooManyParts => errors::ERR_INVALID_EVENT_MESSAGE_FORMAT,
                 Self::InvalidAccount => errors::ERR_INVALID_ACCOUNT_ID,
                 Self::EthAddressValidationError(e) => e.as_ref(),
-                Self::ParseMessageError(e) => e.as_ref(),
             }
         }
     }
@@ -353,6 +344,7 @@ pub mod error {
         MessageParseFailed(ParseEventMessageError),
         OverflowNumber,
     }
+
     impl AsRef<[u8]> for ParseError {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -385,5 +377,219 @@ pub mod error {
                 Self::OverflowNumber => errors::ERR_OVERFLOW_NUMBER,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::errors;
+    use aurora_engine_precompiles::make_address;
+    use aurora_engine_types::H160;
+
+    #[test]
+    fn test_decoded_and_then_encoded_message_does_not_change() {
+        let expect_message =
+            "aurora:05000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        let message_data =
+            FtTransferMessageData::parse_on_transfer_message(expect_message).unwrap();
+        let actual_message = message_data.encode();
+
+        assert_eq!(expect_message, actual_message);
+    }
+
+    #[test]
+    fn test_parsing_message_with_incorrect_amount_of_parts() {
+        let message = "foo";
+        let error = FtTransferMessageData::parse_on_transfer_message(message).unwrap_err();
+        let expected_error_message = errors::ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT;
+        let actual_error_message = error.as_ref();
+
+        assert_eq!(expected_error_message, actual_error_message);
+    }
+
+    #[test]
+    fn test_parsing_message_with_invalid_account_id() {
+        let message = "INVALID:0";
+        let error = FtTransferMessageData::parse_on_transfer_message(message).unwrap_err();
+        let expected_error_message = errors::ERR_INVALID_ACCOUNT_ID;
+        let actual_error_message = error.as_ref();
+
+        assert_eq!(expected_error_message, actual_error_message);
+    }
+
+    #[test]
+    fn test_parsing_message_with_invalid_hex_data() {
+        let message = "foo:INVALID";
+        let error = FtTransferMessageData::parse_on_transfer_message(message).unwrap_err();
+        let expected_error_message = errors::ERR_INVALID_ON_TRANSFER_MESSAGE_HEX;
+        let actual_error_message = error.as_ref();
+
+        assert_eq!(expected_error_message, actual_error_message);
+    }
+
+    #[test]
+    fn test_parsing_message_with_invalid_length_of_hex_data() {
+        let message = "foo:dead";
+        let error = FtTransferMessageData::parse_on_transfer_message(message).unwrap_err();
+        let expected_error_message = errors::ERR_INVALID_ON_TRANSFER_MESSAGE_DATA;
+        let actual_error_message = error.as_ref();
+
+        assert_eq!(expected_error_message, actual_error_message);
+    }
+
+    #[test]
+    fn test_parsing_message_with_overflowing_fee() {
+        let message =
+            "foo:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        let error = FtTransferMessageData::parse_on_transfer_message(message).unwrap_err();
+        let expected_error_message = errors::ERR_OVERFLOW_NUMBER;
+        let actual_error_message = error.as_ref();
+
+        assert_eq!(expected_error_message, actual_error_message);
+    }
+
+    #[test]
+    fn test_eth_token_message_data_decodes_recipient_correctly() {
+        let fee = Fee::new(NEP141Wei::new(0));
+        let address = Address::zero();
+        let message = format!("aurora:{}", address.encode());
+
+        let token_message_data =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+                .unwrap();
+        let actual_recipient = token_message_data.recipient().to_string();
+        let expected_recipient = "aurora";
+
+        assert_eq!(expected_recipient, actual_recipient);
+    }
+
+    #[test]
+    fn test_eth_token_message_data_decodes_recipient_correctly_with_prefix() {
+        let fee = Fee::new(NEP141Wei::new(0));
+        let address = Address::zero();
+        let message = format!("aurora:0x{}", address.encode());
+
+        let token_message_data =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+                .unwrap();
+        let actual_recipient = token_message_data.recipient().to_string();
+        let expected_recipient = "aurora";
+
+        assert_eq!(expected_recipient, actual_recipient);
+    }
+
+    #[test]
+    fn test_near_token_message_data_decodes_recipient_correctly() {
+        let fee = Fee::new(NEP141Wei::new(0));
+        let message = "aurora";
+
+        let token_message_data =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
+                .unwrap();
+        let actual_recipient = token_message_data.recipient().to_string();
+        let expected_recipient = "aurora";
+
+        assert_eq!(expected_recipient, actual_recipient);
+    }
+
+    #[test]
+    fn test_token_message_data_fails_with_too_many_parts() {
+        let fee = Fee::new(NEP141Wei::new(0));
+        let message = "aurora:foo:bar";
+
+        let parse_error =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
+                .unwrap_err();
+        let actual_parse_error = parse_error.as_ref();
+        let expected_parse_error = errors::ERR_INVALID_EVENT_MESSAGE_FORMAT;
+
+        assert_eq!(expected_parse_error, actual_parse_error);
+    }
+
+    #[test]
+    fn test_token_message_data_fails_with_invalid_account() {
+        let fee = Fee::new(NEP141Wei::new(0));
+        let message = "INVALID";
+
+        let parse_error =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
+                .unwrap_err();
+        let actual_parse_error = parse_error.as_ref();
+        let expected_parse_error = errors::ERR_INVALID_ACCOUNT_ID;
+
+        assert_eq!(expected_parse_error, actual_parse_error);
+    }
+
+    #[test]
+    fn test_eth_token_message_data_fails_with_invalid_address_length() {
+        let fee = Fee::new(NEP141Wei::new(0));
+        let message = "aurora:0xINVALID";
+
+        let parse_error =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
+                .unwrap_err();
+        let actual_parse_error = std::str::from_utf8(parse_error.as_ref()).unwrap();
+        let expected_parse_error = AddressError::IncorrectLength.to_string();
+
+        assert_eq!(expected_parse_error, actual_parse_error);
+    }
+
+    #[test]
+    fn test_eth_token_message_data_fails_with_invalid_address() {
+        let fee = Fee::new(NEP141Wei::new(0));
+        let message = "aurora:0xINVALID_ADDRESS_WITH_CORRECT_LENGTH_HERE";
+
+        let parse_error =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
+                .unwrap_err();
+        let actual_parse_error = std::str::from_utf8(parse_error.as_ref()).unwrap();
+        let expected_parse_error = AddressError::FailedDecodeHex.to_string();
+
+        assert_eq!(expected_parse_error, actual_parse_error);
+    }
+
+    #[test]
+    fn test_deposited_event_parses_from_log_entry_successfully() {
+        let recipient_address = Address::zero();
+        let eth_custodian_address = make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
+
+        let fee = Fee::new(NEP141Wei::new(0));
+        let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
+        let token_message_data: TokenMessageData =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+                .unwrap();
+
+        let expected_deposited_event = DepositedEvent {
+            eth_custodian_address,
+            sender: Address::new(H160([0u8; 20])),
+            token_message_data,
+            amount: NEP141Wei::new(0),
+            fee,
+        };
+
+        let event_schema = Event {
+            name: DEPOSITED_EVENT.into(),
+            inputs: DepositedEvent::event_params(),
+            anonymous: false,
+        };
+        let log_entry = LogEntry {
+            address: eth_custodian_address.raw(),
+            topics: vec![
+                event_schema.signature(),
+                // the sender is not important
+                crate::prelude::H256::zero(),
+            ],
+            data: ethabi::encode(&[
+                ethabi::Token::String(message),
+                ethabi::Token::Uint(U256::from(expected_deposited_event.amount.as_u128())),
+                ethabi::Token::Uint(U256::from(expected_deposited_event.fee.as_u128())),
+            ]),
+        };
+
+        let log_entry_data = rlp::encode(&log_entry).to_vec();
+        let actual_deposited_event = DepositedEvent::from_log_entry_data(&log_entry_data).unwrap();
+
+        assert_eq!(expected_deposited_event, actual_deposited_event);
     }
 }

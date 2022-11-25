@@ -2,6 +2,7 @@ use crate::prelude::{
     parameters::SubmitResult, transactions::legacy::TransactionLegacy, Address, Wei, U256,
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
+use near_vm_errors::VMError;
 
 pub(crate) struct TesterConstructor(pub solidity::ContractConstructor);
 
@@ -68,7 +69,7 @@ impl Tester {
         method: &str,
         value: Wei,
         params: &[ethabi::Token],
-    ) -> Result<SubmitResult, Revert> {
+    ) -> Result<SubmitResult, VMError> {
         let data = self
             .contract
             .abi
@@ -86,7 +87,10 @@ impl Tester {
             data,
         };
 
-        let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
+        runner.submit_transaction(&signer.secret_key, tx)
+    }
+
+    fn submit_result_to_success_or_revert(result: SubmitResult) -> Result<SubmitResult, Revert> {
         match result.status {
             aurora_engine::parameters::TransactionStatus::Succeed(_) => Ok(result),
             aurora_engine::parameters::TransactionStatus::Revert(bytes) => Err(Revert(bytes)),
@@ -124,7 +128,7 @@ impl Tester {
         runner: &mut AuroraRunner,
         signer: &mut Signer,
         flag: bool,
-    ) -> Result<SubmitResult, Revert> {
+    ) -> Result<SubmitResult, VMError> {
         self.call_function(
             runner,
             signer,
@@ -140,12 +144,15 @@ impl Tester {
         signer: &mut Signer,
         flag: bool,
     ) -> Result<SubmitResult, Revert> {
-        self.call_function(
-            runner,
-            signer,
-            "withdrawAndFail",
-            Wei::zero(),
-            &[ethabi::Token::Bool(flag)],
+        Self::submit_result_to_success_or_revert(
+            self.call_function(
+                runner,
+                signer,
+                "withdrawAndFail",
+                Wei::zero(),
+                &[ethabi::Token::Bool(flag)],
+            )
+            .unwrap(),
         )
     }
 
@@ -155,12 +162,15 @@ impl Tester {
         signer: &mut Signer,
         flag: bool,
     ) -> Result<SubmitResult, Revert> {
-        self.call_function(
-            runner,
-            signer,
-            "tryWithdrawAndAvoidFail",
-            Wei::zero(),
-            &[ethabi::Token::Bool(flag)],
+        Self::submit_result_to_success_or_revert(
+            self.call_function(
+                runner,
+                signer,
+                "tryWithdrawAndAvoidFail",
+                Wei::zero(),
+                &[ethabi::Token::Bool(flag)],
+            )
+            .unwrap(),
         )
     }
 
@@ -170,12 +180,15 @@ impl Tester {
         signer: &mut Signer,
         flag: bool,
     ) -> Result<SubmitResult, Revert> {
-        self.call_function(
-            runner,
-            signer,
-            "tryWithdrawAndAvoidFailAndSucceed",
-            Wei::zero(),
-            &[ethabi::Token::Bool(flag)],
+        Self::submit_result_to_success_or_revert(
+            self.call_function(
+                runner,
+                signer,
+                "tryWithdrawAndAvoidFailAndSucceed",
+                Wei::zero(),
+                &[ethabi::Token::Bool(flag)],
+            )
+            .unwrap(),
         )
     }
 
@@ -186,7 +199,7 @@ impl Tester {
         is_to_near: bool,
         amount: Wei,
     ) -> Result<SubmitResult, Revert> {
-        if is_to_near {
+        Self::submit_result_to_success_or_revert(if is_to_near {
             self.call_function(
                 runner,
                 signer,
@@ -194,6 +207,7 @@ impl Tester {
                 amount,
                 &[ethabi::Token::Bytes(DEST_ACCOUNT.as_bytes().to_vec())],
             )
+            .unwrap()
         } else {
             self.call_function(
                 runner,
@@ -202,7 +216,8 @@ impl Tester {
                 amount,
                 &[ethabi::Token::Address(DEST_ADDRESS.raw())],
             )
-        }
+            .unwrap()
+        })
     }
 }
 

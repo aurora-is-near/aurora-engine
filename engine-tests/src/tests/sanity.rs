@@ -289,16 +289,14 @@ fn test_is_contract() {
     };
 
     // Should return false for accounts that don't exist
-    assert_eq!(
-        call_contract(Address::from_array([1; 20]), &mut runner, &mut signer),
-        false,
-    );
+    assert!(!call_contract(
+        Address::from_array([1; 20]),
+        &mut runner,
+        &mut signer
+    ));
 
     // Should return false for accounts that don't have contract code
-    assert_eq!(
-        call_contract(signer_address, &mut runner, &mut signer),
-        false,
-    );
+    assert!(!call_contract(signer_address, &mut runner, &mut signer),);
 
     // Should return true for contracts
     let erc20_constructor = test_utils::erc20::ERC20Constructor::load();
@@ -308,10 +306,7 @@ fn test_is_contract() {
         |c| c.deploy("TOKEN_A", "TA", nonce.into()),
         erc20_constructor,
     );
-    assert_eq!(
-        call_contract(token_a.address, &mut runner, &mut signer),
-        true,
-    );
+    assert!(call_contract(token_a.address, &mut runner, &mut signer),);
 }
 
 #[test]
@@ -421,6 +416,41 @@ fn test_revert_during_contract_deploy() {
         .unwrap();
 
     assert_eq!(revert_message.as_str(), "Revert message");
+}
+
+#[test]
+fn test_call_too_deep_error() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+        "src/tests/res",
+        "target/solidity_build",
+        "CallTooDeep.sol",
+        "CallTooDeep",
+    );
+
+    let nonce = signer.use_nonce();
+    let contract = runner.deploy_contract(
+        &signer.secret_key,
+        |c| c.deploy_without_constructor(nonce.into()),
+        constructor,
+    );
+
+    let result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            contract.call_method_without_args("test", nonce)
+        })
+        .unwrap();
+
+    // It is counter-intuitive that this returns a `Revert` instead of `CallTooDeep`.
+    // The reason this is the case is because it is only the last call that triggers the
+    // `CallTooDeep` exit status, while the one before only sees that the call it made failed
+    // and therefore reverts. As a result, the `CallTooDeep` exit status is not actually
+    // visible to users.
+    match result.status {
+        TransactionStatus::Revert(_) => (),
+        other => panic!("Unexpected status {:?}", other),
+    }
 }
 
 #[test]
@@ -995,7 +1025,7 @@ fn query_address_sim(
 ) -> U256 {
     let x = aurora.call(method, address.as_bytes());
     match &x.outcome().status {
-        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(&b),
+        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(b),
         other => panic!("Unexpected outcome: {:?}", other),
     }
 }

@@ -33,7 +33,7 @@ fn test_uniswap_input_multihop() {
     let tokens = context.create_tokens(10, MINT_AMOUNT.into());
     for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {
         context.create_pool(token_a, token_b);
-        context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
+        context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), token_a, token_b);
     }
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
@@ -52,7 +52,7 @@ fn test_uniswap_exact_output() {
     test_utils::assert_gas_bound(profile.all_gas(), 33);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        40 <= wasm_fraction && wasm_fraction <= 50,
+        (40..=50).contains(&wasm_fraction),
         "{}% is not between 40% and 50%",
         wasm_fraction
     );
@@ -62,7 +62,7 @@ fn test_uniswap_exact_output() {
     test_utils::assert_gas_bound(profile.all_gas(), 18);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        45 <= wasm_fraction && wasm_fraction <= 55,
+        (45..=55).contains(&wasm_fraction),
         "{}% is not between 45% and 55%",
         wasm_fraction
     );
@@ -154,8 +154,8 @@ impl UniswapTestContext {
     }
 
     pub fn create_tokens(&mut self, n: usize, mint_amount: U256) -> Vec<ERC20> {
-        let names = ('a'..'z').into_iter().map(|c| format!("token_{}", c));
-        let symbols = ('A'..'Z').into_iter().map(|c| format!("{}{}{}", c, c, c));
+        let names = ('a'..='z').into_iter().map(|c| format!("token_{}", c));
+        let symbols = ('A'..='Z').into_iter().map(|c| format!("{}{}{}", c, c, c));
         let mut result: Vec<ERC20> = names
             .zip(symbols)
             .take(n)
@@ -210,7 +210,7 @@ impl UniswapTestContext {
         MintParams {
             token0,
             token1,
-            fee: POOL_FEE.into(),
+            fee: POOL_FEE,
             tick_lower: -1000,
             tick_upper: 1000,
             amount0_desired: amount,
@@ -243,11 +243,11 @@ impl UniswapTestContext {
         let result = {
             let mut values = [U256::zero(); 4];
             let result_bytes = test_utils::unwrap_success(result);
-            for i in 0..4 {
+            for (i, item) in values.iter_mut().enumerate() {
                 let lower = i * 32;
                 let upper = (i + 1) * 32;
                 let value = U256::from_big_endian(&result_bytes[lower..upper]);
-                values[i] = value;
+                *item = value;
             }
             LiquidityResult {
                 token_id: values[0],
@@ -327,8 +327,8 @@ impl UniswapTestContext {
         token_out: &ERC20,
         amount_out: U256,
     ) -> (U256, ExecutionProfile) {
-        self.approve_erc20(&token_in, self.swap_router.0.address, U256::MAX);
-        self.approve_erc20(&token_out, self.swap_router.0.address, U256::MAX);
+        self.approve_erc20(token_in, self.swap_router.0.address, U256::MAX);
+        self.approve_erc20(token_out, self.swap_router.0.address, U256::MAX);
 
         let params = self.exact_output_single_params(amount_out, token_in, token_out);
         let swap_router = &self.swap_router;

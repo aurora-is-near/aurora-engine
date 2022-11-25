@@ -69,7 +69,7 @@ args = [
 [tasks.udeps]
 category = "Check"
 env = { "CARGO_MAKE_RUST_CHANNEL" = "nightly", "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
-install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.30", test_arg = ["udeps", "-h"], force = false }
+install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.34", test_arg = ["udeps", "-h"], force = true }
 command = "${CARGO}"
 args = [
     "udeps",
@@ -81,9 +81,7 @@ category = "Check"
 command = "${CARGO}"
 args = [
     "clippy",
-    "--no-default-features",
-    "--features",
-    "contract",
+    "--all-targets",
     "--",
     "-D",
     "warnings",
@@ -179,6 +177,15 @@ dependencies = [
     "post-engine-build-env",
 ]
 
+[tasks.build-engine-flow-docker]
+category = "Build"
+dependencies = [
+    "build-engine",
+    "make-bin-directory",
+    "copy-engine-build",
+    "post-engine-build-env",
+]
+
 [tasks.build-test]
 condition = { profiles = ["mainnet", "testnet", "custom"] }
 env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
@@ -187,9 +194,21 @@ run_task = "build-engine-flow"
 
 [tasks.build]
 condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
-env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
+
+[tasks.build-docker-inner]
+condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
+env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+category = "Build"
+run_task = "build-engine-flow-docker"
+
+[tasks.build-docker]
+category = "Build"
+script = '''
+docker run --volume $PWD:/host -w /host -it nearprotocol/contract-builder:master-b8fc60809b907543d909ee75fcc1bd7b68cbe2fd-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
+'''
 
 [tasks.test-contracts]
 category = "Test"

@@ -14,6 +14,7 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 #[derive(
     BorshSerialize, BorshDeserialize, Default, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccountId(Box<str>);
 
 impl AccountId {
@@ -56,7 +57,7 @@ impl AccountId {
             }
 
             (!last_char_is_separator)
-                .then(|| ())
+                .then_some(())
                 .ok_or(ParseAccountError::Invalid)
         }
     }
@@ -250,7 +251,7 @@ mod tests {
         }
 
         for account_id in BAD_ACCOUNT_IDS.iter().cloned() {
-            if let Ok(_) = AccountId::validate(account_id) {
+            if AccountId::validate(account_id).is_ok() {
                 panic!("Valid account id {:?} marked valid", account_id);
             }
         }

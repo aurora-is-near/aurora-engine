@@ -34,17 +34,17 @@ use crate::xcc::CrossContractCall;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
-use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, Box};
+use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
 use evm::backend::Log;
 use evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
-use evm::{Context, ExitError, ExitSucceed};
+use evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct PrecompileOutput {
     pub cost: EthGas,
     pub output: Vec<u8>,
@@ -112,6 +112,13 @@ impl HardFork for Berlin {}
 
 pub struct Precompiles<'a, I, E, H> {
     pub all_precompiles: prelude::BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
+    pub paused_precompiles: prelude::BTreeSet<Address>,
+}
+
+impl<'a, I, E, H> Precompiles<'a, I, E, H> {
+    fn is_paused(&self, address: &Address) -> bool {
+        self.paused_precompiles.contains(address)
+    }
 }
 
 impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
@@ -121,9 +128,15 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
         &self,
         handle: &mut impl PrecompileHandle,
     ) -> Option<Result<executor::stack::PrecompileOutput, PrecompileFailure>> {
-        let address = handle.code_address();
+        let address = Address::new(handle.code_address());
 
-        let result = match self.all_precompiles.get(&Address::new(address))? {
+        if self.is_paused(&address) {
+            return Some(Err(PrecompileFailure::Fatal {
+                exit_status: ExitFatal::Other(prelude::Cow::Borrowed("ERR_PAUSED")),
+            }));
+        }
+
+        let result = match self.all_precompiles.get(&address)? {
             AllPrecompiles::ExitToNear(p) => process_precompile(p, handle),
             AllPrecompiles::ExitToEthereum(p) => process_precompile(p, handle),
             AllPrecompiles::PredecessorAccount(p) => process_precompile(p, handle),
@@ -132,6 +145,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
             AllPrecompiles::CrossContractCall(p) => process_handle_based_precompile(p, handle),
             AllPrecompiles::Generic(p) => process_precompile(p.as_ref(), handle),
         };
+
         Some(result.and_then(|output| post_process(output, handle)))
     }
 
@@ -354,6 +368,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
 
         Self {
             all_precompiles: generic_precompiles,
+            paused_precompiles: BTreeSet::new(),
         }
     }
 }
@@ -460,7 +475,7 @@ mod tests {
     #[test]
     fn test_make_address() {
         for i in 0..u8::MAX {
-            assert_eq!(super::make_address(0, i as u128), u8_to_address(i));
+            assert_eq!(super::make_address(0, i.into()), u8_to_address(i));
         }
 
         let mut rng = rand::thread_rng();
@@ -469,6 +484,130 @@ mod tests {
             let (x, y) = split_address(address);
             assert_eq!(address, super::make_address(x, y))
         }
+    }
+
+    #[test]
+    fn test_paused_precompiles_throws_error() {
+        use crate::{
+            AllPrecompiles, Context, EvmPrecompileResult, ExitError, Precompile, PrecompileOutput,
+            Precompiles,
+        };
+        use aurora_engine_sdk::env::Fixed;
+        use aurora_engine_sdk::promise::Noop;
+        use aurora_engine_test_doubles::io::StoragePointer;
+        use aurora_engine_types::types::EthGas;
+        use evm::executor::stack::{PrecompileFailure, PrecompileHandle, PrecompileSet};
+        use evm::{ExitFatal, ExitReason, Transfer};
+
+        struct MockPrecompile;
+
+        impl Precompile for MockPrecompile {
+            fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError>
+            where
+                Self: Sized,
+            {
+                Ok(EthGas::new(0))
+            }
+
+            fn run(
+                &self,
+                _input: &[u8],
+                _target_gas: Option<EthGas>,
+                _context: &Context,
+                _is_static: bool,
+            ) -> EvmPrecompileResult {
+                Ok(PrecompileOutput::default())
+            }
+        }
+
+        struct MockPrecompileHandle {
+            code_address: H160,
+        }
+
+        impl MockPrecompileHandle {
+            pub fn new(code_address: H160) -> Self {
+                Self { code_address }
+            }
+        }
+
+        impl PrecompileHandle for MockPrecompileHandle {
+            fn call(
+                &mut self,
+                _to: H160,
+                _transfer: Option<Transfer>,
+                _input: Vec<u8>,
+                _gas_limit: Option<u64>,
+                _is_static: bool,
+                _context: &Context,
+            ) -> (ExitReason, Vec<u8>) {
+                unimplemented!()
+            }
+
+            fn record_cost(&mut self, _cost: u64) -> Result<(), ExitError> {
+                unimplemented!()
+            }
+
+            fn remaining_gas(&self) -> u64 {
+                unimplemented!()
+            }
+
+            fn log(
+                &mut self,
+                _address: H160,
+                _topics: Vec<aurora_engine_types::H256>,
+                _data: Vec<u8>,
+            ) -> Result<(), ExitError> {
+                unimplemented!()
+            }
+
+            fn code_address(&self) -> H160 {
+                self.code_address
+            }
+
+            fn input(&self) -> &[u8] {
+                unimplemented!()
+            }
+
+            fn context(&self) -> &Context {
+                unimplemented!()
+            }
+
+            fn is_static(&self) -> bool {
+                unimplemented!()
+            }
+
+            fn gas_limit(&self) -> Option<u64> {
+                unimplemented!()
+            }
+        }
+
+        let precompile_address = Address::default();
+        let precompile: AllPrecompiles<StoragePointer, Fixed, Noop> =
+            AllPrecompiles::Generic(Box::new(MockPrecompile));
+
+        let precompiles: Precompiles<StoragePointer, Fixed, Noop> = Precompiles {
+            all_precompiles: {
+                let mut map = prelude::BTreeMap::new();
+                map.insert(precompile_address, precompile);
+                map
+            },
+            paused_precompiles: {
+                let mut set = prelude::BTreeSet::new();
+                set.insert(precompile_address);
+                set
+            },
+        };
+        let mut precompile_handle = MockPrecompileHandle::new(precompile_address.raw());
+
+        let result = precompiles
+            .execute(&mut precompile_handle)
+            .expect("result must contain error but is empty");
+        let actual_failure = result.expect_err("result must contain failure but is successful");
+        let expected_failure = PrecompileFailure::Fatal {
+            exit_status: ExitFatal::Other(prelude::Cow::Borrowed("ERR_PAUSED")),
+        };
+
+        assert_eq!(expected_failure, actual_failure);
     }
 
     fn u8_to_address(x: u8) -> Address {

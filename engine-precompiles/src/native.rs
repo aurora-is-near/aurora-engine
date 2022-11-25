@@ -30,8 +30,12 @@ mod costs {
     // TODO(#483): Determine the correct amount of gas
     pub(super) const EXIT_TO_ETHEREUM_GAS: EthGas = EthGas::new(0);
 
+    /// Value determined experimentally based on tests and mainnet data. Example:
+    /// https://explorer.mainnet.near.org/transactions/5CD7NrqWpK3H8MAAU4mYEPuuWz9AqR9uJkkZJzw5b8PM#D1b5NVRrAsJKUX2ZGs3poKViu1Rgt4RJZXtTfMgdxH4S
     pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
+    /// Value determined experimentally based on tests.
+    /// (No mainnet data available since this feature is not enabled)
     #[cfg(feature = "error_refund")]
     pub(super) const REFUND_ON_ERROR_GAS: NearGas = NearGas::new(5_000_000_000_000);
 

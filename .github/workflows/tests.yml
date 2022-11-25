@@ -12,31 +12,35 @@ jobs:
     name: Test suite (mainnet, testnet)
     runs-on: [self-hosted, heavy]
     steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
       - name: Restore cache
         run: |
-          cache-util restore cargo_git cargo_registry sccache yarn_cache
+          cache-util restore cargo_git cargo_registry yarn_cache
           cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
-      - name: List directories
-        run: ls -la target/wasm32-unknown-unknown/release && ls -la
       - name: Build contracts
         run: cargo make build-contracts
       - name: Test contracts
         run: cargo make test-contracts
       - name: Build mainnet test WASM
         run: cargo make --profile mainnet build-test
+      - name: List mainnet WASM directory and root directory
+        run: ls -la target/wasm32-unknown-unknown/release && ls -la
       - name: Test mainnet
         run: cargo make --profile mainnet test-workspace
       - name: Build testnet test WASM
         run: cargo make --profile testnet build-test
+      - name: List testnet WASM directory and root directory
+        run: ls -la target/wasm32-unknown-unknown/release && ls -la
       - name: Test testnet
         run: cargo make --profile testnet test-workspace
       - name: Save cache
         run: |
-          cache-util save cargo_git cargo_registry sccache yarn_cache
+          cache-util save cargo_git cargo_registry yarn_cache
           cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  RUSTC_WRAPPER: sccache

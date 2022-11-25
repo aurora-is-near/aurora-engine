@@ -18,9 +18,11 @@ aurora-engine = { path = "../engine", default-features = false, features = ["std
 aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
+aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false, features = ["std"] }
 borsh = { version = "0.9.3" }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false }
-rocksdb = { version = "0.18.0", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.1-aurora", default-features = false }
+hex = "0.4.3"
+rocksdb = { version = "0.19.0", default-features = false }
 postgres = "0.19.2"
 serde = "1.0.130"
 serde_json = "1.0.72"

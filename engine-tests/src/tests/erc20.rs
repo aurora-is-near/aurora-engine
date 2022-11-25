@@ -110,7 +110,7 @@ fn profile_erc20_get_balance() {
     // at least 70% of the cost is spent on wasm computation (as opposed to host functions)
     let wasm_fraction = (100 * profile.wasm_gas()) / profile.all_gas();
     assert!(
-        20 <= wasm_fraction && wasm_fraction <= 30,
+        (20..=30).contains(&wasm_fraction),
         "{}% is not between 20% and 30%",
         wasm_fraction
     );

@@ -17,3 +17,7 @@ panic = "abort"
 [dependencies]
 aurora-engine-types = { path = "../../engine-types", default-features = false }
 near-sdk = "4.0.0"
+
+[features]
+default = []
+all-promise-actions = []

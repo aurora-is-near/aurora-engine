@@ -33,6 +33,9 @@ pub fn origin() -> String {
 pub(crate) const SUBMIT: &str = "submit";
 pub(crate) const CALL: &str = "call";
 pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
+pub(crate) const PAUSE_PRECOMPILES: &str = "pause_precompiles";
+pub(crate) const PAUSED_PRECOMPILES: &str = "paused_precompiles";
+pub(crate) const RESUME_PRECOMPILES: &str = "resume_precompiles";
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
@@ -149,7 +152,7 @@ impl<'a> OneShotAuroraRunner<'a> {
 impl AuroraRunner {
     pub fn one_shot(&self) -> OneShotAuroraRunner {
         OneShotAuroraRunner {
-            base: &self,
+            base: self,
             ext: self.ext.clone(),
             context: self.context.clone(),
         }
@@ -223,7 +226,11 @@ impl AuroraRunner {
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             if maybe_error.is_none()
-                && (method_name == SUBMIT || method_name == CALL || method_name == DEPLOY_ERC20)
+                && (method_name == SUBMIT
+                    || method_name == CALL
+                    || method_name == DEPLOY_ERC20
+                    || method_name == PAUSE_PRECOMPILES
+                    || method_name == RESUME_PRECOMPILES)
             {
                 standalone_runner
                     .submit_raw(method_name, &self.context, &self.promise_results)
@@ -302,7 +309,7 @@ impl AuroraRunner {
         let ft_value = {
             let mut current_ft: FungibleToken = trie
                 .get(&ft_key)
-                .map(|bytes| FungibleToken::try_from_slice(&bytes).unwrap())
+                .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
                 .unwrap_or_default();
             current_ft.total_eth_supply_on_near =
                 current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
@@ -319,7 +326,7 @@ impl AuroraRunner {
         let aurora_balance_value = {
             let mut current_balance: u128 = trie
                 .get(&aurora_balance_key)
-                .map(|bytes| u128::try_from_slice(&bytes).unwrap())
+                .map(|bytes| u128::try_from_slice(bytes).unwrap())
                 .unwrap_or_default();
             current_balance += init_balance.raw().as_u128();
             current_balance
@@ -582,7 +589,7 @@ impl Default for AuroraRunner {
 
 /// Wrapper around `ProfileData` to still include the wasm gas usage
 /// (which was removed in https://github.com/near/nearcore/pull/4438).
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct ExecutionProfile {
     pub host_breakdown: ProfileData,
     wasm_gas: u64,
@@ -804,8 +811,8 @@ pub(crate) fn validate_address_balance_and_nonce(
 }
 
 pub(crate) fn address_from_hex(address: &str) -> Address {
-    let bytes = if address.starts_with("0x") {
-        hex::decode(&address[2..]).unwrap()
+    let bytes = if let Some(address) = address.strip_prefix("0x") {
+        hex::decode(address).unwrap()
     } else {
         hex::decode(address).unwrap()
     };
@@ -831,7 +838,7 @@ pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {
 
 pub fn unwrap_success_slice(result: &SubmitResult) -> &[u8] {
     match &result.status {
-        TransactionStatus::Succeed(ret) => &ret,
+        TransactionStatus::Succeed(ret) => ret,
         other => panic!("Unexpected status: {:?}", other),
     }
 }

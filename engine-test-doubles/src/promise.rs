@@ -4,6 +4,7 @@ use aurora_engine_types::parameters::{PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::types::PromiseResult;
 use std::collections::HashMap;
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum PromiseArgs {
     Create(PromiseCreateArgs),
     #[allow(dead_code)]
@@ -42,18 +43,18 @@ impl PromiseHandler for PromiseTracker {
         self.promise_results.get(index as usize).cloned()
     }
 
-    fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
+    unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
         let id = self.take_id();
         self.scheduled_promises
             .insert(id, PromiseArgs::Create(args.clone()));
         PromiseId::new(id)
     }
 
-    fn promise_attach_callback(
+    unsafe fn promise_attach_callback(
         &mut self,
         base: PromiseId,
-        callback: &aurora_engine_types::parameters::PromiseCreateArgs,
-    ) -> aurora_engine_sdk::promise::PromiseId {
+        callback: &PromiseCreateArgs,
+    ) -> PromiseId {
         let id = self.take_id();
         self.scheduled_promises.insert(
             id,
@@ -65,7 +66,7 @@ impl PromiseHandler for PromiseTracker {
         PromiseId::new(id)
     }
 
-    fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
+    unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
         let id = self.take_id();
         self.scheduled_promises
             .insert(id, PromiseArgs::Batch(args.clone()));
