@@ -474,10 +474,11 @@ fn test_create_out_of_gas() {
             }
         })
         .unwrap();
-    match result.status {
-        TransactionStatus::OutOfGas => (),
-        other => panic!("Unexpected status: {:?}", other),
-    };
+    assert!(
+        matches!(result.status, TransactionStatus::OutOfGas),
+        "Unexpected status: {:?}",
+        result.status
+    );
 }
 
 #[test]
