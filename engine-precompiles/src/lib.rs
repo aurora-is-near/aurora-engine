@@ -44,7 +44,7 @@ use evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct PrecompileOutput {
     pub cost: EthGas,
     pub output: Vec<u8>,
