@@ -12,11 +12,11 @@ documentation.
 
 ## Deployments
 
-Network | Contract ID         | Chain ID   | Version
-------- | ------------------- | ---------- | ------
-Mainnet | [`aurora`][Mainnet] | 1313161554 | 2.6.1
-Testnet | [`aurora`][Testnet] | 1313161555 | 2.7.0
-Local   | `aurora.test.near`  | 1313161556 | 2.7.0
+| Network | Contract ID         | Chain ID   |
+|---------|---------------------|------------|
+| Mainnet | [`aurora`][Mainnet] | 1313161554 |
+| Testnet | [`aurora`][Testnet] | 1313161555 |
+| Local   | `aurora.test.near`  | 1313161556 |
 
 [Mainnet]: https://explorer.near.org/accounts/aurora
 [Testnet]: https://explorer.testnet.near.org/accounts/aurora
