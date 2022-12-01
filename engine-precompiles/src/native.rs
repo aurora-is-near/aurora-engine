@@ -1,4 +1,5 @@
 use super::{EvmPrecompileResult, Precompile};
+use crate::prelude::types::EthGas;
 use crate::prelude::{
     format,
     parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
@@ -12,9 +13,6 @@ use crate::prelude::{
     parameters::{PromiseWithCallbackArgs, RefundCallArgs},
     types,
 };
-use borsh::BorshDeserialize;
-
-use crate::prelude::types::EthGas;
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::storage::EthConnectorStorageId;
@@ -227,20 +225,15 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
 }
 
-fn get_eth_connector_contract_address<I: IO>(io: &I) -> Result<AccountId, ExitError> {
-    get_contract_data(io, &EthConnectorStorageId::EthConnectorAccount)
-}
-
-fn get_contract_data<T: BorshDeserialize, I: IO>(
-    io: &I,
-    suffix: &EthConnectorStorageId,
-) -> Result<T, ExitError> {
-    io.read_storage(&construct_contract_key(suffix))
-        .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
-        .and_then(|x| {
-            x.to_value()
-                .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
-        })
+fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
+    io.read_storage(&construct_contract_key(
+        &EthConnectorStorageId::EthConnectorAccount,
+    ))
+    .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
+    .and_then(|x| {
+        x.to_value()
+            .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
+    })
 }
 
 fn construct_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
@@ -303,11 +296,11 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 // Input slice format:
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
-                let eth_contract_address = get_eth_connector_contract_address(&self.io)?;
+                let eth_connector_contract_account = get_eth_connector_contract_account(&self.io)?;
 
                 if let Ok(dest_account) = AccountId::try_from(input) {
                     (
-                        eth_contract_address,
+                        eth_connector_contract_account,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(

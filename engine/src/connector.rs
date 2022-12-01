@@ -1,5 +1,5 @@
 use crate::admin_controlled::AdminControlled;
-use crate::fungible_token::{self, FungibleTokenMetadata};
+use crate::fungible_token::FungibleTokenMetadata;
 use crate::parameters::{BalanceOfEthCallArgs, NEP141FtOnTransferArgs, SetContractDataCallArgs};
 use crate::prelude::{address::error::AddressError, Wei};
 use crate::prelude::{PromiseCreateArgs, U256};
@@ -73,27 +73,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_DEPOSIT,
         }
-    }
-
-    /// Internal ETH withdraw ETH logic
-    pub(crate) fn internal_remove_eth(
-        &mut self,
-        _amount: Wei,
-    ) -> Result<(), fungible_token::error::WithdrawError> {
-        // TODO: fix it
-        // self.burn_eth_on_aurora(amount)?;
-        // self.save_ft_contract();
-        Ok(())
-    }
-
-    /// Burn ETH tokens
-    #[allow(dead_code)]
-    fn burn_eth_on_aurora(
-        &mut self,
-        _amount: Wei,
-    ) -> Result<(), fungible_token::error::WithdrawError> {
-        //self.ft.internal_withdraw_eth_from_aurora(amount)
-        Ok(())
     }
 
     /// Withdraw nETH from NEAR accounts

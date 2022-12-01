@@ -4,7 +4,6 @@ use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
-use crate::connector::EthConnectorContract;
 use crate::errors;
 use crate::map::BijectionMap;
 use aurora_engine_sdk::caching::FullCache;
@@ -1734,17 +1733,8 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
         match accounting.net() {
             // Net loss is possible if `SELFDESTRUCT(self)` calls are made.
             accounting::Net::Lost(amount) => {
+                let _ = amount;
                 sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
-                // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
-                // if we cannot read the storage then there is nothing to remove.
-                EthConnectorContract::init_instance(self.io)
-                    .map(|mut connector| {
-                        // The `unwrap` is safe here because (a) if the connector
-                        // is implemented correctly then the total supply will never underflow and (b) we are passing
-                        // in the balance directly so there will always be enough balance.
-                        connector.internal_remove_eth(Wei::new(amount)).unwrap();
-                    })
-                    .ok();
             }
             accounting::Net::Zero => (),
             accounting::Net::Gained(_) => {
