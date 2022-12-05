@@ -22,4 +22,4 @@ mod standalone;
 mod standard_precompiles;
 mod state_migration;
 pub(crate) mod uniswap;
-mod xcc;
+pub(crate) mod xcc;

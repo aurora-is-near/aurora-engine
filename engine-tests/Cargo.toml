@@ -22,7 +22,7 @@ aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false, features = ["std"] }
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
 engine-standalone-storage = { path = "../engine-standalone-storage" }
-engine-standalone-tracing = { path = "../engine-standalone-tracing" }
+engine-standalone-tracing = { path = "../engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 borsh = { version = "0.9.3", default-features = false }
 sha3 = { version = "0.10.2", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.3-aurora", default-features = false, features = ["std", "tracing"] }
