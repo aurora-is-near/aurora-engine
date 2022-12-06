@@ -816,7 +816,7 @@ fn approve_erc20(
     assert!(approve_result.status.is_ok());
 }
 
-fn contract_bytes() -> Vec<u8> {
+pub(crate) fn contract_bytes() -> Vec<u8> {
     let base_path = Path::new("../etc").join("xcc-router");
     let output_path = base_path.join("target/wasm32-unknown-unknown/release/xcc_router.wasm");
     test_utils::rust::compile(base_path);

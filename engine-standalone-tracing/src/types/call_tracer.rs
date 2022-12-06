@@ -5,21 +5,21 @@ use aurora_engine_types::{types::Address, U256};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallFrame {
-    call_type: CallType,
-    from: Address,
-    to: Option<Address>,
-    value: U256,
-    gas: u64,
-    gas_used: u64,
-    input: Vec<u8>,
-    output: Vec<u8>,
-    error: Option<String>,
-    calls: Vec<CallFrame>,
+    pub call_type: CallType,
+    pub from: Address,
+    pub to: Option<Address>,
+    pub value: U256,
+    pub gas: u64,
+    pub gas_used: u64,
+    pub input: Vec<u8>,
+    pub output: Vec<u8>,
+    pub error: Option<String>,
+    pub calls: Vec<CallFrame>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CallTracer {
-    call_stack: Vec<CallFrame>,
+    pub call_stack: Vec<CallFrame>,
 }
 
 impl CallTracer {
@@ -163,10 +163,10 @@ impl evm::tracing::EventListener for CallTracer {
             } => {
                 let call_type = if is_static {
                     CallType::StaticCall
-                } else if transfer.is_none() {
-                    CallType::DelegateCall
                 } else if code_address == context.address {
                     CallType::Call
+                } else if transfer.is_none() {
+                    CallType::DelegateCall
                 } else {
                     CallType::CallCode
                 };
