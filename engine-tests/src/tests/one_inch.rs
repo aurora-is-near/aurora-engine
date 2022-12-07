@@ -58,7 +58,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
-    assert_gas_bound(profile.all_gas(), 24);
+    assert_gas_bound(profile.all_gas(), 23);
 
     // Same here
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
@@ -73,7 +73,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_gas_bound(profile.all_gas(), 25);
+    assert_gas_bound(profile.all_gas(), 24);
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
@@ -84,7 +84,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
-    assert_gas_bound(profile.all_gas(), 21);
+    assert_gas_bound(profile.all_gas(), 20);
 }
 
 #[test]

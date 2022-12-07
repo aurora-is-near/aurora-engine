@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.1] 2022-12-07
+
+### Changes
+
+- Performance improvement (approximately 5% reduction in NEAR gas usage) by [@birchmd]. ([#645])
+
+### Fixes
+
+- Tracing bug fix by [@birchmd]. ([#646])
+
+[#645]: https://github.com/aurora-is-near/aurora-engine/pull/645
+[#646]: https://github.com/aurora-is-near/aurora-engine/pull/646
+
 ## [2.8.0] 2022-11-15
 
 ### Added
@@ -321,7 +334,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.8.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.8.1...develop
+[2.8.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.8.0...2.8.1
 [2.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.7.0...2.8.0
 [2.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.1...2.7.0
 [2.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.0...2.6.1 
