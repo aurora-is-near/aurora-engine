@@ -3,6 +3,7 @@ use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
+use sha3::{Digest, Keccak256};
 
 use crate::connector::EthConnectorContract;
 use crate::errors;
@@ -1271,6 +1272,13 @@ pub fn increment_nonce<I: IO>(io: &mut I, address: &Address) {
     let account_nonce = get_nonce(io, address);
     let new_nonce = account_nonce.saturating_add(U256::one());
     set_nonce(io, address, &new_nonce);
+}
+
+pub fn create_legacy_address(caller: &Address, nonce: &U256) -> Address {
+    let mut stream = rlp::RlpStream::new_list(2);
+				stream.append(&caller.raw());
+				stream.append(nonce);
+				Address::new(H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into())
 }
 
 pub fn nep141_erc20_map<I: IO>(io: I) -> BijectionMap<NEP141Account, ERC20Address, I> {
