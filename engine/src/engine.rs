@@ -1273,6 +1273,13 @@ pub fn increment_nonce<I: IO>(io: &mut I, address: &Address) {
     set_nonce(io, address, &new_nonce);
 }
 
+pub fn create_legacy_address(caller: &Address, nonce: &U256) -> Address {
+    let mut stream = rlp::RlpStream::new_list(2);
+    stream.append(&caller.raw());
+    stream.append(nonce);
+    Address::new(aurora_engine_sdk::keccak(&stream.out()).into())
+}
+
 pub fn nep141_erc20_map<I: IO>(io: I) -> BijectionMap<NEP141Account, ERC20Address, I> {
     BijectionMap::new(KeyPrefix::Nep141Erc20Map, KeyPrefix::Erc20Nep141Map, io)
 }
