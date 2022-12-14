@@ -1277,7 +1277,9 @@ pub fn create_legacy_address(caller: &Address, nonce: &U256) -> Address {
     let mut stream = rlp::RlpStream::new_list(2);
     stream.append(&caller.raw());
     stream.append(nonce);
-    Address::new(aurora_engine_sdk::keccak(&stream.out()).into())
+    let hash = aurora_engine_sdk::keccak(&stream.out());
+    let hash_bytes = hash.as_bytes();
+    Address::try_from_slice(&hash_bytes[12..]).unwrap()
 }
 
 pub fn nep141_erc20_map<I: IO>(io: I) -> BijectionMap<NEP141Account, ERC20Address, I> {
