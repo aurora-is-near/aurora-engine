@@ -2291,7 +2291,7 @@ mod tests {
 
     #[test]
     fn test_create_legacy_address() {
-        // Aurora transaction hash (see aurorascan.dev): 0xfc94bb484a9b144b1588a2d7238a497b425db343f0217ab66eb6e5171b3b4645
+        // Aurora transaction hash (aurorascan.dev): 0xfc94bb484a9b144b1588a2d7238a497b425db343f0217ab66eb6e5171b3b4645
         let caller = Address::decode("3160f7328df59c14d85dfd09addad4ef18ae3e2c").unwrap();
         let nonce = U256::from_dec_str("109438").unwrap();
         let created_address = create_legacy_address(&caller, &nonce);
