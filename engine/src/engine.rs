@@ -2293,7 +2293,6 @@ mod tests {
     fn test_create_legacy_address() {
         let caller = Address::decode("3160f7328df59c14d85dfd09addad4ef18ae3e2c").unwrap();
         let nonce = U256::from_dec_str("109438").unwrap();
-
         let created_address = create_legacy_address(&caller, &nonce);
 
         assert_eq!(
