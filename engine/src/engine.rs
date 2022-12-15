@@ -1791,7 +1791,6 @@ mod tests {
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use aurora_engine_test_doubles::promise::PromiseTracker;
     use aurora_engine_types::types::RawU256;
-    use sha3::{Digest, Keccak256};
     use std::sync::RwLock;
 
     #[test]
@@ -1838,7 +1837,7 @@ mod tests {
         let actual_result = engine.deploy_code_with_input(input, &mut handler).unwrap();
 
         let nonce = U256::zero();
-        let expected_address = create_legacy_address(origin.raw(), nonce).0.to_vec();
+        let expected_address = create_legacy_address(&origin, &nonce).as_bytes().to_vec();
         let expected_status = TransactionStatus::Succeed(expected_address);
         let expected_gas_used = 53000;
         let expected_logs = Vec::new();
@@ -2041,7 +2040,7 @@ mod tests {
             nep141: nep141_token,
         };
         let nonce = U256::zero();
-        let expected_address = Address::new(create_legacy_address(origin.raw(), nonce));
+        let expected_address = create_legacy_address(&origin, &nonce);
         let actual_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
 
         assert_eq!(expected_address, actual_address);
@@ -2291,6 +2290,19 @@ mod tests {
     }
 
     #[test]
+    fn test_create_legacy_address() {
+        let caller = Address::decode("3160f7328df59c14d85dfd09addad4ef18ae3e2c").unwrap();
+        let nonce = U256::from_dec_str("109438").unwrap();
+
+        let created_address = create_legacy_address(&caller, &nonce);
+
+        assert_eq!(
+            created_address.encode(),
+            "140e8a21d08cbb530929b012581a7c7e696145ef"
+        );
+    }
+
+    #[test]
     fn test_missing_engine_state_is_not_found() {
         let storage = Storage::default();
         let storage = RwLock::new(storage);
@@ -2338,12 +2350,5 @@ mod tests {
         }];
 
         assert_eq!(expected_logs, actual_logs);
-    }
-
-    fn create_legacy_address(address: H160, nonce: U256) -> H160 {
-        let mut stream = rlp::RlpStream::new_list(2);
-        stream.append(&address);
-        stream.append(&nonce);
-        H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into()
     }
 }
