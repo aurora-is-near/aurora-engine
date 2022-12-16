@@ -146,7 +146,6 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
- "sha3",
  "test-case",
  "wee_alloc",
 ]
