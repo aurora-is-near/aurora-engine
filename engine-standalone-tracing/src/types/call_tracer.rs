@@ -26,7 +26,13 @@ impl CallTracer {
     fn end(&mut self, output: Vec<u8>, error: Option<&evm::ExitReason>) {
         let frame = self.call_stack.first_mut().unwrap();
         match error {
-            None => frame.output = output,
+            None => {
+                match frame.call_type {
+                    // In CREATE case, output is set by the `CreateOutput` rather than the `Exit` event.
+                    CallType::Create | CallType::Create2 => (),
+                    _ => frame.output = output,
+                }
+            }
             Some(error) => {
                 let error_message = format!("{:?}", error);
                 if error_message.to_lowercase().contains("revert") {
@@ -68,13 +74,16 @@ impl CallTracer {
 
         let mut frame = self.call_stack.pop().unwrap();
         match error {
-            None => frame.output = output,
+            None => {
+                match frame.call_type {
+                    // In CREATE case, output is set by the `CreateOutput` rather than the `Exit` event.
+                    CallType::Create | CallType::Create2 => (),
+                    _ => frame.output = output,
+                }
+            }
             Some(error) => {
                 frame.error = Some(format!("{:?}", error));
-                match frame.call_type {
-                    CallType::Create | CallType::Create2 => frame.to = None,
-                    _ => (),
-                }
+                frame.output = output;
             }
         }
 
@@ -202,6 +211,19 @@ impl evm::tracing::EventListener for CallTracer {
                     target_gas.unwrap_or_default(),
                     value,
                 );
+            }
+            evm::tracing::Event::CreateOutput { address, code } => {
+                // `to` field should have been set to the address of the contract being created
+                debug_assert_eq!(
+                    Some(address),
+                    self.call_stack
+                        .last()
+                        .and_then(|call_frame| call_frame.to.as_ref().map(Address::raw))
+                );
+                let current_frame = self.call_stack.last_mut();
+                if let Some(frame) = current_frame {
+                    frame.output = code.to_vec();
+                }
             }
             evm::tracing::Event::Suicide {
                 address,
