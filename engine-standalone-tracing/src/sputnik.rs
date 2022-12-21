@@ -211,6 +211,7 @@ impl evm::tracing::EventListener for TransactionTraceBuilder {
             Event::TransactCall { .. } => (), // no useful information
             Event::TransactCreate { .. } => (), // no useful information
             Event::TransactCreate2 { .. } => (), // no useful information
+            Event::CreateOutput { .. } => (), // no useful information
         }
     }
 }

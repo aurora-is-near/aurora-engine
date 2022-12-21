@@ -25,9 +25,9 @@ engine-standalone-storage = { path = "../engine-standalone-storage" }
 engine-standalone-tracing = { path = "../engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 borsh = { version = "0.9.3", default-features = false }
 sha3 = { version = "0.10.2", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.3-aurora", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.3-aurora", default-features = false, features = ["std", "tracing"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.3-aurora", default-features = false, features = ["std", "tracing"] }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
 rlp = { version = "0.5.0", default-features = false }
 base64 = "0.13.0"
 bstr = "1.0.1"
