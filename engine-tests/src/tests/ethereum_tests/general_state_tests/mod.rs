@@ -81,8 +81,8 @@ fn run(path: String, name: String) {
 pub fn run_dir(dir: &str) {
     // get file names in the directory
     let paths = std::fs::read_dir(dir).unwrap();
-    if path.is_none() {
-        println!("path {} does not exist", paths);
+    if paths.is_none() {
+        println!("path {} does not exist", path);
     }
     for path in paths {
         let path = path.unwrap().path();
