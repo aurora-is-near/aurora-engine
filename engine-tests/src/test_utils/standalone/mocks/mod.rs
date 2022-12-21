@@ -12,9 +12,6 @@ use engine_standalone_storage::{BlockMetadata, Storage};
 use near_sdk_sim::DEFAULT_GAS;
 
 pub mod block;
-pub mod promise;
-pub mod storage;
-pub mod tracing;
 
 pub const ETH_CUSTODIAN_ADDRESS: Address =
     aurora_engine_precompiles::make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
@@ -127,7 +124,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
         .unwrap();
 
     let transfer_args = NEP141FtOnTransferArgs {
-        sender_id: aurora_account_id.clone(),
+        sender_id: aurora_account_id,
         amount: Balance::new(balance.raw().as_u128()),
         msg: format!(
             "aurora:{}{}",
@@ -135,9 +132,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
             hex::encode(address.as_bytes())
         ),
     };
-    connector
-        .ft_on_transfer(&mut engine, &transfer_args)
-        .unwrap();
+    connector.ft_on_transfer(&engine, &transfer_args).unwrap();
 
     engine.apply(std::iter::once(state_change), std::iter::empty(), false);
 }

@@ -1,3 +1,6 @@
+use aurora_engine::pausables::{
+    EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
+};
 use aurora_engine::{connector, engine, parameters::SubmitResult, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::{
@@ -222,7 +225,6 @@ fn non_submit_execute<'db>(
             } else {
                 engine.receive_erc20_tokens(
                     &env.predecessor_account_id,
-                    &env.signer_account_id,
                     args,
                     &env.current_account_id,
                     &mut handler,
@@ -388,6 +390,22 @@ fn non_submit_execute<'db>(
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
         TransactionKind::Submit(_) => unreachable!(),
+        TransactionKind::PausePrecompiles(args) => {
+            let precompiles_to_pause = PrecompileFlags::from_bits_truncate(args.paused_mask);
+
+            let mut pauser = EnginePrecompilesPauser::from_io(io);
+            pauser.pause_precompiles(precompiles_to_pause);
+
+            None
+        }
+        TransactionKind::ResumePrecompiles(args) => {
+            let precompiles_to_resume = PrecompileFlags::from_bits_truncate(args.paused_mask);
+
+            let mut pauser = EnginePrecompilesPauser::from_io(io);
+            pauser.resume_precompiles(precompiles_to_resume);
+
+            None
+        }
     };
 
     Ok(result)

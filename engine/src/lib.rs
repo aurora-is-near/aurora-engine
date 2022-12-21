@@ -27,6 +27,7 @@ pub mod errors;
 pub mod fungible_token;
 pub mod json;
 pub mod log_entry;
+pub mod pausables;
 mod prelude;
 pub mod xcc;
 
@@ -71,17 +72,21 @@ mod contract {
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine, EngineState};
-    use crate::errors;
     use crate::fungible_token::FungibleTokenMetadata;
     use crate::json::parse_json;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
-        StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallCallArgs, ViewCallArgs,
+        PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
+        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
+        TransferCallCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
+    use crate::pausables::{
+        Authorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PausedPrecompilesManager,
+        PrecompileFlags,
+    };
     use crate::prelude::account_id::AccountId;
     use crate::prelude::parameters::RefundCallArgs;
     use crate::prelude::sdk::types::{
@@ -91,6 +96,7 @@ mod contract {
     use crate::prelude::{
         sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
     };
+    use crate::{errors, pausables};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
@@ -194,6 +200,49 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn state_migration() {
         // TODO: currently we don't have migrations
+    }
+
+    /// Resumes previously [`paused`] precompiles.
+    ///
+    /// [`paused`]: crate::contract::pause_precompiles
+    #[no_mangle]
+    pub extern "C" fn resume_precompiles() {
+        let io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        let predecessor_account_id = io.predecessor_account_id();
+
+        require_owner_only(&state, &predecessor_account_id);
+
+        let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
+        let flags = PrecompileFlags::from_bits_truncate(args.paused_mask);
+        let mut pauser = EnginePrecompilesPauser::from_io(io);
+        pauser.resume_precompiles(flags);
+    }
+
+    /// Pauses a precompile.
+    #[no_mangle]
+    pub extern "C" fn pause_precompiles() {
+        let io = Runtime;
+        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer();
+
+        if !authorizer.is_authorized(&io.predecessor_account_id()) {
+            sdk::panic_utf8("ERR_UNAUTHORIZED".as_bytes());
+        }
+
+        let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
+        let flags = PrecompileFlags::from_bits_truncate(args.paused_mask);
+        let mut pauser = EnginePrecompilesPauser::from_io(io);
+        pauser.pause_precompiles(flags);
+    }
+
+    /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
+    /// 0-bit means not paused.
+    #[no_mangle]
+    pub extern "C" fn paused_precompiles() {
+        let mut io = Runtime;
+        let pauser = EnginePrecompilesPauser::from_io(io);
+        let data = pauser.paused().bits().to_le_bytes();
+        io.return_output(&data[..]);
     }
 
     ///
@@ -302,6 +351,12 @@ mod contract {
     pub extern "C" fn factory_update_address_version() {
         let mut io = Runtime;
         io.assert_private_call().sdk_unwrap();
+        let check_deploy: Result<(), &[u8]> = match io.promise_result(0) {
+            Some(PromiseResult::Successful(_)) => Ok(()),
+            Some(_) => Err(b"ERR_ROUTER_DEPLOY_FAILED"),
+            None => Err(b"ERR_ROUTER_UPDATE_NOT_CALLBACK"),
+        };
+        check_deploy.sdk_unwrap();
         let args: crate::xcc::AddressVersionUpdateArgs = io.read_input_borsh().sdk_unwrap();
         crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
     }
@@ -346,10 +401,8 @@ mod contract {
                 .ft_on_transfer(&engine, &args)
                 .sdk_unwrap();
         } else {
-            let signer_account_id = io.signer_account_id();
             engine.receive_erc20_tokens(
                 &predecessor_account_id,
-                &signer_account_id,
                 &args,
                 &current_account_id,
                 &mut Runtime,
@@ -556,7 +609,10 @@ mod contract {
             .sdk_unwrap()
             .deposit(raw_proof, current_account_id, predecessor_account_id)
             .sdk_unwrap();
-        let promise_id = io.promise_create_with_callback(&promise_args);
+        // Safety: this call is safe because it comes from the eth-connector, not users.
+        // The call is to verify the user-supplied proof for the deposit, with `finish_deposit`
+        // as a callback.
+        let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -593,7 +649,10 @@ mod contract {
             .sdk_unwrap();
 
         if let Some(promise_args) = maybe_promise_args {
-            let promise_id = io.promise_create_with_callback(&promise_args);
+            // Safety: this call is safe because it comes from the eth-connector, not users.
+            // The call will be to the Engine's ft_transfer_call`, which is needed as part
+            // of the bridge flow (if depositing ETH to an Aurora address).
+            let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
             io.promise_return(promise_id);
         }
     }
@@ -710,7 +769,9 @@ mod contract {
                 io.prepaid_gas(),
             )
             .sdk_unwrap();
-        let promise_id = io.promise_create_with_callback(&promise_args);
+        // Safety: this call is safe. It is required by the NEP-141 spec that `ft_transfer_call`
+        // creates a call to another contract's `ft_on_transfer` method.
+        let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
         io.promise_return(promise_id);
     }
 
@@ -725,7 +786,9 @@ mod contract {
             .storage_deposit(predecessor_account_id, amount, args)
             .sdk_unwrap();
         if let Some(promise) = maybe_promise {
-            io.promise_create_batch(&promise);
+            // Safety: This call is safe. It is only a transfer back to the user in the case
+            // that they over paid for their deposit.
+            unsafe { io.promise_create_batch(&promise) };
         }
     }
 
@@ -740,7 +803,8 @@ mod contract {
             .storage_unregister(predecessor_account_id, force)
             .sdk_unwrap();
         if let Some(promise) = maybe_promise {
-            io.promise_create_batch(&promise);
+            // Safety: This call is safe. It is only a transfer back to the user for their deposit.
+            unsafe { io.promise_create_batch(&promise) };
         }
     }
 
@@ -894,12 +958,15 @@ mod contract {
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FINISH,
         };
-        io.promise_create_with_callback(
-            &aurora_engine_types::parameters::PromiseWithCallbackArgs {
-                base: verify_call,
-                callback: finish_call,
-            },
-        );
+        // Safety: this call is safe because it is only used in integration tests.
+        unsafe {
+            io.promise_create_with_callback(
+                &aurora_engine_types::parameters::PromiseWithCallbackArgs {
+                    base: verify_call,
+                    callback: finish_call,
+                },
+            )
+        };
     }
 
     ///

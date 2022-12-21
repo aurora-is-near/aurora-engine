@@ -31,6 +31,7 @@ opt-level = 3
 resolver = "2"
 members = [
     "engine",
+    "engine-test-doubles",
     "engine-precompiles",
     "engine-sdk",
     "engine-standalone-storage",
@@ -45,5 +46,6 @@ exclude = [
     "etc/eth-json-test",
     "etc/tests/benchmark-contract",
     "etc/tests/self-contained-5bEgfRQ",
+    "etc/tests/fibonacci",
     "etc/xcc-router",
 ]

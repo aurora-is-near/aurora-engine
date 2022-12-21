@@ -250,15 +250,10 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         }
         self.internal_withdraw_eth_from_near(sender_id, amount)?;
         self.internal_deposit_eth_to_near(receiver_id, amount)?;
-        sdk::log!(&crate::prelude::format!(
-            "Transfer {} from {} to {}",
-            amount,
-            sender_id,
-            receiver_id
-        ));
+        sdk::log!("Transfer {} from {} to {}", amount, sender_id, receiver_id);
         #[cfg(feature = "log")]
         if let Some(memo) = memo {
-            sdk::log!(&crate::prelude::format!("Memo: {}", memo));
+            sdk::log!("Memo: {}", memo);
         }
         Ok(())
     }
@@ -373,20 +368,20 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                     receiver_balance
                 };
                 self.accounts_insert(receiver_id, receiver_balance - refund_amount);
-                sdk::log!(&crate::prelude::format!(
+                sdk::log!(
                     "Decrease receiver {} balance to: {}",
                     receiver_id,
                     receiver_balance - refund_amount
-                ));
+                );
 
                 return if let Some(sender_balance) = self.get_account_eth_balance(sender_id) {
                     self.accounts_insert(sender_id, sender_balance + refund_amount);
-                    sdk::log!(&crate::prelude::format!(
+                    sdk::log!(
                         "Refund amount {} from {} to {}",
                         refund_amount,
                         receiver_id,
                         sender_id
-                    ));
+                    );
                     (amount - refund_amount, ZERO_NEP141_WEI)
                 } else {
                     // Sender's account was deleted, so we need to burn tokens.
@@ -434,10 +429,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                 Err(error::StorageFundingError::UnRegisterPositiveBalance)
             }
         } else {
-            sdk::log!(&crate::prelude::format!(
-                "The account {} is not registered",
-                account_id
-            ));
+            sdk::log!("The account {} is not registered", account_id);
             Err(error::StorageFundingError::NotRegistered)
         }
     }

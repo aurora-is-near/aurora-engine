@@ -310,6 +310,18 @@ pub struct ResolveTransferCallArgs {
     pub receiver_id: AccountId,
 }
 
+impl TryFrom<JsonValue> for ResolveTransferCallArgs {
+    type Error = error::ParseTypeFromJsonError;
+
+    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
+        Ok(Self {
+            sender_id: AccountId::try_from(v.string("sender_id")?)?,
+            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
+            amount: NEP141Wei::new(v.u128("amount")?),
+        })
+    }
+}
+
 /// Finish deposit NEAR eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct FinishDepositCallArgs {
@@ -377,8 +389,9 @@ impl TryFrom<JsonValue> for TransferCallCallArgs {
 
 /// storage_balance_of eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StorageBalanceOfCallArgs {
-    pub account_id: crate::prelude::account_id::AccountId,
+    pub account_id: AccountId,
 }
 
 impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
@@ -424,6 +437,7 @@ impl From<JsonValue> for StorageWithdrawCallArgs {
 
 /// transfer args for json invocation
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TransferCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
@@ -443,12 +457,14 @@ impl TryFrom<JsonValue> for TransferCallArgs {
 }
 
 /// balance_of args for json invocation
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BalanceOfCallArgs {
     pub account_id: AccountId,
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BalanceOfEthCallArgs {
     pub address: Address,
 }
@@ -469,20 +485,14 @@ pub struct RegisterRelayerCallArgs {
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,
 }
 
-impl TryFrom<JsonValue> for ResolveTransferCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        Ok(Self {
-            sender_id: AccountId::try_from(v.string("sender_id")?)?,
-            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: NEP141Wei::new(v.u128("amount")?),
-        })
-    }
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct PausePrecompilesCallArgs {
+    pub paused_mask: u32,
 }
 
 pub mod error {
@@ -571,7 +581,7 @@ mod tests {
         // Using old input format (not wrapped into call args enum) - raw data structure with legacy arguments.
         let input_bytes = legacy_input.try_to_vec().unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
+        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input)));
 
         // Using old input format (not wrapped into call args enum) - raw data structure with new argument (`value` field).
         // Data structures with new arguments allowed only in new input format for future extensibility reason.

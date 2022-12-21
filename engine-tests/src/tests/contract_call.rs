@@ -6,7 +6,7 @@ use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT
 
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
+    let token = runner.deploy_erc20_token("tt.testnet");
     let mut signer = test_utils::Signer::random();
     runner.create_address(
         test_utils::address_from_secret_key(&signer.secret_key),
@@ -20,17 +20,12 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let tester: Tester = runner
         .deploy_contract(
             &signer.secret_key,
-            |ctr| ctr.deploy(nonce, token.into()),
+            |ctr| ctr.deploy(nonce, token),
             tester_ctr,
         )
         .into();
 
-    runner.mint(
-        token,
-        tester.contract.address.into(),
-        1_000_000_000,
-        origin(),
-    );
+    runner.mint(token, tester.contract.address, 1_000_000_000, origin());
 
     (runner, signer, token, tester)
 }

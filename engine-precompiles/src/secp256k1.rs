@@ -56,7 +56,7 @@ fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
 pub struct ECRecover;
 
 impl ECRecover {
-    pub(super) const ADDRESS: Address = super::make_address(0, 1);
+    pub const ADDRESS: Address = super::make_address(0, 1);
 }
 
 impl Precompile for ECRecover {
@@ -135,7 +135,7 @@ mod tests {
             &hex::decode("1563915e194D8CfBA1943570603F7606A3115508").unwrap(),
         )
         .unwrap();
-        assert!(ecverify(hash, &signature, signer));
+        assert!(ecverify(hash, signature, signer));
     }
 
     #[test]

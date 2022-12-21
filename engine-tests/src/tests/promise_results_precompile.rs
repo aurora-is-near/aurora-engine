@@ -33,7 +33,7 @@ fn test_promise_results_precompile() {
 
     runner.promise_results = promise_results.clone();
     let result = runner
-        .submit_transaction(&signer.secret_key, transaction.clone())
+        .submit_transaction(&signer.secret_key, transaction)
         .unwrap();
 
     let standalone_result = standalone

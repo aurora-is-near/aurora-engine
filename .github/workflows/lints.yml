@@ -12,6 +12,9 @@ jobs:
     name: Format
     runs-on: [self-hosted, light]
     steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
       - name: Run cargo fmt
@@ -20,6 +23,9 @@ jobs:
     name: Clippy
     runs-on: [self-hosted, heavy]
     steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
       - run: cargo make build-contracts
@@ -31,17 +37,25 @@ jobs:
     name: Udeps
     runs-on: [self-hosted, heavy]
     steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
+      - name: Update udeps
+        run: cargo install --force cargo-udeps
       - name: Run udeps
         run: cargo make udeps
   contracts:
     name: Contracts
     runs-on: [self-hosted, light]
     steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
       - name: Run yarn lint
         run: cargo make check-contracts
       - name: Check committed EvmErc20.bin
-        run: bash verify_evm_erc20.sh
+        run: bash scripts/verify_evm_erc20.sh

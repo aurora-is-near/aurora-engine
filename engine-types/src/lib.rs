@@ -18,6 +18,7 @@ mod v0 {
         boxed::Box,
         collections::BTreeMap as HashMap,
         collections::BTreeMap,
+        collections::BTreeSet,
         fmt, format, str,
         string::String,
         string::ToString,

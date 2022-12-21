@@ -6,10 +6,11 @@ use crate::{
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
-pub(super) struct ModExp<HF: HardFork>(PhantomData<HF>);
+#[derive(Default)]
+pub struct ModExp<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> ModExp<HF> {
-    pub(super) const ADDRESS: Address = super::make_address(0, 5);
+    pub const ADDRESS: Address = super::make_address(0, 5);
 
     pub fn new() -> Self {
         Self(Default::default())
@@ -21,7 +22,6 @@ impl<HF: HardFork> ModExp<HF> {
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
         let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
         let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
-        // #[allow(clippy::redundant_closure)]
         let exp = parse_bytes(
             bytes,
             start.saturating_add(96),
@@ -146,7 +146,7 @@ impl Precompile for ModExp<Berlin> {
         let mul = Self::mul_complexity(base_len, mod_len);
         let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
         // mul * iter_count bounded by 2^189 (so no overflow)
-        let gas = mul * iter_count / U256::from(3);
+        let gas = mul * iter_count.max(U256::one()) / U256::from(3);
 
         Ok(EthGas::new(core::cmp::max(200, saturating_round(gas))))
     }
@@ -418,13 +418,13 @@ mod tests {
     #[test]
     fn test_modexp() {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
-            let input = hex::decode(&test.input).unwrap();
+            let input = hex::decode(test.input).unwrap();
 
             let res = ModExp::<Byzantium>::new()
                 .run(&input, Some(*test_gas), &new_context(), false)
                 .unwrap()
                 .output;
-            let expected = hex::decode(&test.expected).unwrap();
+            let expected = hex::decode(test.expected).unwrap();
             assert_eq!(res, expected, "{}", test.name);
         }
     }
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn test_byzantium_modexp_gas() {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
-            let input = hex::decode(&test.input).unwrap();
+            let input = hex::decode(test.input).unwrap();
 
             let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);
@@ -442,7 +442,7 @@ mod tests {
     #[test]
     fn test_berlin_modexp_gas() {
         for (test, test_gas) in TESTS.iter().zip(BERLIN_GAS.iter()) {
-            let input = hex::decode(&test.input).unwrap();
+            let input = hex::decode(test.input).unwrap();
 
             let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);
@@ -494,5 +494,18 @@ mod tests {
             .unwrap();
         let expected: Vec<u8> = Vec::new();
         assert_eq!(res.output, expected)
+    }
+
+    #[test]
+    fn test_modexp_gas_revert() {
+        let input = "000000000000090000000000000000";
+        // Gas cost comes out to 18446744073709551615
+        let res = ModExp::<Berlin>::new().run(
+            &hex::decode(input).unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
     }
 }

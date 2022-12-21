@@ -25,7 +25,6 @@ pub enum JsonError {
     InvalidU128,
     InvalidBool,
     InvalidString,
-    InvalidArray,
     ExpectedStringGotNumber,
     OutOfRange(JsonOutOfRangeError),
 }
@@ -108,7 +107,6 @@ impl AsRef<[u8]> for JsonError {
             Self::InvalidU128 => errors::ERR_FAILED_PARSE_U128,
             Self::InvalidBool => errors::ERR_FAILED_PARSE_BOOL,
             Self::InvalidString => errors::ERR_FAILED_PARSE_STRING,
-            Self::InvalidArray => errors::ERR_FAILED_PARSE_ARRAY,
             Self::ExpectedStringGotNumber => errors::ERR_EXPECTED_STRING_GOT_NUMBER,
             Self::OutOfRange(err) => err.as_ref(),
         }
@@ -121,23 +119,6 @@ impl AsRef<[u8]> for JsonOutOfRangeError {
             Self::OutOfRangeU8 => errors::ERR_OUT_OF_RANGE_U8,
             Self::OutOfRangeU128 => errors::ERR_OUT_OF_RANGE_U128,
         }
-    }
-}
-
-#[cfg(test)]
-impl std::fmt::Debug for JsonError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        f.write_fmt(format_args!(
-            "{}",
-            std::str::from_utf8(self.as_ref()).unwrap()
-        ))
-    }
-}
-
-#[cfg(test)]
-impl std::fmt::Display for JsonError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_fmt(format_args!("{:?}", *self))
     }
 }
 
@@ -275,7 +256,7 @@ impl core::fmt::Display for JsonValue {
 pub fn parse_json(data: &[u8]) -> Option<JsonValue> {
     let data_array: Vec<char> = data.iter().map(|b| char::from(*b)).collect::<Vec<_>>();
     let mut index = 0;
-    rjson::parse::<JsonValue, JsonArray, JsonObject, JsonValue>(&*data_array, &mut index)
+    rjson::parse::<JsonValue, JsonArray, JsonObject, JsonValue>(&data_array, &mut index)
 }
 
 #[cfg(test)]
@@ -283,34 +264,64 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_json_all_types_fail_to_parse_missing_key() {
+        let expected_err = std::str::from_utf8(errors::ERR_JSON_MISSING_VALUE).unwrap();
+        let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
+
+        let actual_err = json.string("missing_key").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
+
+        let actual_err = json.bool("missing_key").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
+
+        let actual_err = json.u64("missing_key").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
+
+        let actual_err = json.u128("missing_key").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
+    }
+
+    #[test]
     fn test_json_type_string() {
         let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
         let string_data = json.string("foo").ok().unwrap();
         assert_eq!(string_data, "abcd");
 
+        let expected_err = std::str::from_utf8(errors::ERR_FAILED_PARSE_STRING).unwrap();
         let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
-        let err = json.string("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidString);
+        let actual_err = json.string("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": true}"#.as_bytes()).unwrap();
-        let err = json.string("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidString);
+        let actual_err = json.string("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": ["abcd"]}"#.as_bytes()).unwrap();
-        let err = json.string("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidString);
+        let actual_err = json.string("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": {}}"#.as_bytes()).unwrap();
-        let err = json.string("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidString);
+        let actual_err = json.string("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": null}"#.as_bytes()).unwrap();
-        let err = json.string("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidString);
+        let actual_err = json.string("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
+        let expected_err = std::str::from_utf8(errors::ERR_NOT_A_JSON_TYPE).unwrap();
         let json = JsonValue::Null;
-        let err = json.string("foo").unwrap_err();
-        assert_eq!(err, JsonError::NotJsonType);
+        let actual_err = json.string("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
     }
 
     #[test]
@@ -329,41 +340,52 @@ mod tests {
         let val = json.u64("foo").ok().unwrap();
         assert_eq!(val, u64::MAX);
 
+        let expected_err = std::str::from_utf8(errors::ERR_FAILED_PARSE_U64).unwrap();
         let json = parse_json(r#"{"foo": 12.99}"#.as_bytes()).unwrap();
-        let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU64);
+        let actual_err = json.u64("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": -123}"#.as_bytes()).unwrap();
-        let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU64);
+        let actual_err = json.u64("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
-        let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU64);
+        let actual_err = json.u64("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": "123"}"#.as_bytes()).unwrap();
-        let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU64);
+        let actual_err = json.u64("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": true}"#.as_bytes()).unwrap();
-        let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU64);
+        let actual_err = json.u64("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": [123]}"#.as_bytes()).unwrap();
-        let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU64);
+        let actual_err = json.u64("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": {}}"#.as_bytes()).unwrap();
-        let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU64);
+        let actual_err = json.u64("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": null}"#.as_bytes()).unwrap();
-        let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU64);
+        let actual_err = json.u64("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
+        let expected_err = std::str::from_utf8(errors::ERR_NOT_A_JSON_TYPE).unwrap();
         let json = JsonValue::Null;
-        let err = json.u64("foo").unwrap_err();
-        assert_eq!(err, JsonError::NotJsonType);
+        let actual_err = json.u64("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
     }
 
     #[test]
@@ -372,95 +394,118 @@ mod tests {
         let val = json.u128("foo").ok().unwrap();
         assert_eq!(val, 123);
 
+        let expected_err =
+            std::str::from_utf8(JsonOutOfRangeError::OutOfRangeU128.as_ref()).unwrap();
         let json = parse_json(r#"{"foo": "-123"}"#.as_bytes()).unwrap();
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(
-            err,
-            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU128)
-        );
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
+        let expected_err = std::str::from_utf8(errors::ERR_EXPECTED_STRING_GOT_NUMBER).unwrap();
         let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::ExpectedStringGotNumber);
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": 12.3}"#.as_bytes()).unwrap();
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::ExpectedStringGotNumber);
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
+        let expected_err = std::str::from_utf8(errors::ERR_FAILED_PARSE_U128).unwrap();
         let json = parse_json(r#"{"foo": "12.3"}"#.as_bytes()).unwrap();
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU128);
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU128);
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": true}"#.as_bytes()).unwrap();
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU128);
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": ["123"]}"#.as_bytes()).unwrap();
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU128);
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": {}}"#.as_bytes()).unwrap();
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU128);
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": null}"#.as_bytes()).unwrap();
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidU128);
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
+        let expected_err = std::str::from_utf8(errors::ERR_NOT_A_JSON_TYPE).unwrap();
         let json = JsonValue::Null;
-        let err = json.u128("foo").unwrap_err();
-        assert_eq!(err, JsonError::NotJsonType);
+        let actual_err = json.u128("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
     }
 
     #[test]
     fn test_json_type_bool() {
         let json = parse_json(r#"{"foo": true}"#.as_bytes()).unwrap();
         let val = json.bool("foo").ok().unwrap();
-        assert_eq!(val, true);
+        assert!(val);
 
         let json = parse_json(r#"{"foo": false}"#.as_bytes()).unwrap();
         let val = json.bool("foo").ok().unwrap();
-        assert_eq!(val, false);
+        assert!(!val);
 
+        let expected_err = std::str::from_utf8(errors::ERR_FAILED_PARSE_BOOL).unwrap();
         let json = parse_json(r#"{"foo": "true"}"#.as_bytes()).unwrap();
-        let err = json.bool("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidBool);
+        let actual_err = json.bool("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": "false"}"#.as_bytes()).unwrap();
-        let err = json.bool("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidBool);
+        let actual_err = json.bool("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": [true]}"#.as_bytes()).unwrap();
-        let err = json.bool("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidBool);
+        let actual_err = json.bool("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": 123}"#.as_bytes()).unwrap();
-        let err = json.bool("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidBool);
+        let actual_err = json.bool("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": 12.3}"#.as_bytes()).unwrap();
-        let err = json.bool("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidBool);
+        let actual_err = json.bool("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": "abcd"}"#.as_bytes()).unwrap();
-        let err = json.bool("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidBool);
+        let actual_err = json.bool("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": {}}"#.as_bytes()).unwrap();
-        let err = json.bool("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidBool);
+        let actual_err = json.bool("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
         let json = parse_json(r#"{"foo": null}"#.as_bytes()).unwrap();
-        let err = json.bool("foo").unwrap_err();
-        assert_eq!(err, JsonError::InvalidBool);
+        let actual_err = json.bool("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
+        let expected_err = std::str::from_utf8(errors::ERR_NOT_A_JSON_TYPE).unwrap();
         let json = JsonValue::Null;
-        let err = json.bool("foo").unwrap_err();
-        assert_eq!(err, JsonError::NotJsonType);
+        let actual_err = json.bool("foo").unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
     }
 
     #[test]
@@ -469,20 +514,23 @@ mod tests {
         let val = JsonValue::parse_u8(&json).ok().unwrap();
         assert_eq!(val, 123);
 
+        let expected_err = std::str::from_utf8(errors::ERR_FAILED_PARSE_U8).unwrap();
         let json = JsonValue::from(-1_i64);
-        let err = JsonValue::parse_u8(&json).unwrap_err();
-        assert_eq!(err, JsonError::InvalidU8);
+        let actual_err = JsonValue::parse_u8(&json).unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
+        let expected_err = std::str::from_utf8(JsonOutOfRangeError::OutOfRangeU8.as_ref()).unwrap();
         let json = JsonValue::from(256_u64);
-        let err = JsonValue::parse_u8(&json).unwrap_err();
-        assert_eq!(
-            err,
-            JsonError::OutOfRange(JsonOutOfRangeError::OutOfRangeU8)
-        );
+        let actual_err = JsonValue::parse_u8(&json).unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
 
+        let expected_err = std::str::from_utf8(errors::ERR_FAILED_PARSE_U8).unwrap();
         let json = JsonValue::from("abcd".to_string());
-        let err = JsonValue::parse_u8(&json).unwrap_err();
-        assert_eq!(err, JsonError::InvalidU8);
+        let actual_err = JsonValue::parse_u8(&json).unwrap_err();
+        let actual_err = std::str::from_utf8(actual_err.as_ref()).unwrap();
+        assert_eq!(actual_err, expected_err);
     }
 
     #[test]

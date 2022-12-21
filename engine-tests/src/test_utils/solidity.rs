@@ -173,7 +173,7 @@ where
     let output_mount_arg = format!("{}:/output", output_path.to_str().unwrap());
     let contract_arg = format!("/contracts/{}", contract_file.as_ref().to_str().unwrap());
     let output = Command::new("/usr/bin/env")
-        .args(&[
+        .args([
             "docker",
             "run",
             "-v",

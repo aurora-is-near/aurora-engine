@@ -128,10 +128,10 @@ fn f(mut h: [u64; 8], m: [u64; 16], t: [u64; 2], f: bool, rounds: u32) -> Vec<u8
     result
 }
 
-pub(super) struct Blake2F;
+pub struct Blake2F;
 
 impl Blake2F {
-    pub(super) const ADDRESS: Address = crate::make_address(0, 9);
+    pub const ADDRESS: Address = crate::make_address(0, 9);
 }
 
 impl Precompile for Blake2F {

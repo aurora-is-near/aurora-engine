@@ -142,19 +142,19 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data)
             .map_err(error::DepositError::EventParseFailed)?;
 
-        sdk::log!(&format!(
+        sdk::log!(
             "Deposit started: from {} to recipient {:?} with amount: {:?} and fee {:?}",
             event.sender.encode(),
-            event.token_message_data.get_recipient(),
+            event.token_message_data.recipient(),
             event.amount,
             event.fee
-        ));
+        );
 
-        sdk::log!(&format!(
+        sdk::log!(
             "Event's address {}, custodian address {}",
             event.eth_custodian_address.encode(),
             self.contract.eth_custodian_address.encode(),
-        ));
+        );
 
         if event.eth_custodian_address != self.contract.eth_custodian_address {
             return Err(error::DepositError::CustodianAddressMismatch);
@@ -165,10 +165,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
 
         // Verify proof data with cross-contract call to prover account
-        sdk::log!(&format!(
+        sdk::log!(
             "Deposit verify_log_entry for prover: {}",
             self.contract.prover_account,
-        ));
+        );
 
         // Do not skip bridge call. This is only used for development and diagnostics.
         let skip_bridge_call = false.try_to_vec().unwrap();
@@ -189,7 +189,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             TokenMessageData::Near(account_id) => FinishDepositCallArgs {
                 new_owner_id: account_id,
                 amount: event.amount,
-                proof_key: proof.get_key(),
+                proof_key: proof.key(),
                 relayer_id: predecessor_account_id,
                 fee: event.fee,
                 msg: None,
@@ -217,7 +217,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 FinishDepositCallArgs {
                     new_owner_id: current_account_id.clone(),
                     amount: event.amount,
-                    proof_key: proof.get_key(),
+                    proof_key: proof.key(),
                     relayer_id: predecessor_account_id,
                     fee: event.fee,
                     msg: Some(transfer_data),
@@ -252,7 +252,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         data: FinishDepositCallArgs,
         prepaid_gas: NearGas,
     ) -> Result<Option<PromiseWithCallbackArgs>, error::FinishDepositError> {
-        sdk::log!(&format!("Finish deposit with the amount: {}", data.amount));
+        sdk::log!("Finish deposit with the amount: {}", data.amount);
 
         // Mint tokens to recipient minus fee
         if let Some(msg) = data.msg {
@@ -297,7 +297,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Record used proof as hash key
     fn record_proof(&mut self, key: &str) -> Result<(), error::ProofUsed> {
-        sdk::log!(&format!("Record proof: {}", key));
+        sdk::log!("Record proof: {}", key);
 
         if self.is_used_event(key) {
             return Err(error::ProofUsed);
@@ -313,7 +313,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         owner_id: AccountId,
         amount: NEP141Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
-        sdk::log!(&format!("Mint {} nETH tokens for: {}", amount, owner_id));
+        sdk::log!("Mint {} nETH tokens for: {}", amount, owner_id);
 
         if self.ft.get_account_eth_balance(&owner_id).is_none() {
             self.ft.accounts_insert(&owner_id, ZERO_NEP141_WEI);
@@ -327,11 +327,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         owner_id: Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
-        sdk::log!(&format!(
-            "Mint {} ETH tokens for: {}",
-            amount,
-            owner_id.encode()
-        ));
+        sdk::log!("Mint {} ETH tokens for: {}", amount, owner_id.encode());
         self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
     }
 
@@ -373,7 +369,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
     pub fn ft_total_eth_supply_on_near(&mut self) {
         let total_supply = self.ft.ft_total_eth_supply_on_near();
-        sdk::log!(&format!("Total ETH supply on NEAR: {}", total_supply));
+        sdk::log!("Total ETH supply on NEAR: {}", total_supply);
         self.io
             .return_output(format!("\"{}\"", total_supply).as_bytes());
     }
@@ -381,7 +377,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
     pub fn ft_total_eth_supply_on_aurora(&mut self) {
         let total_supply = self.ft.ft_total_eth_supply_on_aurora();
-        sdk::log!(&format!("Total ETH supply on Aurora: {}", total_supply));
+        sdk::log!("Total ETH supply on Aurora: {}", total_supply);
         self.io
             .return_output(format!("\"{}\"", total_supply).as_bytes());
     }
@@ -389,10 +385,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Return balance of nETH (ETH on Near)
     pub fn ft_balance_of(&mut self, args: BalanceOfCallArgs) {
         let balance = self.ft.ft_balance_of(&args.account_id);
-        sdk::log!(&format!(
-            "Balance of nETH [{}]: {}",
-            args.account_id, balance
-        ));
+        sdk::log!("Balance of nETH [{}]: {}", args.account_id, balance);
 
         self.io.return_output(format!("\"{}\"", balance).as_bytes());
     }
@@ -405,11 +398,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let balance = self
             .ft
             .internal_unwrap_balance_of_eth_on_aurora(&args.address);
-        sdk::log!(&format!(
-            "Balance of ETH [{}]: {}",
-            args.address.encode(),
-            balance
-        ));
+        sdk::log!("Balance of ETH [{}]: {}", args.address.encode(), balance);
         self.io.return_output(format!("\"{}\"", balance).as_bytes());
         Ok(())
     }
@@ -427,10 +416,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             &args.memo,
         )?;
         self.save_ft_contract();
-        sdk::log!(&format!(
+        sdk::log!(
             "Transfer amount {} to {} success with memo: {:?}",
-            args.amount, args.receiver_id, args.memo
-        ));
+            args.amount,
+            args.receiver_id,
+            args.memo
+        );
         Ok(())
     }
 
@@ -446,10 +437,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             &args.receiver_id,
             args.amount,
         );
-        sdk::log!(&format!(
+        sdk::log!(
             "Resolve transfer from {} to {} success",
-            args.sender_id, args.receiver_id
-        ));
+            args.sender_id,
+            args.receiver_id
+        );
         // `ft_resolve_transfer` can change `total_supply` so we should save the contract
         self.save_ft_contract();
         self.io.return_output(format!("\"{}\"", amount).as_bytes());
@@ -466,10 +458,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         args: TransferCallCallArgs,
         prepaid_gas: NearGas,
     ) -> Result<PromiseWithCallbackArgs, error::FtTransferCallError> {
-        sdk::log!(&format!(
+        sdk::log!(
             "Transfer call to {} amount {}",
-            args.receiver_id, args.amount,
-        ));
+            args.receiver_id,
+            args.amount,
+        );
 
         // Verify message data before `ft_on_transfer` call to avoid verification panics
         // It's allowed empty message if `receiver_id =! current_account_id`
@@ -650,7 +643,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Checks whether the provided proof was already used
     pub fn is_used_proof(&self, proof: Proof) -> bool {
-        self.is_used_event(&proof.get_key())
+        self.is_used_event(&proof.key())
     }
 
     /// Get Eth connector paused flags

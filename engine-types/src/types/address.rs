@@ -115,13 +115,12 @@ mod tests {
     fn test_address_decode() {
         // Test compatibility with previous typ RawAddress.
         // It was: type RawAddress = [u8;20];
-        let eth_address_vec =
-            hex::decode("096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_string()).unwrap();
+        let eth_address_vec = hex::decode("096DE9C2B8A5B8c22cEe3289B101f6960d68E51E").unwrap();
         let mut eth_address = [0u8; 20];
         eth_address.copy_from_slice(&eth_address_vec[..]);
 
         let aurora_eth_address =
-            Address::decode(&"096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_string()).unwrap();
+            Address::decode("096DE9C2B8A5B8c22cEe3289B101f6960d68E51E").unwrap();
         assert_eq!(eth_address, aurora_eth_address.as_bytes());
 
         let serialized_addr = eth_address.try_to_vec().unwrap();
