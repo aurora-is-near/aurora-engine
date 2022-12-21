@@ -85,8 +85,7 @@ pub fn run_dir(dir: &str) {
         println!("Error: {:?}", paths.err().unwrap());
         return;
     }
-   
-    for path in paths {
+    for path in paths.unwrap() {
         if path.is_err() {
             println!("Error: {:?}", path.err().unwrap());
             continue;
