@@ -80,7 +80,11 @@ fn run(path: String, name: String) {
 
 pub fn run_dir(dir: &str) {
     // get file names in the directory
-    let paths = std::fs::read_dir(dir).unwrap();
+    let paths = std::fs::read_dir(dir);
+    if paths.is_err() {
+        println!("Error: {:?}", paths.err().unwrap());
+        return;
+    }
    
     for path in paths {
         if path.is_err() {
