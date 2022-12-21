@@ -416,8 +416,16 @@ pub fn test_state_zero_knowledge2() {
 pub fn test_state() {
     let cwd = std::env::current_dir().unwrap();
     println!("Current directory is {}", cwd.display());
-    let paths = std::fs::read_dir("../../etc/eth-json-test/res/tests/GeneralStateTests").unwrap();
-    for path in paths {
+    let paths = std::fs::read_dir("../../etc/eth-json-test/res/tests/GeneralStateTests");
+    if paths.is_err() {
+        println!("Error: {:?}", paths.err().unwrap());
+        return;
+    }
+    for path in paths.unwrap() {
+        if path.is_err() {
+            println!("Error: {:?}", path.err().unwrap());
+            continue;
+        }
         let path = path.unwrap().path();
         let path_str = path.to_str().unwrap().to_string();
         let name = path.file_name().unwrap().to_str().unwrap().to_string();
@@ -460,9 +468,16 @@ pub fn test_vm_tests() {
 
 #[test]
 pub fn test_vm() {
-    let paths =
-        std::fs::read_dir("../../etc/eth-json-test/res/tests/GeneralStateTests/VMTests").unwrap();
-    for path in paths {
+    let paths = std::fs::read_dir("../../etc/eth-json-test/res/tests/GeneralStateTests/VMTests");
+    if paths.is_err() {
+        println!("Error: {:?}", paths.err().unwrap());
+        return;
+    }
+    for path in paths.unwrap() {
+        if path.is_err() {
+            println!("Error: {:?}", path.err().unwrap());
+            continue;
+        }
         let path = path.unwrap().path();
         let path_str = path.to_str().unwrap().to_string();
         let name = path.file_name().unwrap().to_str().unwrap().to_string();
