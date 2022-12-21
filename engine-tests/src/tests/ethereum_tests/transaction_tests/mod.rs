@@ -47,7 +47,7 @@ fn run(path: String, name: String) {
     // Bring up the test json file
     let tt_json = TransactionTest::new(path, name);
     let tx_bytes_str = &tt_json.txbytes;
-    let txbytes: Vec<u8> = hexstr_to_bytes(&tx_bytes_str);
+    let txbytes: Vec<u8> = hexstr_to_bytes(tx_bytes_str);
 
     // Do transaction with tx bytes as data
     let outcome: Result<(SubmitResult, ExecutionProfile), VMError> =

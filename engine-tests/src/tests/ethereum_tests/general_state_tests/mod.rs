@@ -34,7 +34,7 @@ fn initialize_runner(path: String, name: String) -> (test_utils::AuroraRunner, G
         let without_prefix = account_data.balance.trim_start_matches("0x");
         let balance = u64::from_str_radix(without_prefix, 16).unwrap_or_default();
         // if an account is a wallet
-        if account_data.code == "0x".to_string() {
+        if account_data.code == *"0x" {
             runner.create_address(
                 address_from_hex(&address),
                 Wei::new_u64(balance),
@@ -56,7 +56,7 @@ fn initialize_runner(path: String, name: String) -> (test_utils::AuroraRunner, G
 }
 
 fn run(path: String, name: String) {
-    let (mut runner, gst) = initialize_runner(path.clone(), name.clone());
+    let (mut runner, gst) = initialize_runner(path, name);
 
     // Bring up the test json file
     let gst_txs = gst.post("Merge".to_string());
