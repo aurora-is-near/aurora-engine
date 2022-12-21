@@ -13,6 +13,34 @@ use engine_standalone_tracing::{
 };
 
 #[test]
+fn test_trace_contract_deploy() {
+    let mut runner = standalone::StandaloneRunner::default();
+    let mut signer = test_utils::Signer::random();
+
+    runner.init_evm();
+
+    let constructor = test_utils::erc20::ERC20Constructor::load();
+    let deploy_tx = constructor.deploy("Test", "TST", signer.use_nonce().into());
+    let mut listener = CallTracer::default();
+    let deploy_result = sputnik::traced_call(&mut listener, || {
+        runner
+            .submit_transaction(&signer.secret_key, deploy_tx)
+            .unwrap()
+    });
+    let contract_address = {
+        let bytes = test_utils::unwrap_success_slice(&deploy_result);
+        Address::try_from_slice(bytes).unwrap()
+    };
+    let code = runner.get_code(&contract_address);
+
+    assert_eq!(listener.call_stack.len(), 1);
+    let trace = listener.call_stack.pop().unwrap();
+
+    assert_eq!(trace.to, Some(contract_address));
+    assert_eq!(trace.output, code);
+}
+
+#[test]
 fn test_trace_precompile_direct_call() {
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = test_utils::Signer::random();
