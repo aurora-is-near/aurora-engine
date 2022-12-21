@@ -63,7 +63,7 @@ fn run(path: String, name: String) {
 
     for i in gst_txs {
         let tx_post_bytes = &i.txbytes;
-        let txbytes: Vec<u8> = hexstr_to_bytes(&tx_post_bytes);
+        let txbytes: Vec<u8> = hexstr_to_bytes(tx_post_bytes);
         let outcome: Result<(SubmitResult, ExecutionProfile), VMError> =
             runner.submit_transaction_raw(txbytes);
         assert!(outcome.is_ok());
