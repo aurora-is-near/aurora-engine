@@ -1,0 +1,3 @@
+[submodule "engine-tests/src/res/"]
+	path = engine-tests/src/res/
+	url = https://github.com/ethereum/tests.git
