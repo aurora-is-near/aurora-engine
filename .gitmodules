@@ -1,3 +1,0 @@
-[submodule "etc/eth-json-test/res/tests"]
-	path = etc/eth-json-test/res/tests
-	url = https://github.com/ethereum/tests.git
