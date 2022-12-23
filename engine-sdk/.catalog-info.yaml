@@ -1,0 +1,19 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: aurora-engine-sdk
+  description: |-
+    Helper library for interacting with NEAR Blockchain, used by the engine, tests and contracts that need to interact with the engine.
+  tags:
+    - contract-library
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: engine-team
+  type: contract-library
+  lifecycle: production
+  system: aurora-engine
+  interactsWith: []

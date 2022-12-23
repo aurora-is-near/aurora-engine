@@ -1,0 +1,19 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: aurora-engine-types
+  description: |-
+    Shared Engine Types
+  tags:
+    - contract-library
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: engine-team
+  type: contract-library
+  lifecycle: production
+  system: aurora-engine
+  interactsWith: []

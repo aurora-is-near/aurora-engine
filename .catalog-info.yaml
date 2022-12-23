@@ -6,6 +6,4 @@ metadata:
   description: Public Aurora Engine repository
 spec:
   targets:
-    - ./engine/.catalog-info.yaml
-    - ./etc/eth-contracts/.catalog-info.yaml
-    - ./engine-precompiles/.catalog-info.yaml
+    - ./**/.catalog-info.yaml
