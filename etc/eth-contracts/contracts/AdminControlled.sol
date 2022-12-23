@@ -7,6 +7,7 @@ contract AdminControlled {
     uint public paused;
 
     constructor(address _admin, uint flags) {
+        // slither-disable-next-line missing-zero-check
         admin = _admin;
 
         // Add the possibility to set pause flags on the initialization
@@ -34,12 +35,14 @@ contract AdminControlled {
     }
 
     function adminSendEth(address payable destination, uint amount) public onlyAdmin {
+        // slither-disable-next-line missing-zero-check
         destination.transfer(amount);
     }
 
     function adminReceiveEth() public payable onlyAdmin {}
 
     function adminDelegatecall(address target, bytes memory data) public payable onlyAdmin returns (bytes memory) {
+        // slither-disable-next-line controlled-delegatecall,low-level-calls,missing-zero-check
         (bool success, bytes memory rdata) = target.delegatecall(data);
         require(success);
         return rdata;

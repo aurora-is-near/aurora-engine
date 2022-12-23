@@ -1,0 +1,18 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: aurora-engine-tests
+  description: |-
+    Collection of Engine Tests
+  tags:
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "-1"
+spec:
+  owner: engine-team
+  type: contract-tests
+  lifecycle: production
+  system: aurora-engine
+  interactsWith: []
