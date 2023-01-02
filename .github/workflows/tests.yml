@@ -17,12 +17,12 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
+        with: 
+          submodules: true
       - name: Restore cache
         run: |
           cache-util restore cargo_git cargo_registry yarn_cache
           cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
-      - name: update submodule
-        run:  git submodule update --recursive --init 
       - name: Build contracts
         run: cargo make build-contracts
       - name: Test contracts
