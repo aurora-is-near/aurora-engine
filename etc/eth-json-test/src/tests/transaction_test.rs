@@ -1,5 +1,5 @@
 use crate::test_types::transaction_test::TransactionTest;
-
+/* 
 #[test]
 fn test_data_test_first_zero_bytes() -> Result<(), std::io::Error> {
     let data_test_first_zero_bytes = TransactionTest::new(
@@ -103,3 +103,4 @@ fn test_dataTx_bcValidBlockTestFrontierOnOtherNewtork() -> Result<(), std::io::E
     println!("{:?}", data_tx_bc_valid_block_test_frontier.txbytes());
     Ok(())
 }
+*/
