@@ -119,8 +119,7 @@ pub fn run_dir(dir: &str) {
 #[test]
 pub fn test_add() {
     run(
-        "res/eth-tests/GeneralStateTests/VMTests/vmArithmeticTest/add.json"
-            .to_string(),
+        "res/eth-tests/GeneralStateTests/VMTests/vmArithmeticTest/add.json".to_string(),
         "add".to_string(),
     )
 }
@@ -166,9 +165,7 @@ pub fn test_state_call_create_call_code() {
 
 #[test]
 pub fn test_state_call_delegatecall_codecall() {
-    run_dir(
-        "res/eth-tests/GeneralStateTests/stCallDelegateCodesCallCodeHomestead",
-    );
+    run_dir("res/eth-tests/GeneralStateTests/stCallDelegateCodesCallCodeHomestead");
 }
 
 #[test]

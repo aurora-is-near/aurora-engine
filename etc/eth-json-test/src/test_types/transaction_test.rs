@@ -24,9 +24,9 @@ pub enum TtResult {
         exception: String,
         /// Consumed Gas in hexadecimal notation
         #[serde(alias = "intrinsicGas")]
-        intrinsic_gas: String
+        intrinsic_gas: String,
     },
-    TtResultOk{
+    TtResultOk {
         /// Exception on expected error
         #[serde(alias = "hash")]
         hash: String,
@@ -34,8 +34,8 @@ pub enum TtResult {
         #[serde(alias = "intrinsicGas")]
         intrinsic_gas: String,
         #[serde(alias = "sender")]
-        sender: String
-    }
+        sender: String,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -46,10 +46,10 @@ pub struct TransactionTest {
     /// Result of the transaction
     pub result: HashMap<String, serde_json::Value>,
     /// Encoded TX bytes to feed to Aurora VM
-    pub txbytes: String
+    pub txbytes: String,
 }
 
-impl TransactionTest{
+impl TransactionTest {
     pub fn new(path: String, test_name: String) -> Self {
         let json_str = read_file(path);
         let tt: TransactionTestJson = serde_json::from_str(&json_str).unwrap();
@@ -57,7 +57,7 @@ impl TransactionTest{
         TransactionTest {
             info: input.clone().info,
             result: input.clone().result,
-            txbytes: input.clone().txbytes
+            txbytes: input.clone().txbytes,
         }
     }
 
@@ -74,13 +74,13 @@ impl TransactionTest{
             Ok(result) => TtResult::TtResultOk {
                 hash: result.hash,
                 intrinsic_gas: result.intrinsic_gas,
-                sender: result.sender
+                sender: result.sender,
             },
             Err(_) => {
                 let result: TtResultErr = serde_json::from_value(value.clone()).unwrap();
                 TtResult::TtResultErr {
                     exception: result.exception,
-                    intrinsic_gas: result.intrinsic_gas
+                    intrinsic_gas: result.intrinsic_gas,
                 }
             }
         };
@@ -92,7 +92,6 @@ impl TransactionTest{
     }
 }
 
-
 // TODO: set result for London hard fork only
 #[derive(Debug, Clone, Deserialize)]
 pub struct TtResultOk {
@@ -103,7 +102,7 @@ pub struct TtResultOk {
     #[serde(alias = "intrinsicGas")]
     pub intrinsic_gas: String,
     #[serde(alias = "sender")]
-    pub sender: String
+    pub sender: String,
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -113,29 +112,27 @@ pub struct TtResultErr {
     pub exception: String,
     /// Consumed Gas in hexadecimal notation
     #[serde(alias = "intrinsicGas")]
-    pub intrinsic_gas: String
+    pub intrinsic_gas: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TransactonTestInfo {
     /// Comment for explanation
-    pub comment : String,
+    pub comment: String,
     /// Filling RPC server specification
     #[serde(alias = "filling-rpc-server")]
-    pub filling_rpc_server : String,
+    pub filling_rpc_server: String,
     /// Filling Tool Version
     #[serde(alias = "filling-tool-version")]
-    pub filling_tool_version : String,
+    pub filling_tool_version: String,
     /// Generated Test Hash, hash from test object
     #[serde(alias = "generatedTestHash")]
-    pub generated_test_hash : String,
+    pub generated_test_hash: String,
     /// lllc version
-    pub lllcversion : String,
+    pub lllcversion: String,
     /// Source within the test repository of ethereum/tests
-    pub source : String,
+    pub source: String,
     /// Source hash from the test repository of ethereum/tests
     #[serde(alias = "sourceHash")]
-    pub source_hash : String
+    pub source_hash: String,
 }
-
-

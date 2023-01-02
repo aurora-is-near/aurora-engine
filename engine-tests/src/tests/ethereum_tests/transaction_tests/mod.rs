@@ -95,8 +95,7 @@ fn test_address_less_than_20() {
 #[test]
 fn test_address_less_than_20_prefixed() {
     run(
-        "res/eth-tests/TransactionTests/ttAddress/AddressLessThan20Prefixed0.json"
-            .to_string(),
+        "res/eth-tests/TransactionTests/ttAddress/AddressLessThan20Prefixed0.json".to_string(),
         "AddressLessThan20Prefixed0".to_string(),
     );
 }
