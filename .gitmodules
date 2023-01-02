@@ -1,8 +1,3 @@
-<<<<<<< HEAD
 [submodule "engine-tests/src/res/eth-tests"]
 	path = engine-tests/src/res/eth-tests
-=======
-[submodule "engine-tests/src/res/"]
-	path = engine-tests/src/res/
->>>>>>> add-gst-tests
 	url = https://github.com/ethereum/tests.git
