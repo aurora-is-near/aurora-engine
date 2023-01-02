@@ -19,6 +19,8 @@ jobs:
         uses: actions/checkout@v3
         with: 
           submodules: true
+      - name: Check submodule is bplaced
+        run: ls engine-tests/src/res/eth-tests
       - name: Restore cache
         run: |
           cache-util restore cargo_git cargo_registry yarn_cache
