@@ -24,7 +24,7 @@ tokio = { version = "1.14", features = ["full"] }
 workspaces = "0.5"
 anyhow = "1.0"
 hex = "0.4.3"
-ethabi = "17.1"
+ethabi = "18.0"
 rlp = { version = "0.5.0", default-features = false }
 
 [features]

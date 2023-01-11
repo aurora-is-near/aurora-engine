@@ -5,28 +5,34 @@ use aurora_engine_types::{types::Address, U256};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallFrame {
-    call_type: CallType,
-    from: Address,
-    to: Option<Address>,
-    value: U256,
-    gas: u64,
-    gas_used: u64,
-    input: Vec<u8>,
-    output: Vec<u8>,
-    error: Option<String>,
-    calls: Vec<CallFrame>,
+    pub call_type: CallType,
+    pub from: Address,
+    pub to: Option<Address>,
+    pub value: U256,
+    pub gas: u64,
+    pub gas_used: u64,
+    pub input: Vec<u8>,
+    pub output: Vec<u8>,
+    pub error: Option<String>,
+    pub calls: Vec<CallFrame>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CallTracer {
-    call_stack: Vec<CallFrame>,
+    pub call_stack: Vec<CallFrame>,
 }
 
 impl CallTracer {
     fn end(&mut self, output: Vec<u8>, error: Option<&evm::ExitReason>) {
         let frame = self.call_stack.first_mut().unwrap();
         match error {
-            None => frame.output = output,
+            None => {
+                match frame.call_type {
+                    // In CREATE case, output is set by the `CreateOutput` rather than the `Exit` event.
+                    CallType::Create | CallType::Create2 => (),
+                    _ => frame.output = output,
+                }
+            }
             Some(error) => {
                 let error_message = format!("{:?}", error);
                 if error_message.to_lowercase().contains("revert") {
@@ -68,13 +74,16 @@ impl CallTracer {
 
         let mut frame = self.call_stack.pop().unwrap();
         match error {
-            None => frame.output = output,
+            None => {
+                match frame.call_type {
+                    // In CREATE case, output is set by the `CreateOutput` rather than the `Exit` event.
+                    CallType::Create | CallType::Create2 => (),
+                    _ => frame.output = output,
+                }
+            }
             Some(error) => {
                 frame.error = Some(format!("{:?}", error));
-                match frame.call_type {
-                    CallType::Create | CallType::Create2 => frame.to = None,
-                    _ => (),
-                }
+                frame.output = output;
             }
         }
 
@@ -163,10 +172,10 @@ impl evm::tracing::EventListener for CallTracer {
             } => {
                 let call_type = if is_static {
                     CallType::StaticCall
-                } else if transfer.is_none() {
-                    CallType::DelegateCall
                 } else if code_address == context.address {
                     CallType::Call
+                } else if transfer.is_none() {
+                    CallType::DelegateCall
                 } else {
                     CallType::CallCode
                 };
@@ -202,6 +211,19 @@ impl evm::tracing::EventListener for CallTracer {
                     target_gas.unwrap_or_default(),
                     value,
                 );
+            }
+            evm::tracing::Event::CreateOutput { address, code } => {
+                // `to` field should have been set to the address of the contract being created
+                debug_assert_eq!(
+                    Some(address),
+                    self.call_stack
+                        .last()
+                        .and_then(|call_frame| call_frame.to.as_ref().map(Address::raw))
+                );
+                let current_frame = self.call_stack.last_mut();
+                if let Some(frame) = current_frame {
+                    frame.output = code.to_vec();
+                }
             }
             evm::tracing::Event::Suicide {
                 address,
