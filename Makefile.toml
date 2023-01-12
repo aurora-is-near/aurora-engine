@@ -224,10 +224,11 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
+#    "test_aurora_ft_transfer1",
     "--features",
     "${CARGO_FEATURES_TEST}",
-#    "--",
-#    "--nocapture",
+    "--",
+    "--nocapture",
 ]
 
 [tasks.build-aurora-eth-connector]

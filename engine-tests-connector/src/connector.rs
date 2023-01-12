@@ -82,14 +82,6 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .unwrap();
     assert_eq!(balance.0, DEPOSITED_AMOUNT);
 
-    let balance = contract
-        .eth_connector_contract
-        .call("ft_total_eth_supply_on_near")
-        .view()
-        .await?
-        .json::<U128>()
-        .unwrap();
-    assert_eq!(balance.0, DEPOSITED_AMOUNT);
     Ok(())
 }
 
@@ -125,11 +117,7 @@ async fn test_ft_transfer() -> anyhow::Result<()> {
             .0,
         DEPOSITED_FEE - transfer_amount as u128,
     );
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_AMOUNT,
-    );
-    assert_eq!(DEPOSITED_AMOUNT, contract.total_supply().await?.0);
+    assert_eq!(DEPOSITED_AMOUNT, contract.total_supply().await?);
     Ok(())
 }
 
@@ -169,7 +157,7 @@ async fn test_withdraw_eth_from_near() -> anyhow::Result<()> {
         DEPOSITED_AMOUNT - DEPOSITED_FEE
     );
     assert_eq!(
-        contract.total_supply().await?.0,
+        contract.total_supply().await?,
         DEPOSITED_AMOUNT - withdraw_amount.as_u128(),
     );
     Ok(())
@@ -196,11 +184,7 @@ async fn test_deposit_eth_to_near_balance_total_supply() -> anyhow::Result<()> {
         contract.get_eth_on_near_balance(&receiver_id).await?.0,
         DEPOSITED_AMOUNT - DEPOSITED_FEE
     );
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_AMOUNT,
-    );
-    assert_eq!(contract.total_supply().await?.0, DEPOSITED_AMOUNT);
+    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
     Ok(())
 }
 
@@ -220,11 +204,7 @@ async fn test_deposit_eth_to_aurora_balance_total_supply() -> anyhow::Result<()>
             .await?,
         DEPOSITED_EVM_AMOUNT
     );
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_EVM_AMOUNT,
-    );
-    assert_eq!(contract.total_supply().await?.0, DEPOSITED_EVM_AMOUNT,);
+    assert_eq!(contract.total_supply().await?, DEPOSITED_EVM_AMOUNT,);
     Ok(())
 }
 
@@ -297,11 +277,7 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
             .await?,
         transfer_amount.0,
     );
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_AMOUNT,
-    );
-    assert_eq!(contract.total_supply().await?.0, DEPOSITED_AMOUNT);
+    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
     Ok(())
 }
 
@@ -461,11 +437,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
             .await?,
         0
     );
-    assert_eq!(contract.total_supply().await?.0, DEPOSITED_AMOUNT);
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_AMOUNT
-    );
+    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
     Ok(())
 }
 
@@ -624,11 +596,7 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
             .await?,
         transfer_amount.0
     );
-    assert_eq!(contract.total_supply().await?.0, DEPOSITED_AMOUNT);
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_AMOUNT
-    );
+    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
     Ok(())
 }
 
@@ -682,11 +650,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
             .await?,
         0
     );
-    assert_eq!(contract.total_supply().await?.0, DEPOSITED_AMOUNT);
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_AMOUNT
-    );
+    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
     Ok(())
 }
 
@@ -867,11 +831,7 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
         DEPOSITED_EVM_AMOUNT
     );
     assert_eq!(
-        contract.total_supply().await?.0,
-        DEPOSITED_AMOUNT + DEPOSITED_EVM_AMOUNT
-    );
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
+        contract.total_supply().await?,
         DEPOSITED_AMOUNT + DEPOSITED_EVM_AMOUNT
     );
     Ok(())
@@ -1009,11 +969,7 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
             .0,
         DEPOSITED_FEE - transfer_amount as u128
     );
-    assert_eq!(contract.total_supply().await?.0, DEPOSITED_AMOUNT);
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_AMOUNT
-    );
+    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
 
     let res = contract
         .engine_contract
@@ -1052,11 +1008,7 @@ async fn test_deposit_to_near_with_zero_fee() -> anyhow::Result<()> {
         0
     );
 
-    assert_eq!(contract.total_supply().await?.0, deposited_amount);
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        deposited_amount
-    );
+    assert_eq!(contract.total_supply().await?, deposited_amount);
     Ok(())
 }
 
@@ -1077,11 +1029,7 @@ async fn test_deposit_to_aurora_with_zero_fee() -> anyhow::Result<()> {
             .await?,
         deposited_amount
     );
-    assert_eq!(contract.total_supply().await?.0, deposited_amount);
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        deposited_amount
-    );
+    assert_eq!(contract.total_supply().await?, deposited_amount);
     Ok(())
 }
 
@@ -1274,11 +1222,7 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
             .0,
         DEPOSITED_FEE - transfer_amount.0,
     );
-    assert_eq!(
-        contract.total_eth_supply_on_near().await?.0,
-        DEPOSITED_AMOUNT,
-    );
-    assert_eq!(DEPOSITED_AMOUNT, contract.total_supply().await?.0);
+    assert_eq!(DEPOSITED_AMOUNT, contract.total_supply().await?);
 
     let transfer_amount2: U128 = 1000.into();
     let res = user_acc
@@ -1456,7 +1400,7 @@ async fn test_withdraw_from_user() -> anyhow::Result<()> {
         DEPOSITED_AMOUNT - DEPOSITED_FEE - withdraw_amount.as_u128()
     );
     assert_eq!(
-        contract.total_supply().await?.0,
+        contract.total_supply().await?,
         DEPOSITED_AMOUNT - withdraw_amount.as_u128(),
     );
     Ok(())

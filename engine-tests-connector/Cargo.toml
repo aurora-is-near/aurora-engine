@@ -21,7 +21,7 @@ byte-slice-cast = { version = "1.0", default-features = false }
 near-sdk = "4.0"
 near-units = "0.2"
 tokio = { version = "1.14", features = ["full"] }
-workspaces = "0.5"
+workspaces = "0.7"
 anyhow = "1.0"
 hex = "0.4.3"
 ethabi = "18.0"

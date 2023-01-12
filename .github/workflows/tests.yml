@@ -41,10 +41,7 @@ jobs:
         run: ls -la target/wasm32-unknown-unknown/release && ls -la
       - name: Test testnet
         run: cargo make --profile testnet test-workspace
-      - name: Save cache
-        run: |
-          cache-util save cargo_git cargo_registry yarn_cache
-          cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0

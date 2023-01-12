@@ -236,20 +236,6 @@ impl TestContract {
         Ok(res)
     }
 
-    pub async fn total_eth_supply_on_near(&self) -> anyhow::Result<U128> {
-        let res = self
-            .engine_contract
-            .call("ft_total_eth_supply_on_near")
-            .gas(DEFAULT_GAS)
-            .transact()
-            .await?
-            .into_result()
-            .unwrap()
-            .json::<U128>()
-            .unwrap();
-        Ok(res)
-    }
-
     pub async fn get_eth_on_near_balance(&self, account: &AccountId) -> anyhow::Result<U128> {
         let res = self
             .engine_contract
@@ -286,7 +272,7 @@ impl TestContract {
         Ok(res.parse().unwrap())
     }
 
-    pub async fn total_supply(&self) -> anyhow::Result<U128> {
+    pub async fn total_supply(&self) -> anyhow::Result<u128> {
         let res = self
             .engine_contract
             .call("ft_total_supply")
@@ -297,7 +283,7 @@ impl TestContract {
             .unwrap()
             .json::<U128>()
             .unwrap();
-        Ok(res)
+        Ok(res.0)
     }
 }
 
@@ -319,7 +305,7 @@ pub fn get_eth_connector_contract() -> Vec<u8> {
 fn get_engine_contract() -> Vec<u8> {
     if cfg!(feature = "mainnet-test") {
         std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap()
-    } else if cfg!(feature = "testnet-test") {
+    } else if cfg!(feature = "") {
         std::fs::read("../bin/aurora-testnet-test.wasm").unwrap()
     } else {
         panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
