@@ -47,7 +47,7 @@ near-primitives = { git = "https://github.com/birchmd/nearcore.git", rev = "6033
 libsecp256k1 = { version = "0.7.0", default-features = false }
 rand = "0.8.5"
 criterion = "0.4.0"
-git2 = "0.15"
+git2 = "0.16"
 tempfile = "3.2.0"
 walrus = "0.19"
 
