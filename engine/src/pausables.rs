@@ -116,17 +116,16 @@ impl<I: IO> EnginePrecompilesPauser<I> {
         match self.io.read_storage(&Self::storage_key()) {
             None => PrecompileFlags::empty(),
             Some(bytes) => {
-                let int_length = core::mem::size_of::<u32>();
-                let input = bytes.to_vec();
+                const U32_SIZE: usize = core::mem::size_of::<u32>();
 
-                if input.len() < int_length {
+                if bytes.len() < U32_SIZE {
                     return PrecompileFlags::empty();
                 }
 
-                let (int_bytes, _) = input.split_at(int_length);
-                PrecompileFlags::from_bits_truncate(u32::from_le_bytes(
-                    int_bytes.try_into().unwrap(),
-                ))
+                let mut buffer = [0u8; U32_SIZE];
+                bytes.copy_to_slice(&mut buffer);
+
+                PrecompileFlags::from_bits_truncate(u32::from_le_bytes(buffer))
             }
         }
     }
