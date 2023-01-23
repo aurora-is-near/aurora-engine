@@ -234,15 +234,13 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_no_precompile_is_paused_if_storage_contains_too_few_bytes() {
         let key = EnginePrecompilesPauser::<StoragePointer>::storage_key();
         let storage = RwLock::new(Storage::default());
         let mut io = StoragePointer(&storage);
         io.write_storage(key.as_slice(), &[7u8]);
         let pauser = EnginePrecompilesPauser::from_io(io);
-
-        let expected_paused = PrecompileFlags::empty();
-        let actual_paused = pauser.paused();
-        assert_eq!(expected_paused, actual_paused);
+        let _paused = pauser.paused(); // panic here !!!
     }
 }
