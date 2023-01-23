@@ -414,10 +414,20 @@ impl From<NewCallArgs> for EngineState {
     }
 }
 
+/// Used to select which gas token to pay in.
+pub enum GasToken {
+    /// Gas is paid in Ether.
+    ETH,
+    /// Gas is paid in a ERC-20 compatible token.
+    ERC20(Address),
+}
+
+
 pub struct Engine<'env, I: IO, E: Env> {
     state: EngineState,
     origin: Address,
     gas_price: U256,
+    gas_token: GasToken,
     current_account_id: AccountId,
     io: I,
     env: &'env E,
@@ -453,6 +463,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             state,
             origin,
             gas_price: U256::zero(),
+            gas_token: GasToken::ETH,
             current_account_id,
             io,
             env,
@@ -463,10 +474,13 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         }
     }
 
+    // TODO: If we don't actually charge_gas here after changes, this should
+    // be renamed.
     pub fn charge_gas(
         &mut self,
         sender: &Address,
         transaction: &NormalizedEthTransaction,
+        gas_token: GasToken,
     ) -> Result<GasPaymentResult, GasPaymentError> {
         if transaction.max_fee_per_gas.is_zero() {
             return Ok(GasPaymentResult::default());
@@ -482,11 +496,22 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             .map(Wei::new)
             .ok_or(GasPaymentError::EthAmountOverflow)?;
 
-        let new_balance = get_balance(&self.io, sender)
-            .checked_sub(prepaid_amount)
-            .ok_or(GasPaymentError::OutOfFund)?;
+        match gas_token {
+            GasToken::ETH => {
+                // TODO: Remove the set_balance as we need to just check if they can spend
+                // Use new `can_transfer` function instead.
+                // Also needs to be verified how it is done on geth.
+                let new_balance = get_balance(&self.io, sender)
+                    .checked_sub(prepaid_amount)
+                    .ok_or(GasPaymentError::OutOfFund)?;
 
-        set_balance(&mut self.io, sender, &new_balance);
+                // This part is questionable.
+                set_balance(&mut self.io, sender, &new_balance);
+            }
+            GasToken::ERC20(addr) => {
+                // TODO: Needs SputnikVM balance check
+            }
+        }
 
         self.gas_price = effective_gas_price;
 
@@ -947,7 +972,6 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     let prepaid_amount = match engine.charge_gas(&sender, &transaction) {
         Ok(gas_result) => gas_result,
         Err(GasPaymentError::OutOfFund) => {
-            increment_nonce(&mut io, &sender);
             let result = SubmitResult::new(TransactionStatus::OutOfFund, 0, vec![]);
             return Ok(result);
         }
@@ -1115,6 +1139,7 @@ pub fn get_authorizer() -> EngineAuthorizer {
     EngineAuthorizer::from_accounts(once(account))
 }
 
+// TODO: Gas must be charged from here.
 pub fn refund_unused_gas<I: IO>(
     io: &mut I,
     sender: &Address,
@@ -1141,8 +1166,12 @@ pub fn refund_unused_gas<I: IO>(
         .checked_sub(spent_amount)
         .ok_or(GasPaymentError::EthAmountOverflow)?;
 
-    add_balance(io, sender, refund)?;
-    add_balance(io, relayer, reward_amount)?;
+    if refund > Wei::zero() {
+        add_balance(io, sender, refund)?;
+    }
+    if reward_amount > Wei::zero() {
+        add_balance(io, relayer, reward_amount)?;
+    }
 
     Ok(())
 }
@@ -1323,6 +1352,14 @@ pub fn get_balance<I: IO>(io: &I, address: &Address) -> Wei {
         .read_u256(&address_to_key(KeyPrefix::Balance, address))
         .unwrap_or_else(|_| U256::zero());
     Wei::new(raw)
+}
+
+/// Checks whether there are enough funds for the given address and amount.
+///
+/// This does not take gas into account.
+pub fn can_transfer<I: IO>(io: &I, address: &Address, amount: Wei) -> bool {
+    let current_balance = get_balance(io, address);
+    amount >= current_balance
 }
 
 pub fn remove_storage<I: IO>(io: &mut I, address: &Address, key: &H256, generation: u32) {
