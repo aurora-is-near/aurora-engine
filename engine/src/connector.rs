@@ -91,7 +91,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_total_eth_supply_on_near(&mut self) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
-            method: "ft_total_eth_supply_on_near".to_string(),
+            method: "ft_total_supply".to_string(),
             args: Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: VIEW_CALL_GAS,
@@ -183,7 +183,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_transfer(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
-            method: "ft_transfer".to_string(),
+            method: "engine_ft_transfer".to_string(),
             args: data,
             attached_balance: Yocto::new(1),
             attached_gas: GAS_FOR_FT_TRANSFER,
@@ -197,7 +197,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_transfer_call(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
-            method: "ft_transfer_call".to_string(),
+            method: "engine_ft_transfer_call".to_string(),
             args: data,
             attached_balance: Yocto::new(1),
             attached_gas: GAS_FOR_FT_TRANSFER_CALL,
@@ -208,7 +208,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn storage_deposit(&self, data: Vec<u8>, attached_deposit: u128) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
-            method: "storage_deposit".to_string(),
+            method: "engine_storage_deposit".to_string(),
             args: data,
             attached_balance: Yocto::new(attached_deposit),
             attached_gas: DEFAULT_PREPAID_GAS,
@@ -219,7 +219,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn storage_unregister(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
-            method: "storage_unregister".to_string(),
+            method: "engine_storage_unregister".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: DEFAULT_PREPAID_GAS,
@@ -230,7 +230,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn storage_withdraw(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
-            method: "storage_withdraw".to_string(),
+            method: "engine_storage_withdraw".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: DEFAULT_PREPAID_GAS,

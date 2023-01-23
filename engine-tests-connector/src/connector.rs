@@ -629,8 +629,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE_FOR_FEE"));
+    assert!(res.is_success());
 
     let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
     assert_eq!(
@@ -648,7 +647,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
         contract
             .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS))
             .await?,
-        0
+        transfer_amount.0
     );
     assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
     Ok(())
@@ -1137,7 +1136,7 @@ async fn test_ft_transfer_max_value() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_NOT_ENOUGH_BALANCE"));
+    assert!(contract.check_error_message(res, "The account doesn't have enough balance"));
     Ok(())
 }
 
@@ -1257,8 +1256,7 @@ async fn test_access_rights() -> anyhow::Result<()> {
     contract.call_deposit_eth_to_near().await?;
 
     let transfer_amount1: U128 = 50.into();
-    let transfer_amount2: U128 = 3000.into();
-    let receiver_id = AccountId::try_from("test.root".to_string()).unwrap();
+    let transfer_amount2: U128 = 10.into();
     let user_acc = contract.create_sub_account("eth_recipient").await?;
 
     let res = contract
@@ -1286,13 +1284,31 @@ async fn test_access_rights() -> anyhow::Result<()> {
             .0,
         DEPOSITED_FEE - transfer_amount1.0
     );
-    assert_eq!(contract.get_eth_on_near_balance(&receiver_id).await?.0, 0);
 
-    let res = user_acc
-        .call(contract.eth_connector_contract.id(), "ft_transfer")
+    let res = contract
+        .eth_connector_contract
+        .call("set_access_right")
+        .args_json(json!((user_acc.id(),)))
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+
+    let res = contract
+        .eth_connector_contract
+        .call("get_access_right")
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?
+        .json::<AccountId>()?;
+    assert_eq!(&res, user_acc.id());
+
+    let res = contract
+        .engine_contract
+        .call("ft_transfer")
         .args_json(json!({
-            "receiver_id": &receiver_id,
-            "amount": transfer_amount2,
+            "receiver_id": &user_acc.id(),
+            "amount": transfer_amount1,
             "memo": "transfer memo"
         }))
         .gas(DEFAULT_GAS)
@@ -1313,13 +1329,11 @@ async fn test_access_rights() -> anyhow::Result<()> {
             .0,
         DEPOSITED_FEE - transfer_amount1.0
     );
-    assert_eq!(contract.get_eth_on_near_balance(&receiver_id).await?.0, 0);
 
-    // Set access right
     let res = contract
         .eth_connector_contract
         .call("set_access_right")
-        .args_json((user_acc.id(),))
+        .args_json(json!((contract.engine_contract.id(),)))
         .gas(DEFAULT_GAS)
         .transact()
         .await?;
@@ -1332,12 +1346,13 @@ async fn test_access_rights() -> anyhow::Result<()> {
         .transact()
         .await?
         .json::<AccountId>()?;
-    assert_eq!(&res, user_acc.id());
+    assert_eq!(&res, contract.engine_contract.id());
 
-    let res = user_acc
-        .call(contract.eth_connector_contract.id(), "ft_transfer")
+    let res = contract
+        .engine_contract
+        .call("ft_transfer")
         .args_json(json!({
-            "receiver_id": &receiver_id,
+            "receiver_id": &user_acc.id(),
             "amount": transfer_amount2,
             "memo": "transfer memo"
         }))
@@ -1349,19 +1364,16 @@ async fn test_access_rights() -> anyhow::Result<()> {
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount1.0 - transfer_amount2.0,
+        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount1.0 + transfer_amount2.0
     );
     assert_eq!(
         contract
             .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
-        DEPOSITED_FEE - transfer_amount1.0
+        DEPOSITED_FEE - transfer_amount1.0 - transfer_amount2.0
     );
-    assert_eq!(
-        contract.get_eth_on_near_balance(&receiver_id).await?.0,
-        transfer_amount2.0
-    );
+
     Ok(())
 }
 
