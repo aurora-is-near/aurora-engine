@@ -117,10 +117,7 @@ impl<I: IO> EnginePrecompilesPauser<I> {
             None => PrecompileFlags::empty(),
             Some(bytes) => {
                 const U32_SIZE: usize = core::mem::size_of::<u32>();
-
-                if bytes.len() < U32_SIZE {
-                    return PrecompileFlags::empty();
-                }
+                assert_eq!(bytes.len(), U32_SIZE, "ERR_CORRUPTED_PAUSE_FLAGS");
 
                 let mut buffer = [0u8; U32_SIZE];
                 bytes.copy_to_slice(&mut buffer);
