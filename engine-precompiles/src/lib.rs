@@ -15,6 +15,7 @@ pub mod prepaid_gas;
 pub mod promise_result;
 pub mod random;
 pub mod secp256k1;
+pub mod set_gas_token;
 mod utils;
 pub mod xcc;
 
@@ -111,8 +112,8 @@ impl HardFork for Istanbul {}
 impl HardFork for Berlin {}
 
 pub struct Precompiles<'a, I, E, H> {
-    pub all_precompiles: prelude::BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
-    pub paused_precompiles: prelude::BTreeSet<Address>,
+    pub all_precompiles: BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
+    pub paused_precompiles: BTreeSet<Address>,
 }
 
 impl<'a, I, E, H> Precompiles<'a, I, E, H> {
@@ -149,7 +150,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
         Some(result.and_then(|output| post_process(output, handle)))
     }
 
-    fn is_precompile(&self, address: prelude::H160) -> bool {
+    fn is_precompile(&self, address: H160) -> bool {
         self.all_precompiles.contains_key(&Address::new(address))
     }
 }
@@ -270,7 +271,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
         ];
-        let fun: prelude::Vec<Box<dyn Precompile>> = vec![
+        let fun: Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
@@ -386,10 +387,10 @@ pub enum AllPrecompiles<'a, I, E, H> {
 /// fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
-pub const fn make_address(x: u32, y: u128) -> prelude::types::Address {
+pub const fn make_address(x: u32, y: u128) -> Address {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
-    prelude::types::Address::new(H160([
+    Address::new(H160([
         x_bytes[0],
         x_bytes[1],
         x_bytes[2],
@@ -413,10 +414,10 @@ pub const fn make_address(x: u32, y: u128) -> prelude::types::Address {
     ]))
 }
 
-const fn make_h256(x: u128, y: u128) -> prelude::H256 {
+const fn make_h256(x: u128, y: u128) -> H256 {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
-    prelude::H256([
+    H256([
         x_bytes[0],
         x_bytes[1],
         x_bytes[2],

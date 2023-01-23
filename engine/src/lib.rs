@@ -30,7 +30,6 @@ pub mod log_entry;
 pub mod pausables;
 mod prelude;
 pub mod xcc;
-mod erc20;
 
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]
