@@ -1,7 +1,7 @@
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
-use aurora_engine::{connector, engine, parameters::SubmitResult, xcc};
+use aurora_engine::{connector, engine, parameters::SubmitResult, state, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::{
     account_id::AccountId,
@@ -137,7 +137,7 @@ fn execute_transaction<'db>(
             let transaction_bytes: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
-            let result = engine::get_state(&io)
+            let result = state::get_state(&io)
                 .map(|engine_state| {
                     let submit_result = engine::submit(
                         io,
@@ -335,12 +335,12 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::RefundOnError(maybe_args) => {
-            let result: Result<Option<TransactionExecutionResult>, engine::EngineStateError> =
+            let result: Result<Option<TransactionExecutionResult>, state::error::EngineStateError> =
                 maybe_args
                     .clone()
                     .map(|args| {
                         let mut handler = crate::promise::NoScheduler { promise_data };
-                        let engine_state = engine::get_state(&io)?;
+                        let engine_state = state::get_state(&io)?;
                         let result =
                             engine::refund_on_error(io, &env, engine_state, args, &mut handler);
                         Ok(TransactionExecutionResult::Submit(result))
@@ -367,7 +367,7 @@ fn non_submit_execute<'db>(
             None
         }
         TransactionKind::NewEngine(args) => {
-            engine::set_state(&mut io, args.clone().into());
+            state::set_state(&mut io, args.clone().into())?;
 
             None
         }
@@ -420,9 +420,9 @@ pub enum ConsumeMessageOutcome {
 
 #[derive(Debug)]
 pub struct TransactionIncludedOutcome {
-    pub hash: aurora_engine_types::H256,
+    pub hash: H256,
     pub info: TransactionMessage,
-    pub diff: crate::Diff,
+    pub diff: Diff,
     pub maybe_result: Result<Option<TransactionExecutionResult>, error::Error>,
 }
 
@@ -434,11 +434,11 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine, fungible_token};
+    use aurora_engine::{connector, engine, fungible_token, state};
 
     #[derive(Debug)]
     pub enum Error {
-        EngineState(engine::EngineStateError),
+        EngineState(state::error::EngineStateError),
         Engine(engine::EngineError),
         DeployErc20(engine::DeployErc20Error),
         FtOnTransfer(connector::error::FtTransferCallError),
@@ -452,8 +452,8 @@ pub mod error {
         ConnectorStorage(connector::error::StorageReadError),
     }
 
-    impl From<engine::EngineStateError> for Error {
-        fn from(e: engine::EngineStateError) -> Self {
+    impl From<state::error::EngineStateError> for Error {
+        fn from(e: state::error::EngineStateError) -> Self {
             Self::EngineState(e)
         }
     }

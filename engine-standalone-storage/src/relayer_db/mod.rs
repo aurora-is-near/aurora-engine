@@ -1,4 +1,4 @@
-use aurora_engine::engine;
+use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::account_id::AccountId;
@@ -63,7 +63,7 @@ where
 pub fn initialize_transactions<I>(
     storage: &mut Storage,
     mut rows: I,
-    engine_state: engine::EngineState,
+    engine_state: state::EngineState,
 ) -> Result<(), error::Error>
 where
     I: FallibleIterator<Item = types::TransactionRow, Error = postgres::Error>,
@@ -159,13 +159,13 @@ where
 }
 
 pub mod error {
-    use aurora_engine::engine;
+    use aurora_engine::{engine, state};
 
     #[derive(Debug)]
     pub enum Error {
         Storage(crate::Error),
         Postgres(postgres::Error),
-        EngineState(engine::EngineStateError),
+        EngineState(state::error::EngineStateError),
         Engine(engine::EngineError),
     }
 
@@ -181,8 +181,8 @@ pub mod error {
         }
     }
 
-    impl From<engine::EngineStateError> for Error {
-        fn from(e: engine::EngineStateError) -> Self {
+    impl From<state::error::EngineStateError> for Error {
+        fn from(e: state::error::EngineStateError) -> Self {
             Self::EngineState(e)
         }
     }
@@ -198,7 +198,7 @@ pub mod error {
 mod test {
     use super::FallibleIterator;
     use crate::sync::types::{TransactionKind, TransactionMessage};
-    use aurora_engine::{connector, engine, parameters};
+    use aurora_engine::{connector, parameters, state};
     use aurora_engine_types::H256;
 
     /// Requires a running postgres server to work. A snapshot of the DB can be
@@ -210,11 +210,11 @@ mod test {
     fn test_fill_db() {
         let mut storage = crate::Storage::open("rocks_tmp/").unwrap();
         let mut connection = super::connect_without_tls(&Default::default()).unwrap();
-        let engine_state = engine::EngineState {
+        let engine_state = state::EngineState {
             chain_id: aurora_engine_types::types::u256_to_arr(&1313161555.into()),
             owner_id: "aurora".parse().unwrap(),
-            bridge_prover_id: "prover.bridge.near".parse().unwrap(),
             upgrade_delay_blocks: 0,
+            default_gas_token: Default::default(),
         };
 
         // Initialize engine and connector states in storage.
@@ -231,12 +231,12 @@ mod test {
                 .unwrap();
             let result = storage.with_engine_access(block_height, 0, &[], |io| {
                 let mut local_io = io;
-                engine::set_state(&mut local_io, engine_state.clone());
+                state::set_state(&mut local_io, engine_state.clone()).unwrap();
                 connector::EthConnectorContract::create_contract(
                     io,
                     engine_state.owner_id.clone(),
                     parameters::InitCallArgs {
-                        prover_account: engine_state.bridge_prover_id.clone(),
+                        prover_account: "prover.bridge.near".parse().unwrap(),
                         eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"
                             .to_string(),
                         metadata: Default::default(),

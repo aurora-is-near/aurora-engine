@@ -1,4 +1,4 @@
-use aurora_engine::engine;
+use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
 use aurora_engine_test_doubles::io::{Storage, StoragePointer};
 use aurora_engine_test_doubles::promise::PromiseTracker;
@@ -15,11 +15,11 @@ fn test_deploy_code() {
         buf
     };
     let owner_id: AccountId = "aurora".parse().unwrap();
-    let state = engine::EngineState {
+    let state = state::EngineState {
         chain_id,
         owner_id: owner_id.clone(),
-        bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
+        default_gas_token: Default::default(),
     };
     let origin = Address::new(H160([0u8; 20]));
     let storage = RwLock::new(Storage::default());
