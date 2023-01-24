@@ -629,6 +629,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
+    println!("{:#?}", res);
     assert!(res.is_success());
 
     let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
