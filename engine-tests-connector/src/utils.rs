@@ -333,7 +333,7 @@ pub fn get_eth_connector_contract() -> Vec<u8> {
 fn get_engine_contract() -> Vec<u8> {
     if cfg!(feature = "mainnet-test") {
         std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap()
-    } else if cfg!(feature = "") {
+    } else if cfg!(feature = "testnet-test") {
         std::fs::read("../bin/aurora-testnet-test.wasm").unwrap()
     } else {
         panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
