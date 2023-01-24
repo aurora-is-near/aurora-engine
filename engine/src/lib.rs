@@ -25,6 +25,7 @@ pub mod deposit_event;
 pub mod engine;
 pub mod errors;
 pub mod fungible_token;
+pub mod gas_token;
 pub mod json;
 pub mod log_entry;
 pub mod pausables;

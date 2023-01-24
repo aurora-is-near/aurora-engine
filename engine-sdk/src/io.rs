@@ -156,7 +156,7 @@ pub trait IO {
         Ok(U256::from_big_endian(&result))
     }
 
-    fn write_borsh<T: BorshSerialize>(
+    fn write_storage_borsh<T: BorshSerialize>(
         &mut self,
         key: &[u8],
         value: &T,
