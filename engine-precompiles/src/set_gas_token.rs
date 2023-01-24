@@ -28,6 +28,7 @@ pub mod consts {
 }
 
 pub mod events {
+    use crate::prelude::vec;
     use crate::set_gas_token::consts;
     use aurora_engine_types::types::Address;
     use aurora_engine_types::H256;

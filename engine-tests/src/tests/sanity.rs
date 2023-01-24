@@ -843,8 +843,8 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
         &runner,
         source_address,
         INITIAL_BALANCE,
-        // nonce is still incremented since the transaction was otherwise valid
-        (INITIAL_NONCE + 1).into(),
+        // we shouldn't increment nonce in case of OutOfFund error
+        (INITIAL_NONCE).into(),
     );
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
     test_utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
@@ -1015,7 +1015,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
     // validate post-state
     assert_eq!(
         query_address_sim(&address, "get_nonce", &aurora),
-        U256::from(INITIAL_NONCE + 1),
+        U256::from(INITIAL_NONCE),
     );
     assert_eq!(
         query_address_sim(&address, "get_balance", &aurora),
