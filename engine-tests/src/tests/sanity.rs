@@ -136,10 +136,10 @@ fn test_state_format() {
     let args = aurora_engine::parameters::NewCallArgs {
         chain_id: aurora_engine_types::types::u256_to_arr(&666.into()),
         owner_id: "boss".parse().unwrap(),
-        bridge_prover_id: "prover_mcprovy_face".parse().unwrap(),
         upgrade_delay_blocks: 3,
+        default_gas_token: [0u8; 20],
     };
-    let state: aurora_engine::engine::EngineState = args.into();
+    let state: aurora_engine::state::EngineState = args.into();
     let expected_hex: String = [
         "000000000000000000000000000000000000000000000000000000000000029a",
         "04000000626f7373",
