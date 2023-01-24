@@ -73,7 +73,6 @@ mod contract {
     use crate::admin_controlled::AdminControlled;
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine, EngineState};
-    use crate::fungible_token::FungibleTokenMetadata;
     use crate::json::parse_json;
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -866,9 +865,11 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_metadata() {
         let mut io = Runtime;
-        let metadata: FungibleTokenMetadata = connector::get_metadata(&io).unwrap_or_default();
-        let json_data = crate::json::JsonValue::from(metadata);
-        io.return_output(json_data.to_string().as_bytes())
+        let promise_args = EthConnectorContract::init_instance(io)
+            .sdk_unwrap()
+            .get_metadata();
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
+        io.promise_return(promise_id);
     }
 
     #[cfg(feature = "integration-test")]

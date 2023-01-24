@@ -448,7 +448,7 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine, fungible_token};
+    use aurora_engine::{connector, engine};
 
     #[derive(Debug)]
     pub enum Error {
@@ -456,11 +456,11 @@ pub mod error {
         Engine(engine::EngineError),
         DeployErc20(engine::DeployErc20Error),
         FtOnTransfer(connector::error::FtTransferCallError),
-        Deposit(fungible_token::error::DepositError),
+        Deposit(connector::error::DepositError),
         FinishDeposit(connector::error::FinishDepositError),
-        FtTransfer(fungible_token::error::TransferError),
+        FtTransfer(connector::error::TransferError),
         FtWithdraw(connector::error::WithdrawError),
-        FtStorageFunding(fungible_token::error::StorageFundingError),
+        FtStorageFunding(connector::error::StorageFundingError),
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
         ConnectorInit(connector::error::InitContractError),
         ConnectorStorage(connector::error::StorageReadError),
@@ -490,8 +490,8 @@ pub mod error {
         }
     }
 
-    impl From<fungible_token::error::DepositError> for Error {
-        fn from(e: fungible_token::error::DepositError) -> Self {
+    impl From<connector::error::DepositError> for Error {
+        fn from(e: connector::error::DepositError) -> Self {
             Self::Deposit(e)
         }
     }
@@ -502,8 +502,8 @@ pub mod error {
         }
     }
 
-    impl From<fungible_token::error::TransferError> for Error {
-        fn from(e: fungible_token::error::TransferError) -> Self {
+    impl From<connector::error::TransferError> for Error {
+        fn from(e: connector::error::TransferError) -> Self {
             Self::FtTransfer(e)
         }
     }
@@ -514,8 +514,8 @@ pub mod error {
         }
     }
 
-    impl From<fungible_token::error::StorageFundingError> for Error {
-        fn from(e: fungible_token::error::StorageFundingError) -> Self {
+    impl From<connector::error::StorageFundingError> for Error {
+        fn from(e: connector::error::StorageFundingError) -> Self {
             Self::FtStorageFunding(e)
         }
     }

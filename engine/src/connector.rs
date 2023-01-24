@@ -1,12 +1,10 @@
 use crate::admin_controlled::AdminControlled;
-use crate::fungible_token::FungibleTokenMetadata;
 use crate::parameters::{BalanceOfEthCallArgs, NEP141FtOnTransferArgs, SetContractDataCallArgs};
 use crate::prelude::{address::error::AddressError, Wei};
 use crate::prelude::{PromiseCreateArgs, U256};
 
 use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
-use crate::fungible_token::error::DepositError;
 use crate::prelude::{
     format, sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, Yocto,
@@ -14,6 +12,7 @@ use crate::prelude::{
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::types::ZERO_WEI;
+use error::DepositError;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -291,6 +290,17 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             attached_gas: DEFAULT_PREPAID_GAS,
         }
     }
+
+    /// Return FT metadata
+    pub fn get_metadata(&self) -> PromiseCreateArgs {
+        PromiseCreateArgs {
+            target_account_id: self.get_eth_connector_contract_account(),
+            method: "ft_metadata".to_string(),
+            args: Vec::new(),
+            attached_balance: ZERO_ATTACHED_BALANCE,
+            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+        }
+    }
 }
 
 impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
@@ -346,21 +356,19 @@ pub fn set_contract_data<I: IO>(
     Ok(contract_data)
 }
 
-/// Return metdata
-pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
-    io.read_storage(&construct_contract_key(
-        &EthConnectorStorageId::FungibleTokenMetadata,
-    ))
-    .and_then(|data| data.to_value().ok())
-}
-
 pub mod error {
     use crate::errors;
     use aurora_engine_types::types::address::error::AddressError;
-    use aurora_engine_types::types::balance::error::BalanceOverflowError;
 
     use crate::deposit_event::error::ParseOnTransferMessageError;
-    use crate::fungible_token;
+    use crate::prelude::types::balance::error::BalanceOverflowError;
+
+    const TOTAL_SUPPLY_OVERFLOW: &[u8; 25] = errors::ERR_TOTAL_SUPPLY_OVERFLOW;
+    const BALANCE_OVERFLOW: &[u8; 20] = errors::ERR_BALANCE_OVERFLOW;
+    const NOT_ENOUGH_BALANCE: &[u8; 22] = errors::ERR_NOT_ENOUGH_BALANCE;
+    const TOTAL_SUPPLY_UNDERFLOW: &[u8; 26] = errors::ERR_TOTAL_SUPPLY_UNDERFLOW;
+    const ZERO_AMOUNT: &[u8; 15] = errors::ERR_ZERO_AMOUNT;
+    const SELF_TRANSFER: &[u8; 26] = errors::ERR_SENDER_EQUALS_RECEIVER;
 
     const PROOF_EXIST: &[u8; 15] = errors::ERR_PROOF_EXIST;
 
@@ -397,8 +405,8 @@ pub mod error {
         }
     }
 
-    impl From<fungible_token::error::DepositError> for FinishDepositError {
-        fn from(e: fungible_token::error::DepositError) -> Self {
+    impl From<DepositError> for FinishDepositError {
+        fn from(e: DepositError) -> Self {
             Self::TransferCall(FtTransferCallError::Transfer(e.into()))
         }
     }
@@ -414,12 +422,12 @@ pub mod error {
 
     #[derive(Debug)]
     pub enum WithdrawError {
-        FT(fungible_token::error::WithdrawError),
+        FT(WithdrawFtError),
         ParseArgs,
     }
 
-    impl From<fungible_token::error::WithdrawError> for WithdrawError {
-        fn from(e: fungible_token::error::WithdrawError) -> Self {
+    impl From<WithdrawFtError> for WithdrawError {
+        fn from(e: WithdrawFtError) -> Self {
             Self::FT(e)
         }
     }
@@ -438,17 +446,17 @@ pub mod error {
         BalanceOverflow(BalanceOverflowError),
         MessageParseFailed(ParseOnTransferMessageError),
         InsufficientAmountForFee,
-        Transfer(fungible_token::error::TransferError),
+        Transfer(TransferError),
     }
 
-    impl From<fungible_token::error::TransferError> for FtTransferCallError {
-        fn from(e: fungible_token::error::TransferError) -> Self {
+    impl From<TransferError> for FtTransferCallError {
+        fn from(e: TransferError) -> Self {
             Self::Transfer(e)
         }
     }
 
-    impl From<fungible_token::error::DepositError> for FtTransferCallError {
-        fn from(e: fungible_token::error::DepositError) -> Self {
+    impl From<DepositError> for FtTransferCallError {
+        fn from(e: DepositError) -> Self {
             Self::Transfer(e.into())
         }
     }
@@ -490,6 +498,101 @@ pub mod error {
     impl AsRef<[u8]> for ProofUsed {
         fn as_ref(&self) -> &[u8] {
             PROOF_EXIST
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum DepositError {
+        TotalSupplyOverflow,
+        BalanceOverflow,
+    }
+
+    impl AsRef<[u8]> for DepositError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TotalSupplyOverflow => TOTAL_SUPPLY_OVERFLOW,
+                Self::BalanceOverflow => BALANCE_OVERFLOW,
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum WithdrawFtError {
+        TotalSupplyUnderflow,
+        InsufficientFunds,
+        BalanceOverflow(BalanceOverflowError),
+    }
+
+    impl AsRef<[u8]> for WithdrawFtError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TotalSupplyUnderflow => TOTAL_SUPPLY_UNDERFLOW,
+                Self::InsufficientFunds => NOT_ENOUGH_BALANCE,
+                Self::BalanceOverflow(e) => e.as_ref(),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum TransferError {
+        TotalSupplyUnderflow,
+        TotalSupplyOverflow,
+        InsufficientFunds,
+        BalanceOverflow,
+        ZeroAmount,
+        SelfTransfer,
+    }
+
+    impl AsRef<[u8]> for TransferError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TotalSupplyUnderflow => TOTAL_SUPPLY_UNDERFLOW,
+                Self::TotalSupplyOverflow => TOTAL_SUPPLY_OVERFLOW,
+                Self::InsufficientFunds => NOT_ENOUGH_BALANCE,
+                Self::BalanceOverflow => BALANCE_OVERFLOW,
+                Self::ZeroAmount => ZERO_AMOUNT,
+                Self::SelfTransfer => SELF_TRANSFER,
+            }
+        }
+    }
+
+    impl From<WithdrawFtError> for TransferError {
+        fn from(err: WithdrawFtError) -> Self {
+            match err {
+                WithdrawFtError::InsufficientFunds => Self::InsufficientFunds,
+                WithdrawFtError::TotalSupplyUnderflow => Self::TotalSupplyUnderflow,
+                WithdrawFtError::BalanceOverflow(_) => Self::BalanceOverflow,
+            }
+        }
+    }
+
+    impl From<DepositError> for TransferError {
+        fn from(err: DepositError) -> Self {
+            match err {
+                DepositError::BalanceOverflow => Self::BalanceOverflow,
+                DepositError::TotalSupplyOverflow => Self::TotalSupplyOverflow,
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum StorageFundingError {
+        NotRegistered,
+        NoAvailableBalance,
+        InsufficientDeposit,
+        UnRegisterPositiveBalance,
+    }
+
+    impl AsRef<[u8]> for StorageFundingError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::NotRegistered => errors::ERR_ACCOUNT_NOT_REGISTERED,
+                Self::NoAvailableBalance => errors::ERR_NO_AVAILABLE_BALANCE,
+                Self::InsufficientDeposit => errors::ERR_ATTACHED_DEPOSIT_NOT_ENOUGH,
+                Self::UnRegisterPositiveBalance => {
+                    errors::ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE
+                }
+            }
         }
     }
 }
