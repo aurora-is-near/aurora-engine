@@ -2,7 +2,6 @@ use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::test_utils;
 use crate::tests::state_migration;
-use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{SubmitResult, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use borsh::BorshSerialize;
@@ -923,23 +922,6 @@ fn test_block_hash_contract() {
         .unwrap();
 
     test_utils::panic_on_fail(result.status);
-}
-
-#[test]
-fn test_ft_metadata() {
-    let mut runner = test_utils::deploy_evm();
-
-    let account_id: String = runner.context.signer_account_id.clone().into();
-    let (maybe_outcome, maybe_error) = runner.call("ft_metadata", &account_id, Vec::new());
-    assert!(maybe_error.is_none());
-    let outcome = maybe_outcome.unwrap();
-    let json_value =
-        aurora_engine::json::parse_json(&outcome.return_data.as_value().unwrap()).unwrap();
-
-    assert_eq!(
-        json_value,
-        aurora_engine::json::JsonValue::from(FungibleTokenMetadata::default())
-    );
 }
 
 // Same as `test_eth_transfer_insufficient_balance` above, except runs through

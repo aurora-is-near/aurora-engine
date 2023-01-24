@@ -399,7 +399,7 @@ pub mod sim_tests {
     use crate::test_utils::exit_precompile::TesterConstructor;
 
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
-    use aurora_engine::fungible_token::FungibleTokenMetadata;
+    use aurora_engine::metadata::FungibleTokenMetadata;
     use aurora_engine::parameters::{
         CallArgs, DeployErc20TokenArgs, FunctionCallArgsV2, SetEthConnectorContractAccountArgs,
         SubmitResult,

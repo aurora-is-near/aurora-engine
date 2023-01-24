@@ -227,7 +227,8 @@ args = [
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",
-    "--nocapture",
+    "--test-threads=4",    
+    # "--nocapture",
 ]
 
 [tasks.build-aurora-eth-connector]

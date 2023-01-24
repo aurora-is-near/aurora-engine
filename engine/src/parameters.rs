@@ -1,6 +1,6 @@
 use crate::errors;
-use crate::fungible_token::FungibleTokenMetadata;
 use crate::json::{JsonError, JsonValue};
+use crate::metadata::FungibleTokenMetadata;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     format, Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256, String, Vec,

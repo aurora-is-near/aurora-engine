@@ -1,5 +1,4 @@
-use crate::json::JsonValue;
-use crate::prelude::{BTreeMap, BorshDeserialize, BorshSerialize};
+use crate::prelude::{BorshDeserialize, BorshSerialize};
 use crate::prelude::{String, ToString};
 
 /// Fungible token Reference hash type.
@@ -42,41 +41,5 @@ impl Default for FungibleTokenMetadata {
             reference_hash: None,
             decimals: 18,
         }
-    }
-}
-
-impl From<FungibleTokenMetadata> for JsonValue {
-    fn from(metadata: FungibleTokenMetadata) -> Self {
-        let mut kvs = BTreeMap::new();
-        kvs.insert("spec".to_string(), JsonValue::String(metadata.spec));
-        kvs.insert("name".to_string(), JsonValue::String(metadata.name));
-        kvs.insert("symbol".to_string(), JsonValue::String(metadata.symbol));
-        kvs.insert(
-            "icon".to_string(),
-            metadata
-                .icon
-                .map(JsonValue::String)
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "reference".to_string(),
-            metadata
-                .reference
-                .map(JsonValue::String)
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "reference_hash".to_string(),
-            metadata
-                .reference_hash
-                .map(|hash| JsonValue::String(hash.encode()))
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "decimals".to_string(),
-            JsonValue::U64(u64::from(metadata.decimals)),
-        );
-
-        JsonValue::Object(kvs)
     }
 }

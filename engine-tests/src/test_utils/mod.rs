@@ -14,7 +14,7 @@ use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
 
-use crate::prelude::fungible_token::FungibleTokenMetadata;
+use crate::prelude::metadata::FungibleTokenMetadata;
 use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
