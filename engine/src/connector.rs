@@ -104,7 +104,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         ft.internal_register_account(&owner_id);
 
         let paused_mask = UNPAUSE_ALL;
-        io.write_borsh(
+        io.write_storage_borsh(
             &construct_contract_key(&EthConnectorStorageId::PausedMask),
             &paused_mask,
         );
@@ -618,7 +618,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Save eth-connector fungible token contract data
     fn save_ft_contract(&mut self) {
-        self.io.write_borsh(
+        self.io.write_storage_borsh(
             &construct_contract_key(&EthConnectorStorageId::FungibleToken),
             &self.ft.data(),
         );
@@ -633,7 +633,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Save already used event proof as hash key
     fn save_used_event(&mut self, key: &str) {
-        self.io.write_borsh(&self.used_event_key(key), &0u8);
+        self.io.write_storage_borsh(&self.used_event_key(key), &0u8);
     }
 
     /// Check is event of proof already used
@@ -666,7 +666,7 @@ impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
     /// Set admin paused status
     fn set_paused(&mut self, paused_mask: PausedMask) {
         self.paused_mask = paused_mask;
-        self.io.write_borsh(
+        self.io.write_storage_borsh(
             &construct_contract_key(&EthConnectorStorageId::PausedMask),
             &self.paused_mask,
         );
@@ -700,12 +700,12 @@ pub fn set_contract_data<I: IO>(
         eth_custodian_address: Address::decode(&args.eth_custodian_address)?,
     };
     // Save eth-connector specific data
-    io.write_borsh(
+    io.write_storage_borsh(
         &construct_contract_key(&EthConnectorStorageId::Contract),
         &contract_data,
     );
 
-    io.write_borsh(
+    io.write_storage_borsh(
         &construct_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
         &args.metadata,
     );

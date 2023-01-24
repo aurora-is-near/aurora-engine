@@ -1,25 +1,13 @@
-use crate::parameters::{CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs};
-use core::mem;
-use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::{executor, Context};
-use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
-
-use crate::connector::EthConnectorContract;
-use crate::errors;
-use crate::map::BijectionMap;
-use aurora_engine_sdk::caching::FullCache;
-use aurora_engine_sdk::env::Env;
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
-
 use crate::accounting;
+use crate::connector::EthConnectorContract;
+use crate::gas_token::GasToken;
+use crate::map::BijectionMap;
+use crate::parameters::{CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs};
 use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
 use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
 };
 use crate::prelude::parameters::RefundCallArgs;
-use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
-use crate::prelude::precompiles::xcc::cross_contract_call;
 use crate::prelude::precompiles::{self, Precompiles};
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
@@ -27,11 +15,19 @@ use crate::prelude::{
     BTreeMap, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs,
     ToString, Vec, Wei, Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
-use aurora_engine_precompiles::set_gas_token::SetGasToken;
+use crate::{errors, gas_token};
 use aurora_engine_precompiles::{Precompile, PrecompileConstructorContext};
+use aurora_engine_sdk::caching::FullCache;
+use aurora_engine_sdk::env::Env;
+use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
 use aurora_engine_types::types::EthGas;
 use core::cell::RefCell;
 use core::iter::once;
+use core::mem;
+use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
+use evm::{executor, Context};
+use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -416,14 +412,6 @@ impl From<NewCallArgs> for EngineState {
     }
 }
 
-/// Used to select which gas token to pay in.
-pub enum GasToken {
-    /// Gas is paid in Ether.
-    ETH,
-    /// Gas is paid in a ERC-20 compatible token.
-    ERC20(Address),
-}
-
 pub struct Engine<'env, I: IO, E: Env> {
     state: EngineState,
     origin: Address,
@@ -497,12 +485,12 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let current_balance = get_balance(&self.io, sender);
 
         match gas_token {
-            GasToken::ETH => {
+            GasToken::Base => {
                 if current_balance < prepaid_amount {
                     return Err(GasPaymentError::OutOfFund);
                 }
             }
-            GasToken::ERC20(_address) => {
+            GasToken::Erc20(_address) => {
                 // TODO: Needs SputnikVM balance check
                 todo!()
             }
@@ -567,7 +555,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
+        let logs = apply_actions_from_logs(&mut self.io, handler, logs, &self.current_account_id);
 
         self.apply(values, Vec::<Log>::new(), true);
 
@@ -648,7 +636,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
+        let logs = apply_actions_from_logs(&mut self.io, handler, logs, &self.current_account_id);
 
         // There is no way to return the logs to the NEAR log method as it only
         // allows a return of UTF-8 strings.
@@ -873,7 +861,8 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 promise_handler: ro_promise_handler,
             });
             // Cross contract calls are not enabled on mainnet yet.
-            tmp.all_precompiles.remove(&cross_contract_call::ADDRESS);
+            tmp.all_precompiles
+                .remove(&precompiles::xcc::cross_contract_call::ADDRESS);
             tmp
         } else {
             Precompiles::new_london(PrecompileConstructorContext {
@@ -969,7 +958,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
     // TODO: Have GasToken derived from storage.
-    let prepaid_amount = match engine.get_gas_payment(&sender, &transaction, GasToken::ETH) {
+    let prepaid_amount = match engine.get_gas_payment(&sender, &transaction, GasToken::Base) {
         Ok(gas_result) => gas_result,
         Err(GasPaymentError::OutOfFund) => {
             let result = SubmitResult::new(TransactionStatus::OutOfFund, 0, vec![]);
@@ -998,7 +987,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         // not sure if there are consequences in changing the gas during the
         // execution of the transaction.
         if receiver == precompiles::set_gas_token::SET_GAS_TOKEN_ADDRESS {
-            let set_gas_token = SetGasToken;
+            let set_gas_token = precompiles::set_gas_token::SetGasToken;
             let context = Context {
                 address: receiver.raw(),
                 caller: transaction.address.raw(),
@@ -1097,7 +1086,7 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
         }
         // ETH exit; transfer ETH back from precompile address
         None => {
-            let exit_address = exit_to_near::ADDRESS;
+            let exit_address = precompiles::native::exit_to_near::ADDRESS;
             let mut engine =
                 Engine::new_with_state(state, exit_address, current_account_id, io, env);
             let refund_address = args.recipient_address;
@@ -1460,8 +1449,8 @@ fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) 
     remove_all_storage(io, address, generation);
 }
 
-fn filter_promises_from_logs<I, T, P>(
-    io: &I,
+fn apply_actions_from_logs<I, T, P>(
+    io: &mut I,
     handler: &mut P,
     logs: T,
     current_account_id: &AccountId,
@@ -1473,8 +1462,8 @@ where
 {
     logs.into_iter()
         .filter_map(|log| {
-            if log.address == exit_to_near::ADDRESS.raw()
-                || log.address == exit_to_ethereum::ADDRESS.raw()
+            if log.address == precompiles::native::exit_to_near::ADDRESS.raw()
+                || log.address == precompiles::native::exit_to_ethereum::ADDRESS.raw()
             {
                 if log.topics.is_empty() {
                     if let Ok(promise) = PromiseArgs::try_from_slice(&log.data) {
@@ -1506,8 +1495,8 @@ where
                     // `topics` field.
                     Some(log.into())
                 }
-            } else if log.address == cross_contract_call::ADDRESS.raw() {
-                if log.topics[0] == cross_contract_call::AMOUNT_TOPIC {
+            } else if log.address == precompiles::xcc::cross_contract_call::ADDRESS.raw() {
+                if log.topics[0] == precompiles::xcc::cross_contract_call::AMOUNT_TOPIC {
                     // NEAR balances are 128-bit, so the leading 16 bytes of the 256-bit topic
                     // value should always be zero.
                     assert_eq!(&log.topics[1].as_bytes()[0..16], &[0; 16]);
@@ -1524,6 +1513,21 @@ where
                     }
                 }
                 // do not pass on these "internal logs" to caller
+                None
+            } else if log.address == precompiles::set_gas_token::SET_GAS_TOKEN_ADDRESS.raw() {
+                if log.topics[0] == precompiles::set_gas_token::events::SET_GAS_TOKEN_SIGNATURE {
+                    let sender_address = {
+                        let mut buf = [0u8; 20];
+                        buf.copy_from_slice(&log.data[12..]);
+                        Address::from_array(buf)
+                    };
+                    let gas_token: GasToken = {
+                        let mut buf = [0u8; 20];
+                        buf.copy_from_slice(&log.topics[1].as_bytes()[12..]); // No need to `get` here given we know the length
+                        GasToken::from_address(Address::from_array(buf))
+                    };
+                    gas_token::set_gas_token(io, sender_address, gas_token);
+                }
                 None
             } else {
                 Some(log.into())
@@ -2135,7 +2139,7 @@ mod tests {
         };
         // TODO: Add other tests than just ETH as a gas token.
         let actual_result = engine
-            .get_gas_payment(&origin, &transaction, GasToken::ETH)
+            .get_gas_payment(&origin, &transaction, GasToken::Base)
             .unwrap();
 
         let expected_result = GasPaymentResult {
@@ -2249,7 +2253,12 @@ mod tests {
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         let refund_amount = Wei::new_u64(1000);
-        add_balance(&mut io, &exit_to_near::ADDRESS, refund_amount).unwrap();
+        add_balance(
+            &mut io,
+            &precompiles::native::exit_to_near::ADDRESS,
+            refund_amount,
+        )
+        .unwrap();
         set_state(&mut io, expected_state.clone());
         let args = RefundCallArgs {
             recipient_address,
@@ -2399,7 +2408,7 @@ mod tests {
     fn test_filtering_promises_from_logs_with_none_keeps_all() {
         let storage = Storage::default();
         let storage = RwLock::new(storage);
-        let io = StoragePointer(&storage);
+        let mut io = StoragePointer(&storage);
         let current_account_id = AccountId::default();
         let mut handler = Noop;
         let logs = vec![Log {
@@ -2408,7 +2417,7 @@ mod tests {
             data: vec![],
         }];
 
-        let actual_logs = filter_promises_from_logs(&io, &mut handler, logs, &current_account_id);
+        let actual_logs = apply_actions_from_logs(&mut io, &mut handler, logs, &current_account_id);
         let expected_logs = vec![ResultLog {
             address: Default::default(),
             topics: vec![],

@@ -207,7 +207,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
         ];
-        let fun: prelude::Vec<Box<dyn Precompile>> = vec![
+        let fun: Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
@@ -236,7 +236,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
         ];
-        let fun: prelude::Vec<Box<dyn Precompile>> = vec![
+        let fun: Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
@@ -307,7 +307,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
         ];
-        let fun: prelude::Vec<Box<dyn Precompile>> = vec![
+        let fun: Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),

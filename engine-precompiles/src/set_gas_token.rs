@@ -34,8 +34,7 @@ pub mod events {
     use aurora_engine_types::H256;
     use evm::backend::Log;
 
-    // TODO
-    pub(crate) const SET_GAS_TOKEN_SIGNATURE: H256 = crate::make_h256(
+    pub const SET_GAS_TOKEN_SIGNATURE: H256 = crate::make_h256(
         0x29d0b6eaa171d0d1607729f506329510,
         0x7bc9766ba17d250f129cb5bd06503d13,
     );
@@ -47,13 +46,13 @@ pub mod events {
 
     impl SetGasTokenLog {
         pub(crate) fn encode(self) -> Log {
-            let data = ethabi::encode(&[ethabi::Token::Address(self.gas_token.raw())]);
-            let sender_address = {
+            let gas_token_address = {
                 let mut buf = [0u8; 32];
-                buf[12..].copy_from_slice(self.sender.as_bytes());
+                buf[12..].copy_from_slice(self.gas_token.as_bytes());
                 H256(buf)
             };
-            let topics = vec![SET_GAS_TOKEN_SIGNATURE, sender_address];
+            let data = ethabi::encode(&[ethabi::Token::Address(self.sender.raw())]);
+            let topics = vec![SET_GAS_TOKEN_SIGNATURE, gas_token_address];
 
             let raw_log = ethabi::RawLog { topics, data };
 
@@ -140,6 +139,7 @@ impl Precompile for SetGasToken {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::H160;
     use aurora_engine_sdk::types::near_account_to_evm_address;
 
     #[test]
@@ -154,5 +154,22 @@ mod tests {
     fn test_signature() {
         let schema = events::set_gas_token_schema();
         assert_eq!(schema.signature(), events::SET_GAS_TOKEN_SIGNATURE);
+    }
+
+    #[test]
+    fn test_run() {
+        let set_gas_token = SetGasToken;
+        let user = H160([0x11u8; 20]);
+        let target_gas = EthGas::new(10_000);
+        let context = Context {
+            address: SET_GAS_TOKEN_ADDRESS.raw(),
+            caller: user,
+            apparent_value: Default::default(),
+        };
+        let input = hex::decode("8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79").unwrap(); // Aurora mainnet contract address
+        let result = set_gas_token
+            .run(&input, Some(target_gas), &context, false)
+            .unwrap();
+        println!("{result:?}");
     }
 }

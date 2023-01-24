@@ -537,7 +537,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             self.io.write_storage(&key, &accounts_counter.to_le_bytes());
         }
         self.io
-            .write_borsh(&Self::account_to_key(account_id), &amount);
+            .write_storage_borsh(&Self::account_to_key(account_id), &amount);
     }
 
     /// Get accounts counter for statistics
