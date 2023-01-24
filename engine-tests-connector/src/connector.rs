@@ -8,7 +8,7 @@ use aurora_engine_types::{
 use byte_slice_cast::AsByteSlice;
 use near_sdk::json_types::U64;
 use near_sdk::serde_json::json;
-use near_sdk::{json_types::U128, ONE_YOCTO};
+use near_sdk::{json_types::U128, serde, ONE_YOCTO};
 use workspaces::AccountId;
 
 /// Bytes for a NEAR smart contract implementing `ft_on_transfer`
@@ -1415,5 +1415,49 @@ async fn test_withdraw_from_user() -> anyhow::Result<()> {
         contract.total_supply().await?,
         DEPOSITED_AMOUNT - withdraw_amount.as_u128(),
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_ft_metadata() -> anyhow::Result<()> {
+    use aurora_engine::metadata::FungibleTokenMetadata as ft_m;
+    use serde::{self, Deserialize};
+
+    #[derive(Debug, Deserialize)]
+    pub struct FungibleTokenMetadata {
+        pub spec: String,
+        pub name: String,
+        pub symbol: String,
+        pub icon: Option<String>,
+        pub reference: Option<String>,
+        pub reference_hash: Option<[u8; 32]>,
+        pub decimals: u8,
+    }
+
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+
+    let metadata = contract
+        .engine_contract
+        .call("ft_metadata")
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?
+        .into_result()
+        .unwrap()
+        .json::<FungibleTokenMetadata>()
+        .unwrap();
+    let m = ft_m::default();
+    let reference_hash = m.reference_hash.map(|h| {
+        let x: [u8; 32] = h.as_ref().try_into().unwrap();
+        x
+    });
+    assert_eq!(metadata.spec, m.spec);
+    assert_eq!(metadata.decimals, m.decimals);
+    assert_eq!(metadata.icon, m.icon);
+    assert_eq!(metadata.name, m.name);
+    assert_eq!(metadata.reference, m.reference);
+    assert_eq!(metadata.reference_hash, reference_hash);
+    assert_eq!(metadata.symbol, m.symbol);
     Ok(())
 }
