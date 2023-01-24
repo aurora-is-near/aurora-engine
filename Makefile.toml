@@ -224,7 +224,7 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-    "test_ft_transfer_call_fee_greater_than_amount",
+    # "test_ft_transfer_call_fee_greater_than_amount",
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",
