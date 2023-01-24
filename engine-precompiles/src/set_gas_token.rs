@@ -1,9 +1,9 @@
+use crate::prelude::{vec, Cow};
 use crate::set_gas_token::events::SetGasTokenLog;
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{Address, EthGas};
 use evm::backend::Log;
 use evm::{Context, ExitError};
-use std::borrow::Cow;
 
 pub use consts::SET_GAS_TOKEN_ADDRESS;
 

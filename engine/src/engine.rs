@@ -428,7 +428,6 @@ pub struct Engine<'env, I: IO, E: Env> {
     state: EngineState,
     origin: Address,
     gas_price: U256,
-    gas_token: GasToken,
     current_account_id: AccountId,
     io: I,
     env: &'env E,
@@ -464,7 +463,6 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             state,
             origin,
             gas_price: U256::zero(),
-            gas_token: GasToken::ETH,
             current_account_id,
             io,
             env,
@@ -509,7 +507,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 // This part is questionable.
                 set_balance(&mut self.io, sender, &new_balance);
             }
-            GasToken::ERC20(addr) => {
+            GasToken::ERC20(_addr) => {
                 // TODO: Needs SputnikVM balance check
                 todo!()
             }
@@ -814,7 +812,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 &erc20_token,
                 Wei::zero(),
                 setup_receive_erc20_tokens_input(args, &recipient),
-                u64::MAX,
+                EthGas::MAX,
                 Vec::new(), // TODO: are there values we should put here?
                 handler,
             )
@@ -986,10 +984,13 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
             return Err(EngineErrorKind::GasPayment(err).into());
         }
     };
-    let gas_limit: EthGas = transaction
-        .gas_limit
-        .try_into()
-        .map_err(|_| EngineErrorKind::GasOverflow)?;
+    let gas_limit: EthGas = {
+        let gas_limit: u64 = transaction
+            .gas_limit
+            .try_into()
+            .map_err(|_| EngineErrorKind::GasOverflow)?;
+        EthGas::new(gas_limit)
+    };
     let access_list = transaction
         .access_list
         .into_iter()
@@ -1564,7 +1565,7 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
     handler.promise_attach_callback(base_id, promise)
 }
 
-impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
+impl<'env, I: IO + Copy, E: Env> Backend for Engine<'env, I, E> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
         self.gas_price
@@ -1851,6 +1852,7 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "std")]
 mod tests {
     use super::*;
     use crate::parameters::{FunctionCallArgsV1, FunctionCallArgsV2};
@@ -2139,7 +2141,10 @@ mod tests {
             data: vec![],
             access_list: vec![],
         };
-        let actual_result = engine.charge_gas(&origin, &transaction).unwrap();
+        // TODO: Add other tests than just ETH as a gas token.
+        let actual_result = engine
+            .charge_gas(&origin, &transaction, GasToken::ETH)
+            .unwrap();
 
         let expected_result = GasPaymentResult {
             prepaid_amount: Wei::zero(),
