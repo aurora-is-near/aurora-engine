@@ -21,11 +21,10 @@ pub struct NewCallArgs {
     /// Account which can upgrade this contract.
     /// Use empty to disable updatability.
     pub owner_id: AccountId,
-    /// Account of the bridge prover.
-    /// Use empty to not use base token as bridged asset.
-    pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
+    /// The default gas token.
+    pub default_gas_token: [u8; 20],
 }
 
 /// Borsh-encoded log for use in a `SubmitResult`.

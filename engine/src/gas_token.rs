@@ -8,10 +8,11 @@ mod errors {
     pub const ERR_DESERIALIZE_GAS_TOKEN: &str = "ERR_DESERIALIZE_GAS_TOKEN";
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Default, Clone, PartialEq, Eq, Debug, BorshSerialize, BorshDeserialize)]
 /// Used to select which gas token to pay in.
 pub enum GasToken {
     /// Gas is paid in Ether.
+    #[default]
     Base,
     /// Gas is paid in a ERC-20 compatible token.
     Erc20(Address),
@@ -34,6 +35,10 @@ impl GasToken {
         } else {
             Erc20(address)
         }
+    }
+
+    pub(crate) fn from_array(bytes: [u8; 20]) -> GasToken {
+        Self::from_address(Address::from_array(bytes))
     }
 }
 
