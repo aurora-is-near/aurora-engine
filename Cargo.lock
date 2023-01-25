@@ -244,6 +244,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-standalone-nep141-legacy"
+version = "0.1.0"
+dependencies = [
+ "aurora-engine",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "base64 0.13.0",
+ "borsh",
+]
+
+[[package]]
 name = "aurora-engine-test-doubles"
 version = "1.0.0"
 dependencies = [
@@ -1351,6 +1362,7 @@ dependencies = [
  "aurora-engine",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
+ "aurora-engine-standalone-nep141-legacy",
  "aurora-engine-transactions",
  "aurora-engine-types",
  "base64 0.13.0",

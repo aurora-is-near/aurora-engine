@@ -1,11 +1,14 @@
-use aurora_engine::admin_controlled::AdminControlled;
-use aurora_engine::pausables::{
-    EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
-};
-use aurora_engine::{connector, engine, parameters::SubmitResult, xcc};
+use aurora_engine::pausables::PausedPrecompilesManager;
+use aurora_engine::pausables::PrecompileFlags;
+use aurora_engine::{engine, parameters::SubmitResult, pausables::EnginePrecompilesPauser, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
-use aurora_engine_types::parameters::{EngineWithdrawCallArgs, PromiseCreateArgs};
-use aurora_engine_types::{account_id::AccountId, types::Address, H256};
+use aurora_engine_standalone_nep141_legacy::legacy_connector;
+use aurora_engine_types::{
+    account_id::AccountId,
+    parameters::PromiseWithCallbackArgs,
+    types::{Address, Yocto},
+    H256,
+};
 
 pub mod types;
 
@@ -217,7 +220,7 @@ fn non_submit_execute<'db>(
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
             if env.predecessor_account_id == env.current_account_id {
-                connector::EthConnectorContract::init_instance(io)?
+                legacy_connector::EthConnectorContract::init_instance(io)?
                     .ft_on_transfer(&engine, args)?;
             } else {
                 engine.receive_erc20_tokens(
@@ -227,125 +230,100 @@ fn non_submit_execute<'db>(
                     &mut handler,
                 );
             }
+
             None
         }
 
         TransactionKind::FtTransferCall(args) => {
-            let input = if let Some(memo) = args.clone().memo {
-                format!(
-                    "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?},  \"msg\": {:?} }}",
-                    env.predecessor_account_id,
-                    args.receiver_id.to_string(),
-                    args.amount.to_string(),
-                    memo,
-                    args.msg
-                )
-            } else {
-                format!(
-                    "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"msg\": {:?} }}",
-                    env.predecessor_account_id,
-                    args.receiver_id.to_string(),
-                    args.amount.to_string(),
-                    args.msg
-                )
-            }.as_bytes().to_vec();
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector.ft_transfer_call(input);
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
+            let promise_args = connector.ft_transfer_call(
+                env.predecessor_account_id.clone(),
+                env.current_account_id.clone(),
+                args.clone(),
+                env.prepaid_gas,
+            )?;
+
             Some(TransactionExecutionResult::Promise(promise_args))
+        }
+
+        TransactionKind::ResolveTransfer(args, promise_result) => {
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
+            connector.ft_resolve_transfer(args.clone(), promise_result.clone());
+
+            None
         }
 
         TransactionKind::FtTransfer(args) => {
-            let connector = connector::EthConnectorContract::init_instance(io)?;
-            let input = if let Some(memo) = args.clone(). memo {
-                format!(
-                    "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?} }}",
-                    env.predecessor_account_id,
-                    args.receiver_id.to_string(),
-                    args.amount.to_string(),
-                    memo
-                )
-            } else {
-                format!(
-                    "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?} }}",
-                    env.predecessor_account_id,
-                    args.receiver_id.to_string(),
-                    args.amount.to_string(),
-                )
-            }.as_bytes().to_vec();
-            let promise_args = connector.ft_transfer(input);
-            Some(TransactionExecutionResult::Promise(promise_args))
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
+            connector.ft_transfer(&env.predecessor_account_id, args.clone())?;
+
+            None
         }
 
         TransactionKind::Withdraw(args) => {
-            use borsh::BorshSerialize;
-            let input = EngineWithdrawCallArgs {
-                sender_id: env.predecessor_account_id(),
-                recipient_address: args.recipient_address,
-                amount: args.amount,
-            }
-            .try_to_vec()
-            .map_err(|_| error::Error::FtWithdraw(connector::error::WithdrawError::ParseArgs))?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
+            connector.withdraw_eth_from_near(
+                &env.current_account_id,
+                &env.predecessor_account_id,
+                args.clone(),
+            )?;
 
-            let connector = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector.withdraw_eth_from_near(input);
+            None
+        }
+
+        TransactionKind::Deposit(raw_proof) => {
+            let connector_contract = legacy_connector::EthConnectorContract::init_instance(io)?;
+            let promise_args = connector_contract.deposit(
+                raw_proof.clone(),
+                env.current_account_id(),
+                env.predecessor_account_id(),
+            )?;
+
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
-        TransactionKind::Deposit(args) => {
-            let mut connector_contract = connector::EthConnectorContract::init_instance(io)?;
-            connector_contract.set_eth_connector_contract_account(env.current_account_id);
-            let promise_args = connector_contract.deposit(args.clone());
-            Some(TransactionExecutionResult::Promise(promise_args))
+        TransactionKind::FinishDeposit(finish_args) => {
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
+            let maybe_promise_args = connector.finish_deposit(
+                env.predecessor_account_id(),
+                env.current_account_id(),
+                finish_args.clone(),
+                env.prepaid_gas,
+            )?;
+
+            maybe_promise_args.map(TransactionExecutionResult::Promise)
         }
 
         TransactionKind::StorageDeposit(args) => {
-            let connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
+            let _ = connector.storage_deposit(
+                env.predecessor_account_id,
+                Yocto::new(env.attached_deposit),
+                args.clone(),
+            )?;
 
-            let input = format!("\"sender_id\": {:?}", env.predecessor_account_id());
-            let input = if let Some(account_id) = args.account_id.clone() {
-                format!("{}, \"account_id\": {:?}", input, account_id.to_string())
-            } else {
-                input
-            };
-            let input = if let Some(registration_only) = args.registration_only {
-                format!(
-                    "{}, \"registration_only\": {:?}",
-                    input,
-                    registration_only.to_string()
-                )
-            } else {
-                input
-            };
-            let input = format!("{{ {} }}", input).as_bytes().to_vec();
-
-            let promise_args = connector.storage_deposit(input, env.attached_deposit);
-            Some(TransactionExecutionResult::Promise(promise_args))
+            None
         }
 
         TransactionKind::StorageUnregister(force) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let input = format!("\"sender_id\": {:?}", env.predecessor_account_id);
-            let input = if let Some(force) = force {
-                format!("{}, \"force\": {:?}", input, force)
-            } else {
-                input
-            };
-            let input = format!("{{ {} }}", input).as_bytes().to_vec();
-            let promise_args = connector.storage_unregister(input);
-            Some(TransactionExecutionResult::Promise(promise_args))
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
+            let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
+
+            None
         }
 
         TransactionKind::StorageWithdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let input = format!("\"sender_id\": {:?}", env.predecessor_account_id);
-            let input = if let Some(amount) = args.amount {
-                format!("{}, \"amount\": {:?}", input, amount.as_u128())
-            } else {
-                input
-            };
-            let input = format!("{{ {} }}", input).as_bytes().to_vec();
-            let promise_args = connector.storage_withdraw(input);
-            Some(TransactionExecutionResult::Promise(promise_args))
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
+            connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
+
+            None
+        }
+
+        TransactionKind::SetPausedFlags(args) => {
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
+            connector.set_paused_flags(args.clone());
+
+            None
         }
 
         TransactionKind::RegisterRelayer(evm_address) => {
@@ -374,12 +352,20 @@ fn non_submit_execute<'db>(
 
         TransactionKind::SetConnectorData(args) => {
             let mut connector_io = io;
-            connector::set_contract_data(&mut connector_io, args.clone())?;
+            legacy_connector::set_contract_data(&mut connector_io, args.clone())?;
 
             None
         }
 
-        TransactionKind::NewConnector(_args) => None,
+        TransactionKind::NewConnector(args) => {
+            legacy_connector::EthConnectorContract::create_contract(
+                io,
+                env.current_account_id,
+                args.clone(),
+            )?;
+
+            None
+        }
         TransactionKind::NewEngine(args) => {
             engine::set_state(&mut io, args.clone().into());
 
@@ -444,26 +430,27 @@ pub struct TransactionIncludedOutcome {
 pub enum TransactionExecutionResult {
     Submit(engine::EngineResult<SubmitResult>),
     DeployErc20(Address),
-    Promise(PromiseCreateArgs),
+    Promise(PromiseWithCallbackArgs),
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine};
+    use aurora_engine::engine;
+    use aurora_engine_standalone_nep141_legacy::{fungible_token, legacy_connector};
 
     #[derive(Debug)]
     pub enum Error {
         EngineState(engine::EngineStateError),
         Engine(engine::EngineError),
         DeployErc20(engine::DeployErc20Error),
-        FtOnTransfer(connector::error::FtTransferCallError),
-        Deposit(connector::error::DepositError),
-        FinishDeposit(connector::error::FinishDepositError),
-        FtTransfer(connector::error::TransferError),
-        FtWithdraw(connector::error::WithdrawError),
-        FtStorageFunding(connector::error::StorageFundingError),
+        FtOnTransfer(legacy_connector::error::FtTransferCallError),
+        Deposit(legacy_connector::error::DepositError),
+        FinishDeposit(legacy_connector::error::FinishDepositError),
+        FtTransfer(fungible_token::error::TransferError),
+        FtWithdraw(legacy_connector::error::WithdrawError),
+        FtStorageFunding(fungible_token::error::StorageFundingError),
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
-        ConnectorInit(connector::error::InitContractError),
-        ConnectorStorage(connector::error::StorageReadError),
+        ConnectorInit(legacy_connector::error::InitContractError),
+        ConnectorStorage(legacy_connector::error::StorageReadError),
     }
 
     impl From<engine::EngineStateError> for Error {
@@ -484,38 +471,38 @@ pub mod error {
         }
     }
 
-    impl From<connector::error::FtTransferCallError> for Error {
-        fn from(e: connector::error::FtTransferCallError) -> Self {
+    impl From<legacy_connector::error::FtTransferCallError> for Error {
+        fn from(e: legacy_connector::error::FtTransferCallError) -> Self {
             Self::FtOnTransfer(e)
         }
     }
 
-    impl From<connector::error::DepositError> for Error {
-        fn from(e: connector::error::DepositError) -> Self {
+    impl From<legacy_connector::error::DepositError> for Error {
+        fn from(e: legacy_connector::error::DepositError) -> Self {
             Self::Deposit(e)
         }
     }
 
-    impl From<connector::error::FinishDepositError> for Error {
-        fn from(e: connector::error::FinishDepositError) -> Self {
+    impl From<legacy_connector::error::FinishDepositError> for Error {
+        fn from(e: legacy_connector::error::FinishDepositError) -> Self {
             Self::FinishDeposit(e)
         }
     }
 
-    impl From<connector::error::TransferError> for Error {
-        fn from(e: connector::error::TransferError) -> Self {
+    impl From<fungible_token::error::TransferError> for Error {
+        fn from(e: fungible_token::error::TransferError) -> Self {
             Self::FtTransfer(e)
         }
     }
 
-    impl From<connector::error::WithdrawError> for Error {
-        fn from(e: connector::error::WithdrawError) -> Self {
+    impl From<legacy_connector::error::WithdrawError> for Error {
+        fn from(e: legacy_connector::error::WithdrawError) -> Self {
             Self::FtWithdraw(e)
         }
     }
 
-    impl From<connector::error::StorageFundingError> for Error {
-        fn from(e: connector::error::StorageFundingError) -> Self {
+    impl From<fungible_token::error::StorageFundingError> for Error {
+        fn from(e: fungible_token::error::StorageFundingError) -> Self {
             Self::FtStorageFunding(e)
         }
     }
@@ -526,14 +513,14 @@ pub mod error {
         }
     }
 
-    impl From<connector::error::InitContractError> for Error {
-        fn from(e: connector::error::InitContractError) -> Self {
+    impl From<legacy_connector::error::InitContractError> for Error {
+        fn from(e: legacy_connector::error::InitContractError) -> Self {
             Self::ConnectorInit(e)
         }
     }
 
-    impl From<connector::error::StorageReadError> for Error {
-        fn from(e: connector::error::StorageReadError) -> Self {
+    impl From<legacy_connector::error::StorageReadError> for Error {
+        fn from(e: legacy_connector::error::StorageReadError) -> Self {
             Self::ConnectorStorage(e)
         }
     }

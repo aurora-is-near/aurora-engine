@@ -35,6 +35,7 @@ members = [
     "engine-precompiles",
     "engine-sdk",
     "engine-standalone-storage",
+    "engine-standalone-nep141-legacy",
     "engine-standalone-tracing",
     "engine-tests",
     "engine-transactions",

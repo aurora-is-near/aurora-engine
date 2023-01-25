@@ -118,20 +118,20 @@ where
             Err(e) => {
                 if tx_succeeded {
                     println!(
-                        "WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
-                        near_tx_hash,
-                        e
-                    );
+						"WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
+						near_tx_hash,
+						e
+					);
                 }
                 continue;
             }
             Ok(result) => {
                 if result.status.is_fail() && tx_succeeded {
                     println!(
-                        "WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
-                        near_tx_hash,
-                        result.status
-                    );
+						"WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
+						near_tx_hash,
+						result.status
+					);
                     continue;
                 }
                 // if result.status.is_fail() && !tx_succeeded then this is consistent; we
@@ -198,8 +198,9 @@ pub mod error {
 mod test {
     use super::FallibleIterator;
     use crate::sync::types::{TransactionKind, TransactionMessage};
-    use aurora_engine::engine;
-    use aurora_engine_types::{H256, U256};
+    use aurora_engine::{engine, parameters};
+    use aurora_engine_standalone_nep141_legacy::legacy_connector;
+    use aurora_engine_types::H256;
 
     /// Requires a running postgres server to work. A snapshot of the DB can be
     /// downloaded using the script from https://github.com/aurora-is-near/partner-relayer-deploy
@@ -211,7 +212,7 @@ mod test {
         let mut storage = crate::Storage::open("rocks_tmp/").unwrap();
         let mut connection = super::connect_without_tls(&Default::default()).unwrap();
         let engine_state = engine::EngineState {
-            chain_id: aurora_engine_types::types::u256_to_arr(&U256::from(1313161555_u64)),
+            chain_id: aurora_engine_types::types::u256_to_arr(&1313161555.into()),
             owner_id: "aurora".parse().unwrap(),
             bridge_prover_id: "prover.bridge.near".parse().unwrap(),
             upgrade_delay_blocks: 0,
@@ -232,8 +233,19 @@ mod test {
             let result = storage.with_engine_access(block_height, 0, &[], |io| {
                 let mut local_io = io;
                 engine::set_state(&mut local_io, engine_state.clone());
+                legacy_connector::EthConnectorContract::create_contract(
+                    io,
+                    engine_state.owner_id.clone(),
+                    parameters::InitCallArgs {
+                        prover_account: engine_state.bridge_prover_id.clone(),
+                        eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"
+                            .to_string(),
+                        metadata: Default::default(),
+                    },
+                )
             });
 
+            result.result.ok().unwrap();
             let diff = result.diff;
             storage
                 .set_transaction_included(
