@@ -713,7 +713,7 @@ pub fn set_contract_data<I: IO>(
     Ok(contract_data)
 }
 
-/// Return metdata
+/// Return metadata
 pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
     io.read_storage(&construct_contract_key(
         &EthConnectorStorageId::FungibleTokenMetadata,

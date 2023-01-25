@@ -171,8 +171,8 @@ impl<I: IO> PausedPrecompilesManager for EnginePrecompilesPauser<I> {
 mod tests {
     use super::*;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
+    use std::cell::RefCell;
     use std::iter::once;
-    use std::sync::RwLock;
     use test_case::test_case;
 
     #[test_case(PrecompileFlags::EXIT_TO_ETHEREUM, exit_to_ethereum::ADDRESS)]
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_pausing_precompile_marks_it_as_paused() {
-        let storage = RwLock::new(Storage::default());
+        let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         let flags = PrecompileFlags::EXIT_TO_NEAR;
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_resuming_precompile_removes_its_mark_as_paused() {
-        let storage = RwLock::new(Storage::default());
+        let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         let flags = PrecompileFlags::EXIT_TO_NEAR;
@@ -237,7 +237,7 @@ mod tests {
     #[should_panic]
     fn test_no_precompile_is_paused_if_storage_contains_too_few_bytes() {
         let key = EnginePrecompilesPauser::<StoragePointer>::storage_key();
-        let storage = RwLock::new(Storage::default());
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         io.write_storage(key.as_slice(), &[7u8]);
         let pauser = EnginePrecompilesPauser::from_io(io);
