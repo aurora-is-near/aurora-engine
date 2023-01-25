@@ -1442,7 +1442,7 @@ where
                     // The exit precompiles do produce externally consumable logs in
                     // addition to the promises. The external logs have a non-empty
                     // `topics` field.
-                    Some(log.into())
+                    Some(evm_log_to_result_log(log))
                 }
             } else if log.address == cross_contract_call::ADDRESS.raw() {
                 if log.topics[0] == cross_contract_call::AMOUNT_TOPIC {
@@ -1464,10 +1464,23 @@ where
                 // do not pass on these "internal logs" to caller
                 None
             } else {
-                Some(log.into())
+                Some(evm_log_to_result_log(log))
             }
         })
         .collect()
+}
+
+fn evm_log_to_result_log(log: Log) -> ResultLog {
+    let topics = log
+        .topics
+        .into_iter()
+        .map(|topic| topic.0)
+        .collect::<Vec<_>>();
+    ResultLog {
+        address: Address::new(log.address),
+        topics,
+        data: log.data,
+    }
 }
 
 unsafe fn schedule_promise<P: PromiseHandler>(
