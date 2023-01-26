@@ -22,8 +22,8 @@
     "hardhat-storage-layout": "^0.1.6",
     "rainbow-bridge-lib": "^3.0.0",
     "solc": "0.8.15",
+    "solhint": "^3.3.8",
     "solidity-coverage": "^0.7.21",
-    "solium": "^1.2.5",
     "typescript": ">=3.7.0"
   },
   "scripts": {
@@ -33,8 +33,8 @@
     "coverage": "hardhat coverage",
     "lint:js": "eslint .",
     "lint:js:fix": "eslint . --fix",
-    "lint:sol": "solium -d .",
-    "lint:sol:fix": "solium -d . --fix",
+    "lint:sol": "solhint 'contracts/**/*.sol'",
+    "lint:sol:fix": "solhint --fix 'contracts/**/*.sol'",
     "lint": "yarn lint:js && yarn lint:sol",
     "lint:fix": "yarn lint:js:fix && yarn lint:sol:fix"
   }
