@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 
 contract AdminControlled {
+    // slither-disable-next-line immutable-states
     address public admin;
     uint public paused;
 
