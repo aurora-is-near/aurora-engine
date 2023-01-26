@@ -582,7 +582,6 @@ mod contract {
     }
 
     #[no_mangle]
-
     pub extern "C" fn withdraw() {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();

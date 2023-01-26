@@ -1822,15 +1822,14 @@ mod tests {
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use aurora_engine_test_doubles::promise::PromiseTracker;
     use aurora_engine_types::types::RawU256;
-    use std::sync::RwLock;
+    use std::cell::RefCell;
 
     #[test]
     fn test_view_call_to_empty_contract_without_input_returns_empty_data() {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
         let engine =
@@ -1856,8 +1855,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
         let mut engine =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
@@ -1882,8 +1880,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
         let mut engine =
@@ -1914,8 +1911,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
         let mut engine =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
@@ -1944,8 +1940,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
         let mut engine =
@@ -1973,8 +1968,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
         let mut engine =
@@ -2000,8 +1994,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
         let mut engine =
@@ -2020,8 +2013,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         set_balance(&mut io, &origin, &Wei::new_u64(22000));
         let mut engine = Engine::new_with_state(
@@ -2046,9 +2038,9 @@ mod tests {
             .unwrap();
         engine.receive_erc20_tokens(&nep141_token, &args, &current_account_id, &mut handler);
 
-        let storage_read = storage.read().unwrap();
-        let actual_output = std::str::from_utf8(storage_read.output.as_slice()).unwrap();
-        let expected_output = "\"0\"";
+        let storage = storage.borrow();
+        let actual_output = storage.output.as_slice();
+        let expected_output = b"\"0\"";
 
         assert_eq!(expected_output, actual_output);
     }
@@ -2059,8 +2051,7 @@ mod tests {
         let origin = aurora_engine_sdk::types::near_account_to_evm_address(
             env.predecessor_account_id().as_bytes(),
         );
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
         state::set_state(&mut io, EngineState::default()).unwrap();
@@ -2082,8 +2073,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
         let mut engine =
@@ -2177,8 +2167,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let engine =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
@@ -2197,8 +2186,7 @@ mod tests {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         state::set_state(&mut io, expected_state.clone()).unwrap();
@@ -2212,8 +2200,7 @@ mod tests {
     fn test_refund_transfer_eth_back_from_precompile_address() {
         let recipient_address = make_address(1, 1);
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         let refund_amount = Wei::new_u64(1000);
@@ -2236,8 +2223,7 @@ mod tests {
     fn test_refund_remint_burned_erc20_tokens() {
         let origin = Address::zero();
         let env = Fixed::default();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         state::set_state(&mut io, expected_state.clone()).unwrap();
@@ -2258,8 +2244,7 @@ mod tests {
     #[test]
     fn test_refund_free_effective_gas_does_nothing() {
         let origin = Address::zero();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         state::set_state(&mut io, expected_state).unwrap();
@@ -2276,8 +2261,7 @@ mod tests {
     #[test]
     fn test_refund_gas_pays_expected_amount() {
         let origin = Address::zero();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         state::set_state(&mut io, expected_state).unwrap();
@@ -2300,8 +2284,7 @@ mod tests {
     #[test]
     fn test_check_nonce_with_increment_succeeds() {
         let origin = Address::zero();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
 
         increment_nonce(&mut io, &origin);
@@ -2311,16 +2294,13 @@ mod tests {
     #[test]
     fn test_check_nonce_without_increment_fails() {
         let origin = Address::zero();
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
 
         increment_nonce(&mut io, &origin);
         let actual_error_kind = check_nonce(&io, &origin, &U256::from(0u64)).unwrap_err();
-        let actual_error_kind = std::str::from_utf8(actual_error_kind.as_bytes()).unwrap();
-        let expected_error_kind = std::str::from_utf8(errors::ERR_INCORRECT_NONCE).unwrap();
 
-        assert_eq!(expected_error_kind, actual_error_kind);
+        assert_eq!(actual_error_kind.as_bytes(), errors::ERR_INCORRECT_NONCE);
     }
 
     #[test]
@@ -2338,9 +2318,8 @@ mod tests {
 
     #[test]
     fn test_filtering_promises_from_logs_with_none_keeps_all() {
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
-        let mut io = StoragePointer(&storage);
+        let storage = RefCell::new(Storage::default());
+        let io = StoragePointer(&storage);
         let current_account_id = AccountId::default();
         let mut handler = Noop;
         let logs = vec![Log {

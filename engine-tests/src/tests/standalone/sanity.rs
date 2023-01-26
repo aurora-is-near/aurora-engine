@@ -4,7 +4,7 @@ use aurora_engine_test_doubles::io::{Storage, StoragePointer};
 use aurora_engine_test_doubles::promise::PromiseTracker;
 use aurora_engine_types::types::{Address, EthGas, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
-use std::sync::RwLock;
+use std::cell::RefCell;
 
 #[test]
 fn test_deploy_code() {
@@ -22,7 +22,7 @@ fn test_deploy_code() {
         default_gas_token: Default::default(),
     };
     let origin = Address::new(H160([0u8; 20]));
-    let storage = RwLock::new(Storage::default());
+    let storage = RefCell::new(Storage::default());
     let io = StoragePointer(&storage);
     let env = aurora_engine_sdk::env::Fixed {
         signer_account_id: owner_id.clone(),

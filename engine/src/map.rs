@@ -66,9 +66,9 @@ mod tests {
         use aurora_engine_test_doubles::io::{Storage, StoragePointer};
         use aurora_engine_types::account_id::AccountId;
         use aurora_engine_types::types::Address;
-        use std::sync::RwLock;
+        use std::cell::RefCell;
 
-        let storage = RwLock::new(Storage::default());
+        let storage = RefCell::new(Storage::default());
         let storage = StoragePointer(&storage);
         let left_prefix = KeyPrefix::Nep141Erc20Map;
         let right_prefix = KeyPrefix::Erc20Nep141Map;
