@@ -478,8 +478,10 @@ fn sample_block() -> sync::types::BlockMessage {
 }
 
 fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
-    let mut runner = StandaloneRunner::default();
-    runner.init_legacy_connector = true;
+    let mut runner = StandaloneRunner {
+        init_legacy_connector: true,
+        ..Default::default()
+    };
     runner.init_evm();
 
     let block_message = sample_block();
