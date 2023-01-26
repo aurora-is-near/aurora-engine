@@ -116,17 +116,13 @@ impl<I: IO> EnginePrecompilesPauser<I> {
         match self.io.read_storage(&Self::storage_key()) {
             None => PrecompileFlags::empty(),
             Some(bytes) => {
-                let int_length = core::mem::size_of::<u32>();
-                let input = bytes.to_vec();
+                const U32_SIZE: usize = core::mem::size_of::<u32>();
+                assert_eq!(bytes.len(), U32_SIZE, "PrecompileFlags value is corrupted");
 
-                if input.len() < int_length {
-                    return PrecompileFlags::empty();
-                }
+                let mut buffer = [0u8; U32_SIZE];
+                bytes.copy_to_slice(&mut buffer);
 
-                let (int_bytes, _) = input.split_at(int_length);
-                PrecompileFlags::from_bits_truncate(u32::from_le_bytes(
-                    int_bytes.try_into().unwrap(),
-                ))
+                PrecompileFlags::from_bits_truncate(u32::from_le_bytes(buffer))
             }
         }
     }
@@ -238,15 +234,13 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_no_precompile_is_paused_if_storage_contains_too_few_bytes() {
         let key = EnginePrecompilesPauser::<StoragePointer>::storage_key();
         let storage = RwLock::new(Storage::default());
         let mut io = StoragePointer(&storage);
         io.write_storage(key.as_slice(), &[7u8]);
         let pauser = EnginePrecompilesPauser::from_io(io);
-
-        let expected_paused = PrecompileFlags::empty();
-        let actual_paused = pauser.paused();
-        assert_eq!(expected_paused, actual_paused);
+        let _paused = pauser.paused(); // panic here !!!
     }
 }

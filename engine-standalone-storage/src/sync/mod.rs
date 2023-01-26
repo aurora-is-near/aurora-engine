@@ -335,7 +335,7 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::RefundOnError(maybe_args) => {
-            let result: Result<Option<TransactionExecutionResult>, state::error::EngineStateError> =
+            let result: Result<Option<TransactionExecutionResult>, state::EngineStateError> =
                 maybe_args
                     .clone()
                     .map(|args| {
@@ -438,7 +438,7 @@ pub mod error {
 
     #[derive(Debug)]
     pub enum Error {
-        EngineState(state::error::EngineStateError),
+        EngineState(state::EngineStateError),
         Engine(engine::EngineError),
         DeployErc20(engine::DeployErc20Error),
         FtOnTransfer(connector::error::FtTransferCallError),
@@ -452,8 +452,8 @@ pub mod error {
         ConnectorStorage(connector::error::StorageReadError),
     }
 
-    impl From<state::error::EngineStateError> for Error {
-        fn from(e: state::error::EngineStateError) -> Self {
+    impl From<state::EngineStateError> for Error {
+        fn from(e: state::EngineStateError) -> Self {
             Self::EngineState(e)
         }
     }

@@ -537,7 +537,7 @@ mod contract {
         require_owner_only(&state, &io.predecessor_account_id());
         let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
-        state::set_state(&mut io, state);
+        state::set_state(&mut io, state).sdk_unwrap();
         // set genesis block balances
         for account_balance in args.genesis_alloc {
             engine::set_balance(
@@ -991,7 +991,7 @@ mod contract {
         }
     }
 
-    fn require_owner_only(state: &EngineState, predecessor_account_id: &AccountId) {
+    fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
         if &state.owner_id != predecessor_account_id {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
         }

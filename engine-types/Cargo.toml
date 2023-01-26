@@ -24,4 +24,9 @@ rand = "0.8.5"
 [features]
 default = ["std"]
 std = ["borsh/std", "hex/std", "primitive-types/std"]
+# `primitive-types/std` is excluded because its `std` implementation includes a transitive
+# dependency on `getrandom` which uses OS call to obtain entropy. Such calls are not
+# available in Wasm, therefore we cannot use the `std` implementation of `primitive-types`
+# in other Rust contracts.
+contracts-std = ["borsh/std", "hex/std"]
 impl-serde = ["primitive-types/impl-serde", "serde"]

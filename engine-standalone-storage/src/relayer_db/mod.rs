@@ -165,7 +165,7 @@ pub mod error {
     pub enum Error {
         Storage(crate::Error),
         Postgres(postgres::Error),
-        EngineState(state::error::EngineStateError),
+        EngineState(state::EngineStateError),
         Engine(engine::EngineError),
     }
 
@@ -181,8 +181,8 @@ pub mod error {
         }
     }
 
-    impl From<state::error::EngineStateError> for Error {
-        fn from(e: state::error::EngineStateError) -> Self {
+    impl From<state::EngineStateError> for Error {
+        fn from(e: state::EngineStateError) -> Self {
             Self::EngineState(e)
         }
     }

@@ -1,7 +1,12 @@
 use crate::connector::EthConnectorContract;
-use crate::gas_token::GasToken;
 use crate::map::BijectionMap;
-use crate::parameters::{CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs};
+use crate::{errors, state};
+use aurora_engine_sdk::caching::FullCache;
+use aurora_engine_sdk::env::Env;
+use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
+
+use crate::accounting;
 use crate::parameters::{DeployErc20TokenArgs, TransactionStatus};
 use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
@@ -14,16 +19,8 @@ use crate::prelude::{
     BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, Vec, Wei,
     Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
-use crate::state::error::EngineStateError;
 use crate::state::EngineState;
-use crate::{accounting, state};
-use crate::{errors, gas_token};
-use aurora_engine_precompiles::{Precompile, PrecompileConstructorContext};
-use aurora_engine_sdk::caching::FullCache;
-use aurora_engine_sdk::env::Env;
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
-use aurora_engine_types::types::EthGas;
+use aurora_engine_precompiles::PrecompileConstructorContext;
 use core::cell::RefCell;
 use core::iter::once;
 use core::mem;
@@ -230,7 +227,7 @@ impl From<BalanceOverflow> for GasPaymentError {
 
 #[derive(Debug)]
 pub enum DeployErc20Error {
-    State(EngineStateError),
+    State(state::EngineStateError),
     Failed(TransactionStatus),
     Engine(EngineError),
     Register(RegisterTokenError),
@@ -393,7 +390,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         current_account_id: AccountId,
         io: I,
         env: &'env E,
-    ) -> Result<Self, EngineStateError> {
+    ) -> Result<Self, state::EngineStateError> {
         state::get_state(&io)
             .map(|state| Self::new_with_state(state, origin, current_account_id, io, env))
     }
@@ -1443,7 +1440,7 @@ where
                     // The exit precompiles do produce externally consumable logs in
                     // addition to the promises. The external logs have a non-empty
                     // `topics` field.
-                    Some(log.into())
+                    Some(evm_log_to_result_log(log))
                 }
             } else if log.address == precompiles::xcc::cross_contract_call::ADDRESS.raw() {
                 if log.topics[0] == precompiles::xcc::cross_contract_call::AMOUNT_TOPIC {
@@ -1480,10 +1477,23 @@ where
                 }
                 None
             } else {
-                Some(log.into())
+                Some(evm_log_to_result_log(log))
             }
         })
         .collect()
+}
+
+fn evm_log_to_result_log(log: Log) -> ResultLog {
+    let topics = log
+        .topics
+        .into_iter()
+        .map(|topic| topic.0)
+        .collect::<Vec<_>>();
+    ResultLog {
+        address: Address::new(log.address),
+        topics,
+        data: log.data,
+    }
 }
 
 unsafe fn schedule_promise<P: PromiseHandler>(
@@ -2203,12 +2213,7 @@ mod tests {
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         let refund_amount = Wei::new_u64(1000);
-        add_balance(
-            &mut io,
-            &precompiles::native::exit_to_near::ADDRESS,
-            refund_amount,
-        )
-        .unwrap();
+        add_balance(&mut io, &exit_to_near::ADDRESS, refund_amount).unwrap();
         state::set_state(&mut io, expected_state.clone()).unwrap();
         let args = RefundCallArgs {
             recipient_address,
