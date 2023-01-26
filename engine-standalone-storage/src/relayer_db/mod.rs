@@ -118,9 +118,9 @@ where
             Err(e) => {
                 if tx_succeeded {
                     println!(
-						"WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
-						near_tx_hash,
-						e
+                        "WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
+                        near_tx_hash,
+                        e
 					);
                 }
                 continue;
@@ -128,9 +128,9 @@ where
             Ok(result) => {
                 if result.status.is_fail() && tx_succeeded {
                     println!(
-						"WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
-						near_tx_hash,
-						result.status
+                        "WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
+                        near_tx_hash,
+                        result.status
 					);
                     continue;
                 }
