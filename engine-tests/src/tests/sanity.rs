@@ -139,7 +139,7 @@ fn test_state_format() {
         bridge_prover_id: "prover_mcprovy_face".parse().unwrap(),
         upgrade_delay_blocks: 3,
     };
-    let state: aurora_engine::engine::EngineState = args.into();
+    let state: aurora_engine::state::EngineState = args.into();
     let expected_hex: String = [
         "000000000000000000000000000000000000000000000000000000000000029a",
         "04000000626f7373",

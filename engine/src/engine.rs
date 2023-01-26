@@ -5,15 +5,15 @@ use evm::executor;
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::connector::EthConnectorContract;
-use crate::errors;
 use crate::map::BijectionMap;
+use crate::{errors, state};
 use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
 
 use crate::accounting;
-use crate::parameters::{DeployErc20TokenArgs, NewCallArgs, TransactionStatus};
+use crate::parameters::{DeployErc20TokenArgs, TransactionStatus};
 use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
 };
@@ -24,9 +24,10 @@ use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BTreeMap, BorshDeserialize, BorshSerialize, KeyPrefix, PromiseArgs, PromiseCreateArgs,
-    ToString, Vec, Wei, Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
+    BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, Vec, Wei,
+    Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
+use crate::state::EngineState;
 use aurora_engine_precompiles::PrecompileConstructorContext;
 use core::cell::RefCell;
 use core::iter::once;
@@ -230,7 +231,7 @@ impl From<BalanceOverflow> for GasPaymentError {
 
 #[derive(Debug)]
 pub enum DeployErc20Error {
-    State(EngineStateError),
+    State(state::EngineStateError),
     Failed(TransactionStatus),
     Engine(EngineError),
     Register(RegisterTokenError),
@@ -337,21 +338,6 @@ impl AsRef<[u8]> for RegisterTokenError {
     }
 }
 
-#[derive(Debug)]
-pub enum EngineStateError {
-    NotFound,
-    DeserializationFailed,
-}
-
-impl AsRef<[u8]> for EngineStateError {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::NotFound => errors::ERR_STATE_NOT_FOUND,
-            Self::DeserializationFailed => errors::ERR_STATE_CORRUPTED,
-        }
-    }
-}
-
 pub struct StackExecutorParams<'a, I, E, H> {
     precompiles: Precompiles<'a, I, E, H>,
     gas_limit: u64,
@@ -387,33 +373,6 @@ pub struct GasPaymentResult {
     pub priority_fee_per_gas: U256,
 }
 
-/// Engine internal state, mostly configuration.
-/// Should not contain anything large or enumerable.
-#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
-pub struct EngineState {
-    /// Chain id, according to the EIP-155 / ethereum-lists spec.
-    pub chain_id: [u8; 32],
-    /// Account which can upgrade this contract.
-    /// Use empty to disable updatability.
-    pub owner_id: AccountId,
-    /// Account of the bridge prover.
-    /// Use empty to not use base token as bridged asset.
-    pub bridge_prover_id: AccountId,
-    /// How many blocks after staging upgrade can deploy it.
-    pub upgrade_delay_blocks: u64,
-}
-
-impl From<NewCallArgs> for EngineState {
-    fn from(args: NewCallArgs) -> Self {
-        EngineState {
-            chain_id: args.chain_id,
-            owner_id: args.owner_id,
-            bridge_prover_id: args.bridge_prover_id,
-            upgrade_delay_blocks: args.upgrade_delay_blocks,
-        }
-    }
-}
-
 pub struct Engine<'env, I: IO, E: Env> {
     state: EngineState,
     origin: Address,
@@ -429,17 +388,15 @@ pub struct Engine<'env, I: IO, E: Env> {
 
 pub(crate) const CONFIG: &Config = &Config::london();
 
-/// Key for storing the state of the engine.
-const STATE_KEY: &[u8; 5] = b"STATE";
-
 impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     pub fn new(
         origin: Address,
         current_account_id: AccountId,
         io: I,
         env: &'env E,
-    ) -> Result<Self, EngineStateError> {
-        get_state(&io).map(|state| Self::new_with_state(state, origin, current_account_id, io, env))
+    ) -> Result<Self, state::EngineStateError> {
+        state::get_state(&io)
+            .map(|state| Self::new_with_state(state, origin, current_account_id, io, env))
     }
 
     pub fn new_with_state(
@@ -1090,22 +1047,6 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
     data.extend_from_slice(&block_height.to_be_bytes());
 
     sdk::sha256(&data)
-}
-
-pub fn get_state<I: IO>(io: &I) -> Result<EngineState, EngineStateError> {
-    match io.read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
-        None => Err(EngineStateError::NotFound),
-        Some(bytes) => EngineState::try_from_slice(&bytes.to_vec())
-            .map_err(|_| EngineStateError::DeserializationFailed),
-    }
-}
-
-/// Saves state into the storage.
-pub fn set_state<I: IO>(io: &mut I, state: EngineState) {
-    io.write_storage(
-        &bytes_to_key(KeyPrefix::Config, STATE_KEY),
-        &state.try_to_vec().expect("ERR_SER"),
-    );
 }
 
 pub fn get_authorizer() -> EngineAuthorizer {
@@ -2045,7 +1986,7 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        set_state(&mut io, EngineState::default());
+        state::set_state(&mut io, EngineState::default()).unwrap();
 
         let nep141_token = AccountId::new("testcoin").unwrap();
         let mut handler = Noop;
@@ -2180,7 +2121,7 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        set_state(&mut io, expected_state.clone());
+        state::set_state(&mut io, expected_state.clone()).unwrap();
         let engine = Engine::new(origin, current_account_id, io, &env).unwrap();
         let actual_state = engine.state;
 
@@ -2197,7 +2138,7 @@ mod tests {
         let expected_state = EngineState::default();
         let refund_amount = Wei::new_u64(1000);
         add_balance(&mut io, &exit_to_near::ADDRESS, refund_amount).unwrap();
-        set_state(&mut io, expected_state.clone());
+        state::set_state(&mut io, expected_state.clone()).unwrap();
         let args = RefundCallArgs {
             recipient_address,
             erc20_address: None,
@@ -2219,7 +2160,7 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        set_state(&mut io, expected_state.clone());
+        state::set_state(&mut io, expected_state.clone()).unwrap();
         let value = Wei::new_u64(1000);
         let args = RefundCallArgs {
             recipient_address: Default::default(),
@@ -2241,7 +2182,7 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        set_state(&mut io, expected_state);
+        state::set_state(&mut io, expected_state).unwrap();
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
             prepaid_amount: Default::default(),
@@ -2259,7 +2200,7 @@ mod tests {
         let storage = RwLock::new(storage);
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        set_state(&mut io, expected_state);
+        state::set_state(&mut io, expected_state).unwrap();
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
             prepaid_amount: Wei::new_u64(8000),
@@ -2313,33 +2254,6 @@ mod tests {
             created_address.encode(),
             "140e8a21d08cbb530929b012581a7c7e696145ef"
         );
-    }
-
-    #[test]
-    fn test_missing_engine_state_is_not_found() {
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
-        let io = StoragePointer(&storage);
-
-        let actual_error = get_state(&io).unwrap_err();
-        let actual_error = std::str::from_utf8(actual_error.as_ref()).unwrap();
-        let expected_error = std::str::from_utf8(errors::ERR_STATE_NOT_FOUND).unwrap();
-
-        assert_eq!(expected_error, actual_error);
-    }
-
-    #[test]
-    fn test_empty_engine_state_is_corrupted() {
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
-        let mut io = StoragePointer(&storage);
-
-        io.write_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY), &[]);
-        let actual_error = get_state(&io).unwrap_err();
-        let actual_error = std::str::from_utf8(actual_error.as_ref()).unwrap();
-        let expected_error = std::str::from_utf8(errors::ERR_STATE_CORRUPTED).unwrap();
-
-        assert_eq!(expected_error, actual_error);
     }
 
     #[test]

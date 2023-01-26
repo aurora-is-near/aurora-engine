@@ -39,7 +39,7 @@ pub extern "C" fn run() {
     let state = BTreeMap::try_from_slice(STATE).unwrap();
     let in_mem_io = InMemIO::new(&state, INPUT);
 
-    let engine_state = aurora_engine::engine::get_state(&in_mem_io).unwrap();
+    let engine_state = aurora_engine::state::get_state(&in_mem_io).unwrap();
     let relayer_address = aurora_engine_sdk::types::near_account_to_evm_address(
         local_env.predecessor_account_id.as_bytes(),
     );
