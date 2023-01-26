@@ -2319,7 +2319,7 @@ mod tests {
     #[test]
     fn test_filtering_promises_from_logs_with_none_keeps_all() {
         let storage = RefCell::new(Storage::default());
-        let io = StoragePointer(&storage);
+        let mut io = StoragePointer(&storage);
         let current_account_id = AccountId::default();
         let mut handler = Noop;
         let logs = vec![Log {
