@@ -90,12 +90,11 @@ pub mod error {
 mod tests {
     use super::*;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
-    use std::sync::RwLock;
+    use std::cell::RefCell;
 
     #[test]
     fn test_missing_engine_state_is_not_found() {
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
 
         let actual_error = get_state(&io).unwrap_err();
@@ -107,8 +106,7 @@ mod tests {
 
     #[test]
     fn test_empty_engine_state_is_corrupted() {
-        let storage = Storage::default();
-        let storage = RwLock::new(storage);
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
 
         io.write_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY), &[]);
