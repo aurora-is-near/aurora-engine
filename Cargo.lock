@@ -272,6 +272,7 @@ dependencies = [
  "aurora-engine",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
+ "aurora-engine-standalone-nep141-legacy",
  "aurora-engine-test-doubles",
  "aurora-engine-transactions",
  "aurora-engine-types",

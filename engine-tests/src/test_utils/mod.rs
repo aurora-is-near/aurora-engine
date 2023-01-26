@@ -1,6 +1,7 @@
 use aurora_engine::parameters::{SetEthConnectorContractAccountArgs, ViewCallArgs};
+use aurora_engine_standalone_nep141_legacy::fungible_token::FungibleToken;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::types::PromiseResult;
+use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
@@ -306,7 +307,17 @@ impl AuroraRunner {
             crate::prelude::storage::KeyPrefix::EthConnector,
             &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
         );
-
+        let ft_value = {
+            let mut current_ft: FungibleToken = trie
+                .get(&ft_key)
+                .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
+                .unwrap_or_default();
+            current_ft.total_eth_supply_on_near =
+                current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
+            current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
+                + NEP141Wei::new(init_balance.raw().as_u128());
+            current_ft
+        };
         let aurora_balance_key = [
             ft_key.as_slice(),
             self.context.current_account_id.as_ref().as_bytes(),
@@ -330,6 +341,7 @@ impl AuroraRunner {
         if !init_nonce.is_zero() {
             trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         }
+        trie.insert(ft_key, ft_value.try_to_vec().unwrap());
         trie.insert(proof_key, vec![0]);
         trie.insert(
             aurora_balance_key,
@@ -506,7 +518,6 @@ impl AuroraRunner {
     }
 
     fn validate_standalone(&self) {
-        /*TODO: fix
         if let Some(standalone_runner) = &self.standalone_runner {
             let standalone_state = standalone_runner.get_current_state();
             // The number of keys in standalone_state may be larger because values are never deleted
@@ -522,7 +533,7 @@ impl AuroraRunner {
                     );
                 }
             }
-        }*/
+        }
     }
 }
 

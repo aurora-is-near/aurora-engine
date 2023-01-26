@@ -224,10 +224,11 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
+    # "test_consume_deposit_message",
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",
-    "--test-threads=4",    
+    # "--test-threads=4",    
     # "--nocapture",
 ]
 
