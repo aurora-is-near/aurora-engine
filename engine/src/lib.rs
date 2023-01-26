@@ -839,7 +839,7 @@ mod contract {
         let args: SetEthConnectorContractAccountArgs = io.read_input_borsh().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .set_eth_connector_contract_account(args.account);
+            .set_eth_connector_contract_account(&args.account);
     }
 
     #[no_mangle]

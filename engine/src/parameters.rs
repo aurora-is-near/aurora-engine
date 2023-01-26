@@ -483,7 +483,7 @@ pub struct RegisterRelayerCallArgs {
     pub address: Address,
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct SetEthConnectorContractAccountArgs {
     pub account: AccountId,
 }

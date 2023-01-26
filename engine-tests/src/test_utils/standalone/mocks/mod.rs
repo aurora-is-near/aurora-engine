@@ -1,14 +1,11 @@
 use crate::test_utils;
 use aurora_engine::engine;
-use aurora_engine::parameters::{
-    FinishDepositCallArgs, InitCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-};
+use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::{Address, Balance, NEP141Wei, NearGas, Wei};
+use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{account_id::AccountId, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
-use near_sdk_sim::DEFAULT_GAS;
 
 pub mod block;
 
@@ -57,6 +54,12 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
 
     engine::set_state(&mut io, new_args.into());
 
+    use aurora_engine::admin_controlled::AdminControlled;
+    let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io).unwrap();
+    connector.set_eth_connector_contract_account(&"aurora_eth_connector.root".parse().unwrap());
+}
+
+pub fn init_legacy_connector<I: IO + Copy, E: Env>(io: I, env: &E) {
     let connector_args = InitCallArgs {
         prover_account: test_utils::str_to_account_id("prover.near"),
         eth_custodian_address: ETH_CUSTODIAN_ADDRESS.encode(),
@@ -77,7 +80,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     balance: Wei,
     nonce: U256,
     code: Option<Vec<u8>>,
-    mut io: I,
+    io: I,
     env: &E,
 ) {
     use evm::backend::ApplyBackend;
@@ -94,44 +97,6 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
         storage: std::iter::empty(),
         reset_storage: false,
     };
-
-    let deposit_args = FinishDepositCallArgs {
-        new_owner_id: aurora_account_id.clone(),
-        amount: NEP141Wei::new(balance.raw().as_u128()),
-        proof_key: String::new(),
-        relayer_id: aurora_account_id.clone(),
-        fee: 0.into(),
-        msg: None,
-    };
-
-    // Delete the fake proof so that we can use it again.
-    let proof_key = crate::prelude::storage::bytes_to_key(
-        crate::prelude::storage::KeyPrefix::EthConnector,
-        &[crate::prelude::storage::EthConnectorStorageId::UsedEvent as u8],
-    );
-    io.remove_storage(&proof_key);
-
-    let mut connector = aurora_engine_standalone_nep141_legacy::legacy_connector::EthConnectorContract::init_instance(io).unwrap();
-    connector
-        .finish_deposit(
-            aurora_account_id.clone(),
-            aurora_account_id.clone(),
-            deposit_args,
-            NearGas::new(DEFAULT_GAS),
-        )
-        .map_err(unsafe_to_string)
-        .unwrap();
-
-    let transfer_args = NEP141FtOnTransferArgs {
-        sender_id: aurora_account_id,
-        amount: Balance::new(balance.raw().as_u128()),
-        msg: format!(
-            "aurora:{}{}",
-            hex::encode(Wei::zero().to_bytes()),
-            hex::encode(address.as_bytes())
-        ),
-    };
-    connector.ft_on_transfer(&engine, &transfer_args).unwrap();
 
     engine.apply(std::iter::once(state_change), std::iter::empty(), false);
 }

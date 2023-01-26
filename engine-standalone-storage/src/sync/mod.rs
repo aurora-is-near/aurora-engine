@@ -366,6 +366,14 @@ fn non_submit_execute<'db>(
 
             None
         }
+        TransactionKind::SetEthConnectorContractAccount(args) => {
+            use aurora_engine::admin_controlled::AdminControlled;
+
+            let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io)?;
+            connector.set_eth_connector_contract_account(&args.account);
+
+            None
+        }
         TransactionKind::NewEngine(args) => {
             engine::set_state(&mut io, args.clone().into());
 
@@ -450,7 +458,8 @@ pub mod error {
         FtStorageFunding(fungible_token::error::StorageFundingError),
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
         ConnectorInit(legacy_connector::error::InitContractError),
-        ConnectorStorage(legacy_connector::error::StorageReadError),
+        LegacyConnectorStorage(legacy_connector::error::StorageReadError),
+        ConnectorStorage(aurora_engine::connector::error::StorageReadError),
     }
 
     impl From<engine::EngineStateError> for Error {
@@ -521,6 +530,12 @@ pub mod error {
 
     impl From<legacy_connector::error::StorageReadError> for Error {
         fn from(e: legacy_connector::error::StorageReadError) -> Self {
+            Self::LegacyConnectorStorage(e)
+        }
+    }
+
+    impl From<aurora_engine::connector::error::StorageReadError> for Error {
+        fn from(e: aurora_engine::connector::error::StorageReadError) -> Self {
             Self::ConnectorStorage(e)
         }
     }

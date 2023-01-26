@@ -308,10 +308,10 @@ impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
         get_contract_data(&self.io, &EthConnectorStorageId::EthConnectorAccount).unwrap()
     }
 
-    fn set_eth_connector_contract_account(&mut self, account: AccountId) {
+    fn set_eth_connector_contract_account(&mut self, account: &AccountId) {
         self.io.write_borsh(
             &construct_contract_key(&EthConnectorStorageId::EthConnectorAccount),
-            &account,
+            account,
         );
     }
 }

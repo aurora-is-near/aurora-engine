@@ -118,6 +118,7 @@ pub enum TransactionKind {
     SetConnectorData(parameters::SetContractDataCallArgs),
     /// Initialize eth-connector
     NewConnector(parameters::InitCallArgs),
+    SetEthConnectorContractAccount(parameters::SetEthConnectorContractAccountArgs),
     /// Initialize Engine
     NewEngine(parameters::NewCallArgs),
     /// Update xcc-router bytecode
@@ -329,6 +330,9 @@ impl TransactionKind {
             TransactionKind::RegisterRelayer(_) => Self::no_evm_execution("register_relayer"),
             TransactionKind::SetConnectorData(_) => Self::no_evm_execution("set_connector_data"),
             TransactionKind::NewConnector(_) => Self::no_evm_execution("new_connector"),
+            TransactionKind::SetEthConnectorContractAccount(_) => {
+                Self::no_evm_execution("set_eth_connector_contract_account")
+            }
             TransactionKind::NewEngine(_) => Self::no_evm_execution("new_engine"),
             TransactionKind::FactoryUpdate(_) => Self::no_evm_execution("factory_update"),
             TransactionKind::FactoryUpdateAddressVersion(_) => {
@@ -505,6 +509,7 @@ enum BorshableTransactionKind<'a> {
     PausePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
+    SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -545,6 +550,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
+            TransactionKind::SetEthConnectorContractAccount(x) => {
+                Self::SetEthConnectorContractAccount(Cow::Borrowed(x))
+            }
         }
     }
 }
@@ -601,6 +609,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::ResumePrecompiles(x) => {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
+            }
+            BorshableTransactionKind::SetEthConnectorContractAccount(x) => {
+                Ok(Self::SetEthConnectorContractAccount(x.into_owned()))
             }
         }
     }
