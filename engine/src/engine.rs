@@ -1,13 +1,14 @@
 use crate::connector::EthConnectorContract;
 use crate::map::BijectionMap;
-use crate::{errors, state};
+use crate::{errors, gas_token, state};
 use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
 
 use crate::accounting;
-use crate::parameters::{DeployErc20TokenArgs, TransactionStatus};
+use crate::gas_token::GasToken;
+use crate::parameters::{DeployErc20TokenArgs, NEP141FtOnTransferArgs, TransactionStatus};
 use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
 };
@@ -20,7 +21,9 @@ use crate::prelude::{
     Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
-use aurora_engine_precompiles::PrecompileConstructorContext;
+use aurora_engine_precompiles::{Precompile, PrecompileConstructorContext};
+use aurora_engine_types::parameters::engine::{CallArgs, ResultLog, SubmitResult, ViewCallArgs};
+use aurora_engine_types::types::EthGas;
 use core::cell::RefCell;
 use core::iter::once;
 use core::mem;
@@ -958,7 +961,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
                     let tx_status = TransactionStatus::Succeed(vec![]);
                     let mut result_logs = Vec::new();
                     for log in v.logs {
-                        result_logs.push(log.into());
+                        result_logs.push(evm_log_to_result_log(log));
                     }
                     Ok(SubmitResult::new(tx_status, v.cost.as_u64(), result_logs))
                 }
@@ -1813,6 +1816,7 @@ mod tests {
     use super::*;
     use crate::parameters::{FunctionCallArgsV1, FunctionCallArgsV2};
     use aurora_engine_precompiles::make_address;
+    use aurora_engine_precompiles::native::exit_to_near;
     use aurora_engine_sdk::env::Fixed;
     use aurora_engine_sdk::promise::Noop;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};

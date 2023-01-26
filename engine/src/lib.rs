@@ -106,7 +106,6 @@ mod contract {
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
-    use crate::state::EngineState;
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";

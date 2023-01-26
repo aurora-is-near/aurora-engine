@@ -5,6 +5,8 @@ use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use borsh::{BorshDeserialize, BorshSerialize};
 
+pub use error::EngineStateError;
+
 /// Key for storing the state of the engine.
 const STATE_KEY: &[u8; 5] = b"STATE";
 
