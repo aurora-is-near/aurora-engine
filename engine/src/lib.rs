@@ -29,6 +29,7 @@ pub mod json;
 pub mod log_entry;
 pub mod pausables;
 mod prelude;
+pub mod state;
 pub mod xcc;
 
 #[cfg(target_arch = "wasm32")]
@@ -71,7 +72,7 @@ mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
 
     use crate::connector::{self, EthConnectorContract};
-    use crate::engine::{self, Engine, EngineState};
+    use crate::engine::{self, Engine};
     use crate::fungible_token::FungibleTokenMetadata;
     use crate::json::parse_json;
     use crate::parameters::{
@@ -96,7 +97,7 @@ mod contract {
     use crate::prelude::{
         sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
     };
-    use crate::{errors, pausables};
+    use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
@@ -117,12 +118,12 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn new() {
         let mut io = Runtime;
-        if let Ok(state) = engine::get_state(&io) {
+        if let Ok(state) = state::get_state(&io) {
             require_owner_only(&state, &io.predecessor_account_id());
         }
 
         let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
-        engine::set_state(&mut io, args.into());
+        state::set_state(&mut io, args.into()).sdk_unwrap();
     }
 
     /// Get version of the contract.
@@ -140,7 +141,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_owner() {
         let mut io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         io.return_output(state.owner_id.as_bytes());
     }
 
@@ -156,13 +157,13 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
         let mut io = Runtime;
-        io.return_output(&engine::get_state(&io).sdk_unwrap().chain_id)
+        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id)
     }
 
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let mut io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         let index = internal_get_upgrade_index();
         io.return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
     }
@@ -171,7 +172,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
         let mut io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         let block_height = io.block_height();
         require_owner_only(&state, &io.predecessor_account_id());
         io.read_input_and_store(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
@@ -185,7 +186,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
         let io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let index = internal_get_upgrade_index();
         if io.block_height() <= index + state.upgrade_delay_blocks {
@@ -208,7 +209,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn resume_precompiles() {
         let io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
 
         require_owner_only(&state, &predecessor_account_id);
@@ -295,7 +296,7 @@ mod contract {
         let io = Runtime;
         let input = io.read_input().to_vec();
         let current_account_id = io.current_account_id();
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         let relayer_address = predecessor_address(&io.predecessor_account_id());
         let result = engine::submit(
             io,
@@ -338,7 +339,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn factory_update() {
         let mut io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let bytes = io.read_input().to_vec();
         let router_bytecode = crate::xcc::RouterCode::new(bytes);
@@ -366,7 +367,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn factory_set_wnear_address() {
         let mut io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let address = io.read_input_arr20().sdk_unwrap();
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
@@ -447,7 +448,7 @@ mod contract {
         } else {
             // Exit call failed; need to refund tokens
             let args: RefundCallArgs = io.read_input_borsh().sdk_unwrap();
-            let state = engine::get_state(&io).sdk_unwrap();
+            let state = state::get_state(&io).sdk_unwrap();
             let refund_result =
                 engine::refund_on_error(io, &io, state, args, &mut Runtime).sdk_unwrap();
 
@@ -476,7 +477,7 @@ mod contract {
         let mut io = Runtime;
         let block_height = io.read_input_borsh().sdk_unwrap();
         let account_id = io.current_account_id();
-        let chain_id = engine::get_state(&io)
+        let chain_id = state::get_state(&io)
             .map(|state| state.chain_id)
             .sdk_unwrap();
         let block_hash =
@@ -526,11 +527,11 @@ mod contract {
     pub extern "C" fn begin_chain() {
         use crate::prelude::U256;
         let mut io = Runtime;
-        let mut state = engine::get_state(&io).sdk_unwrap();
+        let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
-        engine::set_state(&mut io, state);
+        state::set_state(&mut io, state).sdk_unwrap();
         // set genesis block balances
         for account_balance in args.genesis_alloc {
             engine::set_balance(
@@ -540,14 +541,14 @@ mod contract {
             )
         }
         // return new chain ID
-        io.return_output(&engine::get_state(&io).sdk_unwrap().chain_id)
+        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id)
     }
 
     #[cfg(feature = "evm_bully")]
     #[no_mangle]
     pub extern "C" fn begin_block() {
         let io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let _args: BeginBlockArgs = io.read_input_borsh().sdk_unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
@@ -984,7 +985,7 @@ mod contract {
         }
     }
 
-    fn require_owner_only(state: &EngineState, predecessor_account_id: &AccountId) {
+    fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
         if &state.owner_id != predecessor_account_id {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
         }

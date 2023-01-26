@@ -1,9 +1,9 @@
 use crate::test_utils;
-use aurora_engine::engine;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     FinishDepositCallArgs, InitCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
 };
+use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::types::{Address, Balance, NEP141Wei, NearGas, Wei};
@@ -56,7 +56,7 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
         upgrade_delay_blocks: 1,
     };
 
-    engine::set_state(&mut io, new_args.into());
+    state::set_state(&mut io, new_args.into()).unwrap();
 
     let connector_args = InitCallArgs {
         prover_account: test_utils::str_to_account_id("prover.near"),
