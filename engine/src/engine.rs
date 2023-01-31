@@ -1184,6 +1184,7 @@ pub fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
         .unwrap_or_else(|_| U256::zero())
 }
 
+#[cfg(test)]
 pub fn increment_nonce<I: IO>(io: &mut I, address: &Address) {
     let account_nonce = get_nonce(io, address);
     let new_nonce = account_nonce.saturating_add(U256::one());
