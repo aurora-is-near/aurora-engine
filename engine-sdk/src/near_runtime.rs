@@ -415,7 +415,7 @@ impl crate::promise::PromiseHandler for Runtime {
                     receiver_id,
                     function_names,
                 } => {
-                    feature_gated!("all-promise-actions", {
+                    {
                         let pk: RawPublicKey = public_key.into();
                         let pk_bytes = pk.as_bytes();
                         let allowance = allowance.as_u128();
@@ -432,18 +432,16 @@ impl crate::promise::PromiseHandler for Runtime {
                             function_names.len() as _,
                             function_names.as_ptr() as _,
                         )
-                    });
+                    };
                 }
                 PromiseAction::DeleteKey { public_key } => {
-                    feature_gated!("all-promise-actions", {
-                        let pk: RawPublicKey = public_key.into();
-                        let pk_bytes = pk.as_bytes();
-                        exports::promise_batch_action_delete_key(
-                            id,
-                            pk_bytes.len() as _,
-                            pk_bytes.as_ptr() as _,
-                        )
-                    });
+                    let pk: RawPublicKey = public_key.into();
+                    let pk_bytes = pk.as_bytes();
+                    exports::promise_batch_action_delete_key(
+                        id,
+                        pk_bytes.len() as _,
+                        pk_bytes.as_ptr() as _,
+                    )
                 }
                 PromiseAction::DeleteAccount { beneficiary_id } => {
                     feature_gated!("all-promise-actions", {

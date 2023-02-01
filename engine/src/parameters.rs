@@ -208,6 +208,12 @@ pub struct RegisterRelayerCallArgs {
     pub address: Address,
 }
 
+// add/remove_relayer_key calls args
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RelayerKeyArgs {
+    pub public_key: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct PauseEthConnectorCallArgs {
     pub paused_mask: PausedMask,

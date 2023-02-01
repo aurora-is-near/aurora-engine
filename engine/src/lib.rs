@@ -68,7 +68,9 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
+    use aurora_engine_types::parameters::NearPublicKey;
     use borsh::{BorshDeserialize, BorshSerialize};
+    use core::str::FromStr;
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
@@ -93,12 +95,16 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
+    use crate::prelude::{
+        sdk, u256_to_arr, vec, Address, PromiseAction, PromiseBatchAction, PromiseResult, Yocto,
+        ERR_FAILED_PARSE, H256,
+    };
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
+    use aurora_engine_types::public_key::PublicKey;
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
@@ -328,6 +334,48 @@ mod contract {
             predecessor_account_id.as_bytes(),
             Address::from_array(relayer_address),
         );
+    }
+
+    // TODO move state.relayer_id check to near-plugins/AccessControllable
+    // no refunds are handled on purpose for the sake of safety
+    #[no_mangle]
+    pub extern "C" fn add_relayer_key() {
+        use crate::prelude::ToString;
+        let public_key = parse_public_key_args_if_allowed();
+
+        let mut io = Runtime;
+        let allowance = Yocto::new(io.attached_deposit());
+        sdk::log!("attached key allowance: {}", allowance);
+        if allowance.as_u128() < 100 {
+            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
+        }
+
+        let action = PromiseAction::AddFunctionCallKey {
+            public_key,
+            allowance,
+            nonce: 0, // not actually used - depends on block height
+            receiver_id: io.current_account_id(),
+            function_names: "submit".to_string(),
+        };
+        let promise = PromiseBatchAction {
+            target_account_id: io.current_account_id(),
+            actions: vec![action],
+        };
+
+        unsafe { io.promise_create_batch(&promise) };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn remove_relayer_key() {
+        let mut io = Runtime;
+        let public_key = parse_public_key_args_if_allowed();
+        let action = PromiseAction::DeleteKey { public_key };
+        let promise = PromiseBatchAction {
+            target_account_id: io.current_account_id(),
+            actions: vec![action],
+        };
+
+        unsafe { io.promise_create_batch(&promise) };
     }
 
     /// Updates the bytecode for user's router contracts created by the engine.
@@ -989,6 +1037,21 @@ mod contract {
 
     fn predecessor_address(predecessor_account_id: &AccountId) -> Address {
         near_account_to_evm_address(predecessor_account_id.as_bytes())
+    }
+
+    fn parse_public_key_args_if_allowed() -> NearPublicKey {
+        let io = Runtime;
+        let state = state::get_state(&io).sdk_unwrap();
+
+        require_owner_only(&state, &io.predecessor_account_id());
+
+        let args: parameters::RelayerKeyArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .sdk_unwrap();
+
+        let npk: NearPublicKey = PublicKey::from_str(&args.public_key).unwrap().into();
+        sdk::log!("Processing public key: {:?}", npk);
+        npk
     }
 
     mod exports {

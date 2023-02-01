@@ -34,6 +34,7 @@ pub(crate) const PAUSE_PRECOMPILES: &str = "pause_precompiles";
 pub(crate) const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub(crate) const RESUME_PRECOMPILES: &str = "resume_precompiles";
 
+pub(crate) mod asserts;
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
 pub(crate) mod mocked_external;

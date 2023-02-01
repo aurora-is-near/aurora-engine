@@ -259,6 +259,7 @@ name = "aurora-engine-types"
 version = "1.0.0"
 dependencies = [
  "borsh",
+ "bs58",
  "hex",
  "primitive-types 0.12.1",
  "rand 0.8.5",
@@ -451,6 +452,9 @@ name = "bs58"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
+dependencies = [
+ "sha2 0.9.9",
+]
 
 [[package]]
 name = "bstr"
