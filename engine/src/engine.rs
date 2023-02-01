@@ -111,13 +111,6 @@ pub enum EngineErrorKind {
 }
 
 impl EngineErrorKind {
-    pub fn with_gas_used(self, gas_used: u64) -> EngineError {
-        EngineError {
-            kind: self,
-            gas_used,
-        }
-    }
-
     pub fn as_bytes(&self) -> &[u8] {
         use EngineErrorKind::*;
         match self {
@@ -490,13 +483,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let used_gas = executor.used_gas();
-        let status = match exit_reason.into_result(result) {
-            Ok(status) => status,
-            Err(e) => {
-                increment_nonce(&mut self.io, &origin);
-                return Err(e.with_gas_used(used_gas));
-            }
-        };
+        let status = exit_reason.into_result(result)?;
 
         let (values, logs) = executor.into_state().deconstruct();
         let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
@@ -571,13 +558,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         );
 
         let used_gas = executor.used_gas();
-        let status = match exit_reason.into_result(result) {
-            Ok(status) => status,
-            Err(e) => {
-                increment_nonce(&mut self.io, origin);
-                return Err(e.with_gas_used(used_gas));
-            }
-        };
+        let status = exit_reason.into_result(result)?;
 
         let (values, logs) = executor.into_state().deconstruct();
         let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
@@ -903,11 +884,6 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
     let prepaid_amount = match engine.charge_gas(&sender, &transaction) {
         Ok(gas_result) => gas_result,
-        Err(GasPaymentError::OutOfFund) => {
-            increment_nonce(&mut io, &sender);
-            let result = SubmitResult::new(TransactionStatus::OutOfFund, 0, vec![]);
-            return Ok(result);
-        }
         Err(err) => {
             return Err(EngineErrorKind::GasPayment(err).into());
         }
@@ -1208,6 +1184,7 @@ pub fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
         .unwrap_or_else(|_| U256::zero())
 }
 
+#[cfg(test)]
 pub fn increment_nonce<I: IO>(io: &mut I, address: &Address) {
     let account_nonce = get_nonce(io, address);
     let new_nonce = account_nonce.saturating_add(U256::one());
