@@ -150,7 +150,6 @@ fn test_state_format() {
     assert_eq!(hex::encode(state.try_to_vec().unwrap()), expected_hex);
 }
 
-#[cfg(test)]
 fn generate_code(len: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();
     let mut buf = vec![0u8; len];
