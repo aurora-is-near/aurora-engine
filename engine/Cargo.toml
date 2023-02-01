@@ -20,7 +20,6 @@ aurora-engine-types = { path = "../engine-types", default-features = false }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false }
-base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
 bitflags = { version = "1.3", default-features = false }
 borsh = { version = "0.9.3", default-features = false }
 byte-slice-cast = { version = "1.0", default-features = false }
@@ -42,7 +41,7 @@ digest = "0.10"
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "base64/std", "borsh/std", "byte-slice-cast/std", "ethabi/std", "evm/std", "hex/std", "rjson/std", "rlp/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "borsh/std", "byte-slice-cast/std", "ethabi/std", "evm/std", "hex/std", "rjson/std", "rlp/std"]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
 evm_bully = []
 log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]

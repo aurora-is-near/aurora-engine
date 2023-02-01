@@ -5,6 +5,7 @@ use crate::prelude::{Address, Vec, U256};
 use crate::prelude::{H256, STORAGE_PRICE_PER_BYTE};
 pub use types::keccak;
 
+pub mod base64;
 pub mod caching;
 pub mod env;
 pub mod error;

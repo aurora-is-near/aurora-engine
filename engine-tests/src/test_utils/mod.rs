@@ -248,8 +248,8 @@ impl AuroraRunner {
     ) {
         let trie = &mut self.ext.underlying.fake_trie;
         for entry in snapshot.result.values {
-            let key = base64::decode(entry.key).unwrap();
-            let value = base64::decode(entry.value).unwrap();
+            let key = aurora_engine_sdk::base64::decode(entry.key).unwrap();
+            let value = aurora_engine_sdk::base64::decode(entry.value).unwrap();
             trie.insert(key, value);
         }
     }

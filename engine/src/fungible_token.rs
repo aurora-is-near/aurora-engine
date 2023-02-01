@@ -63,7 +63,7 @@ pub struct FungibleReferenceHash([u8; 32]);
 impl FungibleReferenceHash {
     /// Encode to base64-encoded string
     pub fn encode(&self) -> String {
-        base64::encode(self)
+        aurora_engine_sdk::base64::encode(self)
     }
 }
 
