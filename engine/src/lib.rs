@@ -558,7 +558,7 @@ mod contract {
     pub extern "C" fn new_eth_connector() {
         let io = Runtime;
         // Only the owner can initialize the EthConnector
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
 
         let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
@@ -571,7 +571,7 @@ mod contract {
     pub extern "C" fn set_eth_connector_contract_data() {
         let mut io = Runtime;
         // Only the owner can set the EthConnector contract data
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
 
         let args: SetContractDataCallArgs = io.read_input_borsh().sdk_unwrap();
@@ -849,7 +849,7 @@ mod contract {
     pub extern "C" fn set_paused_flags() {
         let io = Runtime;
         // Only the owner can initialize the EthConnector
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
 
         let args: PauseEthConnectorCallArgs = io.read_input_borsh().sdk_unwrap();
