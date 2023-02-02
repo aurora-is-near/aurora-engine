@@ -14,8 +14,7 @@ use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::{MockCompiledContractCache, VMError};
 use rlp::RlpStream;
 
-use crate::prelude::metadata::FungibleTokenMetadata;
-use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
+use crate::prelude::parameters::{NewCallArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -302,39 +301,10 @@ impl AuroraRunner {
             trie.insert(code_key.to_vec(), code);
         }
 
-        let ft_key = crate::prelude::storage::bytes_to_key(
-            crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
-        );
-
-        let aurora_balance_key = [
-            ft_key.as_slice(),
-            self.context.current_account_id.as_ref().as_bytes(),
-        ]
-        .concat();
-        let aurora_balance_value = {
-            let mut current_balance: u128 = trie
-                .get(&aurora_balance_key)
-                .map(|bytes| u128::try_from_slice(bytes).unwrap())
-                .unwrap_or_default();
-            current_balance += init_balance.raw().as_u128();
-            current_balance
-        };
-
-        let proof_key = crate::prelude::storage::bytes_to_key(
-            crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent as u8],
-        );
-
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         if !init_nonce.is_zero() {
             trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         }
-        trie.insert(proof_key, vec![0]);
-        trie.insert(
-            aurora_balance_key,
-            aurora_balance_value.try_to_vec().unwrap(),
-        );
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.env.block_height = self.context.block_index;
@@ -506,7 +476,6 @@ impl AuroraRunner {
     }
 
     fn validate_standalone(&self) {
-        /*TODO: fix
         if let Some(standalone_runner) = &self.standalone_runner {
             let standalone_state = standalone_runner.get_current_state();
             // The number of keys in standalone_state may be larger because values are never deleted
@@ -522,7 +491,7 @@ impl AuroraRunner {
                     );
                 }
             }
-        }*/
+        }
     }
 }
 
@@ -615,15 +584,6 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     let account_id = runner.aurora_account_id.clone();
     let (_, maybe_error) = runner.call("new", &account_id, args.try_to_vec().unwrap());
 
-    assert!(maybe_error.is_none());
-
-    let args = InitCallArgs {
-        prover_account: str_to_account_id("prover.near"),
-        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
-        metadata: FungibleTokenMetadata::default(),
-    };
-    let (_, maybe_error) =
-        runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
     assert!(maybe_error.is_none());
 
     let args = SetEthConnectorContractAccountArgs {

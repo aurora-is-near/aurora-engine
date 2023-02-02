@@ -839,7 +839,18 @@ mod contract {
         let args: SetEthConnectorContractAccountArgs = io.read_input_borsh().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .set_eth_connector_contract_account(args.account);
+            .set_eth_connector_contract_account(&args.account);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn disable_legacy_nep141() {
+        let io = Runtime;
+        let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+
+        EthConnectorContract::init_instance(io)
+            .sdk_unwrap()
+            .disable_legacy_nep141();
     }
 
     #[no_mangle]
