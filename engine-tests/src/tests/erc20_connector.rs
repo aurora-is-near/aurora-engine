@@ -64,7 +64,7 @@ pub struct EthereumAddress {
     pub address: Address,
 }
 
-impl test_utils::AuroraRunner {
+impl AuroraRunner {
     pub fn new() -> Self {
         test_utils::deploy_evm()
     }
@@ -563,7 +563,7 @@ pub mod sim_tests {
             tester_address,
             aurora,
         } = test_exit_to_near_eth_common();
-        let exit_account_id = "any.near".to_owned();
+        let exit_account_id = "any.near";
 
         // call exit to near
         let input = super::build_input(
@@ -589,7 +589,7 @@ pub mod sim_tests {
             (INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT) as u128
         );
         assert_eq!(
-            nep_141_balance_of(exit_account_id.as_str(), &aurora.contract, &aurora),
+            nep_141_balance_of(exit_account_id, &aurora.contract, &aurora),
             ETH_EXIT_AMOUNT as u128
         );
         assert_eq!(
@@ -771,7 +771,7 @@ pub mod sim_tests {
     }
 
     fn exit_to_near(
-        source: &near_sdk_sim::UserAccount,
+        source: &UserAccount,
         dest: &str,
         amount: u128,
         erc20: &ERC20,
@@ -801,9 +801,9 @@ pub mod sim_tests {
     }
 
     pub(crate) fn transfer_nep_141_to_erc_20(
-        nep_141: &near_sdk_sim::UserAccount,
+        nep_141: &UserAccount,
         erc20: &ERC20,
-        source: &near_sdk_sim::UserAccount,
+        source: &UserAccount,
         dest: Address,
         amount: u128,
         aurora: &AuroraAccount,
@@ -866,7 +866,7 @@ pub mod sim_tests {
     }
 
     pub(crate) fn deploy_erc20_from_nep_141(
-        nep_141: &near_sdk_sim::UserAccount,
+        nep_141: &UserAccount,
         aurora: &AuroraAccount,
     ) -> ERC20 {
         let args = DeployErc20TokenArgs {
@@ -876,12 +876,12 @@ pub mod sim_tests {
         let addr_bytes: Vec<u8> = result.unwrap_borsh();
         let address = Address::try_from_slice(&addr_bytes).unwrap();
         let abi = ERC20Constructor::load().0.abi;
-        ERC20(crate::test_utils::solidity::DeployedContract { abi, address })
+        ERC20(test_utils::solidity::DeployedContract { abi, address })
     }
 
     pub fn nep_141_balance_of(
         account_id: &str,
-        nep_141: &near_sdk_sim::UserAccount,
+        nep_141: &UserAccount,
         aurora: &AuroraAccount,
     ) -> u128 {
         aurora
@@ -953,9 +953,9 @@ pub mod sim_tests {
     }
 
     struct TestExitToNearContext {
-        ft_owner: near_sdk_sim::UserAccount,
+        ft_owner: UserAccount,
         ft_owner_address: Address,
-        nep_141: near_sdk_sim::UserAccount,
+        nep_141: UserAccount,
         erc20: ERC20,
         aurora: AuroraAccount,
     }

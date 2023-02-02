@@ -690,7 +690,7 @@ pub(crate) fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) ->
 
 pub(crate) fn create_eth_transaction(
     to: Option<Address>,
-    value: crate::prelude::Wei,
+    value: Wei,
     data: Vec<u8>,
     chain_id: Option<u64>,
     secret_key: &SecretKey,

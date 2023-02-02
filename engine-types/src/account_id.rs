@@ -4,6 +4,7 @@
 
 use crate::{fmt, str, str::FromStr, Box, String, Vec};
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 pub const MIN_ACCOUNT_ID_LEN: usize = 2;
 pub const MAX_ACCOUNT_ID_LEN: usize = 64;
@@ -12,9 +13,19 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 ///
 /// This guarantees all properly constructed AccountId's are valid for the NEAR network.
 #[derive(
-    BorshSerialize, BorshDeserialize, Default, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd,
+    BorshSerialize,
+    BorshDeserialize,
+    Serialize,
+    Deserialize,
+    Default,
+    Eq,
+    Ord,
+    Hash,
+    Clone,
+    Debug,
+    PartialEq,
+    PartialOrd,
 )]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccountId(Box<str>);
 
 impl AccountId {

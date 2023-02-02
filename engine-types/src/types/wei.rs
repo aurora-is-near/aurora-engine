@@ -1,10 +1,9 @@
 use crate::fmt::Formatter;
 use crate::types::balance::error;
 use crate::types::Fee;
-use crate::{Add, Display, Sub, SubAssign, U256};
+use crate::{format, Add, Display, Sub, SubAssign, ToString, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
 pub const ZERO_WEI: Wei = Wei::new_u64(0);
@@ -16,8 +15,35 @@ pub type WeiU256 = [u8; 32];
 #[derive(
     Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
 )]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NEP141Wei(u128);
+
+impl Serialize for NEP141Wei {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let value = self.0.to_string();
+        serializer.serialize_str(&value)
+    }
+}
+
+impl<'de> Deserialize<'de> for NEP141Wei {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+        D::Error: serde::de::Error,
+    {
+        use serde::de::Error;
+
+        let value = serde_json::Value::deserialize(deserializer)?;
+        Ok(Self(
+            value
+                .as_str()
+                .ok_or_else(|| Error::custom(format!("Wait for a string but got: {}", value)))
+                .and_then(|value| value.parse().map_err(Error::custom))?,
+        ))
+    }
+}
 
 impl Display for NEP141Wei {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::fmt::Result {
@@ -68,8 +94,7 @@ impl SubAssign<NEP141Wei> for NEP141Wei {
 }
 
 /// Newtype to distinguish balances (denominated in Wei) from other U256 types.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Wei(U256);
 
 impl Wei {

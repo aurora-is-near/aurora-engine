@@ -18,7 +18,7 @@ aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false }
 rlp = { version = "0.5.0", default-features = false }
-serde = { version = "1", features = ["derive"], optional = true }
+serde = { version = "1", default-features = false, features = ["alloc", "derive"], optional = true }
 
 [dev-dependencies]
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
