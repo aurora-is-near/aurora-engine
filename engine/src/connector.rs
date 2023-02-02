@@ -301,6 +301,20 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             attached_gas: GAS_FOR_FINISH_DEPOSIT,
         }
     }
+
+    /// Disable flag for standalone-legacy-nep141
+    pub fn disable_legacy_nep141(&mut self) {
+        self.io.write_borsh(
+            &construct_contract_key(&EthConnectorStorageId::DisableLegacyNEP141),
+            &1u8,
+        );
+    }
+
+    pub fn is_disabled_legacy_nep141(&self) -> bool {
+        self.io.storage_has_key(&construct_contract_key(
+            &EthConnectorStorageId::DisableLegacyNEP141,
+        ))
+    }
 }
 
 impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {

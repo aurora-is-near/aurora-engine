@@ -61,6 +61,7 @@ pub enum EthConnectorStorageId {
     StatisticsAuroraAccountsCounter = 0x4,
     FungibleTokenMetadata = 0x5,
     EthConnectorAccount = 0x6,
+    DisableLegacyNEP141 = 0x7,
 }
 
 impl From<EthConnectorStorageId> for u8 {
@@ -74,6 +75,7 @@ impl From<EthConnectorStorageId> for u8 {
             StatisticsAuroraAccountsCounter => 0x4,
             FungibleTokenMetadata => 0x5,
             EthConnectorAccount => 0x6,
+            DisableLegacyNEP141 => 0x7,
         }
     }
 }

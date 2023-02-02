@@ -119,6 +119,7 @@ pub enum TransactionKind {
     /// Initialize eth-connector
     NewConnector(parameters::InitCallArgs),
     SetEthConnectorContractAccount(parameters::SetEthConnectorContractAccountArgs),
+    DisableLegacyNEP141,
     /// Initialize Engine
     NewEngine(parameters::NewCallArgs),
     /// Update xcc-router bytecode
@@ -333,6 +334,7 @@ impl TransactionKind {
             TransactionKind::SetEthConnectorContractAccount(_) => {
                 Self::no_evm_execution("set_eth_connector_contract_account")
             }
+            TransactionKind::DisableLegacyNEP141 => Self::no_evm_execution("disable_legacy_nep141"),
             TransactionKind::NewEngine(_) => Self::no_evm_execution("new_engine"),
             TransactionKind::FactoryUpdate(_) => Self::no_evm_execution("factory_update"),
             TransactionKind::FactoryUpdateAddressVersion(_) => {
@@ -510,6 +512,7 @@ enum BorshableTransactionKind<'a> {
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
     SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
+    DisableLegacyNEP141,
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -553,6 +556,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetEthConnectorContractAccount(x) => {
                 Self::SetEthConnectorContractAccount(Cow::Borrowed(x))
             }
+            TransactionKind::DisableLegacyNEP141 => Self::DisableLegacyNEP141,
         }
     }
 }
@@ -613,6 +617,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::SetEthConnectorContractAccount(x) => {
                 Ok(Self::SetEthConnectorContractAccount(x.into_owned()))
             }
+            BorshableTransactionKind::DisableLegacyNEP141 => Ok(Self::DisableLegacyNEP141),
         }
     }
 }

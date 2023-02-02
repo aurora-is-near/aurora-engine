@@ -843,6 +843,16 @@ mod contract {
     }
 
     #[no_mangle]
+    pub extern "C" fn disable_legacy_nep141() {
+        let io = Runtime;
+        io.assert_private_call().sdk_unwrap();
+
+        EthConnectorContract::init_instance(io)
+            .sdk_unwrap()
+            .disable_legacy_nep141();
+    }
+
+    #[no_mangle]
     pub extern "C" fn get_paused_flags() {
         let mut io = Runtime;
         let promise_args = EthConnectorContract::init_instance(io)

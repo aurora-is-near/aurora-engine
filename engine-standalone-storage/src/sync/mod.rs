@@ -182,6 +182,9 @@ fn non_submit_execute<'db>(
     relayer_address: Address,
     promise_data: &[Option<Vec<u8>>],
 ) -> Result<Option<TransactionExecutionResult>, error::Error> {
+    let is_disabled_legacy_nep141 =
+        aurora_engine::connector::EthConnectorContract::init_instance(io)?
+            .is_disabled_legacy_nep141();
     let result = match transaction {
         TransactionKind::Call(args) => {
             // We can ignore promises in the standalone engine (see above)
@@ -234,6 +237,7 @@ fn non_submit_execute<'db>(
             None
         }
 
+        TransactionKind::FtTransferCall(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::FtTransferCall(args) => {
             let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             let promise_args = connector.ft_transfer_call(
@@ -371,6 +375,12 @@ fn non_submit_execute<'db>(
 
             let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io)?;
             connector.set_eth_connector_contract_account(&args.account);
+
+            None
+        }
+        TransactionKind::DisableLegacyNEP141 => {
+            let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io)?;
+            connector.disable_legacy_nep141();
 
             None
         }
