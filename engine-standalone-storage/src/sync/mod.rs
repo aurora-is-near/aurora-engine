@@ -250,6 +250,7 @@ fn non_submit_execute<'db>(
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
+        TransactionKind::ResolveTransfer(_, _) if is_disabled_legacy_nep141 => None,
         TransactionKind::ResolveTransfer(args, promise_result) => {
             let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.ft_resolve_transfer(args.clone(), promise_result.clone());
@@ -257,6 +258,7 @@ fn non_submit_execute<'db>(
             None
         }
 
+        TransactionKind::FtTransfer(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::FtTransfer(args) => {
             let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.ft_transfer(&env.predecessor_account_id, args.clone())?;
@@ -264,6 +266,7 @@ fn non_submit_execute<'db>(
             None
         }
 
+        TransactionKind::Withdraw(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::Withdraw(args) => {
             let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.withdraw_eth_from_near(
@@ -275,6 +278,7 @@ fn non_submit_execute<'db>(
             None
         }
 
+        TransactionKind::Deposit(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::Deposit(raw_proof) => {
             let connector_contract = legacy_connector::EthConnectorContract::init_instance(io)?;
             let promise_args = connector_contract.deposit(
@@ -286,6 +290,7 @@ fn non_submit_execute<'db>(
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
+        TransactionKind::FinishDeposit(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::FinishDeposit(finish_args) => {
             let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             let maybe_promise_args = connector.finish_deposit(
@@ -298,6 +303,7 @@ fn non_submit_execute<'db>(
             maybe_promise_args.map(TransactionExecutionResult::Promise)
         }
 
+        TransactionKind::StorageDeposit(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::StorageDeposit(args) => {
             let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             let _ = connector.storage_deposit(
@@ -309,6 +315,7 @@ fn non_submit_execute<'db>(
             None
         }
 
+        TransactionKind::StorageUnregister(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::StorageUnregister(force) => {
             let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
@@ -316,6 +323,7 @@ fn non_submit_execute<'db>(
             None
         }
 
+        TransactionKind::StorageWithdraw(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::StorageWithdraw(args) => {
             let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
@@ -323,6 +331,7 @@ fn non_submit_execute<'db>(
             None
         }
 
+        TransactionKind::SetPausedFlags(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::SetPausedFlags(args) => {
             let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.set_paused_flags(args.clone());
@@ -354,6 +363,7 @@ fn non_submit_execute<'db>(
             result?
         }
 
+        TransactionKind::SetConnectorData(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::SetConnectorData(args) => {
             let mut connector_io = io;
             legacy_connector::set_contract_data(&mut connector_io, args.clone())?;
@@ -361,6 +371,7 @@ fn non_submit_execute<'db>(
             None
         }
 
+        TransactionKind::NewConnector(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::NewConnector(args) => {
             legacy_connector::EthConnectorContract::create_contract(
                 io,
@@ -370,6 +381,7 @@ fn non_submit_execute<'db>(
 
             None
         }
+
         TransactionKind::SetEthConnectorContractAccount(args) => {
             use aurora_engine::admin_controlled::AdminControlled;
 
@@ -378,12 +390,14 @@ fn non_submit_execute<'db>(
 
             None
         }
+
         TransactionKind::DisableLegacyNEP141 => {
             let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io)?;
             connector.disable_legacy_nep141();
 
             None
         }
+
         TransactionKind::NewEngine(args) => {
             engine::set_state(&mut io, args.clone().into());
 

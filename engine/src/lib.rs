@@ -845,7 +845,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn disable_legacy_nep141() {
         let io = Runtime;
-        io.assert_private_call().sdk_unwrap();
+        let state = engine::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
 
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
