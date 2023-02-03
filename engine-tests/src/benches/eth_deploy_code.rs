@@ -9,7 +9,7 @@ use crate::test_utils::{
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 
-pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
+pub fn eth_deploy_code_benchmark(c: &mut Criterion) {
     let mut runner = deploy_evm();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
@@ -33,7 +33,7 @@ pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
     let calling_account_id = "some-account.near";
 
     // measure gas usage
-    for input in inputs.iter() {
+    for input in &inputs {
         let input_size = input.len();
         let (output, maybe_err) = runner
             .one_shot()
@@ -43,8 +43,8 @@ pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
         let gas = output.burnt_gas;
         let eth_gas = crate::test_utils::parse_eth_gas(&output);
         // TODO(#45): capture this in a file
-        println!("ETH_DEPLOY_CODE_{:?} NEAR GAS: {:?}", input_size, gas);
-        println!("ETH_DEPLOY_CODE_{:?} ETH GAS: {:?}", input_size, eth_gas);
+        println!("ETH_DEPLOY_CODE_{input_size:?} NEAR GAS: {gas:?}");
+        println!("ETH_DEPLOY_CODE_{input_size:?} ETH GAS: {eth_gas:?}");
     }
 
     // measure wall-clock time
@@ -58,7 +58,7 @@ pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
                 || (runner.one_shot(), calling_account_id, input.clone()),
                 |(r, c, i)| r.call(SUBMIT, c, i),
                 BatchSize::SmallInput,
-            )
+            );
         });
     }
     group.finish();

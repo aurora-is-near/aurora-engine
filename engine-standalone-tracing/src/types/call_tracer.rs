@@ -1,5 +1,5 @@
 //! This module defines data structure to produce traces compatible with geths "callTracer":
-//! https://github.com/ethereum/go-ethereum/blob/ad15050c7fbedd0f05a49e81400de18c2cc2c284/eth/tracers/native/call.go
+//! `https://github.com/ethereum/go-ethereum/blob/ad15050c7fbedd0f05a49e81400de18c2cc2c284/eth/tracers/native/call.go`
 
 use aurora_engine_types::{types::Address, U256};
 
@@ -34,7 +34,7 @@ impl CallTracer {
                 }
             }
             Some(error) => {
-                let error_message = format!("{:?}", error);
+                let error_message = format!("{error:?}");
                 if error_message.to_lowercase().contains("revert") {
                     frame.output = output;
                 }
@@ -82,7 +82,7 @@ impl CallTracer {
                 }
             }
             Some(error) => {
-                frame.error = Some(format!("{:?}", error));
+                frame.error = Some(format!("{error:?}"));
                 frame.output = output;
             }
         }
@@ -100,6 +100,7 @@ impl CallTracer {
     }
 
     #[cfg(feature = "serde")]
+    #[must_use]
     pub fn serializable(mut self) -> Option<SerializableCallFrame> {
         if self.call_stack.len() != 1 {
             // If there is more than one element in `call_stack` then it must mean the trace did not complete
@@ -147,10 +148,10 @@ impl evm_gasometer::tracing::EventListener for CallTracer {
             } => self.update_gas_from_snapshot(snapshot),
 
             // Not useful
-            evm_gasometer::tracing::Event::RecordCost { .. } => (),
-            evm_gasometer::tracing::Event::RecordDynamicCost { .. } => (),
-            evm_gasometer::tracing::Event::RecordStipend { .. } => (),
-            evm_gasometer::tracing::Event::RecordTransaction { .. } => (),
+            evm_gasometer::tracing::Event::RecordCost { .. }
+            | evm_gasometer::tracing::Event::RecordDynamicCost { .. }
+            | evm_gasometer::tracing::Event::RecordStipend { .. }
+            | evm_gasometer::tracing::Event::RecordTransaction { .. } => (),
         }
     }
 }
@@ -198,9 +199,10 @@ impl evm::tracing::EventListener for CallTracer {
                 target_gas,
             } => {
                 let call_type = match scheme {
-                    evm::CreateScheme::Legacy { .. } => CallType::Create,
                     evm::CreateScheme::Create2 { .. } => CallType::Create2,
-                    evm::CreateScheme::Fixed(_) => CallType::Create, // is this even possible in production?
+                    evm::CreateScheme::Legacy { .. } | evm::CreateScheme::Fixed(_) => {
+                        CallType::Create
+                    } // is this even possible in production?
                 };
 
                 self.enter(
@@ -254,10 +256,10 @@ impl evm::tracing::EventListener for CallTracer {
             }
 
             // not useful
-            evm::tracing::Event::PrecompileSubcall { .. } => (),
-            evm::tracing::Event::TransactCall { .. } => (),
-            evm::tracing::Event::TransactCreate { .. } => (),
-            evm::tracing::Event::TransactCreate2 { .. } => (),
+            evm::tracing::Event::PrecompileSubcall { .. }
+            | evm::tracing::Event::TransactCall { .. }
+            | evm::tracing::Event::TransactCreate { .. }
+            | evm::tracing::Event::TransactCreate2 { .. } => (),
         }
     }
 }

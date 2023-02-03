@@ -7,11 +7,12 @@ use sha3::{Digest, Keccak256};
 
 #[cfg(feature = "contract")]
 #[inline]
+#[must_use]
 pub fn keccak(input: &[u8]) -> H256 {
     unsafe {
         super::exports::keccak256(input.len() as u64, input.as_ptr() as u64, 1);
         let bytes = H256::zero();
-        super::exports::read_register(1, bytes.0.as_ptr() as *const u64 as u64);
+        super::exports::read_register(1, bytes.0.as_ptr() as u64);
         bytes
     }
 }
@@ -22,6 +23,7 @@ pub fn keccak(data: &[u8]) -> H256 {
     H256::from_slice(Keccak256::digest(data).as_slice())
 }
 
+#[must_use]
 pub fn near_account_to_evm_address(addr: &[u8]) -> Address {
     Address::try_from_slice(&keccak(addr)[12..]).unwrap()
 }
@@ -34,20 +36,14 @@ pub trait ExpectUtf8<T> {
 #[cfg(feature = "contract")]
 impl<T> ExpectUtf8<T> for Option<T> {
     fn expect_utf8(self, message: &[u8]) -> T {
-        match self {
-            Some(t) => t,
-            None => crate::panic_utf8(message),
-        }
+        self.unwrap_or_else(|| crate::panic_utf8(message))
     }
 }
 
 #[cfg(feature = "contract")]
 impl<T, E> ExpectUtf8<T> for Result<T, E> {
     fn expect_utf8(self, message: &[u8]) -> T {
-        match self {
-            Ok(t) => t,
-            Err(_) => crate::panic_utf8(message),
-        }
+        self.unwrap_or_else(|_| crate::panic_utf8(message))
     }
 }
 
@@ -59,20 +55,14 @@ pub trait SdkExpect<T> {
 #[cfg(feature = "contract")]
 impl<T> SdkExpect<T> for Option<T> {
     fn sdk_expect(self, msg: &str) -> T {
-        match self {
-            Some(t) => t,
-            None => crate::panic_utf8(msg.as_ref()),
-        }
+        self.unwrap_or_else(|| crate::panic_utf8(msg.as_bytes()))
     }
 }
 
 #[cfg(feature = "contract")]
 impl<T, E> SdkExpect<T> for Result<T, E> {
     fn sdk_expect(self, msg: &str) -> T {
-        match self {
-            Ok(t) => t,
-            Err(_) => crate::panic_utf8(msg.as_ref()),
-        }
+        self.unwrap_or_else(|_| crate::panic_utf8(msg.as_bytes()))
     }
 }
 
@@ -84,10 +74,7 @@ pub trait SdkUnwrap<T> {
 #[cfg(feature = "contract")]
 impl<T> SdkUnwrap<T> for Option<T> {
     fn sdk_unwrap(self) -> T {
-        match self {
-            Some(t) => t,
-            None => crate::panic_utf8("ERR_UNWRAP".as_bytes()),
-        }
+        self.unwrap_or_else(|| crate::panic_utf8(b"ERR_UNWRAP"))
     }
 }
 

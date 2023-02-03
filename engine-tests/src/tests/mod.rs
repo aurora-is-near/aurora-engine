@@ -16,10 +16,12 @@ mod prepaid_gas_precompile;
 mod promise_results_precompile;
 mod random;
 mod repro;
-pub(crate) mod sanity;
+pub mod sanity;
 mod self_destruct_state;
 mod standalone;
 mod standard_precompiles;
 mod state_migration;
-pub(crate) mod uniswap;
-pub(crate) mod xcc;
+pub mod uniswap;
+pub mod xcc;
+
+const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61_200_152;

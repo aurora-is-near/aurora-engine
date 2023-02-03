@@ -19,6 +19,7 @@ pub struct ConnectionParams {
 }
 
 impl ConnectionParams {
+    #[must_use]
     pub fn as_connection_string(&self) -> String {
         format!(
             "host={} port={} dbname={} user={} password={}",
@@ -84,12 +85,12 @@ impl From<postgres::Row> for BlockRow {
         let receipts_root = get_hash(&row, "receipts_root");
 
         Self {
-            chain: chain as u64,
-            id: id as u64,
+            chain: u64::try_from(chain).unwrap_or_default(),
+            id: u64::try_from(id).unwrap_or_default(),
             hash,
             near_hash: near_hash.map(H256::from_slice),
             timestamp,
-            size: size as u32,
+            size: u32::try_from(size).unwrap_or_default(),
             gas_limit,
             gas_used,
             parent_hash,
@@ -170,10 +171,10 @@ impl From<postgres::Row> for TransactionRow {
         let output: Option<Vec<u8>> = row.get("output");
 
         Self {
-            block: block as u64,
+            block: u64::try_from(block).unwrap_or_default(),
             block_hash,
-            index: index as u16,
-            id: id as u64,
+            index: u16::try_from(index).unwrap_or_default(),
+            id: u64::try_from(id).unwrap_or_default(),
             hash,
             near_hash,
             near_receipt_hash,
@@ -233,7 +234,7 @@ fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {
     let timestamp: Option<SystemTime> = row.get(field);
     timestamp
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos() as u64)
+        .and_then(|d| u64::try_from(d.as_nanos()).ok())
 }
 
 struct PostgresNumeric {
@@ -263,20 +264,20 @@ impl TryFrom<PostgresNumeric> for U256 {
     type Error = NumericToU256Error;
 
     fn try_from(value: PostgresNumeric) -> Result<Self, Self::Error> {
-        if let PostgresNumericSign::Negative = value.sign {
+        if matches!(value.sign, PostgresNumericSign::Negative) {
             return Err(NumericToU256Error::Negative);
-        } else if let PostgresNumericSign::NaN = value.sign {
+        } else if matches!(value.sign, PostgresNumericSign::NaN) {
             return Err(NumericToU256Error::NaN);
         } else if value.scale != 0 || value.weight < 0 {
             return Err(NumericToU256Error::NotAWholeNumber);
         }
 
-        let mut total = U256::zero();
+        let mut total = Self::zero();
         let mut weight = PostgresNumeric::BASE_WEIGHT
             .checked_pow(value.weight.into())
             .ok_or(NumericToU256Error::Overflow)?;
         for group in value.groups {
-            let contribution = U256::from(group)
+            let contribution = Self::from(group)
                 .checked_mul(weight)
                 .ok_or(NumericToU256Error::Overflow)?;
             total = total
@@ -334,7 +335,7 @@ impl<'a> postgres::types::FromSql<'a> for PostgresNumeric {
             groups.push(read_u16(&mut cursor)?);
         }
 
-        Ok(PostgresNumeric {
+        Ok(Self {
             weight,
             sign,
             scale,

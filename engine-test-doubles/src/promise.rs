@@ -40,7 +40,9 @@ impl PromiseHandler for PromiseTracker {
     }
 
     fn promise_result(&self, index: u64) -> Option<PromiseResult> {
-        self.promise_results.get(index as usize).cloned()
+        self.promise_results
+            .get(usize::try_from(index).ok()?)
+            .cloned()
     }
 
     unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
@@ -81,8 +83,8 @@ impl PromiseHandler for PromiseTracker {
         Self {
             internal_index: 0,
             promise_results: self.promise_results.clone(),
-            scheduled_promises: Default::default(),
-            returned_promise: Default::default(),
+            scheduled_promises: HashMap::default(),
+            returned_promise: Option::default(),
         }
     }
 }

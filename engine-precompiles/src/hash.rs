@@ -64,9 +64,9 @@ impl Precompile for SHA256 {
         Ok(PrecompileOutput::without_logs(cost, output))
     }
 
-    /// See: https://ethereum.github.io/yellowpaper/paper.pdf
-    /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
+    /// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
+    /// See: `https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000002`
     #[cfg(feature = "contract")]
     fn run(
         &self,
@@ -114,9 +114,9 @@ impl Precompile for RIPEMD160 {
         )
     }
 
-    /// See: https://ethereum.github.io/yellowpaper/paper.pdf
-    /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000003
+    /// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
+    /// See: `https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000003`
     fn run(
         &self,
         input: &[u8],

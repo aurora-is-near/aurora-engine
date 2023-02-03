@@ -10,6 +10,7 @@ use crate::test_utils::standalone::{mocks, storage::create_db};
 use crate::test_utils::{self, Signer};
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn test_replay_transaction() {
     let mut signer = Signer::random();
     let address = test_utils::address_from_secret_key(&signer.secret_key);
@@ -85,7 +86,11 @@ fn test_replay_transaction() {
                 .enumerate()
                 .map(|(position, tx)| {
                     let diff = runner
-                        .execute_transaction_at_position(tx, block_height, position as u16)
+                        .execute_transaction_at_position(
+                            tx,
+                            block_height,
+                            u16::try_from(position).unwrap(),
+                        )
                         .unwrap();
 
                     test_utils::standalone::storage::commit(&mut runner.storage, &diff);
@@ -117,7 +122,7 @@ fn test_replay_transaction() {
         rand::seq::SliceRandom::shuffle(txs.as_mut_slice(), &mut rng);
         for ((position, tx), diff) in txs {
             let replay_diff = runner
-                .execute_transaction_at_position(tx, block_height, position as u16)
+                .execute_transaction_at_position(tx, block_height, u16::try_from(position).unwrap())
                 .unwrap()
                 .diff;
             assert_eq!(replay_diff, diff);
@@ -170,7 +175,7 @@ fn test_block_index() {
 
     // write block hash / height association
     storage
-        .set_block_data(block_hash, block_height, block_metadata.clone())
+        .set_block_data(block_hash, block_height, &block_metadata.clone())
         .unwrap();
     // read it back
     assert_eq!(
@@ -199,22 +204,22 @@ fn test_block_index() {
     let missing_block_hash = H256([32u8; 32]);
     match storage.get_block_hash_by_height(missing_block_height) {
         Err(engine_standalone_storage::Error::NoBlockAtHeight(h)) if h == missing_block_height => {}
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
     match storage.get_block_height_by_hash(missing_block_hash) {
         Err(engine_standalone_storage::Error::BlockNotFound(h)) if h == missing_block_hash => (), // ok
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
     match storage.get_block_metadata(missing_block_hash) {
         Err(engine_standalone_storage::Error::BlockNotFound(h)) if h == missing_block_hash => (), // ok
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
 
     // insert later block
     let next_height = block_height + 1;
     let next_hash = H256([0xaa; 32]);
     storage
-        .set_block_data(next_hash, next_height, block_metadata.clone())
+        .set_block_data(next_hash, next_height, &block_metadata.clone())
         .unwrap();
 
     // check earliest+latest blocks are still correct
@@ -231,7 +236,7 @@ fn test_block_index() {
     let prev_height = block_height - 1;
     let prev_hash = H256([0xbb; 32]);
     storage
-        .set_block_data(prev_hash, prev_height, block_metadata)
+        .set_block_data(prev_hash, prev_height, &block_metadata)
         .unwrap();
 
     // check earliest+latest blocks are still correct
@@ -312,15 +317,15 @@ fn test_transaction_index() {
     match storage.get_transaction_data(missing_tx_hash) {
         Err(engine_standalone_storage::Error::TransactionHashNotFound(h))
             if h == missing_tx_hash => {}
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
     match storage.get_transaction_by_position(tx_not_included) {
         Err(engine_standalone_storage::Error::TransactionNotFound(x)) if x == tx_not_included => (), // ok
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
     match storage.get_transaction_diff(tx_not_included) {
         Err(engine_standalone_storage::Error::TransactionNotFound(x)) if x == tx_not_included => (), // ok
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
 
     drop(storage);

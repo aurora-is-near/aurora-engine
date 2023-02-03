@@ -6,11 +6,12 @@ use aurora_engine_types::{Cow, Vec};
 use borsh::BorshSerialize;
 use evm::{Context, ExitError};
 
-/// get_promise_results precompile address
+/// `get_promise_results` precompile address
 ///
 /// Address: `0x0a3540f79be10ef14890e87c1a0040a68cc6af71`
 /// This address is computed as: `&keccak("getPromiseResults")[12..]`
-pub const ADDRESS: Address = crate::make_address(0x0a3540f7, 0x9be10ef14890e87c1a0040a68cc6af71);
+pub const ADDRESS: Address =
+    crate::make_address(0x0a35_40f7, 0x9be1_0ef1_4890_e87c_1a00_40a6_8cc6_af71);
 
 pub mod costs {
     use crate::prelude::types::EthGas;
@@ -26,7 +27,7 @@ pub struct PromiseResult<H> {
 }
 
 impl<H> PromiseResult<H> {
-    pub fn new(handler: H) -> Self {
+    pub const fn new(handler: H) -> Self {
         Self { handler }
     }
 }
@@ -84,7 +85,7 @@ mod tests {
     fn test_get_promise_results_precompile_id() {
         assert_eq!(
             promise_result::ADDRESS,
-            near_account_to_evm_address("getPromiseResults".as_bytes())
+            near_account_to_evm_address(b"getPromiseResults")
         );
     }
 }
