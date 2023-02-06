@@ -150,19 +150,19 @@ fn test_state_format() {
     assert_eq!(hex::encode(state.try_to_vec().unwrap()), expected_hex);
 }
 
+fn generate_code(len: usize) -> Vec<u8> {
+    let mut rng = rand::thread_rng();
+    let mut buf = vec![0u8; len];
+    rng.fill_bytes(&mut buf);
+    buf
+}
+
 #[test]
 fn test_deploy_contract() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
     // Randomly generate some "contract code"
-    const LEN: usize = 567;
-    let code: Vec<u8> = {
-        let mut rng = rand::thread_rng();
-        let mut buf = vec![0u8; LEN];
-        rng.fill_bytes(&mut buf);
-        buf
-    };
-
+    let code = generate_code(567);
     // Deploy that code
     let result = runner
         .submit_with_signer(&mut signer, |nonce| {
@@ -183,12 +183,7 @@ fn test_deploy_largest_contract() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let len = evm::Config::berlin().create_contract_limit.unwrap();
-    let code: Vec<u8> = {
-        let mut rng = rand::thread_rng();
-        let mut buf = vec![0u8; len];
-        rng.fill_bytes(&mut buf);
-        buf
-    };
+    let code = generate_code(len);
 
     // Deploy that code
     let (result, profile) = runner
@@ -352,9 +347,7 @@ fn test_solidity_pure_bench() {
     );
 
     // Pure rust version of the same contract
-    let base_path = std::path::Path::new("../etc")
-        .join("tests")
-        .join("benchmark-contract");
+    let base_path = Path::new("../etc").join("tests").join("benchmark-contract");
     let output_path =
         base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
     test_utils::rust::compile(base_path);
@@ -404,7 +397,7 @@ fn test_revert_during_contract_deploy() {
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
 
-    let revert_bytes = crate::test_utils::unwrap_revert(submit_result);
+    let revert_bytes = test_utils::unwrap_revert(submit_result);
     // First 4 bytes is a function selector with signature `Error(string)`
     assert_eq!(&revert_bytes[0..4], &[8, 195, 121, 160]);
     // Remaining data is an ABI-encoded string
@@ -562,9 +555,7 @@ fn test_override_state() {
             ))
             .unwrap();
         match result {
-            crate::prelude::parameters::TransactionStatus::Succeed(bytes) => {
-                Address::try_from_slice(&bytes[12..32]).unwrap()
-            }
+            TransactionStatus::Succeed(bytes) => Address::try_from_slice(&bytes[12..32]).unwrap(),
             _ => panic!("tx failed"),
         }
     };
@@ -808,6 +799,8 @@ fn test_transfer_charging_gas_success() {
 
 #[test]
 fn test_eth_transfer_charging_gas_not_enough_balance() {
+    use near_vm_errors::{FunctionCallError, HostError, VMError};
+
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
@@ -829,10 +822,13 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
-    let result = runner
+    let error = runner
         .submit_with_signer(&mut source_account, transaction)
-        .unwrap();
-    assert_eq!(result.status, TransactionStatus::OutOfFund);
+        .unwrap_err();
+    assert!(matches!(error, VMError::FunctionCallError(
+        FunctionCallError::HostError(
+            HostError::GuestPanic { panic_msg })) if panic_msg == "ERR_OUT_OF_FUND"
+    ));
 
     // validate post-state
     let relayer = sdk::types::near_account_to_evm_address(
@@ -843,8 +839,8 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
         &runner,
         source_address,
         INITIAL_BALANCE,
-        // nonce is still incremented since the transaction was otherwise valid
-        (INITIAL_NONCE + 1).into(),
+        // nonce is still not incremented since the transaction was invalid
+        INITIAL_NONCE.into(),
     );
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
     test_utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
@@ -884,8 +880,8 @@ fn test_block_hash() {
         let number = crate::prelude::U256::from(runner.chain_id);
         crate::prelude::u256_to_arr(&number)
     };
-    let account_id = runner.aurora_account_id;
-    let block_hash = aurora_engine::engine::compute_block_hash(chain_id, 10, account_id.as_bytes());
+    let account_id = runner.aurora_account_id.as_bytes();
+    let block_hash = aurora_engine::engine::compute_block_hash(chain_id, 10, account_id);
 
     assert_eq!(
         hex::encode(block_hash.0).as_str(),
@@ -996,6 +992,8 @@ fn test_eth_transfer_insufficient_balance_sim() {
 // Same as `test_eth_transfer_charging_gas_not_enough_balance` but run through `near-sdk-sim`.
 #[test]
 fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
+    use near_primitives::{errors::TxExecutionError, transaction::ExecutionStatus};
+
     let (aurora, mut signer, address) = initialize_evm_sim();
 
     // Run transaction which will fail (not enough balance to cover gas)
@@ -1009,13 +1007,17 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
         &signer.secret_key,
     );
     let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
-    let result: SubmitResult = call_result.unwrap_borsh();
-    assert_eq!(result.status, TransactionStatus::OutOfFund);
+    let outcome = call_result.outcome();
+    assert!(matches!(
+    &outcome.status,
+    ExecutionStatus::Failure(
+        TxExecutionError::ActionError(e)) if e.to_string().contains("ERR_OUT_OF_FUND")
+    ));
 
     // validate post-state
     assert_eq!(
         query_address_sim(&address, "get_nonce", &aurora),
-        U256::from(INITIAL_NONCE + 1),
+        INITIAL_NONCE.into(), // nonce hasn't been changed because an error occurs
     );
     assert_eq!(
         query_address_sim(&address, "get_balance", &aurora),

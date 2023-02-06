@@ -153,7 +153,7 @@ wget https://github.com/aurora-is-near/aurora-engine/releases/download/latest/ma
 ### Installing the Aurora CLI tool
 
 ```sh
-npm install -g aurora-is-near/aurora-cli
+npm install -g @auroraisnear/cli
 ```
 
 ### Deploying the EVM with the CLI

@@ -315,11 +315,11 @@ impl Storage {
 
                 let value = if iter.valid() {
                     let bytes = iter.value().unwrap();
-                    diff::DiffValue::try_from_bytes(bytes).unwrap_or_else(|e| {
+                    DiffValue::try_from_bytes(bytes).unwrap_or_else(|e| {
                         panic!(
                             "Could not deserialize key={} value={} error={:?}",
-                            base64::encode(&db_key),
-                            base64::encode(bytes),
+                            aurora_engine_sdk::base64::encode(&db_key),
+                            aurora_engine_sdk::base64::encode(bytes),
                             e,
                         )
                     })

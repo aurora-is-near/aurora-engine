@@ -9,13 +9,6 @@ const INITIAL_NONCE: u64 = 0;
 #[test]
 fn test_multisender_eth() {
     let (mut runner, mut signer, contract_address) = initialize();
-
-    let call_contract = |nonce: U256, data: Vec<u8>| -> TransactionLegacy {
-        let mut tx = test_utils::transfer(contract_address, Wei::zero(), nonce);
-        tx.data = data;
-        tx
-    };
-
     let mut multi_send_eth = |num_addr: usize| -> (u64, u64) {
         let destinations: Vec<(Address, U256)> = (0..num_addr)
             .map(|_| {
@@ -28,7 +21,7 @@ fn test_multisender_eth() {
 
         let (result, profile) = runner
             .submit_with_signer_profiled(&mut signer, |nonce| {
-                call_contract(nonce, send_eth_data(&destinations))
+                call_contract(contract_address, nonce, send_eth_data(&destinations))
             })
             .unwrap();
         test_utils::unwrap_success_slice(&result);
@@ -70,12 +63,6 @@ fn test_multisender_erc20() {
         .unwrap();
     test_utils::unwrap_success_slice(&result);
 
-    let call_contract = |nonce: U256, data: Vec<u8>| -> TransactionLegacy {
-        let mut tx = test_utils::transfer(contract_address, Wei::zero(), nonce);
-        tx.data = data;
-        tx
-    };
-
     let mut multi_send_erc20 = |num_addr: usize| -> (u64, u64) {
         let destinations: Vec<(Address, U256)> = (0..num_addr)
             .map(|_| {
@@ -88,7 +75,11 @@ fn test_multisender_erc20() {
 
         let (result, profile) = runner
             .submit_with_signer_profiled(&mut signer, |nonce| {
-                call_contract(nonce, send_erc20_data(erc20.0.address, &destinations))
+                call_contract(
+                    contract_address,
+                    nonce,
+                    send_erc20_data(erc20.0.address, &destinations),
+                )
             })
             .unwrap();
         test_utils::unwrap_success_slice(&result);
@@ -104,15 +95,7 @@ fn test_multisender_erc20() {
 fn send_erc20_data(token_address: Address, amounts: &[(Address, U256)]) -> Vec<u8> {
     const SELECTOR: [u8; 4] = [142, 3, 28, 182];
 
-    let amounts: Vec<ethabi::Token> = amounts
-        .iter()
-        .map(|(addr, amount)| {
-            ethabi::Token::Tuple(vec![
-                ethabi::Token::Address(addr.raw()),
-                ethabi::Token::Uint(*amount),
-            ])
-        })
-        .collect();
+    let amounts = convert_amounts(amounts);
     let tokens = vec![
         ethabi::Token::Address(token_address.raw()),
         ethabi::Token::Array(amounts),
@@ -128,15 +111,7 @@ fn send_erc20_data(token_address: Address, amounts: &[(Address, U256)]) -> Vec<u
 fn send_eth_data(amounts: &[(Address, U256)]) -> Vec<u8> {
     const SELECTOR: [u8; 4] = [86, 232, 150, 19];
 
-    let amounts: Vec<ethabi::Token> = amounts
-        .iter()
-        .map(|(addr, amount)| {
-            ethabi::Token::Tuple(vec![
-                ethabi::Token::Address(addr.raw()),
-                ethabi::Token::Uint(*amount),
-            ])
-        })
-        .collect();
+    let amounts = convert_amounts(amounts);
     let tokens = vec![ethabi::Token::Array(amounts)];
 
     let mut result = Vec::new();
@@ -197,4 +172,22 @@ fn initialize_data(owner_address: Address) -> Vec<u8> {
     result.extend_from_slice(&ethabi::encode(&tokens));
 
     result
+}
+
+fn call_contract(contract_address: Address, nonce: U256, data: Vec<u8>) -> TransactionLegacy {
+    let mut tx = test_utils::transfer(contract_address, Wei::zero(), nonce);
+    tx.data = data;
+    tx
+}
+
+fn convert_amounts(amounts: &[(Address, U256)]) -> Vec<ethabi::Token> {
+    amounts
+        .iter()
+        .map(|(addr, amount)| {
+            ethabi::Token::Tuple(vec![
+                ethabi::Token::Address(addr.raw()),
+                ethabi::Token::Uint(*amount),
+            ])
+        })
+        .collect()
 }
