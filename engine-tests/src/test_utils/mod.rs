@@ -825,8 +825,7 @@ pub(crate) fn as_account_id(account_id: &str) -> near_primitives_core::types::Ac
 }
 
 pub(crate) fn str_to_account_id(account_id: &str) -> AccountId {
-    use aurora_engine_types::str::FromStr;
-    AccountId::from_str(account_id).unwrap()
+    AccountId::new(account_id).unwrap()
 }
 
 pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {
