@@ -361,6 +361,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct GasPaymentResult {
+    pub prepaid_amount: Wei,
     pub effective_gas_price: U256,
     pub priority_fee_per_gas: U256,
 }
@@ -412,7 +413,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         }
     }
 
-    pub fn get_gas_payment(
+    pub fn charge_gas(
         &mut self,
         sender: &Address,
         transaction: &NormalizedEthTransaction,
@@ -431,14 +432,15 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             .map(Wei::new)
             .ok_or(GasPaymentError::EthAmountOverflow)?;
         let balance = self.cached_balance(sender);
+        let new_balance = balance
+            .checked_sub(prepaid_amount)
+            .ok_or(GasPaymentError::OutOfFund)?;
 
-        if balance < prepaid_amount {
-            return Err(GasPaymentError::OutOfFund);
-        }
-
+        self.update_cached_balance(sender, new_balance.raw());
         self.gas_price = effective_gas_price;
 
         Ok(GasPaymentResult {
+            prepaid_amount,
             effective_gas_price,
             priority_fee_per_gas,
         })
@@ -821,21 +823,21 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     }
 
     /// Updates account's cached balance information.
-    pub fn update_cached_balance(&self, address: Address, balance: U256) {
+    pub fn update_cached_balance(&self, address: &Address, balance: U256) {
         let mut cache = self.account_info_cache.borrow_mut();
-        let mut basic = cache.get_or_insert_with(address, || Basic {
+        let mut basic = cache.get_or_insert_with(*address, || Basic {
             balance,
-            nonce: get_nonce(&self.io, &address),
+            nonce: get_nonce(&self.io, address),
         });
 
         basic.balance = balance;
     }
 
     /// Updates account's cached nonce information.
-    fn update_cached_nonce(&self, address: Address, nonce: U256) {
+    fn update_cached_nonce(&self, address: &Address, nonce: U256) {
         let mut cache = self.account_info_cache.borrow_mut();
-        let mut basic = cache.get_or_insert_with(address, || Basic {
-            balance: get_balance(&self.io, &address).raw(),
+        let mut basic = cache.get_or_insert_with(*address, || Basic {
+            balance: get_balance(&self.io, address).raw(),
             nonce,
         });
 
@@ -843,7 +845,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     }
 
     /// Charges gas and updates account's balance.
-    pub fn charge_gas(
+    pub fn refund_unused_gas(
         &mut self,
         sender: &Address,
         gas_used: u64,
@@ -865,10 +867,13 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let reward_amount = gas_to_wei(gas_payment.priority_fee_per_gas)?;
 
         let balance = self.cached_balance(sender);
-        let new_balance = balance
+        let refunded_balance = gas_payment
+            .prepaid_amount
             .checked_sub(spent_amount)
+            .and_then(|refund| balance.checked_add(refund))
             .ok_or(GasPaymentError::EthAmountOverflow)?;
-        set_balance(&mut self.io, sender, &new_balance);
+
+        set_balance(&mut self.io, sender, &refunded_balance);
 
         if reward_amount > Wei::zero() {
             add_balance(&mut self.io, relayer, reward_amount)?;
@@ -884,7 +889,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     transaction_bytes: &[u8],
     state: EngineState,
     current_account_id: AccountId,
-    relayer: Address,
+    relayer_address: Address,
     handler: &mut P,
 ) -> EngineResult<SubmitResult> {
     #[cfg(feature = "contract")]
@@ -943,7 +948,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
     let gas_payment = engine
-        .get_gas_payment(&sender, &transaction)
+        .charge_gas(&sender, &transaction)
         .map_err(EngineErrorKind::GasPayment)?;
     let gas_limit: u64 = transaction
         .gas_limit
@@ -984,7 +989,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         Err(engine_err) => engine_err.gas_used,
     };
     engine
-        .charge_gas(&sender, gas_used, gas_payment, &relayer)
+        .refund_unused_gas(&sender, gas_used, gas_payment, &relayer_address)
         .map_err(|e| EngineError {
             gas_used,
             kind: EngineErrorKind::GasPayment(e),
@@ -1643,12 +1648,12 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
 
                     if current_basic.nonce != basic.nonce {
                         set_nonce(&mut self.io, &address, &basic.nonce);
-                        self.update_cached_nonce(address, basic.nonce);
+                        self.update_cached_nonce(&address, basic.nonce);
                         writes_counter += 1;
                     }
                     if current_basic.balance != basic.balance {
                         set_balance(&mut self.io, &address, &Wei::new(basic.balance));
-                        self.update_cached_balance(address, basic.balance);
+                        self.update_cached_balance(&address, basic.balance);
                         writes_counter += 1;
                     }
 
@@ -2018,9 +2023,10 @@ mod tests {
             data: vec![],
             access_list: vec![],
         };
-        let actual_result = engine.get_gas_payment(&origin, &transaction).unwrap();
+        let actual_result = engine.charge_gas(&origin, &transaction).unwrap();
 
         let expected_result = GasPaymentResult {
+            prepaid_amount: Wei::default(),
             effective_gas_price: U256::zero(),
             priority_fee_per_gas: U256::zero(),
         };
@@ -2165,7 +2171,7 @@ mod tests {
     }
 
     #[test]
-    fn test_charge_free_effective_gas_does_nothing() {
+    fn test_refund_free_effective_gas_does_nothing() {
         let origin = Address::zero();
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
@@ -2175,13 +2181,41 @@ mod tests {
         let mut engine = Engine::new(origin, "aurora".parse().unwrap(), io, &env).unwrap();
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
+            prepaid_amount: Wei::default(),
             effective_gas_price: U256::zero(),
             priority_fee_per_gas: U256::zero(),
         };
 
         engine
-            .charge_gas(&origin, 1000, gas_result, &relayer)
+            .refund_unused_gas(&origin, 1000, gas_result, &relayer)
             .unwrap();
+    }
+
+    #[test]
+    fn test_refund_gas_pays_expected_amount() {
+        let origin = Address::zero();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        let expected_state = EngineState::default();
+        state::set_state(&mut io, expected_state).unwrap();
+        let env = Fixed::default();
+        let mut engine = Engine::new(origin, "aurora".parse().unwrap(), io, &env).unwrap();
+        let relayer = make_address(1, 1);
+        let gas_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(8000),
+            effective_gas_price: Wei::new_u64(1).raw(),
+            priority_fee_per_gas: U256::zero(),
+        };
+        let gas_used = 4000;
+
+        engine
+            .refund_unused_gas(&origin, gas_used, gas_result, &relayer)
+            .unwrap();
+
+        let actual_refund = get_balance(&io, &origin);
+        let expected_refund = Wei::new_u64(gas_used);
+
+        assert_eq!(expected_refund, actual_refund);
     }
 
     #[test]

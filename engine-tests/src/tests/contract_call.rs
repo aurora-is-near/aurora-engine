@@ -201,7 +201,7 @@ fn withdraw_eth() {
     ];
     let exit_events = parse_exit_events(result, &schema);
 
-    assert!(exit_events.len() == 1);
+    assert_eq!(exit_events.len(), 1);
     assert_eq!(&expected_event, &exit_events[0].params);
 
     // exit to ethereum
@@ -220,7 +220,7 @@ fn withdraw_eth() {
     let schema = aurora_engine_precompiles::native::events::exit_to_eth_schema();
     let exit_events = parse_exit_events(result, &schema);
 
-    assert!(exit_events.len() == 1);
+    assert_eq!(exit_events.len(), 1);
     assert_eq!(&expected_event, &exit_events[0].params);
 }
 
