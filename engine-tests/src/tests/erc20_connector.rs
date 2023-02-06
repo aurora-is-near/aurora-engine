@@ -63,7 +63,7 @@ pub struct EthereumAddress {
     pub address: Address,
 }
 
-impl test_utils::AuroraRunner {
+impl AuroraRunner {
     pub fn new() -> Self {
         test_utils::deploy_evm()
     }
@@ -556,7 +556,7 @@ pub mod sim_tests {
             tester_address,
             aurora,
         } = test_exit_to_near_eth_common();
-        let exit_account_id = "any.near".to_owned();
+        let exit_account_id = "any.near";
 
         // call exit to near
         let input = super::build_input(
@@ -582,7 +582,7 @@ pub mod sim_tests {
             (INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT) as u128
         );
         assert_eq!(
-            nep_141_balance_of(exit_account_id.as_str(), &aurora.contract, &aurora),
+            nep_141_balance_of(exit_account_id, &aurora.contract, &aurora),
             ETH_EXIT_AMOUNT as u128
         );
         assert_eq!(

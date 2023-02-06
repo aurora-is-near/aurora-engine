@@ -25,7 +25,6 @@ pub mod deposit_event;
 pub mod engine;
 pub mod errors;
 pub mod fungible_token;
-pub mod json;
 pub mod log_entry;
 pub mod pausables;
 mod prelude;
@@ -74,7 +73,7 @@ mod contract {
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
     use crate::fungible_token::FungibleTokenMetadata;
-    use crate::json::parse_json;
+    use crate::parameters::error::ParseTypeFromJsonError;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
@@ -94,9 +93,7 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{
-        sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
-    };
+    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -391,9 +388,8 @@ mod contract {
         )
         .sdk_unwrap();
 
-        let args: NEP141FtOnTransferArgs = parse_json(io.read_input().to_vec().as_slice())
-            .sdk_unwrap()
-            .try_into()
+        let args: NEP141FtOnTransferArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
 
         if predecessor_account_id == current_account_id {
@@ -696,10 +692,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
-        let args = parameters::BalanceOfCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).sdk_unwrap(),
-        )
-        .sdk_unwrap();
+        let args: parameters::BalanceOfCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_balance_of(args);
@@ -720,10 +715,9 @@ mod contract {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
-        let args = parameters::TransferCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).sdk_unwrap(),
-        )
-        .sdk_unwrap();
+        let args: parameters::TransferCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_transfer(&predecessor_account_id, args)
@@ -749,15 +743,13 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
-        use sdk::types::ExpectUtf8;
         let mut io = Runtime;
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
 
-        let args = TransferCallCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).expect_utf8(ERR_FAILED_PARSE.as_bytes()),
-        )
-        .sdk_unwrap();
+        let args: TransferCallCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .sdk_unwrap();
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
         let promise_args = EthConnectorContract::init_instance(io)
@@ -778,7 +770,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
         let mut io = Runtime;
-        let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
+        let args: StorageDepositCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
         let amount = Yocto::new(io.attached_deposit());
         let maybe_promise = EthConnectorContract::init_instance(io)
@@ -797,7 +791,9 @@ mod contract {
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
-        let force = parse_json(&io.read_input().to_vec()).and_then(|args| args.bool("force").ok());
+        let force = serde_json::from_slice::<serde_json::Value>(&io.read_input().to_vec())
+            .ok()
+            .and_then(|args| args["force"].as_bool());
         let maybe_promise = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_unregister(predecessor_account_id, force)
@@ -812,8 +808,9 @@ mod contract {
     pub extern "C" fn storage_withdraw() {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let args =
-            StorageWithdrawCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
+        let args: StorageWithdrawCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
@@ -824,10 +821,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_balance_of() {
         let io = Runtime;
-        let args = parameters::StorageBalanceOfCallArgs::try_from(
-            parse_json(&io.read_input().to_vec()).sdk_unwrap(),
-        )
-        .sdk_unwrap();
+        let args: parameters::StorageBalanceOfCallArgs =
+            serde_json::from_slice(&io.read_input().to_vec())
+                .map_err(Into::<ParseTypeFromJsonError>::into)
+                .sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_balance_of(args)
@@ -891,8 +888,8 @@ mod contract {
     pub extern "C" fn ft_metadata() {
         let mut io = Runtime;
         let metadata: FungibleTokenMetadata = connector::get_metadata(&io).unwrap_or_default();
-        let json_data = crate::json::JsonValue::from(metadata);
-        io.return_output(json_data.to_string().as_bytes())
+        let bytes = serde_json::to_vec(&metadata).unwrap_or_default();
+        io.return_output(&bytes)
     }
 
     #[cfg(feature = "integration-test")]
@@ -909,7 +906,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use crate::connector::ZERO_ATTACHED_BALANCE;
-        use crate::prelude::{NEP141Wei, U256};
+        use crate::prelude::{NEP141Wei, ToString, U256};
         use evm::backend::ApplyBackend;
         const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
         const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
