@@ -351,12 +351,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn factory_update_address_version() {
         let mut io = Runtime;
-        // Only the owner can initialize the EthConnector
-        let is_private = io.assert_private_call();
-        if is_private.is_err() {
-            let state = state::get_state(&io).sdk_unwrap();
-            require_owner_only(&state, &io.predecessor_account_id());
-        }
+        // The function is only set to be private, otherwise callback error will happen.
+        io.assert_private_call().sdk_unwrap();
         let check_deploy: Result<(), &[u8]> = match io.promise_result(0) {
             Some(PromiseResult::Successful(_)) => Ok(()),
             Some(_) => Err(b"ERR_ROUTER_DEPLOY_FAILED"),
