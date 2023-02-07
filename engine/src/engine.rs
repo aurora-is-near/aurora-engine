@@ -874,6 +874,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             .ok_or(GasPaymentError::EthAmountOverflow)?;
 
         set_balance(&mut self.io, sender, &refunded_balance);
+        self.update_cached_balance(sender, refunded_balance.raw());
 
         if reward_amount > Wei::zero() {
             add_balance(&mut self.io, relayer, reward_amount)?;
@@ -2207,15 +2208,17 @@ mod tests {
             priority_fee_per_gas: U256::zero(),
         };
         let gas_used = 4000;
+        let expected_balance = gas_result.prepaid_amount - Wei::new_u64(gas_used);
 
         engine
             .refund_unused_gas(&origin, gas_used, gas_result, &relayer)
             .unwrap();
 
-        let actual_refund = get_balance(&io, &origin);
-        let expected_refund = Wei::new_u64(gas_used);
+        let actual_balance = get_balance(&io, &origin);
+        assert_eq!(expected_balance, actual_balance);
 
-        assert_eq!(expected_refund, actual_refund);
+        let cached_balance = engine.cached_balance(&origin);
+        assert_eq!(expected_balance, cached_balance);
     }
 
     #[test]
@@ -2273,5 +2276,51 @@ mod tests {
         }];
 
         assert_eq!(expected_logs, actual_logs);
+    }
+
+    #[test]
+    fn test_gas_charge_using_cached_balance() {
+        let origin = make_address(1, 1);
+        let init_balance = Wei::new_u64(100_000);
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, init_balance).unwrap();
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        assert_eq!(engine.cached_balance(&origin), init_balance);
+
+        let transaction = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: None,
+            nonce: U256::default(),
+            gas_limit: 50_000.into(),
+            max_priority_fee_per_gas: 1.into(),
+            max_fee_per_gas: 1.into(),
+            to: None,
+            value: Wei::default(),
+            data: b"some_data".to_vec(),
+            access_list: vec![],
+        };
+        let actual_result = engine.charge_gas(&origin, &transaction).unwrap();
+
+        let expected_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(50_000),
+            effective_gas_price: 1.into(),
+            priority_fee_per_gas: 1.into(),
+        };
+
+        assert_eq!(expected_result, actual_result);
+        assert_eq!(engine.cached_balance(&origin), Wei::new_u64(50_000));
+
+        engine
+            .refund_unused_gas(&origin, 25_000, actual_result, &Address::zero())
+            .unwrap();
+
+        let expected_balance = Wei::new_u64(75_000);
+        assert_eq!(engine.cached_balance(&origin), expected_balance);
+        assert_eq!(get_balance(&engine.io, &origin), expected_balance);
     }
 }
