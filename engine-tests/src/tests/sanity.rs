@@ -1051,6 +1051,17 @@ fn test_eth_double_spending_trying_sim() {
     // The status is `OutOfFund` because we try to spend 800_000 (transfer) + 300_000 (gas prepaid)
     // = 1_100_000, but initial balance is 1_000_000
     assert_eq!(result.status, TransactionStatus::OutOfFund);
+
+    // validate post-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        // Cover the EVM gas spent on the transaction before failing. 21_000 is the base cost of
+        // initiating a transaction in the EVM.
+        INITIAL_BALANCE - Wei::new_u64(21_000 * GAS_PRICE),
+        (INITIAL_NONCE + 1).into(),
+    );
+    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 }
 
 fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, Address) {
