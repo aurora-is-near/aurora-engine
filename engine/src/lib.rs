@@ -351,6 +351,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn factory_update_address_version() {
         let mut io = Runtime;
+        // Only the owner can initialize the EthConnector
         let is_private = io.assert_private_call();
         if is_private.is_err() {
             let state = state::get_state(&io).sdk_unwrap();
@@ -562,7 +563,6 @@ mod contract {
     pub extern "C" fn new_eth_connector() {
         let io = Runtime;
         // Only the owner can initialize the EthConnector
-
         let is_private = io.assert_private_call();
         if is_private.is_err() {
             let state = state::get_state(&io).sdk_unwrap();
@@ -579,7 +579,6 @@ mod contract {
     pub extern "C" fn set_eth_connector_contract_data() {
         let mut io = Runtime;
         // Only the owner can set the EthConnector contract data
-
         let is_private = io.assert_private_call();
         if is_private.is_err() {
             let state = state::get_state(&io).sdk_unwrap();
@@ -860,7 +859,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_paused_flags() {
         let io = Runtime;
-
+        // Only the owner can initialize the EthConnector
         let is_private = io.assert_private_call();
         if is_private.is_err() {
             let state = state::get_state(&io).sdk_unwrap();
