@@ -322,13 +322,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     ///  Mint ETH tokens
-    fn mint_eth_on_aurora(
+    fn mint_eth_on_aurora<'env, E: Env>(
         &mut self,
+        engine: &mut Engine<'env, I, E>,
         owner_id: Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!("Mint {} ETH tokens for: {}", amount, owner_id.encode());
-        self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
+        self.ft
+            .internal_deposit_eth_to_aurora(engine, owner_id, amount)
     }
 
     /// Burn ETH tokens
@@ -575,7 +577,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// ft_on_transfer callback function
     pub fn ft_on_transfer<'env, E: Env>(
         &mut self,
-        engine: &Engine<'env, I, E>,
+        engine: &mut Engine<'env, I, E>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
@@ -590,12 +592,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         match (wei_fee, relayer) {
             (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
                 self.mint_eth_on_aurora(
+                    engine,
                     message_data.recipient,
                     Wei::new(U256::from(args.amount.as_u128())) - fee,
                 )?;
-                self.mint_eth_on_aurora(evm_relayer_address, fee)?;
+                self.mint_eth_on_aurora(engine, evm_relayer_address, fee)?;
             }
             _ => self.mint_eth_on_aurora(
+                engine,
                 message_data.recipient,
                 Wei::new(U256::from(args.amount.as_u128())),
             )?,
