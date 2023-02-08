@@ -1,5 +1,5 @@
 use crate::connector::ZERO_ATTACHED_BALANCE;
-use crate::engine;
+use crate::engine::{self, Engine};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::Wei;
@@ -8,6 +8,7 @@ use crate::prelude::{
     PromiseBatchAction, PromiseCreateArgs, PromiseResult, PromiseWithCallbackArgs,
     StorageBalanceBounds, StorageUsage, String, ToString, Vec,
 };
+use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::types::{NEP141Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO};
 use serde::{Deserialize, Serialize};
@@ -141,8 +142,9 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     /// Internal ETH deposit to Aurora
-    pub fn internal_deposit_eth_to_aurora(
+    pub fn internal_deposit_eth_to_aurora<'env, E: Env>(
         &mut self,
+        engine: &mut Engine<'env, I, E>,
         address: Address,
         amount: Wei,
     ) -> Result<(), error::DepositError> {
@@ -150,7 +152,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let new_balance = balance
             .checked_add(amount)
             .ok_or(error::DepositError::BalanceOverflow)?;
-        engine::set_balance(&mut self.io, &address, &new_balance);
+        engine.set_balance(&address, &new_balance);
         self.total_eth_supply_on_aurora = self
             .total_eth_supply_on_aurora
             .checked_add(amount)

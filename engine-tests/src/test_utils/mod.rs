@@ -857,11 +857,10 @@ pub fn panic_on_fail(status: TransactionStatus) {
 pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
     // Add 1 to round up
     let tgas_used = (total_gas / 1_000_000_000_000) + 1;
-    assert!(
-        tgas_used == tgas_bound,
+    assert_eq!(
+        tgas_used, tgas_bound,
         "{} Tgas is not equal to {} Tgas",
-        tgas_used,
-        tgas_bound,
+        tgas_used, tgas_bound
     );
 }
 

@@ -221,7 +221,7 @@ fn non_submit_execute<'db>(
 
             if env.predecessor_account_id == env.current_account_id {
                 connector::EthConnectorContract::init_instance(io)?
-                    .ft_on_transfer(&engine, args)?;
+                    .ft_on_transfer(&mut engine, args)?;
             } else {
                 engine.receive_erc20_tokens(
                     &env.predecessor_account_id,

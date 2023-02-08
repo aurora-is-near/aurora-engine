@@ -395,7 +395,7 @@ mod contract {
         if predecessor_account_id == current_account_id {
             EthConnectorContract::init_instance(io)
                 .sdk_unwrap()
-                .ft_on_transfer(&engine, &args)
+                .ft_on_transfer(&mut engine, &args)
                 .sdk_unwrap();
         } else {
             engine.receive_erc20_tokens(

@@ -431,13 +431,14 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             .checked_mul(effective_gas_price)
             .map(Wei::new)
             .ok_or(GasPaymentError::EthAmountOverflow)?;
-
-        let new_balance = get_balance(&self.io, sender)
+        let balance = self.get_balance(sender);
+        let new_balance = balance
             .checked_sub(prepaid_amount)
             .ok_or(GasPaymentError::OutOfFund)?;
 
-        set_balance(&mut self.io, sender, &new_balance);
-
+        // At this point we don't need to store the balance into persistent storage.
+        // EVM will get the balance from the cache then.
+        self.set_cached_balance(sender, new_balance.raw());
         self.gas_price = effective_gas_price;
 
         Ok(GasPaymentResult {
@@ -816,10 +817,116 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             all_precompiles: precompiles.all_precompiles,
         }
     }
+
+    /// Returns account's balance.
+    pub fn get_balance(&self, address: &Address) -> Wei {
+        let basic = self.basic(address.raw());
+        Wei::new(basic.balance)
+    }
+
+    /// Sets account's balance.
+    pub fn set_balance(&mut self, address: &Address, balance: &Wei) {
+        self.set_cached_balance(address, balance.raw());
+        set_balance(&mut self.io, address, balance);
+    }
+
+    /// Increments account's balance.
+    pub fn add_balance(&mut self, address: &Address, amount: Wei) -> Result<(), BalanceOverflow> {
+        let current_balance = self.get_balance(address);
+        let new_balance = current_balance.checked_add(amount).ok_or(BalanceOverflow)?;
+
+        self.set_balance(address, &new_balance);
+
+        Ok(())
+    }
+
+    /// Updates account's cached balance.
+    pub fn set_cached_balance(&self, address: &Address, balance: U256) {
+        let mut cache = self.account_info_cache.borrow_mut();
+        let mut basic = cache.get_or_insert_with(*address, || Basic {
+            balance,
+            nonce: get_nonce(&self.io, address),
+        });
+
+        basic.balance = balance;
+    }
+
+    /// Returns account's nonce.
+    pub fn get_nonce(&self, address: &Address) -> U256 {
+        let basic = self.basic(address.raw());
+        basic.nonce
+    }
+
+    /// Checks the nonce to ensure that the address matches the transaction
+    /// nonce.
+    #[inline]
+    pub fn check_nonce(
+        &self,
+        address: &Address,
+        transaction_nonce: &U256,
+    ) -> Result<(), EngineErrorKind> {
+        let account_nonce = self.get_nonce(address);
+
+        if transaction_nonce != &account_nonce {
+            return Err(EngineErrorKind::IncorrectNonce);
+        }
+
+        Ok(())
+    }
+
+    /// Sets user's nonce.
+    pub fn set_nonce(&mut self, address: &Address, nonce: &U256) {
+        self.set_cached_nonce(address, *nonce);
+        set_nonce(&mut self.io, address, nonce);
+    }
+
+    /// Updates account's cached nonce information.
+    fn set_cached_nonce(&self, address: &Address, nonce: U256) {
+        let mut cache = self.account_info_cache.borrow_mut();
+        let mut basic = cache.get_or_insert_with(*address, || Basic {
+            balance: get_balance(&self.io, address).raw(),
+            nonce,
+        });
+
+        basic.nonce = nonce;
+    }
+
+    /// Charges gas and updates account's balance.
+    pub fn refund_unused_gas(
+        &mut self,
+        sender: &Address,
+        gas_used: u64,
+        gas_payment: GasPaymentResult,
+        relayer: &Address,
+    ) -> Result<(), GasPaymentError> {
+        if gas_payment.effective_gas_price.is_zero() {
+            return Ok(());
+        }
+
+        let gas_to_wei = |price: U256| {
+            U256::from(gas_used)
+                .checked_mul(price)
+                .map(Wei::new)
+                .ok_or(GasPaymentError::EthAmountOverflow)
+        };
+
+        let spent_amount = gas_to_wei(gas_payment.effective_gas_price)?;
+        let reward_amount = gas_to_wei(gas_payment.priority_fee_per_gas)?;
+
+        let refund = gas_payment
+            .prepaid_amount
+            .checked_sub(spent_amount)
+            .ok_or(GasPaymentError::EthAmountOverflow)?;
+
+        self.add_balance(sender, refund)?;
+        self.add_balance(relayer, reward_amount)?;
+
+        Ok(())
+    }
 }
 
 pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
-    mut io: I,
+    io: I,
     env: &E,
     transaction_bytes: &[u8],
     state: EngineState,
@@ -863,7 +970,9 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     sdk::log!("signer_address {:?}", sender);
 
-    check_nonce(&io, &sender, &transaction.nonce)?;
+    let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
+
+    engine.check_nonce(&sender, &transaction.nonce)?;
 
     // Check intrinsic gas is covered by transaction gas limit
     match transaction.intrinsic_gas(crate::engine::CONFIG) {
@@ -881,13 +990,9 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         return Err(EngineErrorKind::MaxPriorityGasFeeTooLarge.into());
     }
 
-    let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
-    let prepaid_amount = match engine.charge_gas(&sender, &transaction) {
-        Ok(gas_result) => gas_result,
-        Err(err) => {
-            return Err(EngineErrorKind::GasPayment(err).into());
-        }
-    };
+    let gas_payment = engine
+        .charge_gas(&sender, &transaction)
+        .map_err(EngineErrorKind::GasPayment)?;
     let gas_limit: u64 = transaction
         .gas_limit
         .try_into()
@@ -921,19 +1026,19 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         // TODO: charge for storage
     };
 
-    // Give refund
+    // Getting an amount of real gas usage after the execution of the transaction.
     let gas_used = match &result {
         Ok(submit_result) => submit_result.gas_used,
         Err(engine_err) => engine_err.gas_used,
     };
-    refund_unused_gas(&mut io, &sender, gas_used, prepaid_amount, &relayer_address).map_err(
-        |e| EngineError {
+    engine
+        .refund_unused_gas(&sender, gas_used, gas_payment, &relayer_address)
+        .map_err(|e| EngineError {
             gas_used,
             kind: EngineErrorKind::GasPayment(e),
-        },
-    )?;
+        })?;
 
-    // return result to user
+    // Return result to the user.
     result
 }
 
@@ -1030,38 +1135,6 @@ pub fn get_authorizer() -> EngineAuthorizer {
     let account = AccountId::new("aurora").expect("Failed to parse account from string");
 
     EngineAuthorizer::from_accounts(once(account))
-}
-
-pub fn refund_unused_gas<I: IO>(
-    io: &mut I,
-    sender: &Address,
-    gas_used: u64,
-    gas_result: GasPaymentResult,
-    relayer: &Address,
-) -> Result<(), GasPaymentError> {
-    if gas_result.effective_gas_price.is_zero() {
-        return Ok(());
-    }
-
-    let gas_to_wei = |price: U256| {
-        U256::from(gas_used)
-            .checked_mul(price)
-            .map(Wei::new)
-            .ok_or(GasPaymentError::EthAmountOverflow)
-    };
-
-    let spent_amount = gas_to_wei(gas_result.effective_gas_price)?;
-    let reward_amount = gas_to_wei(gas_result.priority_fee_per_gas)?;
-
-    let refund = gas_result
-        .prepaid_amount
-        .checked_sub(spent_amount)
-        .ok_or(GasPaymentError::EthAmountOverflow)?;
-
-    add_balance(io, sender, refund)?;
-    add_balance(io, relayer, reward_amount)?;
-
-    Ok(())
 }
 
 pub fn setup_receive_erc20_tokens_input(
@@ -1162,33 +1235,9 @@ pub fn remove_nonce<I: IO>(io: &mut I, address: &Address) {
     io.remove_storage(&address_to_key(KeyPrefix::Nonce, address));
 }
 
-/// Checks the nonce to ensure that the address matches the transaction
-/// nonce.
-#[inline]
-pub fn check_nonce<I: IO>(
-    io: &I,
-    address: &Address,
-    transaction_nonce: &U256,
-) -> Result<(), EngineErrorKind> {
-    let account_nonce = get_nonce(io, address);
-
-    if transaction_nonce != &account_nonce {
-        return Err(EngineErrorKind::IncorrectNonce);
-    }
-
-    Ok(())
-}
-
 pub fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
     io.read_u256(&address_to_key(KeyPrefix::Nonce, address))
         .unwrap_or_else(|_| U256::zero())
-}
-
-#[cfg(test)]
-pub fn increment_nonce<I: IO>(io: &mut I, address: &Address) {
-    let account_nonce = get_nonce(io, address);
-    let new_nonce = account_nonce.saturating_add(U256::one());
-    set_nonce(io, address, &new_nonce);
 }
 
 pub fn create_legacy_address(caller: &Address, nonce: &U256) -> Address {
@@ -1212,17 +1261,6 @@ pub fn get_erc20_from_nep141<I: IO>(
     io.read_storage(&key)
         .map(|v| v.to_vec())
         .ok_or(GetErc20FromNep141Error::Nep141NotFound)
-}
-
-pub fn add_balance<I: IO>(
-    io: &mut I,
-    address: &Address,
-    amount: Wei,
-) -> Result<(), BalanceOverflow> {
-    let current_balance = get_balance(io, address);
-    let new_balance = current_balance.checked_add(amount).ok_or(BalanceOverflow)?;
-    set_balance(io, address, &new_balance);
-    Ok(())
 }
 
 pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
@@ -1617,11 +1655,11 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
                     let generation = get_generation(&self.io, &address);
 
                     if current_basic.nonce != basic.nonce {
-                        set_nonce(&mut self.io, &address, &basic.nonce);
+                        self.set_nonce(&address, &basic.nonce);
                         writes_counter += 1;
                     }
                     if current_basic.balance != basic.balance {
-                        set_balance(&mut self.io, &address, &Wei::new(basic.balance));
+                        self.set_balance(&address, &Wei::new(basic.balance));
                         writes_counter += 1;
                     }
 
@@ -1722,7 +1760,6 @@ mod tests {
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use aurora_engine_test_doubles::promise::PromiseTracker;
     use aurora_engine_types::types::RawU256;
-    use std::cell::RefCell;
 
     #[test]
     fn test_view_call_to_empty_contract_without_input_returns_empty_data() {
@@ -1730,10 +1767,11 @@ mod tests {
         let current_account_id = AccountId::default();
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
-        let mut io = StoragePointer(&storage);
-        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let engine =
+        let io = StoragePointer(&storage);
+        let mut engine =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        engine.add_balance(&origin, Wei::new_u64(22000)).unwrap();
 
         let contract = make_address(1, 1);
         let value = Wei::new_u64(1000);
@@ -1781,10 +1819,11 @@ mod tests {
         let current_account_id = AccountId::default();
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
-        let mut io = StoragePointer(&storage);
-        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let io = StoragePointer(&storage);
         let mut engine =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        engine.add_balance(&origin, Wei::new_u64(22000)).unwrap();
 
         let input = Vec::<u8>::new();
         let mut handler = Noop;
@@ -1841,10 +1880,11 @@ mod tests {
         let current_account_id = AccountId::default();
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
-        let mut io = StoragePointer(&storage);
-        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let io = StoragePointer(&storage);
         let mut engine =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        engine.add_balance(&origin, Wei::new_u64(22000)).unwrap();
 
         let gas_limit = u64::MAX;
         let mut handler = Noop;
@@ -1869,10 +1909,11 @@ mod tests {
         let current_account_id = AccountId::default();
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
-        let mut io = StoragePointer(&storage);
-        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let io = StoragePointer(&storage);
         let mut engine =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        engine.add_balance(&origin, Wei::new_u64(22000)).unwrap();
 
         let input = Vec::<u8>::new();
         let mut handler = Noop;
@@ -1895,10 +1936,11 @@ mod tests {
         let current_account_id = AccountId::default();
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
-        let mut io = StoragePointer(&storage);
-        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let io = StoragePointer(&storage);
         let mut engine =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        engine.add_balance(&origin, Wei::new_u64(22000)).unwrap();
 
         let account_id = AccountId::new("relayer").unwrap();
         let expected_relayer_address = make_address(1, 1);
@@ -1914,8 +1956,7 @@ mod tests {
         let current_account_id = AccountId::default();
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
-        let mut io = StoragePointer(&storage);
-        set_balance(&mut io, &origin, &Wei::new_u64(22000));
+        let io = StoragePointer(&storage);
         let mut engine = Engine::new_with_state(
             EngineState::default(),
             origin,
@@ -1923,6 +1964,8 @@ mod tests {
             io,
             &env,
         );
+
+        engine.set_balance(&origin, &Wei::new_u64(22000));
 
         let receiver = make_address(6, 6);
         let erc20_token = make_address(4, 5);
@@ -1953,8 +1996,11 @@ mod tests {
         );
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
-        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
         state::set_state(&mut io, EngineState::default()).unwrap();
+
+        let mut engine = Engine::new(origin, AccountId::default(), io, &env).unwrap();
+
+        engine.add_balance(&origin, Wei::new_u64(22000)).unwrap();
 
         let nep141_token = AccountId::new("testcoin").unwrap();
         let mut handler = Noop;
@@ -1974,10 +2020,11 @@ mod tests {
         let current_account_id = AccountId::default();
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
-        let mut io = StoragePointer(&storage);
-        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let io = StoragePointer(&storage);
         let mut engine =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        engine.add_balance(&origin, Wei::new_u64(22000)).unwrap();
 
         let transaction = NormalizedEthTransaction {
             address: Default::default(),
@@ -1994,7 +2041,7 @@ mod tests {
         let actual_result = engine.charge_gas(&origin, &transaction).unwrap();
 
         let expected_result = GasPaymentResult {
-            prepaid_amount: Wei::zero(),
+            prepaid_amount: Wei::default(),
             effective_gas_price: U256::zero(),
             priority_fee_per_gas: U256::zero(),
         };
@@ -2095,14 +2142,19 @@ mod tests {
 
     #[test]
     fn test_refund_transfer_eth_back_from_precompile_address() {
+        let origin = Address::zero();
         let recipient_address = make_address(1, 1);
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         let refund_amount = Wei::new_u64(1000);
-        add_balance(&mut io, &exit_to_near::ADDRESS, refund_amount).unwrap();
         state::set_state(&mut io, expected_state.clone()).unwrap();
+        let mut engine = Engine::new(origin, AccountId::default(), io, &env).unwrap();
+
+        engine
+            .add_balance(&exit_to_near::ADDRESS, refund_amount)
+            .unwrap();
         let args = RefundCallArgs {
             recipient_address,
             erc20_address: None,
@@ -2145,14 +2197,18 @@ mod tests {
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         state::set_state(&mut io, expected_state).unwrap();
+        let env = Fixed::default();
+        let mut engine = Engine::new(origin, "aurora".parse().unwrap(), io, &env).unwrap();
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
-            prepaid_amount: Default::default(),
+            prepaid_amount: Wei::default(),
             effective_gas_price: U256::zero(),
             priority_fee_per_gas: U256::zero(),
         };
 
-        refund_unused_gas(&mut io, &origin, 1000, gas_result, &relayer).unwrap();
+        engine
+            .refund_unused_gas(&origin, 1000, gas_result, &relayer)
+            .unwrap();
     }
 
     #[test]
@@ -2162,6 +2218,8 @@ mod tests {
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         state::set_state(&mut io, expected_state).unwrap();
+        let env = Fixed::default();
+        let mut engine = Engine::new(origin, "aurora".parse().unwrap(), io, &env).unwrap();
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
             prepaid_amount: Wei::new_u64(8000),
@@ -2169,13 +2227,17 @@ mod tests {
             priority_fee_per_gas: U256::zero(),
         };
         let gas_used = 4000;
+        let expected_balance = gas_result.prepaid_amount - Wei::new_u64(gas_used);
 
-        refund_unused_gas(&mut io, &origin, gas_used, gas_result, &relayer).unwrap();
+        engine
+            .refund_unused_gas(&origin, gas_used, gas_result, &relayer)
+            .unwrap();
 
-        let actual_refund = get_balance(&io, &origin);
-        let expected_refund = Wei::new_u64(gas_used);
+        let actual_balance = get_balance(&io, &origin);
+        assert_eq!(expected_balance, actual_balance);
 
-        assert_eq!(expected_refund, actual_refund);
+        let cached_balance = engine.get_balance(&origin);
+        assert_eq!(expected_balance, cached_balance);
     }
 
     #[test]
@@ -2183,9 +2245,14 @@ mod tests {
         let origin = Address::zero();
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
+        let env = Fixed::default();
+        let expected_state = EngineState::default();
+        state::set_state(&mut io, expected_state).unwrap();
+        let mut engine = Engine::new(origin, AccountId::default(), io, &env).unwrap();
+        let nonce = U256::from(100u64);
 
-        increment_nonce(&mut io, &origin);
-        check_nonce(&io, &origin, &U256::from(1u64)).unwrap();
+        engine.set_nonce(&origin, &nonce);
+        engine.check_nonce(&origin, &nonce).unwrap();
     }
 
     #[test]
@@ -2193,9 +2260,11 @@ mod tests {
         let origin = Address::zero();
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
-
-        increment_nonce(&mut io, &origin);
-        let actual_error_kind = check_nonce(&io, &origin, &U256::from(0u64)).unwrap_err();
+        let env = Fixed::default();
+        let expected_state = EngineState::default();
+        state::set_state(&mut io, expected_state).unwrap();
+        let engine = Engine::new(origin, AccountId::default(), io, &env).unwrap();
+        let actual_error_kind = engine.check_nonce(&origin, &U256::from(100)).unwrap_err();
 
         assert_eq!(actual_error_kind.as_bytes(), errors::ERR_INCORRECT_NONCE);
     }
@@ -2233,5 +2302,52 @@ mod tests {
         }];
 
         assert_eq!(expected_logs, actual_logs);
+    }
+
+    #[test]
+    fn test_gas_charge_using_cached_balance() {
+        let origin = make_address(1, 1);
+        let init_balance = Wei::new_u64(100_000);
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let io = StoragePointer(&storage);
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        engine.add_balance(&origin, init_balance).unwrap();
+
+        assert_eq!(engine.get_balance(&origin), init_balance);
+
+        let transaction = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: None,
+            nonce: U256::default(),
+            gas_limit: 50_000.into(),
+            max_priority_fee_per_gas: 1.into(),
+            max_fee_per_gas: 1.into(),
+            to: None,
+            value: Wei::default(),
+            data: b"some_data".to_vec(),
+            access_list: vec![],
+        };
+        let actual_result = engine.charge_gas(&origin, &transaction).unwrap();
+
+        let expected_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(50_000),
+            effective_gas_price: 1.into(),
+            priority_fee_per_gas: 1.into(),
+        };
+
+        assert_eq!(expected_result, actual_result);
+        assert_eq!(engine.get_balance(&origin), Wei::new_u64(50_000));
+
+        engine
+            .refund_unused_gas(&origin, 25_000, actual_result, &Address::zero())
+            .unwrap();
+
+        let expected_balance = Wei::new_u64(75_000);
+        assert_eq!(engine.get_balance(&origin), expected_balance);
+        assert_eq!(get_balance(&engine.io, &origin), expected_balance);
     }
 }
