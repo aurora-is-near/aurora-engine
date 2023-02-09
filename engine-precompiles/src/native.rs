@@ -225,6 +225,13 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
 }
 
+fn validate_amount(amount: U256) -> Result<(), ExitError> {
+    if amount > U256::from(u128::MAX) {
+        return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
+    }
+    Ok(())
+}
+
 impl<I: IO> Precompile for ExitToNear<I> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
@@ -326,9 +333,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
 
-                if amount > U256::from(u128::MAX) {
-                    return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
-                }
+                validate_amount(amount)?;
 
                 if let Ok(receiver_account_id) = AccountId::try_from(input) {
                     (
@@ -518,9 +523,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
 
-                if amount > U256::from(u128::MAX) {
-                    return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
-                }
+                validate_amount(amount)?;
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
@@ -588,18 +591,9 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
 #[cfg(test)]
 mod tests {
-    use aurora_engine_types::{Cow, U256};
-    use evm::ExitError;
-
-    use super::{exit_to_ethereum, exit_to_near};
+    use super::{exit_to_ethereum, exit_to_near, validate_amount};
     use crate::prelude::sdk::types::near_account_to_evm_address;
-
-    fn validate_amount(amount: U256) -> Result<(), ExitError> {
-        if amount > U256::from(u128::MAX) {
-            return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
-        }
-        Ok(())
-    }
+    use aurora_engine_types::U256;
 
     #[test]
     fn test_precompile_id() {
@@ -632,5 +626,10 @@ mod tests {
     #[should_panic(expected = "ERR_INVALID_AMOUNT")]
     fn test_exit_with_invalid_amount() {
         validate_amount(U256::MAX).unwrap();
+    }
+
+    #[test]
+    fn test_exit_with_valid_amount() {
+        validate_amount(U256::from(u128::MAX)).unwrap();
     }
 }
