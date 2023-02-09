@@ -61,6 +61,7 @@ pub fn sha256(input: &[u8]) -> H256 {
 }
 
 #[cfg(not(feature = "contract"))]
+#[must_use]
 pub fn sha256(input: &[u8]) -> H256 {
     use sha2::Digest;
 
@@ -190,7 +191,7 @@ pub fn log(data: &str) {
 }
 
 #[cfg(not(feature = "contract"))]
-pub fn log(_data: &str) {
+pub const fn log(_data: &str) {
     // TODO: standalone logging
 }
 

@@ -40,9 +40,9 @@ impl Precompile for SHA256 {
         )
     }
 
-    /// See: https://ethereum.github.io/yellowpaper/paper.pdf
-    /// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000002
+    /// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
+    /// See: `https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000002`
     #[cfg(not(feature = "contract"))]
     fn run(
         &self,

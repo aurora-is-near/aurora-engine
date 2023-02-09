@@ -19,6 +19,7 @@ pub fn keccak(input: &[u8]) -> H256 {
 
 #[cfg(not(feature = "contract"))]
 #[inline]
+#[must_use]
 pub fn keccak(data: &[u8]) -> H256 {
     H256::from_slice(Keccak256::digest(data).as_slice())
 }

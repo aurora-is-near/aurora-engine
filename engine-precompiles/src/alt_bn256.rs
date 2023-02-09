@@ -481,6 +481,7 @@ impl<HF: HardFork> Bn256Pair<HF> {
     }
 
     #[cfg(not(feature = "contract"))]
+    #[allow(clippy::needless_pass_by_value)]
     fn execute(vals: Vec<(bn::G1, bn::G2)>) -> bool {
         bn::pairing_batch(&vals) == bn::Gt::one()
     }
