@@ -20,7 +20,6 @@ use evm::backend::Log;
 use evm::{Context, ExitError};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
-const MAX_U128: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_455u128;
 
 mod costs {
     use crate::prelude::types::{EthGas, NearGas};
