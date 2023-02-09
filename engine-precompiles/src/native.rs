@@ -216,6 +216,13 @@ impl<I> ExitToNear<I> {
     }
 }
 
+fn check_input_size(input: &[u8], min: usize, max: Option<usize>) -> Result<(), ExitError> {
+    if input.len() < min || input.len() > max.unwrap_or(usize::MAX) {
+        return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));
+    }
+    Ok(())
+}
+
 fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId, ExitError> {
     AccountId::try_from(
         io.read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
@@ -237,17 +244,15 @@ impl<I: IO> Precompile for ExitToNear<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
+        check_input_size(input, 21, None)?;
         #[cfg(feature = "error_refund")]
         fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
-            if input.len() < 21 {
-                return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));
-            }
-            let refund_address = Address::try_from_slice(&input[1..21]).unwrap();
-            Ok((refund_address, &input[21..]))
+            let refund_address = Address::try_from_slice(&input.get(1..21).unwrap()).unwrap();
+            Ok((refund_address, &input.get(21..).unwrap()))
         }
         #[cfg(not(feature = "error_refund"))]
         fn parse_input(input: &[u8]) -> &[u8] {
-            &input[1..]
+            input.get(1..).unwrap()
         }
 
         if let Some(target_gas) = target_gas {
@@ -263,10 +268,12 @@ impl<I: IO> Precompile for ExitToNear<I> {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
+        // ETH transfer input [flag (1 byte), refund_address (20 bytes), 1 byte , recipient_account_id (N bytes)] min bytes 21+ bytes
+        // ERC20 transfer input [flag (1 byte), refund_address (20 bytes), 1 byte, amount (32 bytes), recipient_account_id (N bytes)] max bytes 54+ bytes
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
-        let flag = input[0];
+        let flag = input.first().unwrap();
         #[cfg(feature = "error_refund")]
         let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
@@ -323,8 +330,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 let erc20_address = context.caller;
                 let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes(), &self.io)?;
 
-                let amount = U256::from_big_endian(&input[..32]);
-                input = &input[32..];
+                let amount = U256::from_big_endian(input.get(..32).unwrap());
+                input = input.get(32..).unwrap();
 
                 if let Ok(receiver_account_id) = AccountId::try_from(input) {
                     (
@@ -444,6 +451,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
+        check_input_size(input, 21, Some(53))?;
         use crate::prelude::types::NEP141Wei;
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
@@ -458,12 +466,15 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
+        // ETH transfer input: [flag (1 byte) , eth_recipient (20 bytes)] (min bytes 21 bytes)
+        // ERC20 transfer input: [flag (1 byte) , amount (32 bytes), eth_recipient (20 bytes)] (max bytes 53)
+
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
         let mut input = input;
-        let flag = input[0];
-        input = &input[1..];
+        let flag = input.first().unwrap();
+        input = input.get(1..).unwrap();
 
         let (nep141_address, serialized_args, exit_event) = match flag {
             0x0 => {
@@ -511,8 +522,8 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                 let erc20_address = context.caller;
                 let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes(), &self.io)?;
 
-                let amount = U256::from_big_endian(&input[..32]);
-                input = &input[32..];
+                let amount = U256::from_big_endian(input.get(..32).unwrap());
+                input = input.get(32..).unwrap();
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
@@ -580,7 +591,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
 #[cfg(test)]
 mod tests {
-    use super::{exit_to_ethereum, exit_to_near};
+    use super::{check_input_size, exit_to_ethereum, exit_to_near};
     use crate::prelude::sdk::types::near_account_to_evm_address;
 
     #[test]
@@ -608,5 +619,34 @@ mod tests {
             exit_to_eth.signature(),
             super::events::EXIT_TO_ETH_SIGNATURE
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_INVALID_INPUT")]
+    fn test_check_invalid_input_lt_min() {
+        let input = [0u8; 4];
+        check_input_size(&input, 10, Some(20)).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_INVALID_INPUT")]
+    fn test_check_invalid_input_lt_min_non_max() {
+        let input = [0u8; 4];
+        check_input_size(&input, 10, None).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_INVALID_INPUT")]
+    fn test_check_invalid_input_gt_max() {
+        let input = [1u8; 55];
+        check_input_size(&input, 10, Some(54)).unwrap();
+    }
+
+    #[test]
+    fn test_check_valid_input() {
+        let input = [1u8; 55];
+        check_input_size(&input, 10, None).unwrap();
+        let input = [1u8; 55];
+        check_input_size(&input, 10, Some(55)).unwrap();
     }
 }
