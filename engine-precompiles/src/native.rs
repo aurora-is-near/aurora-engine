@@ -327,7 +327,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
 
-                if amount > MAX_U128.into() {
+                if amount > U256::from(u128::MAX) {
                     return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
                 }
 
