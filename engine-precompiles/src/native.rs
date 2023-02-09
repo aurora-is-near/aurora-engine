@@ -20,6 +20,7 @@ use evm::backend::Log;
 use evm::{Context, ExitError};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
+const MAX_U128: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_455u128;
 
 mod costs {
     use crate::prelude::types::{EthGas, NearGas};
@@ -326,6 +327,10 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
 
+                if amount > MAX_U128.into() {
+                    return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
+                }
+
                 if let Ok(receiver_account_id) = AccountId::try_from(input) {
                     (
                         nep141_address,
@@ -513,6 +518,10 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
+
+                if amount > MAX_U128.into() {
+                    return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
+                }
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
