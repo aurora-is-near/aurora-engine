@@ -48,13 +48,13 @@ pub mod events {
 
     /// Derived from event signature (see `tests::test_exit_signatures`)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
-        0x5a91_b8bc_9c19_8167_3db8_fb22_6dbd_8fcd,
-        0xd0c2_3f45_cd28_abb3_1403_a539_2f6d_d0c7,
+        0x5a91b8bc9c1981673db8fb226dbd8fcd,
+        0xd0c23f45cd28abb31403a5392f6dd0c7,
     );
     /// Derived from event signature (see `tests::test_exit_signatures`)
     pub const EXIT_TO_ETH_SIGNATURE: H256 = crate::make_h256(
-        0xd046_c2bb_01a5_622b_c4b9_6963_3239_1d87,
-        0x4913_7376_2eea_c083_1c48_400e_2d5a_5f07,
+        0xd046c2bb01a5622bc4b9696332391d87,
+        0x491373762eeac0831c48400e2d5a5f07,
     );
 
     /// The exit precompile events have an `erc20_address` field to indicate
@@ -208,7 +208,7 @@ pub mod exit_to_near {
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
     pub const ADDRESS: Address =
-        crate::make_address(0xe921_7bc7, 0x0b7e_d1f5_98dd_d319_9e80_b093_fa71_124f);
+        crate::make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
 }
 
 impl<I> ExitToNear<I> {
@@ -425,7 +425,7 @@ pub mod exit_to_ethereum {
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
     pub const ADDRESS: Address =
-        crate::make_address(0xb0bd_02f6, 0xa392_af54_8bdf_1cfa_ee5d_fa0e_efcc_8eab);
+        crate::make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
 }
 
 impl<I> ExitToEthereum<I> {

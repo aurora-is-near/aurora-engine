@@ -191,7 +191,8 @@ pub fn log(data: &str) {
 }
 
 #[cfg(not(feature = "contract"))]
-pub const fn log(_data: &str) {
+#[allow(clippy::missing_const_for_fn)]
+pub fn log(_data: &str) {
     // TODO: standalone logging
 }
 

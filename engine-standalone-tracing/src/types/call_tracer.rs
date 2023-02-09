@@ -202,7 +202,7 @@ impl evm::tracing::EventListener for CallTracer {
                     evm::CreateScheme::Create2 { .. } => CallType::Create2,
                     evm::CreateScheme::Legacy { .. } | evm::CreateScheme::Fixed(_) => {
                         CallType::Create
-                    } // is this even possible in production?
+                    } // Is Fixed even possible in production? With high probability not.
                 };
 
                 self.enter(

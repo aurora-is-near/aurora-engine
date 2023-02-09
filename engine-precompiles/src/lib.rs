@@ -5,7 +5,8 @@
     clippy::similar_names,
     clippy::module_name_repetitions,
     clippy::missing_panics_doc,
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc,
+    clippy::unreadable_literal
 )]
 pub mod account_ids;
 pub mod alt_bn256;

@@ -2,8 +2,8 @@ use near_vm_logic::mocks::mock_external::MockedExternal;
 
 /// Derived from mainnet data reported here: `https://hackmd.io/@birchmd/r1HRjr0P9`
 /// Uses the formulas:
-/// `n_T` = (`G_T` / `G_R`) * (`g_R` / `g_T`)
-/// `n_c` = (`G_c` / `G_R`) * (`g_R` / `g_c`)
+/// `n_T = (G_T / G_R) * (g_R / g_T)`
+/// `n_c = (G_c / G_R) * (g_R / g_c)`
 /// Where `n_T` is the average number of new touched trie nodes per read,
 /// `n_c` is the average number of cached trie nodes read per read,
 /// `G_T` is the average gas cost of touching trie node per Aurora transaction,

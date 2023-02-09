@@ -27,7 +27,7 @@ pub mod predecessor_account {
     /// Address: `0x723ffbaba940e75e7bf5f6d61dcbf8d9a4de0fd7`
     /// This address is computed as: `&keccak("predecessorAccountId")[12..]`
     pub const ADDRESS: Address =
-        crate::make_address(0x723f_fbab, 0xa940_e75e_7bf5_f6d6_1dcb_f8d9_a4de_0fd7);
+        crate::make_address(0x723ffbab, 0xa940e75e7bf5f6d61dcbf8d9a4de0fd7);
 }
 
 impl<'a, E> PredecessorAccount<'a, E> {
@@ -73,7 +73,7 @@ impl CurrentAccount {
     /// Address: `0xfefae79e4180eb0284f261205e3f8cea737aff56`
     /// This address is computed as: `&keccak("currentAccountId")[12..]`
     pub const ADDRESS: Address =
-        super::make_address(0xfefa_e79e, 0x4180_eb02_84f2_6120_5e3f_8cea_737a_ff56);
+        super::make_address(0xfefae79e, 0x4180eb0284f261205e3f8cea737aff56);
 
     #[must_use]
     pub const fn new(current_account_id: AccountId) -> Self {

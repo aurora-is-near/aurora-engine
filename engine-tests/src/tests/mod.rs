@@ -23,5 +23,3 @@ mod standard_precompiles;
 mod state_migration;
 pub mod uniswap;
 pub mod xcc;
-
-const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61_200_152;

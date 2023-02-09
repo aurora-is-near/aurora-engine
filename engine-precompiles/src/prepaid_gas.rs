@@ -9,8 +9,7 @@ use evm::{Context, ExitError};
 ///
 /// Address: `0x536822d27de53629ef1f84c60555689e9488609f`
 /// This address is computed as: `&keccak("prepaidGas")[12..]`
-pub const ADDRESS: Address =
-    crate::make_address(0x5368_22d2, 0x7de5_3629_ef1f_84c6_0555_689e_9488_609f);
+pub const ADDRESS: Address = crate::make_address(0x536822d2, 0x7de53629ef1f84c60555689e9488609f);
 
 mod costs {
     use crate::prelude::types::EthGas;

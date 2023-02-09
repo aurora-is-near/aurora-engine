@@ -202,7 +202,8 @@ mod contract {
     /// to make any necessary changes to the state such that it aligns with the newly deployed
     /// code.
     #[no_mangle]
-    pub const extern "C" fn state_migration() {
+    #[allow(clippy::missing_const_for_fn)]
+    pub extern "C" fn state_migration() {
         // TODO: currently we don't have migrations
     }
 

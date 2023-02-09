@@ -37,14 +37,14 @@ mod consts {
     ///
     /// See [RFC 7693](https://tools.ietf.org/html/rfc7693#section-2.6) specification for more details.
     pub(super) const IV: [u64; 8] = [
-        0x6a09_e667_f3bc_c908,
-        0xbb67_ae85_84ca_a73b,
-        0x3c6e_f372_fe94_f82b,
-        0xa54f_f53a_5f1d_36f1,
-        0x510e_527f_ade6_82d1,
-        0x9b05_688c_2b3e_6c1f,
-        0x1f83_d9ab_fb41_bd6b,
-        0x5be0_cd19_137e_2179,
+        0x6a09e667f3bcc908,
+        0xbb67ae8584caa73b,
+        0x3c6ef372fe94f82b,
+        0xa54ff53a5f1d36f1,
+        0x510e527fade682d1,
+        0x9b05688c2b3e6c1f,
+        0x1f83d9abfb41bd6b,
+        0x5be0cd19137e2179,
     ];
 
     // G rotation constants.

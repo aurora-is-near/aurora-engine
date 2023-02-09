@@ -30,7 +30,7 @@ fn test_xcc_eth_gas_cost() {
     let _res = runner.call("factory_update", ORIGIN, xcc_wasm_bytes);
     let mut signer = test_utils::Signer::random();
     let mut baseline_signer = test_utils::Signer::random();
-    runner.context.block_index = super::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    runner.context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
     // Need to use for engine's deployment!
     let wnear_erc20 = deploy_erc20(&mut runner, &mut signer);
     approve_erc20(

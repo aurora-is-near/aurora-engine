@@ -39,11 +39,10 @@ const BLOCK_HASH_PREFIX_SIZE: usize = 1;
 const BLOCK_HEIGHT_SIZE: usize = 8;
 const CHAIN_ID_SIZE: usize = 32;
 
-#[cfg(not(feature = "contract"))]
 /// Block height where the bug fix for parsing transactions to the zero address
 /// is deployed. The current value is only approximate; will be updated once the
 /// fix is actually deployed.
-pub const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61200152;
+pub const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61_200_152;
 
 #[must_use]
 pub fn current_address(current_account_id: &AccountId) -> Address {

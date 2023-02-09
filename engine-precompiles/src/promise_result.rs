@@ -10,8 +10,7 @@ use evm::{Context, ExitError};
 ///
 /// Address: `0x0a3540f79be10ef14890e87c1a0040a68cc6af71`
 /// This address is computed as: `&keccak("getPromiseResults")[12..]`
-pub const ADDRESS: Address =
-    crate::make_address(0x0a35_40f7, 0x9be1_0ef1_4890_e87c_1a00_40a6_8cc6_af71);
+pub const ADDRESS: Address = crate::make_address(0x0a3540f7, 0x9be10ef14890e87c1a0040a68cc6af71);
 
 pub mod costs {
     use crate::prelude::types::EthGas;

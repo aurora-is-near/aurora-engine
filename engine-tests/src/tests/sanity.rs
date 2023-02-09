@@ -109,21 +109,21 @@ fn test_transaction_to_zero_address() {
     context.input = tx_bytes;
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
-    context.block_index = super::ZERO_ADDRESS_FIX_HEIGHT - 1;
+    context.block_index = ZERO_ADDRESS_FIX_HEIGHT - 1;
     let result = runner
         .submit_raw(test_utils::SUBMIT, &context, &[])
         .unwrap();
     assert_eq!(result.gas_used, 53_000);
-    runner.env.block_height = super::ZERO_ADDRESS_FIX_HEIGHT;
+    runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
-    context.block_index = super::ZERO_ADDRESS_FIX_HEIGHT;
+    context.block_index = ZERO_ADDRESS_FIX_HEIGHT;
     let result = runner
         .submit_raw(test_utils::SUBMIT, &context, &[])
         .unwrap();
     assert_eq!(result.gas_used, 21_000);
-    runner.env.block_height = super::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT + 1;
     assert_eq!(runner.get_nonce(&address), U256::one());
 }
 
@@ -859,6 +859,7 @@ pub fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, A
     (runner, signer, dest_address)
 }
 
+use aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT;
 use aurora_engine_types::H160;
 use sha3::Digest;
 

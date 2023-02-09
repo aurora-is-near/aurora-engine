@@ -117,8 +117,7 @@ pub struct ProgramCounter(pub u32);
 impl ProgramCounter {
     /// Performs the conversion into u32.
     #[must_use]
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn into_u32(self) -> u32 {
+    pub const fn into_u32(self) -> u32 {
         self.0
     }
 }

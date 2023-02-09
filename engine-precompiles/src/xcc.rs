@@ -81,13 +81,13 @@ pub mod cross_contract_call {
     /// Address: `0x516cded1d16af10cad47d6d49128e2eb7d27b372`
     /// This address is computed as: `&keccak("nearCrossContractCall")[12..]`
     pub const ADDRESS: Address =
-        crate::make_address(0x516c_ded1, 0xd16a_f10c_ad47_d6d4_9128_e2eb_7d27_b372);
+        crate::make_address(0x516cded1, 0xd16af10cad47d6d49128e2eb7d27b372);
 
     /// Sentinel value used to indicate the following topic field is how much NEAR the
     /// cross-contract call will require.
     pub const AMOUNT_TOPIC: H256 = crate::make_h256(
-        0x0072_6571_7569_7265_645f_6e65_6172,
-        0x0072_6571_7569_7265_645f_6e65_6172,
+        0x0072657175697265645f6e656172,
+        0x0072657175697265645f6e656172,
     );
 }
 
