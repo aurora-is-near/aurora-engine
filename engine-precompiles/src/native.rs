@@ -217,7 +217,7 @@ impl<I> ExitToNear<I> {
 }
 
 fn is_valid_input_size(input: &[u8], min: usize, max: Option<usize>) -> Result<(), ExitError> {
-    if max.is_some() && (input.len() < min || input.len() > max.unwrap()) {
+    if input.len() < min || max.map_or(false, |max| input.len() > max) {
         return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));
     }
     Ok(())
