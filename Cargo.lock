@@ -150,7 +150,6 @@ dependencies = [
  "ethabi",
  "evm",
  "hex",
- "rjson",
  "rlp",
  "serde",
  "serde_json",
@@ -264,6 +263,7 @@ dependencies = [
  "primitive-types 0.12.1",
  "rand 0.8.5",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3639,11 +3639,6 @@ checksum = "bd124222d17ad93a644ed9d011a40f4fb64aa54275c08cc216524a9ea82fb09f"
 dependencies = [
  "digest 0.10.6",
 ]
-
-[[package]]
-name = "rjson"
-version = "0.3.2"
-source = "git+https://github.com/aurora-is-near/rjson?rev=cc3da949#cc3da9495e7e520900d66d2b517539f74fff93cf"
 
 [[package]]
 name = "rkyv"

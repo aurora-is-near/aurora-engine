@@ -1,6 +1,7 @@
 use crate::fmt::Formatter;
-use crate::{Add, Display, Sub};
+use crate::{format, Add, Display, Sub, ToString};
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
 pub const ZERO_YOCTO: Yocto = Yocto::new(0);
@@ -32,8 +33,47 @@ impl Balance {
     }
 }
 
+impl Serialize for Balance {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let value = self.0.to_string();
+        serializer.serialize_str(&value)
+    }
+}
+
+impl<'de> Deserialize<'de> for Balance {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+        D::Error: serde::de::Error,
+    {
+        use serde::de::Error;
+
+        let value = serde_json::Value::deserialize(deserializer)?;
+        Ok(Self(
+            value
+                .as_str()
+                .ok_or_else(|| Error::custom(format!("Wait for a string but got: {}", value)))
+                .and_then(|value| value.parse().map_err(Error::custom))?,
+        ))
+    }
+}
+
 #[derive(
-    Default, BorshSerialize, BorshDeserialize, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd,
+    Default,
+    BorshSerialize,
+    BorshDeserialize,
+    Serialize,
+    Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
 )]
 /// Near Yocto type which wraps an underlying u128.
 /// 1 NEAR = 10^24 yoctoNEAR
@@ -90,5 +130,37 @@ pub mod error {
             let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
             write!(f, "{}", msg)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Balance;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Deserialize, Serialize)]
+    struct SomeStruct {
+        balance: Balance,
+    }
+
+    #[test]
+    fn test_deserialize_balance() {
+        let json = r#"{"balance": "340282366920938463463374607431768211455"}"#;
+        let result: SomeStruct = serde_json::from_str(json).unwrap();
+        assert_eq!(result.balance, Balance::new(u128::MAX));
+
+        let json = r#"{"balance": "340282366920938463463374607431768211456"}"#; // Overflow
+        let result = serde_json::from_str::<SomeStruct>(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_serialize_balance() {
+        let json = r#"{"balance":"340282366920938463463374607431768211455"}"#;
+        let result = SomeStruct {
+            balance: Balance::new(340282366920938463463374607431768211455),
+        };
+
+        assert_eq!(&serde_json::to_string(&result).unwrap(), json);
     }
 }

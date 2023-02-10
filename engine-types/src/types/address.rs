@@ -1,15 +1,13 @@
 use crate::{format, String, H160};
 use borsh::maybestd::io;
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 const ADDRESS_HEX_LENGTH: usize = 40;
 const ADDRESS_BYTE_LENGTH: usize = 20;
 
 /// Base Eth Address type
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Address(H160);
 
 impl Address {
