@@ -216,8 +216,8 @@ impl<I> ExitToNear<I> {
     }
 }
 
-fn check_input_size(input: &[u8], min: usize, max: Option<usize>) -> Result<(), ExitError> {
-    if input.len() < min || input.len() > max.unwrap_or(usize::MAX) {
+fn is_valid_input_size(input: &[u8], min: usize, max: Option<usize>) -> Result<(), ExitError> {
+    if max.is_some() && (input.len() < min || input.len() > max.unwrap()) {
         return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));
     }
     Ok(())
@@ -244,7 +244,18 @@ impl<I: IO> Precompile for ExitToNear<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        check_input_size(input, 21, None)?;
+        // ETH transfer input format: (21+ bytes)
+        //  - flag (1 byte)
+        //  - refund_address (20 bytes)
+        //  - 1 byte ??
+        //  - recipient_account_id (N bytes)
+        // ERC20 transfer input format: (54+ bytes)
+        //  - flag (1 byte)
+        //  - refund_address (20 bytes)
+        //  - 1 byte ???
+        //  - amount (32 bytes)
+        //  - recipient_account_id (N bytes)
+        is_valid_input_size(input, 21, None)?;
         #[cfg(feature = "error_refund")]
         fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
             let refund_address = Address::try_from_slice(&input.get(1..21).unwrap()).unwrap();
@@ -268,8 +279,6 @@ impl<I: IO> Precompile for ExitToNear<I> {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
-        // ETH transfer input [flag (1 byte), refund_address (20 bytes), 1 byte , recipient_account_id (N bytes)] min bytes 21+ bytes
-        // ERC20 transfer input [flag (1 byte), refund_address (20 bytes), 1 byte, amount (32 bytes), recipient_account_id (N bytes)] max bytes 54+ bytes
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
@@ -451,7 +460,14 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        check_input_size(input, 21, Some(53))?;
+        // ETH transfer input format (min size 21 bytes)
+        //  - flag (1 byte)
+        //  - eth_recipient (20 bytes)
+        // ERC20 transfer input format: max 53 bytes
+        //  - flag (1 byte)
+        //  - amount (32 bytes)
+        //  - eth_recipient (20 bytes)
+        is_valid_input_size(input, 21, Some(53))?;
         use crate::prelude::types::NEP141Wei;
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
@@ -465,9 +481,6 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         } else if context.address != exit_to_ethereum::ADDRESS.raw() {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
-
-        // ETH transfer input: [flag (1 byte) , eth_recipient (20 bytes)] (min bytes 21 bytes)
-        // ERC20 transfer input: [flag (1 byte) , amount (32 bytes), eth_recipient (20 bytes)] (max bytes 53)
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
@@ -591,7 +604,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
 #[cfg(test)]
 mod tests {
-    use super::{check_input_size, exit_to_ethereum, exit_to_near};
+    use super::{exit_to_ethereum, exit_to_near, is_valid_input_size};
     use crate::prelude::sdk::types::near_account_to_evm_address;
 
     #[test]
@@ -625,28 +638,21 @@ mod tests {
     #[should_panic(expected = "ERR_INVALID_INPUT")]
     fn test_check_invalid_input_lt_min() {
         let input = [0u8; 4];
-        check_input_size(&input, 10, Some(20)).unwrap();
-    }
-
-    #[test]
-    #[should_panic(expected = "ERR_INVALID_INPUT")]
-    fn test_check_invalid_input_lt_min_non_max() {
-        let input = [0u8; 4];
-        check_input_size(&input, 10, None).unwrap();
+        is_valid_input_size(&input, 10, Some(20)).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "ERR_INVALID_INPUT")]
     fn test_check_invalid_input_gt_max() {
         let input = [1u8; 55];
-        check_input_size(&input, 10, Some(54)).unwrap();
+        is_valid_input_size(&input, 10, Some(54)).unwrap();
     }
 
     #[test]
     fn test_check_valid_input() {
         let input = [1u8; 55];
-        check_input_size(&input, 10, None).unwrap();
-        let input = [1u8; 55];
-        check_input_size(&input, 10, Some(55)).unwrap();
+        is_valid_input_size(&input, 10, Some(input.len())).unwrap();
+        is_valid_input_size(&input, 0, Some(input.len())).unwrap();
+        is_valid_input_size(&input, 0, None).unwrap();
     }
 }
