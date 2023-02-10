@@ -133,10 +133,6 @@ impl<T> Stack<T> {
     }
 }
 
-pub fn str_from_slice(inp: &[u8]) -> &str {
-    str::from_utf8(inp).unwrap()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

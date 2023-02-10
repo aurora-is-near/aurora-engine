@@ -527,10 +527,8 @@ mod tests {
         let parse_error =
             TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
                 .unwrap_err();
-        let actual_parse_error = std::str::from_utf8(parse_error.as_ref()).unwrap();
-        let expected_parse_error = AddressError::IncorrectLength.to_string();
 
-        assert_eq!(expected_parse_error, actual_parse_error);
+        assert_eq!(parse_error.as_ref(), AddressError::IncorrectLength.as_ref());
     }
 
     #[test]
@@ -541,10 +539,8 @@ mod tests {
         let parse_error =
             TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
                 .unwrap_err();
-        let actual_parse_error = std::str::from_utf8(parse_error.as_ref()).unwrap();
-        let expected_parse_error = AddressError::FailedDecodeHex.to_string();
 
-        assert_eq!(expected_parse_error, actual_parse_error);
+        assert_eq!(parse_error.as_ref(), AddressError::FailedDecodeHex.as_ref());
     }
 
     #[test]

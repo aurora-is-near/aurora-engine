@@ -94,7 +94,9 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
+    use crate::prelude::{
+        sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
+    };
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -140,7 +142,7 @@ mod contract {
     pub extern "C" fn get_owner() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        io.return_output(state.owner_id.as_bytes());
+        io.return_output(state.owner_id().as_bytes());
     }
 
     /// Get bridge prover id for this contract.
@@ -155,7 +157,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
         let mut io = Runtime;
-        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id)
+        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id())
     }
 
     #[no_mangle]
@@ -163,7 +165,7 @@ mod contract {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         let index = internal_get_upgrade_index();
-        io.return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
+        io.return_output(&(index + state.upgrade_delay_blocks()).to_le_bytes())
     }
 
     /// Stage new code for deployment.
@@ -187,7 +189,7 @@ mod contract {
         let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let index = internal_get_upgrade_index();
-        if io.block_height() <= index + state.upgrade_delay_blocks {
+        if io.block_height() <= index + state.upgrade_delay_blocks() {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED_TOO_EARLY);
         }
         Runtime::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
@@ -197,13 +199,7 @@ mod contract {
     /// to make any necessary changes to the state such that it aligns with the newly deployed
     /// code.
     #[no_mangle]
-    pub extern "C" fn state_migration() {
-        let mut io = Runtime;
-        io.assert_private_call().sdk_unwrap();
-
-        // TODO: Must be removed after migration.
-        state::legacy::migrate_state(&mut io).sdk_unwrap();
-    }
+    pub extern "C" fn state_migration() {}
 
     /// Resumes previously [`paused`] precompiles.
     ///
@@ -479,7 +475,7 @@ mod contract {
         let block_height = io.read_input_borsh().sdk_unwrap();
         let account_id = io.current_account_id();
         let chain_id = state::get_state(&io)
-            .map(|state| state.chain_id)
+            .map(|state| state.chain_id())
             .sdk_unwrap();
         let block_hash =
             crate::engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
@@ -531,7 +527,7 @@ mod contract {
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
-        state.chain_id = args.chain_id;
+        state.set_chain_id(args.chain_id);
         state::set_state(&mut io, state).sdk_unwrap();
         // set genesis block balances
         for account_balance in args.genesis_alloc {
@@ -542,7 +538,7 @@ mod contract {
             )
         }
         // return new chain ID
-        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id)
+        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id())
     }
 
     #[cfg(feature = "evm_bully")]
@@ -911,7 +907,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use crate::connector::ZERO_ATTACHED_BALANCE;
-        use crate::prelude::{NEP141Wei, ToString, U256};
+        use crate::prelude::{NEP141Wei, U256};
         use evm::backend::ApplyBackend;
         const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
         const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
@@ -987,7 +983,7 @@ mod contract {
     }
 
     fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
-        if &state.owner_id != predecessor_account_id {
+        if &state.owner_id() != predecessor_account_id {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
         }
     }

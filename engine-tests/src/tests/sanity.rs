@@ -141,6 +141,7 @@ fn test_state_format() {
     };
     let state: aurora_engine::state::EngineState = args.into();
     let expected_hex: String = [
+        "00", // V2 - "00", V1 - "01",
         "000000000000000000000000000000000000000000000000000000000000029a",
         "04000000626f7373",
         "0300000000000000",
