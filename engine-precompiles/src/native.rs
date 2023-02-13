@@ -247,17 +247,15 @@ impl<I: IO> Precompile for ExitToNear<I> {
         // ETH transfer input format: (21+ bytes)
         //  - flag (1 byte)
         //  - refund_address (20 bytes)
-        //  - 1 byte ??
         //  - recipient_account_id (N bytes)
-        // ERC20 transfer input format: (54+ bytes)
+        // ERC20 transfer input format: (53+ bytes)
         //  - flag (1 byte)
         //  - refund_address (20 bytes)
-        //  - 1 byte ???
         //  - amount (32 bytes)
         //  - recipient_account_id (N bytes)
-        is_valid_input_size(input, 21, None)?;
         #[cfg(feature = "error_refund")]
         fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
+            is_valid_input_size(input, 21, None)?;
             let refund_address = Address::try_from_slice(&input.get(1..21).unwrap()).unwrap();
             Ok((refund_address, &input.get(21..).unwrap()))
         }
@@ -635,17 +633,16 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "ERR_INVALID_INPUT")]
     fn test_check_invalid_input_lt_min() {
         let input = [0u8; 4];
-        is_valid_input_size(&input, 10, Some(20)).unwrap();
+        assert!(is_valid_input_size(&input, 10, Some(20)).is_err());
+        assert!(is_valid_input_size(&input, 5, None).is_err());
     }
 
     #[test]
-    #[should_panic(expected = "ERR_INVALID_INPUT")]
     fn test_check_invalid_input_gt_max() {
         let input = [1u8; 55];
-        is_valid_input_size(&input, 10, Some(54)).unwrap();
+        assert!(is_valid_input_size(&input, 10, Some(54)).is_err());
     }
 
     #[test]
