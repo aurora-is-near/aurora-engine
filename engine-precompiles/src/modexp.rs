@@ -1,5 +1,5 @@
 use crate::prelude::types::{Address, EthGas};
-use crate::prelude::{PhantomData, Vec, U256};
+use crate::prelude::{Cow, PhantomData, Vec, U256};
 use crate::{
     utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
 };
@@ -22,6 +22,9 @@ impl<HF: HardFork> ModExp<HF> {
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
         let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
         let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
+        if exp_len > usize::MAX - 96 {
+            return Err(ExitError::Other(Cow::Borrowed("ERR_INVALID_EXP_LENGTH")));
+        }
         let exp = parse_bytes(
             bytes,
             start.saturating_add(96),
@@ -45,6 +48,10 @@ impl<HF: HardFork> ModExp<HF> {
         let base_len = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
         let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
         let mod_len = usize::try_from(mod_len).map_err(utils::err_usize_conv)?;
+
+        if exp_len > usize::MAX - 96 {
+            return Err(ExitError::Other(Cow::Borrowed("ERR_INVALID_EXP_LENGTH")));
+        }
 
         let base_start = 96;
         let base_end = base_len.saturating_add(base_start);
@@ -451,7 +458,7 @@ mod tests {
     #[test]
     fn test_berlin_modexp_big_input() {
         let base_len = U256::from(4);
-        let exp_len = U256::from(u64::MAX);
+        let exp_len = U256::from(usize::MAX - 96);
         let mod_len = U256::from(4);
         let base: u32 = 1;
         let exp = U256::MAX;
@@ -470,7 +477,7 @@ mod tests {
     #[test]
     fn test_berlin_modexp_bigger_input() {
         let base_len = U256::MAX;
-        let exp_len = U256::MAX;
+        let exp_len = U256::from(usize::MAX - 96);
         let mod_len = U256::MAX;
         let base: u32 = 1;
         let exp = U256::MAX;
@@ -506,5 +513,32 @@ mod tests {
             false,
         );
         assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
+    fn test_invalid_exp_length() {
+        let base_len = U256::from(0);
+        let exp_len = U256::from(usize::MAX);
+        let mod_len = U256::from(0);
+        let base: u32 = 1;
+        let exp = U256::MAX;
+
+        let mut input: Vec<u8> = Vec::new();
+        input.extend_from_slice(&u256_to_arr(&base_len));
+        input.extend_from_slice(&u256_to_arr(&exp_len));
+        input.extend_from_slice(&u256_to_arr(&mod_len));
+        input.extend_from_slice(&base.to_be_bytes());
+        input.extend_from_slice(&u256_to_arr(&exp));
+
+        let res = ModExp::<Byzantium>::new().run(
+            &input,
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(
+            Err(ExitError::Other(Cow::Borrowed("ERR_INVALID_EXP_LENGTH"))),
+            res
+        );
     }
 }
