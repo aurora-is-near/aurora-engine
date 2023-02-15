@@ -107,6 +107,8 @@ pub enum TransactionKind {
     StorageUnregister(Option<bool>),
     /// FT storage standard method
     StorageWithdraw(parameters::StorageWithdrawCallArgs),
+    /// Admin only method; used to transfer administration
+    SetOwner(parameters::SetOwnerArgs),
     /// Admin only method
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account

@@ -69,6 +69,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
+    use parameters::SetOwnerArgs;
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
@@ -150,12 +151,11 @@ mod contract {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
-        let args = io.read_input().to_vec();
-        let sr: String = String::from_utf8(args).unwrap();
-        let id = AccountId::from_str(&sr).unwrap();
-        state.owner_id = id.clone();
+        let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
+        state.owner_id = args.new_owner;
         state::set_state(&mut io, state).sdk_unwrap();
-        io.return_output(id.as_bytes());
+        // return true as bytes
+        io.return_output(&[1]);
     }
 
     /// Get bridge prover id for this contract.
