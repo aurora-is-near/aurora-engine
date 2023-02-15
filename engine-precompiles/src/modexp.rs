@@ -507,4 +507,46 @@ mod tests {
         );
         assert_eq!(Err(ExitError::OutOfGas), res);
     }
+
+    #[test]
+    #[should_panic(expected = "attempt to add with overflow")]
+    fn test_parse_bytes_reverts_with_attempt_to_add_with_overflow() {
+        // base_len 0
+        // exp_len usize::MAX - 95
+        // mod_len 0
+        let input = "\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        000000000000000000000000000000000000000000000000ffffffffffffffa0\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        // Gas cost comes out to 18446744073709551615
+        let _ = ModExp::<Berlin>::new().run(
+            &hex::decode(input).unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "capacity overflow")]
+    fn test_parse_bytes_reverts_with_capacity_overflow() {
+        // base_len 0
+        // exp_len usize::MAX - 96
+        // mod_len 0
+        let input = "\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        000000000000000000000000000000000000000000000000ffffffffffffff9f\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        // Gas cost comes out to 18446744073709551615
+        let _ = ModExp::<Berlin>::new().run(
+            &hex::decode(input).unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+    }
 }
