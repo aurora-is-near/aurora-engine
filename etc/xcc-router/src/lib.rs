@@ -6,7 +6,9 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LazyOption, LookupMap};
 use near_sdk::json_types::{U128, U64};
 use near_sdk::BorshStorageKey;
-use near_sdk::{env, near_bindgen, AccountId, Gas, PanicOnDefault, Promise, PromiseIndex};
+use near_sdk::{
+    env, near_bindgen, AccountId, Gas, PanicOnDefault, Promise, PromiseIndex, PromiseResult,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
@@ -194,7 +196,15 @@ impl Router {
             .get()
             .unwrap_or_else(|| env::panic_str("ERR_CONTRACT_NOT_INITIALIZED"));
         if caller != parent {
-            env::panic_str(ERR_ILLEGAL_CALLER)
+            env::panic_str(ERR_ILLEGAL_CALLER);
+        }
+        // Any method that can only be called by the parent should also only be executed if
+        // the parent's execution was successful.
+        let num_promises = env::promise_results_count();
+        for index in 0..num_promises {
+            if let PromiseResult::Failed | PromiseResult::NotReady = env::promise_result(index) {
+                env::panic_str("ERR_CALLBACK_OF_FAILED_PROMISE");
+            }
         }
     }
 
