@@ -341,6 +341,20 @@ impl TransactionKind {
             TransactionKind::Unknown => Self::no_evm_execution("unknown"),
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
+            TransactionKind::Submit(_) => todo!(),
+            TransactionKind::Call(_) => todo!(),
+            TransactionKind::PausePrecompiles(_) => todo!(),
+            TransactionKind::ResumePrecompiles(_) => todo!(),
+            TransactionKind::Deploy(_) => todo!(),
+            TransactionKind::DeployErc20(_) => todo!(),
+            TransactionKind::FtOnTransfer(_) => todo!(),
+            TransactionKind::Deposit(_) => todo!(),
+            TransactionKind::FtTransferCall(_) => todo!(),
+            TransactionKind::FinishDeposit(_) => todo!(),
+            TransactionKind::ResolveTransfer(_, _) => todo!(),
+            TransactionKind::FtTransfer(_) => todo!(),
+            TransactionKind::SetOwner(_) => Self::no_evm_execution("set_owner"),
+            TransactionKind::RefundOnError(_) => todo!(),
         }
     }
 
@@ -495,6 +509,7 @@ enum BorshableTransactionKind<'a> {
     StorageUnregister(Option<bool>),
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
     SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
+    SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     RegisterRelayer(Cow<'a, types::Address>),
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
@@ -546,6 +561,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
+            TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
         }
     }
 }
@@ -603,6 +619,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::ResumePrecompiles(x) => {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
             }
+            BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
         }
     }
 }
