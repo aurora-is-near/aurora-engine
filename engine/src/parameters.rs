@@ -27,7 +27,7 @@ pub struct NewCallArgs {
 }
 
 /// Borsh-encoded parameters for the `set_owner` function.
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct SetOwnerArgs {
     pub new_owner: AccountId,
 }
