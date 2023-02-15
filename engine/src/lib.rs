@@ -99,6 +99,8 @@ mod contract {
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
+    use core::str::FromStr;
+    use crate::prelude::String;
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
@@ -140,6 +142,20 @@ mod contract {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         io.return_output(state.owner_id.as_bytes());
+    }
+
+    /// Set owner account id for this contract.
+    #[no_mangle]
+    pub extern "C" fn set_owner() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let args = io.read_input().to_vec();
+        let sr: String = String::from_utf8(args).unwrap();
+        let id = AccountId::from_str(&sr).unwrap();
+        state.owner_id = id.clone();
+        state::set_state(&mut io, state).sdk_unwrap();
+        io.return_output(id.as_bytes());
     }
 
     /// Get bridge prover id for this contract.
