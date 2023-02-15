@@ -93,6 +93,7 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
+    use crate::prelude::String;
     use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
@@ -100,7 +101,6 @@ mod contract {
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
     use core::str::FromStr;
-    use crate::prelude::String;
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
