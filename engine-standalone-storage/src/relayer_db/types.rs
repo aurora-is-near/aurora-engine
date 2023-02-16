@@ -317,7 +317,7 @@ impl TryFrom<TransactionDuration> for u64 {
     type Error = &'static str;
 
     fn try_from(value: TransactionDuration) -> Result<Self, Self::Error> {
-        if value.0 > u64::MAX as u128 {
+        if value.0 > u64::MAX.into() {
             Err("Value is too large to fit in u64")
         } else {
             value.try_into()
