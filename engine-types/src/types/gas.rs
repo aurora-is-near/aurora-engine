@@ -54,6 +54,8 @@ impl Display for EthGas {
 }
 
 impl EthGas {
+    pub const MAX: EthGas = EthGas(u64::MAX);
+
     /// Constructs a new `EthGas` with a given u64 value.
     pub const fn new(gas: u64) -> EthGas {
         Self(gas)

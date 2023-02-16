@@ -420,9 +420,9 @@ pub enum ConsumeMessageOutcome {
 
 #[derive(Debug)]
 pub struct TransactionIncludedOutcome {
-    pub hash: aurora_engine_types::H256,
+    pub hash: H256,
     pub info: TransactionMessage,
-    pub diff: crate::Diff,
+    pub diff: Diff,
     pub maybe_result: Result<Option<TransactionExecutionResult>, error::Error>,
 }
 

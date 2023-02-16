@@ -17,7 +17,7 @@ pub const ETH_CUSTODIAN_ADDRESS: Address =
     aurora_engine_precompiles::make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
 
 pub fn compute_block_hash(block_height: u64) -> H256 {
-    aurora_engine::engine::compute_block_hash([0u8; 32], block_height, b"aurora")
+    engine::compute_block_hash([0u8; 32], block_height, b"aurora")
 }
 
 pub fn insert_block(storage: &mut Storage, block_height: u64) {
@@ -52,8 +52,8 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
     let new_args = NewCallArgs {
         chain_id: aurora_engine_types::types::u256_to_arr(&U256::from(chain_id)),
         owner_id: env.current_account_id(),
-        bridge_prover_id: test_utils::str_to_account_id("bridge_prover.near"),
         upgrade_delay_blocks: 1,
+        default_gas_token: [0u8; 20], // Base coin
     };
 
     state::set_state(&mut io, new_args.into()).unwrap();

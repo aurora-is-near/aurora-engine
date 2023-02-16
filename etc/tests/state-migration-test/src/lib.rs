@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use aurora_engine::state;
+use aurora_engine::state::{self, EngineState};
 use aurora_engine_sdk::near_runtime::Runtime;
 use aurora_engine_sdk::io::{IO, StorageIntermediate};
 use aurora_engine_types::storage;

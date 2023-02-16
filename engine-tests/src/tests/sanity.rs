@@ -136,15 +136,16 @@ fn test_state_format() {
     let args = aurora_engine::parameters::NewCallArgs {
         chain_id: aurora_engine_types::types::u256_to_arr(&666.into()),
         owner_id: "boss".parse().unwrap(),
-        bridge_prover_id: "prover_mcprovy_face".parse().unwrap(),
         upgrade_delay_blocks: 3,
+        default_gas_token: [255u8; 20],
     };
     let state: aurora_engine::state::EngineState = args.into();
     let expected_hex: String = [
+        "00", // V2 - "00", V1 - "01",
         "000000000000000000000000000000000000000000000000000000000000029a",
         "04000000626f7373",
-        "1300000070726f7665725f6d6370726f76795f66616365",
         "0300000000000000",
+        "01ffffffffffffffffffffffffffffffffffffffff",
     ]
     .concat();
     assert_eq!(hex::encode(state.try_to_vec().unwrap()), expected_hex);

@@ -3,6 +3,9 @@ use borsh::maybestd::io;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
+const ADDRESS_HEX_LENGTH: usize = 40;
+const ADDRESS_BYTE_LENGTH: usize = 20;
+
 /// Base Eth Address type
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Address(H160);
@@ -24,10 +27,10 @@ impl Address {
     }
 
     pub fn decode(address: &str) -> Result<Address, error::AddressError> {
-        if address.len() != 40 {
+        if address.len() != ADDRESS_HEX_LENGTH {
             return Err(error::AddressError::IncorrectLength);
         }
-        let mut result = [0u8; 20];
+        let mut result = [0u8; ADDRESS_BYTE_LENGTH];
         hex::decode_to_slice(address, &mut result)
             .map_err(|_| error::AddressError::FailedDecodeHex)?;
         Ok(Address::new(H160(result)))
@@ -38,18 +41,25 @@ impl Address {
     }
 
     pub fn try_from_slice(raw_addr: &[u8]) -> Result<Self, error::AddressError> {
-        if raw_addr.len() != 20 {
-            return Err(error::AddressError::IncorrectLength);
+        use core::cmp::Ordering;
+        match raw_addr.len().cmp(&ADDRESS_BYTE_LENGTH) {
+            Ordering::Greater => Err(error::AddressError::IncorrectLength),
+            Ordering::Less => {
+                let mut buf = [0u8; ADDRESS_BYTE_LENGTH];
+                let pos = ADDRESS_BYTE_LENGTH - raw_addr.len();
+                buf[pos..].copy_from_slice(raw_addr);
+                Ok(Self::new(H160::from_slice(&buf)))
+            }
+            Ordering::Equal => Ok(Self::new(H160::from_slice(raw_addr))),
         }
-        Ok(Self::new(H160::from_slice(raw_addr)))
     }
 
-    pub const fn from_array(array: [u8; 20]) -> Self {
+    pub const fn from_array(array: [u8; ADDRESS_BYTE_LENGTH]) -> Self {
         Self(H160(array))
     }
 
     pub const fn zero() -> Self {
-        Address::new(H160([0u8; 20]))
+        Address::new(H160([0u8; ADDRESS_BYTE_LENGTH]))
     }
 }
 
@@ -69,15 +79,15 @@ impl BorshSerialize for Address {
 
 impl BorshDeserialize for Address {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() < 20 {
+        if buf.len() < ADDRESS_BYTE_LENGTH {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
                 format!("{}", error::AddressError::IncorrectLength),
             ));
         }
         // Guaranty no panics. The length checked early
-        let address = Self(H160::from_slice(&buf[..20]));
-        *buf = &buf[20..];
+        let address = Self(H160::from_slice(&buf[..ADDRESS_BYTE_LENGTH]));
+        *buf = &buf[ADDRESS_BYTE_LENGTH..];
         Ok(address)
     }
 }
@@ -137,8 +147,19 @@ mod tests {
     }
 
     #[test]
-    fn test_wrong_address_19() {
-        let serialized_addr = [0u8; 19];
+    fn test_address_less_than_20_byte_length() {
+        let serialized_addr = [0x1u8; 1];
+        let addr = Address::try_from_slice(&serialized_addr).unwrap();
+        let expected = Address::try_from_slice(
+            &hex::decode("0000000000000000000000000000000000000001").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(addr, expected);
+    }
+
+    #[test]
+    fn test_address_greater_than_20_byte_length() {
+        let serialized_addr = [0x11u8; 21];
         let addr = Address::try_from_slice(&serialized_addr);
         let err = addr.unwrap_err();
         matches!(err, error::AddressError::IncorrectLength);

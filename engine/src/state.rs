@@ -1,3 +1,4 @@
+use crate::gas_token::GasToken;
 use crate::parameters::NewCallArgs;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::account_id::AccountId;
@@ -10,9 +11,73 @@ pub use error::EngineStateError;
 const STATE_KEY: &[u8; 5] = b"STATE";
 
 /// Engine internal state, mostly configuration.
+#[derive(BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq, Debug)]
+pub enum EngineState {
+    V2(EngineStateV2),
+    V1(EngineStateV1),
+}
+
+impl EngineState {
+    pub fn chain_id(&self) -> [u8; 32] {
+        match self {
+            EngineState::V2(state) => state.chain_id,
+            EngineState::V1(state) => state.chain_id,
+        }
+    }
+
+    pub fn set_chain_id(&mut self, chain_id: [u8; 32]) {
+        match self {
+            EngineState::V2(state) => state.chain_id = chain_id,
+            EngineState::V1(state) => state.chain_id = chain_id,
+        }
+    }
+
+    pub fn owner_id(&self) -> AccountId {
+        match self {
+            EngineState::V2(state) => state.owner_id.clone(),
+            EngineState::V1(state) => state.owner_id.clone(),
+        }
+    }
+
+    pub fn upgrade_delay_blocks(&self) -> u64 {
+        match self {
+            EngineState::V2(state) => state.upgrade_delay_blocks,
+            EngineState::V1(state) => state.upgrade_delay_blocks,
+        }
+    }
+
+    pub fn deserialize(bytes: &[u8]) -> Option<Self> {
+        Self::try_from_slice(bytes)
+            .or_else(|_| EngineStateV1::try_from_slice(bytes).map(Self::V1))
+            .ok()
+    }
+}
+
+impl Default for EngineState {
+    fn default() -> Self {
+        Self::V2(EngineStateV2::default())
+    }
+}
+
+/// Engine internal state V2, mostly configuration.
 /// Should not contain anything large or enumerable.
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
-pub struct EngineState {
+pub struct EngineStateV2 {
+    /// Chain id, according to the EIP-155 / ethereum-lists spec.
+    pub chain_id: [u8; 32],
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
+    /// The default gas token.
+    pub default_gas_token: GasToken,
+}
+
+/// Engine internal state V1, mostly configuration.
+/// Should not contain anything large or enumerable.
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
+pub struct EngineStateV1 {
     /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],
     /// Account which can upgrade this contract.
@@ -27,31 +92,32 @@ pub struct EngineState {
 
 impl From<NewCallArgs> for EngineState {
     fn from(args: NewCallArgs) -> Self {
-        EngineState {
+        EngineState::V2(EngineStateV2 {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
-            bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-        }
+            default_gas_token: GasToken::from_array(args.default_gas_token),
+        })
     }
 }
 
 /// Gets the state from storage, if it exists otherwise it will error.
-pub fn get_state<I: IO>(io: &I) -> Result<EngineState, error::EngineStateError> {
+pub fn get_state<I: IO>(io: &I) -> Result<EngineState, EngineStateError> {
     match io.read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
-        None => Err(error::EngineStateError::NotFound),
-        Some(bytes) => EngineState::try_from_slice(&bytes.to_vec())
-            .map_err(|_| error::EngineStateError::DeserializationFailed),
+        None => Err(EngineStateError::NotFound),
+        Some(bytes) => {
+            EngineState::deserialize(&bytes.to_vec()).ok_or(EngineStateError::DeserializationFailed)
+        }
     }
 }
 
 /// Saves state into the storage. Does not return the previous state.
-pub fn set_state<I: IO>(io: &mut I, state: EngineState) -> Result<(), error::EngineStateError> {
+pub fn set_state<I: IO>(io: &mut I, state: EngineState) -> Result<(), EngineStateError> {
     io.write_storage(
         &bytes_to_key(KeyPrefix::Config, STATE_KEY),
         &state
             .try_to_vec()
-            .map_err(|_| error::EngineStateError::SerializationFailed)?,
+            .map_err(|_| EngineStateError::SerializationFailed)?,
     );
 
     Ok(())
@@ -96,12 +162,9 @@ mod tests {
     fn test_missing_engine_state_is_not_found() {
         let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
-
         let actual_error = get_state(&io).unwrap_err();
-        let actual_error = std::str::from_utf8(actual_error.as_ref()).unwrap();
-        let expected_error = std::str::from_utf8(error::ERR_STATE_NOT_FOUND).unwrap();
 
-        assert_eq!(expected_error, actual_error);
+        assert_eq!(actual_error.as_ref(), error::ERR_STATE_NOT_FOUND);
     }
 
     #[test]
@@ -111,9 +174,7 @@ mod tests {
 
         io.write_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY), &[]);
         let actual_error = get_state(&io).unwrap_err();
-        let actual_error = std::str::from_utf8(actual_error.as_ref()).unwrap();
-        let expected_error = std::str::from_utf8(error::ERR_STATE_CORRUPTED).unwrap();
 
-        assert_eq!(expected_error, actual_error);
+        assert_eq!(actual_error.as_ref(), error::ERR_STATE_CORRUPTED);
     }
 }

@@ -1,8 +1,9 @@
+use aurora_engine::state::EngineStateV2;
 use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
 use aurora_engine_test_doubles::io::{Storage, StoragePointer};
 use aurora_engine_test_doubles::promise::PromiseTracker;
-use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::types::{Address, EthGas, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use std::cell::RefCell;
 
@@ -15,12 +16,12 @@ fn test_deploy_code() {
         buf
     };
     let owner_id: AccountId = "aurora".parse().unwrap();
-    let state = state::EngineState {
+    let state = state::EngineState::V2(EngineStateV2 {
         chain_id,
         owner_id: owner_id.clone(),
-        bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
-    };
+        default_gas_token: Default::default(),
+    });
     let origin = Address::new(H160([0u8; 20]));
     let storage = RefCell::new(Storage::default());
     let io = StoragePointer(&storage);
@@ -41,7 +42,7 @@ fn test_deploy_code() {
         origin,
         Wei::zero(),
         evm_deploy(&code_to_deploy),
-        u64::MAX,
+        EthGas::MAX,
         Vec::new(),
         &mut handler,
     );
