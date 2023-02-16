@@ -254,9 +254,9 @@ impl PostgresNumeric {
 
 #[repr(u16)]
 enum PostgresNumericSign {
-    Positive = 0x0000,
-    Negative = 0x4000,
-    NaN = 0xc000,
+    Positive = 0x0000u16,
+    Negative = 0x4000u16,
+    NaN = 0xc000u16,
 }
 
 impl TryFrom<PostgresNumeric> for U256 {
