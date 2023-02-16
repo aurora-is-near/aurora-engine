@@ -4,6 +4,7 @@ use aurora_engine_transactions::{
 };
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
+use postgres::Row;
 use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::time::SystemTime;
@@ -68,14 +69,50 @@ pub struct BlockRow {
     pub receipts_root: H256,
 }
 
+struct BlockRowSize(i32);
+
+impl From<BlockRowSize> for u32 {
+    fn from(value: BlockRowSize) -> Self {
+        // set negative values to 0
+        value.0.max(0) as u32
+    }
+}
+
+struct BlockRowChain(i32);
+
+impl From<BlockRowChain> for u64 {
+    fn from(value: BlockRowChain) -> Self {
+        // set negative values to 0
+        value.0.max(0) as u64
+    }
+}
+
+struct BlockRowId(i64);
+
+impl From<BlockRowId> for u64 {
+    fn from(value: BlockRowId) -> Self {
+        // set negative values to 0
+        value.0.max(0) as u64
+    }
+}
+
+struct BlockRowBlock(i64);
+
+impl From<BlockRowBlock> for u64 {
+    fn from(value: BlockRowBlock) -> Self {
+        // set negative values to 0
+        value.0.max(0) as u64
+    }
+}
+
 impl From<postgres::Row> for BlockRow {
     fn from(row: postgres::Row) -> Self {
-        let chain: i32 = row.get("chain");
-        let id: i64 = row.get("id");
+        let chain: BlockRowChain = BlockRowChain(row.get("chain"));
+        let id: BlockRowId = BlockRowId(row.get("id"));
         let hash = get_hash(&row, "hash");
         let near_hash: Option<&[u8]> = row.get("near_hash");
         let timestamp = get_timestamp(&row, "timestamp");
-        let size: i32 = row.get("size");
+        let size: BlockRowSize = BlockRowSize(row.get("size"));
         let gas_limit = get_numeric(&row, "gas_limit");
         let gas_used = get_numeric(&row, "gas_used");
         let parent_hash = get_hash(&row, "parent_hash");
@@ -146,12 +183,38 @@ pub struct TransactionRow {
     pub output: Vec<u8>,
 }
 
+struct TransactionRowBlock(pub i64);
+
+impl From<TransactionRowBlock> for u64 {
+    fn from(value: TransactionRowBlock) -> Self {
+        // set negative values to 0
+        value.0.max(0) as u64
+    }
+}
+struct TransactionRowIndex(pub i32);
+
+impl From<TransactionRowIndex> for u16 {
+    fn from(value: TransactionRowIndex) -> Self {
+        // set Maximum value to u16::MAX
+        value.0.min(u16::MAX.into()) as u16
+    }
+}
+
+struct TransactionRowId(pub i64);
+
+impl From<TransactionRowId> for u64 {
+    fn from(value: TransactionRowId) -> Self {
+        // set negative values to 0
+        value.0.max(0) as u64
+    }
+}
+
 impl From<postgres::Row> for TransactionRow {
     fn from(row: postgres::Row) -> Self {
-        let block: i64 = row.get("block");
+        let block: TransactionRowBlock = TransactionRowBlock(row.get("block"));
         let block_hash = get_hash(&row, "block_hash");
-        let index: i32 = row.get("index");
-        let id: i64 = row.get("id");
+        let index: TransactionRowIndex = TransactionRowIndex(row.get("index"));
+        let id: TransactionRowId = TransactionRowId(row.get("id"));
         let hash = get_hash(&row, "hash");
         let near_hash = get_hash(&row, "near_hash");
         let near_receipt_hash = get_hash(&row, "near_receipt_hash");
@@ -229,11 +292,22 @@ fn get_address(row: &postgres::Row, field: &str) -> Address {
     Address::try_from_slice(value).unwrap()
 }
 
+struct TransactionDuration(pub u128);
+
+impl From<TransactionDuration> for u64 {
+    fn from(value: TransactionDuration) -> Self {
+        // use a bitwise AND operation with the mask 0xFFFFFFFFFFFFFFFF to extract the lower 64 bits of the u128 value,
+        // then cast the result to a u64
+        let value_as_u64 = (value.0 & 0xFFFFFFFFFFFFFFFF) as u64;
+        value_as_u64
+    }
+}
+
 fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {
     let timestamp: Option<SystemTime> = row.get(field);
     timestamp
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|d| u64::from(d.as_nanos()))
+        .map(|d| u64::from(TransactionDuration(d.as_nanos())))
 }
 
 struct PostgresNumeric {
@@ -254,9 +328,19 @@ impl PostgresNumeric {
 
 #[repr(u16)]
 enum PostgresNumericSign {
-    Positive = 0x0000u16,
-    Negative = 0x4000u16,
-    NaN = 0xc000u16,
+    Positive = 0x0000,
+    Negative = 0x4000,
+    NaN = 0xc000,
+}
+
+impl From<PostgresNumericSign> for u16 {
+    fn from(sign: PostgresNumericSign) -> Self {
+        match sign {
+            PostgresNumericSign::Positive => 0x0000,
+            PostgresNumericSign::Negative => 0x4000,
+            PostgresNumericSign::NaN => 0xc000,
+        }
+    }
 }
 
 impl TryFrom<PostgresNumeric> for U256 {

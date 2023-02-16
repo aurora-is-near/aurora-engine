@@ -27,14 +27,29 @@ const ENGINE_KEY_SUFFIX_LEN: usize = (64 / 8) + (16 / 8);
 
 #[repr(u8)]
 pub enum StoragePrefix {
-    BlockHash = 0x00u8,
-    BlockHeight = 0x01u8,
-    TransactionData = 0x02u8,
-    TransactionHash = 0x03u8,
-    Diff = 0x04u8,
-    Engine = 0x05u8,
-    BlockMetadata = 0x06u8,
-    EngineAccountId = 0x07u8,
+    BlockHash = 0x00,
+    BlockHeight = 0x01,
+    TransactionData = 0x02,
+    TransactionHash = 0x03,
+    Diff = 0x04,
+    Engine = 0x05,
+    BlockMetadata = 0x06,
+    EngineAccountId = 0x07,
+}
+
+impl From<StoragePrefix> for u8 {
+    fn from(prefix: StoragePrefix) -> Self {
+        match prefix {
+            StoragePrefix::BlockHash => 0x00,
+            StoragePrefix::BlockHeight => 0x01,
+            StoragePrefix::TransactionData => 0x02,
+            StoragePrefix::TransactionHash => 0x03,
+            StoragePrefix::Diff => 0x04,
+            StoragePrefix::Engine => 0x05,
+            StoragePrefix::BlockMetadata => 0x06,
+            StoragePrefix::EngineAccountId => 0x07,
+        }
+    }
 }
 
 const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
