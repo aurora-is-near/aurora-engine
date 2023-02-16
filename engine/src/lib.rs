@@ -150,10 +150,16 @@ mod contract {
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
-        state.owner_id = args.new_owner;
-        state::set_state(&mut io, state).sdk_unwrap();
+        if state.owner_id == args.new_owner {
+            // Would be a no-op to set, do nothing and return false
+            io.return_output(b"false");
+        } else {
+            state.owner_id = args.new_owner;
+            state::set_state(&mut io, state).sdk_unwrap();
+            io.return_output(b"true");
+        }
         // return true as bytes
-        io.return_output(&[1]);
+        io.return_output(b"true");
     }
 
     /// Get bridge prover id for this contract.

@@ -496,7 +496,6 @@ enum BorshableTransactionKind<'a> {
     StorageUnregister(Option<bool>),
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
     SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
-    SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     RegisterRelayer(Cow<'a, types::Address>),
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
@@ -508,6 +507,7 @@ enum BorshableTransactionKind<'a> {
     PausePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
+    SetOwner(Cow<'a, parameters::SetOwnerArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
