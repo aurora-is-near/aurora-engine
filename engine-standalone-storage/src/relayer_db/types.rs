@@ -84,12 +84,12 @@ impl From<postgres::Row> for BlockRow {
         let receipts_root = get_hash(&row, "receipts_root");
 
         Self {
-            chain: chain as u64,
-            id: id as u64,
+            chain: u64::from(chain),
+            id: u64::from(id),
             hash,
             near_hash: near_hash.map(H256::from_slice),
             timestamp,
-            size: size as u32,
+            size: u32::from(size),
             gas_limit,
             gas_used,
             parent_hash,
@@ -170,10 +170,10 @@ impl From<postgres::Row> for TransactionRow {
         let output: Option<Vec<u8>> = row.get("output");
 
         Self {
-            block: block as u64,
+            block: u64::from(block),
             block_hash,
-            index: index as u16,
-            id: id as u64,
+            index: u16::from(index),
+            id: u64::from(id),
             hash,
             near_hash,
             near_receipt_hash,
@@ -233,7 +233,7 @@ fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {
     let timestamp: Option<SystemTime> = row.get(field);
     timestamp
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos() as u64)
+        .map(|d| u64::from(d.as_nanos()))
 }
 
 struct PostgresNumeric {
@@ -318,18 +318,18 @@ impl<'a> postgres::types::FromSql<'a> for PostgresNumeric {
         let weight = read_i16(&mut cursor)?;
 
         let sign_raw = read_u16(&mut cursor)?;
-        let sign = if sign_raw == PostgresNumericSign::Positive as u16 {
+        let sign = if sign_raw == u16::from(PostgresNumericSign::Positive) {
             PostgresNumericSign::Positive
-        } else if sign_raw == PostgresNumericSign::Negative as u16 {
+        } else if sign_raw == u16::from(PostgresNumericSign::Negative) {
             PostgresNumericSign::Negative
-        } else if sign_raw == PostgresNumericSign::NaN as u16 {
+        } else if sign_raw == u16::from(PostgresNumericSign::NaN) {
             PostgresNumericSign::NaN
         } else {
             panic!("Unexpected Numeric Sign value");
         };
 
         let scale = read_u16(&mut cursor)?;
-        let mut groups = Vec::with_capacity(num_groups as usize);
+        let mut groups = Vec::with_capacity(usize::from(num_groups));
         for _ in 0..num_groups {
             groups.push(read_u16(&mut cursor)?);
         }

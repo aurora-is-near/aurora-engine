@@ -463,7 +463,7 @@ impl BlockMetadata {
 }
 
 fn construct_storage_key(prefix: StoragePrefix, key: &[u8]) -> Vec<u8> {
-    [&[VERSION], &[prefix as u8], key].concat()
+    [&[VERSION], &[u8::from(prefix)], key].concat()
 }
 
 fn construct_engine_key(key: &[u8], block_height: u64, transaction_position: u16) -> Vec<u8> {
