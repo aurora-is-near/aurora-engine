@@ -69,7 +69,6 @@ impl StreamCompactMerkleTree {
     /// For n leaf hashes added, a single call to this function is O(log n),
     /// but the amortized time for the n calls is O(1).
     pub fn add(&mut self, leaf_hash: H256) {
-        // add new leaf to the right as is own subtree
         let leaf_subtree = CompactMerkleSubtree {
             height: 1,
             hash: leaf_hash,
@@ -94,7 +93,7 @@ impl StreamCompactMerkleTree {
                 self.subtrees.pop();
                 self.subtrees.push(father_subtree);
 
-                index = index - 1;
+                index -= 1;
             }
             // all remaining subtrees have different heights so we can't compact anything else
             else {
@@ -106,8 +105,7 @@ impl StreamCompactMerkleTree {
     /// Computes the hash of the Merkle Tree.
     /// For n leaf hashes added, this function is O(log n).
     pub fn compute_hash(&self) -> H256 {
-        // emtpy tree
-        if self.subtrees.len() == 0 {
+        if self.subtrees.is_empty() {
             return H256::zero();
         }
 
@@ -123,14 +121,14 @@ impl StreamCompactMerkleTree {
             // same height means they are siblings so we can compact hashes
             if left_subtree.height == right_subtree.height {
                 right_subtree.hash = keccak(&[left_subtree.hash.as_bytes(), right_subtree.hash.as_bytes()].concat());
-                index = index - 1;
+                index -= 1;
             }
             // left_subtree is higher so we need to duplicate right_subtree to grow up (standard mechanism for unbalanced merkle trees)
             else {
                 right_subtree.hash = keccak(&[right_subtree.hash.as_bytes(), right_subtree.hash.as_bytes()].concat());
             }
 
-            right_subtree.height = right_subtree.height + 1;
+            right_subtree.height += 1;
         }
 
         right_subtree.hash
