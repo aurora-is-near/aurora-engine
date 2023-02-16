@@ -26,8 +26,7 @@ impl BlockHashchain {
         let input_hash = keccak(input);
         let output_hash = keccak(output);
 
-        let data = [method_name_hash.as_bytes(), input_hash.as_bytes(), output_hash.as_bytes()].concat();
-        let tx_hash = keccak(&data);
+        let tx_hash = keccak(&[method_name_hash.as_bytes(), input_hash.as_bytes(), output_hash.as_bytes()].concat());
 
         self.txs_merkle_tree.add(tx_hash);
     }
@@ -36,8 +35,7 @@ impl BlockHashchain {
         let block_height_hash = keccak(&block_height.to_be_bytes());
         let txs_hash = self.txs_merkle_tree.compute_hash();
         
-        let data = [self.contract_name_hash.as_bytes(), block_height_hash.as_bytes(), previous_block_hashchain.as_bytes(), txs_hash.as_bytes()].concat();
-        keccak(&data)
+        keccak(&[self.contract_name_hash.as_bytes(), block_height_hash.as_bytes(), previous_block_hashchain.as_bytes(), txs_hash.as_bytes()].concat())
     }
 
     pub fn clear_txs(&mut self) {
@@ -85,7 +83,7 @@ impl StreamCompactMerkleTree {
             if left_subtree.height == right_subtree.height {
                 let father_subtree = CompactMerkleSubtree {
                     height: left_subtree.height + 1,
-                    hash: Self::hash_concatenation(&left_subtree.hash, &right_subtree.hash),
+                    hash: keccak(&[left_subtree.hash.as_bytes(), right_subtree.hash.as_bytes()].concat())
                 };
 
                 self.subtrees.pop();
@@ -120,15 +118,12 @@ impl StreamCompactMerkleTree {
 
             // same height means they are siblings so we can compact computation
             if left_subtree.height == right_subtree.height {
-                right_subtree.hash =
-                    Self::hash_concatenation(&left_subtree.hash, &right_subtree.hash);
+                right_subtree.hash = keccak(&[left_subtree.hash.as_bytes(), right_subtree.hash.as_bytes()].concat());
                 index = index - 1;
             }
-            // left_subtree is higher so we need to duplicate right_subtree to grow up
-            // this is the standard mechanism for merkle unbalanced binary trees
+            // left_subtree is higher so we need to duplicate right_subtree to grow up (standard mechanism for unbalanced merkle trees)
             else {
-                right_subtree.hash =
-                    Self::hash_concatenation(&right_subtree.hash, &right_subtree.hash);
+                right_subtree.hash = keccak(&[right_subtree.hash.as_bytes(), right_subtree.hash.as_bytes()].concat());
             }
 
             right_subtree.height = right_subtree.height + 1;
@@ -140,12 +135,6 @@ impl StreamCompactMerkleTree {
     /// Clears the structure leaving it empty.
     pub fn clear(&mut self) {
         self.subtrees.clear();
-    }
-
-    fn hash_concatenation(left_hash: &H256, right_hash: &H256) -> H256 {
-        let data_left = left_hash.as_bytes();
-        let data_right = right_hash.as_bytes();
-        keccak(&[data_left, data_right].concat())
     }
 }
 
