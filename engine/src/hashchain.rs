@@ -25,11 +25,11 @@ impl BlockHashchain {
 
     /// Adds a transaction.
     pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8]) {
-        let method_name_hash = keccak(method_name.as_bytes());
-        let input_hash = keccak(input);
-        let output_hash = keccak(output);
+        let method_name_hash = keccak(method_name.as_bytes()).0;
+        let input_hash = keccak(input).0;
+        let output_hash = keccak(output).0;
 
-        let tx_hash = keccak(&[method_name_hash.as_bytes(), input_hash.as_bytes(), output_hash.as_bytes()].concat()).0;
+        let tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
 
         self.txs_merkle_tree.add(tx_hash);
     }
@@ -37,10 +37,10 @@ impl BlockHashchain {
     /// Computes the block hashchain.
     /// Uses the added transactions and the parameters.
     pub fn compute_block_hashchain(&self, block_height: u64, previous_block_hashchain: RawH256) -> RawH256 {
-        let block_height_hash = keccak(&block_height.to_be_bytes());
+        let block_height_hash = keccak(&block_height.to_be_bytes()).0;
         let txs_hash = self.txs_merkle_tree.compute_hash();
         
-        keccak(&[&self.contract_name_hash, block_height_hash.as_bytes(), &previous_block_hashchain, &txs_hash].concat()).0
+        keccak(&[self.contract_name_hash, block_height_hash, previous_block_hashchain, txs_hash].concat()).0
     }
 
     /// Clears the transactions added.
