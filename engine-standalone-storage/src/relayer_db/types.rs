@@ -4,7 +4,6 @@ use aurora_engine_transactions::{
 };
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
-use postgres::Row;
 use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::time::SystemTime;

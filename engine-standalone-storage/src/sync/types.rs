@@ -341,20 +341,6 @@ impl TransactionKind {
             TransactionKind::Unknown => Self::no_evm_execution("unknown"),
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
-            TransactionKind::Submit(_) => todo!(),
-            TransactionKind::Call(_) => todo!(),
-            TransactionKind::PausePrecompiles(_) => todo!(),
-            TransactionKind::ResumePrecompiles(_) => todo!(),
-            TransactionKind::Deploy(_) => todo!(),
-            TransactionKind::DeployErc20(_) => todo!(),
-            TransactionKind::FtOnTransfer(_) => todo!(),
-            TransactionKind::Deposit(_) => todo!(),
-            TransactionKind::FtTransferCall(_) => todo!(),
-            TransactionKind::FinishDeposit(_) => todo!(),
-            TransactionKind::ResolveTransfer(_, _) => todo!(),
-            TransactionKind::FtTransfer(_) => todo!(),
-            TransactionKind::SetOwner(_) => Self::no_evm_execution("set_owner"),
-            TransactionKind::RefundOnError(_) => todo!(),
         }
     }
 
