@@ -84,7 +84,7 @@ struct BlockRowChain(i32);
 impl From<BlockRowChain> for u64 {
     fn from(value: BlockRowChain) -> Self {
         // set negative values to 0
-        let res: u32 = value.0.max(0).try_into().unwrap();
+        let res: u64 = value.0.max(0).try_into().unwrap();
         res
     }
 }
