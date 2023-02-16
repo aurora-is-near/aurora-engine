@@ -152,11 +152,10 @@ mod contract {
         let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
         if state.owner_id == args.new_owner {
             // Would be a no-op to set, do nothing and return false
-            io.return_output(b"false");
+            sdk::panic_utf8("Owner is already set to this account".as_bytes());
         } else {
             state.owner_id = args.new_owner;
             state::set_state(&mut io, state).sdk_unwrap();
-            io.return_output(b"true");
         }
         // return true as bytes
         io.return_output(b"true");
