@@ -142,6 +142,9 @@ impl StreamCompactMerkleTree {
     }
 }
 
+/// Compact Merkle Subtree
+/// For leafs, this represents only the leaf node with height 1 and the hash of the leaf.
+/// For bigger subtrees, this represents the entire balanced subtree with its height and merkle hash.
 struct CompactMerkleSubtree {
     /// Height of the subtree.
     height: u8,
