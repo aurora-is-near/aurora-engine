@@ -74,7 +74,8 @@ struct BlockRowSize(i32);
 impl From<BlockRowSize> for u32 {
     fn from(value: BlockRowSize) -> Self {
         // set negative values to 0
-        value.0.max(0) as u32
+        let res: u32 = value.0.max(0).try_into().unwrap();
+        res
     }
 }
 
@@ -83,7 +84,8 @@ struct BlockRowChain(i32);
 impl From<BlockRowChain> for u64 {
     fn from(value: BlockRowChain) -> Self {
         // set negative values to 0
-        value.0.max(0) as u64
+        let res: u32 = value.0.max(0).try_into().unwrap();
+        res
     }
 }
 
@@ -92,7 +94,8 @@ struct BlockRowId(i64);
 impl From<BlockRowId> for u64 {
     fn from(value: BlockRowId) -> Self {
         // set negative values to 0
-        value.0.max(0) as u64
+        let res: u64 = value.0.max(0).try_into().unwrap();
+        res
     }
 }
 
@@ -101,7 +104,8 @@ struct BlockRowBlock(i64);
 impl From<BlockRowBlock> for u64 {
     fn from(value: BlockRowBlock) -> Self {
         // set negative values to 0
-        value.0.max(0) as u64
+        let res: u64 = value.0.max(0).try_into().unwrap();
+        res
     }
 }
 
@@ -188,7 +192,8 @@ struct TransactionRowBlock(pub i64);
 impl From<TransactionRowBlock> for u64 {
     fn from(value: TransactionRowBlock) -> Self {
         // set negative values to 0
-        value.0.max(0) as u64
+        let res: u64 = value.0.max(0).try_into().unwrap();
+        res
     }
 }
 struct TransactionRowIndex(pub i32);
@@ -196,7 +201,8 @@ struct TransactionRowIndex(pub i32);
 impl From<TransactionRowIndex> for u16 {
     fn from(value: TransactionRowIndex) -> Self {
         // set Maximum value to u16::MAX
-        value.0.min(u16::MAX.into()) as u16
+        let res: u16 = value.0.min(u16::MAX.into()).try_into().unwrap();
+        res
     }
 }
 
@@ -205,7 +211,8 @@ struct TransactionRowId(pub i64);
 impl From<TransactionRowId> for u64 {
     fn from(value: TransactionRowId) -> Self {
         // set negative values to 0
-        value.0.max(0) as u64
+        let res: u64 = value.0.max(0).try_into().unwrap();
+        res
     }
 }
 
@@ -298,7 +305,7 @@ impl From<TransactionDuration> for u64 {
     fn from(value: TransactionDuration) -> Self {
         // use a bitwise AND operation with the mask 0xFFFFFFFFFFFFFFFF to extract the lower 64 bits of the u128 value,
         // then cast the result to a u64
-        let value_as_u64 = (value.0 & 0xFFFFFFFFFFFFFFFF) as u64;
+        let value_as_u64: u64 = (value.0 & 0xFFFFFFFFFFFFFFFF).try_into().unwrap();
         value_as_u64
     }
 }
