@@ -1,5 +1,6 @@
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::types::RawH256;
+use crate::prelude::{BorshDeserialize, BorshSerialize};
 
 /// Block Hashchain
 /// The order of operations should be:
@@ -8,6 +9,7 @@ use aurora_engine_types::types::RawH256;
 /// 3. Compute the block hashchain for the current block once all the transactions were added.
 /// 4. Clear the transactions of the current block.
 /// 5. Go back to step 2 for the next block.
+#[derive(BorshSerialize, BorshDeserialize)]
 struct BlockHashchain {
     contract_name_hash: RawH256,
     txs_merkle_tree: StreamCompactMerkleTree
@@ -51,6 +53,7 @@ impl BlockHashchain {
 /// It can be feed by a stream of hashes (leafs) adding them to the right of the tree.
 /// Internally, compacts full binary subtrees mantaining only the growing branch.
 /// Space used is O(log n) where n is the number of leaf hashes added.
+#[derive(BorshSerialize, BorshDeserialize)]
 struct StreamCompactMerkleTree {
     /// Complete binary merkle subtrees.
     /// Left subtrees are strictly higher (bigger).
@@ -143,6 +146,7 @@ impl StreamCompactMerkleTree {
 /// Compact Merkle Subtree
 /// For leafs, this represents only the leaf node with height 1 and the hash of the leaf.
 /// For bigger subtrees, this represents the entire balanced subtree with its height and merkle hash.
+#[derive(BorshSerialize, BorshDeserialize)]
 struct CompactMerkleSubtree {
     /// Height of the subtree.
     height: u8,
