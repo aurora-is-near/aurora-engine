@@ -21,6 +21,7 @@ impl BlockHashchain {
         }
     }
 
+    /// Adds a transaction.
     pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8]) {
         let method_name_hash = keccak(method_name.as_bytes());
         let input_hash = keccak(input);
@@ -31,6 +32,8 @@ impl BlockHashchain {
         self.txs_merkle_tree.add(tx_hash);
     }
 
+    /// Computes the block hashchain.
+    /// Uses the added transactions and the parameters.
     pub fn compute_block_hashchain(&self, block_height: u64, previous_block_hashchain: H256) -> H256 {
         let block_height_hash = keccak(&block_height.to_be_bytes());
         let txs_hash = self.txs_merkle_tree.compute_hash();
@@ -38,6 +41,7 @@ impl BlockHashchain {
         keccak(&[self.contract_name_hash.as_bytes(), block_height_hash.as_bytes(), previous_block_hashchain.as_bytes(), txs_hash.as_bytes()].concat())
     }
 
+    /// Clears the transactions added.
     pub fn clear_txs(&mut self) {
         self.txs_merkle_tree.clear();
     }
@@ -107,7 +111,7 @@ impl StreamCompactMerkleTree {
             return H256::zero();
         }
 
-        // compute compacting subtrees hashes from right to left
+        // compute hash compacting or duplicating subtrees hashes from right to left
         let mut index = &self.subtrees.len() - 1;
         let mut right_subtree = CompactMerkleSubtree {
             ..self.subtrees[index]
@@ -116,7 +120,7 @@ impl StreamCompactMerkleTree {
         while index >= 1 {
             let left_subtree = &self.subtrees[index - 1];
 
-            // same height means they are siblings so we can compact computation
+            // same height means they are siblings so we can compact hashes
             if left_subtree.height == right_subtree.height {
                 right_subtree.hash = keccak(&[left_subtree.hash.as_bytes(), right_subtree.hash.as_bytes()].concat());
                 index = index - 1;
