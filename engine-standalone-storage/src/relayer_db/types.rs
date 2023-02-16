@@ -113,12 +113,10 @@ impl TryFrom<BlockRowBlock> for u64 {
     }
 }
 
-
 impl TryFrom<postgres::Row> for BlockRow {
     type Error = postgres::Error;
 
     fn try_from(row: postgres::Row) -> Result<Self, Self::Error> {
-
         let chain: BlockRowChain = BlockRowChain(row.get("chain"));
         let id: BlockRowId = BlockRowId(row.get("id"));
         let hash = get_hash(&row, "hash");
