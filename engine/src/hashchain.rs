@@ -1,5 +1,5 @@
-use aurora_engine_types::H256;
 use aurora_engine_sdk::keccak;
+use aurora_engine_types::types::RawH256;
 
 /// Block Hashchain
 /// The order of operations should be:
@@ -9,14 +9,14 @@ use aurora_engine_sdk::keccak;
 /// 4. Clear the transactions of the current block.
 /// 5. Go back to step 2 for the next block.
 struct BlockHashchain {
-    contract_name_hash: H256,
+    contract_name_hash: RawH256,
     txs_merkle_tree: StreamCompactMerkleTree
 }
 
 impl BlockHashchain {
     pub fn new(contract_name: &str) -> Self {
         Self {
-            contract_name_hash: keccak(contract_name.as_bytes()),
+            contract_name_hash: keccak(contract_name.as_bytes()).0,
             txs_merkle_tree: StreamCompactMerkleTree::new()
         }
     }
@@ -27,18 +27,18 @@ impl BlockHashchain {
         let input_hash = keccak(input);
         let output_hash = keccak(output);
 
-        let tx_hash = keccak(&[method_name_hash.as_bytes(), input_hash.as_bytes(), output_hash.as_bytes()].concat());
+        let tx_hash = keccak(&[method_name_hash.as_bytes(), input_hash.as_bytes(), output_hash.as_bytes()].concat()).0;
 
         self.txs_merkle_tree.add(tx_hash);
     }
 
     /// Computes the block hashchain.
     /// Uses the added transactions and the parameters.
-    pub fn compute_block_hashchain(&self, block_height: u64, previous_block_hashchain: H256) -> H256 {
+    pub fn compute_block_hashchain(&self, block_height: u64, previous_block_hashchain: RawH256) -> RawH256 {
         let block_height_hash = keccak(&block_height.to_be_bytes());
         let txs_hash = self.txs_merkle_tree.compute_hash();
         
-        keccak(&[self.contract_name_hash.as_bytes(), block_height_hash.as_bytes(), previous_block_hashchain.as_bytes(), txs_hash.as_bytes()].concat())
+        keccak(&[&self.contract_name_hash, block_height_hash.as_bytes(), &previous_block_hashchain, &txs_hash].concat()).0
     }
 
     /// Clears the transactions added.
@@ -68,7 +68,7 @@ impl StreamCompactMerkleTree {
     /// Adds a leaf hash to the right of the tree.
     /// For n leaf hashes added, a single call to this function is O(log n),
     /// but the amortized time for the n calls is O(1).
-    pub fn add(&mut self, leaf_hash: H256) {
+    pub fn add(&mut self, leaf_hash: RawH256) {
         let leaf_subtree = CompactMerkleSubtree {
             height: 1,
             hash: leaf_hash,
@@ -86,7 +86,7 @@ impl StreamCompactMerkleTree {
             if left_subtree.height == right_subtree.height {
                 let father_subtree = CompactMerkleSubtree {
                     height: left_subtree.height + 1,
-                    hash: keccak(&[left_subtree.hash.as_bytes(), right_subtree.hash.as_bytes()].concat())
+                    hash: keccak(&[left_subtree.hash, right_subtree.hash].concat()).0
                 };
 
                 self.subtrees.pop();
@@ -104,9 +104,9 @@ impl StreamCompactMerkleTree {
 
     /// Computes the hash of the Merkle Tree.
     /// For n leaf hashes added, this function is O(log n).
-    pub fn compute_hash(&self) -> H256 {
+    pub fn compute_hash(&self) -> RawH256 {
         if self.subtrees.is_empty() {
-            return H256::zero();
+            return [0; 32];
         }
 
         // compute hash compacting or duplicating subtrees hashes from right to left
@@ -120,12 +120,12 @@ impl StreamCompactMerkleTree {
 
             // same height means they are siblings so we can compact hashes
             if left_subtree.height == right_subtree.height {
-                right_subtree.hash = keccak(&[left_subtree.hash.as_bytes(), right_subtree.hash.as_bytes()].concat());
+                right_subtree.hash = keccak(&[left_subtree.hash, right_subtree.hash].concat()).0;
                 index -= 1;
             }
             // left_subtree is higher so we need to duplicate right_subtree to grow up (standard mechanism for unbalanced merkle trees)
             else {
-                right_subtree.hash = keccak(&[right_subtree.hash.as_bytes(), right_subtree.hash.as_bytes()].concat());
+                right_subtree.hash = keccak(&[right_subtree.hash, right_subtree.hash].concat()).0;
             }
 
             right_subtree.height += 1;
@@ -148,7 +148,7 @@ struct CompactMerkleSubtree {
     height: u8,
 
     /// Merkle tree hash of the subtree.
-    hash: H256,
+    hash: RawH256,
 }
 
 #[cfg(test)]
@@ -162,7 +162,7 @@ mod StreamCompactMerkleTree_tests {
         let merkle_tree_hash = merkle_tree.compute_hash();
 
         assert_eq!(merkle_tree.subtrees.len(), 0);
-        assert_eq!(merkle_tree_hash, H256::zero());
+        assert_eq!(merkle_tree_hash, [0; 32]);
     }
 
     #[test]
@@ -184,7 +184,7 @@ mod StreamCompactMerkleTree_tests {
         let one_hash = hash(1);
         let two_hash = hash(2);
 
-        let expected_merkle_tree_hash = keccak(&[one_hash.as_bytes(), two_hash.as_bytes()].concat());
+        let expected_merkle_tree_hash = keccak(&[one_hash, two_hash].concat()).0;
 
         let mut merkle_tree = StreamCompactMerkleTree::new();
         merkle_tree.add(one_hash);
@@ -320,7 +320,7 @@ mod StreamCompactMerkleTree_tests {
 
         let mut merkle_tree = StreamCompactMerkleTree::new();
         assert_eq!(merkle_tree.subtrees.len(), 0);
-        assert_eq!(merkle_tree.compute_hash(), H256::zero());
+        assert_eq!(merkle_tree.compute_hash(), [0; 32]);
         assert_eq!(merkle_tree.subtrees.len(), 0);
 
         merkle_tree.add(one_hash);
@@ -330,15 +330,15 @@ mod StreamCompactMerkleTree_tests {
 
         merkle_tree.clear();
         assert_eq!(merkle_tree.subtrees.len(), 0);
-        assert_eq!(merkle_tree.compute_hash(), H256::zero());
+        assert_eq!(merkle_tree.compute_hash(), [0; 32]);
         assert_eq!(merkle_tree.subtrees.len(), 0);
     }
 
-    fn hash(number: u16) -> H256 {
-        keccak(&number.to_be_bytes())
+    fn hash(number: u16) -> RawH256 {
+        keccak(&number.to_be_bytes()).0
     }
 
-    fn hash_concatenation(hash_left: H256, hash_right: H256) -> H256 {
-        keccak(&[hash_left.as_bytes(), hash_right.as_bytes()].concat())
+    fn hash_concatenation(hash_left: RawH256, hash_right: RawH256) -> RawH256 {
+        keccak(&[hash_left, hash_right].concat()).0
     }
 }
