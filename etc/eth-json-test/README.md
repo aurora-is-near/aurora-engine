@@ -8,7 +8,7 @@
 Specify which transaction test's path and name to parse
 
 ```Rust
-use crate::transaction_test::{TransactionTest};
+use crate::transaction_test::TransactionTest;
 
 #[test]
 fn test_address_less_than_20_prefixed() -> Result<(), std::io::Error>  {
