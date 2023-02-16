@@ -341,6 +341,7 @@ impl TransactionKind {
             TransactionKind::Unknown => Self::no_evm_execution("unknown"),
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
+            TransactionKind::SetOwner(_) => Self::no_evm_execution("set_owner"),
         }
     }
 
