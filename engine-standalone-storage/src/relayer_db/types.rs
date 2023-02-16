@@ -4,6 +4,7 @@ use aurora_engine_transactions::{
 };
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
+use core::num::TryFromIntError;
 use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::time::SystemTime;
@@ -70,46 +71,54 @@ pub struct BlockRow {
 
 struct BlockRowSize(i32);
 
-impl From<BlockRowSize> for u32 {
-    fn from(value: BlockRowSize) -> Self {
+impl TryFrom<BlockRowSize> for u32 {
+    type Error = TryFromIntError;
+
+    fn try_from(value: BlockRowSize) -> Result<Self, Self::Error> {
         // set negative values to 0
-        let res: u32 = value.0.max(0).try_into().unwrap();
-        res
+        value.0.max(0).try_into()
     }
 }
 
 struct BlockRowChain(i32);
 
-impl From<BlockRowChain> for u64 {
-    fn from(value: BlockRowChain) -> Self {
+impl TryFrom<BlockRowChain> for u64 {
+    type Error = TryFromIntError;
+
+    fn try_from(value: BlockRowChain) -> Result<Self, Self::Error> {
         // set negative values to 0
-        let res: u64 = value.0.max(0).try_into().unwrap();
-        res
+        value.0.max(0).try_into()
     }
 }
 
 struct BlockRowId(i64);
 
-impl From<BlockRowId> for u64 {
-    fn from(value: BlockRowId) -> Self {
+impl TryFrom<BlockRowId> for u64 {
+    type Error = TryFromIntError;
+
+    fn try_from(value: BlockRowId) -> Result<Self, Self::Error> {
         // set negative values to 0
-        let res: u64 = value.0.max(0).try_into().unwrap();
-        res
+        value.0.max(0).try_into()
     }
 }
 
 struct BlockRowBlock(i64);
 
-impl From<BlockRowBlock> for u64 {
-    fn from(value: BlockRowBlock) -> Self {
+impl TryFrom<BlockRowBlock> for u64 {
+    type Error = TryFromIntError;
+
+    fn try_from(value: BlockRowBlock) -> Result<Self, Self::Error> {
         // set negative values to 0
-        let res: u64 = value.0.max(0).try_into().unwrap();
-        res
+        value.0.max(0).try_into()
     }
 }
 
-impl From<postgres::Row> for BlockRow {
-    fn from(row: postgres::Row) -> Self {
+
+impl TryFrom<postgres::Row> for BlockRow {
+    type Error = postgres::Error;
+
+    fn try_from(row: postgres::Row) -> Result<Self, Self::Error> {
+
         let chain: BlockRowChain = BlockRowChain(row.get("chain"));
         let id: BlockRowId = BlockRowId(row.get("id"));
         let hash = get_hash(&row, "hash");
@@ -123,20 +132,20 @@ impl From<postgres::Row> for BlockRow {
         let state_root = get_hash(&row, "state_root");
         let receipts_root = get_hash(&row, "receipts_root");
 
-        Self {
-            chain: u64::from(chain),
-            id: u64::from(id),
+        Ok(Self {
+            chain: u64::try_from(chain).unwrap(),
+            id: u64::try_from(id).unwrap(),
             hash,
             near_hash: near_hash.map(H256::from_slice),
             timestamp,
-            size: u32::from(size),
+            size: u32::try_from(size).unwrap(),
             gas_limit,
             gas_used,
             parent_hash,
             transactions_root,
             state_root,
             receipts_root,
-        }
+        })
     }
 }
 
@@ -188,35 +197,41 @@ pub struct TransactionRow {
 
 struct TransactionRowBlock(pub i64);
 
-impl From<TransactionRowBlock> for u64 {
-    fn from(value: TransactionRowBlock) -> Self {
+impl TryFrom<TransactionRowBlock> for u64 {
+    type Error = TryFromIntError;
+
+    fn try_from(value: TransactionRowBlock) -> Result<Self, Self::Error> {
         // set negative values to 0
-        let res: u64 = value.0.max(0).try_into().unwrap();
-        res
+        value.0.max(0).try_into()
     }
 }
+
 struct TransactionRowIndex(pub i32);
 
-impl From<TransactionRowIndex> for u16 {
-    fn from(value: TransactionRowIndex) -> Self {
+impl TryFrom<TransactionRowIndex> for u16 {
+    type Error = TryFromIntError;
+
+    fn try_from(value: TransactionRowIndex) -> Result<Self, Self::Error> {
         // set Maximum value to u16::MAX
-        let res: u16 = value.0.min(u16::MAX.into()).try_into().unwrap();
-        res
+        value.0.min(u16::MAX.into()).try_into()
     }
 }
 
 struct TransactionRowId(pub i64);
 
-impl From<TransactionRowId> for u64 {
-    fn from(value: TransactionRowId) -> Self {
+impl TryFrom<TransactionRowId> for u64 {
+    type Error = TryFromIntError;
+
+    fn try_from(value: TransactionRowId) -> Result<Self, Self::Error> {
         // set negative values to 0
-        let res: u64 = value.0.max(0).try_into().unwrap();
-        res
+        value.0.max(0).try_into()
     }
 }
 
-impl From<postgres::Row> for TransactionRow {
-    fn from(row: postgres::Row) -> Self {
+impl TryFrom<postgres::Row> for TransactionRow {
+    type Error = postgres::Error;
+
+    fn try_from(row: postgres::Row) -> Result<Self, Self::Error> {
         let block: TransactionRowBlock = TransactionRowBlock(row.get("block"));
         let block_hash = get_hash(&row, "block_hash");
         let index: TransactionRowIndex = TransactionRowIndex(row.get("index"));
@@ -238,11 +253,11 @@ impl From<postgres::Row> for TransactionRow {
         let status: bool = row.get("status");
         let output: Option<Vec<u8>> = row.get("output");
 
-        Self {
-            block: u64::from(block),
+        Ok(Self {
+            block: u64::try_from(block).unwrap(),
             block_hash,
-            index: u16::from(index),
-            id: u64::from(id),
+            index: u16::try_from(index).unwrap(),
+            id: u64::try_from(id).unwrap(),
             hash,
             near_hash,
             near_receipt_hash,
@@ -259,7 +274,7 @@ impl From<postgres::Row> for TransactionRow {
             s,
             status,
             output: output.unwrap_or_default(),
-        }
+        })
     }
 }
 
@@ -300,12 +315,15 @@ fn get_address(row: &postgres::Row, field: &str) -> Address {
 
 struct TransactionDuration(pub u128);
 
-impl From<TransactionDuration> for u64 {
-    fn from(value: TransactionDuration) -> Self {
-        // use a bitwise AND operation with the mask 0xFFFFFFFFFFFFFFFF to extract the lower 64 bits of the u128 value,
-        // then cast the result to a u64
-        let value_as_u64: u64 = (value.0 & 0xFFFFFFFFFFFFFFFF).try_into().unwrap();
-        value_as_u64
+impl TryFrom<TransactionDuration> for u64 {
+    type Error = &'static str;
+
+    fn try_from(value: TransactionDuration) -> Result<Self, Self::Error> {
+        if value.0 > u64::MAX as u128 {
+            Err("Value is too large to fit in u64")
+        } else {
+            value.try_into()
+        }
     }
 }
 
@@ -313,7 +331,7 @@ fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {
     let timestamp: Option<SystemTime> = row.get(field);
     timestamp
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|d| u64::from(TransactionDuration(d.as_nanos())))
+        .map(|d| u64::try_from(TransactionDuration(d.as_nanos())).unwrap())
 }
 
 struct PostgresNumeric {
