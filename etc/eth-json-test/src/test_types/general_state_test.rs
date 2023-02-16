@@ -2,7 +2,7 @@ use std::fs::read_to_string;
 
 // helper function to read file
 pub fn read_file(path: String) -> String {
-    return read_to_string(path).unwrap();
+    read_to_string(path).unwrap()
 }
 
 use serde::Deserialize;
