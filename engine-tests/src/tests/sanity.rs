@@ -1039,11 +1039,13 @@ fn test_set_owner() {
         set_owner_args.try_to_vec().unwrap(),
     );
 
-    // setting owner from the owner with same owner id should fail
+    // setting owner from the owner with same owner id should succeed
     assert!(outcome.is_some() && error.is_none());
 
     // get owner to see if the owner_id property has changed
     let (outcome, error) = runner.call("get_owner", &aurora_account_id, vec![]);
+    
+    // check if the query goes through the standalone runner
     assert!(outcome.is_some() && error.is_none());
 
     // check if the owner_id property has changed to new_owner.near
@@ -1070,7 +1072,10 @@ fn test_set_owner_fail_on_same_owner() {
     );
 
     // setting owner from the owner with same owner id should fail
-    assert!(outcome.is_none() && error.is_some());
+    assert!(outcome.is_some() && error.is_some());
+
+    // check error equality
+    assert_eq!(error.unwrap().to_string(), "Smart contract panicked: ERR_SAME_OWNER");  
 }
 
 fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, Address) {

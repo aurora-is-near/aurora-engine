@@ -68,6 +68,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
+    use aurora_engine_types::types::balance::error;
     use borsh::{BorshDeserialize, BorshSerialize};
     use parameters::SetOwnerArgs;
 
@@ -152,7 +153,7 @@ mod contract {
         let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
         if state.owner_id == args.new_owner {
             // Would be a no-op to set, do nothing and return false
-            sdk::panic_utf8("Owner is already set to this account".as_bytes());
+            sdk::panic_utf8(errors::ERR_SAME_OWNER);
         } else {
             state.owner_id = args.new_owner;
             state::set_state(&mut io, state).sdk_unwrap();
