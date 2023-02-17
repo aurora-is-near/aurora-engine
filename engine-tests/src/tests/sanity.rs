@@ -1044,7 +1044,7 @@ fn test_set_owner() {
 
     // get owner to see if the owner_id property has changed
     let (outcome, error) = runner.call("get_owner", &aurora_account_id, vec![]);
-    
+
     // check if the query goes through the standalone runner
     assert!(outcome.is_some() && error.is_none());
 
@@ -1075,7 +1075,10 @@ fn test_set_owner_fail_on_same_owner() {
     assert!(outcome.is_some() && error.is_some());
 
     // check error equality
-    assert_eq!(error.unwrap().to_string(), "Smart contract panicked: ERR_SAME_OWNER");  
+    assert_eq!(
+        error.unwrap().to_string(),
+        "Smart contract panicked: ERR_SAME_OWNER"
+    );
 }
 
 fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, Address) {
