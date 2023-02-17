@@ -1022,7 +1022,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
         INITIAL_BALANCE.raw(),
     );
 }
- 
+
 #[test]
 fn test_set_owner() {
     let mut runner = test_utils::deploy_evm();
@@ -1033,7 +1033,11 @@ fn test_set_owner() {
         new_owner: str_to_account_id("new_owner.near"),
     };
 
-    let (outcome, error) = runner.call("set_owner", &aurora_account_id,set_owner_args.try_to_vec().unwrap());
+    let (outcome, error) = runner.call(
+        "set_owner",
+        &aurora_account_id,
+        set_owner_args.try_to_vec().unwrap(),
+    );
 
     // setting owner from the owner with same owner id should fail
     assert!(outcome.is_some() && error.is_none());
@@ -1043,7 +1047,10 @@ fn test_set_owner() {
     assert!(outcome.is_some() && error.is_none());
 
     // check if the owner_id property has changed to new_owner.near
-    assert_eq!("new_owner.near".as_bytes(), outcome.unwrap().return_data.as_value().unwrap());
+    assert_eq!(
+        "new_owner.near".as_bytes(),
+        outcome.unwrap().return_data.as_value().unwrap()
+    );
 }
 
 #[test]
@@ -1056,8 +1063,12 @@ fn test_set_owner_fail_on_same_owner() {
         new_owner: str_to_account_id("owner.near"),
     };
 
-    let (outcome, error) = runner.call("set_owner", &aurora_account_id, set_owner_args.try_to_vec().unwrap());
-    
+    let (outcome, error) = runner.call(
+        "set_owner",
+        &aurora_account_id,
+        set_owner_args.try_to_vec().unwrap(),
+    );
+
     // setting owner from the owner with same owner id should fail
     assert!(outcome.is_none() && error.is_some());
 }
