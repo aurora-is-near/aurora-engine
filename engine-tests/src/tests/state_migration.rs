@@ -30,10 +30,9 @@ fn test_set_owner() {
 
     // set owner args
     let args = SetOwnerArgs {
-        new_owner: str_to_account_id("new_owner.near")
+        new_owner: str_to_account_id("new_owner.near"),
     };
-    let result = aurora
-        .call("set_owner", &args.try_to_vec().unwrap());
+    let result = aurora.call("set_owner", &args.try_to_vec().unwrap());
     // setting owner from the owner with new owner id should succeed
     result.assert_success();
 }
@@ -44,10 +43,9 @@ fn test_set_owner_fail_on_same_owner() {
 
     // set owner args
     let args = SetOwnerArgs {
-        new_owner: aurora.user.account_id().as_str().parse().unwrap()
+        new_owner: aurora.user.account_id().as_str().parse().unwrap(),
     };
-    let result = aurora
-        .call("set_owner", &args.try_to_vec().unwrap());
+    let result = aurora.call("set_owner", &args.try_to_vec().unwrap());
     // setting owner from the owner with same owner id should fail
     assert!(!result.is_ok());
 }
