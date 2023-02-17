@@ -4,7 +4,7 @@ use crate::prelude::{BorshDeserialize, BorshSerialize};
 
 /// Block Hashchain Computer
 /// The order of operations should be:
-/// 1. Create the BlockHashchain one time.
+/// 1. Create the BlockHashchainComputer one time.
 /// 2. Add transactions of the current block.
 /// 3. Compute the block hashchain for the current block once all the transactions were added.
 /// 4. Clear the transactions of the current block.
@@ -50,9 +50,9 @@ impl BlockHashchainComputer {
 }
 
 /// Stream Compact Merkle Tree
-/// It can be feed by a stream of hashes (leafs) adding them to the right of the tree.
-/// Internally, compacts full binary subtrees mantaining only the growing branch.
-/// Space used is O(log n) where n is the number of leaf hashes added.
+/// It can be feed by a stream of hashes (leaves) adding them to the right of the tree.
+/// Internally, compacts full binary subtrees maintaining only the growing branch.
+/// Space used is O(log n) where n is the number of leaf hashes added. It is usually less.
 #[derive(BorshSerialize, BorshDeserialize)]
 struct StreamCompactMerkleTree {
     /// Complete binary merkle subtrees.
@@ -69,7 +69,7 @@ impl StreamCompactMerkleTree {
     }
 
     /// Adds a leaf hash to the right of the tree.
-    /// For n leaf hashes added, a single call to this function is O(log n),
+    /// For n leaves hashes added, a single call to this function is O(log n),
     /// but the amortized time for the n calls is O(1).
     pub fn add(&mut self, leaf_hash: RawH256) {
         let leaf_subtree = CompactMerkleSubtree {
@@ -85,7 +85,7 @@ impl StreamCompactMerkleTree {
             let right_subtree = &self.subtrees[index];
             let left_subtree = &self.subtrees[index - 1];
 
-            // same height means they are sibilings so we can compact them
+            // same height means they are siblings so we can compact them
             if left_subtree.height == right_subtree.height {
                 let father_subtree = CompactMerkleSubtree {
                     height: left_subtree.height + 1,
@@ -106,7 +106,7 @@ impl StreamCompactMerkleTree {
     }
 
     /// Computes the hash of the Merkle Tree.
-    /// For n leaf hashes added, this function is O(log n).
+    /// For n leaves hashes added, this function is O(log n).
     pub fn compute_hash(&self) -> RawH256 {
         if self.subtrees.is_empty() {
             return [0; 32];
@@ -144,7 +144,7 @@ impl StreamCompactMerkleTree {
 }
 
 /// Compact Merkle Subtree
-/// For leafs, this represents only the leaf node with height 1 and the hash of the leaf.
+/// For leaves, this represents only the leaf node with height 1 and the hash of the leaf.
 /// For bigger subtrees, this represents the entire balanced subtree with its height and merkle hash.
 #[derive(BorshSerialize, BorshDeserialize)]
 struct CompactMerkleSubtree {
@@ -172,7 +172,7 @@ mod block_hashchain_computer_tests {
 
         let mut block_hashchain_computer = BlockHashchainComputer::new("aurora");
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
-        
+
         block_hashchain_computer.add_tx(method_name, input, output);
 
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 1);
