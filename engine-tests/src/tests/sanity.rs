@@ -1060,7 +1060,7 @@ fn test_set_owner_fail_on_same_owner() {
 
     // set owner args
     let set_owner_args = SetOwnerArgs {
-        new_owner: str_to_account_id("owner.near"),
+        new_owner: str_to_account_id(&aurora_account_id),
     };
 
     let (outcome, error) = runner.call(
