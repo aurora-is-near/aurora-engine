@@ -1,6 +1,6 @@
 use crate::prelude::U256;
 use crate::test_utils::{self, str_to_account_id, AuroraRunner};
-use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
+use aurora_engine::parameters::{InitCallArgs, NewCallArgs, SetOwnerArgs};
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
 use std::fs;
@@ -22,6 +22,34 @@ fn test_state_migration() {
     result.assert_success();
     let some_numbers: [u32; 7] = result.unwrap_borsh();
     assert_eq!(some_numbers, [3, 1, 4, 1, 5, 9, 2]);
+}
+
+#[test]
+fn test_set_owner() {
+    let aurora = deploy_evm();
+
+    // set owner args
+    let args = SetOwnerArgs {
+        new_owner: str_to_account_id("new_owner.near")
+    };
+    let result = aurora
+        .call("set_owner", &args.try_to_vec().unwrap());
+    // setting owner from the owner with new owner id should succeed
+    result.assert_success();
+}
+
+#[test]
+fn test_set_owner_fail_on_same_owner() {
+    let aurora = deploy_evm();
+
+    // set owner args
+    let args = SetOwnerArgs {
+        new_owner: aurora.user.account_id().as_str().parse().unwrap()
+    };
+    let result = aurora
+        .call("set_owner", &args.try_to_vec().unwrap());
+    // setting owner from the owner with same owner id should fail
+    assert!(!result.is_ok());
 }
 
 pub fn deploy_evm() -> AuroraAccount {

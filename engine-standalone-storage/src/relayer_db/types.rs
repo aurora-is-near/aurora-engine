@@ -200,7 +200,7 @@ impl TryFrom<TransactionRowBlock> for u64 {
 
     fn try_from(value: TransactionRowBlock) -> Result<Self, Self::Error> {
         // set negative values to 0
-        value.0.max(0).try_into()
+        value.0.try_into()
     }
 }
 
@@ -211,7 +211,7 @@ impl TryFrom<TransactionRowIndex> for u16 {
 
     fn try_from(value: TransactionRowIndex) -> Result<Self, Self::Error> {
         // set Maximum value to u16::MAX
-        value.0.min(u16::MAX.into()).try_into()
+        value.0.try_into()
     }
 }
 
@@ -222,7 +222,7 @@ impl TryFrom<TransactionRowId> for u64 {
 
     fn try_from(value: TransactionRowId) -> Result<Self, Self::Error> {
         // set negative values to 0
-        value.0.max(0).try_into()
+        value.0.try_into()
     }
 }
 
@@ -320,7 +320,7 @@ impl TryFrom<TransactionDuration> for u64 {
         if value.0 > u64::MAX.into() {
             Err("Value is too large to fit in u64")
         } else {
-            value.try_into()
+            Ok(value.0.try_into().unwrap())
         }
     }
 }
