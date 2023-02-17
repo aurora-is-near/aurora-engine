@@ -200,7 +200,7 @@ impl TryFrom<TransactionRowBlock> for u64 {
 
     fn try_from(value: TransactionRowBlock) -> Result<Self, Self::Error> {
         // set negative values to 0
-        value.0.max(0).try_into()
+        value.0.try_into()
     }
 }
 
