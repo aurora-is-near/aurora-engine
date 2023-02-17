@@ -2,7 +2,7 @@ use aurora_engine_sdk::keccak;
 use aurora_engine_types::types::RawH256;
 use crate::prelude::{BorshDeserialize, BorshSerialize};
 
-/// Block Hashchain
+/// Block Hashchain Computer
 /// The order of operations should be:
 /// 1. Create the BlockHashchain one time.
 /// 2. Add transactions of the current block.
@@ -10,12 +10,12 @@ use crate::prelude::{BorshDeserialize, BorshSerialize};
 /// 4. Clear the transactions of the current block.
 /// 5. Go back to step 2 for the next block.
 #[derive(BorshSerialize, BorshDeserialize)]
-struct BlockHashchain {
+struct BlockHashchainComputer {
     contract_name_hash: RawH256,
     txs_merkle_tree: StreamCompactMerkleTree
 }
 
-impl BlockHashchain {
+impl BlockHashchainComputer {
     pub fn new(contract_name: &str) -> Self {
         Self {
             contract_name_hash: keccak(contract_name.as_bytes()).0,
@@ -156,7 +156,89 @@ struct CompactMerkleSubtree {
 }
 
 #[cfg(test)]
-mod StreamCompactMerkleTree_tests {
+mod block_hashchain_computer_tests {
+    use super::*;
+
+    #[test]
+    fn add_tx_test() {
+        let method_name = "foo";
+        let input = "foo_input".as_bytes();
+        let output = "foo_output".as_bytes();
+
+        let method_name_hash = keccak(method_name.as_bytes()).0;
+        let input_hash = keccak(input).0;
+        let output_hash = keccak(output).0;
+        let expected_tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
+
+        let mut block_hashchain_computer = BlockHashchainComputer::new("aurora");
+        assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
+        
+        block_hashchain_computer.add_tx(method_name, input, output);
+
+        assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 1);
+        assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees[0].hash, expected_tx_hash);
+    }
+
+    #[test]
+    fn compute_block_hashchain_zero_txs_test() {
+        let contract_name = "aurora";
+        let contract_name_hash = keccak(contract_name.as_bytes()).0;
+
+        let block_height:u64 = 2;
+        let block_height_hash = keccak(&block_height.to_be_bytes()).0;
+        let previous_block_hashchain = keccak(&1u64.to_be_bytes()).0;
+
+        let expected_block_hashchain = keccak(&[contract_name_hash, block_height_hash, previous_block_hashchain, [0; 32]].concat()).0;
+
+        let block_hashchain_computer = BlockHashchainComputer::new(contract_name); 
+        let block_hashchain = block_hashchain_computer.compute_block_hashchain(block_height, previous_block_hashchain);
+
+        assert_eq!(block_hashchain, expected_block_hashchain);
+    }
+
+    #[test]
+    fn compute_block_hashchain_one_txs_test() {
+        let contract_name = "aurora";
+        let contract_name_hash = keccak(contract_name.as_bytes()).0;
+
+        let method_name = "foo";
+        let input = "foo_input".as_bytes();
+        let output = "foo_output".as_bytes();
+
+        let method_name_hash = keccak(method_name.as_bytes()).0;
+        let input_hash = keccak(input).0;
+        let output_hash = keccak(output).0;
+        let tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
+
+        let block_height:u64 = 2;
+        let block_height_hash = keccak(&block_height.to_be_bytes()).0;
+        let previous_block_hashchain = keccak(&1u64.to_be_bytes()).0;
+
+        let expected_block_hashchain = keccak(&[contract_name_hash, block_height_hash, previous_block_hashchain, tx_hash].concat()).0;
+
+        let mut block_hashchain_computer = BlockHashchainComputer::new(contract_name); 
+        block_hashchain_computer.add_tx(method_name, input, output);
+        let block_hashchain = block_hashchain_computer.compute_block_hashchain(block_height, previous_block_hashchain);
+
+        assert_eq!(block_hashchain, expected_block_hashchain);
+    }
+
+
+    #[test]
+    fn clear_test() {
+        let mut block_hashchain_computer = BlockHashchainComputer::new("aurora");
+        assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
+
+        block_hashchain_computer.add_tx("foo", "foo_input".as_bytes(), "foo_output".as_bytes());
+        assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 1);
+
+        block_hashchain_computer.clear_txs();
+        assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
+    }
+}
+
+#[cfg(test)]
+mod stream_compact_merkle_tree_tests {
     use super::*;
 
     #[test]
