@@ -314,14 +314,10 @@ fn get_address(row: &postgres::Row, field: &str) -> Address {
 struct TransactionDuration(pub u128);
 
 impl TryFrom<TransactionDuration> for u64 {
-    type Error = &'static str;
+    type Error = TryFromIntError;
 
     fn try_from(value: TransactionDuration) -> Result<Self, Self::Error> {
-        if value.0 > u64::MAX.into() {
-            Err("Value is too large to fit in u64")
-        } else {
-            Ok(value.0.try_into().unwrap())
-        }
+        value.0.try_into()
     }
 }
 
