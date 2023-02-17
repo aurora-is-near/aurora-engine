@@ -1,9 +1,9 @@
 use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
-use crate::test_utils::{self, str_to_account_id, AuroraRunner};
+use crate::test_utils::{self, str_to_account_id};
 use crate::tests::state_migration;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
-use aurora_engine::parameters::{NewCallArgs, SetOwnerArgs, SubmitResult, TransactionStatus};
+use aurora_engine::parameters::{SetOwnerArgs, SubmitResult, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use borsh::BorshSerialize;
 use libsecp256k1::SecretKey;
@@ -1025,28 +1025,21 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
  
 #[test]
 fn test_set_owner() {
-    let mut runner = AuroraRunner::default();
-    let new_args = NewCallArgs {
-        chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
-        owner_id: str_to_account_id("owner.near"),
-        bridge_prover_id: str_to_account_id("prover.near"),
-        upgrade_delay_blocks: 1,
-    };
-
-    let (_outcome, _error) = runner.call("new", "owner.near", new_args.try_to_vec().unwrap());
+    let mut runner = test_utils::deploy_evm();
+    let aurora_account_id = runner.aurora_account_id.clone();
 
     // set owner args
     let set_owner_args = SetOwnerArgs {
         new_owner: str_to_account_id("new_owner.near"),
     };
 
-    let (outcome, error) = runner.call("set_owner", "owner.near",set_owner_args.try_to_vec().unwrap());
+    let (outcome, error) = runner.call("set_owner", &aurora_account_id,set_owner_args.try_to_vec().unwrap());
 
     // setting owner from the owner with same owner id should fail
     assert!(outcome.is_some() && error.is_none());
 
     // get owner to see if the owner_id property has changed
-    let (outcome, error) = runner.call("get_owner", "owner.near", vec![]);
+    let (outcome, error) = runner.call("get_owner", &aurora_account_id, vec![]);
     assert!(outcome.is_some() && error.is_none());
 
     // check if the owner_id property has changed to new_owner.near
@@ -1055,22 +1048,15 @@ fn test_set_owner() {
 
 #[test]
 fn test_set_owner_fail_on_same_owner() {
-    let mut runner = AuroraRunner::default();
-    let new_args = NewCallArgs {
-        chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
-        owner_id: str_to_account_id("owner.near"),
-        bridge_prover_id: str_to_account_id("prover.near"),
-        upgrade_delay_blocks: 1,
-    };
+    let mut runner = test_utils::deploy_evm();
+    let aurora_account_id = runner.aurora_account_id.clone();
 
-    let (_outcome, _error) = runner.call("new", "owner.near", new_args.try_to_vec().unwrap());
-    
     // set owner args
     let set_owner_args = SetOwnerArgs {
         new_owner: str_to_account_id("owner.near"),
     };
 
-    let (outcome, error) = runner.call("set_owner", "owner.near",set_owner_args.try_to_vec().unwrap());
+    let (outcome, error) = runner.call("set_owner", &aurora_account_id, set_owner_args.try_to_vec().unwrap());
     
     // setting owner from the owner with same owner id should fail
     assert!(outcome.is_none() && error.is_some());
