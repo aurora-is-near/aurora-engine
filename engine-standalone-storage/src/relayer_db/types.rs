@@ -232,7 +232,7 @@ impl TryFrom<postgres::Row> for TransactionRow {
     fn try_from(row: postgres::Row) -> Result<Self, Self::Error> {
         let block: TransactionRowBlock = TransactionRowBlock(row.get("block"));
         let block_hash = get_hash(&row, "block_hash");
-        let index: TransactionRowIndex = TransactionRowIndex(row.get("index"));
+        let index = TransactionRowIndex(row.get("index"));
         let id: TransactionRowId = TransactionRowId(row.get("id"));
         let hash = get_hash(&row, "hash");
         let near_hash = get_hash(&row, "near_hash");
