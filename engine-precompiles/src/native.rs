@@ -216,8 +216,8 @@ impl<I> ExitToNear<I> {
     }
 }
 
-fn is_valid_input_size(input: &[u8], min: usize, max: Option<usize>) -> Result<(), ExitError> {
-    if input.len() < min || max.map_or(false, |max| input.len() > max) {
+fn validate_input_size(input: &[u8], min: usize, max: usize) -> Result<(), ExitError> {
+    if input.len() < min || input.len() > max {
         return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));
     }
     Ok(())
@@ -244,24 +244,25 @@ impl<I: IO> Precompile for ExitToNear<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        // ETH transfer input format: (21+ bytes)
+        // ETH transfer input format: (85 bytes)
         //  - flag (1 byte)
         //  - refund_address (20 bytes)
-        //  - recipient_account_id (N bytes)
-        // ERC20 transfer input format: (53+ bytes)
+        //  - recipient_account_id (max 64 bytes)
+        // ERC20 transfer input format: (117 bytes)
         //  - flag (1 byte)
         //  - refund_address (20 bytes)
         //  - amount (32 bytes)
-        //  - recipient_account_id (N bytes)
+        //  - recipient_account_id (max 64 bytes)
         #[cfg(feature = "error_refund")]
         fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
-            is_valid_input_size(input, 21, None)?;
-            let refund_address = Address::try_from_slice(&input.get(1..21).unwrap()).unwrap();
-            Ok((refund_address, &input.get(21..).unwrap()))
+            validate_input_size(input, 21, 117)?;
+            let refund_address = Address::try_from_slice(&input[1..21]).unwrap();
+            Ok((refund_address, &input[21..]))
         }
         #[cfg(not(feature = "error_refund"))]
-        fn parse_input(input: &[u8]) -> &[u8] {
-            input.get(1..).unwrap()
+        fn parse_input(input: &[u8]) -> Result<&[u8], ExitError> {
+            validate_input_size(input, 3, 117)?;
+            Ok(&input[1..])
         }
 
         if let Some(target_gas) = target_gas {
@@ -280,11 +281,11 @@ impl<I: IO> Precompile for ExitToNear<I> {
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
-        let flag = input.first().unwrap();
+        let flag = input[0];
         #[cfg(feature = "error_refund")]
         let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
-        let mut input = parse_input(input);
+        let mut input = parse_input(input)?;
         let current_account_id = self.current_account_id.clone();
         #[cfg(feature = "error_refund")]
         let refund_on_error_target = current_account_id.clone();
@@ -337,8 +338,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 let erc20_address = context.caller;
                 let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes(), &self.io)?;
 
-                let amount = U256::from_big_endian(input.get(..32).unwrap());
-                input = input.get(32..).unwrap();
+                let amount = U256::from_big_endian(&input[..32]);
+                input = &input[32..];
 
                 if let Ok(receiver_account_id) = AccountId::try_from(input) {
                     (
@@ -465,7 +466,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         //  - flag (1 byte)
         //  - amount (32 bytes)
         //  - eth_recipient (20 bytes)
-        is_valid_input_size(input, 21, Some(53))?;
+        validate_input_size(input, 21, 117)?;
         use crate::prelude::types::NEP141Wei;
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
@@ -484,8 +485,8 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
         let mut input = input;
-        let flag = input.first().unwrap();
-        input = input.get(1..).unwrap();
+        let flag = input[0];
+        input = &input[1..];
 
         let (nep141_address, serialized_args, exit_event) = match flag {
             0x0 => {
@@ -533,8 +534,8 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                 let erc20_address = context.caller;
                 let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes(), &self.io)?;
 
-                let amount = U256::from_big_endian(input.get(..32).unwrap());
-                input = input.get(32..).unwrap();
+                let amount = U256::from_big_endian(&input[..32]);
+                input = &input[32..];
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
@@ -602,7 +603,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
 #[cfg(test)]
 mod tests {
-    use super::{exit_to_ethereum, exit_to_near, is_valid_input_size};
+    use super::{exit_to_ethereum, exit_to_near, validate_input_size};
     use crate::prelude::sdk::types::near_account_to_evm_address;
 
     #[test]
@@ -635,21 +636,26 @@ mod tests {
     #[test]
     fn test_check_invalid_input_lt_min() {
         let input = [0u8; 4];
-        assert!(is_valid_input_size(&input, 10, Some(20)).is_err());
-        assert!(is_valid_input_size(&input, 5, None).is_err());
+        assert!(validate_input_size(&input, 10, 20).is_err());
+        assert!(validate_input_size(&input, 5, 0).is_err());
+    }
+
+    #[test]
+    fn test_check_invalid_max_value_for_input() {
+        let input = [0u8; 4];
+        assert!(validate_input_size(&input, 5, 0).is_err());
     }
 
     #[test]
     fn test_check_invalid_input_gt_max() {
         let input = [1u8; 55];
-        assert!(is_valid_input_size(&input, 10, Some(54)).is_err());
+        assert!(validate_input_size(&input, 10, 54).is_err());
     }
 
     #[test]
     fn test_check_valid_input() {
         let input = [1u8; 55];
-        is_valid_input_size(&input, 10, Some(input.len())).unwrap();
-        is_valid_input_size(&input, 0, Some(input.len())).unwrap();
-        is_valid_input_size(&input, 0, None).unwrap();
+        validate_input_size(&input, 10, input.len()).unwrap();
+        validate_input_size(&input, 0, input.len()).unwrap();
     }
 }
