@@ -1,6 +1,6 @@
+use crate::prelude::{BorshDeserialize, BorshSerialize};
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::types::RawH256;
-use crate::prelude::{BorshDeserialize, BorshSerialize};
 
 /// Block Hashchain Computer
 /// The order of operations should be:
@@ -12,14 +12,14 @@ use crate::prelude::{BorshDeserialize, BorshSerialize};
 #[derive(BorshSerialize, BorshDeserialize)]
 struct BlockHashchainComputer {
     contract_name_hash: RawH256,
-    txs_merkle_tree: StreamCompactMerkleTree
+    txs_merkle_tree: StreamCompactMerkleTree,
 }
 
 impl BlockHashchainComputer {
     pub fn new(contract_name: &str) -> Self {
         Self {
             contract_name_hash: keccak(contract_name.as_bytes()).0,
-            txs_merkle_tree: StreamCompactMerkleTree::new()
+            txs_merkle_tree: StreamCompactMerkleTree::new(),
         }
     }
 
@@ -36,11 +36,24 @@ impl BlockHashchainComputer {
 
     /// Computes the block hashchain.
     /// Uses the added transactions and the parameters.
-    pub fn compute_block_hashchain(&self, block_height: u64, previous_block_hashchain: RawH256) -> RawH256 {
+    pub fn compute_block_hashchain(
+        &self,
+        block_height: u64,
+        previous_block_hashchain: RawH256,
+    ) -> RawH256 {
         let block_height_hash = keccak(&block_height.to_be_bytes()).0;
         let txs_hash = self.txs_merkle_tree.compute_hash();
-        
-        keccak(&[self.contract_name_hash, block_height_hash, previous_block_hashchain, txs_hash].concat()).0
+
+        keccak(
+            &[
+                self.contract_name_hash,
+                block_height_hash,
+                previous_block_hashchain,
+                txs_hash,
+            ]
+            .concat(),
+        )
+        .0
     }
 
     /// Clears the transactions added.
@@ -89,7 +102,7 @@ impl StreamCompactMerkleTree {
             if left_subtree.height == right_subtree.height {
                 let father_subtree = CompactMerkleSubtree {
                     height: left_subtree.height + 1,
-                    hash: keccak(&[left_subtree.hash, right_subtree.hash].concat()).0
+                    hash: keccak(&[left_subtree.hash, right_subtree.hash].concat()).0,
                 };
 
                 self.subtrees.pop();
@@ -176,7 +189,10 @@ mod block_hashchain_computer_tests {
         block_hashchain_computer.add_tx(method_name, input, output);
 
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 1);
-        assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees[0].hash, expected_tx_hash);
+        assert_eq!(
+            block_hashchain_computer.txs_merkle_tree.subtrees[0].hash,
+            expected_tx_hash
+        );
     }
 
     #[test]
@@ -184,14 +200,24 @@ mod block_hashchain_computer_tests {
         let contract_name = "aurora";
         let contract_name_hash = keccak(contract_name.as_bytes()).0;
 
-        let block_height:u64 = 2;
+        let block_height: u64 = 2;
         let block_height_hash = keccak(&block_height.to_be_bytes()).0;
         let previous_block_hashchain = keccak(&1u64.to_be_bytes()).0;
 
-        let expected_block_hashchain = keccak(&[contract_name_hash, block_height_hash, previous_block_hashchain, [0; 32]].concat()).0;
+        let expected_block_hashchain = keccak(
+            &[
+                contract_name_hash,
+                block_height_hash,
+                previous_block_hashchain,
+                [0; 32],
+            ]
+            .concat(),
+        )
+        .0;
 
-        let block_hashchain_computer = BlockHashchainComputer::new(contract_name); 
-        let block_hashchain = block_hashchain_computer.compute_block_hashchain(block_height, previous_block_hashchain);
+        let block_hashchain_computer = BlockHashchainComputer::new(contract_name);
+        let block_hashchain = block_hashchain_computer
+            .compute_block_hashchain(block_height, previous_block_hashchain);
 
         assert_eq!(block_hashchain, expected_block_hashchain);
     }
@@ -210,19 +236,28 @@ mod block_hashchain_computer_tests {
         let output_hash = keccak(output).0;
         let tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
 
-        let block_height:u64 = 2;
+        let block_height: u64 = 2;
         let block_height_hash = keccak(&block_height.to_be_bytes()).0;
         let previous_block_hashchain = keccak(&1u64.to_be_bytes()).0;
 
-        let expected_block_hashchain = keccak(&[contract_name_hash, block_height_hash, previous_block_hashchain, tx_hash].concat()).0;
+        let expected_block_hashchain = keccak(
+            &[
+                contract_name_hash,
+                block_height_hash,
+                previous_block_hashchain,
+                tx_hash,
+            ]
+            .concat(),
+        )
+        .0;
 
-        let mut block_hashchain_computer = BlockHashchainComputer::new(contract_name); 
+        let mut block_hashchain_computer = BlockHashchainComputer::new(contract_name);
         block_hashchain_computer.add_tx(method_name, input, output);
-        let block_hashchain = block_hashchain_computer.compute_block_hashchain(block_height, previous_block_hashchain);
+        let block_hashchain = block_hashchain_computer
+            .compute_block_hashchain(block_height, previous_block_hashchain);
 
         assert_eq!(block_hashchain, expected_block_hashchain);
     }
-
 
     #[test]
     fn clear_test() {
@@ -278,7 +313,11 @@ mod stream_compact_merkle_tree_tests {
 
         let merkle_tree_hash = merkle_tree.compute_hash();
 
-        assert_eq!(merkle_tree.subtrees.len(), 1, "One and two should be compacted into a single subtree.");
+        assert_eq!(
+            merkle_tree.subtrees.len(),
+            1,
+            "1 and 2 should be compacted."
+        );
         assert_eq!(merkle_tree.subtrees[0].hash, expected_merkle_tree_hash);
         assert_eq!(merkle_tree_hash, expected_merkle_tree_hash);
     }
@@ -291,7 +330,10 @@ mod stream_compact_merkle_tree_tests {
 
         let expected_left_subtree_hash = hash_concatenation(one_hash, two_hash);
         let expected_right_subtree_hash_computation = hash_concatenation(three_hash, three_hash);
-        let expected_merkle_tree_hash = hash_concatenation(expected_left_subtree_hash, expected_right_subtree_hash_computation);
+        let expected_merkle_tree_hash = hash_concatenation(
+            expected_left_subtree_hash,
+            expected_right_subtree_hash_computation,
+        );
 
         let mut merkle_tree = StreamCompactMerkleTree::new();
         merkle_tree.add(one_hash);
@@ -300,9 +342,16 @@ mod stream_compact_merkle_tree_tests {
 
         let merkle_tree_hash = merkle_tree.compute_hash();
 
-        assert_eq!(merkle_tree.subtrees.len(), 2, "One and two should be compacted into a single subtree, and three should be alone.");
+        assert_eq!(
+            merkle_tree.subtrees.len(),
+            2,
+            "1 and 2 should be compacted; 3 should be alone."
+        );
         assert_eq!(merkle_tree.subtrees[0].hash, expected_left_subtree_hash);
-        assert_eq!(merkle_tree.subtrees[1].hash, three_hash, "Three is alone so its hash should not change.");
+        assert_eq!(
+            merkle_tree.subtrees[1].hash, three_hash,
+            "3 should be alone."
+        );
         assert_eq!(merkle_tree_hash, expected_merkle_tree_hash);
     }
 
@@ -315,7 +364,8 @@ mod stream_compact_merkle_tree_tests {
 
         let expected_left_subtree_hash = hash_concatenation(one_hash, two_hash);
         let expected_right_subtree_hash = hash_concatenation(three_hash, four_hash);
-        let expected_merkle_tree_hash = hash_concatenation(expected_left_subtree_hash, expected_right_subtree_hash);
+        let expected_merkle_tree_hash =
+            hash_concatenation(expected_left_subtree_hash, expected_right_subtree_hash);
 
         let mut merkle_tree = StreamCompactMerkleTree::new();
         merkle_tree.add(one_hash);
@@ -325,7 +375,7 @@ mod stream_compact_merkle_tree_tests {
 
         let merkle_tree_hash = merkle_tree.compute_hash();
 
-        assert_eq!(merkle_tree.subtrees.len(), 1, "One and two should be compacted, three and four also, and then both resulting should be compacted too.");
+        assert_eq!(merkle_tree.subtrees.len(), 1, "1 and 2 should be compacted, 3 and 4 also, and then both resulting should be compacted too.");
         assert_eq!(merkle_tree.subtrees[0].hash, expected_merkle_tree_hash);
         assert_eq!(merkle_tree_hash, expected_merkle_tree_hash);
     }
@@ -340,12 +390,21 @@ mod stream_compact_merkle_tree_tests {
 
         let expected_left_left_subtree_hash = hash_concatenation(one_hash, two_hash);
         let expected_left_right_subtree_hash = hash_concatenation(three_hash, four_hash);
-        let expected_left_subtree_hash = hash_concatenation(expected_left_left_subtree_hash, expected_left_right_subtree_hash);
+        let expected_left_subtree_hash = hash_concatenation(
+            expected_left_left_subtree_hash,
+            expected_left_right_subtree_hash,
+        );
 
         let expected_right_left_subtree_hash_computation = hash_concatenation(five_hash, five_hash);
-        let expected_right_subtree_hash_computation = hash_concatenation(expected_right_left_subtree_hash_computation, expected_right_left_subtree_hash_computation);
+        let expected_right_subtree_hash_computation = hash_concatenation(
+            expected_right_left_subtree_hash_computation,
+            expected_right_left_subtree_hash_computation,
+        );
 
-        let expected_merkle_tree_hash = hash_concatenation(expected_left_subtree_hash, expected_right_subtree_hash_computation);
+        let expected_merkle_tree_hash = hash_concatenation(
+            expected_left_subtree_hash,
+            expected_right_subtree_hash_computation,
+        );
 
         let mut merkle_tree = StreamCompactMerkleTree::new();
         merkle_tree.add(one_hash);
@@ -356,7 +415,11 @@ mod stream_compact_merkle_tree_tests {
 
         let merkle_tree_hash = merkle_tree.compute_hash();
 
-        assert_eq!(merkle_tree.subtrees.len(), 2, "One, two, three and four should be compacted, five is alone.");
+        assert_eq!(
+            merkle_tree.subtrees.len(),
+            2,
+            "1, 2, 3 and 4 should be compacted; 5 is alone."
+        );
         assert_eq!(merkle_tree.subtrees[0].hash, expected_left_subtree_hash);
         assert_eq!(merkle_tree.subtrees[1].hash, five_hash);
         assert_eq!(merkle_tree_hash, expected_merkle_tree_hash);
@@ -374,13 +437,23 @@ mod stream_compact_merkle_tree_tests {
 
         let expected_left_left_subtree_hash = hash_concatenation(one_hash, two_hash);
         let expected_left_right_subtree_hash = hash_concatenation(three_hash, four_hash);
-        let expected_left_subtree_hash = hash_concatenation(expected_left_left_subtree_hash, expected_left_right_subtree_hash);
+        let expected_left_subtree_hash = hash_concatenation(
+            expected_left_left_subtree_hash,
+            expected_left_right_subtree_hash,
+        );
 
         let expected_right_left_subtree_hash = hash_concatenation(five_hash, six_hash);
-        let expected_right_right_subtree_hash_computation = hash_concatenation(seven_hash, seven_hash);
-        let expected_right_subtree_hash_computation = hash_concatenation(expected_right_left_subtree_hash, expected_right_right_subtree_hash_computation);
+        let expected_right_right_subtree_hash_computation =
+            hash_concatenation(seven_hash, seven_hash);
+        let expected_right_subtree_hash_computation = hash_concatenation(
+            expected_right_left_subtree_hash,
+            expected_right_right_subtree_hash_computation,
+        );
 
-        let expected_merkle_tree_hash = hash_concatenation(expected_left_subtree_hash, expected_right_subtree_hash_computation);
+        let expected_merkle_tree_hash = hash_concatenation(
+            expected_left_subtree_hash,
+            expected_right_subtree_hash_computation,
+        );
 
         let mut merkle_tree = StreamCompactMerkleTree::new();
         merkle_tree.add(one_hash);
@@ -393,9 +466,16 @@ mod stream_compact_merkle_tree_tests {
 
         let merkle_tree_hash = merkle_tree.compute_hash();
 
-        assert_eq!(merkle_tree.subtrees.len(), 3, "One, two, three and four should be compacted, five and six too, seven is alone.");
+        assert_eq!(
+            merkle_tree.subtrees.len(),
+            3,
+            "1, 2, 3 and 4 should be compacted; 5 and 6 too; 7 is alone."
+        );
         assert_eq!(merkle_tree.subtrees[0].hash, expected_left_subtree_hash);
-        assert_eq!(merkle_tree.subtrees[1].hash, expected_right_left_subtree_hash);
+        assert_eq!(
+            merkle_tree.subtrees[1].hash,
+            expected_right_left_subtree_hash
+        );
         assert_eq!(merkle_tree.subtrees[2].hash, seven_hash);
         assert_eq!(merkle_tree_hash, expected_merkle_tree_hash);
     }
