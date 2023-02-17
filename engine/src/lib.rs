@@ -68,7 +68,6 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use aurora_engine_types::types::balance::error;
     use borsh::{BorshDeserialize, BorshSerialize};
     use parameters::SetOwnerArgs;
 
