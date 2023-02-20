@@ -863,7 +863,6 @@ mod contract {
     pub extern "C" fn set_paused_flags() {
         let io = Runtime;
         io.assert_private_call().sdk_unwrap();
-
         let args: PauseEthConnectorCallArgs = io.read_input_borsh().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
