@@ -1,6 +1,6 @@
 use aurora_engine::engine;
 use aurora_engine::parameters::{
-    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SubmitResult, TransactionStatus,
+    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SubmitResult, TransactionStatus, SetOwnerArgs,
 };
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
@@ -269,6 +269,25 @@ impl StandaloneRunner {
             let mut tx_msg =
                 Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::PausePrecompiles(call_args);
+
+            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
+        } else if method_name == test_utils::SET_OWNER {
+            let input = &ctx.input[..];
+            let call_args = SetOwnerArgs::try_from_slice(input)
+                .expect("Unable to parse input as SetOwnerArgs");
+
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::SetOwner(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
             self.cumulative_diff.append(outcome.diff.clone());
