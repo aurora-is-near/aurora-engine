@@ -282,7 +282,7 @@ impl StandaloneRunner {
             ))
         } else if method_name == test_utils::SET_OWNER {
             let input = &ctx.input[..];
-            let call_args =
+            let call_args: SetOwnerArgs =
                 serde_json::from_slice(input).expect("Unable to parse input as SetOwnerArgs");
 
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
