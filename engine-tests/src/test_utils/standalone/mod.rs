@@ -1,6 +1,7 @@
 use aurora_engine::engine;
 use aurora_engine::parameters::{
-    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SubmitResult, TransactionStatus, SetOwnerArgs,
+    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs, SubmitResult,
+    TransactionStatus,
 };
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
@@ -281,8 +282,8 @@ impl StandaloneRunner {
             ))
         } else if method_name == test_utils::SET_OWNER {
             let input = &ctx.input[..];
-            let call_args = SetOwnerArgs::try_from_slice(input)
-                .expect("Unable to parse input as SetOwnerArgs");
+            let call_args =
+                SetOwnerArgs::try_from_slice(input).expect("Unable to parse input as SetOwnerArgs");
 
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
             let mut tx_msg =
