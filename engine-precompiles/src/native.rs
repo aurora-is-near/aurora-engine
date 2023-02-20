@@ -466,7 +466,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         //  - flag (1 byte)
         //  - amount (32 bytes)
         //  - eth_recipient (20 bytes)
-        validate_input_size(input, 21, 117)?;
+        validate_input_size(input, 21, 53)?;
         use crate::prelude::types::NEP141Wei;
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
