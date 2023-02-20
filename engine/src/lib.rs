@@ -152,7 +152,6 @@ mod contract {
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
         if state.owner_id == args.new_owner {
-            // Would be a no-op to set, do nothing and return false
             sdk::panic_utf8(errors::ERR_SAME_OWNER);
         } else {
             state.owner_id = args.new_owner;
