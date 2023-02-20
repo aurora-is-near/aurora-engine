@@ -27,7 +27,7 @@ fn repro_GdASJ3KESs() {
         block_timestamp: 1645717564644206730,
         input_path: "src/tests/res/input_GdASJ3KESs.hex",
         evm_gas_used: 706713,
-        near_gas_used: 122,
+        near_gas_used: 123,
     });
 }
 
@@ -52,7 +52,7 @@ fn repro_8ru7VEA() {
         block_timestamp: 1648829935343349589,
         input_path: "src/tests/res/input_8ru7VEA.hex",
         evm_gas_used: 1732181,
-        near_gas_used: 223,
+        near_gas_used: 228,
     });
 }
 
@@ -72,7 +72,7 @@ fn repro_FRcorNv() {
         block_timestamp: 1650960438774745116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1239721,
-        near_gas_used: 181,
+        near_gas_used: 182,
     });
 }
 
@@ -107,7 +107,7 @@ fn repro_D98vwmi() {
         block_timestamp: 1651753443421003245,
         input_path: "src/tests/res/input_D98vwmi.hex",
         evm_gas_used: 1_035_348,
-        near_gas_used: 182,
+        near_gas_used: 184,
     });
 }
 
@@ -126,7 +126,7 @@ fn repro_Emufid2() {
         block_timestamp: 1662118048636713538,
         input_path: "src/tests/res/input_Emufid2.hex",
         evm_gas_used: 1_156_364,
-        near_gas_used: 306,
+        near_gas_used: 307,
     });
 }
 
