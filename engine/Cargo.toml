@@ -27,11 +27,14 @@ ethabi = { version = "18.0", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 rlp = { version = "0.5.0", default-features = false }
-serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
+serde = { version = "1", default-features = false, features = [
+    "alloc",
+    "derive",
+] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wee_alloc = { version = "0.4.5", default-features = false }
+lol_alloc = { version = "0.3.0", default-features = false }
 
 [dev-dependencies]
 aurora-engine-test-doubles = { path = "../engine-test-doubles" }
@@ -40,7 +43,20 @@ digest = "0.10"
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "borsh/std", "byte-slice-cast/std", "ethabi/std", "evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]
+std = [
+    "aurora-engine-types/std",
+    "aurora-engine-sdk/std",
+    "aurora-engine-precompiles/std",
+    "aurora-engine-transactions/std",
+    "borsh/std",
+    "byte-slice-cast/std",
+    "ethabi/std",
+    "evm/std",
+    "hex/std",
+    "rlp/std",
+    "serde/std",
+    "serde_json/std",
+]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
 evm_bully = []
 log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]
@@ -50,4 +66,8 @@ integration-test = ["log"]
 all-promise-actions = ["aurora-engine-sdk/all-promise-actions"]
 mainnet = ["contract", "log", "aurora-engine-sdk/mainnet"]
 testnet = ["contract", "log", "aurora-engine-sdk/testnet"]
-impl-serde = ["aurora-engine-types/impl-serde", "aurora-engine-transactions/impl-serde", "evm/with-serde"]
+impl-serde = [
+    "aurora-engine-types/impl-serde",
+    "aurora-engine-transactions/impl-serde",
+    "evm/with-serde",
+]
