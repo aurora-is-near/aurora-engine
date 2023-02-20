@@ -69,7 +69,6 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
-    use parameters::SetOwnerArgs;
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
@@ -149,7 +148,9 @@ mod contract {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
-        let args: SetOwnerArgs = io.read_input_json().sdk_unwrap();
+        let args: parameters::SetOwnerArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .sdk_unwrap();
         if state.owner_id == args.new_owner {
             // Would be a no-op to set, do nothing and return false
             sdk::panic_utf8(errors::ERR_SAME_OWNER);
