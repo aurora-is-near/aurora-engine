@@ -226,6 +226,7 @@ impl AuroraRunner {
         if let Some(standalone_runner) = &mut self.standalone_runner {
             if maybe_error.is_none()
                 && (method_name == SUBMIT
+                    || method_name == SUBMIT_WITH_ARGS
                     || method_name == CALL
                     || method_name == DEPLOY_ERC20
                     || method_name == PAUSE_PRECOMPILES

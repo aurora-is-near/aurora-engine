@@ -76,6 +76,8 @@ impl TransactionMessage {
 pub enum TransactionKind {
     /// Raw Ethereum transaction submitted to the engine
     Submit(EthTransactionKind),
+    /// Raw Ethereum transaction with additional arguments submitted to the engine
+    SubmitWithArgs(parameters::SubmitArgs),
     /// Ethereum transaction triggered by a NEAR account
     Call(parameters::CallArgs),
     /// Administrative method that makes a subset of precompiles paused
@@ -143,6 +145,9 @@ impl TransactionKind {
             Self::Submit(eth_tx_kind) => eth_tx_kind
                 .try_into()
                 .unwrap_or_else(|_| Self::no_evm_execution("submit")),
+            Self::SubmitWithArgs(args) => EthTransactionKind::try_from(args.tx_data.as_slice())
+                .and_then(TryInto::try_into)
+                .unwrap_or_else(|_| Self::no_evm_execution("submit_with_args")),
             Self::Call(call_args) => {
                 let from = Self::get_implicit_address(caller);
                 let nonce =
@@ -320,23 +325,21 @@ impl TransactionKind {
             Self::FinishDeposit(_) => Self::no_evm_execution("finish_deposit"),
             Self::ResolveTransfer(_, _) => Self::no_evm_execution("resolve_transfer"),
             Self::FtTransfer(_) => Self::no_evm_execution("ft_transfer"),
-            TransactionKind::Withdraw(_) => Self::no_evm_execution("withdraw"),
-            TransactionKind::StorageDeposit(_) => Self::no_evm_execution("storage_deposit"),
-            TransactionKind::StorageUnregister(_) => Self::no_evm_execution("storage_unregister"),
-            TransactionKind::StorageWithdraw(_) => Self::no_evm_execution("storage_withdraw"),
-            TransactionKind::SetPausedFlags(_) => Self::no_evm_execution("set_paused_flags"),
-            TransactionKind::RegisterRelayer(_) => Self::no_evm_execution("register_relayer"),
-            TransactionKind::SetConnectorData(_) => Self::no_evm_execution("set_connector_data"),
-            TransactionKind::NewConnector(_) => Self::no_evm_execution("new_connector"),
-            TransactionKind::NewEngine(_) => Self::no_evm_execution("new_engine"),
-            TransactionKind::FactoryUpdate(_) => Self::no_evm_execution("factory_update"),
-            TransactionKind::FactoryUpdateAddressVersion(_) => {
+            Self::Withdraw(_) => Self::no_evm_execution("withdraw"),
+            Self::StorageDeposit(_) => Self::no_evm_execution("storage_deposit"),
+            Self::StorageUnregister(_) => Self::no_evm_execution("storage_unregister"),
+            Self::StorageWithdraw(_) => Self::no_evm_execution("storage_withdraw"),
+            Self::SetPausedFlags(_) => Self::no_evm_execution("set_paused_flags"),
+            Self::RegisterRelayer(_) => Self::no_evm_execution("register_relayer"),
+            Self::SetConnectorData(_) => Self::no_evm_execution("set_connector_data"),
+            Self::NewConnector(_) => Self::no_evm_execution("new_connector"),
+            Self::NewEngine(_) => Self::no_evm_execution("new_engine"),
+            Self::FactoryUpdate(_) => Self::no_evm_execution("factory_update"),
+            Self::FactoryUpdateAddressVersion(_) => {
                 Self::no_evm_execution("factory_update_address_version")
             }
-            TransactionKind::FactorySetWNearAddress(_) => {
-                Self::no_evm_execution("factory_set_wnear_address")
-            }
-            TransactionKind::Unknown => Self::no_evm_execution("unknown"),
+            Self::FactorySetWNearAddress(_) => Self::no_evm_execution("factory_set_wnear_address"),
+            Self::Unknown => Self::no_evm_execution("unknown"),
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
         }
@@ -476,6 +479,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
 enum BorshableTransactionKind<'a> {
     Submit(Cow<'a, Vec<u8>>),
+    SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     Call(Cow<'a, parameters::CallArgs>),
     Deploy(Cow<'a, Vec<u8>>),
     DeployErc20(Cow<'a, parameters::DeployErc20TokenArgs>),
@@ -513,6 +517,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
                 let tx_bytes = eth_tx.into();
                 Self::Submit(Cow::Owned(tx_bytes))
             }
+            TransactionKind::SubmitWithArgs(x) => Self::SubmitWithArgs(Cow::Borrowed(x)),
             TransactionKind::Call(x) => Self::Call(Cow::Borrowed(x)),
             TransactionKind::Deploy(x) => Self::Deploy(Cow::Borrowed(x)),
             TransactionKind::DeployErc20(x) => Self::DeployErc20(Cow::Borrowed(x)),
@@ -560,6 +565,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 let eth_tx = tx_bytes.as_slice().try_into()?;
                 Ok(Self::Submit(eth_tx))
             }
+            BorshableTransactionKind::SubmitWithArgs(x) => Ok(Self::SubmitWithArgs(x.into_owned())),
             BorshableTransactionKind::Call(x) => Ok(Self::Call(x.into_owned())),
             BorshableTransactionKind::Deploy(x) => Ok(Self::Deploy(x.into_owned())),
             BorshableTransactionKind::DeployErc20(x) => Ok(Self::DeployErc20(x.into_owned())),
