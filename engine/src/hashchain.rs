@@ -11,14 +11,16 @@ use aurora_engine_types::types::RawH256;
 /// 5. Go back to step 2 for the next block.
 #[derive(BorshSerialize, BorshDeserialize)]
 struct BlockHashchainComputer {
-    contract_name_hash: RawH256,
+    chain_id_hash: RawH256,
+    contract_account_id_hash: RawH256,
     txs_merkle_tree: StreamCompactMerkleTree,
 }
 
 impl BlockHashchainComputer {
-    pub fn new(contract_name: &str) -> Self {
+    pub fn new(chain_id: &[u8; 32], contract_account_id: &[u8]) -> Self {
         Self {
-            contract_name_hash: keccak(contract_name.as_bytes()).0,
+            chain_id_hash: keccak(chain_id).0,
+            contract_account_id_hash: keccak(contract_account_id).0,
             txs_merkle_tree: StreamCompactMerkleTree::new(),
         }
     }
@@ -46,7 +48,8 @@ impl BlockHashchainComputer {
 
         keccak(
             &[
-                self.contract_name_hash,
+                self.chain_id_hash,
+                self.contract_account_id_hash,
                 block_height_hash,
                 previous_block_hashchain,
                 txs_hash,
@@ -183,7 +186,8 @@ mod block_hashchain_computer_tests {
         let output_hash = keccak(output).0;
         let expected_tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
 
-        let mut block_hashchain_computer = BlockHashchainComputer::new("aurora");
+        let mut block_hashchain_computer =
+            BlockHashchainComputer::new(&[0; 32], "aurora".as_bytes());
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
 
         block_hashchain_computer.add_tx(method_name, input, output);
@@ -197,8 +201,10 @@ mod block_hashchain_computer_tests {
 
     #[test]
     fn compute_block_hashchain_zero_txs_test() {
-        let contract_name = "aurora";
-        let contract_name_hash = keccak(contract_name.as_bytes()).0;
+        let chain_id = &[1; 32];
+        let chain_id_hash = keccak(chain_id).0;
+        let contract_account_id = "aurora".as_bytes();
+        let contract_account_id_hash = keccak(contract_account_id).0;
 
         let block_height: u64 = 2;
         let block_height_hash = keccak(&block_height.to_be_bytes()).0;
@@ -206,7 +212,8 @@ mod block_hashchain_computer_tests {
 
         let expected_block_hashchain = keccak(
             &[
-                contract_name_hash,
+                chain_id_hash,
+                contract_account_id_hash,
                 block_height_hash,
                 previous_block_hashchain,
                 [0; 32],
@@ -215,7 +222,7 @@ mod block_hashchain_computer_tests {
         )
         .0;
 
-        let block_hashchain_computer = BlockHashchainComputer::new(contract_name);
+        let block_hashchain_computer = BlockHashchainComputer::new(chain_id, contract_account_id);
         let block_hashchain = block_hashchain_computer
             .compute_block_hashchain(block_height, previous_block_hashchain);
 
@@ -224,8 +231,10 @@ mod block_hashchain_computer_tests {
 
     #[test]
     fn compute_block_hashchain_one_txs_test() {
-        let contract_name = "aurora";
-        let contract_name_hash = keccak(contract_name.as_bytes()).0;
+        let chain_id = &[1; 32];
+        let chain_id_hash = keccak(chain_id).0;
+        let contract_account_id = "aurora".as_bytes();
+        let contract_account_id_hash = keccak(contract_account_id).0;
 
         let method_name = "foo";
         let input = "foo_input".as_bytes();
@@ -242,7 +251,8 @@ mod block_hashchain_computer_tests {
 
         let expected_block_hashchain = keccak(
             &[
-                contract_name_hash,
+                chain_id_hash,
+                contract_account_id_hash,
                 block_height_hash,
                 previous_block_hashchain,
                 tx_hash,
@@ -251,7 +261,8 @@ mod block_hashchain_computer_tests {
         )
         .0;
 
-        let mut block_hashchain_computer = BlockHashchainComputer::new(contract_name);
+        let mut block_hashchain_computer =
+            BlockHashchainComputer::new(chain_id, contract_account_id);
         block_hashchain_computer.add_tx(method_name, input, output);
         let block_hashchain = block_hashchain_computer
             .compute_block_hashchain(block_height, previous_block_hashchain);
@@ -261,7 +272,8 @@ mod block_hashchain_computer_tests {
 
     #[test]
     fn clear_test() {
-        let mut block_hashchain_computer = BlockHashchainComputer::new("aurora");
+        let mut block_hashchain_computer =
+            BlockHashchainComputer::new(&[0; 32], "aurora".as_bytes());
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
 
         block_hashchain_computer.add_tx("foo", "foo_input".as_bytes(), "foo_output".as_bytes());
