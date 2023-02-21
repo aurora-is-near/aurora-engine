@@ -1036,7 +1036,7 @@ fn test_set_owner() {
     let (outcome, error) = runner.call(
         "set_owner",
         &aurora_account_id,
-        serde_json::to_vec(&set_owner_args).unwrap(),
+        set_owner_args.try_to_vec().unwrap(),
     );
 
     // setting owner from the owner with same owner id should succeed
@@ -1068,7 +1068,7 @@ fn test_set_owner_fail_on_same_owner() {
     let (outcome, error) = runner.call(
         "set_owner",
         &aurora_account_id,
-        serde_json::to_vec(&set_owner_args).unwrap(),
+        set_owner_args.try_to_vec().unwrap(),
     );
 
     // setting owner from the owner with same owner id should fail
