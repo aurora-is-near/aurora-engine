@@ -1,3 +1,4 @@
+use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
@@ -134,15 +135,18 @@ fn execute_transaction<'db>(
             let mut handler = crate::promise::NoScheduler {
                 promise_data: &transaction_message.promise_data,
             };
-            let transaction_bytes: Vec<u8> = tx.into();
-            let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
-
+            let tx_data: Vec<u8> = tx.into();
+            let tx_hash = aurora_engine_sdk::keccak(&tx_data);
+            let args = SubmitArgs {
+                tx_data,
+                ..Default::default()
+            };
             let result = state::get_state(&io)
                 .map(|engine_state| {
                     let submit_result = engine::submit(
                         io,
                         &env,
-                        &transaction_bytes,
+                        &args,
                         engine_state,
                         env.current_account_id(),
                         relayer_address,

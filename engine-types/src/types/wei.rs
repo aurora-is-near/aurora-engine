@@ -93,7 +93,7 @@ impl SubAssign<NEP141Wei> for NEP141Wei {
     }
 }
 
-/// Newtype to distinguish balances (denominated in Wei) from other U256 types.
+/// New type to distinguish balances (denominated in Wei) from other U256 types.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Wei(U256);
 
@@ -186,6 +186,12 @@ impl From<Fee> for Wei {
 impl From<NEP141Wei> for Wei {
     fn from(value: NEP141Wei) -> Self {
         Wei(U256::from(value.as_u128()))
+    }
+}
+
+impl From<u128> for Wei {
+    fn from(value: u128) -> Self {
+        Wei(U256::from(value))
     }
 }
 

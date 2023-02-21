@@ -78,7 +78,7 @@ mod contract {
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
-        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
+        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitArgs,
         TransferCallCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
@@ -304,14 +304,42 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn submit() {
         let io = Runtime;
-        let input = io.read_input().to_vec();
+        let tx_data = io.read_input().to_vec();
+        let current_account_id = io.current_account_id();
+        let state = state::get_state(&io).sdk_unwrap();
+        let relayer_address = predecessor_address(&io.predecessor_account_id());
+        let args = SubmitArgs {
+            tx_data,
+            ..Default::default()
+        };
+        let result = engine::submit(
+            io,
+            &io,
+            &args,
+            state,
+            current_account_id,
+            relayer_address,
+            &mut Runtime,
+        );
+
+        result
+            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
+            .sdk_process();
+    }
+
+    /// Analog of the `submit` function, but waits for the `SubmitArgs` structure rather than
+    /// the array of bytes representing the transaction.
+    #[no_mangle]
+    pub extern "C" fn submit_with_args() {
+        let io = Runtime;
+        let args: SubmitArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
         let state = state::get_state(&io).sdk_unwrap();
         let relayer_address = predecessor_address(&io.predecessor_account_id());
         let result = engine::submit(
             io,
             &io,
-            &input,
+            &args,
             state,
             current_account_id,
             relayer_address,
@@ -919,7 +947,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use crate::connector::ZERO_ATTACHED_BALANCE;
-        use crate::prelude::{NEP141Wei, ToString, U256};
+        use crate::prelude::{NEP141Wei, U256};
         use evm::backend::ApplyBackend;
         const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
         const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
@@ -956,14 +984,14 @@ mod contract {
         };
         let verify_call = aurora_engine_types::parameters::PromiseCreateArgs {
             target_account_id: aurora_account_id.clone(),
-            method: "verify_log_entry".to_string(),
+            method: crate::prelude::String::from("verify_log_entry"),
             args: crate::prelude::Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_VERIFY,
         };
         let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
             target_account_id: aurora_account_id,
-            method: "finish_deposit".to_string(),
+            method: crate::prelude::String::from("finish_deposit"),
             args: args.try_to_vec().unwrap(),
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: GAS_FOR_FINISH,

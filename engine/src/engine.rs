@@ -1,4 +1,6 @@
-use crate::parameters::{CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs};
+use crate::parameters::{
+    CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs,
+};
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
@@ -417,6 +419,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         &mut self,
         sender: &Address,
         transaction: &NormalizedEthTransaction,
+        max_gas_price: Option<U256>,
     ) -> Result<GasPaymentResult, GasPaymentError> {
         if transaction.max_fee_per_gas.is_zero() {
             return Ok(GasPaymentResult::default());
@@ -425,6 +428,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let priority_fee_per_gas = transaction
             .max_priority_fee_per_gas
             .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
+        let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
+            price.min(priority_fee_per_gas)
+        });
         let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
         let gas_limit = transaction.gas_limit;
         let prepaid_amount = gas_limit
@@ -821,7 +827,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     mut io: I,
     env: &E,
-    transaction_bytes: &[u8],
+    args: &SubmitArgs,
     state: EngineState,
     current_account_id: AccountId,
     relayer_address: Address,
@@ -829,7 +835,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 ) -> EngineResult<SubmitResult> {
     #[cfg(feature = "contract")]
     let transaction = NormalizedEthTransaction::try_from(
-        EthTransactionKind::try_from(transaction_bytes)
+        EthTransactionKind::try_from(args.tx_data.as_slice())
             .map_err(EngineErrorKind::FailedTransactionParse)?,
     )
     .map_err(|_e| EngineErrorKind::InvalidSignature)?;
@@ -845,7 +851,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
             );
         let block_height = env.block_height();
         let tx: EthTransactionKind = adapter
-            .try_parse_bytes(transaction_bytes, block_height)
+            .try_parse_bytes(args.tx_data.as_slice(), block_height)
             .map_err(EngineErrorKind::FailedTransactionParse)?;
         tx.try_into()
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
@@ -882,12 +888,13 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     }
 
     let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
-    let prepaid_amount = match engine.charge_gas(&sender, &transaction) {
-        Ok(gas_result) => gas_result,
-        Err(err) => {
-            return Err(EngineErrorKind::GasPayment(err).into());
-        }
-    };
+    let prepaid_amount =
+        match engine.charge_gas(&sender, &transaction, args.max_gas_price.map(Into::into)) {
+            Ok(gas_result) => gas_result,
+            Err(err) => {
+                return Err(EngineErrorKind::GasPayment(err).into());
+            }
+        };
     let gas_limit: u64 = transaction
         .gas_limit
         .try_into()
@@ -1991,7 +1998,7 @@ mod tests {
             data: vec![],
             access_list: vec![],
         };
-        let actual_result = engine.charge_gas(&origin, &transaction).unwrap();
+        let actual_result = engine.charge_gas(&origin, &transaction, None).unwrap();
 
         let expected_result = GasPaymentResult {
             prepaid_amount: Wei::zero(),
