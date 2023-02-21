@@ -1054,7 +1054,7 @@ fn test_eth_transfer_with_max_gas_price() {
     test_utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
-        INITIAL_BALANCE - TRANSFER_AMOUNT - fee.into(),
+        INITIAL_BALANCE - TRANSFER_AMOUNT - Wei::new_u128(fee),
         (INITIAL_NONCE + 1).into(),
     );
     test_utils::validate_address_balance_and_nonce(

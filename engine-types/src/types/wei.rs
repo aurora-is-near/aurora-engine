@@ -117,6 +117,10 @@ impl Wei {
         Self(U256([amount, 0, 0, 0]))
     }
 
+    pub fn new_u128(amount: u128) -> Self {
+        Self::new(U256::from(amount))
+    }
+
     pub fn from_eth(amount: U256) -> Option<Self> {
         amount.checked_mul(Self::ETH_TO_WEI).map(Self)
     }
@@ -186,12 +190,6 @@ impl From<Fee> for Wei {
 impl From<NEP141Wei> for Wei {
     fn from(value: NEP141Wei) -> Self {
         Wei(U256::from(value.as_u128()))
-    }
-}
-
-impl From<u128> for Wei {
-    fn from(value: u128) -> Self {
-        Wei(U256::from(value))
     }
 }
 
