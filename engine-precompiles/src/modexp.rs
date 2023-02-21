@@ -6,6 +6,8 @@ use crate::{
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
 
+const MAX_EXP_LENGTH: usize =  usize::MAX - 96;
+
 #[derive(Default)]
 pub struct ModExp<HF: HardFork>(PhantomData<HF>);
 
@@ -22,7 +24,7 @@ impl<HF: HardFork> ModExp<HF> {
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
         let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
         let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
-        if exp_len > usize::MAX - 96 {
+        if exp_len > MAX_EXP_LENGTH {
             return Err(ExitError::Other(Cow::Borrowed("ERR_INVALID_EXP_LENGTH")));
         }
         let exp = parse_bytes(
@@ -49,7 +51,7 @@ impl<HF: HardFork> ModExp<HF> {
         let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
         let mod_len = usize::try_from(mod_len).map_err(utils::err_usize_conv)?;
 
-        if exp_len > usize::MAX - 96 {
+        if exp_len > MAX_EXP_LENGTH {
             return Err(ExitError::Other(Cow::Borrowed("ERR_INVALID_EXP_LENGTH")));
         }
 
@@ -107,13 +109,16 @@ impl ModExp<Byzantium> {
 impl Precompile for ModExp<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
+        if base_len == 0 && mod_len == 0 {
+            Ok(EthGas::new(0u64)) // min gas is zero
+        } else {
+            let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
+            let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
+            // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
+            let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
 
-        let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
-        let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
-        // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
-        let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
-
-        Ok(EthGas::new(saturating_round(gas)))
+            Ok(EthGas::new(saturating_round(gas)))
+        }
     }
 
     /// See: https://eips.ethereum.org/EIPS/eip-198
@@ -149,13 +154,16 @@ impl ModExp<Berlin> {
 impl Precompile for ModExp<Berlin> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
+        if base_len == 0 && mod_len == 0 {
+            Ok(EthGas::new(200u64)) // min gas 200
+        } else {
+            let mul = Self::mul_complexity(base_len, mod_len);
+            let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
+            // mul * iter_count bounded by 2^189 (so no overflow)
+            let gas = mul * iter_count.max(U256::one()) / U256::from(3);
 
-        let mul = Self::mul_complexity(base_len, mod_len);
-        let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
-        // mul * iter_count bounded by 2^189 (so no overflow)
-        let gas = mul * iter_count.max(U256::one()) / U256::from(3);
-
-        Ok(EthGas::new(core::cmp::max(200, saturating_round(gas))))
+            Ok(EthGas::new(core::cmp::max(200, saturating_round(gas))))
+        }
     }
 
     fn run(
@@ -516,7 +524,7 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_exp_length() {
+    fn test_modexp_overflow() {
         let base_len = U256::from(0);
         let exp_len = U256::from(usize::MAX);
         let mod_len = U256::from(0);
@@ -540,5 +548,29 @@ mod tests {
             Err(ExitError::Other(Cow::Borrowed("ERR_INVALID_EXP_LENGTH"))),
             res
         );
+    }
+
+    #[test]
+    fn test_zero_base_len_zero_mod_len() {
+        let base_len = U256::from(0);
+        let exp_len = U256::from(1);
+        let mod_len = U256::from(0);
+        let base = U256::from(1);
+        let exp = U256::from(1);
+        let modulus = U256::from(1);
+
+        let mut input: Vec<u8> = Vec::new();
+        input.extend_from_slice(&u256_to_arr(&base_len));
+        input.extend_from_slice(&u256_to_arr(&exp_len));
+        input.extend_from_slice(&u256_to_arr(&mod_len));
+        input.extend_from_slice(&u256_to_arr(&base));
+        input.extend_from_slice(&u256_to_arr(&exp));
+        input.extend_from_slice(&u256_to_arr(&modulus));
+
+        let res = ModExp::<Byzantium>::new()
+            .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
+            .unwrap();
+        let expected = [0u8; 0];
+        assert_eq!(res.output, expected);
     }
 }
