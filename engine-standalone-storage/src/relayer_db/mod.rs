@@ -270,11 +270,15 @@ mod test {
                 .unwrap();
         }
         let block_rows = super::read_block_data(&mut connection).unwrap();
-        super::initialize_blocks(&mut storage, block_rows.map(|row| Ok(row.into()))).unwrap();
+        super::initialize_blocks(
+            &mut storage,
+            block_rows.map(|row| Ok(row.try_into().unwrap())),
+        )
+        .unwrap();
         let tx_rows = super::read_transaction_data(&mut connection).unwrap();
         super::initialize_transactions(
             &mut storage,
-            tx_rows.map(|row| Ok(row.into())),
+            tx_rows.map(|row| Ok(row.try_into().unwrap())),
             engine_state,
         )
         .unwrap();
