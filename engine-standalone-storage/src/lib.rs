@@ -44,6 +44,21 @@ pub enum StoragePrefix {
     EngineAccountId = 0x07,
 }
 
+impl From<StoragePrefix> for u8 {
+    fn from(value: StoragePrefix) -> Self {
+        match value {
+            StoragePrefix::BlockHash => 0x00,
+            StoragePrefix::BlockHeight => 0x01,
+            StoragePrefix::TransactionData => 0x02,
+            StoragePrefix::TransactionHash => 0x03,
+            StoragePrefix::Diff => 0x04,
+            StoragePrefix::Engine => 0x05,
+            StoragePrefix::BlockMetadata => 0x06,
+            StoragePrefix::EngineAccountId => 0x07,
+        }
+    }
+}
+
 const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
 pub struct Storage {
@@ -471,7 +486,7 @@ impl BlockMetadata {
 }
 
 fn construct_storage_key(prefix: StoragePrefix, key: &[u8]) -> Vec<u8> {
-    [&[VERSION], &[prefix as u8], key].concat()
+    [&[VERSION], &[u8::from(prefix)], key].concat()
 }
 
 fn construct_engine_key(key: &[u8], block_height: u64, transaction_position: u16) -> Vec<u8> {

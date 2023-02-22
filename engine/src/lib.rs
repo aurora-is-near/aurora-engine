@@ -280,8 +280,21 @@ mod contract {
         let bytes = io.read_input().to_vec();
         let args = CallArgs::deserialize(&bytes).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
         let current_account_id = io.current_account_id();
+        let predecessor_account_id = io.predecessor_account_id();
+
+        // During the XCC flow the Engine will call itself to move wNEAR
+        // to the user's sub-account. We do not want this move to happen
+        // if prior promises in the flow have failed.
+        if current_account_id == predecessor_account_id {
+            let check_promise: Result<(), &[u8]> = match io.promise_result_check() {
+                Some(true) | None => Ok(()),
+                Some(false) => Err(b"ERR_CALLBACK_OF_FAILED_PROMISE"),
+            };
+            check_promise.sdk_unwrap();
+        }
+
         let mut engine = Engine::new(
-            predecessor_address(&io.predecessor_account_id()),
+            predecessor_address(&predecessor_account_id),
             current_account_id,
             io,
             &io,
@@ -356,9 +369,9 @@ mod contract {
     pub extern "C" fn factory_update_address_version() {
         let mut io = Runtime;
         io.assert_private_call().sdk_unwrap();
-        let check_deploy: Result<(), &[u8]> = match io.promise_result(0) {
-            Some(PromiseResult::Successful(_)) => Ok(()),
-            Some(_) => Err(b"ERR_ROUTER_DEPLOY_FAILED"),
+        let check_deploy: Result<(), &[u8]> = match io.promise_result_check() {
+            Some(true) => Ok(()),
+            Some(false) => Err(b"ERR_ROUTER_DEPLOY_FAILED"),
             None => Err(b"ERR_ROUTER_UPDATE_NOT_CALLBACK"),
         };
         check_deploy.sdk_unwrap();

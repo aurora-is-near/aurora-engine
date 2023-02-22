@@ -469,6 +469,22 @@ impl crate::promise::PromiseHandler for Runtime {
     fn read_only(&self) -> Self::ReadOnly {
         Self
     }
+
+    // An optimized version of the default implementation where we do not copy over the
+    // result bytes of all the successful promise results.
+    fn promise_result_check(&self) -> Option<bool> {
+        let num_promises = self.promise_results_count();
+        if num_promises == 0 {
+            return None;
+        }
+        for index in 0..num_promises {
+            let status = unsafe { exports::promise_result(index, Self::PROMISE_REGISTER_ID.0) };
+            if status != 1 {
+                return Some(false);
+            }
+        }
+        Some(true)
+    }
 }
 
 /// Similar to `NearPublicKey`, except the first byte includes
