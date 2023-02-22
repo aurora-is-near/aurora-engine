@@ -509,18 +509,96 @@ mod tests {
     }
 
     #[test]
+    fn test_modexp_without_oom_1() {
+        // exp_len `isize::MAX` for wasm32 is 0x7fffffff
+        let input = "\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        000000000000000000000000000000000000000000000000000000007fffffff\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        // should pass without panic
+        let _ = ModExp::<Berlin>::new().run(
+            &hex::decode(input).unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+    }
+
+    #[test]
+    fn test_modexp_without_oom_2() {
+        // exp_len `isize::MAX`+ 1 for wasm32 is 0x80000000
+        let input = "\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        0000000000000000000000000000000000000000000000000000000080000000\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        // should pass without panic!
+        let _ = ModExp::<Berlin>::new().run(
+            &hex::decode(input).unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+    }
+
+    // #[test]
+    // #[should_panic()]
+    // fn test_modexp_oom_1() {
+    //     // this test will panic if exp_len `isize::MAX` = 0x7fffffffffffffff
+    //     let input = "\
+    //     0000000000000000000000000000000000000000000000000000000000000000\
+    //     0000000000000000000000000000000000000000000000007fffffffffffffff\
+    //     0000000000000000000000000000000000000000000000000000000000000000\
+    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    //     // should panic with capacity overflow
+    //     let _ = ModExp::<Berlin>::new().run(
+    //         &hex::decode(input).unwrap(),
+    //         Some(EthGas::new(100_000)),
+    //         &new_context(),
+    //         false,
+    //     );
+    // }
+
+    // #[test]
+    // #[should_panic()]
+    // fn test_modexp_oom_2() {
+    //     // this test will panic if exp_len `isize::MAX` + 1 = 0x8000000000000000
+    //     let input = "\
+    //     0000000000000000000000000000000000000000000000000000000000000000\
+    //     0000000000000000000000000000000000000000000000008000000000000000\
+    //     0000000000000000000000000000000000000000000000000000000000000000\
+    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    //     // should panic with capacity overflow
+    //     let _ = ModExp::<Berlin>::new().run(
+    //         &hex::decode(input).unwrap(),
+    //         Some(EthGas::new(100_000)),
+    //         &new_context(),
+    //         false,
+    //     );
+    // }
+
+    #[test]
     #[should_panic(expected = "attempt to add with overflow")]
-    fn test_parse_bytes_reverts_with_attempt_to_add_with_overflow() {
+    fn test_modexp_oom_add_with_overflow() {
         // base_len 0
-        // exp_len usize::MAX - 95
+        // exp_len usize::MAX 0xffffffffffffffff
         // mod_len 0
         let input = "\
         0000000000000000000000000000000000000000000000000000000000000000\
-        000000000000000000000000000000000000000000000000ffffffffffffffa0\
+        000000000000000000000000000000000000000000000000ffffffffffffffff\
         0000000000000000000000000000000000000000000000000000000000000000\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-        // Gas cost comes out to 18446744073709551615
+        // should panic
         let _ = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
@@ -531,9 +609,9 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "capacity overflow")]
-    fn test_parse_bytes_reverts_with_capacity_overflow() {
+    fn test_modexp_oom_capacity_overflow() {
         // base_len 0
-        // exp_len usize::MAX - 96
+        // exp_len usize::MAX - 96 (0xffffffffffffff9f)
         // mod_len 0
         let input = "\
         0000000000000000000000000000000000000000000000000000000000000000\
@@ -541,7 +619,7 @@ mod tests {
         0000000000000000000000000000000000000000000000000000000000000000\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-        // Gas cost comes out to 18446744073709551615
+        // should panic
         let _ = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
