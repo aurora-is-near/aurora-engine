@@ -1,6 +1,5 @@
 use crate::Storage;
 use aurora_engine::parameters;
-use aurora_engine::parameters::PausePrecompilesCallArgs;
 use aurora_engine::xcc::AddressVersionUpdateArgs;
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -81,9 +80,9 @@ pub enum TransactionKind {
     /// Ethereum transaction triggered by a NEAR account
     Call(parameters::CallArgs),
     /// Administrative method that makes a subset of precompiles paused
-    PausePrecompiles(PausePrecompilesCallArgs),
+    PausePrecompiles(parameters::PausePrecompilesCallArgs),
     /// Administrative method that resumes previously paused subset of precompiles
-    ResumePrecompiles(PausePrecompilesCallArgs),
+    ResumePrecompiles(parameters::PausePrecompilesCallArgs),
     /// Input here represents the EVM code used to create the new contract
     Deploy(Vec<u8>),
     /// New bridged token
@@ -112,7 +111,7 @@ pub enum TransactionKind {
     /// Admin only method
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
-    RegisterRelayer(types::Address),
+    RegisterRelayer(Address),
     /// Called if exist precompiles fail
     RefundOnError(Option<aurora_engine_types::parameters::RefundCallArgs>),
     /// Update eth-connector config
@@ -125,7 +124,7 @@ pub enum TransactionKind {
     FactoryUpdate(Vec<u8>),
     /// Update the version of a deployed xcc-router contract
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
-    FactorySetWNearAddress(types::Address),
+    FactorySetWNearAddress(Address),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -479,7 +478,6 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
 enum BorshableTransactionKind<'a> {
     Submit(Cow<'a, Vec<u8>>),
-    SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     Call(Cow<'a, parameters::CallArgs>),
     Deploy(Cow<'a, Vec<u8>>),
     DeployErc20(Cow<'a, parameters::DeployErc20TokenArgs>),
@@ -497,17 +495,18 @@ enum BorshableTransactionKind<'a> {
     StorageUnregister(Option<bool>),
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
     SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
-    RegisterRelayer(Cow<'a, types::Address>),
+    RegisterRelayer(Cow<'a, Address>),
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
     NewConnector(Cow<'a, parameters::InitCallArgs>),
     NewEngine(Cow<'a, parameters::NewCallArgs>),
     FactoryUpdate(Cow<'a, Vec<u8>>),
     FactoryUpdateAddressVersion(Cow<'a, AddressVersionUpdateArgs>),
-    FactorySetWNearAddress(types::Address),
+    FactorySetWNearAddress(Address),
     PausePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
+    SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
