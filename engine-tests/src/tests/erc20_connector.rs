@@ -457,7 +457,7 @@ pub mod sim_tests {
                 &aurora.contract,
                 &aurora,
             ),
-            INITIAL_ETH_BALANCE as u128
+            INITIAL_ETH_BALANCE.into()
         );
         assert_eq!(
             nep_141_balance_of(hacker_account, &aurora.contract, &aurora),
@@ -579,11 +579,11 @@ pub mod sim_tests {
                 &aurora.contract,
                 &aurora,
             ),
-            (INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT) as u128
+            (INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT).into()
         );
         assert_eq!(
             nep_141_balance_of(exit_account_id, &aurora.contract, &aurora),
-            ETH_EXIT_AMOUNT as u128
+            ETH_EXIT_AMOUNT.into()
         );
         assert_eq!(
             eth_balance_of(signer_address, &aurora),
@@ -674,7 +674,7 @@ pub mod sim_tests {
                 &aurora.contract,
                 &aurora,
             ),
-            INITIAL_ETH_BALANCE as u128
+            INITIAL_ETH_BALANCE.into()
         );
         assert_eq!(
             eth_balance_of(signer_address, &aurora),
