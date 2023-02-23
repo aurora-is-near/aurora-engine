@@ -1,11 +1,20 @@
 use crate::prelude::{BorshDeserialize, BorshSerialize};
-use aurora_engine_sdk::keccak;
-use aurora_engine_types::types::RawH256;
+use aurora_engine_sdk::{
+    io::{StorageIntermediate, IO},
+    keccak,
+};
+use aurora_engine_types::{
+    storage::{bytes_to_key, KeyPrefix},
+    types::RawH256,
+};
+
+/// Key for storing the state of the blockchain hashchain.
+const HASHCHAIN_KEY: &[u8; 9] = b"HASHCHAIN";
 
 /// Blockchain Hashchain
 /// Continually keeps track of the previous block hashchain through the blocks heights.
 #[derive(BorshSerialize, BorshDeserialize)]
-struct BlockchainHashchain {
+pub struct BlockchainHashchain {
     chain_id_hash: RawH256,
     contract_account_id_hash: RawH256,
     current_block_height: u64,
@@ -83,6 +92,30 @@ impl BlockchainHashchain {
 
         Ok(())
     }
+}
+
+/// Gets the state from storage, if it exists otherwise it will error.
+pub fn get_state<I: IO>(io: &I) -> Result<BlockchainHashchain, BlockchainHashchainError> {
+    match io.read_storage(&bytes_to_key(KeyPrefix::Config, HASHCHAIN_KEY)) {
+        None => Err(BlockchainHashchainError::NotFound),
+        Some(bytes) => BlockchainHashchain::try_from_slice(&bytes.to_vec())
+            .map_err(|_| BlockchainHashchainError::DeserializationFailed),
+    }
+}
+
+/// Saves state into the storage. Does not return the previous state.
+pub fn set_state<I: IO>(
+    io: &mut I,
+    state: BlockchainHashchain,
+) -> Result<(), BlockchainHashchainError> {
+    io.write_storage(
+        &bytes_to_key(KeyPrefix::Config, HASHCHAIN_KEY),
+        &state
+            .try_to_vec()
+            .map_err(|_| BlockchainHashchainError::SerializationFailed)?,
+    );
+
+    Ok(())
 }
 
 #[derive(Debug)]
