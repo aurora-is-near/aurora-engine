@@ -70,6 +70,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
+    use hashchain::BlockchainHashchain;
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
@@ -281,9 +282,13 @@ mod contract {
             &io,
         )
         .sdk_unwrap();
-        Engine::call_with_args(&mut engine, args, &mut Runtime)
-            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
+
+        let result =
+            Engine::call_with_args(&mut engine, args, &mut Runtime).map(|res| res.try_to_vec());
+        result
+            .map(|res| res.sdk_expect(errors::ERR_SERIALIZE))
             .sdk_process();
+        update_hashchain(io, "call", bytes, result);
         // TODO: charge for storage
     }
 
@@ -990,6 +995,18 @@ mod contract {
 
     fn predecessor_address(predecessor_account_id: &AccountId) -> Address {
         near_account_to_evm_address(predecessor_account_id.as_bytes())
+    }
+
+    fn update_hashchain<I: IO>(io: &mut I, method_name: &str, input: &[u8], output: &[u8]) {
+        let mut blockchain_hashchain = hashchain::get_state(io).sdk_unwrap();
+        let block_height = u64::from(self.env.block_height());
+
+        if block_height > blockchain_hashchain.current_block_height {
+            blockchain_hashchain.move_to_block(block_height);
+        }
+        blockchain_hashchain.add_block_tx(block_height, method_name, input, output);
+
+        hashchain::set_state(io, blockchain_hashchain);
     }
 
     mod exports {
