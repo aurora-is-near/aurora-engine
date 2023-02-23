@@ -538,6 +538,20 @@ mod tests {
             .unwrap();
         let expected = [0u8; 0];
         assert_eq!(res.output, expected);
+
+        let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+        let min_gas = EthGas::new(0);
+        assert_eq!(gas, min_gas);
+
+        let res = ModExp::<Berlin>::new()
+            .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
+            .unwrap();
+        let expected = [0u8; 0];
+        assert_eq!(res.output, expected);
+
+        let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
+        let min_gas = EthGas::new(200);
+        assert_eq!(gas, min_gas);
     }
 
     #[test]
@@ -562,5 +576,19 @@ mod tests {
             .unwrap();
         let expected = [0u8; 0];
         assert_eq!(res.output, expected);
+
+        let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+        let min_gas = EthGas::new(0);
+        assert_eq!(gas, min_gas);
+
+        let res = ModExp::<Berlin>::new()
+            .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
+            .unwrap();
+        let expected = [0u8; 0];
+        assert_eq!(res.output, expected);
+
+        let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
+        let min_gas = EthGas::new(200);
+        assert_eq!(gas, min_gas);
     }
 }
