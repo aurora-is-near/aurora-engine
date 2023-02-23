@@ -82,6 +82,7 @@ impl<HF: HardFork> ModExp<HF> {
 }
 
 impl ModExp<Byzantium> {
+    const MIN_GAS: EthGas = EthGas::new(0);
     // ouput of this function is bounded by 2^128
     fn mul_complexity(x: u64) -> U256 {
         if x <= 64 {
@@ -101,7 +102,7 @@ impl Precompile for ModExp<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
         if base_len == 0 && mod_len == 0 {
-            Ok(EthGas::new(0u64)) // min gas is zero
+            Ok(Self::MIN_GAS)
         } else {
             let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
             let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
@@ -134,6 +135,7 @@ impl Precompile for ModExp<Byzantium> {
 }
 
 impl ModExp<Berlin> {
+    const MIN_GAS: EthGas = EthGas::new(200);
     // output bounded by 2^122
     fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
@@ -146,7 +148,7 @@ impl Precompile for ModExp<Berlin> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
         if base_len == 0 && mod_len == 0 {
-            Ok(EthGas::new(200u64)) // min gas 200
+            Ok(Self::MIN_GAS)
         } else {
             let mul = Self::mul_complexity(base_len, mod_len);
             let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
@@ -463,11 +465,11 @@ mod tests {
         let exp = U256::MAX;
 
         let mut input: Vec<u8> = Vec::new();
-        input.extend_from_slice(&u256_to_arr(&base_len));
-        input.extend_from_slice(&u256_to_arr(&exp_len));
-        input.extend_from_slice(&u256_to_arr(&mod_len));
-        input.extend_from_slice(&base.to_be_bytes());
-        input.extend_from_slice(&u256_to_arr(&exp));
+        input.extend(u256_to_arr(&base_len));
+        input.extend(u256_to_arr(&exp_len));
+        input.extend(u256_to_arr(&mod_len));
+        input.extend(base.to_be_bytes());
+        input.extend(u256_to_arr(&exp));
 
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();
@@ -482,11 +484,11 @@ mod tests {
         let exp = U256::MAX;
 
         let mut input: Vec<u8> = Vec::new();
-        input.extend_from_slice(&u256_to_arr(&base_len));
-        input.extend_from_slice(&u256_to_arr(&exp_len));
-        input.extend_from_slice(&u256_to_arr(&mod_len));
-        input.extend_from_slice(&base.to_be_bytes());
-        input.extend_from_slice(&u256_to_arr(&exp));
+        input.extend(u256_to_arr(&base_len));
+        input.extend(u256_to_arr(&exp_len));
+        input.extend(u256_to_arr(&mod_len));
+        input.extend(base.to_be_bytes());
+        input.extend(u256_to_arr(&exp));
 
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();
@@ -524,12 +526,12 @@ mod tests {
         let modulus = U256::MAX;
 
         let mut input: Vec<u8> = Vec::new();
-        input.extend_from_slice(&u256_to_arr(&base_len));
-        input.extend_from_slice(&u256_to_arr(&exp_len));
-        input.extend_from_slice(&u256_to_arr(&mod_len));
-        input.extend_from_slice(&u256_to_arr(&base));
-        input.extend_from_slice(&u256_to_arr(&exp));
-        input.extend_from_slice(&u256_to_arr(&modulus));
+        input.extend(u256_to_arr(&base_len));
+        input.extend(u256_to_arr(&exp_len));
+        input.extend(u256_to_arr(&mod_len));
+        input.extend(u256_to_arr(&base));
+        input.extend(u256_to_arr(&exp));
+        input.extend(u256_to_arr(&modulus));
 
         let res = ModExp::<Byzantium>::new()
             .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
@@ -548,12 +550,12 @@ mod tests {
         let modulus = U256::from(1);
 
         let mut input: Vec<u8> = Vec::new();
-        input.extend_from_slice(&u256_to_arr(&base_len));
-        input.extend_from_slice(&u256_to_arr(&exp_len));
-        input.extend_from_slice(&u256_to_arr(&mod_len));
-        input.extend_from_slice(&u256_to_arr(&base));
-        input.extend_from_slice(&u256_to_arr(&exp));
-        input.extend_from_slice(&u256_to_arr(&modulus));
+        input.extend(u256_to_arr(&base_len));
+        input.extend(u256_to_arr(&exp_len));
+        input.extend(u256_to_arr(&mod_len));
+        input.extend(u256_to_arr(&base));
+        input.extend(u256_to_arr(&exp));
+        input.extend(u256_to_arr(&modulus));
 
         let res = ModExp::<Byzantium>::new()
             .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
