@@ -38,8 +38,8 @@ pub enum StoragePrefix {
 }
 
 impl From<StoragePrefix> for u8 {
-    fn from(prefix: StoragePrefix) -> Self {
-        match prefix {
+    fn from(value: StoragePrefix) -> Self {
+        match value {
             StoragePrefix::BlockHash => 0x00,
             StoragePrefix::BlockHeight => 0x01,
             StoragePrefix::TransactionData => 0x02,

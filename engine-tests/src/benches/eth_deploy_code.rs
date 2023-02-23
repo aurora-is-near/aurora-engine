@@ -50,7 +50,7 @@ pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
     // measure wall-clock time
     let mut group = c.benchmark_group("deploy_code");
     for input in inputs {
-        let input_size = input.len() as u64;
+        let input_size = u64::try_from(input.len()).unwrap();
         let id = BenchmarkId::from_parameter(input_size);
         group.throughput(Throughput::Bytes(input_size));
         group.bench_function(id, |b| {

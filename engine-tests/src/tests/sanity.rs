@@ -499,7 +499,7 @@ fn test_timestamp() {
         .unwrap();
     let t_ns = t.as_nanos();
     let t_s = U256::from(t.as_secs());
-    runner.context.block_timestamp = t_ns as u64;
+    runner.context.block_timestamp = u64::try_from(t_ns).unwrap();
 
     // call contract
     let result = runner

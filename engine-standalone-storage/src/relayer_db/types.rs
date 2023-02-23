@@ -69,56 +69,12 @@ pub struct BlockRow {
     pub receipts_root: H256,
 }
 
-struct BlockRowSize(i32);
-
-impl TryFrom<BlockRowSize> for u32 {
-    type Error = TryFromIntError;
-
-    fn try_from(value: BlockRowSize) -> Result<Self, Self::Error> {
-        // set negative values to 0
-        value.0.max(0).try_into()
-    }
-}
-
-struct BlockRowChain(i32);
-
-impl TryFrom<BlockRowChain> for u64 {
-    type Error = TryFromIntError;
-
-    fn try_from(value: BlockRowChain) -> Result<Self, Self::Error> {
-        // set negative values to 0
-        value.0.max(0).try_into()
-    }
-}
-
-struct BlockRowId(i64);
-
-impl TryFrom<BlockRowId> for u64 {
-    type Error = TryFromIntError;
-
-    fn try_from(value: BlockRowId) -> Result<Self, Self::Error> {
-        // set negative values to 0
-        value.0.max(0).try_into()
-    }
-}
-
-struct BlockRowBlock(i64);
-
-impl TryFrom<BlockRowBlock> for u64 {
-    type Error = TryFromIntError;
-
-    fn try_from(value: BlockRowBlock) -> Result<Self, Self::Error> {
-        // set negative values to 0
-        value.0.max(0).try_into()
-    }
-}
-
 impl TryFrom<postgres::Row> for BlockRow {
-    type Error = postgres::Error;
+    type Error = std::num::TryFromIntError;
 
     fn try_from(row: postgres::Row) -> Result<Self, Self::Error> {
-        let chain: BlockRowChain = BlockRowChain(row.get("chain"));
-        let id: BlockRowId = BlockRowId(row.get("id"));
+        let chain: i32 = row.get("chain");
+        let id: i64 = row.get("id");
         let hash = get_hash(&row, "hash");
         let near_hash: Option<&[u8]> = row.get("near_hash");
         let timestamp = get_timestamp(&row, "timestamp");
@@ -131,12 +87,12 @@ impl TryFrom<postgres::Row> for BlockRow {
         let receipts_root = get_hash(&row, "receipts_root");
 
         Ok(Self {
-            chain: u64::try_from(chain).unwrap(),
-            id: u64::try_from(id).unwrap(),
+            chain: chain.try_into()?,
+            id: id.try_into()?,
             hash,
             near_hash: near_hash.map(H256::from_slice),
             timestamp,
-            size: u32::try_from(size).unwrap(),
+            size: size.try_into()?,
             gas_limit,
             gas_used,
             parent_hash,
@@ -193,44 +149,11 @@ pub struct TransactionRow {
     pub output: Vec<u8>,
 }
 
-struct TransactionRowBlock(pub i64);
-
-impl TryFrom<TransactionRowBlock> for u64 {
-    type Error = TryFromIntError;
-
-    fn try_from(value: TransactionRowBlock) -> Result<Self, Self::Error> {
-        // set negative values to 0
-        value.0.try_into()
-    }
-}
-
-struct TransactionRowIndex(pub i32);
-
-impl TryFrom<TransactionRowIndex> for u16 {
-    type Error = TryFromIntError;
-
-    fn try_from(value: TransactionRowIndex) -> Result<Self, Self::Error> {
-        // set Maximum value to u16::MAX
-        value.0.try_into()
-    }
-}
-
-struct TransactionRowId(pub i64);
-
-impl TryFrom<TransactionRowId> for u64 {
-    type Error = TryFromIntError;
-
-    fn try_from(value: TransactionRowId) -> Result<Self, Self::Error> {
-        // set negative values to 0
-        value.0.try_into()
-    }
-}
-
 impl TryFrom<postgres::Row> for TransactionRow {
-    type Error = postgres::Error;
+    type Error = std::num::TryFromIntError;
 
     fn try_from(row: postgres::Row) -> Result<Self, Self::Error> {
-        let block: TransactionRowBlock = TransactionRowBlock(row.get("block"));
+        let block: i64 = row.get("block");
         let block_hash = get_hash(&row, "block_hash");
         let index = TransactionRowIndex(row.get("index"));
         let id: TransactionRowId = TransactionRowId(row.get("id"));
@@ -252,10 +175,10 @@ impl TryFrom<postgres::Row> for TransactionRow {
         let output: Option<Vec<u8>> = row.get("output");
 
         Ok(Self {
-            block: u64::try_from(block).unwrap(),
+            block: block.try_into()?,
             block_hash,
-            index: u16::try_from(index).unwrap(),
-            id: u64::try_from(id).unwrap(),
+            index: index.try_into()?,
+            id: id.try_into()?,
             hash,
             near_hash,
             near_receipt_hash,
@@ -325,7 +248,7 @@ fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {
     let timestamp: Option<SystemTime> = row.get(field);
     timestamp
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|d| u64::try_from(TransactionDuration(d.as_nanos())).unwrap())
+        .and_then(|d| u64::try_from(d.as_nanos()).ok())
 }
 
 struct PostgresNumeric {
@@ -351,12 +274,13 @@ enum PostgresNumericSign {
     NaN = 0xc000,
 }
 
-impl From<PostgresNumericSign> for u16 {
-    fn from(sign: PostgresNumericSign) -> Self {
-        match sign {
-            PostgresNumericSign::Positive => 0x0000,
-            PostgresNumericSign::Negative => 0x4000,
-            PostgresNumericSign::NaN => 0xc000,
+impl From<u16> for PostgresNumericSign {
+    fn from(value: u16) -> Self {
+        match value {
+            0x0000 => Self::Positive,
+            0x4000 => Self::Negative,
+            0xc000 => Self::NaN,
+            _ => panic!("Unexpected Numeric Sign value"),
         }
     }
 }
@@ -418,17 +342,8 @@ impl<'a> postgres::types::FromSql<'a> for PostgresNumeric {
 
         let num_groups = read_u16(&mut cursor)?;
         let weight = read_i16(&mut cursor)?;
-
         let sign_raw = read_u16(&mut cursor)?;
-        let sign = if sign_raw == u16::from(PostgresNumericSign::Positive) {
-            PostgresNumericSign::Positive
-        } else if sign_raw == u16::from(PostgresNumericSign::Negative) {
-            PostgresNumericSign::Negative
-        } else if sign_raw == u16::from(PostgresNumericSign::NaN) {
-            PostgresNumericSign::NaN
-        } else {
-            panic!("Unexpected Numeric Sign value");
-        };
+        let sign = sign_raw.into();
 
         let scale = read_u16(&mut cursor)?;
         let mut groups = Vec::with_capacity(usize::from(num_groups));
