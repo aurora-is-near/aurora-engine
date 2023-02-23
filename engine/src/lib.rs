@@ -120,6 +120,8 @@ mod contract {
         }
 
         let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
+        AccountId::validate(args.owner_id.as_ref()).sdk_unwrap();
+        AccountId::validate(args.bridge_prover_id.as_ref()).sdk_unwrap();
         state::set_state(&mut io, args.into()).sdk_unwrap();
     }
 
@@ -426,7 +428,7 @@ mod contract {
         let mut io = Runtime;
         // Id of the NEP141 token in Near
         let args: DeployErc20TokenArgs = io.read_input_borsh().sdk_unwrap();
-
+        AccountId::validate(args.nep141.as_ref()).sdk_unwrap();
         let address = engine::deploy_erc20_token(args, io, &io, &mut Runtime).sdk_unwrap();
 
         io.return_output(
@@ -570,6 +572,7 @@ mod contract {
         io.assert_private_call().sdk_unwrap();
 
         let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
+        AccountId::validate(args.prover_account.as_ref()).sdk_unwrap();
         let owner_id = io.current_account_id();
 
         EthConnectorContract::create_contract(io, owner_id, args).sdk_unwrap();
@@ -582,6 +585,7 @@ mod contract {
         io.assert_private_call().sdk_unwrap();
 
         let args: SetContractDataCallArgs = io.read_input_borsh().sdk_unwrap();
+        AccountId::validate(args.prover_account.as_ref()).sdk_unwrap();
         connector::set_contract_data(&mut io, args).sdk_unwrap();
     }
 
@@ -747,6 +751,8 @@ mod contract {
         }
 
         let args: ResolveTransferCallArgs = io.read_input().to_value().sdk_unwrap();
+        AccountId::validate(args.sender_id.as_ref()).sdk_unwrap();
+        AccountId::validate(args.receiver_id.as_ref()).sdk_unwrap();
         let promise_result = io.promise_result(0).sdk_unwrap();
 
         EthConnectorContract::init_instance(io)
@@ -876,6 +882,7 @@ mod contract {
     pub extern "C" fn get_erc20_from_nep141() {
         let mut io = Runtime;
         let args: GetErc20FromNep141CallArgs = io.read_input_borsh().sdk_unwrap();
+        AccountId::validate(args.nep141.as_ref()).sdk_unwrap();
 
         io.return_output(
             engine::get_erc20_from_nep141(&io, &args.nep141)
