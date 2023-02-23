@@ -855,7 +855,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_paused_flags() {
         let io = Runtime;
-        // Only the owner can initialize the EthConnector
         let is_private = io.assert_private_call();
         if is_private.is_err() {
             let state = state::get_state(&io).sdk_unwrap();
