@@ -21,8 +21,8 @@ impl BlockchainHashchain {
         Self {
             chain_id_hash: keccak(chain_id).0,
             contract_account_id_hash: keccak(contract_account_id).0,
-            current_block_height: current_block_height,
-            previous_block_hashchain: previous_block_hashchain,
+            current_block_height,
+            previous_block_hashchain,
             block_hashchain_computer: BlockHashchainComputer::new(),
         }
     }
@@ -256,6 +256,192 @@ struct CompactMerkleSubtree {
 
     /// Merkle tree hash of the subtree.
     hash: RawH256,
+}
+
+#[cfg(test)]
+mod blockchain_hashchain_tests {
+    use super::*;
+
+    #[test]
+    fn add_tx_lower_height_test() {
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32]);
+
+        let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[0; 0], &[0; 0]);
+        assert!(add_tx_result.is_err());
+    }
+
+    #[test]
+    fn add_tx_higger_height_test() {
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
+
+        assert_eq!(blockchain_hashchain.current_block_height, 1);
+
+        let add_tx_result = blockchain_hashchain.add_block_tx(3, "foo", &[0; 0], &[0; 0]);
+
+        assert!(add_tx_result.is_ok());
+        assert_eq!(blockchain_hashchain.current_block_height, 3);
+    }
+
+    #[test]
+    fn add_tx_same_height_test() {
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
+
+        assert_eq!(
+            blockchain_hashchain
+                .block_hashchain_computer
+                .txs_merkle_tree
+                .subtrees
+                .len(),
+            0
+        );
+
+        let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[0; 0], &[0; 0]);
+
+        assert!(add_tx_result.is_ok());
+        assert_eq!(blockchain_hashchain.current_block_height, 1);
+        assert_eq!(
+            blockchain_hashchain
+                .block_hashchain_computer
+                .txs_merkle_tree
+                .subtrees
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn move_to_block_lower_height_test() {
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32]);
+
+        let move_to_block_result = blockchain_hashchain.move_to_block(1);
+        assert!(move_to_block_result.is_err());
+    }
+
+    #[test]
+    fn move_to_block_same_height_test() {
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
+
+        let move_to_block_result = blockchain_hashchain.move_to_block(1);
+        assert!(move_to_block_result.is_err());
+    }
+
+    #[test]
+    fn move_to_block_one_more_height_test() {
+        let chain_id = &[1; 32];
+        let chain_id_hash = keccak(chain_id).0;
+        let contract_account_id = "aurora".as_bytes();
+        let contract_account_id_hash = keccak(contract_account_id).0;
+
+        let method_name = "foo";
+        let input = "foo_input".as_bytes();
+        let output = "foo_output".as_bytes();
+
+        let method_name_hash = keccak(method_name.as_bytes()).0;
+        let input_hash = keccak(input).0;
+        let output_hash = keccak(output).0;
+        let tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
+
+        let block_height_2: u64 = 2;
+        let block_height_hash_2 = keccak(&block_height_2.to_be_bytes()).0;
+        let block_hashchain_1 = keccak(&1u64.to_be_bytes()).0;
+
+        let expected_block_hashchain_2 = keccak(
+            &[
+                chain_id_hash,
+                contract_account_id_hash,
+                block_height_hash_2,
+                block_hashchain_1,
+                tx_hash,
+            ]
+            .concat(),
+        )
+        .0;
+
+        let mut blockchain_hashchain = BlockchainHashchain::new(
+            chain_id,
+            contract_account_id,
+            block_height_2,
+            block_hashchain_1,
+        );
+
+        blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);
+        assert_eq!(
+            blockchain_hashchain.previous_block_hashchain,
+            block_hashchain_1
+        );
+
+        blockchain_hashchain.move_to_block(3);
+        assert_eq!(
+            blockchain_hashchain.previous_block_hashchain,
+            expected_block_hashchain_2
+        );
+    }
+
+    #[test]
+    fn move_to_block_two_more_height_test() {
+        let chain_id = &[1; 32];
+        let chain_id_hash = keccak(chain_id).0;
+        let contract_account_id = "aurora".as_bytes();
+        let contract_account_id_hash = keccak(contract_account_id).0;
+
+        let method_name = "foo";
+        let input = "foo_input".as_bytes();
+        let output = "foo_output".as_bytes();
+
+        let method_name_hash = keccak(method_name.as_bytes()).0;
+        let input_hash = keccak(input).0;
+        let output_hash = keccak(output).0;
+        let tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
+
+        let block_hashchain_1 = keccak(&1u64.to_be_bytes()).0;
+        let block_height_2: u64 = 2;
+        let block_height_hash_2 = keccak(&block_height_2.to_be_bytes()).0;
+        let block_height_3: u64 = 3;
+        let block_height_hash_3 = keccak(&block_height_3.to_be_bytes()).0;
+
+        let block_hashchain_2 = keccak(
+            &[
+                chain_id_hash,
+                contract_account_id_hash,
+                block_height_hash_2,
+                block_hashchain_1,
+                tx_hash,
+            ]
+            .concat(),
+        )
+        .0;
+
+        let expected_block_hashchain_3 = keccak(
+            &[
+                chain_id_hash,
+                contract_account_id_hash,
+                block_height_hash_3,
+                block_hashchain_2,
+                [0; 32],
+            ]
+            .concat(),
+        )
+        .0;
+
+        let mut blockchain_hashchain = BlockchainHashchain::new(
+            chain_id,
+            contract_account_id,
+            block_height_2,
+            block_hashchain_1,
+        );
+
+        blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);
+        assert_eq!(
+            blockchain_hashchain.previous_block_hashchain,
+            block_hashchain_1
+        );
+
+        blockchain_hashchain.move_to_block(4);
+        assert_eq!(
+            blockchain_hashchain.previous_block_hashchain,
+            expected_block_hashchain_3
+        );
+    }
 }
 
 #[cfg(test)]
