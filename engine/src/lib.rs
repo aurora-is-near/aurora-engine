@@ -156,8 +156,6 @@ mod contract {
             state.owner_id = args.new_owner;
             state::set_state(&mut io, state).sdk_unwrap();
         }
-        // return true as bytes
-        io.return_output(b"true");
     }
 
     /// Get bridge prover id for this contract.
