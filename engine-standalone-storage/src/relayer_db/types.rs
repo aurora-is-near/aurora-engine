@@ -4,7 +4,6 @@ use aurora_engine_transactions::{
 };
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
-use core::num::TryFromIntError;
 use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::time::SystemTime;
@@ -78,7 +77,7 @@ impl TryFrom<postgres::Row> for BlockRow {
         let hash = get_hash(&row, "hash");
         let near_hash: Option<&[u8]> = row.get("near_hash");
         let timestamp = get_timestamp(&row, "timestamp");
-        let size: BlockRowSize = BlockRowSize(row.get("size"));
+        let size: i32 = row.get("size");
         let gas_limit = get_numeric(&row, "gas_limit");
         let gas_used = get_numeric(&row, "gas_used");
         let parent_hash = get_hash(&row, "parent_hash");
@@ -155,8 +154,8 @@ impl TryFrom<postgres::Row> for TransactionRow {
     fn try_from(row: postgres::Row) -> Result<Self, Self::Error> {
         let block: i64 = row.get("block");
         let block_hash = get_hash(&row, "block_hash");
-        let index = TransactionRowIndex(row.get("index"));
-        let id: TransactionRowId = TransactionRowId(row.get("id"));
+        let index: i32 = row.get("index");
+        let id: i64 = row.get("id");
         let hash = get_hash(&row, "hash");
         let near_hash = get_hash(&row, "near_hash");
         let near_receipt_hash = get_hash(&row, "near_receipt_hash");
@@ -232,16 +231,6 @@ fn get_hash(row: &postgres::Row, field: &str) -> H256 {
 fn get_address(row: &postgres::Row, field: &str) -> Address {
     let value: &[u8] = row.get(field);
     Address::try_from_slice(value).unwrap()
-}
-
-struct TransactionDuration(pub u128);
-
-impl TryFrom<TransactionDuration> for u64 {
-    type Error = TryFromIntError;
-
-    fn try_from(value: TransactionDuration) -> Result<Self, Self::Error> {
-        value.0.try_into()
-    }
 }
 
 fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {
