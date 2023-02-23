@@ -2,6 +2,8 @@ use crate::prelude::{BorshDeserialize, BorshSerialize};
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::types::RawH256;
 
+/// Blockchain Hashchain
+/// Continually keeps track of the previous block hashchain through the blocks heights.
 #[derive(BorshSerialize, BorshDeserialize)]
 struct BlockchainHashchain {
     chain_id_hash: RawH256,
@@ -27,6 +29,8 @@ impl BlockchainHashchain {
         }
     }
 
+    /// Adds a transaction if the indicated block height is equal to the current block height.
+    /// Returns an error in other case.
     pub fn add_block_tx(
         &mut self,
         block_height: u64,
@@ -34,15 +38,10 @@ impl BlockchainHashchain {
         input: &[u8],
         output: &[u8],
     ) -> Result<(), BlockchainHashchainError> {
-        if block_height < self.current_block_height {
+        if block_height != self.current_block_height {
             return Err(BlockchainHashchainError::BlockHeightIncorrect(
-                "Parameter block height should be bigger or equal to current block height"
-                    .to_string(),
+                "Parameter block height should be equal to the current block height.".to_string(),
             ));
-        }
-
-        if block_height > self.current_block_height {
-            self.move_to_block(block_height)?;
         }
 
         self.block_hashchain_computer
@@ -51,13 +50,19 @@ impl BlockchainHashchain {
         Ok(())
     }
 
+    /// Moves to the indicated block height if it is bigger than the current block height:
+    /// -Updates the previous block hashchain computing the hash.
+    /// -Updates the current block height.
+    /// -Clears the transactions.
+    /// Returns an error in other case.
     pub fn move_to_block(
         &mut self,
         next_block_height: u64,
     ) -> Result<(), BlockchainHashchainError> {
         if next_block_height <= self.current_block_height {
             return Err(BlockchainHashchainError::BlockHeightIncorrect(
-                "Parameter block height should be bigger to current block height".to_string(),
+                "Parameter block height should be bigger than the current block height."
+                    .to_string(),
             ));
         }
 
@@ -267,25 +272,8 @@ mod blockchain_hashchain_tests {
         let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[0; 0], &[0; 0]);
+
         assert!(add_tx_result.is_err());
-    }
-
-    #[test]
-    fn add_tx_higger_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
-
-        assert_eq!(blockchain_hashchain.current_block_height, 1);
-
-        let add_tx_result = blockchain_hashchain.add_block_tx(3, "foo", &[0; 0], &[0; 0]);
-
-        assert!(add_tx_result.is_ok());
-        assert_eq!(blockchain_hashchain.current_block_height, 3);
-    }
-
-    #[test]
-    fn add_tx_same_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
-
         assert_eq!(
             blockchain_hashchain
                 .block_hashchain_computer
@@ -294,11 +282,32 @@ mod blockchain_hashchain_tests {
                 .len(),
             0
         );
+    }
+
+    #[test]
+    fn add_tx_higger_height_test() {
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
+
+        let add_tx_result = blockchain_hashchain.add_block_tx(2, "foo", &[0; 0], &[0; 0]);
+
+        assert!(add_tx_result.is_err());
+        assert_eq!(
+            blockchain_hashchain
+                .block_hashchain_computer
+                .txs_merkle_tree
+                .subtrees
+                .len(),
+            0
+        );
+    }
+
+    #[test]
+    fn add_tx_same_height_test() {
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[0; 0], &[0; 0]);
 
         assert!(add_tx_result.is_ok());
-        assert_eq!(blockchain_hashchain.current_block_height, 1);
         assert_eq!(
             blockchain_hashchain
                 .block_hashchain_computer
