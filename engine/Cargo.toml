@@ -25,6 +25,7 @@ borsh = { version = "0.9.3", default-features = false }
 byte-slice-cast = { version = "1.0", default-features = false }
 ethabi = { version = "18.0", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false }
+function_name = "0.3.0"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 rlp = { version = "0.5.0", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "derive"] }

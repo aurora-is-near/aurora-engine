@@ -8,8 +8,34 @@ use aurora_engine_types::{
     types::RawH256,
 };
 
+use self::blockchain_hashchain_error::BlockchainHashchainError;
+
 /// Key for storing the state of the blockchain hashchain.
 const HASHCHAIN_KEY: &[u8; 9] = b"HASHCHAIN";
+
+/// Gets the state from storage, if it exists otherwise it will error.
+pub fn get_state<I: IO>(io: &I) -> Result<BlockchainHashchain, BlockchainHashchainError> {
+    match io.read_storage(&bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_KEY)) {
+        None => Err(BlockchainHashchainError::NotFound),
+        Some(bytes) => BlockchainHashchain::try_from_slice(&bytes.to_vec())
+            .map_err(|_| BlockchainHashchainError::DeserializationFailed),
+    }
+}
+
+/// Saves state into the storage. Does not return the previous state.
+pub fn set_state<I: IO>(
+    io: &mut I,
+    state: BlockchainHashchain,
+) -> Result<(), BlockchainHashchainError> {
+    io.write_storage(
+        &bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_KEY),
+        &state
+            .try_to_vec()
+            .map_err(|_| BlockchainHashchainError::SerializationFailed)?,
+    );
+
+    Ok(())
+}
 
 /// Blockchain Hashchain
 /// Continually keeps track of the previous block hashchain through the blocks heights.
@@ -19,6 +45,7 @@ pub struct BlockchainHashchain {
     contract_account_id_hash: RawH256,
     current_block_height: u64,
     previous_block_hashchain: RawH256,
+    genesis_block_hashchain: RawH256,
     block_hashchain_computer: BlockHashchainComputer,
 }
 
@@ -28,12 +55,14 @@ impl BlockchainHashchain {
         contract_account_id: &[u8],
         current_block_height: u64,
         previous_block_hashchain: RawH256,
+        genesis_block_hashchain: RawH256,
     ) -> Self {
         Self {
             chain_id_hash: keccak(chain_id).0,
             contract_account_id_hash: keccak(contract_account_id).0,
             current_block_height,
             previous_block_hashchain,
+            genesis_block_hashchain,
             block_hashchain_computer: BlockHashchainComputer::new(),
         }
     }
@@ -48,9 +77,7 @@ impl BlockchainHashchain {
         output: &[u8],
     ) -> Result<(), BlockchainHashchainError> {
         if block_height != self.current_block_height {
-            return Err(BlockchainHashchainError::BlockHeightIncorrect(
-                "Parameter block height should be equal to the current block height.".to_string(),
-            ));
+            return Err(BlockchainHashchainError::BlockHeightIncorrect);
         }
 
         self.block_hashchain_computer
@@ -69,10 +96,7 @@ impl BlockchainHashchain {
         next_block_height: u64,
     ) -> Result<(), BlockchainHashchainError> {
         if next_block_height <= self.current_block_height {
-            return Err(BlockchainHashchainError::BlockHeightIncorrect(
-                "Parameter block height should be bigger than the current block height."
-                    .to_string(),
-            ));
+            return Err(BlockchainHashchainError::BlockHeightIncorrect);
         }
 
         while self.current_block_height < next_block_height {
@@ -92,43 +116,53 @@ impl BlockchainHashchain {
 
         Ok(())
     }
-}
 
-/// Gets the state from storage, if it exists otherwise it will error.
-pub fn get_state<I: IO>(io: &I) -> Result<BlockchainHashchain, BlockchainHashchainError> {
-    match io.read_storage(&bytes_to_key(KeyPrefix::Config, HASHCHAIN_KEY)) {
-        None => Err(BlockchainHashchainError::NotFound),
-        Some(bytes) => BlockchainHashchain::try_from_slice(&bytes.to_vec())
-            .map_err(|_| BlockchainHashchainError::DeserializationFailed),
+    /// Gets the current block height of the structure.
+    fn get_current_block_height(&self) -> u64 {
+        self.current_block_height
+    }
+
+    /// Gets the previous block hashchain of the structure.
+    fn get_previous_block_hashchain(&self) -> RawH256 {
+        self.previous_block_hashchain
+    }
+
+    /// Gets the genesis block hashchain of the structure.
+    fn get_genesis_block_hashchain(&self) -> RawH256 {
+        self.genesis_block_hashchain
     }
 }
 
-/// Saves state into the storage. Does not return the previous state.
-pub fn set_state<I: IO>(
-    io: &mut I,
-    state: BlockchainHashchain,
-) -> Result<(), BlockchainHashchainError> {
-    io.write_storage(
-        &bytes_to_key(KeyPrefix::Config, HASHCHAIN_KEY),
-        &state
-            .try_to_vec()
-            .map_err(|_| BlockchainHashchainError::SerializationFailed)?,
-    );
+/// Blockchain Hashchain error module.
+pub mod blockchain_hashchain_error {
+    pub const ERR_STATE_NOT_FOUND: &[u8; 19] = b"ERR_STATE_NOT_FOUND";
+    pub const ERR_STATE_SERIALIZATION_FAILED: &[u8; 26] = b"ERR_STATE_SERIALIZE_FAILED";
+    pub const ERR_STATE_CORRUPTED: &[u8; 19] = b"ERR_STATE_CORRUPTED";
+    pub const ERR_BLOCK_HEIGHT_INCORRECT: &[u8; 26] = b"ERR_BLOCK_HEIGHT_INCORRECT";
 
-    Ok(())
-}
+    #[derive(Debug)]
+    /// Blockchain Hashchain Error
+    pub enum BlockchainHashchainError {
+        /// The state is missing from storage, need to initialize with contract `new` method.
+        NotFound,
+        /// The state serialized had failed.
+        SerializationFailed,
+        /// The state is corrupted, possibly due to failed state migration.
+        DeserializationFailed,
+        /// The block height is incorrect regarding the current block height.
+        BlockHeightIncorrect,
+    }
 
-#[derive(Debug)]
-/// Blockchain Hashchain Error
-pub enum BlockchainHashchainError {
-    /// The state is missing from storage, need to initialize with contract `new` method.
-    NotFound,
-    /// The state serialized had failed.
-    SerializationFailed,
-    /// The state is corrupted, possibly due to failed state migration.
-    DeserializationFailed,
-    /// The block height is incorrect regarding the current block height.
-    BlockHeightIncorrect(String),
+    impl AsRef<[u8]> for BlockchainHashchainError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::NotFound => ERR_STATE_NOT_FOUND,
+                Self::SerializationFailed => ERR_STATE_SERIALIZATION_FAILED,
+                Self::DeserializationFailed => ERR_STATE_CORRUPTED,
+                Self::BlockHeightIncorrect => ERR_BLOCK_HEIGHT_INCORRECT,
+            }
+        }
+    }
 }
 
 /// Block Hashchain Computer
@@ -302,7 +336,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn add_tx_lower_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32], [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[0; 0], &[0; 0]);
 
@@ -319,7 +353,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn add_tx_higger_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32], [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(2, "foo", &[0; 0], &[0; 0]);
 
@@ -336,7 +370,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn add_tx_same_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32], [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[0; 0], &[0; 0]);
 
@@ -353,7 +387,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn move_to_block_lower_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32], [0u8; 32]);
 
         let move_to_block_result = blockchain_hashchain.move_to_block(1);
         assert!(move_to_block_result.is_err());
@@ -361,7 +395,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn move_to_block_same_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32], [0u8; 32]);
 
         let move_to_block_result = blockchain_hashchain.move_to_block(1);
         assert!(move_to_block_result.is_err());
@@ -404,6 +438,7 @@ mod blockchain_hashchain_tests {
             contract_account_id,
             block_height_2,
             block_hashchain_1,
+            [0u8; 32],
         );
 
         blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);
@@ -470,6 +505,7 @@ mod blockchain_hashchain_tests {
             contract_account_id,
             block_height_2,
             block_hashchain_1,
+            [0u8; 32],
         );
 
         blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);

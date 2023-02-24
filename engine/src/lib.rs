@@ -69,12 +69,13 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
+    use ::function_name::named;
     use borsh::{BorshDeserialize, BorshSerialize};
-    use hashchain::BlockchainHashchain;
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
     use crate::fungible_token::FungibleTokenMetadata;
+    use crate::hashchain::BlockchainHashchain;
     use crate::parameters::error::ParseTypeFromJsonError;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
@@ -96,7 +97,8 @@ mod contract {
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
-    use crate::{errors, pausables, state};
+    use crate::state::EngineState;
+    use crate::{errors, pausables, state, hashchain};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
@@ -122,7 +124,18 @@ mod contract {
         }
 
         let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
-        state::set_state(&mut io, args.into()).sdk_unwrap();
+        let state: EngineState = args.into();
+
+        let blockchain_hashchain = BlockchainHashchain::new(
+            &state.chain_id,
+            b"aurora",
+            io.block_height(),
+            [0; 32],
+            [0; 32]
+        );
+
+        state::set_state(&mut io, state).sdk_unwrap();
+        hashchain::set_state(&mut io, blockchain_hashchain).sdk_unwrap();
     }
 
     /// Get version of the contract.
@@ -270,10 +283,11 @@ mod contract {
 
     /// Call method on the EVM contract.
     #[no_mangle]
+    #[named]
     pub extern "C" fn call() {
-        let io = Runtime;
-        let bytes = io.read_input().to_vec();
-        let args = CallArgs::deserialize(&bytes).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
+        let mut io = Runtime;
+        let input = io.read_input().to_vec();
+        let args = CallArgs::deserialize(&input).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
         let current_account_id = io.current_account_id();
         let mut engine = Engine::new(
             predecessor_address(&io.predecessor_account_id()),
@@ -283,20 +297,24 @@ mod contract {
         )
         .sdk_unwrap();
 
-        let result =
-            Engine::call_with_args(&mut engine, args, &mut Runtime).map(|res| res.try_to_vec());
-        result
-            .map(|res| res.sdk_expect(errors::ERR_SERIALIZE))
-            .sdk_process();
-        update_hashchain(io, "call", bytes, result);
+        let result = Engine::call_with_args(&mut engine, args, &mut Runtime)
+            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE));
+
+        match &result {
+            Ok(output) => update_hashchain(&mut io, function_name!(), &input, output),
+            Err(_) => todo!(),
+        }
+        
+        result.sdk_process();
         // TODO: charge for storage
     }
 
     /// Process signed Ethereum transaction.
     /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
+    #[named]
     pub extern "C" fn submit() {
-        let io = Runtime;
+        let mut io = Runtime;
         let input = io.read_input().to_vec();
         let current_account_id = io.current_account_id();
         let state = state::get_state(&io).sdk_unwrap();
@@ -311,9 +329,14 @@ mod contract {
             &mut Runtime,
         );
 
-        result
-            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
-            .sdk_process();
+        let result = result.map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE));
+
+        match &result {
+            Ok(output) => update_hashchain(&mut io, function_name!(), &input, output),
+            Err(_) => todo!(),
+        }
+
+        result.sdk_process();
     }
 
     #[no_mangle]
@@ -485,6 +508,22 @@ mod contract {
         let block_hash =
             crate::engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
         io.return_output(block_hash.as_bytes())
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_previous_block_hashchain() {
+        let mut io = Runtime;
+        let blockchain_hashchain = hashchain::get_state(&io).sdk_unwrap();
+        let previous_block_hashchain = blockchain_hashchain.get_previous_block_hashchain();
+        io.return_output(&previous_block_hashchain);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_genesis_block_hashchain() {
+        let mut io = Runtime;
+        let blockchain_hashchain = hashchain::get_state(&io).sdk_unwrap();
+        let genesis_block_hashchain = blockchain_hashchain.get_genesis_block_hashchain();
+        io.return_output(&genesis_block_hashchain);
     }
 
     #[no_mangle]
@@ -997,16 +1036,16 @@ mod contract {
         near_account_to_evm_address(predecessor_account_id.as_bytes())
     }
 
-    fn update_hashchain<I: IO>(io: &mut I, method_name: &str, input: &[u8], output: &[u8]) {
+    fn update_hashchain(io: &mut Runtime, method_name: &str, input: &[u8], output: &[u8]) {
         let mut blockchain_hashchain = hashchain::get_state(io).sdk_unwrap();
-        let block_height = u64::from(self.env.block_height());
+        let block_height = io.block_height();
 
-        if block_height > blockchain_hashchain.current_block_height {
-            blockchain_hashchain.move_to_block(block_height);
+        if block_height > blockchain_hashchain.get_current_block_height() {
+            blockchain_hashchain.move_to_block(block_height).sdk_unwrap();
         }
-        blockchain_hashchain.add_block_tx(block_height, method_name, input, output);
+        blockchain_hashchain.add_block_tx(block_height, method_name, input, output).sdk_unwrap();
 
-        hashchain::set_state(io, blockchain_hashchain);
+        hashchain::set_state(io, blockchain_hashchain).sdk_unwrap();
     }
 
     mod exports {
