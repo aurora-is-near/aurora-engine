@@ -336,7 +336,8 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn add_tx_lower_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32], [0u8; 32]);
+        let mut blockchain_hashchain =
+            BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32], [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[0; 0], &[0; 0]);
 
@@ -353,7 +354,8 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn add_tx_higger_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32], [0u8; 32]);
+        let mut blockchain_hashchain =
+            BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32], [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(2, "foo", &[0; 0], &[0; 0]);
 
@@ -370,7 +372,8 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn add_tx_same_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32], [0u8; 32]);
+        let mut blockchain_hashchain =
+            BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32], [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[0; 0], &[0; 0]);
 
@@ -387,7 +390,8 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn move_to_block_lower_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32], [0u8; 32]);
+        let mut blockchain_hashchain =
+            BlockchainHashchain::new(&[0; 32], &[0; 0], 2, [0u8; 32], [0u8; 32]);
 
         let move_to_block_result = blockchain_hashchain.move_to_block(1);
         assert!(move_to_block_result.is_err());
@@ -395,7 +399,8 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn move_to_block_same_height_test() {
-        let mut blockchain_hashchain = BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32], [0u8; 32]);
+        let mut blockchain_hashchain =
+            BlockchainHashchain::new(&[0; 32], &[0; 0], 1, [0u8; 32], [0u8; 32]);
 
         let move_to_block_result = blockchain_hashchain.move_to_block(1);
         assert!(move_to_block_result.is_err());
@@ -441,13 +446,16 @@ mod blockchain_hashchain_tests {
             [0u8; 32],
         );
 
-        blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);
+        let move_add_block_tx_result =
+            blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);
+        assert!(move_add_block_tx_result.is_ok());
         assert_eq!(
             blockchain_hashchain.previous_block_hashchain,
             block_hashchain_1
         );
 
-        blockchain_hashchain.move_to_block(3);
+        let move_to_block_result = blockchain_hashchain.move_to_block(3);
+        assert!(move_to_block_result.is_ok());
         assert_eq!(
             blockchain_hashchain.previous_block_hashchain,
             expected_block_hashchain_2
@@ -508,13 +516,16 @@ mod blockchain_hashchain_tests {
             [0u8; 32],
         );
 
-        blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);
+        let move_add_block_tx_result =
+            blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);
+        assert!(move_add_block_tx_result.is_ok());
         assert_eq!(
             blockchain_hashchain.previous_block_hashchain,
             block_hashchain_1
         );
 
-        blockchain_hashchain.move_to_block(4);
+        let move_to_block_result = blockchain_hashchain.move_to_block(4);
+        assert!(move_to_block_result.is_ok());
         assert_eq!(
             blockchain_hashchain.previous_block_hashchain,
             expected_block_hashchain_3

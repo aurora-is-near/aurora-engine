@@ -98,7 +98,7 @@ mod contract {
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
     use crate::state::EngineState;
-    use crate::{errors, pausables, state, hashchain};
+    use crate::{errors, hashchain, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
@@ -131,7 +131,7 @@ mod contract {
             b"aurora",
             io.block_height(),
             [0; 32],
-            [0; 32]
+            [0; 32],
         );
 
         state::set_state(&mut io, state).sdk_unwrap();
@@ -304,7 +304,7 @@ mod contract {
             Ok(output) => update_hashchain(&mut io, function_name!(), &input, output),
             Err(_) => todo!(),
         }
-        
+
         result.sdk_process();
         // TODO: charge for storage
     }
@@ -1041,9 +1041,13 @@ mod contract {
         let block_height = io.block_height();
 
         if block_height > blockchain_hashchain.get_current_block_height() {
-            blockchain_hashchain.move_to_block(block_height).sdk_unwrap();
+            blockchain_hashchain
+                .move_to_block(block_height)
+                .sdk_unwrap();
         }
-        blockchain_hashchain.add_block_tx(block_height, method_name, input, output).sdk_unwrap();
+        blockchain_hashchain
+            .add_block_tx(block_height, method_name, input, output)
+            .sdk_unwrap();
 
         hashchain::set_state(io, blockchain_hashchain).sdk_unwrap();
     }
