@@ -128,7 +128,7 @@ mod contract {
 
         let blockchain_hashchain = BlockchainHashchain::new(
             &state.chain_id,
-            io.current_account_id().as_bytes(),
+            b"aurora",
             io.block_height(),
             [0; 32],
             [0; 32],
@@ -300,8 +300,9 @@ mod contract {
         let result = Engine::call_with_args(&mut engine, args, &mut Runtime)
             .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE));
 
-        if let Ok(output) = &result {
-            update_hashchain(&mut io, function_name!(), &input, output);
+        match &result {
+            Ok(output) => update_hashchain(&mut io, function_name!(), &input, output),
+            Err(_) => todo!(),
         }
 
         result.sdk_process();
@@ -330,8 +331,9 @@ mod contract {
 
         let result = result.map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE));
 
-        if let Ok(output) = &result {
-            update_hashchain(&mut io, function_name!(), &input, output);
+        match &result {
+            Ok(output) => update_hashchain(&mut io, function_name!(), &input, output),
+            Err(_) => todo!(),
         }
 
         result.sdk_process();
