@@ -1,4 +1,4 @@
-use crate::prelude::{BorshDeserialize, BorshSerialize};
+use crate::prelude::{BorshDeserialize, BorshSerialize, Vec};
 use aurora_engine_sdk::{
     io::{StorageIntermediate, IO},
     keccak,
@@ -118,17 +118,17 @@ impl BlockchainHashchain {
     }
 
     /// Gets the current block height of the structure.
-    fn get_current_block_height(&self) -> u64 {
+    pub fn get_current_block_height(&self) -> u64 {
         self.current_block_height
     }
 
     /// Gets the previous block hashchain of the structure.
-    fn get_previous_block_hashchain(&self) -> RawH256 {
+    pub fn get_previous_block_hashchain(&self) -> RawH256 {
         self.previous_block_hashchain
     }
 
     /// Gets the genesis block hashchain of the structure.
-    fn get_genesis_block_hashchain(&self) -> RawH256 {
+    pub fn get_genesis_block_hashchain(&self) -> RawH256 {
         self.genesis_block_hashchain
     }
 }
