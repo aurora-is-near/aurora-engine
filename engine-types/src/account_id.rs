@@ -2,8 +2,8 @@
 //!
 //! Inpired by: https://github.com/near/nearcore/tree/master/core/account-id
 
-use crate::{fmt, str, str::FromStr, Box, String, Vec};
-use borsh::{BorshDeserialize, BorshSerialize};
+use crate::{fmt, str, str::FromStr, Box, String, ToString, Vec};
+use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 pub const MIN_ACCOUNT_ID_LEN: usize = 2;
@@ -13,18 +13,7 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 ///
 /// This guarantees all properly constructed AccountId's are valid for the NEAR network.
 #[derive(
-    BorshSerialize,
-    BorshDeserialize,
-    Serialize,
-    Deserialize,
-    Default,
-    Eq,
-    Ord,
-    Hash,
-    Clone,
-    Debug,
-    PartialEq,
-    PartialOrd,
+    BorshSerialize, Serialize, Deserialize, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd,
 )]
 pub struct AccountId(Box<str>);
 
@@ -90,6 +79,20 @@ impl AccountId {
         let (prefix, suffix) = self.0.split_at(self.0.len() - parent_account_id.0.len());
 
         prefix.find('.') == Some(prefix.len() - 1) && suffix == parent_account_id.as_ref()
+    }
+}
+
+impl BorshDeserialize for AccountId {
+    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
+        let account = <String as BorshDeserialize>::deserialize(buf)?;
+        AccountId::new(&account)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
+    }
+}
+
+impl Default for AccountId {
+    fn default() -> Self {
+        Self("default.aurora".into())
     }
 }
 
