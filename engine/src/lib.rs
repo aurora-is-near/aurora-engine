@@ -513,15 +513,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_previous_block_hashchain() {
         let mut io = Runtime;
-        let block_height = io.block_height();
-        let mut blockchain_hashchain = hashchain::get_state(&io).sdk_unwrap();
-
-        if block_height > blockchain_hashchain.get_current_block_height() {
-            blockchain_hashchain
-                .move_to_block(block_height)
-                .sdk_unwrap();
-        }
-
+        let blockchain_hashchain = hashchain::get_state(&io).sdk_unwrap();
         let previous_block_hashchain = blockchain_hashchain.get_previous_block_hashchain();
         io.return_output(&previous_block_hashchain);
     }
@@ -1045,24 +1037,14 @@ mod contract {
     }
 
     fn update_hashchain(io: &mut Runtime, method_name: &str, input: &[u8], output: &[u8]) {
+        let mut blockchain_hashchain = hashchain::get_state(io).sdk_unwrap();
         let block_height = io.block_height();
-
-        let mut blockchain_hashchain = hashchain::get_state(io).unwrap_or_else(|_| {
-            BlockchainHashchain::new(
-                &state::get_state(io).sdk_unwrap().chain_id,
-                io.current_account_id().as_bytes(),
-                block_height,
-                [0; 32],
-                [0; 32],
-            )
-        });
 
         if block_height > blockchain_hashchain.get_current_block_height() {
             blockchain_hashchain
                 .move_to_block(block_height)
                 .sdk_unwrap();
         }
-
         blockchain_hashchain
             .add_block_tx(block_height, method_name, input, output)
             .sdk_unwrap();
