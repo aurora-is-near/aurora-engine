@@ -1,9 +1,9 @@
 use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
-use crate::test_utils;
+use crate::test_utils::{self, str_to_account_id};
 use crate::tests::state_migration;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
-use aurora_engine::parameters::{SubmitResult, TransactionStatus};
+use aurora_engine::parameters::{SetOwnerArgs, SubmitResult, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use borsh::BorshSerialize;
 use libsecp256k1::SecretKey;
@@ -499,7 +499,7 @@ fn test_timestamp() {
         .unwrap();
     let t_ns = t.as_nanos();
     let t_s = U256::from(t.as_secs());
-    runner.context.block_timestamp = t_ns as u64;
+    runner.context.block_timestamp = u64::try_from(t_ns).unwrap();
 
     // call contract
     let result = runner
@@ -1062,6 +1062,64 @@ fn test_eth_transfer_with_max_gas_price() {
         dest_address,
         TRANSFER_AMOUNT,
         0.into(),
+    );
+}
+
+#[test]
+fn test_set_owner() {
+    let mut runner = test_utils::deploy_evm();
+    let aurora_account_id = runner.aurora_account_id.clone();
+
+    // set owner args
+    let set_owner_args = SetOwnerArgs {
+        new_owner: str_to_account_id("new_owner.near"),
+    };
+
+    let (outcome, error) = runner.call(
+        "set_owner",
+        &aurora_account_id,
+        set_owner_args.try_to_vec().unwrap(),
+    );
+
+    // setting owner from the owner with same owner id should succeed
+    assert!(outcome.is_some() && error.is_none());
+
+    // get owner to see if the owner_id property has changed
+    let (outcome, error) = runner.call("get_owner", &aurora_account_id, vec![]);
+
+    // check if the query goes through the standalone runner
+    assert!(outcome.is_some() && error.is_none());
+
+    // check if the owner_id property has changed to new_owner.near
+    assert_eq!(
+        "new_owner.near".as_bytes(),
+        outcome.unwrap().return_data.as_value().unwrap()
+    );
+}
+
+#[test]
+fn test_set_owner_fail_on_same_owner() {
+    let mut runner = test_utils::deploy_evm();
+    let aurora_account_id = runner.aurora_account_id.clone();
+
+    // set owner args
+    let set_owner_args = SetOwnerArgs {
+        new_owner: str_to_account_id(&aurora_account_id),
+    };
+
+    let (outcome, error) = runner.call(
+        "set_owner",
+        &aurora_account_id,
+        set_owner_args.try_to_vec().unwrap(),
+    );
+
+    // setting owner from the owner with same owner id should fail
+    assert!(outcome.is_some() && error.is_some());
+
+    // check error equality
+    assert_eq!(
+        error.unwrap().to_string(),
+        "Smart contract panicked: ERR_SAME_OWNER"
     );
 }
 
