@@ -66,8 +66,8 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
+    use crate::parameters::SetOwnerArgs;
     use borsh::BorshSerialize;
-    use parameters::SetOwnerArgs;
 
     use crate::admin_controlled::AdminControlled;
     use crate::connector::{self, EthConnectorContract};

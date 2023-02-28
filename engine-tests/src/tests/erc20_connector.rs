@@ -953,14 +953,6 @@ pub mod sim_tests {
     }
 
     pub fn deploy_aurora_eth_connector(aurora: &AuroraAccount) -> UserAccount {
-        #[derive(BorshSerialize, BorshDeserialize)]
-        pub struct InitCallArgs {
-            pub prover_account: AccountId,
-            pub eth_custodian_address: String,
-            pub metadata: FungibleTokenMetadata,
-            pub account_with_access_right: AccountId,
-        }
-
         let contract_bytes = get_aurora_eth_connector_contract();
 
         let contract_account = aurora.user.deploy(
@@ -983,6 +975,8 @@ pub mod sim_tests {
             "eth_custodian_address": "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_string(),
             "metadata": metadata,
             "account_with_access_right": AccountId::new(aurora.contract.account_id.as_ref())
+                .unwrap(),
+            "owner_id": AccountId::new(aurora.contract.account_id.as_ref())
                 .unwrap(),
         });
 
