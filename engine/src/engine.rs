@@ -73,7 +73,7 @@ macro_rules! assert_or_finish {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
 pub struct EngineError {
     pub kind: EngineErrorKind,
     pub gas_used: u64,
@@ -93,7 +93,7 @@ impl AsRef<[u8]> for EngineError {
 
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
 pub enum EngineErrorKind {
     /// Normal EVM errors.
     EvmError(ExitError),
@@ -184,7 +184,7 @@ impl ExitIntoResult for ExitReason {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BalanceOverflow;
 
 impl AsRef<[u8]> for BalanceOverflow {
@@ -195,7 +195,7 @@ impl AsRef<[u8]> for BalanceOverflow {
 
 /// Errors resulting from trying to pay for gas
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GasPaymentError {
     /// Overflow adding ETH to an account balance (should never happen)
     BalanceOverflow(BalanceOverflow),

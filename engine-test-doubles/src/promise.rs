@@ -36,7 +36,7 @@ impl PromiseHandler for PromiseTracker {
     type ReadOnly = Self;
 
     fn promise_results_count(&self) -> u64 {
-        self.promise_results.len() as u64
+        u64::try_from(self.promise_results.len()).unwrap_or_default()
     }
 
     fn promise_result(&self, index: u64) -> Option<PromiseResult> {

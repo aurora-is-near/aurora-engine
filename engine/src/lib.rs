@@ -75,6 +75,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
+    use parameters::SetOwnerArgs;
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
@@ -146,6 +147,21 @@ mod contract {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         io.return_output(state.owner_id.as_bytes());
+    }
+
+    /// Set owner account id for this contract.
+    #[no_mangle]
+    pub extern "C" fn set_owner() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
+        if state.owner_id == args.new_owner {
+            sdk::panic_utf8(errors::ERR_SAME_OWNER);
+        } else {
+            state.owner_id = args.new_owner;
+            state::set_state(&mut io, state).sdk_unwrap();
+        }
     }
 
     /// Get bridge prover id for this contract.
@@ -864,7 +880,6 @@ mod contract {
     pub extern "C" fn set_paused_flags() {
         let io = Runtime;
         io.assert_private_call().sdk_unwrap();
-
         let args: PauseEthConnectorCallArgs = io.read_input_borsh().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()

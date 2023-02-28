@@ -221,7 +221,7 @@ struct SharedMutableReference<T> {
 
 impl<T> SharedMutableReference<T> {
     fn new(reference: &mut T) -> Self {
-        let ptr = NonNull::new(reference as _).unwrap();
+        let ptr = NonNull::new(reference).unwrap();
         Self {
             pointer: Rc::new(RefCell::new(ptr)),
         }

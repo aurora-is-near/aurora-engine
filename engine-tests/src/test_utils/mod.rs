@@ -34,6 +34,7 @@ pub const DEPLOY_ERC20: &str = "deploy_erc20_token";
 pub const PAUSE_PRECOMPILES: &str = "pause_precompiles";
 pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
+pub const SET_OWNER: &str = "set_owner";
 
 pub mod erc20;
 pub mod exit_precompile;
@@ -228,7 +229,8 @@ impl AuroraRunner {
                     || method_name == CALL
                     || method_name == DEPLOY_ERC20
                     || method_name == PAUSE_PRECOMPILES
-                    || method_name == RESUME_PRECOMPILES)
+                    || method_name == RESUME_PRECOMPILES
+                    || method_name == SET_OWNER)
             {
                 standalone_runner
                     .submit_raw(method_name, &self.context, &self.promise_results)
@@ -302,7 +304,7 @@ impl AuroraRunner {
 
         let ft_key = crate::prelude::storage::bytes_to_key(
             crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
+            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
         );
         let ft_value = {
             let mut current_ft: FungibleToken = trie
@@ -332,7 +334,7 @@ impl AuroraRunner {
 
         let proof_key = crate::prelude::storage::bytes_to_key(
             crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent as u8],
+            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
         );
 
         trie.insert(balance_key.to_vec(), balance_value.to_vec());

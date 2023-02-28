@@ -367,8 +367,10 @@ fn test_track_key() {
     let trace = runner.storage.track_engine_key(&balance_key).unwrap();
     let mut expected_balance = initial_balance;
     for (i, (block_height, tx_hash, value)) in trace.into_iter().enumerate() {
-        let i = i as u64;
-        assert_eq!(block_height, created_block_height + i);
+        assert_eq!(
+            block_height,
+            created_block_height + u64::try_from(i).unwrap()
+        );
         let transaction_included = engine_standalone_storage::TransactionIncluded {
             block_hash: runner
                 .storage

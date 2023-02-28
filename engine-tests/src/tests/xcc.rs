@@ -644,7 +644,10 @@ fn test_xcc_exec_gas() {
             router_exec_cost
         );
 
-        assert_eq!(outcome.action_receipts.len() as u64, args.promise_count());
+        assert_eq!(
+            outcome.action_receipts.len(),
+            usize::try_from(args.promise_count()).unwrap()
+        );
         for (target_account_id, receipt) in outcome.action_receipts {
             assert_eq!(
                 target_account_id.as_str(),

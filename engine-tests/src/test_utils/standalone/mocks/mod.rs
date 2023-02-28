@@ -108,7 +108,7 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     // Delete the fake proof so that we can use it again.
     let proof_key = crate::prelude::storage::bytes_to_key(
         crate::prelude::storage::KeyPrefix::EthConnector,
-        &[crate::prelude::storage::EthConnectorStorageId::UsedEvent as u8],
+        &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
     );
     io.remove_storage(&proof_key);
 

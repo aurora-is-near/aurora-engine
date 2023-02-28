@@ -18,6 +18,7 @@ mod random;
 mod repro;
 pub mod sanity;
 mod self_destruct_state;
+mod serde;
 mod standalone;
 mod standard_precompiles;
 mod state_migration;
