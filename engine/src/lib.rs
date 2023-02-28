@@ -67,7 +67,6 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::BorshSerialize;
-    use parameters::SetOwnerArgs;
 
     use crate::admin_controlled::AdminControlled;
     use crate::connector::{self, EthConnectorContract};
@@ -78,7 +77,7 @@ mod contract {
     use crate::parameters::{
         CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         NEP141FtOnTransferArgs, NewCallArgs, PausePrecompilesCallArgs, SetContractDataCallArgs,
-        SetEthConnectorContractAccountArgs, TransferCallCallArgs, ViewCallArgs,
+        SetEthConnectorContractAccountArgs, SetOwnerArgs, TransferCallCallArgs, ViewCallArgs,
     };
     use crate::pausables::{
         Authorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PausedPrecompilesManager,
