@@ -60,7 +60,7 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .unwrap();
     assert_eq!(
         balance.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
+        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount
     );
 
     let balance = contract
@@ -71,7 +71,7 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .await?
         .json::<U128>()
         .unwrap();
-    assert_eq!(balance.0, DEPOSITED_FEE - transfer_amount as u128);
+    assert_eq!(balance.0, DEPOSITED_FEE - transfer_amount);
 
     let balance = contract
         .eth_connector_contract
@@ -108,14 +108,14 @@ async fn test_ft_transfer() -> anyhow::Result<()> {
 
     assert_eq!(
         contract.get_eth_on_near_balance(&receiver_id).await?.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128,
+        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount,
     );
     assert_eq!(
         contract
             .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
-        DEPOSITED_FEE - transfer_amount as u128,
+        DEPOSITED_FEE - transfer_amount,
     );
     assert_eq!(DEPOSITED_AMOUNT, contract.total_supply().await?);
     Ok(())
@@ -960,14 +960,14 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
 
     assert_eq!(
         contract.get_eth_on_near_balance(&receiver_id).await?.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
+        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount
     );
     assert_eq!(
         contract
             .get_eth_on_near_balance(contract.engine_contract.id())
             .await?
             .0,
-        DEPOSITED_FEE - transfer_amount as u128
+        DEPOSITED_FEE - transfer_amount
     );
     assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
 

@@ -1080,7 +1080,7 @@ fn create_test_proof(deposit_amount: u64, recipient_id: &str, custodian_address:
         eth_custodian_address,
         sender: Address::zero(),
         token_message_data,
-        amount: NEP141Wei::new(deposit_amount as u128),
+        amount: NEP141Wei::new(deposit_amount.into()),
         fee,
     };
 

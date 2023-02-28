@@ -198,7 +198,7 @@ pub mod error {
 mod test {
     use super::FallibleIterator;
     use crate::sync::types::{TransactionKind, TransactionMessage};
-    use aurora_engine::{engine, parameters, state};
+    use aurora_engine::{parameters, state};
     use aurora_engine_standalone_nep141_legacy::legacy_connector;
     use aurora_engine_types::H256;
 

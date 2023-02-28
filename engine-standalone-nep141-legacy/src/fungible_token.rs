@@ -13,7 +13,7 @@ use aurora_engine_types::{
         Address, Balance, NEP141Wei, NearGas, PromiseResult, StorageBalanceBounds, StorageUsage,
         Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO,
     },
-    vec, BTreeMap, String, ToString, Vec,
+    vec, String, ToString, Vec,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};

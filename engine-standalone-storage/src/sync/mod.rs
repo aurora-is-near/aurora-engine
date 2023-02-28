@@ -1,6 +1,8 @@
 use aurora_engine::pausables::PausedPrecompilesManager;
 use aurora_engine::pausables::PrecompileFlags;
-use aurora_engine::{engine, parameters::SubmitResult, pausables::EnginePrecompilesPauser, xcc};
+use aurora_engine::{
+    engine, parameters::SubmitResult, pausables::EnginePrecompilesPauser, state, xcc,
+};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_standalone_nep141_legacy::legacy_connector;
 use aurora_engine_types::{

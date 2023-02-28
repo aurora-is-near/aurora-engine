@@ -6,8 +6,6 @@
 )]
 #![deny(clippy::as_conversions)]
 
-use aurora_engine_types::parameters::PromiseCreateArgs;
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
@@ -79,7 +77,7 @@ mod contract {
     use crate::parameters::{
         CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         NEP141FtOnTransferArgs, NewCallArgs, PausePrecompilesCallArgs, SetContractDataCallArgs,
-        SetEthConnectorContractAccountArgs, ViewCallArgs,
+        SetEthConnectorContractAccountArgs, TransferCallCallArgs, ViewCallArgs,
     };
     use crate::pausables::{
         Authorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PausedPrecompilesManager,
@@ -91,7 +89,9 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
+    use crate::prelude::{
+        format, sdk, u256_to_arr, Address, PromiseResult, ToString, ERR_FAILED_PARSE, H256,
+    };
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -639,7 +639,7 @@ mod contract {
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id().to_string();
-        let args: parameters::TransferCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+        let args: TransferCallArgs = serde_json::from_slice(&io.read_input().to_vec())
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
         let input = if let Some(memo) = args.memo {
@@ -670,9 +670,6 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
-        use crate::parameters::TransferCallCallArgs;
-        use aurora_engine_sdk::types::ExpectUtf8;
-
         let mut io = Runtime;
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
@@ -727,9 +724,8 @@ mod contract {
         )
         .sdk_unwrap();
 
-        let args: NEP141FtOnTransferArgs = parse_json(io.read_input().to_vec().as_slice())
-            .sdk_unwrap()
-            .try_into()
+        let args: NEP141FtOnTransferArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
         let mut eth_connector = EthConnectorContract::init_instance(io).sdk_unwrap();
 
@@ -753,7 +749,6 @@ mod contract {
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
-        let args = StorageDepositCallArgs::from(parse_json(&io.read_input().to_vec()).sdk_unwrap());
         let input = format!("\"sender_id\": {:?}", predecessor_account_id);
         let input = if let Some(account_id) = args.account_id {
             format!("{}, \"account_id\": {:?}", input, account_id.to_string())
@@ -861,7 +856,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn disable_legacy_nep141() {
         let io = Runtime;
-        let state = engine::get_state(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
 
         EthConnectorContract::init_instance(io)
@@ -912,7 +907,7 @@ mod contract {
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn mint_account() {
-        use crate::prelude::{NEP141Wei, ToString, U256};
+        use crate::prelude::{NEP141Wei, U256};
         use evm::backend::ApplyBackend;
 
         let io = Runtime;
@@ -987,5 +982,5 @@ mod contract {
 }
 
 pub trait AuroraState {
-    fn add_promise(&mut self, promise: PromiseCreateArgs);
+    fn add_promise(&mut self, promise: aurora_engine_types::parameters::PromiseCreateArgs);
 }
