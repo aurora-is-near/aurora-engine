@@ -108,6 +108,8 @@ pub enum TransactionKind {
     StorageUnregister(Option<bool>),
     /// FT storage standard method
     StorageWithdraw(parameters::StorageWithdrawCallArgs),
+    /// Admin only method; used to transfer administration
+    SetOwner(parameters::SetOwnerArgs),
     /// Admin only method
     SetPausedFlags(PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
@@ -346,6 +348,7 @@ impl TransactionKind {
             TransactionKind::Unknown => Self::no_evm_execution("unknown"),
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
+            TransactionKind::SetOwner(_) => Self::no_evm_execution("set_owner"),
         }
     }
 
@@ -513,6 +516,7 @@ enum BorshableTransactionKind<'a> {
     Unknown,
     SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
     DisableLegacyNEP141,
+    SetOwner(Cow<'a, parameters::SetOwnerArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -557,6 +561,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
                 Self::SetEthConnectorContractAccount(Cow::Borrowed(x))
             }
             TransactionKind::DisableLegacyNEP141 => Self::DisableLegacyNEP141,
+            TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
         }
     }
 }
@@ -618,6 +623,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::SetEthConnectorContractAccount(x.into_owned()))
             }
             BorshableTransactionKind::DisableLegacyNEP141 => Ok(Self::DisableLegacyNEP141),
+            BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
         }
     }
 }

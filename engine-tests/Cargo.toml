@@ -15,12 +15,12 @@ autobenches = false
 [dependencies]
 
 [dev-dependencies]
-aurora-engine = { path = "../engine", default-features = false, features = ["std", "tracing"] }
+aurora-engine = { path = "../engine", default-features = false, features = ["std", "tracing", "impl-serde"] }
 aurora-engine-test-doubles = { path = "../engine-test-doubles", default-features = false }
-aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
+aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std", "impl-serde"] }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false, features = ["std"] }
-aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
+aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std", "impl-serde"] }
 engine-standalone-storage = { path = "../engine-standalone-storage" }
 engine-standalone-tracing = { path = "../engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 aurora-engine-standalone-nep141-legacy = { path = "../engine-standalone-nep141-legacy", default-features = false }

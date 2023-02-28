@@ -32,6 +32,7 @@ pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
 pub(crate) const PAUSE_PRECOMPILES: &str = "pause_precompiles";
 pub(crate) const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub(crate) const RESUME_PRECOMPILES: &str = "resume_precompiles";
+pub(crate) const SET_OWNER: &str = "set_owner";
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
@@ -226,7 +227,8 @@ impl AuroraRunner {
                     || method_name == CALL
                     || method_name == DEPLOY_ERC20
                     || method_name == PAUSE_PRECOMPILES
-                    || method_name == RESUME_PRECOMPILES)
+                    || method_name == RESUME_PRECOMPILES
+                    || method_name == SET_OWNER)
             {
                 standalone_runner
                     .submit_raw(method_name, &self.context, &self.promise_results)

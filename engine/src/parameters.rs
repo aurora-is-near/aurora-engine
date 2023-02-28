@@ -27,6 +27,12 @@ pub struct NewCallArgs {
     pub upgrade_delay_blocks: u64,
 }
 
+/// Borsh-encoded parameters for the `set_owner` function.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct SetOwnerArgs {
+    pub new_owner: AccountId,
+}
+
 /// Borsh-encoded (genesis) account balance used by the `begin_chain` function.
 #[cfg(feature = "evm_bully")]
 #[derive(BorshSerialize, BorshDeserialize)]
