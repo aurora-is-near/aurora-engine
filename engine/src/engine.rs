@@ -73,7 +73,7 @@ macro_rules! assert_or_finish {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
 pub struct EngineError {
     pub kind: EngineErrorKind,
     pub gas_used: u64,
@@ -93,7 +93,7 @@ impl AsRef<[u8]> for EngineError {
 
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
 pub enum EngineErrorKind {
     /// Normal EVM errors.
     EvmError(ExitError),
@@ -185,7 +185,7 @@ impl ExitIntoResult for ExitReason {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BalanceOverflow;
 
 impl AsRef<[u8]> for BalanceOverflow {
@@ -196,7 +196,7 @@ impl AsRef<[u8]> for BalanceOverflow {
 
 /// Errors resulting from trying to pay for gas
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GasPaymentError {
     /// Overflow adding ETH to an account balance (should never happen)
     BalanceOverflow(BalanceOverflow),
@@ -777,27 +777,13 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let env = self.env;
         let ro_promise_handler = handler.read_only();
 
-        let precompiles = if cfg!(all(feature = "mainnet", not(feature = "integration-test"))) {
-            let mut tmp = Precompiles::new_london(PrecompileConstructorContext {
-                current_account_id,
-                random_seed,
-                io,
-                env,
-                promise_handler: ro_promise_handler,
-            });
-            // Cross contract calls are not enabled on mainnet yet.
-            tmp.all_precompiles
-                .remove(&aurora_engine_precompiles::xcc::cross_contract_call::ADDRESS);
-            tmp
-        } else {
-            Precompiles::new_london(PrecompileConstructorContext {
-                current_account_id,
-                random_seed,
-                io,
-                env,
-                promise_handler: ro_promise_handler,
-            })
-        };
+        let precompiles = Precompiles::new_london(PrecompileConstructorContext {
+            current_account_id,
+            random_seed,
+            io,
+            env,
+            promise_handler: ro_promise_handler,
+        });
 
         Self::apply_pause_flags_to_precompiles(precompiles, pause_flags)
     }
