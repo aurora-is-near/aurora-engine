@@ -34,7 +34,7 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
 #[should_panic]
 fn test_deploy_erc20_token_with_invalid_account_id() {
     let mut runner = AuroraRunner::new();
-    let invalid_nep141 = "";
+    let invalid_nep141 = "_";
     runner.deploy_erc20_token(invalid_nep141);
 }
 
