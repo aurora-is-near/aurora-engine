@@ -233,7 +233,7 @@ mod contract {
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         pauser.resume_precompiles(flags);
 
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
     }
 
     /// Pauses a precompile.
@@ -253,7 +253,7 @@ mod contract {
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         pauser.pause_precompiles(flags);
 
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
     }
 
     /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
@@ -374,7 +374,7 @@ mod contract {
             Address::from_array(relayer_address),
         );
 
-        update_hashchain(&mut io, function_name!(), &input, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input, &[]);
     }
 
     /// Updates the bytecode for user's router contracts created by the engine.
@@ -390,7 +390,7 @@ mod contract {
         let router_bytecode = crate::xcc::RouterCode::new(bytes.clone());
         crate::xcc::update_router_code(&mut io, &router_bytecode);
 
-        update_hashchain(&mut io, function_name!(), &bytes, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &bytes, &[]);
     }
 
     /// Updates the bytecode version for the given account. This is only called as a callback
@@ -410,7 +410,7 @@ mod contract {
         let args: crate::xcc::AddressVersionUpdateArgs = input.to_value().sdk_unwrap();
         crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
 
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
     }
 
     /// Sets the address for the wNEAR ERC-20 contract. This contract will be used by the
@@ -425,7 +425,7 @@ mod contract {
         let address = io.read_input_arr20().sdk_unwrap();
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
 
-        update_hashchain(&mut io, function_name!(), &input, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input, &[]);
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.
@@ -466,7 +466,7 @@ mod contract {
             );
         }
 
-        update_hashchain(&mut io, function_name!(), &input, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input, &[]);
     }
 
     /// Deploy ERC20 token mapped to a NEP141
@@ -524,7 +524,7 @@ mod contract {
                 sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
             }
 
-            update_hashchain(&mut io, function_name!(), &input.to_vec(), &[0; 0]);
+            update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
         }
     }
 
@@ -661,7 +661,7 @@ mod contract {
 
         EthConnectorContract::create_contract(io, owner_id, args).sdk_unwrap();
 
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
     }
 
     #[no_mangle]
@@ -675,7 +675,7 @@ mod contract {
         let args: SetContractDataCallArgs = input.to_value().sdk_unwrap();
         connector::set_contract_data(&mut io, args).sdk_unwrap();
 
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
     }
 
     #[no_mangle]
@@ -726,7 +726,7 @@ mod contract {
         let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
         io.promise_return(promise_id);
 
-        update_hashchain(&mut io, function_name!(), &raw_proof, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &raw_proof, &[]);
     }
 
     #[no_mangle]
@@ -771,7 +771,7 @@ mod contract {
             io.promise_return(promise_id);
         }
 
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
     }
 
     #[no_mangle]
@@ -846,7 +846,7 @@ mod contract {
             .ft_transfer(&predecessor_account_id, args)
             .sdk_unwrap();
 
-        update_hashchain(&mut io, function_name!(), &input, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input, &[]);
     }
 
     #[no_mangle]
@@ -867,7 +867,7 @@ mod contract {
             .sdk_unwrap()
             .ft_resolve_transfer(args, promise_result);
 
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
     }
 
     #[no_mangle]
@@ -896,7 +896,7 @@ mod contract {
         let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
         io.promise_return(promise_id);
 
-        update_hashchain(&mut io, function_name!(), &input, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input, &[]);
     }
 
     #[no_mangle]
@@ -919,7 +919,7 @@ mod contract {
             unsafe { io.promise_create_batch(&promise) };
         }
 
-        update_hashchain(&mut io, function_name!(), &input, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input, &[]);
     }
 
     #[no_mangle]
@@ -941,7 +941,7 @@ mod contract {
             unsafe { io.promise_create_batch(&promise) };
         }
 
-        update_hashchain(&mut io, function_name!(), &input, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input, &[]);
     }
 
     #[no_mangle]
@@ -959,7 +959,7 @@ mod contract {
             .storage_withdraw(&predecessor_account_id, args)
             .sdk_unwrap();
 
-        update_hashchain(&mut io, function_name!(), &input, &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input, &[]);
     }
 
     #[no_mangle]
@@ -996,7 +996,7 @@ mod contract {
             .sdk_unwrap()
             .set_paused_flags(args);
 
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[0; 0]);
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
     }
 
     #[no_mangle]
