@@ -107,6 +107,8 @@ pub enum TransactionKind {
     StorageUnregister(Option<bool>),
     /// FT storage standard method
     StorageWithdraw(parameters::StorageWithdrawCallArgs),
+    /// Admin only method; used to transfer administration
+    SetOwner(parameters::SetOwnerArgs),
     /// Admin only method
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
@@ -339,6 +341,7 @@ impl TransactionKind {
             TransactionKind::Unknown => Self::no_evm_execution("unknown"),
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
+            TransactionKind::SetOwner(_) => Self::no_evm_execution("set_owner"),
         }
     }
 
@@ -504,6 +507,7 @@ enum BorshableTransactionKind<'a> {
     PausePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
+    SetOwner(Cow<'a, parameters::SetOwnerArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -544,6 +548,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
+            TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
         }
     }
 }
@@ -601,6 +606,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::ResumePrecompiles(x) => {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
             }
+            BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
         }
     }
 }
