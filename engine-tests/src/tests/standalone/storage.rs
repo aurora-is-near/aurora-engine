@@ -85,7 +85,11 @@ fn test_replay_transaction() {
                 .enumerate()
                 .map(|(position, tx)| {
                     let diff = runner
-                        .execute_transaction_at_position(tx, block_height, position as u16)
+                        .execute_transaction_at_position(
+                            tx,
+                            block_height,
+                            u16::try_from(position).unwrap(),
+                        )
                         .unwrap();
 
                     test_utils::standalone::storage::commit(&mut runner.storage, &diff);
@@ -117,7 +121,7 @@ fn test_replay_transaction() {
         rand::seq::SliceRandom::shuffle(txs.as_mut_slice(), &mut rng);
         for ((position, tx), diff) in txs {
             let replay_diff = runner
-                .execute_transaction_at_position(tx, block_height, position as u16)
+                .execute_transaction_at_position(tx, block_height, u16::try_from(position).unwrap())
                 .unwrap()
                 .diff;
             assert_eq!(replay_diff, diff);
@@ -362,8 +366,10 @@ fn test_track_key() {
     let trace = runner.storage.track_engine_key(&balance_key).unwrap();
     let mut expected_balance = initial_balance;
     for (i, (block_height, tx_hash, value)) in trace.into_iter().enumerate() {
-        let i = i as u64;
-        assert_eq!(block_height, created_block_height + i);
+        assert_eq!(
+            block_height,
+            created_block_height + u64::try_from(i).unwrap()
+        );
         let transaction_included = engine_standalone_storage::TransactionIncluded {
             block_hash: runner
                 .storage
