@@ -1,5 +1,5 @@
 use crate::test_utils::erc20::{ERC20Constructor, ERC20};
-use crate::test_utils::{self, AuroraRunner};
+use crate::test_utils::{self, AuroraRunner, ORIGIN};
 use crate::tests::erc20_connector::sim_tests;
 use crate::tests::state_migration::{deploy_evm, AuroraAccount};
 use aurora_engine_precompiles::xcc::{self, costs, cross_contract_call};
@@ -26,7 +26,7 @@ fn test_xcc_eth_gas_cost() {
     let mut runner = test_utils::deploy_evm();
     runner.standalone_runner = None;
     let xcc_wasm_bytes = contract_bytes();
-    let _ = runner.call("factory_update", "aurora", xcc_wasm_bytes);
+    let _ = runner.call("factory_update", ORIGIN, xcc_wasm_bytes);
     let mut signer = test_utils::Signer::random();
     let mut baseline_signer = test_utils::Signer::random();
     runner.context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
@@ -46,7 +46,7 @@ fn test_xcc_eth_gas_cost() {
     );
     let _ = runner.call(
         "factory_set_wnear_address",
-        "aurora",
+        ORIGIN,
         wnear_erc20.0.address.as_bytes().to_vec(),
     );
 
@@ -586,7 +586,7 @@ fn test_xcc_schedule_gas() {
 
     let (maybe_outcome, maybe_error) = router.call(
         "schedule",
-        "aurora",
+        ORIGIN,
         PromiseArgs::Create(promise).try_to_vec().unwrap(),
     );
     assert!(maybe_error.is_none());
@@ -629,7 +629,7 @@ fn test_xcc_exec_gas() {
         let args = PromiseArgs::Recursive(x);
 
         let (maybe_outcome, maybe_error) =
-            router.call("execute", "aurora", args.try_to_vec().unwrap());
+            router.call("execute", ORIGIN, args.try_to_vec().unwrap());
         assert!(maybe_error.is_none());
         let outcome = maybe_outcome.unwrap();
 
@@ -643,7 +643,10 @@ fn test_xcc_exec_gas() {
             router_exec_cost
         );
 
-        assert_eq!(outcome.action_receipts.len(), args.promise_count() as usize);
+        assert_eq!(
+            outcome.action_receipts.len(),
+            usize::try_from(args.promise_count()).unwrap()
+        );
         for (target_account_id, receipt) in outcome.action_receipts {
             assert_eq!(
                 target_account_id.as_str(),
@@ -688,11 +691,11 @@ fn deploy_router() -> AuroraRunner {
     };
 
     router.context.current_account_id = "some_address.aurora".parse().unwrap();
-    router.context.predecessor_account_id = "aurora".parse().unwrap();
+    router.context.predecessor_account_id = ORIGIN.parse().unwrap();
 
     let init_args = r#"{"wnear_account": "wrap.near", "must_register": true}"#;
     let (maybe_outcome, maybe_error) =
-        router.call("initialize", "aurora", init_args.as_bytes().to_vec());
+        router.call("initialize", ORIGIN, init_args.as_bytes().to_vec());
     assert!(maybe_error.is_none());
     let outcome = maybe_outcome.unwrap();
     assert!(outcome.used_gas < aurora_engine::xcc::INITIALIZE_GAS.as_u64());

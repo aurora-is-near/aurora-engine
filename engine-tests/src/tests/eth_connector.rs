@@ -173,11 +173,6 @@ fn call_deposit_eth_to_aurora(master_account: &UserAccount, contract: &str) {
 }
 
 fn get_eth_on_near_balance(master_account: &UserAccount, acc: &str, contract: &str) -> u128 {
-    #[derive(BorshSerialize)]
-    pub struct BalanceOfCallArgs {
-        pub account_id: String,
-    }
-
     let balance = master_account.view(
         contract.parse().unwrap(),
         "ft_balance_of",
@@ -189,15 +184,12 @@ fn get_eth_on_near_balance(master_account: &UserAccount, acc: &str, contract: &s
 }
 
 fn get_eth_balance(master_account: &UserAccount, address: Address, contract: &str) -> u128 {
-    #[derive(BorshSerialize, BorshDeserialize)]
-    pub struct BalanceOfEthCallArgs {
-        pub address: Address,
-    }
-
     let balance = master_account.view(
         contract.parse().unwrap(),
         "ft_balance_of_eth",
-        &BalanceOfEthCallArgs { address }.try_to_vec().unwrap(),
+        &aurora_engine::parameters::BalanceOfEthCallArgs { address }
+            .try_to_vec()
+            .unwrap(),
     );
     let val_str = String::from_utf8(balance.unwrap()).unwrap();
     let val = &val_str[1..val_str.len() - 1];
@@ -363,13 +355,10 @@ fn test_ft_transfer() {
     res.assert_success();
 
     let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
-    assert_eq!(
-        balance,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
-    );
+    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount);
 
     let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE - transfer_amount as u128);
+    assert_eq!(balance, DEPOSITED_FEE - transfer_amount);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT);
@@ -540,7 +529,7 @@ fn test_ft_transfer_call_without_message() {
     let dummy_ft_receiver = master_account.deploy(
         &dummy_ft_receiver_bytes(),
         "ft-rec.root".parse().unwrap(),
-        near_sdk_sim::STORAGE_AMOUNT,
+        STORAGE_AMOUNT,
     );
     let res = recipient_account.call(
         CONTRACT_ACC.parse().unwrap(),
@@ -1310,13 +1299,10 @@ fn test_get_accounts_counter_and_transfer() {
     res.assert_success();
 
     let balance = get_eth_on_near_balance(&master_account, DEPOSITED_RECIPIENT, CONTRACT_ACC);
-    assert_eq!(
-        balance,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount as u128
-    );
+    assert_eq!(balance, DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount);
 
     let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
-    assert_eq!(balance, DEPOSITED_FEE - transfer_amount as u128);
+    assert_eq!(balance, DEPOSITED_FEE - transfer_amount);
 
     let balance = total_supply(&master_account, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_AMOUNT);
@@ -1634,7 +1620,7 @@ fn test_ft_transfer_empty_value() {
     eprintln!("{:#?}", promise.as_ref().unwrap().outcome().clone().status);
     assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
-        "ERR_FAILED_PARSE_U128",
+        "cannot parse integer from empty string",
         "Expected failure as empty string can't be parsed to u128",
     );
 }
@@ -1662,7 +1648,7 @@ fn test_ft_transfer_wrong_u128_json_type() {
     eprintln!("{:#?}", promise.as_ref().unwrap().outcome().clone().status);
     assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
-        "ERR_EXPECTED_STRING_GOT_NUMBER",
+        "Wait for a string but got: 200",
         "Expected failure as number type can't be parsed to u128",
     );
 }

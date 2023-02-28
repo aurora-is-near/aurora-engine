@@ -73,7 +73,7 @@ macro_rules! assert_or_finish {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
 pub struct EngineError {
     pub kind: EngineErrorKind,
     pub gas_used: u64,
@@ -93,7 +93,7 @@ impl AsRef<[u8]> for EngineError {
 
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
 pub enum EngineErrorKind {
     /// Normal EVM errors.
     EvmError(ExitError),
@@ -111,13 +111,6 @@ pub enum EngineErrorKind {
 }
 
 impl EngineErrorKind {
-    pub fn with_gas_used(self, gas_used: u64) -> EngineError {
-        EngineError {
-            kind: self,
-            gas_used,
-        }
-    }
-
     pub fn as_bytes(&self) -> &[u8] {
         use EngineErrorKind::*;
         match self {
@@ -192,7 +185,7 @@ impl ExitIntoResult for ExitReason {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BalanceOverflow;
 
 impl AsRef<[u8]> for BalanceOverflow {
@@ -203,7 +196,7 @@ impl AsRef<[u8]> for BalanceOverflow {
 
 /// Errors resulting from trying to pay for gas
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GasPaymentError {
     /// Overflow adding ETH to an account balance (should never happen)
     BalanceOverflow(BalanceOverflow),
@@ -490,13 +483,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         let used_gas = executor.used_gas();
-        let status = match exit_reason.into_result(result) {
-            Ok(status) => status,
-            Err(e) => {
-                increment_nonce(&mut self.io, &origin);
-                return Err(e.with_gas_used(used_gas));
-            }
-        };
+        let status = exit_reason.into_result(result)?;
 
         let (values, logs) = executor.into_state().deconstruct();
         let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
@@ -571,13 +558,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         );
 
         let used_gas = executor.used_gas();
-        let status = match exit_reason.into_result(result) {
-            Ok(status) => status,
-            Err(e) => {
-                increment_nonce(&mut self.io, origin);
-                return Err(e.with_gas_used(used_gas));
-            }
-        };
+        let status = exit_reason.into_result(result)?;
 
         let (values, logs) = executor.into_state().deconstruct();
         let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
@@ -796,27 +777,13 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let env = self.env;
         let ro_promise_handler = handler.read_only();
 
-        let precompiles = if cfg!(all(feature = "mainnet", not(feature = "integration-test"))) {
-            let mut tmp = Precompiles::new_london(PrecompileConstructorContext {
-                current_account_id,
-                random_seed,
-                io,
-                env,
-                promise_handler: ro_promise_handler,
-            });
-            // Cross contract calls are not enabled on mainnet yet.
-            tmp.all_precompiles
-                .remove(&aurora_engine_precompiles::xcc::cross_contract_call::ADDRESS);
-            tmp
-        } else {
-            Precompiles::new_london(PrecompileConstructorContext {
-                current_account_id,
-                random_seed,
-                io,
-                env,
-                promise_handler: ro_promise_handler,
-            })
-        };
+        let precompiles = Precompiles::new_london(PrecompileConstructorContext {
+            current_account_id,
+            random_seed,
+            io,
+            env,
+            promise_handler: ro_promise_handler,
+        });
 
         Self::apply_pause_flags_to_precompiles(precompiles, pause_flags)
     }
@@ -903,11 +870,6 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
     let prepaid_amount = match engine.charge_gas(&sender, &transaction) {
         Ok(gas_result) => gas_result,
-        Err(GasPaymentError::OutOfFund) => {
-            increment_nonce(&mut io, &sender);
-            let result = SubmitResult::new(TransactionStatus::OutOfFund, 0, vec![]);
-            return Ok(result);
-        }
         Err(err) => {
             return Err(EngineErrorKind::GasPayment(err).into());
         }
@@ -1208,6 +1170,7 @@ pub fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
         .unwrap_or_else(|_| U256::zero())
 }
 
+#[cfg(test)]
 pub fn increment_nonce<I: IO>(io: &mut I, address: &Address) {
     let account_nonce = get_nonce(io, address);
     let new_nonce = account_nonce.saturating_add(U256::one());

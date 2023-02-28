@@ -201,7 +201,6 @@ fn saturating_round(x: U256) -> u64 {
 fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
     let parse = |start: usize| -> u64 {
         // I don't understand why I need a closure here, but doesn't compile without one
-        #[allow(clippy::redundant_closure)]
         saturating_round(parse_bytes(input, start, 32, |x| U256::from(x)))
     };
     let base_len = parse(0);

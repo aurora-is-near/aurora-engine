@@ -1,6 +1,6 @@
 //! A module containing tests which reproduce transactions sent to live networks.
 
-use crate::test_utils::standalone;
+use crate::test_utils::{standalone, ORIGIN};
 use crate::test_utils::{AuroraRunner, ExecutionProfile};
 use aurora_engine::parameters::SubmitResult;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -60,7 +60,7 @@ fn repro_8ru7VEA() {
 /// https://explorer.mainnet.near.org/transactions/FRcorNvFojoxBrdiVMTy9gRD3H8EYXXKau4feevMZmFV
 /// It hit the gas limit at the time of its execution (engine v2.5.2 after 300 Tgas limit increase).
 /// The transaction performs some complex defi interaction (description from the user):
-/// 1. It sell 30% BSTN to NEAR, and mint cNEAR
+/// 1. It sells 30% BSTN to NEAR, and mint cNEAR
 /// 2. It sells 35% BSTN to NEAR, and make NEAR-BSTN LP token
 /// 3. Deposit LP token created from step2 to Trisolaris farm
 #[allow(non_snake_case)]
@@ -168,7 +168,7 @@ fn repro_common(context: ReproContext) {
     let mut standalone = standalone::StandaloneRunner::default();
     standalone
         .storage
-        .set_engine_account_id(&"aurora".parse().unwrap())
+        .set_engine_account_id(&ORIGIN.parse().unwrap())
         .unwrap();
     json_snapshot::initialize_engine_state(&mut standalone.storage, snapshot).unwrap();
     let standalone_result = standalone
