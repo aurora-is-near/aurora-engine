@@ -13,7 +13,17 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 ///
 /// This guarantees all properly constructed AccountId's are valid for the NEAR network.
 #[derive(
-    BorshSerialize, Serialize, Deserialize, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd,
+    Default,
+    BorshSerialize,
+    Serialize,
+    Deserialize,
+    Eq,
+    Ord,
+    Hash,
+    Clone,
+    Debug,
+    PartialEq,
+    PartialOrd,
 )]
 pub struct AccountId(Box<str>);
 
@@ -84,15 +94,15 @@ impl AccountId {
 
 impl BorshDeserialize for AccountId {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        let account = <String as BorshDeserialize>::deserialize(buf)?;
+        let account: String = BorshDeserialize::deserialize(buf)?;
+
+        // It's for saving backward compatibility.
+        if account.is_empty() {
+            return Ok(Self::default());
+        }
+
         AccountId::new(&account)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
-    }
-}
-
-impl Default for AccountId {
-    fn default() -> Self {
-        Self("default.aurora".into())
     }
 }
 
