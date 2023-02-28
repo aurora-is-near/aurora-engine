@@ -78,7 +78,7 @@ mod contract {
     use crate::parameters::{
         CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
         NEP141FtOnTransferArgs, NewCallArgs, PausePrecompilesCallArgs, SetContractDataCallArgs,
-        SetEthConnectorContractAccountArgs, TransferCallCallArgs, ViewCallArgs,
+        SetEthConnectorContractAccountArgs, SetOwnerArgs, TransferCallCallArgs, ViewCallArgs,
     };
     use crate::pausables::{
         Authorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PausedPrecompilesManager,
