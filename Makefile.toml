@@ -85,6 +85,8 @@ args = [
     "--",
     "-D",
     "warnings",
+    "-D",
+    "clippy::as_conversions",
 ]
 
 [tasks.check-fmt]

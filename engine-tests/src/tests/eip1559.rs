@@ -24,7 +24,7 @@ const EXAMPLE_TX_HEX: &str = "02f8c101010a8207d0833d090094cccccccccccccccccccccc
 // TODO(#170): generally support Ethereum tests
 #[test]
 fn test_eip_1559_tx_encoding_decoding() {
-    let secret_key = exmaple_signer().secret_key;
+    let secret_key = example_signer().secret_key;
     let transaction = example_transaction();
 
     let signed_tx = test_utils::sign_eip_1559_transaction(transaction, &secret_key);
@@ -52,7 +52,7 @@ fn test_eip_1559_tx_encoding_decoding() {
 #[test]
 fn test_eip_1559_example() {
     let mut runner = test_utils::deploy_evm();
-    let mut signer = exmaple_signer();
+    let mut signer = example_signer();
     let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
     let contract_address = test_utils::address_from_hex(CONTRACT_ADDRESS);
     let contract_code = hex::decode(CONTRACT_CODE).unwrap();
@@ -112,7 +112,7 @@ fn encode_tx(signed_tx: &SignedTransaction1559) -> Vec<u8> {
         .collect()
 }
 
-fn exmaple_signer() -> test_utils::Signer {
+fn example_signer() -> test_utils::Signer {
     let secret_key =
         libsecp256k1::SecretKey::parse_slice(&hex::decode(SECRET_KEY).unwrap()).unwrap();
 

@@ -25,10 +25,7 @@ use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
-pub fn origin() -> String {
-    "aurora".to_string()
-}
-
+pub(crate) const ORIGIN: &str = "aurora";
 pub(crate) const SUBMIT: &str = "submit";
 pub(crate) const CALL: &str = "call";
 pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
@@ -247,8 +244,8 @@ impl AuroraRunner {
     ) {
         let trie = &mut self.ext.underlying.fake_trie;
         for entry in snapshot.result.values {
-            let key = base64::decode(entry.key).unwrap();
-            let value = base64::decode(entry.value).unwrap();
+            let key = aurora_engine_sdk::base64::decode(entry.key).unwrap();
+            let value = aurora_engine_sdk::base64::decode(entry.value).unwrap();
             trie.insert(key, value);
         }
     }
@@ -497,7 +494,6 @@ impl AuroraRunner {
 
 impl Default for AuroraRunner {
     fn default() -> Self {
-        let aurora_account_id = "aurora".to_string();
         let evm_wasm_bytes = if cfg!(feature = "mainnet-test") {
             std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap()
         } else if cfg!(feature = "testnet-test") {
@@ -512,16 +508,16 @@ impl Default for AuroraRunner {
         let wasm_config = runtime_config.wasm_config.clone();
 
         Self {
-            aurora_account_id: aurora_account_id.clone(),
+            aurora_account_id: ORIGIN.to_string(),
             chain_id: 1313161556, // NEAR localnet,
             code: ContractCode::new(evm_wasm_bytes, None),
             cache: Default::default(),
             ext: mocked_external::MockedExternalWithTrie::new(Default::default()),
             context: VMContext {
-                current_account_id: as_account_id(&aurora_account_id),
-                signer_account_id: as_account_id(&aurora_account_id),
+                current_account_id: as_account_id(ORIGIN),
+                signer_account_id: as_account_id(ORIGIN),
                 signer_account_pk: vec![],
-                predecessor_account_id: as_account_id(&aurora_account_id),
+                predecessor_account_id: as_account_id(ORIGIN),
                 input: vec![],
                 block_index: 0,
                 block_timestamp: 0,
@@ -618,10 +614,7 @@ pub(crate) fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLega
 
 pub(crate) fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> TransactionLegacy {
     let len = contract_bytes.len();
-    if len > u16::MAX as usize {
-        panic!("Cannot deploy a contract with that many bytes!");
-    }
-    let len = len as u16;
+    let len = u16::try_from(len).expect("Cannot deploy a contract with that many bytes!");
     // This bit of EVM byte code essentially says:
     // "If msg.value > 0 revert; otherwise return `len` amount of bytes that come after me
     // in the code." By prepending this to `contract_bytes` we create a valid EVM program which
@@ -648,7 +641,7 @@ pub(crate) fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) ->
 
 pub(crate) fn create_eth_transaction(
     to: Option<Address>,
-    value: crate::prelude::Wei,
+    value: Wei,
     data: Vec<u8>,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
@@ -686,8 +679,8 @@ pub(crate) fn sign_transaction(
 
     let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
     let v: u64 = match chain_id {
-        Some(chain_id) => (recovery_id.serialize() as u64) + 2 * chain_id + 35,
-        None => (recovery_id.serialize() as u64) + 27,
+        Some(chain_id) => u64::from(recovery_id.serialize()) + 2 * chain_id + 35,
+        None => u64::from(recovery_id.serialize()) + 27,
     };
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());
@@ -761,7 +754,7 @@ pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
 pub(crate) fn validate_address_balance_and_nonce(
     runner: &AuroraRunner,
     address: Address,
-    expected_balance: crate::prelude::Wei,
+    expected_balance: Wei,
     expected_nonce: U256,
 ) {
     assert_eq!(runner.get_balance(address), expected_balance, "balance");

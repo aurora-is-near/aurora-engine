@@ -1,5 +1,5 @@
 use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
-use crate::test_utils::{origin, AuroraRunner, Signer};
+use crate::test_utils::{AuroraRunner, Signer, ORIGIN};
 
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS};
@@ -25,7 +25,7 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
         )
         .into();
 
-    runner.mint(token, tester.contract.address, 1_000_000_000, origin());
+    runner.mint(token, tester.contract.address, 1_000_000_000, ORIGIN);
 
     (runner, signer, token, tester)
 }

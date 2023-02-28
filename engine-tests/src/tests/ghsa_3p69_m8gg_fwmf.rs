@@ -44,5 +44,9 @@ fn test_exploit_fix() {
 
     let (_outcome, maybe_error) = runner.one_shot().call("view", "viewer", input);
     let error_message = format!("{:?}", maybe_error);
-    assert!(error_message.contains("ERR_ILLEGAL_RETURN"));
+    assert!(
+        error_message.contains("ERR_ILLEGAL_RETURN"),
+        "{}",
+        error_message
+    );
 }

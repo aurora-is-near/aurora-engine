@@ -101,10 +101,7 @@ fn test_consume_deposit_message() {
     let ft_on_transfer_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
             let bytes = promise_args.base.args;
-            let json = aurora_engine::json::parse_json(&bytes).unwrap();
-            aurora_engine::parameters::NEP141FtOnTransferArgs::try_from(json)
-                .ok()
-                .unwrap()
+            serde_json::from_slice(&bytes).unwrap()
         }
         other => panic!("Unexpected result {:?}", other),
     };

@@ -42,7 +42,7 @@ impl<T> ExpectUtf8<T> for Option<T> {
 }
 
 #[cfg(feature = "contract")]
-impl<T, E> ExpectUtf8<T> for core::result::Result<T, E> {
+impl<T, E> ExpectUtf8<T> for Result<T, E> {
     fn expect_utf8(self, message: &[u8]) -> T {
         match self {
             Ok(t) => t,
@@ -67,7 +67,7 @@ impl<T> SdkExpect<T> for Option<T> {
 }
 
 #[cfg(feature = "contract")]
-impl<T, E> SdkExpect<T> for core::result::Result<T, E> {
+impl<T, E> SdkExpect<T> for Result<T, E> {
     fn sdk_expect(self, msg: &str) -> T {
         match self {
             Ok(t) => t,
@@ -92,7 +92,7 @@ impl<T> SdkUnwrap<T> for Option<T> {
 }
 
 #[cfg(feature = "contract")]
-impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for core::result::Result<T, E> {
+impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for Result<T, E> {
     fn sdk_unwrap(self) -> T {
         match self {
             Ok(t) => t,

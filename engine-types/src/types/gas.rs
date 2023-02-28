@@ -1,7 +1,6 @@
 use crate::fmt::Formatter;
 use crate::{Add, AddAssign, Display, Div, Mul, Sub};
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -44,8 +43,7 @@ impl NearGas {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 /// Ethereum gas type which wraps an underlying u64.
 pub struct EthGas(u64);
 

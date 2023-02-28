@@ -173,7 +173,7 @@ fn test_evm_tracing() {
         .logs()
         .0
         .iter()
-        .map(|l| l.program_counter.into_u32() as u8)
+        .map(|l| u8::try_from(l.program_counter.into_u32()).unwrap())
         .collect();
     assert_eq!(positions.as_slice(), &EXPECTED_POSITIONS);
 
@@ -181,7 +181,7 @@ fn test_evm_tracing() {
         .logs()
         .0
         .iter()
-        .map(|l| l.gas_cost.as_u64() as u32)
+        .map(|l| u32::try_from(l.gas_cost.as_u64()).unwrap())
         .collect();
     assert_eq!(costs.as_slice(), &EXPECTED_COSTS);
 

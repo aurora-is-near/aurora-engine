@@ -1,10 +1,10 @@
-use aurora_engine::engine;
+use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
 use aurora_engine_test_doubles::io::{Storage, StoragePointer};
 use aurora_engine_test_doubles::promise::PromiseTracker;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
-use std::sync::RwLock;
+use std::cell::RefCell;
 
 #[test]
 fn test_deploy_code() {
@@ -15,14 +15,14 @@ fn test_deploy_code() {
         buf
     };
     let owner_id: AccountId = "aurora".parse().unwrap();
-    let state = engine::EngineState {
+    let state = state::EngineState {
         chain_id,
         owner_id: owner_id.clone(),
         bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
     };
     let origin = Address::new(H160([0u8; 20]));
-    let storage = RwLock::new(Storage::default());
+    let storage = RefCell::new(Storage::default());
     let io = StoragePointer(&storage);
     let env = aurora_engine_sdk::env::Fixed {
         signer_account_id: owner_id.clone(),
@@ -68,10 +68,7 @@ fn test_deploy_code() {
 
 fn evm_deploy(code: &[u8]) -> Vec<u8> {
     let len = code.len();
-    if len > u16::MAX as usize {
-        panic!("Cannot deploy a contract with that many bytes!");
-    }
-    let len = len as u16;
+    let len = u16::try_from(len).expect("Cannot deploy a contract with that many bytes!");
     // This bit of EVM byte code essentially says:
     // "If msg.value > 0 revert; otherwise return `len` amount of bytes that come after me
     // in the code." By prepending this to `code` we create a valid EVM program which

@@ -1,7 +1,6 @@
 use crate::legacy_connector::ZERO_ATTACHED_BALANCE;
 use aurora_engine::{
     engine,
-    json::{parse_json, JsonValue},
     parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance},
 };
 use aurora_engine_sdk as sdk;
@@ -17,6 +16,7 @@ use aurora_engine_types::{
     vec, BTreeMap, String, ToString, Vec,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
 /// Gas for `resolve_transfer`: 5 TGas
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
@@ -63,13 +63,13 @@ pub struct FungibleTokenOps<I: IO> {
 
 /// Fungible token Reference hash type.
 /// Used for FungibleTokenMetadata
-#[derive(Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
+#[derive(Debug, BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct FungibleReferenceHash([u8; 32]);
 
 impl FungibleReferenceHash {
     /// Encode to base64-encoded string
     pub fn encode(&self) -> String {
-        base64::encode(self)
+        aurora_engine_sdk::base64::encode(self)
     }
 }
 
@@ -79,7 +79,7 @@ impl AsRef<[u8]> for FungibleReferenceHash {
     }
 }
 
-#[derive(Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
+#[derive(Debug, BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct FungibleTokenMetadata {
     pub spec: String,
     pub name: String,
@@ -101,42 +101,6 @@ impl Default for FungibleTokenMetadata {
 			reference_hash: None,
 			decimals: 18,
 		}
-    }
-}
-
-impl From<FungibleTokenMetadata> for JsonValue {
-    fn from(metadata: FungibleTokenMetadata) -> Self {
-        let mut kvs = BTreeMap::new();
-        kvs.insert("spec".to_string(), JsonValue::String(metadata.spec));
-        kvs.insert("name".to_string(), JsonValue::String(metadata.name));
-        kvs.insert("symbol".to_string(), JsonValue::String(metadata.symbol));
-        kvs.insert(
-            "icon".to_string(),
-            metadata
-                .icon
-                .map(JsonValue::String)
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "reference".to_string(),
-            metadata
-                .reference
-                .map(JsonValue::String)
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "reference_hash".to_string(),
-            metadata
-                .reference_hash
-                .map(|hash| JsonValue::String(hash.encode()))
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "decimals".to_string(),
-            JsonValue::U64(u64::from(metadata.decimals)),
-        );
-
-        JsonValue::Object(kvs)
     }
 }
 
@@ -296,12 +260,11 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         if sender_id != receiver_id {
             self.internal_transfer_eth_on_near(&sender_id, &receiver_id, amount, memo)?;
         }
-        let data1: String = NEP141FtOnTransferArgs {
+        let args = serde_json::to_vec(&NEP141FtOnTransferArgs {
+            sender_id: sender_id.clone(),
             amount: Balance::new(amount.as_u128()),
             msg,
-            sender_id: sender_id.clone(),
-        }
-        .try_into()
+        })
         .unwrap();
 
         let data2 = ResolveTransferCallArgs {
@@ -315,7 +278,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let ft_on_transfer_call = PromiseCreateArgs {
             target_account_id: receiver_id,
             method: "ft_on_transfer".to_string(),
-            args: data1.into_bytes(),
+            args,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: prepaid_gas - GAS_FOR_FT_TRANSFER_CALL - GAS_FOR_RESOLVE_TRANSFER,
         };
@@ -342,12 +305,8 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         // Get the unused amount from the `ft_on_transfer` call result.
         let unused_amount = match promise_result {
             PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(value) => {
-                if let Some(raw_unused_amount) =
-                    parse_json(value.as_slice()).and_then(|x| (&x).try_into().ok())
-                {
-                    let unused_amount = NEP141Wei::new(raw_unused_amount);
-                    // let unused_amount = Balance::from(raw_unused_amount);
+            PromiseResult::Successful(bytes) => {
+                if let Ok(unused_amount) = serde_json::from_slice(&bytes) {
                     if amount > unused_amount {
                         unused_amount
                     } else {
