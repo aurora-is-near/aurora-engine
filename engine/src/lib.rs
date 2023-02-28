@@ -567,8 +567,13 @@ mod contract {
                 .sdk_unwrap();
         }
 
-        let previous_block_hashchain = blockchain_hashchain.get_previous_block_hashchain();
-        io.return_output(&previous_block_hashchain);
+        let height_and_hashchain = serde_json::to_vec(&(
+            blockchain_hashchain.get_current_block_height() - 1,
+            blockchain_hashchain.get_previous_block_hashchain(),
+        ))
+        .unwrap();
+
+        io.return_output(&height_and_hashchain);
     }
 
     #[no_mangle]
