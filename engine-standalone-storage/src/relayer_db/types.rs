@@ -264,13 +264,14 @@ enum PostgresNumericSign {
     NaN = 0xc000,
 }
 
+#[allow(clippy::fallible_impl_from)]
 impl From<u16> for PostgresNumericSign {
     fn from(value: u16) -> Self {
         match value {
             0x0000 => Self::Positive,
             0x4000 => Self::Negative,
             0xc000 => Self::NaN,
-            _ => panic!("Unexpected Numeric Sign value"),
+            _ => panic!("Unexpected PostgresNumericSign value"),
         }
     }
 }

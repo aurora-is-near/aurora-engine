@@ -160,7 +160,7 @@ mod contract {
             sdk::panic_utf8(errors::ERR_SAME_OWNER);
         } else {
             state.owner_id = args.new_owner;
-            state::set_state(&mut io, state).sdk_unwrap();
+            state::set_state(&mut io, &state).sdk_unwrap();
         }
     }
 

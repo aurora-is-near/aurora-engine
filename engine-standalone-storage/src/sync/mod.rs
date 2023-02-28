@@ -411,7 +411,7 @@ fn non_submit_execute<'db>(
             let mut prev = state::get_state(&io)?;
 
             prev.owner_id = args.clone().new_owner;
-            state::set_state(&mut io, prev)?;
+            state::set_state(&mut io, &prev)?;
 
             None
         }

@@ -1050,8 +1050,8 @@ fn test_set_owner() {
 
     // check if the owner_id property has changed to new_owner.near
     assert_eq!(
-        "new_owner.near".as_bytes(),
-        outcome.unwrap().return_data.as_value().unwrap()
+        b"new_owner.near",
+        outcome.unwrap().return_data.as_value().unwrap().as_slice()
     );
 }
 
