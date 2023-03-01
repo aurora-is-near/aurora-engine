@@ -38,11 +38,11 @@ pub fn deploy_evm() -> AuroraAccount {
         sim_aurora_account.parse().unwrap(),
         5 * near_sdk_sim::STORAGE_AMOUNT,
     );
-    let prover_account = str_to_account_id("prover.near");
+    let bridge_prover_id = str_to_account_id("prover.near");
     let new_args = NewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(aurora_runner.chain_id)),
         owner_id: str_to_account_id(main_account.account_id.as_str()),
-        bridge_prover_id: prover_account.clone(),
+        bridge_prover_id,
         upgrade_delay_blocks: 1,
     };
     main_account
