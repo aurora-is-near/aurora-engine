@@ -66,7 +66,6 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use crate::parameters::SetOwnerArgs;
     use borsh::BorshSerialize;
 
     use crate::admin_controlled::AdminControlled;
