@@ -122,6 +122,7 @@ impl TestContract {
                 "eth_custodian_address": eth_custodian_address,
                 "metadata": metadata,
                 "account_with_access_right": account_with_access_right,
+                "owner_id": account_with_access_right,
             }))
             .gas(DEFAULT_GAS)
             .transact()
