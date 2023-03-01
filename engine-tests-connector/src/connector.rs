@@ -26,7 +26,7 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
     let proof = contract.get_proof(PROOF_DATA_NEAR);
     let res = contract
-        .eth_connector_contract
+        .engine_contract
         .call("deposit")
         .args_borsh(proof)
         .gas(DEFAULT_GAS)
@@ -34,11 +34,13 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .await?;
     assert!(res.is_success());
 
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
     let transfer_amount = 70;
-    let receiver_id = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
-    let res = contract
-        .eth_connector_contract
-        .call("ft_transfer")
+    let receiver_id = contract.engine_contract.id();
+    let res = user_acc
+        .call(contract.engine_contract.id(), "ft_transfer")
         .args_json(json!({
                     "receiver_id": &receiver_id,
                     "amount": transfer_amount.to_string(),
@@ -58,17 +60,17 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .await?
         .json::<U128>()
         .unwrap();
-    assert_eq!(balance.0, DEPOSITED_AMOUNT + transfer_amount);
+    assert_eq!(balance.0, transfer_amount);
 
     let balance = contract
         .eth_connector_contract
         .call("ft_balance_of")
-        .args_json((&contract.eth_connector_contract.id(),))
+        .args_json((&user_acc.id(),))
         .view()
         .await?
         .json::<U128>()
         .unwrap();
-    assert_eq!(balance.0, DEPOSITED_FEE - transfer_amount);
+    assert_eq!(balance.0, DEPOSITED_AMOUNT - transfer_amount);
 
     let balance = contract
         .eth_connector_contract
@@ -123,7 +125,9 @@ async fn test_withdraw_eth_from_near() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
     contract.call_deposit_eth_to_near().await?;
 
-    let user_acc = contract.create_sub_account("eth_recipient").await?;
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
 
     let withdraw_amount = NEP141Wei::new(100);
     let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
@@ -143,7 +147,7 @@ async fn test_withdraw_eth_from_near() -> anyhow::Result<()> {
     assert_eq!(data.eth_custodian_address, custodian_addr);
 
     assert_eq!(
-        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
+        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - withdraw_amount.as_u128(),
     );
     assert_eq!(
@@ -647,7 +651,9 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
 #[tokio::test]
 async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
-    let user_acc = contract.create_sub_account("eth_recipient").await?;
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
     let res = user_acc
         .call(contract.eth_connector_contract.id(), "set_paused_flags")
         .args_borsh(PAUSE_DEPOSIT)
@@ -771,7 +777,9 @@ async fn test_admin_controlled_admin_can_perform_actions_when_paused() -> anyhow
 #[tokio::test]
 async fn test_deposit_pausability() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
-    let user_acc = contract.create_sub_account("eth_recipient").await?;
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
 
     // 1st deposit call - should succeed
     let res = contract
@@ -830,7 +838,9 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
 #[tokio::test]
 async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
-    let user_acc = contract.create_sub_account("eth_recipient").await?;
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
 
     contract.call_deposit_eth_to_near().await?;
 
@@ -932,7 +942,9 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
         .unwrap();
     assert_eq!(res.0, 2);
 
-    let user_acc = contract.create_sub_account("eth_recipient").await?;
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
     let transfer_amount = 70;
     let receiver_id = contract.engine_contract.id();
     let res = user_acc
@@ -949,7 +961,7 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
     assert!(res.is_success());
 
     assert_eq!(
-        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
+        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - transfer_amount
     );
     assert_eq!(
@@ -1185,7 +1197,9 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
     contract.call_deposit_eth_to_near().await?;
 
     let transfer_amount: U128 = 70.into();
-    let user_acc = contract.create_sub_account("eth_recipient").await?;
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
 
     let res = contract
         .engine_contract
@@ -1248,7 +1262,9 @@ async fn test_access_rights() -> anyhow::Result<()> {
 
     let transfer_amount1: U128 = 50.into();
     let transfer_amount2: U128 = 10.into();
-    let user_acc = contract.create_sub_account("eth_recipient").await?;
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
 
     let res = contract
         .engine_contract
@@ -1372,7 +1388,9 @@ async fn test_access_rights() -> anyhow::Result<()> {
 async fn test_withdraw_from_user() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
     contract.call_deposit_eth_to_near().await?;
-    let user_acc = contract.create_sub_account("eth_recipient").await?;
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
 
     let withdraw_amount = NEP141Wei::new(130);
     let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);

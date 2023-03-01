@@ -243,14 +243,14 @@ AURORA_ETH_CONNECTOR_REPO="https://github.com/aurora-is-near/"$AURORA_ETH_CONNEC
 if [ -d $AURORA_ETH_CONNECTOR_DIR ]; then
   cd $AURORA_ETH_CONNECTOR_DIR
   echo "Pull Aurora Eth-Connector repo"
-  git pull origin fix/audit-aur-03 
+  git pull origin master 
 else
   mkdir $AURORA_ETH_CONNECTOR_ETC || true
   cd $AURORA_ETH_CONNECTOR_ETC
   echo "Clone Aurora Eth-Connector repo: "$AURORA_ETH_CONNECTOR_REPO
   git clone --depth 1 $AURORA_ETH_CONNECTOR_REPO
   cd $AURORA_ETH_CONNECTOR_REPO_NAME
-  git checkout -b fix/audit-aur-03
+  git checkout master
 fi
 cargo make --profile mainnet build-test
 '''
