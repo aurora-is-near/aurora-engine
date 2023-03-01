@@ -4,6 +4,7 @@ use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
+use crate::connector::EthConnectorContract;
 use crate::map::BijectionMap;
 use crate::{errors, state};
 use aurora_engine_sdk::caching::FullCache;

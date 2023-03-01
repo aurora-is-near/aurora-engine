@@ -67,6 +67,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::BorshSerialize;
+    use parameters::SetOwnerArgs;
 
     use crate::admin_controlled::AdminControlled;
     use crate::connector::{self, EthConnectorContract};
@@ -374,6 +375,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn factory_update_address_version() {
         let mut io = Runtime;
+        // The function is only set to be private, otherwise callback error will happen.
         io.assert_private_call().sdk_unwrap();
         let check_deploy: Result<(), &[u8]> = match io.promise_result_check() {
             Some(true) => Ok(()),
@@ -546,7 +548,12 @@ mod contract {
     pub extern "C" fn new_eth_connector() {
         let io = Runtime;
         // Only the owner can initialize the EthConnector
-        io.assert_private_call().sdk_unwrap();
+        let is_private = io.assert_private_call();
+
+        if is_private.is_err() {
+            let state = state::get_state(&io).sdk_unwrap();
+            require_owner_only(&state, &io.predecessor_account_id());
+        }
         //
         // let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
         // let owner_id = io.current_account_id();
@@ -557,7 +564,11 @@ mod contract {
     pub extern "C" fn set_eth_connector_contract_data() {
         let mut io = Runtime;
         // Only the owner can set the EthConnector contract data
-        io.assert_private_call().sdk_unwrap();
+        let is_private = io.assert_private_call();
+        if is_private.is_err() {
+            let state = state::get_state(&io).sdk_unwrap();
+            require_owner_only(&state, &io.predecessor_account_id());
+        }
 
         let args: SetContractDataCallArgs = io.read_input_borsh().sdk_unwrap();
         connector::set_contract_data(&mut io, args).sdk_unwrap();
@@ -860,9 +871,15 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_eth_connector_contract_account() {
         let io = Runtime;
-        io.assert_private_call().sdk_unwrap();
+        let is_private = io.assert_private_call();
+
+        if is_private.is_err() {
+            let state = state::get_state(&io).sdk_unwrap();
+            require_owner_only(&state, &io.predecessor_account_id());
+        }
 
         let args: SetEthConnectorContractAccountArgs = io.read_input_borsh().sdk_unwrap();
+
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .set_eth_connector_contract_account(&args.account);
@@ -922,7 +939,7 @@ mod contract {
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn mint_account() {
-        use crate::prelude::{NEP141Wei, U256};
+        use crate::prelude::{NEP141Wei, ToString, U256};
         use evm::backend::ApplyBackend;
 
         let io = Runtime;
