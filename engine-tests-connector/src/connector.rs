@@ -109,7 +109,7 @@ async fn test_ft_transfer() -> anyhow::Result<()> {
 
     assert_eq!(
         contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
-        DEPOSITED_AMOUNT,
+        DEPOSITED_AMOUNT - transfer_amount,
     );
     assert_eq!(
         contract.get_eth_on_near_balance(receiver_id).await?.0,
@@ -630,9 +630,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
 #[tokio::test]
 async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
-    let user_acc = contract
-        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
-        .await?;
+    let user_acc = contract.create_sub_account("some-user").await?;
     let res = user_acc
         .call(contract.eth_connector_contract.id(), "set_paused_flags")
         .args_borsh(PAUSE_DEPOSIT)
@@ -640,7 +638,7 @@ async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "Method set_paused_flags is private"));
+    assert!(contract.check_error_message(res, "ERR_ACCESS_RIGHT"));
 
     let res = contract
         .eth_connector_contract
@@ -1176,7 +1174,7 @@ async fn test_ft_transfer_empty_value() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_FAILED_PARSE_U128"));
+    assert!(contract.check_error_message(res, "cannot parse integer from empty string"));
     Ok(())
 }
 
