@@ -48,11 +48,9 @@ impl FtTransferMessageData {
         }
 
         // Parse fee from message slice. It should contain 32 bytes
-        // But after that in will be parse to u128
+        // But after that it will be parsed to u128
         // That logic for compatability.
-        let mut raw_fee: [u8; 32] = Default::default();
-        raw_fee.copy_from_slice(&msg[..32]);
-        let fee_u128: u128 = U256::from_little_endian(&raw_fee)
+        let fee_u128: u128 = U256::from_little_endian(&msg[..32])
             .try_into()
             .map_err(|_| error::ParseOnTransferMessageError::OverflowNumber)?;
         let fee: Fee = fee_u128.into();

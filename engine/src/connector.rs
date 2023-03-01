@@ -5,6 +5,7 @@ use crate::prelude::{PromiseCreateArgs, U256};
 
 use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
+use crate::metadata::FungibleTokenMetadata;
 use crate::prelude::{
     format, sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, Yocto,
@@ -368,6 +369,14 @@ pub fn set_contract_data<I: IO>(
     );
 
     Ok(contract_data)
+}
+
+/// Return metadata
+pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
+    io.read_storage(&construct_contract_key(
+        &EthConnectorStorageId::FungibleTokenMetadata,
+    ))
+    .and_then(|data| data.to_value().ok())
 }
 
 pub mod error {

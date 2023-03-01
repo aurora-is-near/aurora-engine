@@ -1,6 +1,8 @@
 use aurora_engine::pausables::PausedPrecompilesManager;
 use aurora_engine::pausables::PrecompileFlags;
-use aurora_engine::{engine, parameters::SubmitResult, pausables::EnginePrecompilesPauser, xcc};
+use aurora_engine::{
+    engine, parameters::SubmitResult, pausables::EnginePrecompilesPauser, state, xcc,
+};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_standalone_nep141_legacy::legacy_connector;
 use aurora_engine_types::{
@@ -137,7 +139,7 @@ fn execute_transaction<'db>(
             let transaction_bytes: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
-            let result = engine::get_state(&io)
+            let result = state::get_state(&io)
                 .map(|engine_state| {
                     let submit_result = engine::submit(
                         io,
@@ -348,12 +350,12 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::RefundOnError(maybe_args) => {
-            let result: Result<Option<TransactionExecutionResult>, engine::EngineStateError> =
+            let result: Result<Option<TransactionExecutionResult>, state::EngineStateError> =
                 maybe_args
                     .clone()
                     .map(|args| {
                         let mut handler = crate::promise::NoScheduler { promise_data };
-                        let engine_state = engine::get_state(&io)?;
+                        let engine_state = state::get_state(&io)?;
                         let result =
                             engine::refund_on_error(io, &env, engine_state, args, &mut handler);
                         Ok(TransactionExecutionResult::Submit(result))
@@ -399,7 +401,7 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::NewEngine(args) => {
-            engine::set_state(&mut io, args.clone().into());
+            state::set_state(&mut io, args.clone().into())?;
 
             None
         }
@@ -438,6 +440,14 @@ fn non_submit_execute<'db>(
 
             None
         }
+        TransactionKind::SetOwner(args) => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.owner_id = args.clone().new_owner;
+            state::set_state(&mut io, prev)?;
+
+            None
+        }
     };
 
     Ok(result)
@@ -466,12 +476,12 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::engine;
+    use aurora_engine::{engine, state};
     use aurora_engine_standalone_nep141_legacy::{fungible_token, legacy_connector};
 
     #[derive(Debug)]
     pub enum Error {
-        EngineState(engine::EngineStateError),
+        EngineState(state::EngineStateError),
         Engine(engine::EngineError),
         DeployErc20(engine::DeployErc20Error),
         FtOnTransfer(legacy_connector::error::FtTransferCallError),
@@ -486,8 +496,8 @@ pub mod error {
         ConnectorStorage(aurora_engine::connector::error::StorageReadError),
     }
 
-    impl From<engine::EngineStateError> for Error {
-        fn from(e: engine::EngineStateError) -> Self {
+    impl From<state::EngineStateError> for Error {
+        fn from(e: state::EngineStateError) -> Self {
             Self::EngineState(e)
         }
     }

@@ -1,6 +1,6 @@
 use crate::prelude::U256;
 use crate::test_utils::{self, str_to_account_id, AuroraRunner};
-use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
+use aurora_engine::parameters::NewCallArgs;
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
 use std::fs;
@@ -38,11 +38,11 @@ pub fn deploy_evm() -> AuroraAccount {
         sim_aurora_account.parse().unwrap(),
         5 * near_sdk_sim::STORAGE_AMOUNT,
     );
-    let prover_account = str_to_account_id("prover.near");
+    let bridge_prover_id = str_to_account_id("prover.near");
     let new_args = NewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(aurora_runner.chain_id)),
         owner_id: str_to_account_id(main_account.account_id.as_str()),
-        bridge_prover_id: prover_account.clone(),
+        bridge_prover_id,
         upgrade_delay_blocks: 1,
     };
     main_account
@@ -50,20 +50,6 @@ pub fn deploy_evm() -> AuroraAccount {
             contract_account.account_id.clone(),
             "new",
             &new_args.try_to_vec().unwrap(),
-            near_sdk_sim::DEFAULT_GAS,
-            0,
-        )
-        .assert_success();
-    let init_args = InitCallArgs {
-        prover_account,
-        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
-        metadata: Default::default(),
-    };
-    contract_account
-        .call(
-            contract_account.account_id.clone(),
-            "new_eth_connector",
-            &init_args.try_to_vec().unwrap(),
             near_sdk_sim::DEFAULT_GAS,
             0,
         )

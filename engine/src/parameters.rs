@@ -1,15 +1,15 @@
-use crate::errors;
-use crate::json::{JsonError, JsonValue};
+// use crate::admin_controlled::PausedMask;
+// use crate::errors;
 use crate::metadata::FungibleTokenMetadata;
 use crate::prelude::account_id::AccountId;
-use crate::prelude::{
-    format, Address, Balance, BorshDeserialize, BorshSerialize, RawH256, RawU256, String, Vec,
-    WeiU256,
-};
+use crate::prelude::{Address, Balance, BorshDeserialize, BorshSerialize, RawU256, String, Vec};
 use crate::proof::Proof;
+pub use aurora_engine_types::parameters::engine::{
+    CallArgs, DeployErc20TokenArgs, FunctionCallArgsV1, FunctionCallArgsV2,
+    GetErc20FromNep141CallArgs, GetStorageAtArgs, ResultLog, SubmitResult, TransactionStatus,
+    ViewCallArgs,
+};
 use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
-use evm::backend::Log;
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Borsh-encoded parameters for the `new` function.
@@ -27,166 +27,10 @@ pub struct NewCallArgs {
     pub upgrade_delay_blocks: u64,
 }
 
-/// Borsh-encoded log for use in a `SubmitResult`.
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ResultLog {
-    pub address: Address,
-    pub topics: Vec<RawU256>,
-    pub data: Vec<u8>,
-}
-
-impl From<Log> for ResultLog {
-    fn from(log: Log) -> Self {
-        let topics = log
-            .topics
-            .into_iter()
-            .map(|topic| topic.0)
-            .collect::<Vec<_>>();
-        ResultLog {
-            address: Address::new(log.address),
-            topics,
-            data: log.data,
-        }
-    }
-}
-
-/// The status of a transaction.
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum TransactionStatus {
-    Succeed(Vec<u8>),
-    Revert(Vec<u8>),
-    OutOfGas,
-    OutOfFund,
-    OutOfOffset,
-    CallTooDeep,
-}
-
-impl TransactionStatus {
-    pub fn is_ok(&self) -> bool {
-        matches!(*self, TransactionStatus::Succeed(_))
-    }
-
-    pub fn is_revert(&self) -> bool {
-        matches!(*self, TransactionStatus::Revert(_))
-    }
-
-    pub fn is_fail(&self) -> bool {
-        *self == TransactionStatus::OutOfGas
-            || *self == TransactionStatus::OutOfFund
-            || *self == TransactionStatus::OutOfOffset
-            || *self == TransactionStatus::CallTooDeep
-    }
-}
-
-impl AsRef<[u8]> for TransactionStatus {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::Succeed(_) => b"SUCCESS",
-            Self::Revert(_) => errors::ERR_REVERT,
-            Self::OutOfFund => errors::ERR_OUT_OF_FUNDS,
-            Self::OutOfGas => errors::ERR_OUT_OF_GAS,
-            Self::OutOfOffset => errors::ERR_OUT_OF_OFFSET,
-            Self::CallTooDeep => errors::ERR_CALL_TOO_DEEP,
-        }
-    }
-}
-
-/// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
-/// and `deploy_with_input` methods.
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct SubmitResult {
-    version: u8,
-    pub status: TransactionStatus,
-    pub gas_used: u64,
-    pub logs: Vec<ResultLog>,
-}
-
-impl SubmitResult {
-    /// Must be incremented when making breaking changes to the SubmitResult ABI.
-    /// The current value of 7 is chosen because previously a `TransactionStatus` object
-    /// was first in the serialization, which is an enum with less than 7 variants.
-    /// Therefore, no previous `SubmitResult` would have began with a leading 7 byte,
-    /// and this can be used to distinguish the new ABI (with version byte) from the old.
-    const VERSION: u8 = 7;
-
-    pub fn new(status: TransactionStatus, gas_used: u64, logs: Vec<ResultLog>) -> Self {
-        Self {
-            version: Self::VERSION,
-            status,
-            gas_used,
-            logs,
-        }
-    }
-}
-
-/// Borsh-encoded parameters for the engine `call` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
-pub struct FunctionCallArgsV2 {
-    pub contract: Address,
-    /// Wei compatible Borsh-encoded value field to attach an ETH balance to the transaction
-    pub value: WeiU256,
-    pub input: Vec<u8>,
-}
-
-/// Legacy Borsh-encoded parameters for the engine `call` function, to provide backward type compatibility
-#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
-pub struct FunctionCallArgsV1 {
-    pub contract: Address,
-    pub input: Vec<u8>,
-}
-
-/// Deserialized values from bytes to current or legacy Borsh-encoded parameters
-/// for passing to the engine `call` function, and to provide backward type compatibility
-#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
-pub enum CallArgs {
-    V2(FunctionCallArgsV2),
-    V1(FunctionCallArgsV1),
-}
-
-impl CallArgs {
-    pub fn deserialize(bytes: &[u8]) -> Option<Self> {
-        // For handling new input format (wrapped into call args enum) - for data structures with new arguments,
-        // made for flexibility and extensibility.
-        if let Ok(value) = Self::try_from_slice(bytes) {
-            Some(value)
-            // Fallback, for handling old input format,
-            // i.e. input, formed as a raw (not wrapped into call args enum) data structure with legacy arguments,
-            // made for backward compatibility.
-        } else if let Ok(value) = FunctionCallArgsV1::try_from_slice(bytes) {
-            Some(Self::V1(value))
-            // Dealing with unrecognized input should be handled and result as an exception in a call site.
-        } else {
-            None
-        }
-    }
-}
-
-/// Borsh-encoded parameters for the `view` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq)]
-pub struct ViewCallArgs {
-    pub sender: Address,
-    pub address: Address,
-    pub amount: RawU256,
-    pub input: Vec<u8>,
-}
-
-/// Borsh-encoded parameters for `deploy_erc20_token` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
-pub struct DeployErc20TokenArgs {
-    pub nep141: AccountId,
-}
-
-/// Borsh-encoded parameters for `get_erc20_from_nep141` function.
-pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgs;
-
-/// Borsh-encoded parameters for the `get_storage_at` function.
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct GetStorageAtArgs {
-    pub address: Address,
-    pub key: RawH256,
+/// Borsh-encoded parameters for the `set_owner` function.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct SetOwnerArgs {
+    pub new_owner: AccountId,
 }
 
 /// Borsh-encoded (genesis) account balance used by the `begin_chain` function.
@@ -225,38 +69,13 @@ pub struct BeginBlockArgs {
 
 /// Borsh-encoded parameters for the `ft_transfer_call` function
 /// for regular NEP-141 tokens.
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NEP141FtOnTransferArgs {
     pub sender_id: AccountId,
     /// Balance can be for Eth on Near and for Eth to Aurora
     /// `ft_on_transfer` can be called with arbitrary NEP-141 tokens attached, therefore we do not specify a particular type Wei.
     pub amount: Balance,
     pub msg: String,
-}
-
-impl TryFrom<JsonValue> for NEP141FtOnTransferArgs {
-    type Error = JsonError;
-
-    fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
-        Ok(Self {
-            sender_id: AccountId::try_from(value.string("sender_id")?)
-                .map_err(|_| JsonError::InvalidString)?,
-            amount: Balance::new(value.u128("amount")?),
-            msg: value.string("msg")?,
-        })
-    }
-}
-
-impl From<NEP141FtOnTransferArgs> for String {
-    fn from(value: NEP141FtOnTransferArgs) -> Self {
-        format!(
-            r#"{{"sender_id": "{}", "amount": "{}", "msg": "{}"}}"#,
-            value.sender_id,
-            value.amount,
-            // Escape message to avoid json injection attacks
-            value.msg.replace('\\', "\\\\").replace('"', "\\\"")
-        )
-    }
 }
 
 /// Eth-connector deposit arguments
@@ -285,7 +104,7 @@ pub struct WithdrawResult {
 }
 
 /// Fungible token storage balance
-#[derive(Default)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct StorageBalance {
     pub total: Yocto,
     pub available: Yocto,
@@ -293,11 +112,7 @@ pub struct StorageBalance {
 
 impl StorageBalance {
     pub fn to_json_bytes(&self) -> Vec<u8> {
-        format!(
-            "{{\"total\": \"{}\", \"available\": \"{}\"}}",
-            self.total, self.available
-        )
-        .into_bytes()
+        serde_json::to_vec(self).unwrap_or_default()
     }
 }
 
@@ -307,18 +122,6 @@ pub struct ResolveTransferCallArgs {
     pub sender_id: AccountId,
     pub amount: NEP141Wei,
     pub receiver_id: AccountId,
-}
-
-impl TryFrom<JsonValue> for ResolveTransferCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        Ok(Self {
-            sender_id: AccountId::try_from(v.string("sender_id")?)?,
-            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: NEP141Wei::new(v.u128("amount")?),
-        })
-    }
 }
 
 /// Finish deposit NEAR eth-connector call args
@@ -361,7 +164,7 @@ pub struct InitCallArgs {
 pub type SetContractDataCallArgs = InitCallArgs;
 
 /// transfer eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TransferCallCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
@@ -369,113 +172,42 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
-impl TryFrom<JsonValue> for TransferCallCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        let receiver_id = AccountId::try_from(v.string("receiver_id")?)?;
-        let amount = NEP141Wei::new(v.u128("amount")?);
-        let memo = v.string("memo").ok();
-        let msg = v.string("msg")?;
-        Ok(Self {
-            receiver_id,
-            amount,
-            memo,
-            msg,
-        })
-    }
-}
-
 /// storage_balance_of eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct StorageBalanceOfCallArgs {
     pub account_id: AccountId,
 }
 
-impl TryFrom<JsonValue> for StorageBalanceOfCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        let account_id = AccountId::try_from(v.string("account_id")?)?;
-        Ok(Self { account_id })
-    }
-}
-
 /// storage_deposit eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageDepositCallArgs {
     pub account_id: Option<AccountId>,
     pub registration_only: Option<bool>,
 }
 
-impl From<JsonValue> for StorageDepositCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            account_id: v
-                .string("account_id")
-                .map_or(None, |acc| AccountId::try_from(acc).ok()),
-            registration_only: v.bool("registration_only").ok(),
-        }
-    }
-}
-
 /// storage_withdraw eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageWithdrawCallArgs {
     pub amount: Option<Yocto>,
 }
 
-impl From<JsonValue> for StorageWithdrawCallArgs {
-    fn from(v: JsonValue) -> Self {
-        Self {
-            amount: v.u128("amount").map(Yocto::new).ok(),
-        }
-    }
-}
-
 /// transfer args for json invocation
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TransferCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
     pub memo: Option<String>,
 }
 
-impl TryFrom<JsonValue> for TransferCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        Ok(Self {
-            receiver_id: AccountId::try_from(v.string("receiver_id")?)?,
-            amount: NEP141Wei::new(v.u128("amount")?),
-            memo: v.string("memo").ok(),
-        })
-    }
-}
-
 /// balance_of args for json invocation
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct BalanceOfCallArgs {
     pub account_id: AccountId,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct BalanceOfEthCallArgs {
     pub address: Address,
-}
-
-impl TryFrom<JsonValue> for BalanceOfCallArgs {
-    type Error = error::ParseTypeFromJsonError;
-
-    fn try_from(v: JsonValue) -> Result<Self, Self::Error> {
-        Ok(Self {
-            account_id: AccountId::try_from(v.string("account_id")?)?,
-        })
-    }
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -494,17 +226,17 @@ pub struct PausePrecompilesCallArgs {
 }
 
 pub mod error {
-    use crate::json::JsonError;
-    use aurora_engine_types::account_id::ParseAccountError;
+    use aurora_engine_types::{account_id::ParseAccountError, String, ToString};
 
+    #[derive(Debug)]
     pub enum ParseTypeFromJsonError {
-        Json(JsonError),
+        Json(String),
         InvalidAccount(ParseAccountError),
     }
 
-    impl From<JsonError> for ParseTypeFromJsonError {
-        fn from(e: JsonError) -> Self {
-            Self::Json(e)
+    impl From<serde_json::Error> for ParseTypeFromJsonError {
+        fn from(e: serde_json::Error) -> Self {
+            Self::Json(e.to_string())
         }
     }
 
@@ -517,76 +249,9 @@ pub mod error {
     impl AsRef<[u8]> for ParseTypeFromJsonError {
         fn as_ref(&self) -> &[u8] {
             match self {
-                Self::Json(e) => e.as_ref(),
+                Self::Json(e) => e.as_bytes(),
                 Self::InvalidAccount(e) => e.as_ref(),
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_view_call_fail() {
-        let bytes = [0; 71];
-        let _ = ViewCallArgs::try_from_slice(&bytes).unwrap_err();
-    }
-
-    #[test]
-    fn test_roundtrip_view_call() {
-        let x = ViewCallArgs {
-            sender: Address::from_array([1; 20]),
-            address: Address::from_array([2; 20]),
-            amount: [3; 32],
-            input: vec![1, 2, 3],
-        };
-        let bytes = x.try_to_vec().unwrap();
-        let res = ViewCallArgs::try_from_slice(&bytes).unwrap();
-        assert_eq!(x, res);
-    }
-
-    #[test]
-    fn test_call_args_deserialize() {
-        let new_input = FunctionCallArgsV2 {
-            contract: Address::from_array([0u8; 20]),
-            value: WeiU256::default(),
-            input: Vec::new(),
-        };
-        let legacy_input = FunctionCallArgsV1 {
-            contract: Address::from_array([0u8; 20]),
-            input: Vec::new(),
-        };
-
-        // Parsing bytes in a new input format - data structures (wrapped into call args enum) with new arguments,
-        // made for flexibility and extensibility.
-
-        // Using new input format (wrapped into call args enum) and data structure with new argument (`value` field).
-        let input_bytes = CallArgs::V2(new_input.clone()).try_to_vec().unwrap();
-        let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::V2(new_input.clone())));
-
-        // Using new input format (wrapped into call args enum) and old data structure with legacy arguments,
-        // this is allowed for compatibility reason.
-        let input_bytes = CallArgs::V1(legacy_input.clone()).try_to_vec().unwrap();
-        let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
-
-        // Parsing bytes in an old input format - raw data structure (not wrapped into call args enum) with legacy arguments,
-        // made for backward compatibility.
-
-        // Using old input format (not wrapped into call args enum) - raw data structure with legacy arguments.
-        let input_bytes = legacy_input.try_to_vec().unwrap();
-        let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input)));
-
-        // Using old input format (not wrapped into call args enum) - raw data structure with new argument (`value` field).
-        // Data structures with new arguments allowed only in new input format for future extensibility reason.
-        // Raw data structure (old input format) allowed only with legacy arguments for backward compatibility reason.
-        // Unrecognized input should be handled and result as an exception in a call site.
-        let input_bytes = new_input.try_to_vec().unwrap();
-        let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, None);
     }
 }
