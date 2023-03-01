@@ -226,6 +226,7 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
+
     "--features",
     "${CARGO_FEATURES_TEST}",
     "--",
