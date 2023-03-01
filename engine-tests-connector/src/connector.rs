@@ -1200,12 +1200,11 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
     let user_acc = contract
         .create_sub_account(DEPOSITED_RECIPIENT_NAME)
         .await?;
-
-    let res = contract
-        .engine_contract
-        .call("ft_transfer")
+    let receiver_id = contract.create_sub_account("some-acc").await?;
+    let res = user_acc
+        .call(contract.engine_contract.id(), "ft_transfer")
         .args_json(json!({
-            "receiver_id": &user_acc.id(),
+            "receiver_id": &receiver_id.id(),
             "amount": transfer_amount,
             "memo": "transfer memo"
         }))
@@ -1217,14 +1216,11 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount.0,
+        DEPOSITED_AMOUNT - transfer_amount.0,
     );
     assert_eq!(
-        contract
-            .get_eth_on_near_balance(contract.engine_contract.id())
-            .await?
-            .0,
-        DEPOSITED_FEE - transfer_amount.0,
+        contract.get_eth_on_near_balance(receiver_id.id()).await?.0,
+        transfer_amount.0,
     );
     assert_eq!(DEPOSITED_AMOUNT, contract.total_supply().await?);
 
@@ -1232,7 +1228,7 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer")
         .args_json(json!({
-            "receiver_id": &contract.engine_contract.id(),
+            "receiver_id": &receiver_id.id(),
             "amount": transfer_amount2,
             "memo": "transfer memo"
         }))
@@ -1242,15 +1238,12 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
         .await?;
     assert!(res.is_success());
     assert_eq!(
-        contract
-            .get_eth_on_near_balance(contract.engine_contract.id())
-            .await?
-            .0,
-        DEPOSITED_FEE - transfer_amount.0 + transfer_amount2.0,
+        contract.get_eth_on_near_balance(receiver_id.id()).await?.0,
+        transfer_amount.0 + transfer_amount2.0,
     );
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount.0 - transfer_amount2.0,
+        DEPOSITED_AMOUNT - transfer_amount.0 - transfer_amount2.0,
     );
     Ok(())
 }
