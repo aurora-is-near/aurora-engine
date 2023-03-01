@@ -250,7 +250,7 @@ else
   echo "Clone Aurora Eth-Connector repo: "$AURORA_ETH_CONNECTOR_REPO
   git clone --depth 1 $AURORA_ETH_CONNECTOR_REPO
   cd $AURORA_ETH_CONNECTOR_REPO_NAME
-  git checkout 'fix/audit-aur-03'
+  git checkout -b fix/audit-aur-03
 fi
 cargo make --profile mainnet build-test
 '''
