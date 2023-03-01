@@ -1,3 +1,4 @@
+use crate::metadata::FungibleTokenMetadata;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{Address, Balance, BorshDeserialize, BorshSerialize, RawU256, String, Vec};
 use crate::proof::Proof;

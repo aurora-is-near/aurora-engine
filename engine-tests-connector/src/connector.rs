@@ -143,7 +143,7 @@ async fn test_withdraw_eth_from_near() -> anyhow::Result<()> {
     assert_eq!(data.eth_custodian_address, custodian_addr);
 
     assert_eq!(
-        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - withdraw_amount.as_u128(),
     );
     assert_eq!(
@@ -949,7 +949,7 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
     assert!(res.is_success());
 
     assert_eq!(
-        contract.get_eth_on_near_balance(&user_acc.id()).await?.0,
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - transfer_amount
     );
     assert_eq!(
