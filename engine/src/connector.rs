@@ -7,7 +7,7 @@ use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
 use crate::metadata::FungibleTokenMetadata;
 use crate::prelude::{
-    format, sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
+    sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, Yocto,
 };
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
@@ -18,7 +18,7 @@ use error::DepositError;
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
 pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
-/// NEAR Gas for calling `fininsh_deposit` promise. Used in the `deposit` logic.
+/// NEAR Gas for calling `finish_deposit` promise. Used in the `deposit` logic.
 pub const GAS_FOR_FINISH_DEPOSIT: NearGas = NearGas::new(50_000_000_000_000);
 pub const GAS_FOR_DEPOSIT: NearGas = NearGas::new(120_000_000_000_000);
 pub const GAS_FOR_WITHDRAW: NearGas = NearGas::new(20_000_000_000_000);
@@ -26,7 +26,7 @@ pub const GAS_FOR_FT_TRANSFER: NearGas = NearGas::new(50_000_000_000_000);
 pub const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(100_000_000_000_000);
 pub const VIEW_CALL_GAS: NearGas = NearGas::new(15_000_000_000_000);
 /// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
-// Note: Is 40Tgas always enough?
+// Note: Is 40 Tgas always enough?
 
 /// Eth-connector contract data. It's stored in the storage.
 /// Contains:
@@ -110,14 +110,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
-    /// Return balance of ETH (ETH in Aurora EVM)
     pub fn ft_balance_of_eth_on_aurora(
         &mut self,
         args: BalanceOfEthCallArgs,
     ) -> Result<(), crate::prelude::types::balance::error::BalanceOverflowError> {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(&args.address);
         sdk::log!("Balance of ETH [{}]: {}", args.address.encode(), balance);
-        self.io.return_output(format!("\"{}\"", balance).as_bytes());
+        self.io.return_output(balance.to_string().as_bytes());
         Ok(())
     }
 
@@ -138,24 +137,19 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .map_err(error::FtTransferCallError::MessageParseFailed)?;
 
         // Special case when predecessor_account_id is current_account_id
-        let wei_fee = Wei::from(message_data.fee);
+        let fee = Wei::from(message_data.fee);
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
-        match (wei_fee, relayer) {
-            (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
-                self.mint_eth_on_aurora(
-                    message_data.recipient,
-                    Wei::new(U256::from(args.amount.as_u128())) - fee,
-                )?;
-                self.mint_eth_on_aurora(evm_relayer_address, fee)?;
-            }
-            _ => self.mint_eth_on_aurora(
-                message_data.recipient,
-                Wei::new(U256::from(args.amount.as_u128())),
-            )?,
+
+        if relayer.is_some() && fee > ZERO_WEI {
+            self.mint_eth_on_aurora(relayer.unwrap(), fee)?;
         }
-        //self.save_ft_contract();
-        self.io.return_output("\"0\"".as_bytes());
+
+        self.mint_eth_on_aurora(
+            message_data.recipient,
+            Wei::new(U256::from(args.amount.as_u128())) - fee,
+        )?;
+
         Ok(())
     }
 
@@ -194,7 +188,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// We starting early checking for message data to avoid `ft_on_transfer` call panics
     /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
     /// We allow empty messages for cases when `receiver_id =! current_account_id`
-    pub fn ft_transfer_call(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
+    pub fn ft_transfer_call(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "engine_ft_transfer_call".to_string(),
@@ -216,7 +210,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// FT storage unregister
-    pub fn storage_unregister(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
+    pub fn storage_unregister(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "engine_storage_unregister".to_string(),
@@ -227,7 +221,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// FT storage withdraw
-    pub fn storage_withdraw(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
+    pub fn storage_withdraw(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "engine_storage_withdraw".to_string(),
@@ -238,7 +232,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Get balance of storage
-    pub fn storage_balance_of(&mut self, data: Vec<u8>) -> PromiseCreateArgs {
+    pub fn storage_balance_of(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "storage_balance_of".to_string(),
@@ -250,7 +244,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Get accounts counter for statistics.
     /// It represents total unique accounts (all-time, including accounts which now have zero balance).
-    pub fn get_accounts_counter(&mut self) -> PromiseCreateArgs {
+    pub fn get_accounts_counter(&self) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "get_accounts_counter".to_string(),

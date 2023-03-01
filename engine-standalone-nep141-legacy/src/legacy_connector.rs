@@ -614,7 +614,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             )?,
         }
         self.save_ft_contract();
-        self.io.return_output("\"0\"".as_bytes());
+
         Ok(())
     }
 

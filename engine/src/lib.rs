@@ -769,56 +769,45 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
         use crate::parameters::StorageDepositCallArgs;
+
         let mut io = Runtime;
-        let args: StorageDepositCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+        let input = serde_json::from_slice::<StorageDepositCallArgs>(&io.read_input().to_vec())
+            .map(|mut args| {
+                args.sender_id = Some(io.predecessor_account_id());
+                args
+            })
+            .and_then(|args| serde_json::to_vec(&args))
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
-        let input = format!("\"sender_id\": {:?}", predecessor_account_id);
-        let input = if let Some(account_id) = args.account_id {
-            format!("{}, \"account_id\": {:?}", input, account_id.to_string())
-        } else {
-            input
-        };
-        let input = if let Some(registration_only) = args.registration_only {
-            format!(
-                "{}, \"registration_only\": {:?}",
-                input,
-                registration_only.to_string()
-            )
-        } else {
-            input
-        };
-        let input = format!("{{ {} }}", input).as_bytes().to_vec();
 
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_deposit(input, io.attached_deposit());
         let promise_id = unsafe { io.promise_create_call(&promise_args) };
+
         io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn storage_unregister() {
+        use crate::parameters::StorageUnregisterCallArgs;
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
-        let force = serde_json::from_slice::<serde_json::Value>(&io.read_input().to_vec())
-            .ok()
-            .and_then(|args| args["force"].as_bool());
 
-        let input = format!("\"sender_id\": {:?}", predecessor_account_id);
-        let input = if let Some(force) = force {
-            format!("{}, \"force\": {:?}", input, force)
-        } else {
-            input
-        };
-        let input = format!("{{ {} }}", input).as_bytes().to_vec();
+        let input = serde_json::from_slice::<StorageUnregisterCallArgs>(&io.read_input().to_vec())
+            .map(|mut args| {
+                args.sender_id = Some(io.predecessor_account_id());
+                args
+            })
+            .and_then(|args| serde_json::to_vec(&args))
+            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .sdk_unwrap();
 
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_unregister(input);
         let promise_id = unsafe { io.promise_create_call(&promise_args) };
+
         io.promise_return(promise_id);
     }
 
@@ -827,22 +816,21 @@ mod contract {
         use crate::parameters::StorageWithdrawCallArgs;
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
-        let args: StorageWithdrawCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+
+        let input = serde_json::from_slice::<StorageWithdrawCallArgs>(&io.read_input().to_vec())
+            .map(|mut args| {
+                args.sender_id = Some(io.predecessor_account_id());
+                args
+            })
+            .and_then(|args| serde_json::to_vec(&args))
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
-        let input = format!("\"sender_id\": {:?}", predecessor_account_id);
-        let input = if let Some(amount) = args.amount {
-            format!("{}, \"amount\": {:?}", input, amount.as_u128())
-        } else {
-            input
-        };
-        let input = format!("{{ {} }}", input).as_bytes().to_vec();
 
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_withdraw(input);
         let promise_id = unsafe { io.promise_create_call(&promise_args) };
+
         io.promise_return(promise_id);
     }
 

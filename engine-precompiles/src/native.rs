@@ -287,7 +287,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input);
         #[cfg(feature = "error_refund")]
-        let refund_on_error_target = current_account_id.clone();
+        let refund_on_error_target = self.current_account_id.clone();
 
         let (nep141_address, args, exit_event) = match flag {
             0x0 => {

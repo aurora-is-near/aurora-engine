@@ -161,7 +161,7 @@ pub struct InitCallArgs {
 /// Eth-connector Set contract data call args
 pub type SetContractDataCallArgs = InitCallArgs;
 
-/// transfer eth-connector call args
+/// `transfer` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TransferCallCallArgs {
     pub receiver_id: AccountId,
@@ -170,26 +170,41 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
-/// storage_balance_of eth-connector call args
+/// `storage_balance_of` eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct StorageBalanceOfCallArgs {
     pub account_id: AccountId,
 }
 
-/// storage_deposit eth-connector call args
+/// `storage_deposit` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageDepositCallArgs {
+    #[serde(default)]
+    pub sender_id: Option<AccountId>,
     pub account_id: Option<AccountId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub registration_only: Option<bool>,
 }
 
-/// storage_withdraw eth-connector call args
+/// `storage_unregister` eth-connector call args
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StorageUnregisterCallArgs {
+    #[serde(default)]
+    pub sender_id: Option<AccountId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub force: Option<bool>,
+}
+
+/// `storage_withdraw` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageWithdrawCallArgs {
+    #[serde(default)]
+    pub sender_id: Option<AccountId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<Yocto>,
 }
 
-/// transfer args for json invocation
+/// `transfer` args for json invocation
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TransferCallArgs {
     pub receiver_id: AccountId,
@@ -197,7 +212,7 @@ pub struct TransferCallArgs {
     pub memo: Option<String>,
 }
 
-/// balance_of args for json invocation
+/// `balance_of` args for json invocation
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct BalanceOfCallArgs {
     pub account_id: AccountId,
