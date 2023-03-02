@@ -179,28 +179,19 @@ pub struct StorageBalanceOfCallArgs {
 /// `storage_deposit` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageDepositCallArgs {
-    #[serde(default)]
-    pub sender_id: Option<AccountId>,
     pub account_id: Option<AccountId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub registration_only: Option<bool>,
 }
 
 /// `storage_unregister` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageUnregisterCallArgs {
-    #[serde(default)]
-    pub sender_id: Option<AccountId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub force: Option<bool>,
 }
 
 /// `storage_withdraw` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageWithdrawCallArgs {
-    #[serde(default)]
-    pub sender_id: Option<AccountId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<Yocto>,
 }
 
