@@ -100,7 +100,18 @@ impl TestContract {
         Self::new_with_custodian(CUSTODIAN_ADDRESS).await
     }
 
+    pub async fn new_with_owner(owner: AccountId) -> anyhow::Result<TestContract> {
+        Self::new_contract(CUSTODIAN_ADDRESS, Some(owner)).await
+    }
+
     pub async fn new_with_custodian(eth_custodian_address: &str) -> anyhow::Result<TestContract> {
+        Self::new_contract(eth_custodian_address, None).await
+    }
+
+    async fn new_contract(
+        eth_custodian_address: &str,
+        owner: Option<AccountId>,
+    ) -> anyhow::Result<TestContract> {
         let (engine_contract, eth_connector_contract, root_account) =
             Self::deploy_aurora_contract().await?;
 
@@ -116,6 +127,7 @@ impl TestContract {
             "reference": metadata.reference,
             "decimals": metadata.decimals,
         });
+        let owner_id = owner.unwrap_or(account_with_access_right.clone());
         let res = eth_connector_contract
             .call("new")
             .args_json(json!({
@@ -123,7 +135,7 @@ impl TestContract {
                 "eth_custodian_address": eth_custodian_address,
                 "metadata": metadata,
                 "account_with_access_right": account_with_access_right,
-                "owner_id": account_with_access_right,
+                "owner_id": owner_id,
             }))
             .gas(DEFAULT_GAS)
             .transact()
