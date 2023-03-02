@@ -36,11 +36,13 @@ impl PromiseHandler for PromiseTracker {
     type ReadOnly = Self;
 
     fn promise_results_count(&self) -> u64 {
-        self.promise_results.len() as u64
+        u64::try_from(self.promise_results.len()).unwrap_or_default()
     }
 
     fn promise_result(&self, index: u64) -> Option<PromiseResult> {
-        self.promise_results.get(index as usize).cloned()
+        self.promise_results
+            .get(usize::try_from(index).ok()?)
+            .cloned()
     }
 
     unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {

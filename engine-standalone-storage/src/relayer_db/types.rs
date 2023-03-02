@@ -68,8 +68,10 @@ pub struct BlockRow {
     pub receipts_root: H256,
 }
 
-impl From<postgres::Row> for BlockRow {
-    fn from(row: postgres::Row) -> Self {
+impl TryFrom<postgres::Row> for BlockRow {
+    type Error = std::num::TryFromIntError;
+
+    fn try_from(row: postgres::Row) -> Result<Self, Self::Error> {
         let chain: i32 = row.get("chain");
         let id: i64 = row.get("id");
         let hash = get_hash(&row, "hash");
@@ -83,20 +85,20 @@ impl From<postgres::Row> for BlockRow {
         let state_root = get_hash(&row, "state_root");
         let receipts_root = get_hash(&row, "receipts_root");
 
-        Self {
-            chain: chain as u64,
-            id: id as u64,
+        Ok(Self {
+            chain: chain.try_into()?,
+            id: id.try_into()?,
             hash,
             near_hash: near_hash.map(H256::from_slice),
             timestamp,
-            size: size as u32,
+            size: size.try_into()?,
             gas_limit,
             gas_used,
             parent_hash,
             transactions_root,
             state_root,
             receipts_root,
-        }
+        })
     }
 }
 
@@ -146,8 +148,10 @@ pub struct TransactionRow {
     pub output: Vec<u8>,
 }
 
-impl From<postgres::Row> for TransactionRow {
-    fn from(row: postgres::Row) -> Self {
+impl TryFrom<postgres::Row> for TransactionRow {
+    type Error = std::num::TryFromIntError;
+
+    fn try_from(row: postgres::Row) -> Result<Self, Self::Error> {
         let block: i64 = row.get("block");
         let block_hash = get_hash(&row, "block_hash");
         let index: i32 = row.get("index");
@@ -169,11 +173,11 @@ impl From<postgres::Row> for TransactionRow {
         let status: bool = row.get("status");
         let output: Option<Vec<u8>> = row.get("output");
 
-        Self {
-            block: block as u64,
+        Ok(Self {
+            block: block.try_into()?,
             block_hash,
-            index: index as u16,
-            id: id as u64,
+            index: index.try_into()?,
+            id: id.try_into()?,
             hash,
             near_hash,
             near_receipt_hash,
@@ -190,7 +194,7 @@ impl From<postgres::Row> for TransactionRow {
             s,
             status,
             output: output.unwrap_or_default(),
-        }
+        })
     }
 }
 
@@ -233,7 +237,7 @@ fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {
     let timestamp: Option<SystemTime> = row.get(field);
     timestamp
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos() as u64)
+        .and_then(|d| u64::try_from(d.as_nanos()).ok())
 }
 
 struct PostgresNumeric {
@@ -257,6 +261,17 @@ enum PostgresNumericSign {
     Positive = 0x0000,
     Negative = 0x4000,
     NaN = 0xc000,
+}
+
+impl From<u16> for PostgresNumericSign {
+    fn from(value: u16) -> Self {
+        match value {
+            0x0000 => Self::Positive,
+            0x4000 => Self::Negative,
+            0xc000 => Self::NaN,
+            _ => panic!("Unexpected Numeric Sign value"),
+        }
+    }
 }
 
 impl TryFrom<PostgresNumeric> for U256 {
@@ -316,20 +331,11 @@ impl<'a> postgres::types::FromSql<'a> for PostgresNumeric {
 
         let num_groups = read_u16(&mut cursor)?;
         let weight = read_i16(&mut cursor)?;
-
         let sign_raw = read_u16(&mut cursor)?;
-        let sign = if sign_raw == PostgresNumericSign::Positive as u16 {
-            PostgresNumericSign::Positive
-        } else if sign_raw == PostgresNumericSign::Negative as u16 {
-            PostgresNumericSign::Negative
-        } else if sign_raw == PostgresNumericSign::NaN as u16 {
-            PostgresNumericSign::NaN
-        } else {
-            panic!("Unexpected Numeric Sign value");
-        };
+        let sign = sign_raw.into();
 
         let scale = read_u16(&mut cursor)?;
-        let mut groups = Vec::with_capacity(num_groups as usize);
+        let mut groups = Vec::with_capacity(usize::from(num_groups));
         for _ in 0..num_groups {
             groups.push(read_u16(&mut cursor)?);
         }
