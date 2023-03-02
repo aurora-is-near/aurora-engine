@@ -23,3 +23,4 @@ mod standard_precompiles;
 mod state_migration;
 pub(crate) mod uniswap;
 pub(crate) mod xcc;
+mod block_txs_benchmark;
