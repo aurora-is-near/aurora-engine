@@ -76,7 +76,7 @@ impl Runtime {
         match AccountId::try_from(bytes) {
             Ok(account_id) => account_id,
             // the environment must give us a valid Account ID.
-            Err(_) => unreachable!(),
+            Err(_) => unreachable!("Invalid Account ID"),
         }
     }
 
