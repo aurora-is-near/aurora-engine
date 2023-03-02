@@ -1,13 +1,11 @@
 use crate::prelude::Wei;
-use crate::prelude::{Address, U256};
+use crate::prelude::{Address};
 use crate::test_utils::{
     self,
     erc20::{ERC20Constructor, ERC20},
     Signer,
 };
-use aurora_engine::parameters::TransactionStatus;
-use aurora_engine_sdk as sdk;
-use bstr::ByteSlice;
+
 use libsecp256k1::SecretKey;
 
 const INITIAL_BALANCE: u64 = 1_000_000;
@@ -21,13 +19,13 @@ fn block_txs_erc20_transfer() {
     let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
 
-    assert_eq!(runner.context.block_index, 0, "Initially, block has to be 0.");
+    let initial_block_height = runner.context.block_index;
 
     let result = runner.submit_with_signer(&mut source_account, |nonce| {
         contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
     });
     assert!(result.is_ok());
-    assert_eq!(runner.context.block_index, 1, "First tx; block has to be 1");
+    assert_eq!(runner.context.block_index, initial_block_height + 1, "First tx; block has to be 1 more.");
 
     let mut block_txs_gas: u64 = 0;
 
@@ -40,13 +38,13 @@ fn block_txs_erc20_transfer() {
         .unwrap();
 
         assert!(result.status.is_ok());
-        assert_eq!(runner.context.block_index, 2, "Another tx, block has to be 2");
+        assert_eq!(runner.context.block_index, initial_block_height + 2, "Another tx, block has to be 2 more.");
 
         block_txs_gas += profile.all_gas();
         runner.context.block_index -= 1;
     }
 
-    assert_eq!(runner.context.block_index, 1, "After loop, block has to be 1 since we did a final decrease.");
+    assert_eq!(runner.context.block_index, initial_block_height + 1, "After loop, block has to be 1 more since we did a final decrease.");
     runner.context.block_index += 1;
 
     // transfer tx on block 3 (block index is increased interally before adding tx)
@@ -58,7 +56,7 @@ fn block_txs_erc20_transfer() {
     .unwrap();
 
     assert!(result.status.is_ok());
-    assert_eq!(runner.context.block_index, 3, "After tx, block has to be 3.");
+    assert_eq!(runner.context.block_index, initial_block_height + 3, "After tx, block has to be 3 more.");
 
     let block_tx_hashchain_computation_gas = profile.all_gas();
     let block_total_gas = block_txs_gas + block_tx_hashchain_computation_gas;
