@@ -652,169 +652,174 @@ async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn test_admin_controlled_admin_can_perform_actions_when_paused() -> anyhow::Result<()> {
-    let contract = TestContract::new().await?;
-    contract.call_deposit_eth_to_near().await?;
-
-    let user_acc = contract
-        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
-        .await?;
-    let recipient_addr: Address = validate_eth_address(RECIPIENT_ETH_ADDRESS);
-    let amount_for_withdraw = 10;
-    let withdraw_amount: NEP141Wei = NEP141Wei::new(amount_for_withdraw);
-
-    let transfer_amount: U128 = 1000.into();
-    let res = user_acc
-        .call(contract.engine_contract.id(), "ft_transfer")
-        .args_json(json!({
-                    "receiver_id": &contract.engine_contract.id(),
-                    "amount": transfer_amount,
-                    "memo": "transfer memo"
-        }))
-        .gas(DEFAULT_GAS)
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-
-    let res = contract
-        .engine_contract
-        .call("withdraw")
-        .args_borsh((recipient_addr, withdraw_amount))
-        .gas(DEFAULT_GAS)
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-    assert_eq!(
-        contract
-            .get_eth_on_near_balance(contract.engine_contract.id())
-            .await?
-            .0,
-        transfer_amount.0 - amount_for_withdraw
-    );
-
-    let data: WithdrawResult = res.borsh()?;
-    let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
-    assert_eq!(data.recipient_id, recipient_addr);
-    assert_eq!(data.amount, withdraw_amount);
-    assert_eq!(data.eth_custodian_address, custodian_addr);
+async fn test_access_right() -> anyhow::Result<()> {
+    let acc_name = AccountId::try_from("some_user.root".to_string()).unwrap();
+    let contract = TestContract::new_with_owner(acc_name).await?;
+    let user_acc = contract.create_sub_account("some_user").await?;
 
     let res = contract
         .eth_connector_contract
-        .call("set_paused_flags")
+        .call("get_access_right")
+        .view()
+        .await?
+        .json::<AccountId>()
+        .unwrap();
+    assert_eq!(&res, contract.engine_contract.id());
+
+    let res = user_acc
+        .call(contract.eth_connector_contract.id(), "set_access_right")
+        .args_json((user_acc.id(),))
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+
+    let res = contract
+        .eth_connector_contract
+        .call("get_access_right")
+        .view()
+        .await?
+        .json::<AccountId>()
+        .unwrap();
+    assert_eq!(&res, user_acc.id());
+
+    let res = contract
+        .engine_contract
+        .call("deposit")
+        .args_borsh(&contract.get_proof(PROOF_DATA_NEAR))
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?;
+    assert!(res.is_failure());
+    assert!(contract.check_error_message(res, "ERR_ACCESS_RIGHT"));
+    assert_eq!(contract.total_supply().await?, 0);
+
+    let res = user_acc
+        .call(contract.eth_connector_contract.id(), "set_access_right")
+        .args_json((contract.engine_contract.id(),))
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+
+    let res = contract
+        .eth_connector_contract
+        .call("get_access_right")
+        .view()
+        .await?
+        .json::<AccountId>()
+        .unwrap();
+    assert_eq!(&res, contract.engine_contract.id());
+
+    let res = contract
+        .engine_contract
+        .call("deposit")
+        .args_borsh(&contract.get_proof(PROOF_DATA_NEAR))
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
+    let acc_name = AccountId::try_from("some_user.root".to_string()).unwrap();
+    let contract = TestContract::new_with_owner(acc_name).await?;
+    let user_acc = contract.create_sub_account("some_user").await?;
+
+    // Pause deposit
+    let res = user_acc
+        .call(contract.eth_connector_contract.id(), "set_paused_flags")
         .args_borsh(PAUSE_DEPOSIT)
         .gas(DEFAULT_GAS)
         .transact()
         .await?;
     assert!(res.is_success());
 
-    // 2nd deposit call when paused, but the admin is calling it - should succeed
-    // NB: We can use `PROOF_DATA_ETH` this will be just a different proof but the same deposit
-    // method which should be paused
-    let proof_str: Proof = near_sdk::serde_json::from_str(PROOF_DATA_ETH).unwrap();
+    // Check is flag DEPOSIT_PAUSE
+    let res = contract
+        .eth_connector_contract
+        .call("get_paused_flags")
+        .view()
+        .await?
+        .borsh::<i8>()
+        .unwrap();
+    assert_eq!(res, 1);
 
-    let res = user_acc
-        .call(contract.engine_contract.id(), "deposit")
-        .args_borsh(proof_str.clone())
-        .gas(DEFAULT_GAS)
-        .transact()
+    // 2nd deposit call - should fail.
+    // Becasue `owner_id` check related to `predecessor_acount_id`
+    let res = contract
+        .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_NEAR))
         .await?;
-    println!("{:#?}", res);
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, ""));
+    assert!(contract.check_error_message(res, "ERR_PAUSED"));
 
-    let res = contract
-        .eth_connector_contract
-        .call("deposit")
-        .args_borsh(proof_str)
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-
-    let res = contract
-        .eth_connector_contract
-        .call("set_paused_flags")
-        .args_borsh(PAUSE_WITHDRAW)
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-
-    let transfer_amount: U128 = 5000.into();
     let res = contract
         .engine_contract
-        .call("ft_transfer")
-        .args_json(json!({
-            "receiver_id": &contract.eth_connector_contract.id(),
-            "amount": transfer_amount,
-            "memo": "transfer memo",
-        }))
+        .call("deposit")
+        .args_borsh(&contract.get_proof(PROOF_DATA_ETH))
         .gas(DEFAULT_GAS)
-        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    assert!(res.is_failure());
+    assert!(contract.check_error_message(res, "ERR_PAUSED"));
+
+    assert_eq!(contract.total_supply().await?, 0);
+
+    let res = user_acc
+        .call(contract.eth_connector_contract.id(), "deposit")
+        .args_borsh(&contract.get_proof(PROOF_DATA_NEAR))
+        .gas(DEFAULT_GAS)
         .transact()
         .await?;
     assert!(res.is_success());
-    assert_eq!(
-        contract
-            .get_eth_on_near_balance(contract.eth_connector_contract.id())
-            .await?
-            .0,
-        5000
-    );
+    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
 
-    // 2nd withdraw call when paused, but the admin is calling it - should succeed
-    let res = contract
-        .eth_connector_contract
-        .call("withdraw")
-        .args_borsh((
-            contract.eth_connector_contract.id(),
-            recipient_addr,
-            withdraw_amount,
-        ))
-        .gas(DEFAULT_GAS)
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-
-    let data: WithdrawResult = res.borsh()?;
-    let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
-    assert_eq!(data.recipient_id, recipient_addr);
-    assert_eq!(data.amount, withdraw_amount);
-    assert_eq!(data.eth_custodian_address, custodian_addr);
     Ok(())
 }
 
 #[tokio::test]
 async fn test_deposit_pausability() -> anyhow::Result<()> {
-    let contract = TestContract::new().await?;
-    let user_acc = contract
-        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
-        .await?;
-
-    // 1st deposit call - should succeed
-    let res = contract
-        .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_NEAR))
-        .await?;
-    assert!(res.is_success());
+    let acc_name = AccountId::try_from("some_user.root".to_string()).unwrap();
+    let contract = TestContract::new_with_owner(acc_name).await?;
+    let user_acc = contract.create_sub_account("some_user").await?;
 
     // Pause deposit
-    let res = contract
-        .eth_connector_contract
-        .call("set_paused_flags")
+    let res = user_acc
+        .call(contract.eth_connector_contract.id(), "set_paused_flags")
         .args_borsh(PAUSE_DEPOSIT)
         .gas(DEFAULT_GAS)
         .transact()
         .await?;
     assert!(res.is_success());
 
-    // 2nd deposit call - should fail
-    // NB: We can use `PROOF_DATA_ETH` this will be just a different proof but the same deposit
-    // method which should be paused
+    // Check is flag DEPOSIT_PAUSE
     let res = contract
-        .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_ETH))
+        .eth_connector_contract
+        .call("get_paused_flags")
+        .view()
+        .await?
+        .borsh::<i8>()
+        .unwrap();
+    assert_eq!(res, 1);
+
+    // 2nd deposit call - should fail.
+    // Becasue `owner_id` check related to `predecessor_acount_id`
+    let res = contract
+        .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_NEAR))
+        .await?;
+    assert!(res.is_failure());
+    assert!(contract.check_error_message(res, "ERR_PAUSED"));
+
+    let res = contract
+        .engine_contract
+        .call("deposit")
+        .args_borsh(&contract.get_proof(PROOF_DATA_ETH))
+        .gas(DEFAULT_GAS)
+        .transact()
         .await?;
     assert!(res.is_failure());
     assert!(contract.check_error_message(res, "ERR_PAUSED"));
@@ -831,7 +836,16 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
 
     // 3rd deposit call - should succeed
     let res = contract
-        .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_ETH))
+        .engine_contract
+        .call("deposit")
+        .args_borsh(&contract.get_proof(PROOF_DATA_ETH))
+        .gas(DEFAULT_GAS)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+
+    let res = contract
+        .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_NEAR))
         .await?;
     assert!(res.is_success());
 
@@ -850,7 +864,8 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
-    let contract = TestContract::new().await?;
+    let acc_name = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
+    let contract = TestContract::new_with_owner(acc_name).await?;
     let user_acc = contract
         .create_sub_account(DEPOSITED_RECIPIENT_NAME)
         .await?;
@@ -896,6 +911,22 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     assert!(res.is_failure());
     assert!(contract.check_error_message(res, "WithdrawErrorPaused"));
 
+    // Direct call to eth-connector from owner should be success
+    let res = user_acc
+        .call(contract.eth_connector_contract.id(), "withdraw")
+        .args_borsh((user_acc.id(), recipient_addr, withdraw_amount))
+        .gas(DEFAULT_GAS)
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    assert!(res.is_success());
+
+    let data: WithdrawResult = res.borsh()?;
+    let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
+    assert_eq!(data.recipient_id, recipient_addr);
+    assert_eq!(data.amount, withdraw_amount);
+    assert_eq!(data.eth_custodian_address, custodian_addr);
+
     // Unpause all
     let res = contract
         .eth_connector_contract
@@ -920,6 +951,11 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     assert_eq!(data.recipient_id, recipient_addr);
     assert_eq!(data.amount, withdraw_amount);
     assert_eq!(data.eth_custodian_address, custodian_addr);
+
+    assert_eq!(
+        contract.total_supply().await?,
+        DEPOSITED_AMOUNT - 3 * withdraw_amount.as_u128()
+    );
     Ok(())
 }
 
