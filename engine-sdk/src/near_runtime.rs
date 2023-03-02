@@ -57,6 +57,7 @@ impl Runtime {
             // Use register 0 as the destination for the promise.
             let promise_id = exports::promise_batch_create(u64::MAX as _, 0);
             // Remove code from storage and store it in register 1.
+            // if the code_key exists call `promise_batch_action_deploy_contract`, otherwise panic with error.
             match exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1) {
                 1 => {
                     exports::promise_batch_action_deploy_contract(promise_id, u64::MAX, 1);
