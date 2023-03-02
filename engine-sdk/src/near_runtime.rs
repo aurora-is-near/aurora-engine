@@ -57,8 +57,10 @@ impl Runtime {
             // Use register 0 as the destination for the promise.
             let promise_id = exports::promise_batch_create(u64::MAX as _, 0);
             // Remove code from storage and store it in register 1.
-            exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1);
-            exports::promise_batch_action_deploy_contract(promise_id, u64::MAX, 1);
+            match exports::storage_remove(code_key.len() as _, code_key.as_ptr() as _, 1) {
+                0 => panic!("Code key storage empty"),
+                _ => exports::promise_batch_action_deploy_contract(promise_id, u64::MAX, 1),
+            }
             Self::promise_batch_action_function_call(
                 promise_id,
                 b"state_migration",
