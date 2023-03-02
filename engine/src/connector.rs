@@ -6,6 +6,7 @@ use crate::prelude::{PromiseCreateArgs, U256};
 use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
 use crate::metadata::FungibleTokenMetadata;
+use crate::parameters::error::ParseTypeFromJsonError;
 use crate::prelude::{
     sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
     KeyPrefix, NearGas, ToString, Vec, Yocto,
@@ -113,10 +114,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_balance_of_eth_on_aurora(
         &mut self,
         args: BalanceOfEthCallArgs,
-    ) -> Result<(), crate::prelude::types::balance::error::BalanceOverflowError> {
+    ) -> Result<(), ParseTypeFromJsonError> {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(&args.address);
         sdk::log!("Balance of ETH [{}]: {}", args.address.encode(), balance);
-        self.io.return_output(balance.to_string().as_bytes());
+        self.io.return_output(&serde_json::to_vec(&balance)?);
         Ok(())
     }
 
@@ -141,14 +142,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
 
-        if relayer.is_some() && fee > ZERO_WEI {
+        let mint_amount = if relayer.is_some() && fee > ZERO_WEI {
             self.mint_eth_on_aurora(relayer.unwrap(), fee)?;
-        }
+            args.amount.as_u128() - message_data.fee.as_u128()
+        } else {
+            args.amount.as_u128()
+        };
 
-        self.mint_eth_on_aurora(
-            message_data.recipient,
-            Wei::new(U256::from(args.amount.as_u128())) - fee,
-        )?;
+        self.mint_eth_on_aurora(message_data.recipient, Wei::new(U256::from(mint_amount)))?;
+        self.io.return_output(b"\"0\"");
 
         Ok(())
     }

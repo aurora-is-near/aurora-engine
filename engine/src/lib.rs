@@ -89,9 +89,7 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{
-        format, sdk, u256_to_arr, Address, PromiseResult, ToString, ERR_FAILED_PARSE, H256,
-    };
+    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, ERR_FAILED_PARSE, H256};
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -253,7 +251,7 @@ mod contract {
         let mut io = Runtime;
         let pauser = EnginePrecompilesPauser::from_io(io);
         let data = pauser.paused().bits().to_le_bytes();
-        io.return_output(&data[..]);
+        io.return_output(&data);
     }
 
     ///
@@ -663,28 +661,17 @@ mod contract {
         use crate::parameters::TransferCallArgs;
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id().to_string();
-        let args: TransferCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+        let input = serde_json::from_slice::<TransferCallArgs>(&io.read_input().to_vec())
+            .and_then(|args| {
+                serde_json::to_vec(&(
+                    io.predecessor_account_id(),
+                    args.receiver_id,
+                    args.amount,
+                    args.memo,
+                ))
+            })
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
-        let input = if let Some(memo) = args.memo {
-            format!(
-                "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?} }}",
-                predecessor_account_id,
-                args.receiver_id.to_string(),
-                args.amount.to_string(),
-                memo
-            )
-        } else {
-            format!(
-                "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?} }}",
-                predecessor_account_id,
-                args.receiver_id.to_string(),
-                args.amount.to_string(),
-            )
-        }
-        .as_bytes()
-        .to_vec();
 
         let promise_arg = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
@@ -698,31 +685,18 @@ mod contract {
         let mut io = Runtime;
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id().to_string();
-        let args: TransferCallCallArgs = serde_json::from_slice(&io.read_input().to_vec())
+        let input = serde_json::from_slice::<TransferCallCallArgs>(&io.read_input().to_vec())
+            .and_then(|args| {
+                serde_json::to_vec(&(
+                    io.predecessor_account_id(),
+                    args.receiver_id,
+                    args.amount,
+                    args.memo,
+                    args.msg,
+                ))
+            })
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
-        // TODO: refactor with serde_json?
-        let input = if let Some(memo) = args.memo {
-            format!(
-                "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"memo\": {:?},  \"msg\": {:?} }}",
-                predecessor_account_id,
-                args.receiver_id.to_string(),
-                args.amount.to_string(),
-                memo,
-                args.msg
-            )
-        } else {
-            format!(
-                "{{\"sender_id\": {:?}, \"receiver_id\": {:?}, \"amount\": {:?}, \"msg\": {:?} }}",
-                predecessor_account_id,
-                args.receiver_id.to_string(),
-                args.amount.to_string(),
-                args.msg
-            )
-        }
-        .as_bytes()
-        .to_vec();
 
         let promise_args = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
@@ -772,11 +746,13 @@ mod contract {
 
         let mut io = Runtime;
         let input = serde_json::from_slice::<StorageDepositCallArgs>(&io.read_input().to_vec())
-            .map(|mut args| {
-                args.sender_id = Some(io.predecessor_account_id());
-                args
+            .and_then(|args| {
+                serde_json::to_vec(&(
+                    io.predecessor_account_id(),
+                    args.account_id,
+                    args.registration_only,
+                ))
             })
-            .and_then(|args| serde_json::to_vec(&args))
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
 
@@ -795,11 +771,7 @@ mod contract {
         io.assert_one_yocto().sdk_unwrap();
 
         let input = serde_json::from_slice::<StorageUnregisterCallArgs>(&io.read_input().to_vec())
-            .map(|mut args| {
-                args.sender_id = Some(io.predecessor_account_id());
-                args
-            })
-            .and_then(|args| serde_json::to_vec(&args))
+            .and_then(|args| serde_json::to_vec(&(io.predecessor_account_id(), args.force)))
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
 
@@ -818,11 +790,7 @@ mod contract {
         io.assert_one_yocto().sdk_unwrap();
 
         let input = serde_json::from_slice::<StorageWithdrawCallArgs>(&io.read_input().to_vec())
-            .map(|mut args| {
-                args.sender_id = Some(io.predecessor_account_id());
-                args
-            })
-            .and_then(|args| serde_json::to_vec(&args))
+            .and_then(|args| serde_json::to_vec(&(io.predecessor_account_id(), args.amount)))
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
 

@@ -1,7 +1,7 @@
 use aurora_engine::metadata::FungibleTokenMetadata;
 use aurora_engine::parameters::SetEthConnectorContractAccountArgs;
 use aurora_engine::proof::Proof;
-use aurora_engine_types::types::Address;
+use aurora_engine_types::types::{Address, Wei};
 use near_sdk::serde_json::json;
 use near_sdk::{json_types::U128, serde_json};
 use std::path::Path;
@@ -42,7 +42,6 @@ impl TestContract {
             types::{KeyType, SecretKey},
             AccessKey,
         };
-
         let worker = workspaces::sandbox()
             .await
             .map_err(|err| anyhow::anyhow!("Failed init sandbox: {:?}", err))?;
@@ -50,13 +49,12 @@ impl TestContract {
             .await
             .map_err(|err| anyhow::anyhow!("Failed init testnet: {:?}", err))?;
         let registrar: AccountId = "registrar".parse()?;
+        let sk = SecretKey::from_seed(KeyType::ED25519, registrar.as_str());
         let registrar = worker
             .import_contract(&registrar, &testnet)
             .transact()
             .await?;
         Self::waiting_account_creation(&worker, registrar.id()).await?;
-
-        let sk = SecretKey::from_seed(KeyType::ED25519, "registrar");
 
         let root: AccountId = "root".parse()?;
         registrar
@@ -82,14 +80,10 @@ impl TestContract {
             .transact()
             .await?
             .into_result()?;
-        let engine_cotract_bytes = get_engine_contract();
-        let engine_contract = engine
-            .deploy(&engine_cotract_bytes[..])
-            .await?
-            .into_result()?;
-
+        let engine_contract_bytes = get_engine_contract();
+        let engine_contract = engine.deploy(&engine_contract_bytes).await?.into_result()?;
         let eth_connector_contract = eth_connector
-            .deploy(&get_eth_connector_contract()[..])
+            .deploy(&get_eth_connector_contract())
             .await?
             .into_result()?;
 
@@ -127,7 +121,7 @@ impl TestContract {
             "reference": metadata.reference,
             "decimals": metadata.decimals,
         });
-        let owner_id = owner.unwrap_or(account_with_access_right.clone());
+        let owner_id = owner.unwrap_or_else(|| account_with_access_right.clone());
         let res = eth_connector_contract
             .call("new")
             .args_json(json!({
@@ -299,10 +293,7 @@ impl TestContract {
         pub struct BalanceOfEthCallArgs {
             pub address: Address,
         }
-        let args = BalanceOfEthCallArgs { address: *address }
-            .try_to_vec()
-            .unwrap();
-
+        let args = BalanceOfEthCallArgs { address: *address }.try_to_vec()?;
         let res = self
             .engine_contract
             .call("ft_balance_of_eth")
@@ -310,8 +301,15 @@ impl TestContract {
             .gas(DEFAULT_GAS)
             .transact()
             .await?;
-        let res = res.into_result().unwrap().json::<String>()?;
-        Ok(res.parse().unwrap())
+
+        res.into_result()
+            .unwrap()
+            .json::<Wei>()
+            .map_err(Into::into)
+            .and_then(|res| {
+                res.try_into_u128()
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))
+            })
     }
 
     pub async fn total_supply(&self) -> anyhow::Result<u128> {

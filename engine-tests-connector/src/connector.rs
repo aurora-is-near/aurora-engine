@@ -95,7 +95,7 @@ async fn test_ft_transfer() -> anyhow::Result<()> {
     let user_acc = contract
         .create_sub_account(DEPOSITED_RECIPIENT_NAME)
         .await?;
-    let transfer_amount = 70;
+    let transfer_amount: U128 = 70.into();
     let receiver_id = contract.engine_contract.id();
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer")
@@ -191,11 +191,11 @@ async fn test_deposit_eth_to_aurora_balance_total_supply() -> anyhow::Result<()>
 
     assert_eq!(
         contract
-            .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS),)
+            .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS))
             .await?,
         DEPOSITED_EVM_AMOUNT
     );
-    assert_eq!(contract.total_supply().await?, DEPOSITED_EVM_AMOUNT,);
+    assert_eq!(contract.total_supply().await?, DEPOSITED_EVM_AMOUNT);
     Ok(())
 }
 
@@ -242,7 +242,6 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    dbg!(&res);
     assert!(res.is_success());
 
     assert_eq!(
@@ -331,7 +330,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     );
 
     // Sending to random account should not change balances
-    let some_acc = AccountId::try_from("some-test-acc".to_string()).unwrap();
+    let some_acc = AccountId::from_str("some-test-acc").unwrap();
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer_call")
         .args_json(json!({
@@ -370,7 +369,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     let dummy_contract = contract
         .create_sub_account("ft-rec")
         .await?
-        .deploy(&dummy_ft_receiver_bytes()[..])
+        .deploy(&dummy_ft_receiver_bytes())
         .await?
         .into_result()?;
 
@@ -378,7 +377,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer_call")
         .args_json(json!({
-            "receiver_id": &dummy_contract.id(),
+            "receiver_id": dummy_contract.id(),
             "amount": transfer_amount,
             "memo": &memo,
             "msg": ""
@@ -526,6 +525,7 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
     let user_acc = contract
         .create_sub_account(DEPOSITED_RECIPIENT_NAME)
         .await?;
+
     assert_eq!(contract.get_eth_on_near_balance(receiver_id).await?.0, 0);
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -535,11 +535,9 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
     let transfer_amount: U128 = 50.into();
     let fee: u128 = 30;
     let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    msg.append(
-        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
-            .as_bytes()
-            .to_vec(),
-    );
+    let recipient_address = validate_eth_address(RECIPIENT_ETH_ADDRESS);
+    msg.append(&mut recipient_address.as_bytes().to_vec());
+
     let relayer_id = "relayer.root";
     let message = [relayer_id, hex::encode(msg).as_str()].join(":");
 
@@ -567,9 +565,7 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
         transfer_amount.0
     );
     assert_eq!(
-        contract
-            .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS))
-            .await?,
+        contract.get_eth_balance(&recipient_address).await?,
         transfer_amount.0
     );
     assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
@@ -875,8 +871,8 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
 
     contract.call_deposit_eth_to_near().await?;
 
-    let recipient_addr: Address = validate_eth_address(RECIPIENT_ETH_ADDRESS);
-    let withdraw_amount: NEP141Wei = NEP141Wei::new(100);
+    let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
+    let withdraw_amount = NEP141Wei::new(100);
     // 1st withdraw - should succeed
     let res = user_acc
         .call(contract.engine_contract.id(), "withdraw")
@@ -903,7 +899,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .await?;
     assert!(res.is_success());
 
-    // 2nd withdraw - should fail
+    // 2nd withdraw - should be failed
     let res = user_acc
         .call(contract.engine_contract.id(), "withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
@@ -1222,7 +1218,7 @@ async fn test_ft_transfer_wrong_u128_json_type() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
     contract.call_deposit_eth_to_near().await?;
 
-    let transfer_amount: U128 = 200.into();
+    let transfer_amount = 200;
     let receiver_id = AccountId::from_str(DEPOSITED_RECIPIENT).unwrap();
     let res = contract
         .engine_contract
@@ -1295,136 +1291,6 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - transfer_amount.0 - transfer_amount2.0,
     );
-    Ok(())
-}
-
-#[ignore]
-#[tokio::test]
-async fn test_access_rights() -> anyhow::Result<()> {
-    let contract = TestContract::new().await?;
-    contract.call_deposit_eth_to_near().await?;
-
-    let transfer_amount1: U128 = 50.into();
-    let transfer_amount2: U128 = 10.into();
-    let user_acc = contract
-        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
-        .await?;
-
-    let res = contract
-        .engine_contract
-        .call("ft_transfer")
-        .args_json(json!({
-            "receiver_id": user_acc.id(),
-            "amount": transfer_amount1,
-            "memo": "transfer memo"
-        }))
-        .gas(DEFAULT_GAS)
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-
-    assert_eq!(
-        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount1.0
-    );
-    assert_eq!(
-        contract
-            .get_eth_on_near_balance(contract.engine_contract.id())
-            .await?
-            .0,
-        DEPOSITED_FEE - transfer_amount1.0
-    );
-
-    let res = contract
-        .eth_connector_contract
-        .call("set_access_right")
-        .args_json(json!((user_acc.id(),)))
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-
-    let res = contract
-        .eth_connector_contract
-        .call("get_access_right")
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?
-        .json::<AccountId>()?;
-    assert_eq!(&res, user_acc.id());
-
-    let res = contract
-        .engine_contract
-        .call("ft_transfer")
-        .args_json(json!({
-            "receiver_id": user_acc.id(),
-            "amount": transfer_amount1,
-            "memo": "transfer memo"
-        }))
-        .gas(DEFAULT_GAS)
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await?;
-    assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_ACCESS_RIGHT"));
-
-    assert_eq!(
-        contract.get_eth_on_near_balance(user_acc.id(),).await?.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount1.0
-    );
-    assert_eq!(
-        contract
-            .get_eth_on_near_balance(contract.engine_contract.id())
-            .await?
-            .0,
-        DEPOSITED_FEE - transfer_amount1.0
-    );
-
-    let res = contract
-        .eth_connector_contract
-        .call("set_access_right")
-        .args_json(json!((contract.engine_contract.id(),)))
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-
-    let res = contract
-        .eth_connector_contract
-        .call("get_access_right")
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?
-        .json::<AccountId>()?;
-    assert_eq!(&res, contract.engine_contract.id());
-
-    let res = contract
-        .engine_contract
-        .call("ft_transfer")
-        .args_json(json!({
-            "receiver_id": user_acc.id(),
-            "amount": transfer_amount2,
-            "memo": "transfer memo"
-        }))
-        .gas(DEFAULT_GAS)
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-
-    assert_eq!(
-        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
-        DEPOSITED_AMOUNT - DEPOSITED_FEE + transfer_amount1.0 + transfer_amount2.0
-    );
-    assert_eq!(
-        contract
-            .get_eth_on_near_balance(contract.engine_contract.id())
-            .await?
-            .0,
-        DEPOSITED_FEE - transfer_amount1.0 - transfer_amount2.0
-    );
-
     Ok(())
 }
 
