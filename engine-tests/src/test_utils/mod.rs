@@ -33,6 +33,7 @@ pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
 pub(crate) const PAUSE_PRECOMPILES: &str = "pause_precompiles";
 pub(crate) const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub(crate) const RESUME_PRECOMPILES: &str = "resume_precompiles";
+pub(crate) const SET_OWNER: &str = "set_owner";
 
 pub(crate) mod erc20;
 pub(crate) mod exit_precompile;
@@ -227,7 +228,8 @@ impl AuroraRunner {
                     || method_name == CALL
                     || method_name == DEPLOY_ERC20
                     || method_name == PAUSE_PRECOMPILES
-                    || method_name == RESUME_PRECOMPILES)
+                    || method_name == RESUME_PRECOMPILES
+                    || method_name == SET_OWNER)
             {
                 standalone_runner
                     .submit_raw(method_name, &self.context, &self.promise_results)
@@ -301,7 +303,7 @@ impl AuroraRunner {
 
         let ft_key = crate::prelude::storage::bytes_to_key(
             crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken as u8],
+            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
         );
         let ft_value = {
             let mut current_ft: FungibleToken = trie
@@ -331,7 +333,7 @@ impl AuroraRunner {
 
         let proof_key = crate::prelude::storage::bytes_to_key(
             crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent as u8],
+            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
         );
 
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
@@ -656,10 +658,7 @@ pub(crate) fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLega
 
 pub(crate) fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> TransactionLegacy {
     let len = contract_bytes.len();
-    if len > u16::MAX as usize {
-        panic!("Cannot deploy a contract with that many bytes!");
-    }
-    let len = len as u16;
+    let len = u16::try_from(len).expect("Cannot deploy a contract with that many bytes!");
     // This bit of EVM byte code essentially says:
     // "If msg.value > 0 revert; otherwise return `len` amount of bytes that come after me
     // in the code." By prepending this to `contract_bytes` we create a valid EVM program which
@@ -724,8 +723,8 @@ pub(crate) fn sign_transaction(
 
     let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
     let v: u64 = match chain_id {
-        Some(chain_id) => (recovery_id.serialize() as u64) + 2 * chain_id + 35,
-        None => (recovery_id.serialize() as u64) + 27,
+        Some(chain_id) => u64::from(recovery_id.serialize()) + 2 * chain_id + 35,
+        None => u64::from(recovery_id.serialize()) + 27,
     };
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());

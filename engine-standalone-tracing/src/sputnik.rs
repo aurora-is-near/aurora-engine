@@ -106,7 +106,8 @@ impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
             } => {
                 self.current.opcode = opcode;
                 if let Ok(pc) = position {
-                    self.current.program_counter = ProgramCounter(*pc as u32);
+                    self.current.program_counter =
+                        ProgramCounter(u32::try_from(*pc).unwrap_or_default());
                 }
                 self.current.stack = stack
                     .data()
@@ -229,7 +230,7 @@ struct SharedMutableReference<T> {
 
 impl<T> SharedMutableReference<T> {
     fn new(reference: &mut T) -> Self {
-        let ptr = NonNull::new(reference as _).unwrap();
+        let ptr = NonNull::new(reference).unwrap();
         Self {
             pointer: Rc::new(RefCell::new(ptr)),
         }

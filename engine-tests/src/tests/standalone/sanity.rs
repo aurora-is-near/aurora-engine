@@ -68,10 +68,7 @@ fn test_deploy_code() {
 
 fn evm_deploy(code: &[u8]) -> Vec<u8> {
     let len = code.len();
-    if len > u16::MAX as usize {
-        panic!("Cannot deploy a contract with that many bytes!");
-    }
-    let len = len as u16;
+    let len = u16::try_from(len).expect("Cannot deploy a contract with that many bytes!");
     // This bit of EVM byte code essentially says:
     // "If msg.value > 0 revert; otherwise return `len` amount of bytes that come after me
     // in the code." By prepending this to `code` we create a valid EVM program which
