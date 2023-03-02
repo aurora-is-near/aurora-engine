@@ -13,9 +13,6 @@
 # ENV
 .env/custom.env
 
-# Rust deprectated files
-etc/state-migration-test/*
-
 # Rust artifacts
 bin/
 target/
