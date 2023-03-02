@@ -1,6 +1,6 @@
 use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::{Address, EthGas};
-use crate::PrecompileOutput;
+use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{Cow, Vec};
 use borsh::BorshSerialize;
@@ -42,9 +42,10 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         &self,
         input: &[u8],
         target_gas: Option<EthGas>,
-        _context: &Context,
+        context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        utils::validate_no_value_attached_to_precompile(context.apparent_value.as_u128())?;
         let mut cost = Self::required_gas(input)?;
         let check_cost = |cost: EthGas| -> Result<(), ExitError> {
             if let Some(target_gas) = target_gas {

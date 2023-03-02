@@ -1,6 +1,6 @@
 use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::{Address, EthGas};
-use crate::PrecompileOutput;
+use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::{vec, U256};
 use evm::{Context, ExitError};
@@ -37,9 +37,10 @@ impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
         &self,
         input: &[u8],
         target_gas: Option<EthGas>,
-        _context: &Context,
+        context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        utils::validate_no_value_attached_to_precompile(context.apparent_value.as_u128())?;
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
