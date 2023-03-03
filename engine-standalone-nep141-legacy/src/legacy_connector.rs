@@ -597,24 +597,21 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .map_err(error::FtTransferCallError::MessageParseFailed)?;
 
         // Special case when predecessor_account_id is current_account_id
-        let wei_fee = Wei::from(message_data.fee);
+        let fee = Wei::from(message_data.fee);
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
-        match (wei_fee, relayer) {
-            (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
-                self.mint_eth_on_aurora(
-                    message_data.recipient,
-                    Wei::new(U256::from(args.amount.as_u128())) - fee,
-                )?;
-                self.mint_eth_on_aurora(evm_relayer_address, fee)?;
-            }
-            _ => self.mint_eth_on_aurora(
-                message_data.recipient,
-                Wei::new(U256::from(args.amount.as_u128())),
-            )?,
-        }
+
+        let mint_amount = if relayer.is_some() && fee > ZERO_WEI {
+            self.mint_eth_on_aurora(relayer.unwrap(), fee)?;
+            args.amount.as_u128() - message_data.fee.as_u128()
+        } else {
+            args.amount.as_u128()
+        };
+
+        self.mint_eth_on_aurora(message_data.recipient, Wei::new(U256::from(mint_amount)))?;
         self.save_ft_contract();
-        self.io.return_output("\"0\"".as_bytes());
+        self.io.return_output(b"\"0\"");
+
         Ok(())
     }
 
