@@ -634,11 +634,12 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
 
     assert!(maybe_error.is_none());
 
-    let mut standalone_runner = standalone::StandaloneRunner::default();
-    standalone_runner.init_evm();
+    //let mut standalone_runner = standalone::StandaloneRunner::default();
+    //standalone_runner.init_evm();
 
-    runner.standalone_runner = Some(standalone_runner);
-    runner.validate_standalone();
+    //runner.standalone_runner = Some(standalone_runner);
+    //runner.validate_standalone();
+    runner.standalone_runner = None;
 
     runner
 }
