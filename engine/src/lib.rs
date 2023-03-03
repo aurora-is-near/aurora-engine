@@ -176,7 +176,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
         let index = internal_get_upgrade_index();
         io.return_output(&index.to_le_bytes());
     }
