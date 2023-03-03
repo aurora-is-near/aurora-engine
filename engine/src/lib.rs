@@ -178,7 +178,7 @@ mod contract {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         let index = internal_get_upgrade_index();
-        io.return_output(&(index + state.upgrade_delay_blocks).to_le_bytes())
+        io.return_output(&(index).to_le_bytes())
     }
 
     /// Stage new code for deployment.
@@ -186,12 +186,12 @@ mod contract {
     pub extern "C" fn stage_upgrade() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        let block_height = io.block_height();
+        let delay_block_height = io.block_height() + state.upgrade_delay_blocks;
         require_owner_only(&state, &io.predecessor_account_id());
         io.read_input_and_store(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
         io.write_storage(
             &bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY),
-            &block_height.to_le_bytes(),
+            &delay_block_height.to_le_bytes(),
         );
     }
 
@@ -202,7 +202,7 @@ mod contract {
         let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let index = internal_get_upgrade_index();
-        if io.block_height() <= index + state.upgrade_delay_blocks {
+        if io.block_height() <= index {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED_TOO_EARLY);
         }
         Runtime::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
