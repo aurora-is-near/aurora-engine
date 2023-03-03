@@ -16,22 +16,16 @@ const BLOCK_TRANSACTIONS_AMOUNT: u64 = 200;
 
 #[test]
 fn block_txs_erc20_transfer() {
-    let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
+    let (mut runner, mut source_account, dest_address, contract) = initialize_erc20(); 
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
 
     let initial_block_height = runner.context.block_index;
-
-    //
-    println!("Before mint; nonce = {:?}", source_account.nonce);
 
     let result = runner.submit_with_signer(&mut source_account, |nonce| {
         contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
     });
     assert!(result.is_ok());
     assert_eq!(runner.context.block_index, initial_block_height + 1, "First tx; block has to be 1 more.");
-
-    //
-    println!("After mint; nonce = {:?}", source_account.nonce);
 
     let mut block_txs_gas: u64 = 0;
 
@@ -46,8 +40,7 @@ fn block_txs_erc20_transfer() {
         assert!(result.status.is_ok());
         assert_eq!(runner.context.block_index, initial_block_height + 2, "Another tx, block has to be 2 more.");
 
-        //
-        println!("After loop tx {:?}; nonce = {:?}", i, source_account.nonce);
+        println!("Loop tx {:?}", i);
 
         block_txs_gas += profile.all_gas();
         runner.context.block_index -= 1;
@@ -65,9 +58,6 @@ fn block_txs_erc20_transfer() {
         contract.transfer(dest_address, TRANSFER_AMOUNT.into(), nonce)
     })
     .unwrap();
-
-    //
-    println!("After final tx; nonce = {:?}", source_account.nonce);
 
     assert!(result.status.is_ok());
     assert_eq!(runner.context.block_index, initial_block_height + 3, "After tx, block has to be 3 more.");
