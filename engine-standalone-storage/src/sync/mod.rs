@@ -27,7 +27,7 @@ pub fn consume_message(
             let block_height = block_message.height;
             let block_metadata = block_message.metadata;
             storage
-                .set_block_data(block_hash, block_height, block_metadata)
+                .set_block_data(block_hash, block_height, &block_metadata)
                 .map_err(crate::Error::Rocksdb)?;
             Ok(ConsumeMessageOutcome::BlockAdded)
         }
@@ -198,8 +198,9 @@ fn execute_transaction<'db>(
 }
 
 /// Handles all transaction kinds other than `submit`.
-/// The `submit` transaction kind is special because it is the only one where the transaction hash is
-/// different than the NEAR receipt hash.
+/// The `submit` transaction kind is special because it is the only one where the transaction hash
+/// differs from the NEAR receipt hash.
+#[allow(clippy::too_many_lines)]
 fn non_submit_execute<'db>(
     transaction: &TransactionKind,
     mut io: EngineStateAccess<'db, 'db, 'db>,
@@ -273,14 +274,14 @@ fn non_submit_execute<'db>(
 
         TransactionKind::ResolveTransfer(args, promise_result) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_resolve_transfer(args.clone(), promise_result.clone());
+            connector.ft_resolve_transfer(args, promise_result.clone());
 
             None
         }
 
         TransactionKind::FtTransfer(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_transfer(&env.predecessor_account_id, args.clone())?;
+            connector.ft_transfer(&env.predecessor_account_id, args)?;
 
             None
         }
@@ -290,7 +291,7 @@ fn non_submit_execute<'db>(
             connector.withdraw_eth_from_near(
                 &env.current_account_id,
                 &env.predecessor_account_id,
-                args.clone(),
+                args,
             )?;
 
             None
@@ -321,7 +322,7 @@ fn non_submit_execute<'db>(
 
         TransactionKind::StorageDeposit(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _ = connector.storage_deposit(
+            let _promise = connector.storage_deposit(
                 env.predecessor_account_id,
                 Yocto::new(env.attached_deposit),
                 args.clone(),
@@ -332,21 +333,21 @@ fn non_submit_execute<'db>(
 
         TransactionKind::StorageUnregister(force) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
+            let _promise = connector.storage_unregister(env.predecessor_account_id, *force)?;
 
             None
         }
 
         TransactionKind::StorageWithdraw(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
+            connector.storage_withdraw(&env.predecessor_account_id, args)?;
 
             None
         }
 
         TransactionKind::SetPausedFlags(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.set_paused_flags(args.clone());
+            connector.set_paused_flags(args);
 
             None
         }
@@ -367,7 +368,7 @@ fn non_submit_execute<'db>(
                         let mut handler = crate::promise::NoScheduler { promise_data };
                         let engine_state = state::get_state(&io)?;
                         let result =
-                            engine::refund_on_error(io, &env, engine_state, args, &mut handler);
+                            engine::refund_on_error(io, &env, engine_state, &args, &mut handler);
                         Ok(TransactionExecutionResult::Submit(result))
                     })
                     .transpose();
@@ -385,14 +386,14 @@ fn non_submit_execute<'db>(
         TransactionKind::NewConnector(args) => {
             connector::EthConnectorContract::create_contract(
                 io,
-                env.current_account_id,
+                &env.current_account_id,
                 args.clone(),
             )?;
 
             None
         }
         TransactionKind::NewEngine(args) => {
-            state::set_state(&mut io, args.clone().into())?;
+            state::set_state(&mut io, &args.clone().into())?;
 
             None
         }
@@ -435,7 +436,7 @@ fn non_submit_execute<'db>(
             let mut prev = state::get_state(&io)?;
 
             prev.owner_id = args.clone().new_owner;
-            state::set_state(&mut io, prev)?;
+            state::set_state(&mut io, &prev)?;
 
             None
         }

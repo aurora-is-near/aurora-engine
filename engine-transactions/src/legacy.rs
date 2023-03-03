@@ -40,8 +40,9 @@ impl TransactionLegacy {
         }
     }
 
-    /// Returns self.gas as a u64, or None if self.gas > u64::MAX
+    /// Returns self.gas as a u64, or None if self.gas > `u64::MAX`
     #[allow(unused)]
+    #[must_use]
     pub fn get_gas_limit(&self) -> Option<u64> {
         self.gas_limit.try_into().ok()
     }
@@ -83,7 +84,8 @@ impl LegacyEthSignedTransaction {
     }
 
     /// Returns chain id encoded in `v` parameter of the signature if that was done, otherwise None.
-    pub fn chain_id(&self) -> Option<u64> {
+    #[must_use]
+    pub const fn chain_id(&self) -> Option<u64> {
         match self.v {
             0..=34 => None,
             _ => Some((self.v - 35) / 2),
@@ -166,12 +168,12 @@ mod tests {
             tx.transaction,
             TransactionLegacy {
                 nonce: U256::zero(),
-                gas_price: U256::from(234567897654321u128),
-                gas_limit: U256::from(2000000u128),
+                gas_price: U256::from(234_567_897_654_321_u128),
+                gas_limit: U256::from(2_000_000u128),
                 to: Some(address_from_arr(
                     &hex::decode("F0109fC8DF283027b6285cc889F5aA624EaC1F55").unwrap()
                 )),
-                value: Wei::new_u64(1000000000),
+                value: Wei::new_u64(1_000_000_000),
                 data: vec![],
             }
         );

@@ -30,6 +30,7 @@ impl Accounting {
         self.lost = self.lost.saturating_add(amount);
     }
 
+    #[must_use]
     pub fn net(&self) -> Net {
         match self.gained.cmp(&self.lost) {
             Ordering::Equal => Net::Zero,

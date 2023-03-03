@@ -1,8 +1,13 @@
-#![allow(dead_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
-#![deny(clippy::as_conversions)]
-
+#![deny(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::similar_names,
+    clippy::module_name_repetitions,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc,
+    clippy::unreadable_literal
+)]
 pub mod account_ids;
 pub mod alt_bn256;
 pub mod blake2;
@@ -52,6 +57,7 @@ pub struct PrecompileOutput {
 }
 
 impl PrecompileOutput {
+    #[must_use]
     pub fn without_logs(cost: EthGas, output: Vec<u8>) -> Self {
         Self {
             cost,
@@ -386,6 +392,7 @@ pub enum AllPrecompiles<'a, I, E, H> {
 /// fn for making an address by concatenating the bytes from two given numbers,
 /// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
 /// as a convenience for specifying the addresses of the various precompiles.
+#[must_use]
 pub const fn make_address(x: u32, y: u128) -> prelude::types::Address {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
@@ -482,11 +489,12 @@ mod tests {
         for _ in 0..u8::MAX {
             let address = Address::new(H160(rng.gen()));
             let (x, y) = split_address(address);
-            assert_eq!(address, super::make_address(x, y))
+            assert_eq!(address, super::make_address(x, y));
         }
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_paused_precompiles_throws_error() {
         use crate::{
             AllPrecompiles, Context, EvmPrecompileResult, ExitError, Precompile, PrecompileOutput,
@@ -525,7 +533,7 @@ mod tests {
         }
 
         impl MockPrecompileHandle {
-            pub fn new(code_address: H160) -> Self {
+            pub const fn new(code_address: H160) -> Self {
                 Self { code_address }
             }
         }
@@ -610,7 +618,7 @@ mod tests {
         assert_eq!(expected_failure, actual_failure);
     }
 
-    fn u8_to_address(x: u8) -> Address {
+    const fn u8_to_address(x: u8) -> Address {
         let mut bytes = [0u8; 20];
         bytes[19] = x;
         Address::new(H160(bytes))

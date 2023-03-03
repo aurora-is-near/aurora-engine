@@ -51,6 +51,7 @@ pub struct TransactionMessage {
 }
 
 impl TransactionMessage {
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let borshable: BorshableTransactionMessage = self.into();
         borshable.try_to_vec().unwrap()
@@ -133,6 +134,8 @@ pub enum TransactionKind {
 }
 
 impl TransactionKind {
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn eth_repr(
         self,
         engine_account: &AccountId,
@@ -265,61 +268,63 @@ impl TransactionKind {
                 }
             }
             Self::RefundOnError(maybe_args) => {
-                match maybe_args {
-                    Some(args) => match args.erc20_address {
-                        Some(erc20_address) => {
-                            // ERC-20 refund
-                            let from = Self::get_implicit_address(engine_account);
-                            let nonce = Self::get_implicit_nonce(
-                                &from,
-                                block_height,
-                                transaction_position,
-                                storage,
-                            );
-                            let to = erc20_address;
-                            let data = aurora_engine::engine::setup_refund_on_error_input(
-                                U256::from_big_endian(&args.amount),
-                                args.recipient_address,
-                            );
-                            NormalizedEthTransaction {
-                                address: from,
-                                chain_id: None,
-                                nonce,
-                                gas_limit: U256::from(u64::MAX),
-                                max_priority_fee_per_gas: U256::zero(),
-                                max_fee_per_gas: U256::zero(),
-                                to: Some(to),
-                                value: Wei::zero(),
-                                data,
-                                access_list: Vec::new(),
-                            }
-                        }
-                        None => {
-                            // ETH refund
-                            let value = Wei::new(U256::from_big_endian(&args.amount));
-                            let from = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
-                            let nonce = Self::get_implicit_nonce(
-                                &from,
-                                block_height,
-                                transaction_position,
-                                storage,
-                            );
-                            NormalizedEthTransaction {
-                                address: from,
-                                chain_id: None,
-                                nonce,
-                                gas_limit: U256::from(u64::MAX),
-                                max_priority_fee_per_gas: U256::zero(),
-                                max_fee_per_gas: U256::zero(),
-                                to: Some(args.recipient_address),
-                                value,
-                                data: Vec::new(),
-                                access_list: Vec::new(),
-                            }
-                        }
+                maybe_args.map_or_else(
+                    || Self::no_evm_execution("refund_on_error"),
+                    |args| {
+                        args.erc20_address.map_or_else(
+                            || {
+                                // ETH refund
+                                let value = Wei::new(U256::from_big_endian(&args.amount));
+                                let from = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
+                                let nonce = Self::get_implicit_nonce(
+                                    &from,
+                                    block_height,
+                                    transaction_position,
+                                    storage,
+                                );
+                                NormalizedEthTransaction {
+                                    address: from,
+                                    chain_id: None,
+                                    nonce,
+                                    gas_limit: U256::from(u64::MAX),
+                                    max_priority_fee_per_gas: U256::zero(),
+                                    max_fee_per_gas: U256::zero(),
+                                    to: Some(args.recipient_address),
+                                    value,
+                                    data: Vec::new(),
+                                    access_list: Vec::new(),
+                                }
+                            },
+                            |erc20_address| {
+                                // ERC-20 refund
+                                let from = Self::get_implicit_address(engine_account);
+                                let nonce = Self::get_implicit_nonce(
+                                    &from,
+                                    block_height,
+                                    transaction_position,
+                                    storage,
+                                );
+                                let to = erc20_address;
+                                let data = aurora_engine::engine::setup_refund_on_error_input(
+                                    U256::from_big_endian(&args.amount),
+                                    args.recipient_address,
+                                );
+                                NormalizedEthTransaction {
+                                    address: from,
+                                    chain_id: None,
+                                    nonce,
+                                    gas_limit: U256::from(u64::MAX),
+                                    max_priority_fee_per_gas: U256::zero(),
+                                    max_fee_per_gas: U256::zero(),
+                                    to: Some(to),
+                                    value: Wei::zero(),
+                                    data,
+                                    access_list: Vec::new(),
+                                }
+                            },
+                        )
                     },
-                    None => Self::no_evm_execution("refund_on_error"),
-                }
+                )
             }
             Self::Deposit(_) => Self::no_evm_execution("deposit"),
             Self::FtTransferCall(_) => Self::no_evm_execution("ft_transfer_call"),
@@ -343,7 +348,7 @@ impl TransactionKind {
             Self::Unknown => Self::no_evm_execution("unknown"),
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
-            TransactionKind::SetOwner(_) => Self::no_evm_execution("set_owner"),
+            Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
         }
     }
 

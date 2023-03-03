@@ -1,12 +1,13 @@
 use crate::prelude::U256;
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use aurora_engine_transactions::legacy::TransactionLegacy;
+use aurora_engine_types::types::Wei;
 use aurora_engine_types::H256;
 use ethabi::Constructor;
 
 const DEFAULT_GAS: u64 = 1_000_000_000;
 
-pub(crate) struct RandomConstructor(pub solidity::ContractConstructor);
+pub struct RandomConstructor(pub solidity::ContractConstructor);
 
 impl RandomConstructor {
     pub fn load() -> Self {
@@ -26,10 +27,10 @@ impl RandomConstructor {
 
         TransactionLegacy {
             nonce: nonce.into(),
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: U256::from(DEFAULT_GAS),
             to: None,
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -41,7 +42,7 @@ impl From<RandomConstructor> for solidity::ContractConstructor {
     }
 }
 
-pub(crate) struct Random {
+pub struct Random {
     contract: solidity::DeployedContract,
 }
 
@@ -57,10 +58,10 @@ impl Random {
 
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         };
 
