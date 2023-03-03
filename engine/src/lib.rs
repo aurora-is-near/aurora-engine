@@ -209,6 +209,10 @@ mod contract {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED_TOO_EARLY);
         }
         Runtime::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
+        io.write_storage(
+            &bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY),
+            &u64::MIN.to_le_bytes(),
+        );
     }
 
     /// Called as part of the upgrade process (see `engine-sdk::self_deploy`). This function is meant
