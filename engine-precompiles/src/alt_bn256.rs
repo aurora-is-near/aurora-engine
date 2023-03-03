@@ -48,21 +48,14 @@ mod consts {
     /// Pair element length.
     pub(super) const PAIR_ELEMENT_LEN: usize = 192;
 
-    #[allow(dead_code)]
-    pub(super) const SCALAR_PART_LEN: usize = SCALAR_LEN / 2;
-
     /// Size of BN scalars.
     pub(super) const SCALAR_LEN: usize = 32;
-
-    /// Half the size of a point size.
-    #[allow(dead_code)]
-    pub(super) const POINT_PART_LEN: usize = POINT_LEN / 2;
 
     /// Size of BN points.
     pub(super) const POINT_LEN: usize = 64;
 
     /// Size of BN pairs.
-    #[allow(dead_code)]
+    #[cfg(feature = "contract")]
     pub(super) const POINT_PAIR_LEN: usize = 128;
 
     /// Output length.
