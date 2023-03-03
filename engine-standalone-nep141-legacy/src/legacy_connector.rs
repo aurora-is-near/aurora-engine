@@ -358,7 +358,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         &mut self,
         current_account_id: &AccountId,
         predecessor_account_id: &AccountId,
-        args: WithdrawCallArgs,
+        args: &WithdrawCallArgs,
     ) -> Result<WithdrawResult, error::WithdrawError> {
         // Check is current account id is owner
         let is_owner = current_account_id == predecessor_account_id;
@@ -420,7 +420,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_transfer(
         &mut self,
         predecessor_account_id: &AccountId,
-        args: TransferCallArgs,
+        args: &TransferCallArgs,
     ) -> Result<(), fungible_token::error::TransferError> {
         self.ft.internal_transfer_eth_on_near(
             predecessor_account_id,
@@ -441,7 +441,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// FT resolve transfer logic
     pub fn ft_resolve_transfer(
         &mut self,
-        args: ResolveTransferCallArgs,
+        args: &ResolveTransferCallArgs,
         promise_result: PromiseResult,
     ) {
         let amount = self.ft.ft_resolve_transfer(
@@ -571,7 +571,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn storage_withdraw(
         &mut self,
         account_id: &AccountId,
-        args: StorageWithdrawCallArgs,
+        args: &StorageWithdrawCallArgs,
     ) -> Result<(), fungible_token::error::StorageFundingError> {
         let res = self.ft.storage_withdraw(account_id, args.amount)?;
         self.save_ft_contract();
@@ -662,7 +662,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Set Eth connector paused flags
-    pub fn set_paused_flags(&mut self, args: PauseEthConnectorCallArgs) {
+    pub fn set_paused_flags(&mut self, args: &PauseEthConnectorCallArgs) {
         self.set_paused(args.paused_mask);
     }
 }

@@ -33,7 +33,7 @@ pub const VIEW_CALL_GAS: NearGas = NearGas::new(15_000_000_000_000);
 /// Contains:
 /// * connector specific data
 /// * Fungible token data
-/// * paused_mask - admin control flow data
+/// * `paused_mask` - admin control flow data
 /// * io - I/O trait handler
 pub struct EthConnectorContract<I: IO> {
     io: I,
@@ -52,14 +52,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Init Eth-connector contract instance.
     /// Load contract data from storage and init I/O handler.
     /// Used as single point of contract access for various contract actions
-    pub fn init_instance(io: I) -> Result<Self, error::StorageReadError> {
+    pub const fn init_instance(io: I) -> Result<Self, error::StorageReadError> {
         Ok(Self { io })
     }
 
     /// Create contract data - init eth-connector contract specific data.
     /// Used only once for first time initialization.
     /// Initialized contract data stored in the storage.
-    pub fn create_contract() -> Result<(), error::InitContractError> {
+    pub const fn create_contract() -> Result<(), error::InitContractError> {
         // NOTE: do nothing
         Ok(())
     }
@@ -76,7 +76,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Withdraw nETH from NEAR accounts
+    /// Withdraw `nETH` from NEAR accounts
     /// NOTE: it should be without any log data
     pub fn withdraw_eth_from_near(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
@@ -88,7 +88,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
+    /// Returns total ETH supply on NEAR (`nETH` as NEP-141 token)
     pub fn ft_total_eth_supply_on_near(&mut self) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
@@ -99,7 +99,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Return balance of nETH (ETH on Near)
+    /// Return balance of `nETH` (ETH on Near)
     pub fn ft_balance_of(&self, input: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
@@ -113,7 +113,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Return balance of ETH (ETH in Aurora EVM)
     pub fn ft_balance_of_eth_on_aurora(
         &mut self,
-        args: BalanceOfEthCallArgs,
+        args: &BalanceOfEthCallArgs,
     ) -> Result<(), ParseTypeFromJsonError> {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(&args.address);
         sdk::log!("Balance of ETH [{}]: {}", args.address.encode(), balance);
@@ -126,10 +126,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         crate::engine::get_balance(&self.io, address)
     }
 
-    /// ft_on_transfer callback function
-    pub fn ft_on_transfer<'env, E: Env>(
+    /// `ft_on_transfer` callback function
+    pub fn ft_on_transfer<E: Env>(
         &mut self,
-        engine: &Engine<'env, I, E>,
+        engine: &Engine<I, E>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
@@ -302,38 +302,38 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Disable flag for standalone-legacy-nep141
     pub fn disable_legacy_nep141(&mut self) {
         self.io.write_borsh(
-            &construct_contract_key(&EthConnectorStorageId::DisableLegacyNEP141),
+            &construct_contract_key(EthConnectorStorageId::DisableLegacyNEP141),
             &1u8,
         );
     }
 
     pub fn is_disabled_legacy_nep141(&self) -> bool {
         self.io.storage_has_key(&construct_contract_key(
-            &EthConnectorStorageId::DisableLegacyNEP141,
+            EthConnectorStorageId::DisableLegacyNEP141,
         ))
     }
 }
 
 impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
     fn get_eth_connector_contract_account(&self) -> AccountId {
-        get_contract_data(&self.io, &EthConnectorStorageId::EthConnectorAccount).unwrap()
+        get_contract_data(&self.io, EthConnectorStorageId::EthConnectorAccount).unwrap()
     }
 
     fn set_eth_connector_contract_account(&mut self, account: &AccountId) {
         self.io.write_borsh(
-            &construct_contract_key(&EthConnectorStorageId::EthConnectorAccount),
+            &construct_contract_key(EthConnectorStorageId::EthConnectorAccount),
             account,
         );
     }
 }
 
-fn construct_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
-    crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[u8::from(*suffix)])
+fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
+    crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[u8::from(suffix)])
 }
 
 fn get_contract_data<T: BorshDeserialize, I: IO>(
     io: &I,
-    suffix: &EthConnectorStorageId,
+    suffix: EthConnectorStorageId,
 ) -> Result<T, error::StorageReadError> {
     io.read_storage(&construct_contract_key(suffix))
         .ok_or(error::StorageReadError::KeyNotFound)
@@ -355,12 +355,12 @@ pub fn set_contract_data<I: IO>(
     };
     // Save eth-connector specific data
     io.write_borsh(
-        &construct_contract_key(&EthConnectorStorageId::Contract),
+        &construct_contract_key(EthConnectorStorageId::Contract),
         &contract_data,
     );
 
     io.write_borsh(
-        &construct_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
+        &construct_contract_key(EthConnectorStorageId::FungibleTokenMetadata),
         &args.metadata,
     );
 
@@ -370,7 +370,7 @@ pub fn set_contract_data<I: IO>(
 /// Return metadata
 pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
     io.read_storage(&construct_contract_key(
-        &EthConnectorStorageId::FungibleTokenMetadata,
+        EthConnectorStorageId::FungibleTokenMetadata,
     ))
     .and_then(|data| data.to_value().ok())
 }

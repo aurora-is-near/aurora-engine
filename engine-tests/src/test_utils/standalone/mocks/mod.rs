@@ -23,7 +23,7 @@ pub fn insert_block(storage: &mut Storage, block_height: u64) {
         random_seed: H256::zero(),
     };
     storage
-        .set_block_data(block_hash, block_height, block_metadata)
+        .set_block_data(block_hash, block_height, &block_metadata)
         .unwrap();
 }
 
@@ -45,6 +45,8 @@ pub fn default_env(block_height: u64) -> aurora_engine_sdk::env::Fixed {
 }
 
 pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
+    use aurora_engine::admin_controlled::AdminControlled;
+
     let new_args = NewCallArgs {
         chain_id: aurora_engine_types::types::u256_to_arr(&U256::from(chain_id)),
         owner_id: env.current_account_id(),
@@ -52,9 +54,8 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
         upgrade_delay_blocks: 1,
     };
 
-    state::set_state(&mut io, new_args.into()).unwrap();
+    state::set_state(&mut io, &new_args.into()).unwrap();
 
-    use aurora_engine::admin_controlled::AdminControlled;
     let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io).unwrap();
     connector.set_eth_connector_contract_account(&"aurora_eth_connector.root".parse().unwrap());
 }

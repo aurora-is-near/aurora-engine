@@ -22,10 +22,14 @@ impl<'a> PromiseHandler for NoScheduler<'a> {
 
     fn promise_result(&self, index: u64) -> Option<PromiseResult> {
         let i = usize::try_from(index).ok()?;
-        let result = match self.promise_data.get(i)? {
-            Some(bytes) => PromiseResult::Successful(bytes.clone()),
-            None => PromiseResult::Failed,
-        };
+        let result = self
+            .promise_data
+            .get(i)?
+            .as_ref()
+            .map_or(PromiseResult::Failed, |bytes| {
+                PromiseResult::Successful(bytes.clone())
+            });
+
         Some(result)
     }
 

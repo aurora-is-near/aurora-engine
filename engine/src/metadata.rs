@@ -2,12 +2,13 @@ use crate::prelude::{BorshDeserialize, BorshSerialize};
 use crate::prelude::{String, ToString};
 
 /// Fungible token Reference hash type.
-/// Used for FungibleTokenMetadata
+/// Used for `FungibleTokenMetadata`
 #[derive(Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
 pub struct FungibleReferenceHash([u8; 32]);
 
 impl FungibleReferenceHash {
     /// Encode to base64-encoded string
+    #[must_use]
     pub fn encode(&self) -> String {
         aurora_engine_sdk::base64::encode(self)
     }

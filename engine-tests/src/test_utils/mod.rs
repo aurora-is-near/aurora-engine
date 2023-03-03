@@ -9,6 +9,7 @@ use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileData;
 use near_primitives_core::runtime::fees::RuntimeFeesConfig;
+use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::{MockCompiledContractCache, VMError};
@@ -25,27 +26,27 @@ use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 
-pub(crate) const ORIGIN: &str = "aurora";
-pub(crate) const SUBMIT: &str = "submit";
-pub(crate) const CALL: &str = "call";
-pub(crate) const DEPLOY_ERC20: &str = "deploy_erc20_token";
-pub(crate) const PAUSE_PRECOMPILES: &str = "pause_precompiles";
-pub(crate) const PAUSED_PRECOMPILES: &str = "paused_precompiles";
-pub(crate) const RESUME_PRECOMPILES: &str = "resume_precompiles";
-pub(crate) const SET_OWNER: &str = "set_owner";
+pub const ORIGIN: &str = "aurora";
+pub const SUBMIT: &str = "submit";
+pub const CALL: &str = "call";
+pub const DEPLOY_ERC20: &str = "deploy_erc20_token";
+pub const PAUSE_PRECOMPILES: &str = "pause_precompiles";
+pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
+pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
+pub const SET_OWNER: &str = "set_owner";
 
-pub(crate) mod erc20;
-pub(crate) mod exit_precompile;
-pub(crate) mod mocked_external;
-pub(crate) mod one_inch;
-pub(crate) mod random;
-pub(crate) mod rust;
-pub(crate) mod self_destruct;
-pub(crate) mod solidity;
-pub(crate) mod standalone;
-pub(crate) mod standard_precompiles;
-pub(crate) mod uniswap;
-pub(crate) mod weth;
+pub mod erc20;
+pub mod exit_precompile;
+pub mod mocked_external;
+pub mod one_inch;
+pub mod random;
+pub mod rust;
+pub mod self_destruct;
+pub mod solidity;
+pub mod standalone;
+pub mod standard_precompiles;
+pub mod uniswap;
+pub mod weth;
 
 pub struct Signer {
     pub nonce: u64,
@@ -53,7 +54,7 @@ pub struct Signer {
 }
 
 impl Signer {
-    pub fn new(secret_key: SecretKey) -> Self {
+    pub const fn new(secret_key: SecretKey) -> Self {
         Self {
             nonce: 0,
             secret_key,
@@ -73,7 +74,7 @@ impl Signer {
     }
 }
 
-pub(crate) struct AuroraRunner {
+pub struct AuroraRunner {
     pub aurora_account_id: String,
     pub chain_id: u64,
     pub code: ContractCode,
@@ -95,7 +96,7 @@ pub(crate) struct AuroraRunner {
 /// Same as `AuroraRunner`, but consumes `self` on execution (thus preventing building on
 /// the `ext` post-state with future calls to the contract.
 #[derive(Clone)]
-pub(crate) struct OneShotAuroraRunner<'a> {
+pub struct OneShotAuroraRunner<'a> {
     pub base: &'a AuroraRunner,
     pub ext: mocked_external::MockedExternalWithTrie,
     pub context: VMContext,
@@ -258,7 +259,7 @@ impl AuroraRunner {
         init_balance: crate::prelude::Wei,
         init_nonce: U256,
     ) {
-        self.internal_create_address(address, init_balance, init_nonce, None)
+        self.internal_create_address(address, init_balance, init_nonce, None);
     }
 
     pub fn create_address_with_code(
@@ -268,7 +269,7 @@ impl AuroraRunner {
         init_nonce: U256,
         code: Vec<u8>,
     ) {
-        self.internal_create_address(address, init_balance, init_nonce, Some(code))
+        self.internal_create_address(address, init_balance, init_nonce, Some(code));
     }
 
     fn internal_create_address(
@@ -353,15 +354,16 @@ impl AuroraRunner {
         let (output, maybe_err) =
             self.call(SUBMIT, calling_account_id, rlp::encode(&signed_tx).to_vec());
 
-        if let Some(err) = maybe_err {
-            Err(err)
-        } else {
-            let output = output.unwrap();
-            let profile = ExecutionProfile::new(&output);
-            let submit_result =
-                SubmitResult::try_from_slice(&output.return_data.as_value().unwrap()).unwrap();
-            Ok((submit_result, profile))
-        }
+        maybe_err.map_or_else(
+            || {
+                let output = output.unwrap();
+                let profile = ExecutionProfile::new(&output);
+                let submit_result =
+                    SubmitResult::try_from_slice(&output.return_data.as_value().unwrap()).unwrap();
+                Ok((submit_result, profile))
+            },
+            Err,
+        )
     }
 
     pub fn deploy_contract<F: FnOnce(&T) -> TransactionLegacy, T: Into<ContractConstructor>>(
@@ -386,7 +388,7 @@ impl AuroraRunner {
         }
     }
 
-    pub fn view_call(&self, args: ViewCallArgs) -> Result<TransactionStatus, VMError> {
+    pub fn view_call(&self, args: &ViewCallArgs) -> Result<TransactionStatus, VMError> {
         let input = args.try_to_vec().unwrap();
         let mut runner = self.one_shot();
         runner.context.view_config = Some(ViewConfig {
@@ -401,7 +403,7 @@ impl AuroraRunner {
 
     pub fn profiled_view_call(
         &self,
-        args: ViewCallArgs,
+        args: &ViewCallArgs,
     ) -> (Result<TransactionStatus, VMError>, ExecutionProfile) {
         let input = args.try_to_vec().unwrap();
         let mut runner = self.one_shot();
@@ -461,12 +463,13 @@ impl AuroraRunner {
         maybe_outcome: Option<VMOutcome>,
         maybe_error: Option<VMError>,
     ) -> Result<Vec<u8>, VMError> {
-        if let Some(error) = maybe_error {
-            Err(error)
-        } else {
-            let bytes = maybe_outcome.unwrap().return_data.as_value().unwrap();
-            Ok(bytes)
-        }
+        maybe_error.map_or_else(
+            || {
+                let bytes = maybe_outcome.unwrap().return_data.as_value().unwrap();
+                Ok(bytes)
+            },
+            Err,
+        )
     }
 
     pub fn with_random_seed(mut self, random_seed: H256) -> Self {
@@ -481,14 +484,12 @@ impl AuroraRunner {
             // (they are replaced with a Deleted identifier instead; this is important for replaying transactions).
             assert!(self.ext.underlying.fake_trie.len() <= standalone_state.iter().count());
             for (key, value) in standalone_state.iter() {
-                let trie_value = self.ext.underlying.fake_trie.get(key).map(|v| v.as_slice());
+                let trie_value = self.ext.underlying.fake_trie.get(key).map(Vec::as_slice);
                 let standalone_value = value.value();
-                if trie_value != standalone_value {
-                    panic!(
-                        "Standalone mismatch at {:?}.\nStandlaone: {:?}\nWasm      : {:?}",
-                        key, standalone_value, trie_value
-                    );
-                }
+                assert_eq!(
+                    trie_value, standalone_value,
+                    "Standalone mismatch at {key:?}.\nStandlaone: {standalone_value:?}\nWasm: {trie_value:?}",
+                );
             }
         }
     }
@@ -511,10 +512,10 @@ impl Default for AuroraRunner {
 
         Self {
             aurora_account_id: ORIGIN.to_string(),
-            chain_id: 1313161556, // NEAR localnet,
+            chain_id: 1_313_161_556, // NEAR localnet,
             code: ContractCode::new(evm_wasm_bytes, None),
-            cache: Default::default(),
-            ext: mocked_external::MockedExternalWithTrie::new(Default::default()),
+            cache: MockCompiledContractCache::default(),
+            ext: mocked_external::MockedExternalWithTrie::new(MockedExternal::default()),
             context: VMContext {
                 current_account_id: as_account_id(ORIGIN),
                 signer_account_id: as_account_id(ORIGIN),
@@ -536,7 +537,7 @@ impl Default for AuroraRunner {
             wasm_config,
             fees_config: RuntimeFeesConfig::test(),
             current_protocol_version: u32::MAX,
-            previous_logs: Default::default(),
+            previous_logs: Vec::new(),
             standalone_runner: None,
             promise_results: Vec::new(),
         }
@@ -544,9 +545,9 @@ impl Default for AuroraRunner {
 }
 
 /// Wrapper around `ProfileData` to still include the wasm gas usage
-/// (which was removed in https://github.com/near/nearcore/pull/4438).
+/// (which was removed in `https://github.com/near/nearcore/pull/4438`).
 #[derive(Debug, Default, Clone)]
-pub(crate) struct ExecutionProfile {
+pub struct ExecutionProfile {
     pub host_breakdown: ProfileData,
     wasm_gas: u64,
 }
@@ -561,7 +562,7 @@ impl ExecutionProfile {
         }
     }
 
-    pub fn wasm_gas(&self) -> u64 {
+    pub const fn wasm_gas(&self) -> u64 {
         self.wasm_gas
     }
 
@@ -570,7 +571,7 @@ impl ExecutionProfile {
     }
 }
 
-pub(crate) fn deploy_evm() -> AuroraRunner {
+pub fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     let args = NewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
@@ -603,10 +604,10 @@ pub(crate) fn deploy_evm() -> AuroraRunner {
     runner
 }
 
-pub(crate) fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
+pub fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
     TransactionLegacy {
         nonce,
-        gas_price: Default::default(),
+        gas_price: U256::default(),
         gas_limit: u64::MAX.into(),
         to: Some(to),
         value: amount,
@@ -614,9 +615,9 @@ pub(crate) fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLega
     }
 }
 
-pub(crate) fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> TransactionLegacy {
-    let len = contract_bytes.len();
-    let len = u16::try_from(len).expect("Cannot deploy a contract with that many bytes!");
+pub fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> TransactionLegacy {
+    let len = u16::try_from(contract_bytes.len())
+        .unwrap_or_else(|_| panic!("Cannot deploy a contract with that many bytes!"));
     // This bit of EVM byte code essentially says:
     // "If msg.value > 0 revert; otherwise return `len` amount of bytes that come after me
     // in the code." By prepending this to `contract_bytes` we create a valid EVM program which
@@ -633,7 +634,7 @@ pub(crate) fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) ->
 
     TransactionLegacy {
         nonce,
-        gas_price: Default::default(),
+        gas_price: U256::default(),
         gas_limit: u64::MAX.into(),
         to: None,
         value: Wei::zero(),
@@ -641,7 +642,7 @@ pub(crate) fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) ->
     }
 }
 
-pub(crate) fn create_eth_transaction(
+pub fn create_eth_transaction(
     to: Option<Address>,
     value: Wei,
     data: Vec<u8>,
@@ -650,8 +651,8 @@ pub(crate) fn create_eth_transaction(
 ) -> LegacyEthSignedTransaction {
     // nonce, gas_price and gas are not used by EVM contract currently
     let tx = TransactionLegacy {
-        nonce: Default::default(),
-        gas_price: Default::default(),
+        nonce: U256::default(),
+        gas_price: U256::default(),
         gas_limit: u64::MAX.into(),
         to,
         value,
@@ -660,7 +661,7 @@ pub(crate) fn create_eth_transaction(
     sign_transaction(tx, chain_id, secret_key)
 }
 
-pub(crate) fn as_view_call(tx: TransactionLegacy, sender: Address) -> ViewCallArgs {
+pub fn as_view_call(tx: TransactionLegacy, sender: Address) -> ViewCallArgs {
     ViewCallArgs {
         sender,
         address: tx.to.unwrap(),
@@ -669,7 +670,7 @@ pub(crate) fn as_view_call(tx: TransactionLegacy, sender: Address) -> ViewCallAr
     }
 }
 
-pub(crate) fn sign_transaction(
+pub fn sign_transaction(
     tx: TransactionLegacy,
     chain_id: Option<u64>,
     secret_key: &SecretKey,
@@ -680,10 +681,10 @@ pub(crate) fn sign_transaction(
     let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
 
     let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
-    let v: u64 = match chain_id {
-        Some(chain_id) => u64::from(recovery_id.serialize()) + 2 * chain_id + 35,
-        None => u64::from(recovery_id.serialize()) + 27,
-    };
+    let v: u64 = chain_id.map_or_else(
+        || u64::from(recovery_id.serialize()) + 27,
+        |chain_id| u64::from(recovery_id.serialize()) + 2 * chain_id + 35,
+    );
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());
     LegacyEthSignedTransaction {
@@ -694,7 +695,7 @@ pub(crate) fn sign_transaction(
     }
 }
 
-pub(crate) fn sign_access_list_transaction(
+pub fn sign_access_list_transaction(
     tx: Transaction2930,
     secret_key: &SecretKey,
 ) -> SignedTransaction2930 {
@@ -716,7 +717,7 @@ pub(crate) fn sign_access_list_transaction(
     }
 }
 
-pub(crate) fn sign_eip_1559_transaction(
+pub fn sign_eip_1559_transaction(
     tx: Transaction1559,
     secret_key: &SecretKey,
 ) -> SignedTransaction1559 {
@@ -738,13 +739,13 @@ pub(crate) fn sign_eip_1559_transaction(
     }
 }
 
-pub(crate) fn address_from_secret_key(sk: &SecretKey) -> Address {
+pub fn address_from_secret_key(sk: &SecretKey) -> Address {
     let pk = PublicKey::from_secret_key(sk);
     let hash = sdk::keccak(&pk.serialize()[1..]);
     Address::try_from_slice(&hash[12..]).unwrap()
 }
 
-pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
+pub fn parse_eth_gas(output: &VMOutcome) -> u64 {
     let submit_result_bytes = match &output.return_data {
         ReturnData::Value(bytes) => bytes.as_slice(),
         ReturnData::None | ReturnData::ReceiptIndex(_) => panic!("Unexpected ReturnData"),
@@ -753,7 +754,7 @@ pub(crate) fn parse_eth_gas(output: &VMOutcome) -> u64 {
     submit_result.gas_used
 }
 
-pub(crate) fn validate_address_balance_and_nonce(
+pub fn validate_address_balance_and_nonce(
     runner: &AuroraRunner,
     address: Address,
     expected_balance: Wei,
@@ -763,21 +764,20 @@ pub(crate) fn validate_address_balance_and_nonce(
     assert_eq!(runner.get_nonce(address), expected_nonce, "nonce");
 }
 
-pub(crate) fn address_from_hex(address: &str) -> Address {
-    let bytes = if let Some(address) = address.strip_prefix("0x") {
-        hex::decode(address).unwrap()
-    } else {
-        hex::decode(address).unwrap()
-    };
+pub fn address_from_hex(address: &str) -> Address {
+    let bytes = address.strip_prefix("0x").map_or_else(
+        || hex::decode(address).unwrap(),
+        |address| hex::decode(address).unwrap(),
+    );
 
     Address::try_from_slice(&bytes).unwrap()
 }
 
-pub(crate) fn as_account_id(account_id: &str) -> near_primitives_core::types::AccountId {
+pub fn as_account_id(account_id: &str) -> near_primitives_core::types::AccountId {
     account_id.parse().unwrap()
 }
 
-pub(crate) fn str_to_account_id(account_id: &str) -> AccountId {
+pub fn str_to_account_id(account_id: &str) -> AccountId {
     use aurora_engine_types::str::FromStr;
     AccountId::from_str(account_id).unwrap()
 }
@@ -785,21 +785,21 @@ pub(crate) fn str_to_account_id(account_id: &str) -> AccountId {
 pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {
     match result.status {
         TransactionStatus::Succeed(ret) => ret,
-        other => panic!("Unexpected status: {:?}", other),
+        other => panic!("Unexpected status: {other:?}"),
     }
 }
 
 pub fn unwrap_success_slice(result: &SubmitResult) -> &[u8] {
     match &result.status {
         TransactionStatus::Succeed(ret) => ret,
-        other => panic!("Unexpected status: {:?}", other),
+        other => panic!("Unexpected status: {other:?}"),
     }
 }
 
 pub fn unwrap_revert(result: SubmitResult) -> Vec<u8> {
     match result.status {
         TransactionStatus::Revert(ret) => ret,
-        other => panic!("Unexpected status: {:?}", other),
+        other => panic!("Unexpected status: {other:?}"),
     }
 }
 
@@ -814,17 +814,15 @@ pub fn panic_on_fail(status: TransactionStatus) {
 pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
     // Add 1 to round up
     let tgas_used = (total_gas / 1_000_000_000_000) + 1;
-    assert!(
-        tgas_used == tgas_bound,
-        "{} Tgas is not equal to {} Tgas",
-        tgas_used,
-        tgas_bound,
+    assert_eq!(
+        tgas_used, tgas_bound,
+        "{tgas_used} Tgas is not equal to {tgas_bound} Tgas",
     );
 }
 
 /// Returns true if `abs(a - b) / max(a, b) <= x / 100`. The implementation is written differently than
 /// this simpler formula to avoid floating point arithmetic.
-pub fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
+pub const fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
     let (larger, smaller) = if a < b { (b, a) } else { (a, b) };
 
     (100 / x) * (larger - smaller) <= larger

@@ -4,7 +4,12 @@
     feature(alloc_error_handler)
 )]
 #![cfg_attr(feature = "log", feature(panic_info_message))]
-#![deny(clippy::as_conversions)]
+#![deny(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions
+)]
 
 pub mod account_id;
 pub mod parameters;

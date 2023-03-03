@@ -50,7 +50,7 @@ fn get_selector(str_selector: &str) -> Vec<u8> {
 fn build_input(str_selector: &str, inputs: &[Token]) -> Vec<u8> {
     let sel = get_selector(str_selector);
     let inputs = ethabi::encode(inputs);
-    [sel.as_slice(), inputs.as_slice()].concat().to_vec()
+    [sel.as_slice(), inputs.as_slice()].concat()
 }
 
 fn create_ethereum_address() -> Address {
@@ -105,8 +105,8 @@ impl AuroraRunner {
         )
     }
 
-    pub fn evm_submit(&mut self, input: LegacyEthSignedTransaction, origin: &str) -> CallResult {
-        self.make_call("submit", origin, rlp::encode(&input).to_vec())
+    pub fn evm_submit(&mut self, input: &LegacyEthSignedTransaction, origin: &str) -> CallResult {
+        self.make_call("submit", origin, rlp::encode(input).to_vec())
     }
 
     pub fn deploy_erc20_token(&mut self, nep141: &str) -> Address {
@@ -186,7 +186,7 @@ impl AuroraRunner {
 
         let input = create_eth_transaction(Some(token), Wei::zero(), input, None, &sender);
 
-        let result = self.evm_submit(input, origin); // create_eth_transaction()
+        let result = self.evm_submit(&input, origin); // create_eth_transaction()
         result.check_ok();
         result
     }
@@ -197,7 +197,7 @@ impl AuroraRunner {
         sender_id: &str,
         relayer_id: &str,
         amount: Balance,
-        msg: String,
+        msg: &str,
     ) -> String {
         let res = self.make_call_with_signer(
             "ft_on_transfer",
@@ -274,7 +274,7 @@ fn test_ft_on_transfer() {
     let balance = runner.balance_of(token, recipient, ORIGIN);
     assert_eq!(balance, U256::from(0));
 
-    let res = runner.ft_on_transfer(nep141, alice, alice, amount, recipient.encode());
+    let res = runner.ft_on_transfer(nep141, alice, alice, amount, &recipient.encode());
     // Transaction should succeed so return amount is 0
     assert_eq!(res, "\"0\"");
 
@@ -288,13 +288,11 @@ fn test_ft_on_transfer_fail() {
     let nep141 = "tt.testnet";
     let alice = "alice";
     let amount = Balance::new(10);
-
     let recipient = runner.create_account().address;
-
-    let res = runner.ft_on_transfer(nep141, alice, alice, amount, recipient.encode());
+    let res = runner.ft_on_transfer(nep141, alice, alice, amount, &recipient.encode());
 
     // Transaction should fail so it must return everything
-    assert_eq!(res, format!("\"{}\"", amount));
+    assert_eq!(res, format!("\"{amount}\""));
 }
 
 #[ignore]
@@ -329,7 +327,7 @@ fn test_relayer_charge_fee() {
         alice,
         alice,
         amount,
-        recipient.encode() + &hex::encode(fee_encoded),
+        &format!("{}{}", recipient.encode(), hex::encode(fee_encoded)),
     );
 
     let recipient_balance_end = runner.get_balance(recipient);
@@ -438,7 +436,7 @@ pub mod sim_tests {
                 let submit_result = SubmitResult::try_from_slice(bytes).unwrap();
                 Address::try_from_slice(test_utils::unwrap_success_slice(&submit_result)).unwrap()
             }
-            _ => panic!("Unknown result: {:?}", deploy_result),
+            _ => panic!("Unknown result: {deploy_result:?}"),
         };
         let contract = constructor.deployed_at(contract_address);
 
@@ -618,7 +616,7 @@ pub mod sim_tests {
         // Make the ft_transfer call fail by draining the Aurora account
         let transfer_args = json!({
             "receiver_id": "tmp.near",
-            "amount": format!("{:?}", INITIAL_ETH_BALANCE),
+            "amount": format!("{INITIAL_ETH_BALANCE}"),
             "memo": "null",
         });
         aurora
@@ -794,7 +792,7 @@ pub mod sim_tests {
             .assert_success();
     }
 
-    pub(crate) fn transfer_nep_141_to_erc_20(
+    pub fn transfer_nep_141_to_erc_20(
         nep_141: &UserAccount,
         erc20: &ERC20,
         source: &UserAccount,
@@ -804,7 +802,7 @@ pub mod sim_tests {
     ) {
         let transfer_args = json!({
             "receiver_id": aurora.contract.account_id.as_str(),
-            "amount": format!("{:?}", amount),
+            "amount": format!("{amount}"),
             "memo": "null",
         });
         source
@@ -859,10 +857,7 @@ pub mod sim_tests {
         U256::from_big_endian(&test_utils::unwrap_success(submit_result))
     }
 
-    pub(crate) fn deploy_erc20_from_nep_141(
-        nep_141: &UserAccount,
-        aurora: &AuroraAccount,
-    ) -> ERC20 {
+    pub fn deploy_erc20_from_nep_141(nep_141: &UserAccount, aurora: &AuroraAccount) -> ERC20 {
         let args = DeployErc20TokenArgs {
             nep141: nep_141.account_id().as_str().parse().unwrap(),
         };
@@ -895,7 +890,7 @@ pub mod sim_tests {
     }
 
     /// Deploys the standard FT implementation:
-    /// https://github.com/near/near-sdk-rs/blob/master/examples/fungible-token/ft/src/lib.rs
+    /// `https://github.com/near/near-sdk-rs/blob/master/examples/fungible-token/ft/src/lib.rs`
     pub fn deploy_nep_141(
         nep_141_account_id: &str,
         token_owner: &str,
@@ -912,7 +907,7 @@ pub mod sim_tests {
 
         let init_args = json!({
             "owner_id": token_owner,
-            "total_supply": format!("{:?}", amount),
+            "total_supply": format!("{amount}"),
         })
         .to_string();
 

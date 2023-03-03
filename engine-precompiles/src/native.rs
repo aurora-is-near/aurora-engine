@@ -31,7 +31,7 @@ mod costs {
     pub(super) const EXIT_TO_ETHEREUM_GAS: EthGas = EthGas::new(0);
 
     /// Value determined experimentally based on tests and mainnet data. Example:
-    /// https://explorer.mainnet.near.org/transactions/5CD7NrqWpK3H8MAAU4mYEPuuWz9AqR9uJkkZJzw5b8PM#D1b5NVRrAsJKUX2ZGs3poKViu1Rgt4RJZXtTfMgdxH4S
+    /// `https://explorer.mainnet.near.org/transactions/5CD7NrqWpK3H8MAAU4mYEPuuWz9AqR9uJkkZJzw5b8PM#D1b5NVRrAsJKUX2ZGs3poKViu1Rgt4RJZXtTfMgdxH4S`
     pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
     /// Value determined experimentally based on tests.
@@ -46,12 +46,12 @@ mod costs {
 pub mod events {
     use crate::prelude::{types::Address, vec, String, ToString, H160, H256, U256};
 
-    /// Derived from event signature (see tests::test_exit_signatures)
+    /// Derived from event signature (see `tests::test_exit_signatures`)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
         0x5a91b8bc9c1981673db8fb226dbd8fcd,
         0xd0c23f45cd28abb31403a5392f6dd0c7,
     );
-    /// Derived from event signature (see tests::test_exit_signatures)
+    /// Derived from event signature (see `tests::test_exit_signatures`)
     pub const EXIT_TO_ETH_SIGNATURE: H256 = crate::make_h256(
         0xd046c2bb01a5622bc4b9696332391d87,
         0x491373762eeac0831c48400e2d5a5f07,
@@ -63,9 +63,9 @@ pub mod events {
     /// used for this purpose.
     pub const ETH_ADDRESS: Address = Address::new(H160([0; 20]));
 
-    /// ExitToNear(
+    /// `ExitToNear`(
     ///    Address indexed sender,
-    ///    Address indexed erc20_address,
+    ///    Address indexed `erc20_address`,
     ///    string indexed dest,
     ///    uint amount
     /// )
@@ -81,6 +81,7 @@ pub mod events {
     }
 
     impl ExitToNear {
+        #[must_use]
         pub fn encode(self) -> ethabi::RawLog {
             let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
             let topics = vec![
@@ -94,9 +95,9 @@ pub mod events {
         }
     }
 
-    /// ExitToEth(
+    /// `ExitToEth`(
     ///    Address indexed sender,
-    ///    Address indexed erc20_address,
+    ///    Address indexed `erc20_address`,
     ///    string indexed dest,
     ///    uint amount
     /// )
@@ -112,6 +113,7 @@ pub mod events {
     }
 
     impl ExitToEth {
+        #[must_use]
         pub fn encode(self) -> ethabi::RawLog {
             let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
             let topics = vec![
@@ -131,6 +133,7 @@ pub mod events {
         H256(result)
     }
 
+    #[must_use]
     pub fn exit_to_near_schema() -> ethabi::Event {
         ethabi::Event {
             name: "ExitToNear".to_string(),
@@ -160,6 +163,7 @@ pub mod events {
         }
     }
 
+    #[must_use]
     pub fn exit_to_eth_schema() -> ethabi::Event {
         ethabi::Event {
             name: "ExitToEth".to_string(),
@@ -192,6 +196,7 @@ pub mod events {
 
 //TransferEthToNear
 pub struct ExitToNear<I> {
+    #[cfg(feature = "error_refund")]
     current_account_id: AccountId,
     io: I,
 }
@@ -208,7 +213,13 @@ pub mod exit_to_near {
 }
 
 impl<I> ExitToNear<I> {
-    pub fn new(current_account_id: AccountId, io: I) -> Self {
+    #[cfg(not(feature = "error_refund"))]
+    pub const fn new(io: I) -> Self {
+        Self { io }
+    }
+
+    #[cfg(feature = "error_refund")]
+    pub const fn new(current_account_id: AccountId, io: I) -> Self {
         Self {
             current_account_id,
             io,
@@ -227,7 +238,7 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
 
 fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
     io.read_storage(&construct_contract_key(
-        &EthConnectorStorageId::EthConnectorAccount,
+        EthConnectorStorageId::EthConnectorAccount,
     ))
     .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
     .and_then(|x| {
@@ -236,8 +247,8 @@ fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitEr
     })
 }
 
-fn construct_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
-    bytes_to_key(KeyPrefix::EthConnector, &[u8::from(*suffix)])
+fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
+    bytes_to_key(KeyPrefix::EthConnector, &[u8::from(suffix)])
 }
 
 impl<I: IO> Precompile for ExitToNear<I> {
@@ -245,6 +256,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn run(
         &self,
         input: &[u8],
@@ -442,7 +454,7 @@ pub mod exit_to_ethereum {
 }
 
 impl<I> ExitToEthereum<I> {
-    pub fn new(current_account_id: AccountId, io: I) -> Self {
+    pub const fn new(current_account_id: AccountId, io: I) -> Self {
         Self {
             current_account_id,
             io,
@@ -605,11 +617,11 @@ mod tests {
     fn test_precompile_id() {
         assert_eq!(
             exit_to_ethereum::ADDRESS,
-            near_account_to_evm_address("exitToEthereum".as_bytes())
+            near_account_to_evm_address(b"exitToEthereum")
         );
         assert_eq!(
             exit_to_near::ADDRESS,
-            near_account_to_evm_address("exitToNear".as_bytes())
+            near_account_to_evm_address(b"exitToNear")
         );
     }
 

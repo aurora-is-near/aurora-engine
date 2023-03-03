@@ -27,7 +27,7 @@ pub struct EngineState {
 
 impl From<NewCallArgs> for EngineState {
     fn from(args: NewCallArgs) -> Self {
-        EngineState {
+        Self {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
             bridge_prover_id: args.bridge_prover_id,
@@ -38,15 +38,18 @@ impl From<NewCallArgs> for EngineState {
 
 /// Gets the state from storage, if it exists otherwise it will error.
 pub fn get_state<I: IO>(io: &I) -> Result<EngineState, error::EngineStateError> {
-    match io.read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY)) {
-        None => Err(error::EngineStateError::NotFound),
-        Some(bytes) => EngineState::try_from_slice(&bytes.to_vec())
-            .map_err(|_| error::EngineStateError::DeserializationFailed),
-    }
+    io.read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY))
+        .map_or_else(
+            || Err(EngineStateError::NotFound),
+            |bytes| {
+                EngineState::try_from_slice(&bytes.to_vec())
+                    .map_err(|_| EngineStateError::DeserializationFailed)
+            },
+        )
 }
 
 /// Saves state into the storage. Does not return the previous state.
-pub fn set_state<I: IO>(io: &mut I, state: EngineState) -> Result<(), error::EngineStateError> {
+pub fn set_state<I: IO>(io: &mut I, state: &EngineState) -> Result<(), EngineStateError> {
     io.write_storage(
         &bytes_to_key(KeyPrefix::Config, STATE_KEY),
         &state

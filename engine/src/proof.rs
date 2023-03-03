@@ -12,6 +12,7 @@ pub struct Proof {
 }
 
 impl Proof {
+    #[must_use]
     pub fn key(&self) -> String {
         let mut data = self.log_index.try_to_vec().unwrap();
         data.extend(self.receipt_index.try_to_vec().unwrap());
@@ -19,7 +20,7 @@ impl Proof {
         sdk::sha256(&data[..])
             .0
             .iter()
-            .map(|n| n.to_string())
+            .map(ToString::to_string)
             .collect()
     }
 }

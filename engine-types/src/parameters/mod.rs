@@ -1,8 +1,9 @@
-use crate::account_id::*;
-use crate::types::*;
-use crate::*;
-use borsh::maybestd::io;
-use borsh::{BorshDeserialize, BorshSerialize};
+use crate::{
+    account_id::AccountId,
+    types::{Address, NEP141Wei, NearGas, RawU256, Yocto},
+    Box, String, Vec,
+};
+use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
 
 pub mod engine;
 
@@ -16,6 +17,7 @@ pub enum PromiseArgs {
 
 impl PromiseArgs {
     /// Counts the total number of promises this call creates (including callbacks).
+    #[must_use]
     pub fn promise_count(&self) -> u64 {
         match self {
             Self::Create(_) => 1,
@@ -24,6 +26,7 @@ impl PromiseArgs {
         }
     }
 
+    #[must_use]
     pub fn total_gas(&self) -> NearGas {
         match self {
             Self::Create(call) => call.attached_gas,
@@ -32,6 +35,7 @@ impl PromiseArgs {
         }
     }
 
+    #[must_use]
     pub fn total_near(&self) -> Yocto {
         match self {
             Self::Create(call) => call.attached_balance,
@@ -48,6 +52,7 @@ pub enum SimpleNearPromise {
 }
 
 impl SimpleNearPromise {
+    #[must_use]
     pub fn total_gas(&self) -> NearGas {
         match self {
             Self::Create(call) => call.attached_gas,
@@ -68,6 +73,7 @@ impl SimpleNearPromise {
         }
     }
 
+    #[must_use]
     pub fn total_near(&self) -> Yocto {
         match self {
             Self::Create(call) => call.attached_balance,
@@ -102,6 +108,7 @@ pub enum NearPromise {
 }
 
 impl NearPromise {
+    #[must_use]
     pub fn promise_count(&self) -> u64 {
         match self {
             Self::Simple(_) => 1,
@@ -110,6 +117,7 @@ impl NearPromise {
         }
     }
 
+    #[must_use]
     pub fn total_gas(&self) -> NearGas {
         match self {
             Self::Simple(x) => x.total_gas(),
@@ -121,6 +129,7 @@ impl NearPromise {
         }
     }
 
+    #[must_use]
     pub fn total_near(&self) -> Yocto {
         match self {
             Self::Simple(x) => x.total_near(),
@@ -277,7 +286,7 @@ pub struct RefundCallArgs {
 
 /// Args passed to the the cross contract call precompile.
 /// That precompile is used by Aurora contracts to make calls to the broader NEAR ecosystem.
-/// See https://github.com/aurora-is-near/AIPs/pull/2 for design details.
+/// See `https://github.com/aurora-is-near/AIPs/pull/2` for design details.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub enum CrossContractCallArgs {
     /// The promise is to be executed immediately (as part of the same NEAR transaction as the EVM call).
