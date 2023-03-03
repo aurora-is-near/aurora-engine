@@ -29,6 +29,7 @@ pub struct StandaloneRunner {
     pub chain_id: u64,
     // Cumulative diff from all transactions (ie full state representation)
     pub cumulative_diff: Diff,
+    pub incremental_position: u16,
 }
 
 impl StandaloneRunner {
@@ -198,12 +199,14 @@ impl StandaloneRunner {
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
         env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
 
+        self.incremental_position += 1;
+
         let storage = &mut self.storage;
         if method_name == test_utils::SUBMIT {
             let transaction_bytes = &ctx.input;
             Self::internal_submit_transaction(
                 transaction_bytes,
-                0,
+                self.incremental_position,
                 storage,
                 &mut env,
                 &mut self.cumulative_diff,
@@ -213,7 +216,7 @@ impl StandaloneRunner {
             let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
             let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                Self::template_tx_msg(storage, &env, self.incremental_position, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::Call(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -225,7 +228,7 @@ impl StandaloneRunner {
             let deploy_args = DeployErc20TokenArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
             let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                Self::template_tx_msg(storage, &env, self.incremental_position, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::DeployErc20(deploy_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -248,7 +251,7 @@ impl StandaloneRunner {
 
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
             let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                Self::template_tx_msg(storage, &env, self.incremental_position, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::ResumePrecompiles(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -267,7 +270,7 @@ impl StandaloneRunner {
 
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
             let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                Self::template_tx_msg(storage, &env, self.incremental_position, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::PausePrecompiles(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -399,6 +402,7 @@ impl Default for StandaloneRunner {
             env,
             chain_id,
             cumulative_diff: Diff::default(),
+            incremental_position: 0,
         }
     }
 }
