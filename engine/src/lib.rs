@@ -178,7 +178,7 @@ mod contract {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         let index = internal_get_upgrade_index();
-        io.return_output(&(index).to_le_bytes())
+        io.return_output(&index.to_le_bytes());
     }
 
     /// Stage new code for deployment.
