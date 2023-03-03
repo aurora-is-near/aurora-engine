@@ -3,9 +3,10 @@ use crate::prelude::{
     Address, WeiU256, U256,
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
+use aurora_engine_types::types::Wei;
 use borsh::BorshSerialize;
 
-pub(crate) struct SelfDestructFactoryConstructor(pub solidity::ContractConstructor);
+pub struct SelfDestructFactoryConstructor(pub solidity::ContractConstructor);
 
 const DEFAULT_GAS: u64 = 1_000_000_000;
 
@@ -27,16 +28,16 @@ impl SelfDestructFactoryConstructor {
 
         TransactionLegacy {
             nonce: nonce.into(),
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: U256::from(DEFAULT_GAS),
             to: None,
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
 }
 
-pub(crate) struct SelfDestructFactory {
+pub struct SelfDestructFactory {
     contract: solidity::DeployedContract,
 }
 
@@ -64,10 +65,10 @@ impl SelfDestructFactory {
 
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         };
 
@@ -78,7 +79,7 @@ impl SelfDestructFactory {
     }
 }
 
-pub(crate) struct SelfDestructConstructor(pub solidity::ContractConstructor);
+pub struct SelfDestructConstructor(pub solidity::ContractConstructor);
 
 impl SelfDestructConstructor {
     pub fn load() -> Self {
@@ -88,7 +89,7 @@ impl SelfDestructConstructor {
     }
 }
 
-pub(crate) struct SelfDestruct {
+pub struct SelfDestruct {
     contract: solidity::DeployedContract,
 }
 
@@ -104,10 +105,10 @@ impl SelfDestruct {
 
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         };
 
@@ -132,10 +133,10 @@ impl SelfDestruct {
 
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         };
 
@@ -153,10 +154,10 @@ impl SelfDestruct {
 
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: U256::from(DEFAULT_GAS),
             to: Some(self.contract.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         };
 
@@ -175,7 +176,7 @@ impl SelfDestruct {
         let input = CallArgs::V2(FunctionCallArgsV2 {
             contract: self.contract.address,
             value: WeiU256::default(),
-            input: data.to_vec(),
+            input: data,
         })
         .try_to_vec()
         .unwrap();

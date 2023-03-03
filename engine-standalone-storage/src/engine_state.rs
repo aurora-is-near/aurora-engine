@@ -30,7 +30,7 @@ impl<'a> StorageIntermediate for EngineStorageValue<'a> {
     }
 
     fn copy_to_slice(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_ref())
+        buffer.copy_from_slice(self.as_ref());
     }
 }
 
@@ -45,7 +45,7 @@ pub struct EngineStateAccess<'db, 'input, 'output> {
 }
 
 impl<'db, 'input, 'output> EngineStateAccess<'db, 'input, 'output> {
-    pub fn new(
+    pub const fn new(
         input: &'input [u8],
         bound_block_height: u64,
         bound_tx_position: u16,
@@ -63,6 +63,7 @@ impl<'db, 'input, 'output> EngineStateAccess<'db, 'input, 'output> {
         }
     }
 
+    #[must_use]
     pub fn get_transaction_diff(&self) -> Diff {
         self.transaction_diff.borrow().clone()
     }
@@ -86,7 +87,7 @@ impl<'db, 'input: 'db, 'output: 'db> IO for EngineStateAccess<'db, 'input, 'outp
     }
 
     fn return_output(&mut self, value: &[u8]) {
-        self.output.set(value.to_vec())
+        self.output.set(value.to_vec());
     }
 
     fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
