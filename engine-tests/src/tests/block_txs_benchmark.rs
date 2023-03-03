@@ -12,7 +12,7 @@ const INITIAL_BALANCE: u64 = 1_000_000;
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: u64 = 10;
 
-const BLOCK_TRANSACTIONS_AMOUNT: u64 = 200;
+const BLOCK_TRANSACTIONS_AMOUNT: u64 = 1000;
 
 #[test]
 fn block_txs_erc20_transfer() {
