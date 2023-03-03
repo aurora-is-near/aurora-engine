@@ -53,8 +53,7 @@ fn test_uniswap_exact_output() {
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         (40..=50).contains(&wasm_fraction),
-        "{}% is not between 40% and 50%",
-        wasm_fraction
+        "{wasm_fraction}% is not between 40% and 50%",
     );
 
     let (_amount_in, profile) =
@@ -63,20 +62,19 @@ fn test_uniswap_exact_output() {
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         (45..=55).contains(&wasm_fraction),
-        "{}% is not between 45% and 55%",
-        wasm_fraction
+        "{wasm_fraction}% is not between 45% and 55%",
     );
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct LiquidityResult {
+pub struct LiquidityResult {
     pub token_id: U256,
     pub liquidity: U256,
     pub amount0: U256,
     pub amount1: U256,
 }
 
-pub(crate) struct UniswapTestContext {
+pub struct UniswapTestContext {
     pub factory: Factory,
     pub manager: PositionManager,
     pub swap_router: SwapRouter,
@@ -88,7 +86,7 @@ pub(crate) struct UniswapTestContext {
 impl UniswapTestContext {
     pub fn new(name: &str) -> Self {
         let mut runner = test_utils::deploy_evm();
-        let mut rng = rand::rngs::StdRng::seed_from_u64(414243);
+        let mut rng = rand::rngs::StdRng::seed_from_u64(414_243);
         let source_account = SecretKey::random(&mut rng);
         let source_address = test_utils::address_from_secret_key(&source_account);
         runner.create_address(
@@ -154,8 +152,8 @@ impl UniswapTestContext {
     }
 
     pub fn create_tokens(&mut self, n: usize, mint_amount: U256) -> Vec<ERC20> {
-        let names = ('a'..='z').into_iter().map(|c| format!("token_{}", c));
-        let symbols = ('A'..='Z').into_iter().map(|c| format!("{}{}{}", c, c, c));
+        let names = ('a'..='z').into_iter().map(|c| format!("token_{c}"));
+        let symbols = ('A'..='Z').into_iter().map(|c| format!("{c}{c}{c}"));
         let mut result: Vec<ERC20> = names
             .zip(symbols)
             .take(n)
@@ -236,7 +234,7 @@ impl UniswapTestContext {
         let manager = &self.manager;
         let (result, profile) = self
             .runner
-            .submit_with_signer_profiled(&mut self.signer, |nonce| manager.mint(params, nonce))
+            .submit_with_signer_profiled(&mut self.signer, |nonce| manager.mint(&params, nonce))
             .unwrap();
         assert!(result.status.is_ok());
 
@@ -262,7 +260,7 @@ impl UniswapTestContext {
         (result, profile)
     }
 
-    pub fn exact_input_params(&self, amount_in: U256, token_path: &[ERC20]) -> ExactInputParams {
+    pub fn exact_input_params(amount_in: U256, token_path: &[ERC20]) -> ExactInputParams {
         let path = token_path
             .iter()
             .skip(1)
@@ -287,12 +285,12 @@ impl UniswapTestContext {
         for token in token_path.iter() {
             self.approve_erc20(token, self.swap_router.0.address, U256::MAX);
         }
-        let params = self.exact_input_params(amount_in, token_path);
+        let params = Self::exact_input_params(amount_in, token_path);
         let swap_router = &self.swap_router;
         let (result, profile) = self
             .runner
             .submit_with_signer_profiled(&mut self.signer, |nonce| {
-                swap_router.exact_input(params, nonce)
+                swap_router.exact_input(&params, nonce)
             })
             .unwrap();
         assert!(result.status.is_ok(), "Swap failed");
@@ -303,7 +301,6 @@ impl UniswapTestContext {
     }
 
     pub fn exact_output_single_params(
-        &self,
         amount_out: U256,
         token_in: &ERC20,
         token_out: &ERC20,
@@ -330,12 +327,12 @@ impl UniswapTestContext {
         self.approve_erc20(token_in, self.swap_router.0.address, U256::MAX);
         self.approve_erc20(token_out, self.swap_router.0.address, U256::MAX);
 
-        let params = self.exact_output_single_params(amount_out, token_in, token_out);
+        let params = Self::exact_output_single_params(amount_out, token_in, token_out);
         let swap_router = &self.swap_router;
         let (result, profile) = self
             .runner
             .submit_with_signer_profiled(&mut self.signer, |nonce| {
-                swap_router.exact_output_single(params, nonce)
+                swap_router.exact_output_single(&params, nonce)
             })
             .unwrap();
         assert!(result.status.is_ok(), "Swap failed");

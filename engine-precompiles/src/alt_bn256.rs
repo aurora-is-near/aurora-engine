@@ -9,28 +9,28 @@ use evm::{Context, ExitError};
 mod costs {
     use crate::prelude::types::EthGas;
 
-    /// Cost of the Byzantium alt_bn128_add operation.
+    /// Cost of the Byzantium `alt_bn128_add` operation.
     pub(super) const BYZANTIUM_ADD: EthGas = EthGas::new(500);
 
-    /// Cost of the Byzantium alt_bn128_mul operation.
+    /// Cost of the Byzantium `alt_bn128_mul` operation.
     pub(super) const BYZANTIUM_MUL: EthGas = EthGas::new(40_000);
 
-    /// Cost of the alt_bn128_pair per point.
+    /// Cost of the `alt_bn128_pair` per point.
     pub(super) const BYZANTIUM_PAIR_PER_POINT: EthGas = EthGas::new(80_000);
 
-    /// Cost of the alt_bn128_pair operation.
+    /// Cost of the `alt_bn128_pair` operation.
     pub(super) const BYZANTIUM_PAIR_BASE: EthGas = EthGas::new(100_000);
 
-    /// Cost of the Istanbul alt_bn128_add operation.
+    /// Cost of the Istanbul `alt_bn128_add` operation.
     pub(super) const ISTANBUL_ADD: EthGas = EthGas::new(150);
 
-    /// Cost of the Istanbul alt_bn128_mul operation.
+    /// Cost of the Istanbul `alt_bn128_mul` operation.
     pub(super) const ISTANBUL_MUL: EthGas = EthGas::new(6_000);
 
-    /// Cost of the Istanbul alt_bn128_pair per point.
+    /// Cost of the Istanbul `alt_bn128_pair` per point.
     pub(super) const ISTANBUL_PAIR_PER_POINT: EthGas = EthGas::new(34_000);
 
-    /// Cost of the Istanbul alt_bn128_pair operation.
+    /// Cost of the Istanbul `alt_bn128_pair` operation.
     pub(super) const ISTANBUL_PAIR_BASE: EthGas = EthGas::new(45_000);
 }
 
@@ -48,18 +48,14 @@ mod consts {
     /// Pair element length.
     pub(super) const PAIR_ELEMENT_LEN: usize = 192;
 
-    pub(super) const SCALAR_PART_LEN: usize = SCALAR_LEN / 2;
-
     /// Size of BN scalars.
     pub(super) const SCALAR_LEN: usize = 32;
-
-    /// Half the size of a point size.
-    pub(super) const POINT_PART_LEN: usize = POINT_LEN / 2;
 
     /// Size of BN points.
     pub(super) const POINT_LEN: usize = 64;
 
     /// Size of BN pairs.
+    #[cfg(feature = "contract")]
     pub(super) const POINT_PAIR_LEN: usize = 128;
 
     /// Output length.
@@ -126,12 +122,13 @@ impl HostFnEncode for bn::G1 {
     type Encoded = [u8; consts::POINT_LEN];
 
     fn host_fn_encode(self) -> Self::Encoded {
-        bn::AffineG1::from_jacobian(self)
-            .map(|p| {
+        bn::AffineG1::from_jacobian(self).map_or_else(
+            || [0u8; consts::POINT_LEN],
+            |p| {
                 let (px, py) = (p.x().host_fn_encode(), p.y().host_fn_encode());
                 concat_low_high(px, py)
-            })
-            .unwrap_or_else(|| [0u8; consts::POINT_LEN])
+            },
+        )
     }
 }
 
@@ -140,13 +137,14 @@ impl HostFnEncode for bn::G2 {
     type Encoded = [u8; consts::POINT_PAIR_LEN];
 
     fn host_fn_encode(self) -> Self::Encoded {
-        bn::AffineG2::from_jacobian(self)
-            .map(|g2| {
+        bn::AffineG2::from_jacobian(self).map_or_else(
+            || [0u8; consts::POINT_PAIR_LEN],
+            |g2| {
                 let x = g2.x().host_fn_encode();
                 let y = g2.y().host_fn_encode();
                 concat_low_high(x, y)
-            })
-            .unwrap_or_else(|| [0u8; consts::POINT_PAIR_LEN])
+            },
+        )
     }
 }
 
@@ -174,8 +172,9 @@ pub struct Bn256Add<HF: HardFork>(PhantomData<HF>);
 impl<HF: HardFork> Bn256Add<HF> {
     pub const ADDRESS: Address = super::make_address(0, 6);
 
+    #[must_use]
     pub fn new() -> Self {
-        Self(Default::default())
+        Self(PhantomData::default())
     }
 }
 
@@ -197,15 +196,16 @@ impl<HF: HardFork> Bn256Add<HF> {
         if let Some(sum) = bn::AffineG1::from_jacobian(p1 + p2) {
             sum.x()
                 .to_big_endian(&mut output[0..consts::SCALAR_LEN])
-                .map_err(|_e| consts::ERR_BIG_ENDIAN)?;
+                .map_err(|_| consts::ERR_BIG_ENDIAN)?;
             sum.y()
                 .to_big_endian(&mut output[consts::SCALAR_LEN..consts::SCALAR_LEN * 2])
-                .map_err(|_e| consts::ERR_BIG_ENDIAN)?;
+                .map_err(|_| consts::ERR_BIG_ENDIAN)?;
         }
         Ok(output)
     }
 
     #[cfg(feature = "contract")]
+    #[allow(clippy::unnecessary_wraps)]
     fn execute(p1: bn::G1, p2: bn::G1) -> Result<[u8; consts::OUTPUT_LEN], ExitError> {
         Ok(aurora_engine_sdk::alt_bn128_g1_sum(
             p1.host_fn_encode(),
@@ -219,11 +219,11 @@ impl Precompile for Bn256Add<Byzantium> {
         Ok(costs::BYZANTIUM_ADD)
     }
 
-    /// Takes in two points on the elliptic curve alt_bn128 and calculates the sum
+    /// Takes in two points on the elliptic curve `alt_bn128` and calculates the sum
     /// of them.
     ///
-    /// See: https://eips.ethereum.org/EIPS/eip-196
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
+    /// See: `https://eips.ethereum.org/EIPS/eip-196`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000006`
     fn run(
         &self,
         input: &[u8],
@@ -248,11 +248,11 @@ impl Precompile for Bn256Add<Istanbul> {
         Ok(costs::ISTANBUL_ADD)
     }
 
-    /// Takes in two points on the elliptic curve alt_bn128 and calculates the sum
+    /// Takes in two points on the elliptic curve `alt_bn128` and calculates the sum
     /// of them.
     ///
-    /// See: https://eips.ethereum.org/EIPS/eip-196
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000006
+    /// See: `https://eips.ethereum.org/EIPS/eip-196`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000006`
     fn run(
         &self,
         input: &[u8],
@@ -277,8 +277,9 @@ pub struct Bn256Mul<HF: HardFork>(PhantomData<HF>);
 impl<HF: HardFork> Bn256Mul<HF> {
     pub const ADDRESS: Address = super::make_address(0, 7);
 
+    #[must_use]
     pub fn new() -> Self {
-        Self(Default::default())
+        Self(PhantomData::default())
     }
 }
 
@@ -313,6 +314,7 @@ impl<HF: HardFork> Bn256Mul<HF> {
     }
 
     #[cfg(feature = "contract")]
+    #[allow(clippy::unnecessary_wraps)]
     fn execute(g1: bn::G1, fr: bn::Fr) -> Result<[u8; consts::OUTPUT_LEN], ExitError> {
         Ok(aurora_engine_sdk::alt_bn128_g1_scalar_multiple(
             g1.host_fn_encode(),
@@ -326,10 +328,10 @@ impl Precompile for Bn256Mul<Byzantium> {
         Ok(costs::BYZANTIUM_MUL)
     }
 
-    /// Takes in two points on the elliptic curve alt_bn128 and multiples them.
+    /// Takes in two points on the elliptic curve `alt_bn128` and multiples them.
     ///
-    /// See: https://eips.ethereum.org/EIPS/eip-196
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
+    /// See: `https://eips.ethereum.org/EIPS/eip-196`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000007`
     fn run(
         &self,
         input: &[u8],
@@ -354,10 +356,10 @@ impl Precompile for Bn256Mul<Istanbul> {
         Ok(costs::ISTANBUL_MUL)
     }
 
-    /// Takes in two points on the elliptic curve alt_bn128 and multiples them.
+    /// Takes in two points on the elliptic curve `alt_bn128` and multiples them.
     ///
-    /// See: https://eips.ethereum.org/EIPS/eip-196
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000007
+    /// See: `https://eips.ethereum.org/EIPS/eip-196`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000007`
     fn run(
         &self,
         input: &[u8],
@@ -383,8 +385,9 @@ pub struct Bn256Pair<HF: HardFork>(PhantomData<HF>);
 impl<HF: HardFork> Bn256Pair<HF> {
     pub const ADDRESS: Address = super::make_address(0, 8);
 
+    #[must_use]
     pub fn new() -> Self {
-        Self(Default::default())
+        Self(PhantomData::default())
     }
 }
 
@@ -452,7 +455,7 @@ impl<HF: HardFork> Bn256Pair<HF> {
                             .into()
                     }
                 };
-                vals.push((g1_a, g1_b))
+                vals.push((g1_a, g1_b));
             }
 
             let result = Self::execute(vals);
@@ -471,6 +474,7 @@ impl<HF: HardFork> Bn256Pair<HF> {
     }
 
     #[cfg(not(feature = "contract"))]
+    #[allow(clippy::needless_pass_by_value)]
     fn execute(vals: Vec<(bn::G1, bn::G2)>) -> bool {
         bn::pairing_batch(&vals) == bn::Gt::one()
     }
@@ -497,8 +501,8 @@ impl Precompile for Bn256Pair<Byzantium> {
 
     /// Takes in elements and calculates the pair.
     ///
-    /// See: https://eips.ethereum.org/EIPS/eip-197
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
+    /// See: `https://eips.ethereum.org/EIPS/eip-197`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000008`
     fn run(
         &self,
         input: &[u8],
@@ -531,8 +535,8 @@ impl Precompile for Bn256Pair<Istanbul> {
 
     /// Takes in elements and calculates the pair.
     ///
-    /// See: https://eips.ethereum.org/EIPS/eip-197
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000008
+    /// See: `https://eips.ethereum.org/EIPS/eip-197`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000008`
     fn run(
         &self,
         input: &[u8],
@@ -745,6 +749,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_alt_bn128_pair() {
         let input = hex::decode(
             "\

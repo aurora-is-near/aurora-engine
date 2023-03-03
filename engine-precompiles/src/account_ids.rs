@@ -11,6 +11,7 @@ mod costs {
     // TODO(#483): Determine the correct amount of gas
     pub(super) const PREDECESSOR_ACCOUNT_GAS: EthGas = EthGas::new(0);
     // TODO(#483): Determine the correct amount of gas
+    #[allow(dead_code)]
     pub(super) const CURRENT_ACCOUNT_GAS: EthGas = EthGas::new(0);
 }
 
@@ -21,7 +22,7 @@ pub struct PredecessorAccount<'a, E> {
 pub mod predecessor_account {
     use aurora_engine_types::types::Address;
 
-    /// predecessor_account_id precompile address
+    /// `predecessor_account_id` precompile address
     ///
     /// Address: `0x723ffbaba940e75e7bf5f6d61dcbf8d9a4de0fd7`
     /// This address is computed as: `&keccak("predecessorAccountId")[12..]`
@@ -30,7 +31,7 @@ pub mod predecessor_account {
 }
 
 impl<'a, E> PredecessorAccount<'a, E> {
-    pub fn new(env: &'a E) -> Self {
+    pub const fn new(env: &'a E) -> Self {
         Self { env }
     }
 }
@@ -67,14 +68,15 @@ pub struct CurrentAccount {
 }
 
 impl CurrentAccount {
-    /// current_account_id precompile address
+    /// `current_account_id` precompile address
     ///
     /// Address: `0xfefae79e4180eb0284f261205e3f8cea737aff56`
     /// This address is computed as: `&keccak("currentAccountId")[12..]`
     pub const ADDRESS: Address =
         super::make_address(0xfefae79e, 0x4180eb0284f261205e3f8cea737aff56);
 
-    pub fn new(current_account_id: AccountId) -> Self {
+    #[must_use]
+    pub const fn new(current_account_id: AccountId) -> Self {
         Self { current_account_id }
     }
 }
@@ -114,7 +116,7 @@ mod tests {
     fn test_predecessor_account_precompile_id() {
         assert_eq!(
             predecessor_account::ADDRESS,
-            near_account_to_evm_address("predecessorAccountId".as_bytes())
+            near_account_to_evm_address(b"predecessorAccountId")
         );
     }
 
@@ -122,7 +124,7 @@ mod tests {
     fn test_curent_account_precompile_id() {
         assert_eq!(
             CurrentAccount::ADDRESS,
-            near_account_to_evm_address("currentAccountId".as_bytes())
+            near_account_to_evm_address(b"currentAccountId")
         );
     }
 }
