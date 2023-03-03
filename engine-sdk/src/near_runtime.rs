@@ -69,7 +69,7 @@ impl Runtime {
                         Self::GAS_FOR_STATE_MIGRATION.as_u64(),
                     )
                 }
-                _ => unreachable!("INVALID_CODE_KEY"),
+                _ => panic!("ERR_NO_CODE_STAGED"),
             };
         }
     }
