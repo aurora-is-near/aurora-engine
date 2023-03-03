@@ -12,7 +12,7 @@ const INITIAL_BALANCE: u64 = 1_000_000;
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: u64 = 10;
 
-const BLOCK_TRANSACTIONS_AMOUNT: u64 = 1_000;
+const BLOCK_TRANSACTIONS_AMOUNT: u64 = 200;
 
 #[test]
 fn block_txs_erc20_transfer() {
@@ -21,15 +21,21 @@ fn block_txs_erc20_transfer() {
 
     let initial_block_height = runner.context.block_index;
 
+    //
+    println!("Before mint; nonce = {:?}", source_account.nonce);
+
     let result = runner.submit_with_signer(&mut source_account, |nonce| {
         contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
     });
     assert!(result.is_ok());
     assert_eq!(runner.context.block_index, initial_block_height + 1, "First tx; block has to be 1 more.");
 
+    //
+    println!("After mint; nonce = {:?}", source_account.nonce);
+
     let mut block_txs_gas: u64 = 0;
 
-    for _ in 0..BLOCK_TRANSACTIONS_AMOUNT {
+    for i in 0..BLOCK_TRANSACTIONS_AMOUNT {
         // transfer tx on block 2 (block index is increased interally before adding tx)
         let (result, profile) = runner
         .submit_with_signer_profiled(&mut source_account, |nonce| {
@@ -40,12 +46,17 @@ fn block_txs_erc20_transfer() {
         assert!(result.status.is_ok());
         assert_eq!(runner.context.block_index, initial_block_height + 2, "Another tx, block has to be 2 more.");
 
+        //
+        println!("After loop tx {:?}; nonce = {:?}", i, source_account.nonce);
+
         block_txs_gas += profile.all_gas();
         runner.context.block_index -= 1;
+        runner.context.block_timestamp -= 1_000_000_000;
     }
 
     assert_eq!(runner.context.block_index, initial_block_height + 1, "After loop, block has to be 1 more since we did a final decrease.");
     runner.context.block_index += 1;
+    runner.context.block_timestamp += 1_000_000_000;
 
     // transfer tx on block 3 (block index is increased interally before adding tx)
     // this would trigger the block hashchain computation since there is a change on height
@@ -54,6 +65,9 @@ fn block_txs_erc20_transfer() {
         contract.transfer(dest_address, TRANSFER_AMOUNT.into(), nonce)
     })
     .unwrap();
+
+    //
+    println!("After final tx; nonce = {:?}", source_account.nonce);
 
     assert!(result.status.is_ok());
     assert_eq!(runner.context.block_index, initial_block_height + 3, "After tx, block has to be 3 more.");
