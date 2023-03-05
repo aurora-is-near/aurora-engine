@@ -4,7 +4,13 @@
     all(feature = "log", target_arch = "wasm32"),
     feature(panic_info_message)
 )]
-#![deny(clippy::as_conversions)]
+#![deny(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::unreadable_literal
+)]
 
 use aurora_engine_types::parameters::PromiseCreateArgs;
 
@@ -94,7 +100,9 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
+    use crate::prelude::{
+        sdk, u256_to_arr, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
+    };
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -121,18 +129,16 @@ mod contract {
         }
 
         let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
-        state::set_state(&mut io, args.into()).sdk_unwrap();
+        state::set_state(&mut io, &args.into()).sdk_unwrap();
     }
 
     /// Get version of the contract.
     #[no_mangle]
     pub extern "C" fn get_version() {
         let mut io = Runtime;
-        let version = match option_env!("NEAR_EVM_VERSION") {
-            Some(v) => v.as_bytes(),
-            None => include_bytes!("../../VERSION"),
-        };
-        io.return_output(version)
+        let version = option_env!("NEAR_EVM_VERSION")
+            .map_or(&include_bytes!("../../VERSION")[..], str::as_bytes);
+        io.return_output(version);
     }
 
     /// Get owner account id for this contract.
@@ -154,7 +160,7 @@ mod contract {
             sdk::panic_utf8(errors::ERR_SAME_OWNER);
         } else {
             state.owner_id = args.new_owner;
-            state::set_state(&mut io, state).sdk_unwrap();
+            state::set_state(&mut io, &state).sdk_unwrap();
         }
     }
 
@@ -170,7 +176,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
         let mut io = Runtime;
-        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id)
+        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
     }
 
     #[no_mangle]
@@ -211,6 +217,7 @@ mod contract {
     /// to make any necessary changes to the state such that it aligns with the newly deployed
     /// code.
     #[no_mangle]
+    #[allow(clippy::missing_const_for_fn)]
     pub extern "C" fn state_migration() {
         // TODO: currently we don't have migrations
     }
@@ -239,7 +246,7 @@ mod contract {
         let authorizer: pausables::EngineAuthorizer = engine::get_authorizer();
 
         if !authorizer.is_authorized(&io.predecessor_account_id()) {
-            sdk::panic_utf8("ERR_UNAUTHORIZED".as_bytes());
+            sdk::panic_utf8(b"ERR_UNAUTHORIZED");
         }
 
         let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
@@ -315,7 +322,7 @@ mod contract {
     }
 
     /// Process signed Ethereum transaction.
-    /// Must match CHAIN_ID to make sure it's signed for given chain vs replayed from another chain.
+    /// Must match `CHAIN_ID` to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
     pub extern "C" fn submit() {
         let io = Runtime;
@@ -388,7 +395,7 @@ mod contract {
         crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
     }
 
-    /// Sets the address for the wNEAR ERC-20 contract. This contract will be used by the
+    /// Sets the address for the `wNEAR` ERC-20 contract. This contract will be used by the
     /// cross-contract calls feature to have users pay for their NEAR transactions.
     #[no_mangle]
     pub extern "C" fn factory_set_wnear_address() {
@@ -475,7 +482,7 @@ mod contract {
             let args: RefundCallArgs = io.read_input_borsh().sdk_unwrap();
             let state = state::get_state(&io).sdk_unwrap();
             let refund_result =
-                engine::refund_on_error(io, &io, state, args, &mut Runtime).sdk_unwrap();
+                engine::refund_on_error(io, &io, state, &args, &mut Runtime).sdk_unwrap();
 
             if !refund_result.status.is_ok() {
                 sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
@@ -507,7 +514,7 @@ mod contract {
             .sdk_unwrap();
         let block_hash =
             crate::engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
-        io.return_output(block_hash.as_bytes())
+        io.return_output(block_hash.as_bytes());
     }
 
     #[no_mangle]
@@ -515,7 +522,7 @@ mod contract {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
         let code = engine::get_code(&io, &Address::from_array(address));
-        io.return_output(&code)
+        io.return_output(&code);
     }
 
     #[no_mangle]
@@ -523,7 +530,7 @@ mod contract {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
         let balance = engine::get_balance(&io, &Address::from_array(address));
-        io.return_output(&balance.to_bytes())
+        io.return_output(&balance.to_bytes());
     }
 
     #[no_mangle]
@@ -531,7 +538,7 @@ mod contract {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
         let nonce = engine::get_nonce(&io, &Address::from_array(address));
-        io.return_output(&u256_to_arr(&nonce))
+        io.return_output(&u256_to_arr(&nonce));
     }
 
     #[no_mangle]
@@ -541,7 +548,7 @@ mod contract {
         let address = args.address;
         let generation = engine::get_generation(&io, &address);
         let value = engine::get_storage(&io, &args.address, &H256(args.key), generation);
-        io.return_output(&value.0)
+        io.return_output(&value.0);
     }
 
     ///
@@ -556,17 +563,17 @@ mod contract {
         require_owner_only(&state, &io.predecessor_account_id());
         let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
-        state::set_state(&mut io, state).sdk_unwrap();
+        state::set_state(&mut io, &state).sdk_unwrap();
         // set genesis block balances
         for account_balance in args.genesis_alloc {
             engine::set_balance(
                 &mut io,
                 &account_balance.address,
                 &crate::prelude::Wei::new(U256::from(account_balance.balance)),
-            )
+            );
         }
         // return new chain ID
-        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id)
+        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
     }
 
     #[cfg(feature = "evm_bully")]
@@ -592,7 +599,7 @@ mod contract {
         let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
         let owner_id = io.current_account_id();
 
-        EthConnectorContract::create_contract(io, owner_id, args).sdk_unwrap();
+        EthConnectorContract::create_contract(io, &owner_id, args).sdk_unwrap();
     }
 
     #[no_mangle]
@@ -618,7 +625,7 @@ mod contract {
         let predecessor_account_id = io.predecessor_account_id();
         let result = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .withdraw_eth_from_near(&current_account_id, &predecessor_account_id, args)
+            .withdraw_eth_from_near(&current_account_id, &predecessor_account_id, &args)
             .sdk_unwrap();
         let result_bytes = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
         // We intentionally do not go through the `io` struct here because we must bypass
@@ -697,7 +704,7 @@ mod contract {
 
         let is_used_proof = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .is_used_proof(args.proof);
+            .is_used_proof(&args.proof);
         let res = is_used_proof.try_to_vec().unwrap();
         io.return_output(&res[..]);
     }
@@ -734,7 +741,7 @@ mod contract {
             .sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_balance_of(args);
+            .ft_balance_of(&args);
     }
 
     #[no_mangle]
@@ -743,7 +750,7 @@ mod contract {
         let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_balance_of_eth_on_aurora(args)
+            .ft_balance_of_eth_on_aurora(&args)
             .sdk_unwrap();
     }
 
@@ -757,7 +764,7 @@ mod contract {
             .sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_transfer(&predecessor_account_id, args)
+            .ft_transfer(&predecessor_account_id, &args)
             .sdk_unwrap();
     }
 
@@ -775,7 +782,7 @@ mod contract {
 
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .ft_resolve_transfer(args, promise_result);
+            .ft_resolve_transfer(&args, promise_result);
     }
 
     #[no_mangle]
@@ -851,8 +858,8 @@ mod contract {
         let predecessor_account_id = io.predecessor_account_id();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .storage_withdraw(&predecessor_account_id, args)
-            .sdk_unwrap()
+            .storage_withdraw(&predecessor_account_id, &args)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
@@ -864,7 +871,7 @@ mod contract {
                 .sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .storage_balance_of(args)
+            .storage_balance_of(&args);
     }
 
     #[no_mangle]
@@ -888,7 +895,7 @@ mod contract {
         let args: PauseEthConnectorCallArgs = io.read_input_borsh().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
-            .set_paused_flags(args);
+            .set_paused_flags(&args);
     }
 
     #[no_mangle]
@@ -929,7 +936,7 @@ mod contract {
         let mut io = Runtime;
         let metadata: FungibleTokenMetadata = connector::get_metadata(&io).unwrap_or_default();
         let bytes = serde_json::to_vec(&metadata).unwrap_or_default();
-        io.return_output(&bytes)
+        io.return_output(&bytes);
     }
 
     #[cfg(feature = "integration-test")]
@@ -946,7 +953,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use crate::connector::ZERO_ATTACHED_BALANCE;
-        use crate::prelude::{NEP141Wei, ToString, U256};
+        use crate::prelude::{NEP141Wei, U256};
         use evm::backend::ApplyBackend;
         const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
         const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);

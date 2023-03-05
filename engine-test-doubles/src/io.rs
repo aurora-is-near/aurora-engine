@@ -14,7 +14,7 @@ impl StorageIntermediate for Value {
     }
 
     fn copy_to_slice(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(&self.0)
+        buffer.copy_from_slice(&self.0);
     }
 }
 

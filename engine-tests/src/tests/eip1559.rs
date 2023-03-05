@@ -36,7 +36,7 @@ fn test_eip_1559_tx_encoding_decoding() {
     let decoded_tx = match EthTransactionKind::try_from(expected_bytes.as_slice()) {
         Ok(EthTransactionKind::Eip1559(tx)) => tx,
         Ok(_) => panic!("Unexpected transaction type"),
-        Err(_) => panic!("Transaction parsing failed"),
+        Err(e) => panic!("Transaction parsing failed: {e:?}"),
     };
 
     assert_eq!(signed_tx, decoded_tx);
@@ -44,7 +44,7 @@ fn test_eip_1559_tx_encoding_decoding() {
     assert_eq!(
         signed_tx.sender().unwrap(),
         test_utils::address_from_secret_key(&secret_key)
-    )
+    );
 }
 
 // Test inspired by https://github.com/ethereum/tests/blob/develop/GeneralStateTests/stExample/eip1559.json
@@ -146,7 +146,7 @@ fn h256_from_hex(hex: &str) -> H256 {
     H256(result)
 }
 
-fn one() -> H256 {
+const fn one() -> H256 {
     let mut x = [0u8; 32];
     x[31] = 1;
     H256(x)

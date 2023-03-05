@@ -12,7 +12,7 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::types::{NEP141Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO};
 use serde::{Deserialize, Serialize};
 
-/// Gas for `resolve_transfer`: 5 TGas
+/// Gas for `resolve_transfer`: 5 `TGas`
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
 /// Gas for `ft_on_transfer`
 const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(35_000_000_000_000);
@@ -56,12 +56,13 @@ pub struct FungibleTokenOps<I: IO> {
 }
 
 /// Fungible token Reference hash type.
-/// Used for FungibleTokenMetadata
+/// Used for `FungibleTokenMetadata`
 #[derive(Debug, BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct FungibleReferenceHash([u8; 32]);
 
 impl FungibleReferenceHash {
     /// Encode to base64-encoded string
+    #[must_use]
     pub fn encode(&self) -> String {
         aurora_engine_sdk::base64::encode(self)
     }
@@ -120,7 +121,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         engine::get_balance(&self.io, address)
     }
 
-    /// Internal ETH deposit to NEAR - nETH (NEP-141)
+    /// Internal ETH deposit to NEAR - `nETH` (NEP-141)
     pub fn internal_deposit_eth_to_near(
         &mut self,
         account_id: &AccountId,
@@ -210,7 +211,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             // Register receiver_id account with 0 balance. We need it because
             // when we retire to get the balance of `receiver_id` it will fail
             // if it does not exist.
-            self.internal_register_account(receiver_id)
+            self.internal_register_account(receiver_id);
         }
         self.internal_withdraw_eth_from_near(sender_id, amount)?;
         self.internal_deposit_eth_to_near(receiver_id, amount)?;
@@ -223,14 +224,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     pub fn internal_register_account(&mut self, account_id: &AccountId) {
-        self.accounts_insert(account_id, ZERO_NEP141_WEI)
+        self.accounts_insert(account_id, ZERO_NEP141_WEI);
     }
 
-    pub fn ft_total_eth_supply_on_near(&self) -> NEP141Wei {
+    pub const fn ft_total_eth_supply_on_near(&self) -> NEP141Wei {
         self.total_eth_supply_on_near
     }
 
-    pub fn ft_total_eth_supply_on_aurora(&self) -> Wei {
+    pub const fn ft_total_eth_supply_on_aurora(&self) -> Wei {
         self.total_eth_supply_on_aurora
     }
 
@@ -300,15 +301,13 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let unused_amount = match promise_result {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(bytes) => {
-                if let Ok(unused_amount) = serde_json::from_slice(&bytes) {
+                serde_json::from_slice(&bytes).map_or(amount, |unused_amount| {
                     if amount > unused_amount {
                         unused_amount
                     } else {
                         amount
                     }
-                } else {
-                    amount
-                }
+                })
             }
             PromiseResult::Failed => amount,
         };
@@ -462,24 +461,24 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         Ok((balance, promise))
     }
 
+    #[allow(clippy::option_if_let_else)]
     pub fn storage_withdraw(
         &mut self,
         account_id: &AccountId,
         amount: Option<Yocto>,
     ) -> Result<StorageBalance, error::StorageFundingError> {
-        if let Some(storage_balance) = self.internal_storage_balance_of(account_id) {
-            match amount {
+        self.internal_storage_balance_of(account_id).map_or(
+            Err(error::StorageFundingError::NotRegistered),
+            |storage_balance| match amount {
                 Some(amount) if amount > ZERO_YOCTO => {
                     // The available balance is always zero because `StorageBalanceBounds::max` is
-                    // equal to `StorageBalanceBounds::min`. Therefore it is impossible to withdraw
+                    // equal to `StorageBalanceBounds::min`. Therefore, it is impossible to withdraw
                     // a positive amount.
                     Err(error::StorageFundingError::NoAvailableBalance)
                 }
                 _ => Ok(storage_balance),
-            }
-        } else {
-            Err(error::StorageFundingError::NotRegistered)
-        }
+            },
+        )
     }
 
     /// Insert account.
@@ -513,7 +512,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         self.io.remove_storage(&Self::account_to_key(account_id));
     }
 
-    /// Balance of nETH (ETH on NEAR token)
+    /// Balance of `nETH` (ETH on NEAR token)
     pub fn get_account_eth_balance(&self, account_id: &AccountId) -> Option<NEP141Wei> {
         self.io
             .read_storage(&Self::account_to_key(account_id))

@@ -8,7 +8,7 @@ const MINT_AMOUNT: u64 = 1_000_000_000;
 const LIQUIDITY_AMOUNT: u64 = MINT_AMOUNT / 2;
 const OUTPUT_AMOUNT: u64 = LIQUIDITY_AMOUNT / 100;
 
-pub(crate) fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestContext) {
+pub fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestContext) {
     let calling_account_id = "some-account.near";
     let chain_id = Some(context.runner.chain_id);
     let (token_a, token_b) = context.create_token_pair(MINT_AMOUNT.into());
@@ -23,16 +23,17 @@ pub(crate) fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestCont
     // create transaction for adding liquidity
     let nonce = context.signer.use_nonce();
     let liquidity_params = context.mint_params(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    let tx = context.manager.mint(liquidity_params, nonce.into());
+    let tx = context.manager.mint(&liquidity_params, nonce.into());
     let signed_tx = test_utils::sign_transaction(tx, chain_id, &context.signer.secret_key);
     let liquidity_tx_bytes = rlp::encode(&signed_tx).to_vec();
 
     // create transaction for swapping
     let nonce = context.signer.use_nonce();
-    let swap_params = context.exact_output_single_params(OUTPUT_AMOUNT.into(), &token_a, &token_b);
+    let swap_params =
+        UniswapTestContext::exact_output_single_params(OUTPUT_AMOUNT.into(), &token_a, &token_b);
     let tx = context
         .swap_router
-        .exact_output_single(swap_params, nonce.into());
+        .exact_output_single(&swap_params, nonce.into());
     let signed_tx = test_utils::sign_transaction(tx, chain_id, &context.signer.secret_key);
     let swap_tx_bytes = rlp::encode(&signed_tx).to_vec();
 
@@ -52,7 +53,7 @@ pub(crate) fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestCont
             },
             |(r, c, i)| r.call(SUBMIT, c, i),
             BatchSize::SmallInput,
-        )
+        );
     });
 
     // Measure add_liquidity gas usage; don't use `one_shot` because we want to keep
@@ -66,8 +67,8 @@ pub(crate) fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestCont
     let gas = output.burnt_gas;
     let eth_gas = crate::test_utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
-    println!("UNISWAP_ADD_LIQUIDITY NEAR GAS: {:?}", gas);
-    println!("UNISWAP_ADD_LIQUIDITY ETH GAS: {:?}", eth_gas);
+    println!("UNISWAP_ADD_LIQUIDITY NEAR GAS: {gas:?}");
+    println!("UNISWAP_ADD_LIQUIDITY ETH GAS: {eth_gas:?}");
 
     // Measure swap gas usage
     let (output, maybe_error) =
@@ -80,8 +81,8 @@ pub(crate) fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestCont
     let gas = output.burnt_gas;
     let eth_gas = crate::test_utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
-    println!("UNISWAP_SWAP NEAR GAS: {:?}", gas);
-    println!("UNISWAP_SWAP ETH GAS: {:?}", eth_gas);
+    println!("UNISWAP_SWAP NEAR GAS: {gas:?}");
+    println!("UNISWAP_SWAP ETH GAS: {eth_gas:?}");
 
     // measure add_liquidity wall-clock time
     group.bench_function(swap_id, |b| {
@@ -95,7 +96,7 @@ pub(crate) fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestCont
             },
             |(r, c, i)| r.call(SUBMIT, c, i),
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.finish();
