@@ -9,7 +9,7 @@ pub struct LogEntry {
 
 impl rlp::Decodable for LogEntry {
     fn decode(rlp: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let result = LogEntry {
+        let result = Self {
             address: rlp.val_at(0usize)?,
             topics: rlp.list_at(1usize)?,
             data: rlp.val_at(2usize)?,

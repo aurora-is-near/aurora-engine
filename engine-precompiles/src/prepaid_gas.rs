@@ -5,7 +5,7 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_types::{vec, U256};
 use evm::{Context, ExitError};
 
-/// prepaid_gas precompile address
+/// `prepaid_gas` precompile address
 ///
 /// Address: `0x536822d27de53629ef1f84c60555689e9488609f`
 /// This address is computed as: `&keccak("prepaidGas")[12..]`
@@ -23,7 +23,7 @@ pub struct PrepaidGas<'a, E> {
 }
 
 impl<'a, E> PrepaidGas<'a, E> {
-    pub fn new(env: &'a E) -> Self {
+    pub const fn new(env: &'a E) -> Self {
         Self { env }
     }
 }
@@ -67,7 +67,7 @@ mod tests {
     fn test_prepaid_gas_precompile_id() {
         assert_eq!(
             prepaid_gas::ADDRESS,
-            near_account_to_evm_address("prepaidGas".as_bytes())
+            near_account_to_evm_address(b"prepaidGas")
         );
     }
 }

@@ -7,14 +7,16 @@ use evm::ExitError;
 
 #[cfg(test)]
 pub fn new_context() -> Context {
+    use aurora_engine_types::{H160, U256};
+
     Context {
-        address: Default::default(),
-        caller: Default::default(),
-        apparent_value: Default::default(),
+        address: H160::default(),
+        caller: H160::default(),
+        apparent_value: U256::default(),
     }
 }
 
-pub fn err_usize_conv(_e: TryFromIntError) -> ExitError {
+pub const fn err_usize_conv(_e: TryFromIntError) -> ExitError {
     ExitError::Other(Borrowed("ERR_USIZE_CONVERSION"))
 }
 
