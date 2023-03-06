@@ -1,6 +1,7 @@
 use crate::prelude::Borrowed;
-use core::num::TryFromIntError;
 use aurora_engine_types::U256;
+use core::num::TryFromIntError;
+
 #[cfg(test)]
 use evm::Context;
 use evm::ExitError;
