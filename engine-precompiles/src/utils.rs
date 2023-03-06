@@ -1,4 +1,5 @@
 use crate::prelude::Borrowed;
+use aurora_engine_types::U256;
 use core::num::TryFromIntError;
 
 #[cfg(test)]
@@ -7,7 +8,7 @@ use evm::ExitError;
 
 #[cfg(test)]
 pub fn new_context() -> Context {
-    use aurora_engine_types::{H160, U256};
+    use aurora_engine_types::H160;
 
     Context {
         address: H160::default(),
