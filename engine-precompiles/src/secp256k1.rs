@@ -11,6 +11,7 @@ mod costs {
 
 mod consts {
     pub(super) const INPUT_LEN: usize = 128;
+    pub(super) const SIGNATURE_LENGTH: usize = 65;
 }
 
 /// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
@@ -19,7 +20,7 @@ mod consts {
 // Quite a few library methods rely on this and that should be changed. This
 // should only be for precompiles.
 pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
-    if signature.len() != 65 {
+    if signature.len() != consts::SIGNATURE_LENGTH {
         return Err(ExitError::Other(Borrowed("INVALID_SIGNATURE_LENGTH")));
     }
 
@@ -89,7 +90,7 @@ impl Precompile for ECRecover {
         let mut v = [0; 32];
         v.copy_from_slice(&input[32..64]);
 
-        let mut signature = [0; 65]; // signature is (r, s, v), typed (uint256, uint256, uint8)
+        let mut signature = [0; consts::SIGNATURE_LENGTH]; // signature is (r, s, v), typed (uint256, uint256, uint8)
         signature[0..32].copy_from_slice(&input[64..96]); // r
         signature[32..64].copy_from_slice(&input[96..128]); // s
 
