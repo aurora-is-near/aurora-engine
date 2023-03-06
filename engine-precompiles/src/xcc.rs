@@ -97,7 +97,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
         let input = handle.input();
         let target_gas = handle.gas_limit().map(EthGas::new);
         let context = handle.context();
-        utils::validate_no_value_attached_to_precompile(context.apparent_value.as_u128())?;
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let is_static = handle.is_static();
 
         // This only includes the cost we can easily derive without parsing the input.

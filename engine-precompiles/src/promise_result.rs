@@ -45,7 +45,7 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
-        utils::validate_no_value_attached_to_precompile(context.apparent_value.as_u128())?;
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let mut cost = Self::required_gas(input)?;
         let check_cost = |cost: EthGas| -> Result<(), ExitError> {
             if let Some(target_gas) = target_gas {

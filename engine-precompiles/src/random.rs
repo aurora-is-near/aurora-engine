@@ -42,7 +42,7 @@ impl Precompile for RandomSeed {
         context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
-        utils::validate_no_value_attached_to_precompile(context.apparent_value.as_u128())?;
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
