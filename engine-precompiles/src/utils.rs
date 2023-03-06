@@ -1,5 +1,4 @@
 use crate::prelude::Borrowed;
-use aurora_engine_types::U256;
 use core::num::TryFromIntError;
 
 #[cfg(test)]
