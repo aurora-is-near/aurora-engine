@@ -257,7 +257,7 @@ mod tests {
             &hex::decode("1111111111111111111111111111111111111111111111111111111111111111")
                 .unwrap(),
         );
-        let signature = hex::decode("123").unwrap();
+        let signature = hex::decode("1111").unwrap();
         let res = ecrecover(hash, &signature);
         assert!(res.is_err());
     }
