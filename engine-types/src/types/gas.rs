@@ -87,6 +87,7 @@ impl Div<u64> for EthGas {
     type Output = Self;
 
     fn div(self, rhs: u64) -> Self::Output {
+        assert!(rhs != 0, "ZERO_IS_AN_INVALID_DENOMINATOR");
         Self(self.0 / rhs)
     }
 }
