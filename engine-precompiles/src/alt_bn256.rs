@@ -75,6 +75,7 @@ trait HostFnEncode {
 
 #[cfg(feature = "contract")]
 fn concat_low_high<const P: usize, const S: usize>(low: [u8; P], high: [u8; P]) -> [u8; S] {
+    assert!(S >= (P * 2), "INSUFFICIENT_OUTPUT_ARRAY_SIZE");
     let mut bytes = [0u8; S];
     bytes[0..P].copy_from_slice(&low);
     bytes[P..P * 2].copy_from_slice(&high);
