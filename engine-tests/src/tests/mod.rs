@@ -1,5 +1,6 @@
 mod access_lists;
 mod account_id_precompiles;
+mod block_txs_benchmark;
 mod contract_call;
 mod ecrecover;
 mod eip1559;
@@ -23,4 +24,3 @@ mod standard_precompiles;
 mod state_migration;
 pub(crate) mod uniswap;
 pub(crate) mod xcc;
-mod block_txs_benchmark;

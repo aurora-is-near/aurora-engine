@@ -1,5 +1,5 @@
+use crate::prelude::Address;
 use crate::prelude::Wei;
-use crate::prelude::{Address};
 use crate::test_utils::{
     self,
     erc20::{ERC20Constructor, ERC20},
@@ -12,11 +12,18 @@ const INITIAL_BALANCE: u64 = 1_000_000;
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: u64 = 10;
 
-const BLOCK_TRANSACTIONS_AMOUNT: u64 = 1000;
+#[test]
+fn block_txs_1() {
+    block_txs_erc20_transfer_runner(255);
+}
 
 #[test]
-fn block_txs_erc20_transfer() {
-    let (mut runner, mut source_account, dest_address, contract) = initialize_erc20(); 
+fn block_txs_2() {
+    block_txs_erc20_transfer_runner(1024);
+}
+
+fn block_txs_erc20_transfer_runner(txs_amount: usize) {
+    let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
 
     let initial_block_height = runner.context.block_index;
@@ -25,50 +32,137 @@ fn block_txs_erc20_transfer() {
         contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
     });
     assert!(result.is_ok());
-    assert_eq!(runner.context.block_index, initial_block_height + 1, "First tx; block has to be 1 more.");
+    assert_eq!(
+        runner.context.block_index,
+        initial_block_height + 1,
+        "First tx; block has to be 1 more."
+    );
 
-    let mut block_txs_gas: u64 = 0;
+    let mut block_txs_gas = Vec::with_capacity(txs_amount);
 
-    for i in 0..BLOCK_TRANSACTIONS_AMOUNT {
+    for _ in 0..txs_amount {
         // transfer tx on block 2 (block index is increased interally before adding tx)
         let (result, profile) = runner
-        .submit_with_signer_profiled(&mut source_account, |nonce| {
-            contract.transfer(dest_address, TRANSFER_AMOUNT.into(), nonce)
-        })
-        .unwrap();
+            .submit_with_signer_profiled(&mut source_account, |nonce| {
+                contract.transfer(dest_address, TRANSFER_AMOUNT.into(), nonce)
+            })
+            .unwrap();
 
         assert!(result.status.is_ok());
-        assert_eq!(runner.context.block_index, initial_block_height + 2, "Another tx, block has to be 2 more.");
+        assert_eq!(
+            runner.context.block_index,
+            initial_block_height + 2,
+            "Another tx, block has to be 2 more."
+        );
 
-        println!("Loop tx {:?}", i);
+        let tx_gas = profile.all_gas();
+        block_txs_gas.push(tx_gas);
 
-        block_txs_gas += profile.all_gas();
         runner.context.block_index -= 1;
         runner.context.block_timestamp -= 1_000_000_000;
     }
 
-    assert_eq!(runner.context.block_index, initial_block_height + 1, "After loop, block has to be 1 more since we did a final decrease.");
-    runner.context.block_index += 1;
-    runner.context.block_timestamp += 1_000_000_000;
+    println!("Experiment: Txs in block---------------------------------");
+    println!("Txs amount:");
+    println!("{:?}", txs_amount);
+    println!("Block_txs_gas:");
+    println!("{:?}", block_txs_gas);
+}
 
-    // transfer tx on block 3 (block index is increased interally before adding tx)
-    // this would trigger the block hashchain computation since there is a change on height
-    let (result, profile) = runner
-    .submit_with_signer_profiled(&mut source_account, |nonce| {
-        contract.transfer(dest_address, TRANSFER_AMOUNT.into(), nonce)
-    })
-    .unwrap();
+#[test]
+fn blocks_change_txs_1() {
+    blocks_change_txs_erc20_transfer_runner(&[
+        128 + 0,
+        128 + 1,
+        128 + 2,
+        128 + 4,
+        128 + 8,
+        128 + 16,
+        128 + 32,
+        128 + 64,
+        128 + 16 + 1,
+        255,
+    ]);
+}
 
-    assert!(result.status.is_ok());
-    assert_eq!(runner.context.block_index, initial_block_height + 3, "After tx, block has to be 3 more.");
+#[test]
+fn blocks_change_txs_2() {
+    blocks_change_txs_erc20_transfer_runner(&[129, 131, 133, 135, 137]);
+}
 
-    let block_tx_hashchain_computation_gas = profile.all_gas();
-    let block_total_gas = block_txs_gas + block_tx_hashchain_computation_gas;
+fn blocks_change_txs_erc20_transfer_runner(blocks_txs_amounts: &[u32]) {
+    let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
 
-    println!("block_txs_gas = {:?}", block_txs_gas);
-    println!("block_tx_hashchain_computation_gas = {:?}", block_tx_hashchain_computation_gas);
-    println!("block_total_gas = {:?}", block_total_gas);
-    
+    let mut expected_block_height = runner.context.block_index;
+
+    let result = runner.submit_with_signer(&mut source_account, |nonce| {
+        contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
+    });
+
+    expected_block_height += 1;
+    assert!(result.is_ok());
+    assert_eq!(
+        runner.context.block_index, expected_block_height,
+        "Tx first; height should have move one."
+    );
+
+    let mut blocks_change_txs_gas = Vec::with_capacity(blocks_txs_amounts.len());
+
+    // for each block, add txs and then change height to measure gas
+    for block_txs_amount in blocks_txs_amounts {
+        for _ in 0..*block_txs_amount {
+            // transfer tx on block b (block index is increased interally before adding tx)
+            let result = runner
+                .submit_with_signer(&mut source_account, |nonce| {
+                    contract.transfer(dest_address, TRANSFER_AMOUNT.into(), nonce)
+                })
+                .unwrap();
+            assert!(result.status.is_ok());
+
+            runner.context.block_index -= 1;
+            runner.context.block_timestamp -= 1_000_000_000;
+
+            assert_eq!(
+                runner.context.block_index, expected_block_height,
+                "Tx added to block; height was reduced after so it should remain the same."
+            );
+        }
+
+        assert_eq!(
+            runner.context.block_index, expected_block_height,
+            "Txs added to block; height should remain the same."
+        );
+
+        // move height so next tx goes to the next block and hashchain computation gets triggered
+        expected_block_height += 1;
+        runner.context.block_index += 1;
+        runner.context.block_timestamp += 1_000_000_000;
+
+        let (result, profile) = runner
+            .submit_with_signer_profiled(&mut source_account, |nonce| {
+                contract.transfer(dest_address, TRANSFER_AMOUNT.into(), nonce)
+            })
+            .unwrap();
+
+        runner.context.block_index -= 1;
+        runner.context.block_timestamp -= 1_000_000_000;
+
+        assert!(result.status.is_ok());
+        assert_eq!(
+            runner.context.block_index, expected_block_height,
+            "Tx hashchain computation; height should have one more."
+        );
+
+        let block_change_tx_gas = profile.all_gas();
+        blocks_change_txs_gas.push(block_change_tx_gas);
+    }
+
+    println!("Experiment: Txs in blocks change-------------------------");
+    println!("Blocks txs amounts:");
+    println!("{:?}", blocks_txs_amounts);
+    println!("blocks_change_txs_gas:");
+    println!("{:?}", blocks_change_txs_gas);
 }
 
 fn initialize_erc20() -> (test_utils::AuroraRunner, Signer, Address, ERC20) {
