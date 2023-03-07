@@ -215,8 +215,13 @@ impl StandaloneRunner {
         } else if method_name == test_utils::CALL {
             let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, self.incremental_position, transaction_hash, promise_results);
+            let mut tx_msg = Self::template_tx_msg(
+                storage,
+                &env,
+                self.incremental_position,
+                transaction_hash,
+                promise_results,
+            );
             tx_msg.transaction = TransactionKind::Call(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -227,8 +232,13 @@ impl StandaloneRunner {
         } else if method_name == test_utils::DEPLOY_ERC20 {
             let deploy_args = DeployErc20TokenArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, self.incremental_position, transaction_hash, promise_results);
+            let mut tx_msg = Self::template_tx_msg(
+                storage,
+                &env,
+                self.incremental_position,
+                transaction_hash,
+                promise_results,
+            );
             tx_msg.transaction = TransactionKind::DeployErc20(deploy_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -250,8 +260,13 @@ impl StandaloneRunner {
                 .expect("Unable to parse input as PausePrecompilesCallArgs");
 
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, self.incremental_position, transaction_hash, promise_results);
+            let mut tx_msg = Self::template_tx_msg(
+                storage,
+                &env,
+                self.incremental_position,
+                transaction_hash,
+                promise_results,
+            );
             tx_msg.transaction = TransactionKind::ResumePrecompiles(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -269,8 +284,13 @@ impl StandaloneRunner {
                 .expect("Unable to parse input as PausePrecompilesCallArgs");
 
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, self.incremental_position, transaction_hash, promise_results);
+            let mut tx_msg = Self::template_tx_msg(
+                storage,
+                &env,
+                self.incremental_position,
+                transaction_hash,
+                promise_results,
+            );
             tx_msg.transaction = TransactionKind::PausePrecompiles(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
