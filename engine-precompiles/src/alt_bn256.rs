@@ -151,6 +151,9 @@ impl HostFnEncode for bn::G2 {
 /// Reads the `x` and `y` points from an input at a given position.
 fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
     use bn::{AffineG1, Fq, G1};
+    if input.len() < (pos + consts::SCALAR_LEN * 2) {
+        return Err(ExitError::Other(Borrowed("INVALID_INPUT_LENGTH")));
+    }
 
     let px = Fq::from_slice(&input[pos..(pos + consts::SCALAR_LEN)])
         .map_err(|_e| ExitError::Other(Borrowed("ERR_FQ_INCORRECT")))?;
