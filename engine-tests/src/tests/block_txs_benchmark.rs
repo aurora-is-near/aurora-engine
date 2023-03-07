@@ -112,7 +112,7 @@ fn blocks_change_txs_erc20_transfer_runner(blocks_txs_amounts: &[u32]) {
     // for each block, add txs and then change height to measure gas
     for block_txs_amount in blocks_txs_amounts {
         for _ in 0..*block_txs_amount {
-            // transfer tx on block b (block index is increased interally before adding tx)
+            // transfer tx to the next block (block index is increased interally before adding tx)
             let result = runner
                 .submit_with_signer(&mut source_account, |nonce| {
                     contract.transfer(dest_address, TRANSFER_AMOUNT.into(), nonce)
@@ -120,6 +120,7 @@ fn blocks_change_txs_erc20_transfer_runner(blocks_txs_amounts: &[u32]) {
                 .unwrap();
             assert!(result.status.is_ok());
 
+            // return to previous block so next tx lands on the same one
             runner.context.block_index -= 1;
             runner.context.block_timestamp -= 1_000_000_000;
 
@@ -145,8 +146,7 @@ fn blocks_change_txs_erc20_transfer_runner(blocks_txs_amounts: &[u32]) {
             })
             .unwrap();
 
-        runner.context.block_index -= 1;
-        runner.context.block_timestamp -= 1_000_000_000;
+        expected_block_height += 1;
 
         assert!(result.status.is_ok());
         assert_eq!(
