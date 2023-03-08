@@ -19,10 +19,13 @@ mod consts {
 /// See: `https://etherscan.io/address/0000000000000000000000000000000000000001`
 // Quite a few library methods rely on this and that should be changed. This
 // should only be for precompiles.
-pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
-    if signature.len() != consts::SIGNATURE_LENGTH {
-        return Err(ExitError::Other(Borrowed("INVALID_SIGNATURE_LENGTH")));
-    }
+pub fn ecrecover(
+    hash: H256,
+    signature: &[u8; consts::SIGNATURE_LENGTH],
+) -> Result<Address, ExitError> {
+    // if signature.len() != consts::SIGNATURE_LENGTH {
+    //     return Err(ExitError::Other(Borrowed("INVALID_SIGNATURE_LENGTH")));
+    // }
 
     #[cfg(feature = "contract")]
     return sdk::ecrecover(hash, signature).map_err(|e| ExitError::Other(Borrowed(e.as_str())));
@@ -121,7 +124,7 @@ mod tests {
     use crate::utils::new_context;
 
     fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
-        matches!(ecrecover(hash, signature), Ok(s) if s == signer)
+        matches!(ecrecover(hash, signature[0..65].try_into().unwrap()), Ok(s) if s == signer)
     }
 
     #[test]
@@ -249,16 +252,5 @@ mod tests {
             .unwrap()
             .output;
         assert_eq!(res, expected);
-    }
-
-    #[test]
-    pub fn test_invalid_signature_length() {
-        let hash = H256::from_slice(
-            &hex::decode("1111111111111111111111111111111111111111111111111111111111111111")
-                .unwrap(),
-        );
-        let signature = hex::decode("1111").unwrap();
-        let res = ecrecover(hash, &signature);
-        assert!(res.is_err());
     }
 }
