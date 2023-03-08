@@ -19,7 +19,9 @@ mod consts {
 // Quite a few library methods rely on this and that should be changed. This
 // should only be for precompiles.
 pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
-    assert_eq!(signature.len(), 65);
+    if signature.len() != 65 {
+        return Err(ExitError::Other(Borrowed("ERR_INCORRECT_SIGNATURE_LENGTH")));
+    }
 
     #[cfg(feature = "contract")]
     return sdk::ecrecover(hash, signature).map_err(|e| ExitError::Other(Borrowed(e.as_str())));
