@@ -23,10 +23,6 @@ pub fn ecrecover(
     hash: H256,
     signature: &[u8; consts::SIGNATURE_LENGTH],
 ) -> Result<Address, ExitError> {
-    // if signature.len() != consts::SIGNATURE_LENGTH {
-    //     return Err(ExitError::Other(Borrowed("INVALID_SIGNATURE_LENGTH")));
-    // }
-
     #[cfg(feature = "contract")]
     return sdk::ecrecover(hash, signature).map_err(|e| ExitError::Other(Borrowed(e.as_str())));
 
