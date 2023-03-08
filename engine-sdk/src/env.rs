@@ -9,19 +9,23 @@ pub const DEFAULT_PREPAID_GAS: NearGas = NearGas::new(300_000_000_000_000);
 pub struct Timestamp(u64);
 
 impl Timestamp {
-    pub fn new(ns: u64) -> Self {
+    #[must_use]
+    pub const fn new(ns: u64) -> Self {
         Self(ns)
     }
 
-    pub fn nanos(&self) -> u64 {
+    #[must_use]
+    pub const fn nanos(&self) -> u64 {
         self.0
     }
 
-    pub fn millis(&self) -> u64 {
+    #[must_use]
+    pub const fn millis(&self) -> u64 {
         self.0 / 1_000_000
     }
 
-    pub fn secs(&self) -> u64 {
+    #[must_use]
+    pub const fn secs(&self) -> u64 {
         self.0 / 1_000_000_000
     }
 }
