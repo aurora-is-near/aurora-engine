@@ -83,6 +83,9 @@ impl Div<u64> for EthGas {
     type Output = EthGas;
 
     fn div(self, rhs: u64) -> Self::Output {
+        if rhs == 0 {
+            panic!("Zero is an invalid denominator");
+        }
         EthGas(self.0 / rhs)
     }
 }
