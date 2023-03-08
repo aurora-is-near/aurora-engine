@@ -51,7 +51,7 @@ impl evm_gasometer::tracing::EventListener for TransactionTraceBuilder {
             Event::RecordCost { cost, snapshot } => {
                 self.current.gas_cost = EthGas::new(cost);
                 if let Some(snapshot) = snapshot {
-                    if let gas = snapshot.gas_limit - snapshot.used_gas - snapshot.memory_gas) >= 0 {
+                    if let gas = snapshot.gas_limit - snapshot.used_gas - snapshot.memory_gas >= 0 {
                         self.current.gas =
                             EthGas::new(gas);
                     }
