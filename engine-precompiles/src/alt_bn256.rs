@@ -67,6 +67,15 @@ mod consts {
 }
 
 #[cfg(feature = "contract")]
+mod type_arith {
+    pub struct Double<const P: usize>;
+    pub trait Is<const S: usize> {}
+    impl Is<128> for Double<64> {}
+    impl Is<64> for Double<32> {}
+    impl Is<32> for Double<16> {}
+}
+
+#[cfg(feature = "contract")]
 trait HostFnEncode {
     type Encoded;
 
@@ -74,8 +83,10 @@ trait HostFnEncode {
 }
 
 #[cfg(feature = "contract")]
-fn concat_low_high<const P: usize, const S: usize>(low: [u8; P], high: [u8; P]) -> [u8; S] {
-    assert!(S >= (P * 2), "INSUFFICIENT_OUTPUT_ARRAY_SIZE");
+fn concat_low_high<const P: usize, const S: usize>(low: [u8; P], high: [u8; P]) -> [u8; S]
+where
+    type_arith::Double<P>: type_arith::Is<S>,
+{
     let mut bytes = [0u8; S];
     bytes[0..P].copy_from_slice(&low);
     bytes[P..P * 2].copy_from_slice(&high);
