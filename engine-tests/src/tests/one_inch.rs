@@ -50,7 +50,7 @@ fn test_1inch_liquidity_protocol() {
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
     let (result, profile) = helper.pool_deposit(
         &pool,
-        liquidity_protocol::DepositArgs {
+        &liquidity_protocol::DepositArgs {
             min_token_a: U256::zero(),
             min_token_b: U256::zero(),
             max_token_a: 10_000.into(),
@@ -64,7 +64,7 @@ fn test_1inch_liquidity_protocol() {
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
     let (result, profile) = helper.pool_swap(
         &pool,
-        liquidity_protocol::SwapArgs {
+        &liquidity_protocol::SwapArgs {
             src_token: token_a.0.address,
             dst_token: token_b.0.address,
             amount: 1000.into(),
@@ -77,7 +77,7 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
-        liquidity_protocol::WithdrawArgs {
+        &liquidity_protocol::WithdrawArgs {
             amount: 100.into(),
             min_token_a: U256::one(),
             min_token_b: U256::one(),
@@ -106,8 +106,7 @@ fn test_1_inch_limit_order_deploy() {
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         (50..=60).contains(&wasm_fraction),
-        "{}% is not between 50% and 60%",
-        wasm_fraction
+        "{wasm_fraction}% is not between 50% and 60%",
     );
 }
 
@@ -127,10 +126,10 @@ fn deploy_1_inch_limit_order_contract(
     let nonce = signer.use_nonce();
     let deploy_tx = crate::prelude::transactions::legacy::TransactionLegacy {
         nonce: nonce.into(),
-        gas_price: Default::default(),
+        gas_price: U256::default(),
         gas_limit: u64::MAX.into(),
         to: None,
-        value: Default::default(),
+        value: Wei::default(),
         data: constructor.code,
     };
     let tx = test_utils::sign_transaction(deploy_tx, Some(runner.chain_id), &signer.secret_key);

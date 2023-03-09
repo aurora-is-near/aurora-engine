@@ -12,8 +12,9 @@ pub struct ModExp<HF: HardFork>(PhantomData<HF>);
 impl<HF: HardFork> ModExp<HF> {
     pub const ADDRESS: Address = super::make_address(0, 5);
 
+    #[must_use]
     pub fn new() -> Self {
-        Self(Default::default())
+        Self(PhantomData::default())
     }
 }
 
@@ -113,8 +114,8 @@ impl Precompile for ModExp<Byzantium> {
         }
     }
 
-    /// See: https://eips.ethereum.org/EIPS/eip-198
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000005
+    /// See: `https://eips.ethereum.org/EIPS/eip-198`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000005`
     fn run(
         &self,
         input: &[u8],
@@ -500,7 +501,7 @@ mod tests {
             .run(&[], Some(EthGas::new(100_000)), &new_context(), false)
             .unwrap();
         let expected: Vec<u8> = Vec::new();
-        assert_eq!(res.output, expected)
+        assert_eq!(res.output, expected);
     }
 
     #[test]

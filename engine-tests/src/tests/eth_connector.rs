@@ -156,7 +156,7 @@ fn assert_proof_was_not_used(account: &UserAccount, contract: &str, proof: &str)
 #[allow(dead_code)]
 fn print_logs(logs: &[String]) {
     for l in logs {
-        println!("[log] {}", l);
+        println!("[log] {l}");
     }
 }
 
@@ -450,6 +450,7 @@ fn test_ft_transfer_call_eth() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn test_ft_transfer_call_without_message() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
     let recipient_account = create_user_account(&master_account);
@@ -718,10 +719,10 @@ fn test_deposit_eth_to_near_account() {
         0,
     );
     let promises = res.promise_results();
-    for p in promises.iter() {
+    for p in &promises {
         assert!(p.is_some());
         let p = p.as_ref().unwrap();
-        p.assert_success()
+        p.assert_success();
     }
     res.assert_success();
 
@@ -767,8 +768,7 @@ fn test_deposit_eth_with_empty_custom_connector_account() {
     assert_execution_status_failure(
         promise.as_ref().unwrap().outcome().clone().status,
         format!(
-            r#"CompilationError(CodeDoesNotExist {{ account_id: AccountId("{}") }}"#,
-            user_account_id
+            r#"CompilationError(CodeDoesNotExist {{ account_id: AccountId("{user_account_id}") }}"#,
         )
         .as_str(),
         "Expected failure in `ft_on_transfer` call, but deposit succeeded",
@@ -814,17 +814,17 @@ fn test_deposit_eth_with_custom_connector_account() {
         0,
     );
     let promises = res.promise_results();
-    for p in promises.iter() {
+    for p in &promises {
         assert!(p.is_some());
         let p = p.as_ref().unwrap();
         if p.executor_id().as_str() == user_account_id {
             // The `ft_on_transfer` implementation in the user's account generates this log.
             assert_eq!(
-                p.logs().first().map(|s| s.as_str()),
+                p.logs().first().map(String::as_str),
                 Some("in 17 tokens from @eth_connector.root ft_on_transfer, msg = some_user.root:00000000000000000000000000000000000000000000000000000000000000000a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"),
             );
         }
-        p.assert_success()
+        p.assert_success();
     }
     res.assert_success();
 
@@ -844,10 +844,10 @@ fn test_deposit_with_same_proof() {
     assert_proof_was_not_used(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
 
     let promises = call_deposit_eth_to_near(&contract, CONTRACT_ACC);
-    for p in promises.iter() {
+    for p in &promises {
         assert!(p.is_some());
         let p = p.as_ref().unwrap();
-        p.assert_success()
+        p.assert_success();
     }
 
     assert_proof_was_used(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
@@ -1042,6 +1042,16 @@ fn create_user_account(master_account: &UserAccount) -> UserAccount {
     )
 }
 
+fn validate_promises(promises: Vec<Option<ExecutionResult>>) {
+    assert!(promises.len() > 1);
+
+    for p in promises {
+        assert!(p.is_some());
+        let p = p.as_ref().unwrap();
+        p.assert_success();
+    }
+}
+
 #[test]
 fn test_admin_controlled_only_admin_can_pause() {
     let (master_account, contract) = init(CUSTODIAN_ADDRESS);
@@ -1067,11 +1077,7 @@ fn test_admin_controlled_admin_can_peform_actions_when_paused() {
 
     // 1st deposit call when unpaused - should succeed
     let promises = call_deposit_with_proof(&contract, CONTRACT_ACC, PROOF_DATA_NEAR);
-    for p in promises.iter() {
-        assert!(p.is_some());
-        let p = p.as_ref().unwrap();
-        p.assert_success()
-    }
+    validate_promises(promises);
 
     let withdraw_amount = NEP141Wei::new(100);
     let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
@@ -1091,11 +1097,7 @@ fn test_admin_controlled_admin_can_peform_actions_when_paused() {
     );
     res.assert_success();
     let promises = res.promise_results();
-    for p in promises.iter() {
-        assert!(p.is_some());
-        let p = p.as_ref().unwrap();
-        p.assert_success()
-    }
+    validate_promises(promises);
 
     // Pause deposit
     let res = call_set_paused_flags(&contract, CONTRACT_ACC, PAUSE_DEPOSIT);
@@ -1105,11 +1107,7 @@ fn test_admin_controlled_admin_can_peform_actions_when_paused() {
     // NB: We can use `PROOF_DATA_ETH` this will be just a different proof but the same deposit
     // method which should be paused
     let promises = call_deposit_with_proof(&contract, CONTRACT_ACC, PROOF_DATA_ETH);
-    for p in promises.iter() {
-        assert!(p.is_some());
-        let p = p.as_ref().unwrap();
-        p.assert_success()
-    }
+    validate_promises(promises);
 
     // Pause withdraw
     let res = call_set_paused_flags(&contract, CONTRACT_ACC, PAUSE_WITHDRAW);
@@ -1130,11 +1128,7 @@ fn test_admin_controlled_admin_can_peform_actions_when_paused() {
     );
     res.assert_success();
     let promises = res.promise_results();
-    for p in promises.iter() {
-        assert!(p.is_some());
-        let p = p.as_ref().unwrap();
-        p.assert_success()
-    }
+    validate_promises(promises);
 }
 
 #[test]
@@ -1144,11 +1138,7 @@ fn test_deposit_pausability() {
 
     // 1st deposit call - should succeed
     let promises = call_deposit_with_proof(&user_account, CONTRACT_ACC, PROOF_DATA_NEAR);
-    for p in promises.iter() {
-        assert!(p.is_some());
-        let p = p.as_ref().unwrap();
-        p.assert_success()
-    }
+    validate_promises(promises);
 
     // Pause deposit
     let res = call_set_paused_flags(&contract, CONTRACT_ACC, PAUSE_DEPOSIT);
@@ -1172,11 +1162,7 @@ fn test_deposit_pausability() {
 
     // 3rd deposit call - should succeed
     let promises = call_deposit_with_proof(&user_account, CONTRACT_ACC, PROOF_DATA_ETH);
-    for p in promises.iter() {
-        assert!(p.is_some());
-        let p = p.as_ref().unwrap();
-        p.assert_success()
-    }
+    validate_promises(promises);
 }
 
 #[test]
@@ -1203,12 +1189,7 @@ fn test_withdraw_from_near_pausability() {
     );
     res.assert_success();
     let promises = res.promise_results();
-    assert!(promises.len() > 1);
-    for p in promises.iter() {
-        assert!(p.is_some());
-        let p = p.as_ref().unwrap();
-        p.assert_success()
-    }
+    validate_promises(promises);
 
     // Pause withdraw
     let res = call_set_paused_flags(&contract, CONTRACT_ACC, PAUSE_WITHDRAW);
@@ -1253,12 +1234,7 @@ fn test_withdraw_from_near_pausability() {
     );
     res.assert_success();
     let promises = res.promise_results();
-    assert!(promises.len() > 1);
-    for p in promises.iter() {
-        assert!(p.is_some());
-        let p = p.as_ref().unwrap();
-        p.assert_success()
-    }
+    validate_promises(promises);
 }
 
 #[test]
@@ -1557,14 +1533,14 @@ fn assert_execution_status_failure(
     // "right: 'MISMATCHED_DATA': ERR_MSG [src/some_file.rs:LINE_NUMBER:COLUMN_NUMBER]"
     // So the ": ERR_MSG [" pattern should catch all invariants of error, even if one of the errors
     // message is a subset of another one (e.g. `ERR_MSG_FAILED` is a subset of `ERR_MSG_FAILED_FOO`)
-    let expected_err_msg_pattern = format!(": {}", err_msg);
+    let expected_err_msg_pattern = format!(": {err_msg}");
 
     match execution_status {
         ExecutionStatus::Failure(err) => {
-            println!("Error: {}", err);
+            println!("Error: {err}");
             assert!(err.to_string().contains(&expected_err_msg_pattern));
         }
-        _ => panic!("{}", panic_msg),
+        _ => panic!("{panic_msg}"),
     }
 }
 

@@ -15,22 +15,21 @@ bitflags! {
 }
 
 impl PrecompileFlags {
+    #[must_use]
     pub fn from_address(address: &Address) -> Option<Self> {
         Some(if address == &exit_to_ethereum::ADDRESS {
-            PrecompileFlags::EXIT_TO_ETHEREUM
+            Self::EXIT_TO_ETHEREUM
         } else if address == &exit_to_near::ADDRESS {
-            PrecompileFlags::EXIT_TO_NEAR
+            Self::EXIT_TO_NEAR
         } else {
             return None;
         })
     }
 
     /// Checks if the precompile belonging to the `address` is marked as paused.
+    #[must_use]
     pub fn is_paused_by_address(&self, address: &Address) -> bool {
-        match Self::from_address(address) {
-            Some(precompile_flag) => self.contains(precompile_flag),
-            None => false,
-        }
+        Self::from_address(address).map_or(false, |precompile_flag| self.contains(precompile_flag))
     }
 }
 
@@ -89,7 +88,7 @@ pub struct EngineAuthorizer {
 }
 
 impl EngineAuthorizer {
-    /// Creates new [EngineAuthorizer] and grants permission to pause precompiles for all given `accounts`.
+    /// Creates new [`EngineAuthorizer`] and grants permission to pause precompiles for all given `accounts`.
     pub fn from_accounts(accounts: impl Iterator<Item = AccountId>) -> Self {
         Self {
             acl: accounts.collect(),
@@ -104,27 +103,24 @@ pub struct EnginePrecompilesPauser<I: IO> {
 }
 
 impl<I: IO> EnginePrecompilesPauser<I> {
-    /// Key for storing [PrecompileFlags].
+    /// Key for storing [`PrecompileFlags`].
     const PAUSE_FLAGS_KEY: &'static [u8; 11] = b"PAUSE_FLAGS";
 
-    /// Creates new [EnginePrecompilesPauser] instance that reads from and writes into storage accessed using `io`.
-    pub fn from_io(io: I) -> Self {
+    /// Creates new [`EnginePrecompilesPauser`] instance that reads from and writes into storage accessed using `io`.
+    pub const fn from_io(io: I) -> Self {
         Self { io }
     }
 
     fn read_flags_from_storage(&self) -> PrecompileFlags {
-        match self.io.read_storage(&Self::storage_key()) {
-            None => PrecompileFlags::empty(),
-            Some(bytes) => {
+        self.io
+            .read_storage(&Self::storage_key())
+            .map_or_else(PrecompileFlags::empty, |bytes| {
                 const U32_SIZE: usize = core::mem::size_of::<u32>();
                 assert_eq!(bytes.len(), U32_SIZE, "PrecompileFlags value is corrupted");
-
                 let mut buffer = [0u8; U32_SIZE];
                 bytes.copy_to_slice(&mut buffer);
-
                 PrecompileFlags::from_bits_truncate(u32::from_le_bytes(buffer))
-            }
-        }
+            })
     }
 
     fn write_flags_into_storage(&mut self, pause_flags: PrecompileFlags) {

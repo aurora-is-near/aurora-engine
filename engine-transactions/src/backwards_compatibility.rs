@@ -1,7 +1,7 @@
 //! Warning: this module _incorrectly_ parses RLP-serialized Ethereum transactions.
 //! This is intentional and needed for our "standalone engine" to be able to reproduce
 //! the Aurora state on the NEAR blockchain before the time a bug was fixed. See
-//! https://github.com/aurora-is-near/aurora-engine/pull/458 for more details, but external
+//! `https://github.com/aurora-is-near/aurora-engine/pull/458` for more details, but external
 //! users of this library should _never_ use the adapter in this module.
 
 use crate::{Error, EthTransactionKind};
@@ -18,6 +18,7 @@ pub struct EthTransactionKindAdapter {
 }
 
 impl EthTransactionKindAdapter {
+    #[must_use]
     pub const fn new(bug_fix_height: u64) -> Self {
         Self { bug_fix_height }
     }
