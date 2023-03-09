@@ -696,7 +696,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
 
             Address::new(H160(unwrap_res_or_finish!(
-                hex::decode(&message[..40]).unwrap().as_slice().try_into(),
+                unwrap_res_or_finish!(hex::decode(&message[..40]), output_on_fail, self.io)
+                    .as_slice()
+                    .try_into(),
                 output_on_fail,
                 self.io
             )))
