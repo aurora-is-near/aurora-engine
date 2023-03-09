@@ -51,8 +51,11 @@ impl evm_gasometer::tracing::EventListener for TransactionTraceBuilder {
             Event::RecordCost { cost, snapshot } => {
                 self.current.gas_cost = EthGas::new(cost);
                 if let Some(snapshot) = snapshot {
-                    self.current.gas =
-                        EthGas::new(snapshot.gas_limit - snapshot.used_gas - snapshot.memory_gas);
+                    self.current.gas = EthGas::new(
+                        snapshot
+                            .gas_limit
+                            .saturating_sub(snapshot.used_gas + snapshot.memory_gas),
+                    );
                 }
             }
             Event::RecordDynamicCost {
@@ -73,8 +76,11 @@ impl evm_gasometer::tracing::EventListener for TransactionTraceBuilder {
                 self.current_memory_gas = memory_gas;
                 self.current.gas_cost = EthGas::new(gas_cost + memory_cost_diff);
                 if let Some(snapshot) = snapshot {
-                    self.current.gas =
-                        EthGas::new(snapshot.gas_limit - snapshot.used_gas - snapshot.memory_gas);
+                    self.current.gas = EthGas::new(
+                        snapshot
+                            .gas_limit
+                            .saturating_sub(snapshot.used_gas + snapshot.memory_gas),
+                    );
                 }
             }
             Event::RecordRefund {
