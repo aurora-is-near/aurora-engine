@@ -67,7 +67,7 @@ impl Runtime {
                         &[],
                         0,
                         Self::GAS_FOR_STATE_MIGRATION.as_u64(),
-                    )
+                    );
                 }
                 _ => panic!("ERR_NO_CODE_STAGED"),
             };
