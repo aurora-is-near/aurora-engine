@@ -1,6 +1,6 @@
 use super::sanity::initialize_transfer;
-use crate::prelude::Wei;
 use crate::prelude::{Address, U256};
+use crate::prelude::{Wei, H160};
 use crate::test_utils::{self, AuroraRunner, Signer};
 use aurora_engine_precompiles::Precompile;
 
@@ -48,8 +48,8 @@ fn test_ecrecover_standalone() {
     let input = construct_input(&hash, &sig);
 
     let ctx = evm::Context {
-        address: Default::default(),
-        caller: Default::default(),
+        address: H160::default(),
+        caller: H160::default(),
         apparent_value: U256::zero(),
     };
     let standalone_result = aurora_engine_precompiles::secp256k1::ECRecover

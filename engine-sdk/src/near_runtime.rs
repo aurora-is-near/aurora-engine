@@ -15,7 +15,7 @@ const CUSTODIAN_ADDRESS: &[u8] = &[
 ];
 
 #[cfg(feature = "testnet")]
-/// The testnet eth_custodian address 0x84a82Bb39c83989D5Dc07e1310281923D2544dC2
+/// The testnet `eth_custodian` address 0x84a82Bb39c83989D5Dc07e1310281923D2544dC2
 const CUSTODIAN_ADDRESS: &[u8] = &[
     132, 168, 43, 179, 156, 131, 152, 157, 93, 192, 126, 19, 16, 40, 25, 35, 210, 84, 77, 194,
 ];
@@ -65,19 +65,15 @@ impl Runtime {
                 &[],
                 0,
                 Self::GAS_FOR_STATE_MIGRATION.as_u64(),
-            )
+            );
         }
     }
 
-    /// Assumes a valid account ID has been written to ENV_REGISTER_ID
+    /// Assumes a valid account ID has been written to `ENV_REGISTER_ID`
     /// by a previous call.
     fn read_account_id() -> AccountId {
         let bytes = Self::ENV_REGISTER_ID.to_vec();
-        match AccountId::try_from(bytes) {
-            Ok(account_id) => account_id,
-            // the environment must give us a valid Account ID.
-            Err(_) => unreachable!(),
-        }
+        AccountId::try_from(bytes).map_or_else(|_| unreachable!(), |account_id| account_id)
     }
 
     /// Convenience wrapper around `exports::promise_batch_action_function_call`
@@ -95,9 +91,9 @@ impl Runtime {
                 method_name.as_ptr() as _,
                 arguments.len() as _,
                 arguments.as_ptr() as _,
-                &amount as *const u128 as _,
+                core::ptr::addr_of!(amount) as _,
                 gas,
-            )
+            );
         }
     }
 }
@@ -109,7 +105,7 @@ impl StorageIntermediate for RegisterIndex {
             // By convention, an unused register will return a length of U64::MAX
             // (see https://nomicon.io/RuntimeSpec/Components/BindingsSpec/RegistersAPI).
             if result < u64::MAX {
-                result as usize
+                usize::try_from(result).unwrap_or_default()
             } else {
                 0
             }
@@ -130,17 +126,18 @@ impl crate::io::IO for Runtime {
 
     fn read_input(&self) -> Self::StorageValue {
         unsafe {
-            exports::input(Runtime::INPUT_REGISTER_ID.0);
+            exports::input(Self::INPUT_REGISTER_ID.0);
         }
-        Runtime::INPUT_REGISTER_ID
+        Self::INPUT_REGISTER_ID
     }
 
     fn return_output(&mut self, value: &[u8]) {
         unsafe {
             #[cfg(any(feature = "mainnet", feature = "testnet"))]
-            if value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS {
-                panic!("ERR_ILLEGAL_RETURN");
-            }
+            assert!(
+                !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
+                "ERR_ILLEGAL_RETURN"
+            );
             exports::value_return(value.len() as u64, value.as_ptr() as u64);
         }
     }
@@ -150,10 +147,10 @@ impl crate::io::IO for Runtime {
             if exports::storage_read(
                 key.len() as u64,
                 key.as_ptr() as u64,
-                Runtime::READ_STORAGE_REGISTER_ID.0,
+                Self::READ_STORAGE_REGISTER_ID.0,
             ) == 1
             {
-                Some(Runtime::READ_STORAGE_REGISTER_ID)
+                Some(Self::READ_STORAGE_REGISTER_ID)
             } else {
                 None
             }
@@ -171,10 +168,10 @@ impl crate::io::IO for Runtime {
                 key.as_ptr() as u64,
                 value.len() as u64,
                 value.as_ptr() as u64,
-                Runtime::WRITE_REGISTER_ID.0,
+                Self::WRITE_REGISTER_ID.0,
             ) == 1
             {
-                Some(Runtime::WRITE_REGISTER_ID)
+                Some(Self::WRITE_REGISTER_ID)
             } else {
                 None
             }
@@ -192,10 +189,10 @@ impl crate::io::IO for Runtime {
                 key.as_ptr() as _,
                 u64::MAX,
                 value.0,
-                Runtime::WRITE_REGISTER_ID.0,
+                Self::WRITE_REGISTER_ID.0,
             ) == 1
             {
-                Some(Runtime::WRITE_REGISTER_ID)
+                Some(Self::WRITE_REGISTER_ID)
             } else {
                 None
             }
@@ -204,13 +201,10 @@ impl crate::io::IO for Runtime {
 
     fn remove_storage(&mut self, key: &[u8]) -> Option<Self::StorageValue> {
         unsafe {
-            if exports::storage_remove(
-                key.len() as _,
-                key.as_ptr() as _,
-                Runtime::EVICT_REGISTER_ID.0,
-            ) == 1
+            if exports::storage_remove(key.len() as _, key.as_ptr() as _, Self::EVICT_REGISTER_ID.0)
+                == 1
             {
-                Some(Runtime::EVICT_REGISTER_ID)
+                Some(Self::EVICT_REGISTER_ID)
             } else {
                 None
             }
@@ -261,7 +255,7 @@ impl crate::env::Env for Runtime {
         unsafe {
             exports::random_seed(0);
             let bytes = H256::zero();
-            exports::read_register(0, bytes.0.as_ptr() as *const u64 as u64);
+            exports::read_register(0, bytes.0.as_ptr() as u64);
             bytes
         }
     }
@@ -307,7 +301,7 @@ impl crate::promise::PromiseHandler for Runtime {
                 method_name.as_ptr() as _,
                 arguments.len() as _,
                 arguments.as_ptr() as _,
-                &amount as *const u128 as _,
+                core::ptr::addr_of!(amount) as _,
                 gas,
             )
         };
@@ -334,7 +328,7 @@ impl crate::promise::PromiseHandler for Runtime {
                 method_name.as_ptr() as _,
                 arguments.len() as _,
                 arguments.as_ptr() as _,
-                &amount as *const u128 as _,
+                core::ptr::addr_of!(amount) as _,
                 gas,
             )
         };
@@ -342,19 +336,21 @@ impl crate::promise::PromiseHandler for Runtime {
         PromiseId::new(id)
     }
 
+    #[allow(clippy::too_many_lines)]
     unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
         let account_id = args.target_account_id.as_bytes();
 
         let id = { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) };
 
-        for action in args.actions.iter() {
+        for action in &args.actions {
             match action {
                 PromiseAction::CreateAccount => {
                     exports::promise_batch_action_create_account(id);
                 }
                 PromiseAction::Transfer { amount } => {
                     let amount = amount.as_u128();
-                    exports::promise_batch_action_transfer(id, &amount as *const u128 as _);
+                    let amount_addr = core::ptr::addr_of!(amount);
+                    exports::promise_batch_action_transfer(id, amount_addr as _);
                 }
                 PromiseAction::DeployContract { code } => {
                     let code = code.as_slice();
@@ -373,27 +369,29 @@ impl crate::promise::PromiseHandler for Runtime {
                     let method_name = name.as_bytes();
                     let arguments = args.as_slice();
                     let amount = attached_yocto.as_u128();
+                    let amount_addr = core::ptr::addr_of!(amount);
                     exports::promise_batch_action_function_call(
                         id,
                         method_name.len() as _,
                         method_name.as_ptr() as _,
                         arguments.len() as _,
                         arguments.as_ptr() as _,
-                        &amount as *const u128 as _,
+                        amount_addr as _,
                         gas.as_u64(),
-                    )
+                    );
                 }
                 PromiseAction::Stake { amount, public_key } => {
                     feature_gated!("all-promise-actions", {
                         let amount = amount.as_u128();
+                        let amount_addr = core::ptr::addr_of!(amount);
                         let pk: RawPublicKey = public_key.into();
                         let pk_bytes = pk.as_bytes();
                         exports::promise_batch_action_stake(
                             id,
-                            &amount as *const u128 as _,
+                            amount_addr as _,
                             pk_bytes.len() as _,
                             pk_bytes.as_ptr() as _,
-                        )
+                        );
                     });
                 }
                 PromiseAction::AddFullAccessKey { public_key, nonce } => {
@@ -405,7 +403,7 @@ impl crate::promise::PromiseHandler for Runtime {
                             pk_bytes.len() as _,
                             pk_bytes.as_ptr() as _,
                             *nonce,
-                        )
+                        );
                     });
                 }
                 PromiseAction::AddFunctionCallKey {
@@ -419,6 +417,7 @@ impl crate::promise::PromiseHandler for Runtime {
                         let pk: RawPublicKey = public_key.into();
                         let pk_bytes = pk.as_bytes();
                         let allowance = allowance.as_u128();
+                        let allowance_addr = core::ptr::addr_of!(allowance);
                         let receiver_id = receiver_id.as_bytes();
                         let function_names = function_names.as_bytes();
                         exports::promise_batch_action_add_key_with_function_call(
@@ -426,12 +425,12 @@ impl crate::promise::PromiseHandler for Runtime {
                             pk_bytes.len() as _,
                             pk_bytes.as_ptr() as _,
                             *nonce,
-                            &allowance as *const u128 as _,
+                            allowance_addr as _,
                             receiver_id.len() as _,
                             receiver_id.as_ptr() as _,
                             function_names.len() as _,
                             function_names.as_ptr() as _,
-                        )
+                        );
                     });
                 }
                 PromiseAction::DeleteKey { public_key } => {
@@ -442,7 +441,7 @@ impl crate::promise::PromiseHandler for Runtime {
                             id,
                             pk_bytes.len() as _,
                             pk_bytes.as_ptr() as _,
-                        )
+                        );
                     });
                 }
                 PromiseAction::DeleteAccount { beneficiary_id } => {
@@ -452,7 +451,7 @@ impl crate::promise::PromiseHandler for Runtime {
                             id,
                             beneficiary_id.len() as _,
                             beneficiary_id.as_ptr() as _,
-                        )
+                        );
                     });
                 }
             }
@@ -488,7 +487,7 @@ impl crate::promise::PromiseHandler for Runtime {
     }
 }
 
-/// Similar to NearPublicKey, except the first byte includes
+/// Similar to `NearPublicKey`, except the first byte includes
 /// the curve identifier.
 enum RawPublicKey {
     Ed25519([u8; 33]),
@@ -496,7 +495,7 @@ enum RawPublicKey {
 }
 
 impl RawPublicKey {
-    fn as_bytes(&self) -> &[u8] {
+    const fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Ed25519(bytes) => bytes,
             Self::Secp256k1(bytes) => bytes,
@@ -559,7 +558,7 @@ impl crate::env::Env for ViewEnv {
         unsafe {
             exports::random_seed(0);
             let bytes = H256::zero();
-            exports::read_register(0, bytes.0.as_ptr() as *const u64 as u64);
+            exports::read_register(0, bytes.0.as_ptr() as u64);
             bytes
         }
     }

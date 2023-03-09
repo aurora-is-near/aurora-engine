@@ -32,7 +32,7 @@ fn measure_nft_pagination_gas_usage() {
     for size in data_sizes {
         for n_tokens in tokens_per_page {
             let gas_used = nft_pagination::measure_gas_usage(TOTAL_TOKENS, size, n_tokens);
-            println!("{},{},{}", size, n_tokens, gas_used);
+            println!("{size},{n_tokens},{gas_used}");
         }
     }
 }
