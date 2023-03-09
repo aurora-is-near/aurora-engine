@@ -254,13 +254,12 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         // Special case for Aurora transfer itself - we shouldn't transfer
         if sender_id != receiver_id {
             self.internal_transfer_eth_on_near(&sender_id, &receiver_id, amount, memo)?;
-        } else {
-            let balance = self
-                .get_account_eth_balance(&sender_id)
-                .unwrap_or(ZERO_NEP141_WEI);
-            if amount > balance {
-                return Err(error::TransferError::InsufficientFunds);
-            }
+        }
+        let balance = self
+            .get_account_eth_balance(&sender_id)
+            .unwrap_or(ZERO_NEP141_WEI);
+        if amount > balance {
+            return Err(error::TransferError::InsufficientFunds);
         }
         let args = serde_json::to_vec(&NEP141FtOnTransferArgs {
             sender_id: sender_id.clone(),
