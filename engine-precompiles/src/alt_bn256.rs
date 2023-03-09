@@ -89,7 +89,7 @@ where
 {
     let mut bytes = [0u8; S];
     bytes[0..P].copy_from_slice(&low);
-    bytes[P..P * 2].copy_from_slice(&high);
+    bytes[P..S].copy_from_slice(&high);
     bytes
 }
 
