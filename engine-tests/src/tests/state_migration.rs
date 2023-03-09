@@ -1,5 +1,6 @@
 use crate::prelude::U256;
 use crate::test_utils::{self, str_to_account_id, AuroraRunner};
+use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
@@ -56,7 +57,7 @@ pub fn deploy_evm() -> AuroraAccount {
     let init_args = InitCallArgs {
         prover_account,
         eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
-        metadata: Default::default(),
+        metadata: FungibleTokenMetadata::default(),
     };
     contract_account
         .call(

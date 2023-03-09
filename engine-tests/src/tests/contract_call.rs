@@ -35,7 +35,7 @@ fn hello_world_solidity() {
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let name = "AuroraG".to_string();
-    let expected = format!("Hello {}!", name);
+    let expected = format!("Hello {name}!");
 
     let result = tester.hello_world(&mut runner, &mut signer, name);
     assert_eq!(expected, result);
@@ -156,7 +156,7 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
     ];
 
     for (flag, expected) in test_data {
-        println!("{}", flag);
+        println!("{flag}");
         assert!(tester
             .try_withdraw_and_avoid_fail_and_succeed(&mut runner, &mut signer, flag)
             .is_ok());

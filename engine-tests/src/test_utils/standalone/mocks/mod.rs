@@ -27,7 +27,7 @@ pub fn insert_block(storage: &mut Storage, block_height: u64) {
         random_seed: H256::zero(),
     };
     storage
-        .set_block_data(block_hash, block_height, block_metadata)
+        .set_block_data(block_hash, block_height, &block_metadata)
         .unwrap();
 }
 
@@ -56,7 +56,7 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
         upgrade_delay_blocks: 1,
     };
 
-    state::set_state(&mut io, new_args.into()).unwrap();
+    state::set_state(&mut io, &new_args.into()).unwrap();
 
     let connector_args = InitCallArgs {
         prover_account: test_utils::str_to_account_id("prover.near"),
@@ -66,7 +66,7 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
 
     aurora_engine::connector::EthConnectorContract::create_contract(
         io,
-        env.current_account_id(),
+        &env.current_account_id(),
         connector_args,
     )
     .map_err(unsafe_to_string)
