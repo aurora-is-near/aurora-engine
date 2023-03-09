@@ -1,6 +1,7 @@
 use crate::fmt::Formatter;
 use crate::{Add, AddAssign, Display, Div, Mul, Sub};
 use borsh::{BorshDeserialize, BorshSerialize};
+use core::num::NonZeroU64;
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -83,10 +84,10 @@ impl AddAssign for EthGas {
     }
 }
 
-impl Div<u64> for EthGas {
+impl Div<NonZeroU64> for EthGas {
     type Output = Self;
 
-    fn div(self, rhs: u64) -> Self::Output {
+    fn div(self, rhs: NonZeroU64) -> Self::Output {
         Self(self.0 / rhs)
     }
 }
