@@ -1,3 +1,10 @@
+#![deny(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::similar_names,
+    clippy::module_name_repetitions,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc
+)]
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{account_id::AccountId, H256};
 use rocksdb::DB;
@@ -144,7 +151,7 @@ impl Storage {
         &mut self,
         block_hash: H256,
         block_height: u64,
-        block_metadata: BlockMetadata,
+        block_metadata: &BlockMetadata,
     ) -> Result<(), rocksdb::Error> {
         let block_height_bytes = block_height.to_be_bytes();
 
@@ -206,7 +213,7 @@ impl Storage {
     ) -> Result<(), error::Error> {
         let batch = rocksdb::WriteBatch::default();
         self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, value| {
-            batch.put(key, value)
+            batch.put(key, value);
         })
     }
 
@@ -218,7 +225,7 @@ impl Storage {
     ) -> Result<(), error::Error> {
         let batch = rocksdb::WriteBatch::default();
         self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, _value| {
-            batch.delete(key)
+            batch.delete(key);
         })
     }
 
@@ -292,7 +299,7 @@ impl Storage {
             let tx_hash = self
                 .get_transaction_by_position(tx_included)
                 .unwrap_or_default();
-            result.push((block_height, tx_hash, value))
+            result.push((block_height, tx_hash, value));
         }
         Ok(result)
     }
@@ -349,14 +356,11 @@ impl Storage {
 
             // move to the next key by skipping all other DB keys corresponding to the same engine key
             while iter.valid()
-                && iter
-                    .key()
-                    .map(|db_key| {
-                        db_key[0..engine_prefix_len] == engine_prefix
-                            && &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)]
-                                == engine_key
-                    })
-                    .unwrap_or(false)
+                && iter.key().map_or(false, |db_key| {
+                    db_key[0..engine_prefix_len] == engine_prefix
+                        && &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)]
+                            == engine_key
+                })
             {
                 iter.next();
             }
@@ -420,6 +424,7 @@ pub struct TransactionIncluded {
 }
 
 impl TransactionIncluded {
+    #[must_use]
     pub fn to_bytes(self) -> [u8; 34] {
         let mut bytes = [0u8; 34];
 
@@ -429,6 +434,7 @@ impl TransactionIncluded {
         bytes
     }
 
+    #[must_use]
     pub fn from_bytes(bytes: [u8; 34]) -> Self {
         let block_hash = H256::from_slice(&bytes[0..32]);
         let mut position = [0u8; 2];
@@ -451,6 +457,7 @@ pub struct BlockMetadata {
 }
 
 impl BlockMetadata {
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 40] {
         let mut buf = [0u8; 40];
         buf[0..8].copy_from_slice(&self.timestamp.nanos().to_be_bytes());
@@ -458,6 +465,7 @@ impl BlockMetadata {
         buf
     }
 
+    #[must_use]
     pub fn from_bytes(bytes: [u8; 40]) -> Self {
         let nanos = {
             let mut buf = [0u8; 8];

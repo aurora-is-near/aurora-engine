@@ -40,6 +40,9 @@ fn erc20_mint() {
 
 #[test]
 fn erc20_mint_out_of_gas() {
+    const GAS_LIMIT: u64 = 67_000;
+    const GAS_PRICE: u64 = 10;
+
     let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
 
     // Validate pre-state
@@ -60,12 +63,10 @@ fn erc20_mint_out_of_gas() {
     mint_tx.gas_limit = (intrinsic_gas - 1).into();
     let outcome = runner.submit_transaction(&source_account.secret_key, mint_tx.clone());
     let error = outcome.unwrap_err();
-    let error_message = format!("{:?}", error);
+    let error_message = format!("{error:?}");
     assert!(error_message.contains("ERR_INTRINSIC_GAS"));
 
     // not enough gas to complete transaction
-    const GAS_LIMIT: u64 = 67_000;
-    const GAS_PRICE: u64 = 10;
     mint_tx.gas_limit = U256::from(GAS_LIMIT);
     mint_tx.gas_price = U256::from(GAS_PRICE); // also set non-zero gas price to check gas still charged.
     let outcome = runner.submit_transaction(&source_account.secret_key, mint_tx);
@@ -102,7 +103,7 @@ fn profile_erc20_get_balance() {
 
     let balance_tx = contract.balance_of(source_address, U256::zero());
     let (result, profile) =
-        runner.profiled_view_call(test_utils::as_view_call(balance_tx, source_address));
+        runner.profiled_view_call(&test_utils::as_view_call(balance_tx, source_address));
     assert!(result.is_ok());
 
     // call costs less than 2 Tgas
@@ -111,8 +112,7 @@ fn profile_erc20_get_balance() {
     let wasm_fraction = (100 * profile.wasm_gas()) / profile.all_gas();
     assert!(
         (20..=30).contains(&wasm_fraction),
-        "{}% is not between 20% and 30%",
-        wasm_fraction
+        "{wasm_fraction}% is not between 20% and 30%",
     );
 }
 
@@ -217,7 +217,7 @@ fn deploy_erc_20_out_of_gas() {
     deploy_transaction.gas_limit = (intrinsic_gas - 1).into();
     let outcome = runner.submit_transaction(&source_account, deploy_transaction.clone());
     let error = outcome.unwrap_err();
-    let error_message = format!("{:?}", error);
+    let error_message = format!("{error:?}");
     assert!(error_message.contains("ERR_INTRINSIC_GAS"));
 
     // not enough gas to complete transaction
@@ -243,14 +243,14 @@ fn get_address_erc20_balance(
 ) -> U256 {
     let balance_tx = contract.balance_of(address, signer.nonce.into());
     let result = runner
-        .view_call(test_utils::as_view_call(
+        .view_call(&test_utils::as_view_call(
             balance_tx,
             test_utils::address_from_secret_key(&signer.secret_key),
         ))
         .unwrap();
     let bytes = match result {
-        aurora_engine::parameters::TransactionStatus::Succeed(bytes) => bytes,
-        err => panic!("Unexpected view call status {:?}", err),
+        TransactionStatus::Succeed(bytes) => bytes,
+        err => panic!("Unexpected view call status {err:?}"),
     };
     U256::from_big_endian(&bytes)
 }
