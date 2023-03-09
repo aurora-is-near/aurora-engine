@@ -3,6 +3,7 @@ use crate::prelude::{Borrowed, PhantomData, Vec};
 use crate::utils;
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
 use bn::Group;
+use core::num::{NonZeroU64, NonZeroUsize};
 use evm::{Context, ExitError};
 
 /// bn128 costs.
@@ -506,8 +507,9 @@ impl<HF: HardFork> Bn256Pair<HF> {
 impl Precompile for Bn256Pair<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
-        let pair_element_len =
-            u64::try_from(consts::PAIR_ELEMENT_LEN).map_err(utils::err_usize_conv)?;
+        let pair_element_len = NonZeroUsize::try_from(consts::PAIR_ELEMENT_LEN)
+            .and_then(NonZeroU64::try_from)
+            .map_err(utils::err_usize_conv)?;
         Ok(
             costs::BYZANTIUM_PAIR_PER_POINT * input_len / pair_element_len
                 + costs::BYZANTIUM_PAIR_BASE,
@@ -540,8 +542,9 @@ impl Precompile for Bn256Pair<Byzantium> {
 impl Precompile for Bn256Pair<Istanbul> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
-        let pair_element_len =
-            u64::try_from(consts::PAIR_ELEMENT_LEN).map_err(utils::err_usize_conv)?;
+        let pair_element_len = NonZeroUsize::try_from(consts::PAIR_ELEMENT_LEN)
+            .and_then(NonZeroU64::try_from)
+            .map_err(utils::err_usize_conv)?;
         Ok(
             costs::ISTANBUL_PAIR_PER_POINT * input_len / pair_element_len
                 + costs::ISTANBUL_PAIR_BASE,
