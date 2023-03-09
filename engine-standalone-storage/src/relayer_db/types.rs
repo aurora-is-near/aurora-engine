@@ -19,6 +19,7 @@ pub struct ConnectionParams {
 }
 
 impl ConnectionParams {
+    #[must_use]
     pub fn as_connection_string(&self) -> String {
         format!(
             "host={} port={} dbname={} user={} password={}",
@@ -263,13 +264,14 @@ enum PostgresNumericSign {
     NaN = 0xc000,
 }
 
+#[allow(clippy::fallible_impl_from)]
 impl From<u16> for PostgresNumericSign {
     fn from(value: u16) -> Self {
         match value {
             0x0000 => Self::Positive,
             0x4000 => Self::Negative,
             0xc000 => Self::NaN,
-            _ => panic!("Unexpected Numeric Sign value"),
+            _ => panic!("Unexpected PostgresNumericSign value"),
         }
     }
 }
@@ -278,20 +280,20 @@ impl TryFrom<PostgresNumeric> for U256 {
     type Error = NumericToU256Error;
 
     fn try_from(value: PostgresNumeric) -> Result<Self, Self::Error> {
-        if let PostgresNumericSign::Negative = value.sign {
+        if matches!(value.sign, PostgresNumericSign::Negative) {
             return Err(NumericToU256Error::Negative);
-        } else if let PostgresNumericSign::NaN = value.sign {
+        } else if matches!(value.sign, PostgresNumericSign::NaN) {
             return Err(NumericToU256Error::NaN);
         } else if value.scale != 0 || value.weight < 0 {
             return Err(NumericToU256Error::NotAWholeNumber);
         }
 
-        let mut total = U256::zero();
+        let mut total = Self::zero();
         let mut weight = PostgresNumeric::BASE_WEIGHT
             .checked_pow(value.weight.into())
             .ok_or(NumericToU256Error::Overflow)?;
         for group in value.groups {
-            let contribution = U256::from(group)
+            let contribution = Self::from(group)
                 .checked_mul(weight)
                 .ok_or(NumericToU256Error::Overflow)?;
             total = total
@@ -340,7 +342,7 @@ impl<'a> postgres::types::FromSql<'a> for PostgresNumeric {
             groups.push(read_u16(&mut cursor)?);
         }
 
-        Ok(PostgresNumeric {
+        Ok(Self {
             weight,
             sign,
             scale,

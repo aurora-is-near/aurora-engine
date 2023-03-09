@@ -56,7 +56,7 @@ pub mod error {
 
 #[cfg(test)]
 mod test {
-    /// Requires a JSON snapshot to work. This can be obtained from https://github.com/aurora-is-near/contract-state
+    /// Requires a JSON snapshot to work. This can be obtained from `https://github.com/aurora-is-near/contract-state`
     #[test]
     #[ignore]
     fn test_consume_snapshot() {

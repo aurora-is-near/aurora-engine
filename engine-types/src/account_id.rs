@@ -1,6 +1,6 @@
-//! Guarantees all properly constructed AccountId's are valid for the NEAR network.
+//! Guarantees all properly constructed `AccountId`'s are valid for the NEAR network.
 //!
-//! Inpired by: https://github.com/near/nearcore/tree/master/core/account-id
+//! Inspired by: `https://github.com/near/nearcore/tree/master/core/account-id`
 
 use crate::{fmt, str, str::FromStr, Box, String, ToString, Vec};
 use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
@@ -11,7 +11,7 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 
 /// Account identifier.
 ///
-/// This guarantees all properly constructed AccountId's are valid for the NEAR network.
+/// This guarantees all properly constructed `AccountId`'s are valid for the NEAR network.
 #[derive(
     Default,
     BorshSerialize,
@@ -33,6 +33,7 @@ impl AccountId {
         Ok(Self(account_id.into()))
     }
 
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.as_ref().as_bytes()
     }
@@ -72,6 +73,7 @@ impl AccountId {
         }
     }
 
+    #[must_use]
     pub fn is_top_level_account_id(&self) -> bool {
         self.0.len() >= MIN_ACCOUNT_ID_LEN
             && self.0.len() <= MAX_ACCOUNT_ID_LEN
@@ -79,8 +81,9 @@ impl AccountId {
             && !self.as_ref().contains('.')
     }
 
-    /// Returns true if the signer_id can create a direct sub-account with the given account Id.
-    pub fn is_sub_account_of(&self, parent_account_id: &AccountId) -> bool {
+    /// Returns true if the `signer_id` can create a direct sub-account with the given account Id.
+    #[must_use]
+    pub fn is_sub_account_of(&self, parent_account_id: &Self) -> bool {
         if parent_account_id.0.len() >= self.0.len() {
             return false;
         }
@@ -110,7 +113,7 @@ impl TryFrom<String> for AccountId {
     type Error = ParseAccountError;
 
     fn try_from(account_id: String) -> Result<Self, Self::Error> {
-        AccountId::new(&account_id)
+        Self::new(&account_id)
     }
 }
 
@@ -119,7 +122,7 @@ impl TryFrom<&[u8]> for AccountId {
 
     fn try_from(account_id: &[u8]) -> Result<Self, Self::Error> {
         let account_id = str::from_utf8(account_id).map_err(|_| ParseAccountError::Invalid)?;
-        AccountId::new(account_id)
+        Self::new(account_id)
     }
 }
 
@@ -127,7 +130,7 @@ impl TryFrom<Vec<u8>> for AccountId {
     type Error = ParseAccountError;
 
     fn try_from(account_id: Vec<u8>) -> Result<Self, Self::Error> {
-        AccountId::try_from(&account_id[..])
+        Self::try_from(&account_id[..])
     }
 }
 
@@ -153,13 +156,13 @@ impl fmt::Display for AccountId {
 }
 
 impl From<AccountId> for Box<str> {
-    fn from(value: AccountId) -> Box<str> {
+    fn from(value: AccountId) -> Self {
         value.0
     }
 }
 
 impl From<AccountId> for Vec<u8> {
-    fn from(account_id: AccountId) -> Vec<u8> {
+    fn from(account_id: AccountId) -> Self {
         account_id.as_bytes().to_vec()
     }
 }
@@ -184,9 +187,9 @@ pub enum ParseAccountError {
 impl AsRef<[u8]> for ParseAccountError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            ParseAccountError::TooLong => b"ERR_ACCOUNT_ID_TO_LONG",
-            ParseAccountError::TooShort => b"ERR_ACCOUNT_ID_TO_SHORT",
-            ParseAccountError::Invalid => b"ERR_ACCOUNT_ID_TO_INVALID",
+            Self::TooLong => b"ERR_ACCOUNT_ID_TO_LONG",
+            Self::TooShort => b"ERR_ACCOUNT_ID_TO_SHORT",
+            Self::Invalid => b"ERR_ACCOUNT_ID_TO_INVALID",
         }
     }
 }
@@ -194,7 +197,7 @@ impl AsRef<[u8]> for ParseAccountError {
 impl fmt::Display for ParseAccountError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
-        write!(f, "{}", msg)
+        write!(f, "{msg}")
     }
 }
 
@@ -268,16 +271,17 @@ mod tests {
 
     #[test]
     fn test_is_valid_account_id() {
-        for account_id in OK_ACCOUNT_IDS.iter().cloned() {
+        for account_id in OK_ACCOUNT_IDS {
             if let Err(err) = AccountId::validate(account_id) {
-                panic!("Valid account id {:?} marked invalid: {}", account_id, err);
+                panic!("Valid account id {account_id:?} marked invalid: {err}");
             }
         }
 
-        for account_id in BAD_ACCOUNT_IDS.iter().cloned() {
-            if AccountId::validate(account_id).is_ok() {
-                panic!("Valid account id {:?} marked valid", account_id);
-            }
+        for account_id in BAD_ACCOUNT_IDS {
+            assert!(
+                AccountId::validate(account_id).is_err(),
+                "Valid account id {account_id:?} marked valid"
+            );
         }
     }
 
@@ -304,8 +308,7 @@ mod tests {
                 account_id
                     .parse::<AccountId>()
                     .map_or(false, |account_id| account_id.is_top_level_account_id()),
-                "Valid top level account id {:?} marked invalid",
-                account_id
+                "Valid top level account id {account_id:?} marked invalid",
             );
         }
 
@@ -351,8 +354,7 @@ mod tests {
                 !account_id
                     .parse::<AccountId>()
                     .map_or(false, |account_id| account_id.is_top_level_account_id()),
-                "Invalid top level account id {:?} marked valid",
-                account_id
+                "Invalid top level account id {account_id:?} marked valid",
             );
         }
     }
@@ -376,9 +378,7 @@ mod tests {
                     (signer_id.parse::<AccountId>(), sub_account_id.parse::<AccountId>()),
                     (Ok(signer_id), Ok(sub_account_id)) if sub_account_id.is_sub_account_of(&signer_id)
                 ),
-                "Failed to create sub-account {:?} by account {:?}",
-                sub_account_id,
-                signer_id
+                "Failed to create sub-account {sub_account_id:?} by account {signer_id:?}",
             );
         }
 
@@ -432,9 +432,7 @@ mod tests {
                     (signer_id.parse::<AccountId>(), sub_account_id.parse::<AccountId>()),
                     (Ok(signer_id), Ok(sub_account_id)) if sub_account_id.is_sub_account_of(&signer_id)
                 ),
-                "Invalid sub-account {:?} created by account {:?}",
-                sub_account_id,
-                signer_id
+                "Invalid sub-account {sub_account_id:?} created by account {signer_id:?}",
             );
         }
     }
@@ -454,13 +452,11 @@ mod tests {
                     valid_account_id.parse::<AccountId>(),
                     Ok(account_id) if is_implicit(account_id.as_ref())
                 ),
-                "Account ID {} should be valid 64-len hex",
-                valid_account_id
+                "Account ID {valid_account_id} should be valid 64-len hex",
             );
             assert!(
                 is_implicit(valid_account_id),
-                "Account ID {} should be valid 64-len hex",
-                valid_account_id
+                "Account ID {valid_account_id} should be valid 64-len hex",
             );
         }
 
@@ -478,13 +474,11 @@ mod tests {
                     invalid_account_id.parse::<AccountId>(),
                     Ok(account_id) if is_implicit(account_id.as_ref())
                 ),
-                "Account ID {} should be invalid 64-len hex",
-                invalid_account_id
+                "Account ID {invalid_account_id} should be invalid 64-len hex",
             );
             assert!(
                 !is_implicit(invalid_account_id),
-                "Account ID {} should be invalid 64-len hex",
-                invalid_account_id
+                "Account ID {invalid_account_id} should be invalid 64-len hex",
             );
         }
     }
