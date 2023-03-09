@@ -15,7 +15,7 @@ use crate::prelude::{
 
 use crate::prelude::types::EthGas;
 use crate::PrecompileOutput;
-use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::{account_id::AccountId, types::NEP141Wei};
 use evm::backend::Log;
 use evm::{Context, ExitError};
 
@@ -472,7 +472,6 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         //  - amount (32 bytes)
         //  - eth_recipient (20 bytes)
         validate_input_size(input, 21, 53)?;
-        use crate::prelude::types::NEP141Wei;
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);
