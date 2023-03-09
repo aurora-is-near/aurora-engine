@@ -104,8 +104,7 @@ impl BorshDeserialize for AccountId {
             return Ok(Self::default());
         }
 
-        AccountId::new(&account)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
+        Self::new(&account).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
     }
 }
 
