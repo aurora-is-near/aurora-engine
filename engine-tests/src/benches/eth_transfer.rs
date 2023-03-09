@@ -8,7 +8,7 @@ const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 
-pub(crate) fn eth_transfer_benchmark(c: &mut Criterion) {
+pub fn eth_transfer_benchmark(c: &mut Criterion) {
     let mut runner = deploy_evm();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
@@ -35,8 +35,8 @@ pub(crate) fn eth_transfer_benchmark(c: &mut Criterion) {
     assert!(maybe_err.is_none());
     let gas = output.unwrap().burnt_gas;
     // TODO(#45): capture this in a file
-    println!("ETH_TRANSFER NEAR GAS: {:?}", gas);
-    println!("ETH_TRANSFER ETH GAS: {:?}", 21_000);
+    println!("ETH_TRANSFER NEAR GAS: {gas:?}");
+    println!("ETH_TRANSFER ETH GAS: 21_000");
 
     // measure wall-clock time
     c.bench_function("eth_transfer", |b| {
@@ -44,6 +44,6 @@ pub(crate) fn eth_transfer_benchmark(c: &mut Criterion) {
             || (runner.one_shot(), calling_account_id, input.clone()),
             |(r, c, i)| r.call(SUBMIT, c, i),
             BatchSize::SmallInput,
-        )
+        );
     });
 }

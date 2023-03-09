@@ -1,12 +1,13 @@
 use crate::prelude::{transactions::legacy::TransactionLegacy, Address, U256};
 use crate::test_utils::solidity;
 use aurora_engine_transactions::NormalizedEthTransaction;
+use aurora_engine_types::types::Wei;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
 
-pub(crate) struct ERC20Constructor(pub solidity::ContractConstructor);
+pub struct ERC20Constructor(pub solidity::ContractConstructor);
 
-pub(crate) struct ERC20(pub solidity::DeployedContract);
+pub struct ERC20(pub solidity::DeployedContract);
 
 impl From<ERC20Constructor> for solidity::ContractConstructor {
     fn from(c: ERC20Constructor) -> Self {
@@ -42,10 +43,10 @@ impl ERC20Constructor {
             .unwrap();
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: None,
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -53,17 +54,17 @@ impl ERC20Constructor {
     fn download_solidity_sources() -> PathBuf {
         let sources_dir = Path::new("target").join("openzeppelin-contracts");
         let contracts_dir = sources_dir.join("contracts");
-        if contracts_dir.exists() {
-            contracts_dir
-        } else {
+
+        if !contracts_dir.exists() {
             // Contracts not already present, so download them (but only once, even
             // if multiple tests running in parallel saw `contracts_dir` does not exist).
             DOWNLOAD_ONCE.call_once(|| {
                 let url = "https://github.com/OpenZeppelin/openzeppelin-contracts";
                 git2::Repository::clone(url, sources_dir).unwrap();
             });
-            contracts_dir
         }
+
+        contracts_dir
     }
 
     fn solidity_artifacts_path() -> PathBuf {
@@ -86,10 +87,10 @@ impl ERC20 {
 
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -107,10 +108,10 @@ impl ERC20 {
             .unwrap();
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -135,10 +136,10 @@ impl ERC20 {
             .unwrap();
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -156,10 +157,10 @@ impl ERC20 {
             .unwrap();
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -174,18 +175,18 @@ impl ERC20 {
             .unwrap();
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
 }
 
-pub(crate) fn legacy_into_normalized_tx(tx: TransactionLegacy) -> NormalizedEthTransaction {
+pub fn legacy_into_normalized_tx(tx: TransactionLegacy) -> NormalizedEthTransaction {
     NormalizedEthTransaction {
-        address: Default::default(),
+        address: Address::default(),
         chain_id: None,
         nonce: tx.nonce,
         gas_limit: tx.gas_limit,

@@ -29,7 +29,7 @@ impl Decodable for AccessTuple {
     }
 }
 
-/// See https://eips.ethereum.org/EIPS/eip-2930
+/// See `https://eips.ethereum.org/EIPS/eip-2930`
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Transaction2930 {
     pub chain_id: u64,
@@ -66,11 +66,11 @@ impl Transaction2930 {
         s.append(&self.value.raw());
         s.append(&self.data);
         s.begin_list(self.access_list.len());
-        for tuple in self.access_list.iter() {
+        for tuple in &self.access_list {
             s.begin_list(2);
             s.append(&tuple.address);
             s.begin_list(tuple.storage_keys.len());
-            for key in tuple.storage_keys.iter() {
+            for key in &tuple.storage_keys {
                 s.append(key);
             }
         }

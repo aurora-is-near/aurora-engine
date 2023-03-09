@@ -36,8 +36,8 @@ impl Precompile for Identity {
 
     /// Takes the input bytes, copies them, and returns it as the output.
     ///
-    /// See: https://ethereum.github.io/yellowpaper/paper.pdf
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000004
+    /// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000004`
     fn run(
         &self,
         input: &[u8],

@@ -10,11 +10,11 @@ use crate::test_utils::{self, standalone};
 /// This test replays two transactions from Ethereum mainnet (listed below) and checks we obtain
 /// the same gas usage and transaction trace as reported by etherscan.
 /// Transactions:
-/// * https://etherscan.io/tx/0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4
-/// * https://etherscan.io/tx/0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e
+/// * `https://etherscan.io/tx/0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4`
+/// * `https://etherscan.io/tx/0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e`
 /// Traces:
-/// * https://etherscan.io/vmtrace?txhash=0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4
-/// * https://etherscan.io/vmtrace?txhash=0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e
+/// * `https://etherscan.io/vmtrace?txhash=0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4`
+/// * `https://etherscan.io/vmtrace?txhash=0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e`
 #[test]
 fn test_evm_tracing_with_storage() {
     let mut runner = standalone::StandaloneRunner::default();
@@ -44,7 +44,7 @@ fn test_evm_tracing_with_storage() {
             new_key[2..22].copy_from_slice(weth_address.as_bytes());
             match value {
                 engine_standalone_storage::diff::DiffValue::Modified(bytes) => {
-                    diff.modify(new_key, bytes.clone())
+                    diff.modify(new_key, bytes.clone());
                 }
                 engine_standalone_storage::diff::DiffValue::Deleted => diff.delete(new_key),
             }
@@ -59,7 +59,7 @@ fn test_evm_tracing_with_storage() {
     };
     runner
         .storage
-        .set_block_data(block_hash, block_height, block_metadata)
+        .set_block_data(block_hash, block_height, &block_metadata)
         .unwrap();
     let tx = engine_standalone_storage::sync::TransactionIncludedOutcome {
         hash: H256::zero(),
@@ -98,7 +98,7 @@ fn test_evm_tracing_with_storage() {
 
     // Check trace
     check_transaction_trace(
-        listener.finish(),
+        &listener.finish(),
         "src/tests/res/79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4_trace.json",
     );
 
@@ -121,14 +121,14 @@ fn test_evm_tracing_with_storage() {
 
     // Check trace
     check_transaction_trace(
-        listener.finish(),
+        &listener.finish(),
         "src/tests/res/33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e_trace.json",
     );
 }
 
 /// Test based on expected trace of
-/// https://rinkeby.etherscan.io/tx/0xfc9359e49278b7ba99f59edac0e3de49956e46e530a53c15aa71226b7aa92c6f
-/// (geth example found at https://gist.github.com/karalabe/c91f95ac57f5e57f8b950ec65ecc697f).
+/// `https://rinkeby.etherscan.io/tx/0xfc9359e49278b7ba99f59edac0e3de49956e46e530a53c15aa71226b7aa92c6f`
+/// (geth example found at `https://gist.github.com/karalabe/c91f95ac57f5e57f8b950ec65ecc697f`).
 #[test]
 fn test_evm_tracing() {
     let mut runner = standalone::StandaloneRunner::default();
@@ -173,7 +173,7 @@ fn test_evm_tracing() {
         .logs()
         .0
         .iter()
-        .map(|l| u8::try_from(l.program_counter.into_u32()).unwrap())
+        .filter_map(|l| u8::try_from(l.program_counter.into_u32()).ok())
         .collect();
     assert_eq!(positions.as_slice(), &EXPECTED_POSITIONS);
 
@@ -181,7 +181,7 @@ fn test_evm_tracing() {
         .logs()
         .0
         .iter()
-        .map(|l| u32::try_from(l.gas_cost.as_u64()).unwrap())
+        .filter_map(|l| u32::try_from(l.gas_cost.as_u64()).ok())
         .collect();
     assert_eq!(costs.as_slice(), &EXPECTED_COSTS);
 
@@ -205,7 +205,7 @@ const EXPECTED_OP_CODES: [u8; 27] = [
     91, 91, 91, 0,
 ];
 
-fn check_transaction_trace<P: AsRef<Path>>(trace: TransactionTrace, expected_trace_path: P) {
+fn check_transaction_trace<P: AsRef<Path>>(trace: &TransactionTrace, expected_trace_path: P) {
     let expected_trace: Vec<EtherscanTraceStep> = {
         let file = std::fs::File::open(expected_trace_path).unwrap();
         let reader = std::io::BufReader::new(file);

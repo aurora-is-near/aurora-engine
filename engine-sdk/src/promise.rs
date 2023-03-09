@@ -7,11 +7,13 @@ use aurora_engine_types::types::PromiseResult;
 pub struct PromiseId(u64);
 
 impl PromiseId {
-    pub fn new(id: u64) -> Self {
+    #[must_use]
+    pub const fn new(id: u64) -> Self {
         Self(id)
     }
 
-    pub fn raw(self) -> u64 {
+    #[must_use]
+    pub const fn raw(self) -> u64 {
         self.0
     }
 }
