@@ -9,7 +9,7 @@ use std::cell::RefCell;
 #[test]
 fn test_deploy_code() {
     let chain_id: [u8; 32] = {
-        let value = U256::from(1313161554);
+        let value = U256::from(1_313_161_554);
         let mut buf = [0u8; 32];
         value.to_big_endian(&mut buf);
         buf
@@ -54,7 +54,7 @@ fn test_deploy_code() {
         aurora_engine::parameters::TransactionStatus::Succeed(bytes) => {
             Address::try_from_slice(&bytes).unwrap()
         }
-        other => panic!("Unexpected status: {:?}", other),
+        other => panic!("Unexpected status: {other:?}"),
     };
 
     // state is updated
@@ -67,11 +67,8 @@ fn test_deploy_code() {
 }
 
 fn evm_deploy(code: &[u8]) -> Vec<u8> {
-    let len = code.len();
-    if len > u16::MAX as usize {
-        panic!("Cannot deploy a contract with that many bytes!");
-    }
-    let len = len as u16;
+    let len = u16::try_from(code.len())
+        .unwrap_or_else(|_| panic!("Cannot deploy a contract with that many bytes!"));
     // This bit of EVM byte code essentially says:
     // "If msg.value > 0 revert; otherwise return `len` amount of bytes that come after me
     // in the code." By prepending this to `code` we create a valid EVM program which

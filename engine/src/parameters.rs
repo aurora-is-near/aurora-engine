@@ -26,6 +26,12 @@ pub struct NewCallArgs {
     pub upgrade_delay_blocks: u64,
 }
 
+/// Borsh-encoded parameters for the `set_owner` function.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct SetOwnerArgs {
+    pub new_owner: AccountId,
+}
+
 /// Borsh-encoded (genesis) account balance used by the `begin_chain` function.
 #[cfg(feature = "evm_bully")]
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -80,7 +86,7 @@ pub struct DepositCallArgs {
     pub relayer_eth_account: Option<Address>,
 }
 
-/// Eth-connector isUsedProof arguments
+/// Eth-connector `isUsedProof` arguments
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct IsUsedProofCallArgs {
     /// Proof data
@@ -104,12 +110,13 @@ pub struct StorageBalance {
 }
 
 impl StorageBalance {
+    #[must_use]
     pub fn to_json_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).unwrap_or_default()
     }
 }
 
-/// ft_resolve_transfer eth-connector call args
+/// `ft_resolve_transfer` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct ResolveTransferCallArgs {
     pub sender_id: AccountId,
@@ -165,20 +172,20 @@ pub struct TransferCallCallArgs {
     pub msg: String,
 }
 
-/// storage_balance_of eth-connector call args
+/// `storage_balance_of` eth-connector call args
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct StorageBalanceOfCallArgs {
     pub account_id: AccountId,
 }
 
-/// storage_deposit eth-connector call args
+/// `storage_deposit` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageDepositCallArgs {
     pub account_id: Option<AccountId>,
     pub registration_only: Option<bool>,
 }
 
-/// storage_withdraw eth-connector call args
+/// `storage_withdraw` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageWithdrawCallArgs {
     pub amount: Option<Yocto>,
@@ -192,7 +199,7 @@ pub struct TransferCallArgs {
     pub memo: Option<String>,
 }
 
-/// balance_of args for json invocation
+/// `balance_of` args for json invocation
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct BalanceOfCallArgs {
     pub account_id: AccountId,

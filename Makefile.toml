@@ -82,9 +82,12 @@ command = "${CARGO}"
 args = [
     "clippy",
     "--all-targets",
+    "--all-features",
     "--",
     "-D",
     "warnings",
+    "-D",
+    "clippy::as_conversions",
 ]
 
 [tasks.check-fmt]
