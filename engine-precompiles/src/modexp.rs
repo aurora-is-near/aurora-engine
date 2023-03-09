@@ -520,7 +520,7 @@ mod tests {
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         // should pass without panic
-        let _ = ModExp::<Berlin>::new().run(
+        let _res = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -539,7 +539,7 @@ mod tests {
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         // should pass without panic!
-        let _ = ModExp::<Berlin>::new().run(
+        let _res = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -600,7 +600,7 @@ mod tests {
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         // should panic
-        let _ = ModExp::<Berlin>::new().run(
+        let _res = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -621,7 +621,7 @@ mod tests {
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         // should panic
-        let _ = ModExp::<Berlin>::new().run(
+        let _res = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
