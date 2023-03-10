@@ -24,7 +24,9 @@ impl Depth {
     }
 
     pub fn decrement(&mut self) {
-        self.0 -= 1;
+        if !self.is_zero() {
+            self.0 -= 1;
+        }
     }
 
     #[must_use]
