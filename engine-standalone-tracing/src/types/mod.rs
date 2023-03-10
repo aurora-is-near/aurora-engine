@@ -23,9 +23,7 @@ impl Depth {
     }
 
     pub fn decrement(&mut self) {
-        if self.0 == 0 {
-            panic!("Cannot decrement 0 value");
-        }
+        assert!(!(self.0 == 0), "Cannot decrement 0 value");
         self.0 -= 1;
     }
 
