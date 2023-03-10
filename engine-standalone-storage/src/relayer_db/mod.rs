@@ -1,3 +1,4 @@
+use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_transactions::EthTransactionKind;
@@ -101,11 +102,15 @@ where
         env.block_timestamp = block_metadata.timestamp;
         env.random_seed = block_metadata.random_seed;
 
+        let args = SubmitArgs {
+            tx_data: transaction_bytes,
+            ..Default::default()
+        };
         let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
             engine::submit(
                 io,
                 &env,
-                &transaction_bytes,
+                &args,
                 engine_state.clone(),
                 env.current_account_id(),
                 relayer_address,
