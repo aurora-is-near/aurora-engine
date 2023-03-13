@@ -23,7 +23,7 @@ impl Depth {
     }
 
     pub fn decrement(&mut self) {
-        self.0 -= 1;
+        self.0 = self.0.saturating_sub(1);
     }
 
     pub fn is_zero(&self) -> bool {
