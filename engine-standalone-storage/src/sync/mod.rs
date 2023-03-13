@@ -1,3 +1,4 @@
+use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
@@ -134,15 +135,18 @@ fn execute_transaction<'db>(
             let mut handler = crate::promise::NoScheduler {
                 promise_data: &transaction_message.promise_data,
             };
-            let transaction_bytes: Vec<u8> = tx.into();
-            let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
-
+            let tx_data: Vec<u8> = tx.into();
+            let tx_hash = aurora_engine_sdk::keccak(&tx_data);
+            let args = SubmitArgs {
+                tx_data,
+                ..Default::default()
+            };
             let result = state::get_state(&io)
                 .map(|engine_state| {
                     let submit_result = engine::submit(
                         io,
                         &env,
-                        &transaction_bytes,
+                        &args,
                         engine_state,
                         env.current_account_id(),
                         relayer_address,
@@ -154,7 +158,28 @@ fn execute_transaction<'db>(
 
             (tx_hash, result)
         }
+        TransactionKind::SubmitWithArgs(args) => {
+            let mut handler = crate::promise::NoScheduler {
+                promise_data: &transaction_message.promise_data,
+            };
+            let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
+            let result = state::get_state(&io)
+                .map(|engine_state| {
+                    let submit_result = engine::submit(
+                        io,
+                        &env,
+                        args,
+                        engine_state,
+                        env.current_account_id(),
+                        relayer_address,
+                        &mut handler,
+                    );
+                    Some(TransactionExecutionResult::Submit(submit_result))
+                })
+                .map_err(Into::into);
 
+            (tx_hash, result)
+        }
         other => {
             let result = non_submit_execute(
                 other,
@@ -390,7 +415,7 @@ fn non_submit_execute<'db>(
         }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
-        TransactionKind::Submit(_) => unreachable!(),
+        TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
         TransactionKind::PausePrecompiles(args) => {
             let precompiles_to_pause = PrecompileFlags::from_bits_truncate(args.paused_mask);
 
