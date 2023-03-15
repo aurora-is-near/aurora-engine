@@ -1,4 +1,4 @@
-use aurora_engine::parameters::ViewCallArgs;
+use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -26,15 +26,17 @@ use crate::prelude::{sdk, Address, Wei, H256, U256};
 use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
-
 pub const ORIGIN: &str = "aurora";
 pub const SUBMIT: &str = "submit";
+pub const SUBMIT_WITH_ARGS: &str = "submit_with_args";
 pub const CALL: &str = "call";
 pub const DEPLOY_ERC20: &str = "deploy_erc20_token";
 pub const PAUSE_PRECOMPILES: &str = "pause_precompiles";
 pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const SET_OWNER: &str = "set_owner";
+
+const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
 pub mod erc20;
 pub mod exit_precompile;
@@ -226,6 +228,7 @@ impl AuroraRunner {
         if let Some(standalone_runner) = &mut self.standalone_runner {
             if maybe_error.is_none()
                 && (method_name == SUBMIT
+                    || method_name == SUBMIT_WITH_ARGS
                     || method_name == CALL
                     || method_name == DEPLOY_ERC20
                     || method_name == PAUSE_PRECOMPILES
@@ -390,13 +393,56 @@ impl AuroraRunner {
         account: &SecretKey,
         transaction: TransactionLegacy,
     ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
-        let calling_account_id = "some-account.near";
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
-
         let (output, maybe_err) =
-            self.call(SUBMIT, calling_account_id, rlp::encode(&signed_tx).to_vec());
+            self.call(SUBMIT, CALLER_ACCOUNT_ID, rlp::encode(&signed_tx).to_vec());
 
-        maybe_err.map_or_else(
+        Self::profile_outcome(output, maybe_err)
+    }
+
+    pub fn submit_transaction_with_args(
+        &mut self,
+        account: &SecretKey,
+        transaction: TransactionLegacy,
+        max_gas_price: u128,
+        gas_token_address: Option<Address>,
+    ) -> Result<SubmitResult, VMError> {
+        self.submit_transaction_with_args_profiled(
+            account,
+            transaction,
+            max_gas_price,
+            gas_token_address,
+        )
+        .map(|(result, _)| result)
+    }
+
+    pub fn submit_transaction_with_args_profiled(
+        &mut self,
+        account: &SecretKey,
+        transaction: TransactionLegacy,
+        max_gas_price: u128,
+        gas_token_address: Option<Address>,
+    ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
+        let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
+        let args = SubmitArgs {
+            tx_data: rlp::encode(&signed_tx).to_vec(),
+            max_gas_price: Some(max_gas_price),
+            gas_token_address,
+        };
+        let (output, maybe_err) = self.call(
+            SUBMIT_WITH_ARGS,
+            CALLER_ACCOUNT_ID,
+            args.try_to_vec().unwrap(),
+        );
+
+        Self::profile_outcome(output, maybe_err)
+    }
+
+    fn profile_outcome(
+        output: Option<VMOutcome>,
+        error: Option<VMError>,
+    ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
+        error.map_or_else(
             || {
                 let output = output.unwrap();
                 let profile = ExecutionProfile::new(&output);
@@ -414,11 +460,10 @@ impl AuroraRunner {
         constructor_tx: F,
         contract_constructor: T,
     ) -> DeployedContract {
-        let calling_account_id = "some-account.near";
         let tx = constructor_tx(&contract_constructor);
         let signed_tx = sign_transaction(tx, Some(self.chain_id), account);
         let (output, maybe_err) =
-            self.call(SUBMIT, calling_account_id, rlp::encode(&signed_tx).to_vec());
+            self.call(SUBMIT, CALLER_ACCOUNT_ID, rlp::encode(&signed_tx).to_vec());
         assert!(maybe_err.is_none());
         let submit_result =
             SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();

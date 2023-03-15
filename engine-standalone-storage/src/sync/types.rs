@@ -1,6 +1,5 @@
 use crate::Storage;
 use aurora_engine::parameters;
-use aurora_engine::parameters::PausePrecompilesCallArgs;
 use aurora_engine::xcc::AddressVersionUpdateArgs;
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -77,12 +76,14 @@ impl TransactionMessage {
 pub enum TransactionKind {
     /// Raw Ethereum transaction submitted to the engine
     Submit(EthTransactionKind),
+    /// Raw Ethereum transaction with additional arguments submitted to the engine
+    SubmitWithArgs(parameters::SubmitArgs),
     /// Ethereum transaction triggered by a NEAR account
     Call(parameters::CallArgs),
     /// Administrative method that makes a subset of precompiles paused
-    PausePrecompiles(PausePrecompilesCallArgs),
+    PausePrecompiles(parameters::PausePrecompilesCallArgs),
     /// Administrative method that resumes previously paused subset of precompiles
-    ResumePrecompiles(PausePrecompilesCallArgs),
+    ResumePrecompiles(parameters::PausePrecompilesCallArgs),
     /// Input here represents the EVM code used to create the new contract
     Deploy(Vec<u8>),
     /// New bridged token
@@ -113,7 +114,7 @@ pub enum TransactionKind {
     /// Admin only method
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
-    RegisterRelayer(types::Address),
+    RegisterRelayer(Address),
     /// Called if exist precompiles fail
     RefundOnError(Option<aurora_engine_types::parameters::RefundCallArgs>),
     /// Update eth-connector config
@@ -126,7 +127,7 @@ pub enum TransactionKind {
     FactoryUpdate(Vec<u8>),
     /// Update the version of a deployed xcc-router contract
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
-    FactorySetWNearAddress(types::Address),
+    FactorySetWNearAddress(Address),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -148,6 +149,9 @@ impl TransactionKind {
             Self::Submit(eth_tx_kind) => eth_tx_kind
                 .try_into()
                 .unwrap_or_else(|_| Self::no_evm_execution("submit")),
+            Self::SubmitWithArgs(args) => EthTransactionKind::try_from(args.tx_data.as_slice())
+                .and_then(TryInto::try_into)
+                .unwrap_or_else(|_| Self::no_evm_execution("submit_with_args")),
             Self::Call(call_args) => {
                 let from = Self::get_implicit_address(caller);
                 let nonce =
@@ -499,18 +503,19 @@ enum BorshableTransactionKind<'a> {
     StorageUnregister(Option<bool>),
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
     SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
-    RegisterRelayer(Cow<'a, types::Address>),
+    RegisterRelayer(Cow<'a, Address>),
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
     NewConnector(Cow<'a, parameters::InitCallArgs>),
     NewEngine(Cow<'a, parameters::NewCallArgs>),
     FactoryUpdate(Cow<'a, Vec<u8>>),
     FactoryUpdateAddressVersion(Cow<'a, AddressVersionUpdateArgs>),
-    FactorySetWNearAddress(types::Address),
+    FactorySetWNearAddress(Address),
     PausePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
+    SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -520,6 +525,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
                 let tx_bytes = eth_tx.into();
                 Self::Submit(Cow::Owned(tx_bytes))
             }
+            TransactionKind::SubmitWithArgs(x) => Self::SubmitWithArgs(Cow::Borrowed(x)),
             TransactionKind::Call(x) => Self::Call(Cow::Borrowed(x)),
             TransactionKind::Deploy(x) => Self::Deploy(Cow::Borrowed(x)),
             TransactionKind::DeployErc20(x) => Self::DeployErc20(Cow::Borrowed(x)),
@@ -568,6 +574,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 let eth_tx = tx_bytes.as_slice().try_into()?;
                 Ok(Self::Submit(eth_tx))
             }
+            BorshableTransactionKind::SubmitWithArgs(x) => Ok(Self::SubmitWithArgs(x.into_owned())),
             BorshableTransactionKind::Call(x) => Ok(Self::Call(x.into_owned())),
             BorshableTransactionKind::Deploy(x) => Ok(Self::Deploy(x.into_owned())),
             BorshableTransactionKind::DeployErc20(x) => Ok(Self::DeployErc20(x.into_owned())),

@@ -1023,6 +1023,48 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
     );
 }
 
+/// Tests transfer Eth from one account to another with custom argument `max_gas_price`.
+#[test]
+fn test_eth_transfer_with_max_gas_price() {
+    // set up Aurora runner and accounts
+    let (mut runner, source_account, dest_address) = initialize_transfer();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+
+    // validate pre-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        INITIAL_BALANCE,
+        INITIAL_NONCE.into(),
+    );
+    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+
+    // perform transfer
+    let max_gas_price = 5;
+    let mut transaction = test_utils::transfer(dest_address, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    transaction.gas_price = 10.into();
+    transaction.gas_limit = 30_000.into();
+
+    let result = runner
+        .submit_transaction_with_args(&source_account.secret_key, transaction, max_gas_price, None)
+        .unwrap();
+
+    let fee = u128::from(result.gas_used) * max_gas_price;
+    // validate post-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - Wei::new_u128(fee),
+        (INITIAL_NONCE + 1).into(),
+    );
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        dest_address,
+        TRANSFER_AMOUNT,
+        0.into(),
+    );
+}
+
 #[test]
 fn test_set_owner() {
     let mut runner = test_utils::deploy_evm();
