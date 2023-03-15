@@ -147,21 +147,6 @@ mod contract {
         io.return_output(state.owner_id.as_bytes());
     }
 
-    /// Set owner account id for this contract.
-    #[no_mangle]
-    pub extern "C" fn set_owner() {
-        let mut io = Runtime;
-        let mut state = state::get_state(&io).sdk_unwrap();
-        require_owner_only(&state, &io.predecessor_account_id());
-        let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
-        if state.owner_id == args.new_owner {
-            sdk::panic_utf8(errors::ERR_SAME_OWNER);
-        } else {
-            state.owner_id = args.new_owner;
-            state::set_state(&mut io, &state).sdk_unwrap();
-        }
-    }
-
     #[no_mangle]
     pub extern "C" fn propose_owner() {
         let mut io = Runtime;
