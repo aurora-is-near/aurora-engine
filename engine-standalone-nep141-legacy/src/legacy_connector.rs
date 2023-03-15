@@ -478,7 +478,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         );
 
         // Verify message data before `ft_on_transfer` call to avoid verification panics
-        // It's allowed empty message if `receiver_id =! current_account_id`
+        // It's allowed empty message if `receiver_id != current_account_id`
         if args.receiver_id == current_account_id {
             let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
                 .map_err(error::FtTransferCallError::MessageParseFailed)?;
