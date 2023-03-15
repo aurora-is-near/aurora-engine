@@ -12,11 +12,7 @@ const INITIAL_NONCE: u64 = 0;
 static DOWNLOAD_ONCE: Once = Once::new();
 static COMPILE_ONCE: Once = Once::new();
 
-pub(crate) fn measure_gas_usage(
-    total_tokens: usize,
-    data_size: usize,
-    tokens_per_page: usize,
-) -> u64 {
+pub fn measure_gas_usage(total_tokens: usize, data_size: usize, tokens_per_page: usize) -> u64 {
     let (mut runner, mut source_account, dest_address) = initialize_evm();
 
     let marketplace_constructor = MarketPlaceConstructor::load();
@@ -46,7 +42,7 @@ pub(crate) fn measure_gas_usage(
     // show them
     let nonce = source_account.nonce;
     let tx = marketplace.get_page(tokens_per_page, 0, nonce.into());
-    let (result, profile) = runner.profiled_view_call(test_utils::as_view_call(tx, dest_address));
+    let (result, profile) = runner.profiled_view_call(&test_utils::as_view_call(tx, dest_address));
 
     let status = result.unwrap();
     assert!(status.is_ok());
@@ -109,17 +105,17 @@ impl MarketPlaceConstructor {
     fn download_solidity_sources() -> PathBuf {
         let sources_dir = Path::new("target").join("NFT-culturas-latinas");
         let contracts_dir = sources_dir.join("blockchain");
-        if contracts_dir.exists() {
-            contracts_dir
-        } else {
+
+        if !contracts_dir.exists() {
             // Contracts not already present, so download them (but only once, even
             // if multiple tests running in parallel saw `contracts_dir` does not exist).
             DOWNLOAD_ONCE.call_once(|| {
                 let url = "https://github.com/birchmd/NFT-culturas-latinas.git";
                 git2::Repository::clone(url, sources_dir).unwrap();
             });
-            contracts_dir
         }
+
+        contracts_dir
     }
 }
 

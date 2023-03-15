@@ -1,17 +1,17 @@
 use near_vm_logic::mocks::mock_external::MockedExternal;
 
-/// Derived from mainnet data reported here: https://hackmd.io/@birchmd/r1HRjr0P9
+/// Derived from mainnet data reported here: `https://hackmd.io/@birchmd/r1HRjr0P9`
 /// Uses the formulas:
-/// n_T = (G_T / G_R) * (g_R / g_T)
-/// n_c = (G_c / G_R) * (g_R / g_c)
-/// Where n_T is the average number of new touched trie nodes per read,
-/// n_c is the average number of cached trie nodes read per read,
-/// G_T is the average gas cost of touching trie node per Aurora transaction,
-/// G_c is the average gas cost of reading cached trie node per Aurora transaction,
-/// G_R is the average gas cost of `STORAGE_READ_BASE`  per Aurora transaction,
-/// g_R is the `STORAGE_READ_BASE` cost (from the config),
-/// g_T is the `TOUCHING_TRIE_NODE` cost (from the config), and
-/// g_c is the `READ_CACHED_TRIE_NODE` cost (from the config).
+/// `n_T = (G_T / G_R) * (g_R / g_T)`
+/// `n_c = (G_c / G_R) * (g_R / g_c)`
+/// Where `n_T` is the average number of new touched trie nodes per read,
+/// `n_c` is the average number of cached trie nodes read per read,
+/// `G_T` is the average gas cost of touching trie node per Aurora transaction,
+/// `G_c` is the average gas cost of reading cached trie node per Aurora transaction,
+/// `G_R` is the average gas cost of `STORAGE_READ_BASE`  per Aurora transaction,
+/// `g_R` is the `STORAGE_READ_BASE` cost (from the config),
+/// `g_T` is the `TOUCHING_TRIE_NODE` cost (from the config), and
+/// `g_c` is the `READ_CACHED_TRIE_NODE` cost (from the config).
 pub const MAINNET_AVERAGE_TOUCHED_TRIE_PER_READ: u64 = 2;
 pub const MAINNET_AVERAGE_READ_CACHED_TRIE_PER_READ: u64 = 11;
 /// This is still needed because writes will touch every node in the depth, unlike reads which take advantage of caching.
@@ -25,7 +25,7 @@ pub struct MockedExternalWithTrie {
 }
 
 impl MockedExternalWithTrie {
-    pub fn new(ext: MockedExternal) -> Self {
+    pub const fn new(ext: MockedExternal) -> Self {
         Self {
             underlying: ext,
             new_trie_node_count: std::cell::Cell::new(0),

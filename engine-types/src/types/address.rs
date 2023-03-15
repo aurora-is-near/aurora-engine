@@ -9,30 +9,34 @@ pub struct Address(H160);
 
 impl Address {
     /// Construct Address from H160
+    #[must_use]
     pub const fn new(val: H160) -> Self {
         Self(val)
     }
 
     /// Get raw H160 data
-    pub fn raw(&self) -> H160 {
+    #[must_use]
+    pub const fn raw(&self) -> H160 {
         self.0
     }
 
     /// Encode address to string
+    #[must_use]
     pub fn encode(&self) -> String {
         hex::encode(self.0.as_bytes())
     }
 
-    pub fn decode(address: &str) -> Result<Address, error::AddressError> {
+    pub fn decode(address: &str) -> Result<Self, error::AddressError> {
         if address.len() != 40 {
             return Err(error::AddressError::IncorrectLength);
         }
         let mut result = [0u8; 20];
         hex::decode_to_slice(address, &mut result)
             .map_err(|_| error::AddressError::FailedDecodeHex)?;
-        Ok(Address::new(H160(result)))
+        Ok(Self::new(H160(result)))
     }
 
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.0.as_bytes()
     }
@@ -44,12 +48,14 @@ impl Address {
         Ok(Self::new(H160::from_slice(raw_addr)))
     }
 
+    #[must_use]
     pub const fn from_array(array: [u8; 20]) -> Self {
         Self(H160(array))
     }
 
+    #[must_use]
     pub const fn zero() -> Self {
-        Address::new(H160([0u8; 20]))
+        Self::new(H160([0u8; 20]))
     }
 }
 
@@ -84,7 +90,7 @@ impl BorshDeserialize for Address {
 
 impl Default for Address {
     fn default() -> Self {
-        Address::zero()
+        Self::zero()
     }
 }
 
@@ -166,7 +172,7 @@ pub mod error {
     impl fmt::Display for AddressError {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
-            write!(f, "{}", msg)
+            write!(f, "{msg}")
         }
     }
 }

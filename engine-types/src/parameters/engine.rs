@@ -6,7 +6,7 @@ use crate::{
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ResultLog {
     pub address: Address,
     pub topics: Vec<RawU256>,
@@ -15,7 +15,7 @@ pub struct ResultLog {
 
 /// The status of a transaction.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TransactionStatus {
     Succeed(Vec<u8>),
     Revert(Vec<u8>),
@@ -26,19 +26,22 @@ pub enum TransactionStatus {
 }
 
 impl TransactionStatus {
-    pub fn is_ok(&self) -> bool {
-        matches!(*self, TransactionStatus::Succeed(_))
+    #[must_use]
+    pub const fn is_ok(&self) -> bool {
+        matches!(*self, Self::Succeed(_))
     }
 
-    pub fn is_revert(&self) -> bool {
-        matches!(*self, TransactionStatus::Revert(_))
+    #[must_use]
+    pub const fn is_revert(&self) -> bool {
+        matches!(*self, Self::Revert(_))
     }
 
+    #[must_use]
     pub fn is_fail(&self) -> bool {
-        *self == TransactionStatus::OutOfGas
-            || *self == TransactionStatus::OutOfFund
-            || *self == TransactionStatus::OutOfOffset
-            || *self == TransactionStatus::CallTooDeep
+        *self == Self::OutOfGas
+            || *self == Self::OutOfFund
+            || *self == Self::OutOfOffset
+            || *self == Self::CallTooDeep
     }
 }
 
@@ -58,7 +61,7 @@ impl AsRef<[u8]> for TransactionStatus {
 /// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
 /// and `deploy_with_input` methods.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SubmitResult {
     version: u8,
     pub status: TransactionStatus,
@@ -67,13 +70,14 @@ pub struct SubmitResult {
 }
 
 impl SubmitResult {
-    /// Must be incremented when making breaking changes to the SubmitResult ABI.
+    /// Must be incremented when making breaking changes to the `SubmitResult` ABI.
     /// The current value of 7 is chosen because previously a `TransactionStatus` object
     /// was first in the serialization, which is an enum with less than 7 variants.
     /// Therefore, no previous `SubmitResult` would have began with a leading 7 byte,
     /// and this can be used to distinguish the new ABI (with version byte) from the old.
     const VERSION: u8 = 7;
 
+    #[must_use]
     pub fn new(status: TransactionStatus, gas_used: u64, logs: Vec<ResultLog>) -> Self {
         Self {
             version: Self::VERSION,
@@ -109,20 +113,15 @@ pub enum CallArgs {
 }
 
 impl CallArgs {
+    #[must_use]
     pub fn deserialize(bytes: &[u8]) -> Option<Self> {
-        // For handling new input format (wrapped into call args enum) - for data structures with new arguments,
-        // made for flexibility and extensibility.
-        if let Ok(value) = Self::try_from_slice(bytes) {
-            Some(value)
-            // Fallback, for handling old input format,
-            // i.e. input, formed as a raw (not wrapped into call args enum) data structure with legacy arguments,
-            // made for backward compatibility.
-        } else if let Ok(value) = FunctionCallArgsV1::try_from_slice(bytes) {
-            Some(Self::V1(value))
-            // Dealing with unrecognized input should be handled and result as an exception in a call site.
-        } else {
-            None
-        }
+        Self::try_from_slice(bytes).map_or_else(
+            |_| {
+                FunctionCallArgsV1::try_from_slice(bytes)
+                    .map_or(None, |value| Some(Self::V1(value)))
+            },
+            Some,
+        )
     }
 }
 
@@ -166,7 +165,7 @@ mod tests {
     #[test]
     fn test_view_call_fail() {
         let bytes = [0; 71];
-        let _ = ViewCallArgs::try_from_slice(&bytes).unwrap_err();
+        let _args = ViewCallArgs::try_from_slice(&bytes).unwrap_err();
     }
 
     #[test]

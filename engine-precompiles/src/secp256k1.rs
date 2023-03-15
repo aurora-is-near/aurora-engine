@@ -13,9 +13,9 @@ mod consts {
     pub(super) const INPUT_LEN: usize = 128;
 }
 
-/// See: https://ethereum.github.io/yellowpaper/paper.pdf
-/// See: https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions
-/// See: https://etherscan.io/address/0000000000000000000000000000000000000001
+/// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
+/// See: `https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions`
+/// See: `https://etherscan.io/address/0000000000000000000000000000000000000001`
 // Quite a few library methods rely on this and that should be changed. This
 // should only be for precompiles.
 pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
@@ -100,14 +100,13 @@ impl Precompile for ECRecover {
         signature[64] = v_bit; // v
 
         let address_res = ecrecover(H256::from_slice(&hash), &signature);
-        let output = match address_res {
-            Ok(a) => {
+        let output = address_res
+            .map(|a| {
                 let mut output = [0u8; 32];
                 output[12..32].copy_from_slice(a.as_bytes());
                 output.to_vec()
-            }
-            Err(_) => Vec::new(),
-        };
+            })
+            .unwrap_or_default();
 
         Ok(PrecompileOutput::without_logs(cost, output))
     }
