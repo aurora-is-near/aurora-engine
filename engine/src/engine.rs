@@ -620,16 +620,16 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         bytes_to_key(KeyPrefix::RelayerEvmAddressMap, account_id)
     }
 
-    pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
-        let key = Self::relayer_key(account_id);
-        self.io.write_storage(&key, evm_address.as_bytes());
-    }
+    // pub fn register_relayer(&mut self, account_id: &[u8], evm_address: Address) {
+    //     let key = Self::relayer_key(account_id);
+    //     self.io.write_storage(&key, evm_address.as_bytes());
+    // }
 
-    pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
-        let key = Self::relayer_key(account_id);
-        let raw_addr = self.io.read_storage(&key).map(|v| v.to_vec())?;
-        Address::try_from_slice(&raw_addr[..]).ok()
-    }
+    // pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
+    //     let key = Self::relayer_key(account_id);
+    //     let raw_addr = self.io.read_storage(&key).map(|v| v.to_vec())?;
+    //     Address::try_from_slice(&raw_addr[..]).ok()
+    // }
 
     pub fn register_token(
         &mut self,
@@ -1892,24 +1892,24 @@ mod tests {
         assert_eq!(expected_result, actual_result);
     }
 
-    #[test]
-    fn test_registering_relayer_succeeds() {
-        let origin = Address::zero();
-        let current_account_id = AccountId::default();
-        let env = Fixed::default();
-        let storage = RefCell::new(Storage::default());
-        let mut io = StoragePointer(&storage);
-        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine =
-            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+    // #[test]
+    // fn test_registering_relayer_succeeds() {
+    //     let origin = Address::zero();
+    //     let current_account_id = AccountId::default();
+    //     let env = Fixed::default();
+    //     let storage = RefCell::new(Storage::default());
+    //     let mut io = StoragePointer(&storage);
+    //     add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+    //     let mut engine =
+    //         Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
-        let account_id = AccountId::new("relayer").unwrap();
-        let expected_relayer_address = make_address(1, 1);
-        engine.register_relayer(account_id.as_bytes(), expected_relayer_address);
-        let actual_relayer_address = engine.get_relayer(account_id.as_bytes()).unwrap();
+    //     let account_id = AccountId::new("relayer").unwrap();
+    //     let expected_relayer_address = make_address(1, 1);
+    //     engine.register_relayer(account_id.as_bytes(), expected_relayer_address);
+    //     let actual_relayer_address = engine.get_relayer(account_id.as_bytes()).unwrap();
 
-        assert_eq!(expected_relayer_address, actual_relayer_address);
-    }
+    //     assert_eq!(expected_relayer_address, actual_relayer_address);
+    // }
 
     #[test]
     fn test_registering_token_succeeds() {
