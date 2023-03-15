@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 pub struct NewCallArgs {
     /// Chain id, according to the EIP-115 / ethereum-lists spec.
     pub chain_id: RawU256,
+    /// Account which can claim ownership
+    pub proposed_owner_id: AccountId,
     /// Account which can upgrade this contract.
     /// Use empty to disable updatability.
     pub owner_id: AccountId,

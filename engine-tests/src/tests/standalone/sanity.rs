@@ -17,6 +17,7 @@ fn test_deploy_code() {
     let owner_id: AccountId = "aurora".parse().unwrap();
     let state = state::EngineState {
         chain_id,
+        proposed_owner_id: owner_id.clone(),
         owner_id: owner_id.clone(),
         bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,

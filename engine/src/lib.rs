@@ -162,6 +162,29 @@ mod contract {
         }
     }
 
+    #[no_mangle]
+    pub extern "C" fn propose_owner() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
+        if state.owner_id == args.new_owner {
+            sdk::panic_utf8(errors::ERR_SAME_OWNER);
+        } else {
+            state.proposed_owner_id = args.new_owner;
+            state::set_state(&mut io, &state).sdk_unwrap();
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn accept_ownership() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+        require_proposed_owner_only(&state, &io.predecessor_account_id());
+        state.owner_id = io.predecessor_account_id();
+        state::set_state(&mut io, &state).sdk_unwrap();
+    }
+
     /// Get bridge prover id for this contract.
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
@@ -1056,6 +1079,12 @@ mod contract {
 
     fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
         if &state.owner_id != predecessor_account_id {
+            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
+        }
+    }
+
+    fn require_proposed_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
+        if &state.proposed_owner_id != predecessor_account_id {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
         }
     }

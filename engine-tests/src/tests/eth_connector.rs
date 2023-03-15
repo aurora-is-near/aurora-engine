@@ -70,6 +70,7 @@ fn init_contract(
             "new",
             &NewCallArgs {
                 chain_id: [0u8; 32],
+                proposed_owner_id: str_to_account_id(master_account.account_id.clone().as_str()),
                 owner_id: str_to_account_id(master_account.account_id.clone().as_str()),
                 bridge_prover_id: str_to_account_id(accounts(0).as_str()),
                 upgrade_delay_blocks: 1,

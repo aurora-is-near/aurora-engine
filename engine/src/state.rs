@@ -15,6 +15,8 @@ const STATE_KEY: &[u8; 5] = b"STATE";
 pub struct EngineState {
     /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],
+    /// Account which can claim ownership
+    pub proposed_owner_id: AccountId,
     /// Account which can upgrade this contract.
     /// Use empty to disable updatability.
     pub owner_id: AccountId,
@@ -29,6 +31,7 @@ impl From<NewCallArgs> for EngineState {
     fn from(args: NewCallArgs) -> Self {
         Self {
             chain_id: args.chain_id,
+            proposed_owner_id: args.proposed_owner_id,
             owner_id: args.owner_id,
             bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
