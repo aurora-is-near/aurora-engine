@@ -25,7 +25,7 @@ pub mod deposit_event;
 pub mod engine;
 pub mod errors;
 pub mod fungible_token;
-mod hashchain;
+pub mod hashchain;
 pub mod log_entry;
 pub mod pausables;
 mod prelude;
