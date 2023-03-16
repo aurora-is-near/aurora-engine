@@ -122,12 +122,13 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn new() {
         let mut io = Runtime;
-        if let Ok(state) = state::get_state(&io) {
-            require_owner_only(&state, &io.predecessor_account_id());
-        }
-
-        let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
-        state::set_state(&mut io, &args.into()).sdk_unwrap();
+        state::get_state(&io).map_or_else(
+            |_| {
+                let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
+                state::set_state(&mut io, &args.into()).sdk_unwrap();
+            },
+            |_state| sdk::panic_utf8(b"ERR_ALREADY_INITIALIZED"),
+        );
     }
 
     /// Get version of the contract.
