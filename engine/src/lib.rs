@@ -371,25 +371,25 @@ mod contract {
             .sdk_process();
     }
 
-    // #[no_mangle]
-    // pub extern "C" fn register_relayer() {
-    //     let io = Runtime;
-    //     let relayer_address = io.read_input_arr20().sdk_unwrap();
+    #[no_mangle]
+    pub extern "C" fn register_relayer() {
+        let io = Runtime;
+        let relayer_address = io.read_input_arr20().sdk_unwrap();
 
-    //     let current_account_id = io.current_account_id();
-    //     let predecessor_account_id = io.predecessor_account_id();
-    //     let mut engine = Engine::new(
-    //         predecessor_address(&predecessor_account_id),
-    //         current_account_id,
-    //         io,
-    //         &io,
-    //     )
-    //     .sdk_unwrap();
-    //     engine.register_relayer(
-    //         predecessor_account_id.as_bytes(),
-    //         Address::from_array(relayer_address),
-    //     );
-    // }
+        let current_account_id = io.current_account_id();
+        let predecessor_account_id = io.predecessor_account_id();
+        let mut engine = Engine::new(
+            predecessor_address(&predecessor_account_id),
+            current_account_id,
+            io,
+            &io,
+        )
+        .sdk_unwrap();
+        engine.register_relayer(
+            predecessor_account_id.as_bytes(),
+            Address::from_array(relayer_address),
+        );
+    }
 
     /// Updates the bytecode for user's router contracts created by the engine.
     /// These contracts are where cross-contract calls initiated by the EVM precompile
