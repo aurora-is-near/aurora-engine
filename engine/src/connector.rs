@@ -1,6 +1,6 @@
 use crate::admin_controlled::{AdminControlled, PausedMask};
 use crate::deposit_event::{DepositedEvent, FtTransferMessageData, TokenMessageData};
-use crate::engine::Engine;
+// use crate::engine::Engine;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
 use crate::parameters::{
     BalanceOfCallArgs, BalanceOfEthCallArgs, FinishDepositCallArgs, InitCallArgs,
@@ -17,7 +17,6 @@ use crate::prelude::{
 };
 use crate::prelude::{PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs};
 use crate::proof::Proof;
-use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
@@ -573,9 +572,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// `ft_on_transfer` callback function
-    pub fn ft_on_transfer<E: Env>(
+    pub fn ft_on_transfer(
         &mut self,
-        engine: &Engine<I, E>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
@@ -587,8 +585,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let wei_fee = Wei::from(message_data.fee);
         // Mint fee to relayer
         // let relayer = engine.get_relayer(message_data.relayer.as_bytes());
-        let relayer = engine.predecessor_address(message_data.relayer.as_bytes());
-        match (wei_fee, relayer) {
+        let relayer =
+            aurora_engine_sdk::types::near_account_to_evm_address(message_data.relayer.as_bytes());
+        match (wei_fee, Some(relayer)) {
+            // match (wei_fee, relayer) {
             (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
                 self.mint_eth_on_aurora(
                     message_data.recipient,

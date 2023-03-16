@@ -246,8 +246,7 @@ fn non_submit_execute<'db>(
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
             if env.predecessor_account_id == env.current_account_id {
-                connector::EthConnectorContract::init_instance(io)?
-                    .ft_on_transfer(&engine, args)?;
+                connector::EthConnectorContract::init_instance(io)?.ft_on_transfer(args)?;
             } else {
                 engine.receive_erc20_tokens(
                     &env.predecessor_account_id,
@@ -348,14 +347,6 @@ fn non_submit_execute<'db>(
         TransactionKind::SetPausedFlags(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
             connector.set_paused_flags(args);
-
-            None
-        }
-
-        TransactionKind::RegisterRelayer(evm_address) => {
-            let mut engine =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
-            engine.register_relayer(env.predecessor_account_id.as_bytes(), *evm_address);
 
             None
         }

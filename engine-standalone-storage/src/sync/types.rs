@@ -113,8 +113,6 @@ pub enum TransactionKind {
     SetOwner(parameters::SetOwnerArgs),
     /// Admin only method
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
-    /// Ad entry mapping from address to relayer NEAR account
-    RegisterRelayer(Address),
     /// Called if exist precompiles fail
     RefundOnError(Option<aurora_engine_types::parameters::RefundCallArgs>),
     /// Update eth-connector config
@@ -336,7 +334,6 @@ impl TransactionKind {
             Self::StorageUnregister(_) => Self::no_evm_execution("storage_unregister"),
             Self::StorageWithdraw(_) => Self::no_evm_execution("storage_withdraw"),
             Self::SetPausedFlags(_) => Self::no_evm_execution("set_paused_flags"),
-            Self::RegisterRelayer(_) => Self::no_evm_execution("register_relayer"),
             Self::SetConnectorData(_) => Self::no_evm_execution("set_connector_data"),
             Self::NewConnector(_) => Self::no_evm_execution("new_connector"),
             Self::NewEngine(_) => Self::no_evm_execution("new_engine"),
@@ -503,7 +500,6 @@ enum BorshableTransactionKind<'a> {
     StorageUnregister(Option<bool>),
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
     SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
-    RegisterRelayer(Cow<'a, Address>),
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
     NewConnector(Cow<'a, parameters::InitCallArgs>),
@@ -542,7 +538,6 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::StorageUnregister(x) => Self::StorageUnregister(*x),
             TransactionKind::StorageWithdraw(x) => Self::StorageWithdraw(Cow::Borrowed(x)),
             TransactionKind::SetPausedFlags(x) => Self::SetPausedFlags(Cow::Borrowed(x)),
-            TransactionKind::RegisterRelayer(x) => Self::RegisterRelayer(Cow::Borrowed(x)),
             TransactionKind::RefundOnError(x) => Self::RefundOnError(Cow::Borrowed(x)),
             TransactionKind::SetConnectorData(x) => Self::SetConnectorData(Cow::Borrowed(x)),
             TransactionKind::NewConnector(x) => Self::NewConnector(Cow::Borrowed(x)),
@@ -593,9 +588,6 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::StorageWithdraw(x.into_owned()))
             }
             BorshableTransactionKind::SetPausedFlags(x) => Ok(Self::SetPausedFlags(x.into_owned())),
-            BorshableTransactionKind::RegisterRelayer(x) => {
-                Ok(Self::RegisterRelayer(x.into_owned()))
-            }
             BorshableTransactionKind::RefundOnError(x) => Ok(Self::RefundOnError(x.into_owned())),
             BorshableTransactionKind::SetConnectorData(x) => {
                 Ok(Self::SetConnectorData(x.into_owned()))
