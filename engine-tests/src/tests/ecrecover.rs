@@ -25,6 +25,7 @@ fn test_ecrecover_geth() {
         Vec::new(),
         Vec::new(),
         Vec::new(),
+        hex::decode("000000000000000000000000a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap(),
     ];
 
     for (input, output) in inputs.iter().zip(outputs.iter()) {
