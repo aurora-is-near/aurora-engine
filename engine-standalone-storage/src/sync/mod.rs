@@ -160,14 +160,8 @@ fn execute_transaction<'db>(
                     );
 
                     let result = Some(TransactionExecutionResult::Submit(submit_result));
-                    let update_hashchain_result = update_hashchain(io, env.block_height, &env.current_account_id, InnerTransactionKind::Submit, args.try_to_vec(), &result);
-                    
-                    if let Err(e) = update_hashchain_result {
-                        Err(e)
-                    }
-                    else {
-                        result
-                    }
+                    update_hashchain(io, env.block_height, &env.current_account_id, InnerTransactionKind::Submit, args.try_to_vec(), &result);
+                    result
                 })
                 .map_err(Into::into);
 
