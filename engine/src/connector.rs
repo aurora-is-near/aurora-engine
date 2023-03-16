@@ -584,7 +584,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         // Special case when predecessor_account_id is current_account_id
         let wei_fee = Wei::from(message_data.fee);
         // Mint fee to relayer
-        // let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         let relayer =
             aurora_engine_sdk::types::near_account_to_evm_address(message_data.relayer.as_bytes());
         match (wei_fee, Some(relayer)) {

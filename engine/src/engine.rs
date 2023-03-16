@@ -1877,25 +1877,6 @@ mod tests {
         assert_eq!(expected_result, actual_result);
     }
 
-    // #[test]
-    // fn test_registering_relayer_succeeds() {
-    //     let origin = Address::zero();
-    //     let current_account_id = AccountId::default();
-    //     let env = Fixed::default();
-    //     let storage = RefCell::new(Storage::default());
-    //     let mut io = StoragePointer(&storage);
-    //     add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-    //     let mut engine =
-    //         Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
-
-    //     let account_id = AccountId::new("relayer").unwrap();
-    //     let expected_relayer_address = make_address(1, 1);
-    //     engine.register_relayer(account_id.as_bytes(), expected_relayer_address);
-    //     let actual_relayer_address = engine.get_relayer(account_id.as_bytes()).unwrap();
-
-    //     assert_eq!(expected_relayer_address, actual_relayer_address);
-    // }
-
     #[test]
     fn test_registering_token_succeeds() {
         let origin = Address::zero();
