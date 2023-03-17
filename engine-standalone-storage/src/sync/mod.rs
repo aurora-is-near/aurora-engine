@@ -14,9 +14,9 @@ use aurora_engine_types::{
 
 pub mod types;
 
-use borsh::BorshSerialize;
 use crate::engine_state::EngineStateAccess;
 use crate::{BlockMetadata, Diff, Storage};
+use borsh::BorshSerialize;
 use types::{Message, TransactionKind, TransactionMessage};
 
 use self::types::InnerTransactionKind;
@@ -197,7 +197,13 @@ fn execute_transaction<'db>(
     };
 
     if let Ok(option_result) = &result {
-        if let Err(e) = update_hashchain(&mut io, block_height, &engine_account_id, &transaction_message.transaction, option_result) {
+        if let Err(e) = update_hashchain(
+            &mut io,
+            block_height,
+            &engine_account_id,
+            &transaction_message.transaction,
+            option_result,
+        ) {
             result = Err(e);
         }
     }
@@ -455,8 +461,13 @@ fn non_submit_execute<'db>(
     Ok(result)
 }
 
-fn update_hashchain<'db>(io: &mut EngineStateAccess<'db, 'db, 'db>, block_height: u64, engine_account_id: &AccountId, transaction: &TransactionKind, result: &Option<TransactionExecutionResult>)
-    -> Result<(), error::Error> {
+fn update_hashchain<'db>(
+    io: &mut EngineStateAccess<'db, 'db, 'db>,
+    block_height: u64,
+    engine_account_id: &AccountId,
+    transaction: &TransactionKind,
+    result: &Option<TransactionExecutionResult>,
+) -> Result<(), error::Error> {
     let method_name = InnerTransactionKind::from(transaction).to_string();
     let input = get_input(transaction)?;
     let output = get_output(result)?;
@@ -472,12 +483,10 @@ fn update_hashchain<'db>(io: &mut EngineStateAccess<'db, 'db, 'db>, block_height
     });
 
     if block_height > blockchain_hashchain.get_current_block_height() {
-        blockchain_hashchain
-            .move_to_block(block_height)?;
+        blockchain_hashchain.move_to_block(block_height)?;
     }
 
-    blockchain_hashchain
-        .add_block_tx(block_height, &method_name, &input, &output)?;
+    blockchain_hashchain.add_block_tx(block_height, &method_name, &input, &output)?;
 
     Ok(hashchain::set_state(io, blockchain_hashchain)?)
 }
@@ -509,7 +518,9 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
         TransactionKind::NewConnector(args) => args.try_to_vec().map_err(|e| e.into()),
         TransactionKind::NewEngine(args) => args.try_to_vec().map_err(|e| e.into()),
         TransactionKind::FactoryUpdate(bytecode) => Ok(bytecode.to_vec()),
-        TransactionKind::FactoryUpdateAddressVersion(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FactoryUpdateAddressVersion(args) => {
+            args.try_to_vec().map_err(|e| e.into())
+        }
         TransactionKind::FactorySetWNearAddress(address) => Ok(address.as_bytes().to_vec()),
         TransactionKind::Unknown => Ok(vec![]),
     }
@@ -518,19 +529,15 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
 fn get_output(result: &Option<TransactionExecutionResult>) -> Result<Vec<u8>, error::Error> {
     match result {
         None => Ok(vec![]),
-        Some(execution_result) => {
-            match execution_result {
-                TransactionExecutionResult::Promise(_) => Ok(vec![]),
-                TransactionExecutionResult::DeployErc20(address) => Ok(address.as_bytes().to_vec()),
-                TransactionExecutionResult::Submit(submit) => {
-                    match submit {
-                        Err(e) => Err(e.clone().into()),
-                        Ok(submit_result) => submit_result.try_to_vec().map_err(|e| e.into()),
-                    }
-                },
-            }
+        Some(execution_result) => match execution_result {
+            TransactionExecutionResult::Promise(_) => Ok(vec![]),
+            TransactionExecutionResult::DeployErc20(address) => Ok(address.as_bytes().to_vec()),
+            TransactionExecutionResult::Submit(submit) => match submit {
+                Err(e) => Err(e.clone().into()),
+                Ok(submit_result) => submit_result.try_to_vec().map_err(|e| e.into()),
+            },
         },
-    } 
+    }
 }
 
 #[derive(Debug)]
@@ -556,7 +563,10 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine, fungible_token, state, hashchain::blockchain_hashchain_error::BlockchainHashchainError};
+    use aurora_engine::{
+        connector, engine, fungible_token,
+        hashchain::blockchain_hashchain_error::BlockchainHashchainError, state,
+    };
     use std::io;
 
     #[derive(Debug)]

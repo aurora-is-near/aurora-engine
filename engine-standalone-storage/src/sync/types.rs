@@ -10,7 +10,7 @@ use aurora_engine_types::{
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::borrow::Cow;
-use strum::{EnumString, Display};
+use strum::{Display, EnumString};
 
 /// Type describing the format of messages sent to the storage layer for keeping
 /// it in sync with the blockchain.

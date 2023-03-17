@@ -167,7 +167,7 @@ pub mod blockchain_hashchain_error {
 
 /// Block Hashchain Computer
 /// The order of operations should be:
-/// 1. Create the BlockHashchainComputer one time.
+/// 1. Create the `BlockHashchainComputer` one time.
 /// 2. Add transactions of the current block.
 /// 3. Compute the block hashchain for the current block once all the transactions were added.
 /// 4. Clear the transactions of the current block.
