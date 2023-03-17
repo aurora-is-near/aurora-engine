@@ -450,6 +450,13 @@ pub enum InnerTransactionKind {
 /// Used to make sure InnerTransactionKind is kept in sync with TransactionKind
 impl From<TransactionKind> for InnerTransactionKind {
     fn from(tx: TransactionKind) -> Self {
+        InnerTransactionKind::from(&tx)
+    }
+}
+
+/// Used to make sure InnerTransactionKind is kept in sync with TransactionKind
+impl From<&TransactionKind> for InnerTransactionKind {
+    fn from(tx: &TransactionKind) -> Self {
         match tx {
             TransactionKind::Submit(_) => InnerTransactionKind::Submit,
             TransactionKind::SubmitWithArgs(_) => InnerTransactionKind::SubmitWithArgs,

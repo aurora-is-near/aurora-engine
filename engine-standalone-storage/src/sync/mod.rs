@@ -1,3 +1,4 @@
+use aurora_engine::hashchain;
 use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
@@ -13,9 +14,12 @@ use aurora_engine_types::{
 
 pub mod types;
 
+use borsh::BorshSerialize;
 use crate::engine_state::EngineStateAccess;
 use crate::{BlockMetadata, Diff, Storage};
 use types::{Message, TransactionKind, TransactionMessage};
+
+use self::types::InnerTransactionKind;
 
 pub fn consume_message(
     storage: &mut Storage,
@@ -105,7 +109,7 @@ fn execute_transaction<'db>(
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
-    io: EngineStateAccess<'db, 'db, 'db>,
+    mut io: EngineStateAccess<'db, 'db, 'db>,
 ) -> (
     H256,
     Diff,
@@ -116,7 +120,7 @@ fn execute_transaction<'db>(
     let relayer_address =
         aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes());
     let near_receipt_id = transaction_message.near_receipt_id;
-    let current_account_id = engine_account_id;
+    let current_account_id = engine_account_id.clone();
     let env = env::Fixed {
         signer_account_id,
         current_account_id,
@@ -128,7 +132,7 @@ fn execute_transaction<'db>(
         prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
-    let (tx_hash, result) = match &transaction_message.transaction {
+    let (tx_hash, mut result) = match &transaction_message.transaction {
         TransactionKind::Submit(tx) => {
             // We can ignore promises in the standalone engine because it processes each receipt separately
             // and it is fed a stream of receipts (it does not schedule them)
@@ -191,6 +195,12 @@ fn execute_transaction<'db>(
             (near_receipt_id, result)
         }
     };
+
+    if let Ok(option_result) = &result {
+        if let Err(e) = update_hashchain(&mut io, block_height, &engine_account_id, &transaction_message.transaction, option_result) {
+            result = Err(e);
+        }
+    }
 
     let diff = io.get_transaction_diff();
 
@@ -445,6 +455,84 @@ fn non_submit_execute<'db>(
     Ok(result)
 }
 
+fn update_hashchain<'db>(io: &mut EngineStateAccess<'db, 'db, 'db>, block_height: u64, engine_account_id: &AccountId, transaction: &TransactionKind, result: &Option<TransactionExecutionResult>)
+    -> Result<(), error::Error> {
+    let method_name = InnerTransactionKind::from(transaction).to_string();
+    let input = get_input(transaction)?;
+    let output = get_output(result)?;
+
+    let mut blockchain_hashchain = hashchain::get_state(io).unwrap_or_else(|_| {
+        hashchain::BlockchainHashchain::new(
+            &state::get_state(io).unwrap().chain_id,
+            engine_account_id.as_bytes(),
+            block_height,
+            [0; 32],
+            [0; 32],
+        )
+    });
+
+    if block_height > blockchain_hashchain.get_current_block_height() {
+        blockchain_hashchain
+            .move_to_block(block_height)?;
+    }
+
+    blockchain_hashchain
+        .add_block_tx(block_height, &method_name, &input, &output)?;
+
+    Ok(hashchain::set_state(io, blockchain_hashchain)?)
+}
+
+fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
+    match transaction {
+        TransactionKind::Submit(tx) => Ok(tx.into()),
+        TransactionKind::SubmitWithArgs(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::Call(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::PausePrecompiles(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::ResumePrecompiles(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::Deploy(input) => Ok(input.to_vec()),
+        TransactionKind::DeployErc20(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FtOnTransfer(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::Deposit(raw_proof) => Ok(raw_proof.to_vec()),
+        TransactionKind::FtTransferCall(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FinishDeposit(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::ResolveTransfer(args, _) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FtTransfer(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::Withdraw(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::StorageDeposit(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::StorageUnregister(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::StorageWithdraw(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::SetOwner(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::SetPausedFlags(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::RegisterRelayer(evm_address) => Ok(evm_address.as_bytes().to_vec()),
+        TransactionKind::RefundOnError(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::SetConnectorData(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::NewConnector(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::NewEngine(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FactoryUpdate(bytecode) => Ok(bytecode.to_vec()),
+        TransactionKind::FactoryUpdateAddressVersion(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FactorySetWNearAddress(address) => Ok(address.as_bytes().to_vec()),
+        TransactionKind::Unknown => Ok(vec![]),
+    }
+}
+
+fn get_output(result: &Option<TransactionExecutionResult>) -> Result<Vec<u8>, error::Error> {
+    match result {
+        None => Ok(vec![]),
+        Some(execution_result) => {
+            match execution_result {
+                TransactionExecutionResult::Promise(_) => Ok(vec![]),
+                TransactionExecutionResult::DeployErc20(address) => Ok(address.as_bytes().to_vec()),
+                TransactionExecutionResult::Submit(submit) => {
+                    match submit {
+                        Err(e) => Err(e.clone().into()),
+                        Ok(submit_result) => submit_result.try_to_vec().map_err(|e| e.into()),
+                    }
+                },
+            }
+        },
+    } 
+}
+
 #[derive(Debug)]
 pub enum ConsumeMessageOutcome {
     BlockAdded,
@@ -468,7 +556,8 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine, fungible_token, state};
+    use aurora_engine::{connector, engine, fungible_token, state, hashchain::blockchain_hashchain_error::BlockchainHashchainError};
+    use std::io;
 
     #[derive(Debug)]
     pub enum Error {
@@ -484,6 +573,8 @@ pub mod error {
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
         ConnectorInit(connector::error::InitContractError),
         ConnectorStorage(connector::error::StorageReadError),
+        BlockchainHashchain(BlockchainHashchainError),
+        IO(io::Error),
     }
 
     impl From<state::EngineStateError> for Error {
@@ -555,6 +646,18 @@ pub mod error {
     impl From<connector::error::StorageReadError> for Error {
         fn from(e: connector::error::StorageReadError) -> Self {
             Self::ConnectorStorage(e)
+        }
+    }
+
+    impl From<BlockchainHashchainError> for Error {
+        fn from(e: BlockchainHashchainError) -> Self {
+            Self::BlockchainHashchain(e)
+        }
+    }
+
+    impl From<io::Error> for Error {
+        fn from(e: io::Error) -> Self {
+            Self::IO(e)
         }
     }
 }
