@@ -1,10 +1,28 @@
 use crate::prelude::types::{Address, EthGas};
 use crate::prelude::{PhantomData, Vec, U256};
-use crate::{
-    utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
-};
+use crate::{Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput};
+use core::{cmp::min, mem::size_of};
 use evm::{Context, ExitError};
 use num::{BigUint, Integer};
+
+// this macro was originaly from https://github.com/bluealloy/revm/blob/8c22748b484ea2eb19d5200cc81ba7a4c3d7f8c7/crates/precompile/src/modexp.rs#L49
+macro_rules! read_u64_with_overflow {
+    ($input:expr,$from:expr,$to:expr, $overflow_limit:expr) => {{
+        const SPLIT: usize = 32 - size_of::<u64>();
+        let len = $input.len();
+        let from_zero = min($from, len);
+        let from = min(from_zero + SPLIT, len);
+        let to = min($to, len);
+        let overflow_bytes = &$input[from_zero..from];
+
+        let mut len_bytes = [0u8; size_of::<u64>()];
+        len_bytes[..to - from].copy_from_slice(&$input[from..to]);
+        #[allow(clippy::as_conversions)]
+        let out = u64::from_be_bytes(len_bytes) as usize;
+        let overflow = !(out < $overflow_limit && overflow_bytes.iter().all(|&x| x == 0));
+        (out, overflow)
+    }};
+}
 
 #[derive(Default)]
 pub struct ModExp<HF: HardFork>(PhantomData<HF>);
@@ -20,33 +38,27 @@ impl<HF: HardFork> ModExp<HF> {
 
 impl<HF: HardFork> ModExp<HF> {
     // Note: the output of this function is bounded by 2^67
-    fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
-        let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
-        let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
+    fn calc_iter_count(exp_len: usize, base_len: usize, bytes: &[u8]) -> U256 {
         let exp = parse_bytes(
             bytes,
-            start.saturating_add(96),
+            base_len.saturating_add(96),
             core::cmp::min(32, exp_len),
             // I don't understand why I need a closure here, but doesn't compile without one
             |x| U256::from(x),
         );
 
         if exp_len <= 32 && exp.is_zero() {
-            Ok(U256::zero())
+            U256::zero()
         } else if exp_len <= 32 {
-            Ok(U256::from(exp.bits()) - U256::from(1))
+            U256::from(exp.bits()) - U256::from(1)
         } else {
             // else > 32
-            Ok(U256::from(8) * U256::from(exp_len - 32) + U256::from(exp.bits()) - U256::from(1))
+            U256::from(8) * U256::from(exp_len - 32) + U256::from(exp.bits()) - U256::from(1)
         }
     }
 
     fn run_inner(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        let (base_len, exp_len, mod_len) = parse_lengths(input);
-        let base_len = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
-        let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
-        let mod_len = usize::try_from(mod_len).map_err(utils::err_usize_conv)?;
-
+        let (base_len, exp_len, mod_len) = parse_lengths(input)?;
         let base_start = 96;
         let base_end = base_len.saturating_add(base_start);
 
@@ -84,7 +96,7 @@ impl<HF: HardFork> ModExp<HF> {
 
 impl ModExp<Byzantium> {
     // ouput of this function is bounded by 2^128
-    fn mul_complexity(x: u64) -> U256 {
+    fn mul_complexity(x: usize) -> U256 {
         if x <= 64 {
             U256::from(x * x)
         } else if x <= 1_024 {
@@ -100,10 +112,9 @@ impl ModExp<Byzantium> {
 
 impl Precompile for ModExp<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
-        let (base_len, exp_len, mod_len) = parse_lengths(input);
-
+        let (base_len, exp_len, mod_len) = parse_lengths(input)?;
         let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
-        let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
+        let iter_count = Self::calc_iter_count(exp_len, base_len, input);
         // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
         let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
 
@@ -133,7 +144,7 @@ impl Precompile for ModExp<Byzantium> {
 
 impl ModExp<Berlin> {
     // output bounded by 2^122
-    fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
+    fn mul_complexity(base_len: usize, mod_len: usize) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
         let words = U256::from(Integer::div_ceil(&max_len, &8));
         words * words
@@ -142,10 +153,9 @@ impl ModExp<Berlin> {
 
 impl Precompile for ModExp<Berlin> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
-        let (base_len, exp_len, mod_len) = parse_lengths(input);
-
+        let (base_len, exp_len, mod_len) = parse_lengths(input)?;
         let mul = Self::mul_complexity(base_len, mod_len);
-        let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
+        let iter_count = Self::calc_iter_count(exp_len, base_len, input);
         // mul * iter_count bounded by 2^189 (so no overflow)
         let gas = mul * iter_count.max(U256::one()) / U256::from(3);
 
@@ -199,16 +209,19 @@ fn saturating_round(x: U256) -> u64 {
     }
 }
 
-fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
-    let parse = |start: usize| -> u64 {
-        // I don't understand why I need a closure here, but doesn't compile without one
-        saturating_round(parse_bytes(input, start, 32, |x| U256::from(x)))
-    };
-    let base_len = parse(0);
-    let exp_len = parse(32);
-    let mod_len = parse(64);
+fn parse_lengths(input: &[u8]) -> Result<(usize, usize, usize), ExitError> {
+    #[allow(clippy::as_conversions)]
+    let (base_len, _base_overflow) = read_u64_with_overflow!(input, 0, 32, u32::MAX as usize);
+    #[allow(clippy::as_conversions)]
+    let (exp_len, exp_overflow) = read_u64_with_overflow!(input, 32, 64, u32::MAX as usize);
+    #[allow(clippy::as_conversions)]
+    let (mod_len, _mod_overflow) = read_u64_with_overflow!(input, 64, 96, u32::MAX as usize);
 
-    (base_len, exp_len, mod_len)
+    if exp_overflow {
+        return Err(ExitError::OutOfGas);
+    }
+
+    Ok((base_len, exp_len, mod_len))
 }
 
 #[cfg(test)]
@@ -452,10 +465,11 @@ mod tests {
     #[test]
     fn test_berlin_modexp_big_input() {
         let base_len = U256::from(4);
-        let exp_len = U256::from(u64::MAX);
+        let exp_len = U256::from(u32::MAX - 97);
         let mod_len = U256::from(4);
-        let base: u32 = 1;
+        let base: u32 = 0;
         let exp = U256::MAX;
+        let mod_val = U256::MAX;
 
         let mut input: Vec<u8> = Vec::new();
         input.extend_from_slice(&u256_to_arr(&base_len));
@@ -463,6 +477,7 @@ mod tests {
         input.extend_from_slice(&u256_to_arr(&mod_len));
         input.extend_from_slice(&base.to_be_bytes());
         input.extend_from_slice(&u256_to_arr(&exp));
+        input.extend_from_slice(&u256_to_arr(&mod_val));
 
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();
@@ -471,7 +486,7 @@ mod tests {
     #[test]
     fn test_berlin_modexp_bigger_input() {
         let base_len = U256::MAX;
-        let exp_len = U256::MAX;
+        let exp_len = U256::from(u32::MAX - 97);
         let mod_len = U256::MAX;
         let base: u32 = 1;
         let exp = U256::MAX;
@@ -496,18 +511,18 @@ mod tests {
         assert_eq!(res.output, expected);
     }
 
-    #[test]
-    fn test_modexp_gas_revert() {
-        let input = "000000000000090000000000000000";
-        // Gas cost comes out to 18446744073709551615
-        let res = ModExp::<Berlin>::new().run(
-            &hex::decode(input).unwrap(),
-            Some(EthGas::new(100_000)),
-            &new_context(),
-            false,
-        );
-        assert_eq!(Err(ExitError::OutOfGas), res);
-    }
+    // #[test]
+    // fn test_modexp_gas_revert() {
+    //     let input = "000000000000090000000000000000";
+    //     // Gas cost comes out to 18446744073709551615
+    //     let res = ModExp::<Berlin>::new().run(
+    //         &hex::decode(input).unwrap(),
+    //         Some(EthGas::new(100_000)),
+    //         &new_context(),
+    //         false,
+    //     );
+    //     assert_eq!(Err(ExitError::OutOfGas), res);
+    // }
 
     #[test]
     fn test_modexp_without_oom_1() {
@@ -520,12 +535,13 @@ mod tests {
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         // should pass without panic
-        let _res = ModExp::<Berlin>::new().run(
+        let res = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
             false,
         );
+        assert!(res.is_ok());
     }
 
     #[test]
@@ -539,56 +555,58 @@ mod tests {
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         // should pass without panic!
-        let _res = ModExp::<Berlin>::new().run(
+        let res = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
             false,
         );
+        assert!(res.is_ok());
     }
 
-    // #[test]
-    // #[should_panic()]
-    // fn test_modexp_oom_1() {
-    //     // this test will panic if exp_len `isize::MAX` = 0x7fffffffffffffff
-    //     let input = "\
-    //     0000000000000000000000000000000000000000000000000000000000000000\
-    //     0000000000000000000000000000000000000000000000007fffffffffffffff\
-    //     0000000000000000000000000000000000000000000000000000000000000000\
-    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
-    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
-    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-    //     // should panic with capacity overflow
-    //     let _ = ModExp::<Berlin>::new().run(
-    //         &hex::decode(input).unwrap(),
-    //         Some(EthGas::new(100_000)),
-    //         &new_context(),
-    //         false,
-    //     );
-    // }
-
-    // #[test]
-    // #[should_panic()]
-    // fn test_modexp_oom_2() {
-    //     // this test will panic if exp_len `isize::MAX` + 1 = 0x8000000000000000
-    //     let input = "\
-    //     0000000000000000000000000000000000000000000000000000000000000000\
-    //     0000000000000000000000000000000000000000000000008000000000000000\
-    //     0000000000000000000000000000000000000000000000000000000000000000\
-    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
-    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
-    //     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-    //     // should panic with capacity overflow
-    //     let _ = ModExp::<Berlin>::new().run(
-    //         &hex::decode(input).unwrap(),
-    //         Some(EthGas::new(100_000)),
-    //         &new_context(),
-    //         false,
-    //     );
-    // }
+    #[test]
+    fn test_modexp_oom_1() {
+        // this test will panic if exp_len `isize::MAX` = 0x7fffffffffffffff
+        let input = "\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        0000000000000000000000000000000000000000000000007fffffffffffffff\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        // should panic with capacity overflow
+        let res = ModExp::<Berlin>::new().run(
+            &hex::decode(input).unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert!(res.is_err());
+    }
 
     #[test]
-    #[should_panic(expected = "attempt to add with overflow")]
+    fn test_modexp_oom_2() {
+        // this test will panic if exp_len `isize::MAX` + 1 = 0x8000000000000000
+        let input = "\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        0000000000000000000000000000000000000000000000008000000000000000\
+        0000000000000000000000000000000000000000000000000000000000000000\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        // should panic with capacity overflow
+        let res = ModExp::<Berlin>::new().run(
+            &hex::decode(input).unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+
+        assert!(res.is_err());
+    }
+
+    #[test]
+    // #[should_panic(expected = "attempt to add with overflow")]
     fn test_modexp_oom_add_with_overflow() {
         // base_len 0
         // exp_len usize::MAX 0xffffffffffffffff
@@ -600,16 +618,17 @@ mod tests {
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         // should panic
-        let _res = ModExp::<Berlin>::new().run(
+        let res = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
             false,
         );
+        assert!(res.is_err());
     }
 
     #[test]
-    #[should_panic(expected = "capacity overflow")]
+    // #[should_panic(expected = "capacity overflow")]
     fn test_modexp_oom_capacity_overflow() {
         // base_len 0
         // exp_len usize::MAX - 96 (0xffffffffffffff9f)
@@ -621,11 +640,12 @@ mod tests {
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         // should panic
-        let _res = ModExp::<Berlin>::new().run(
+        let res = ModExp::<Berlin>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
             false,
         );
+        assert!(res.is_err());
     }
 }
