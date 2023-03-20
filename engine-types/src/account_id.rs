@@ -112,7 +112,7 @@ impl BorshDeserialize for AccountId {
     }
 }
 
-#[cfg(not(not(feature = "borsh-compat")))]
+#[cfg(feature = "borsh-compat")]
 impl BorshDeserialize for AccountId {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
         let account: String = BorshDeserialize::deserialize(buf)?;
