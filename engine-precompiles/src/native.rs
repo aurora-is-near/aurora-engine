@@ -261,7 +261,9 @@ impl<I: IO> Precompile for ExitToNear<I> {
         #[cfg(feature = "error_refund")]
         fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
             validate_input_size(input, 21, 117)?;
-            let refund_address = Address::try_from_slice(&input[1..21])?;
+            let mut buffer = [0; 20];
+            buffer.copy_from_slice(&input[1..21]);
+            let refund_address = Address::from_array(buffer);
             Ok((refund_address, &input[21..]))
         }
         #[cfg(not(feature = "error_refund"))]
