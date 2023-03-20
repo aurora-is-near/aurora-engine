@@ -973,7 +973,13 @@ fn test_eth_transfer_insufficient_balance_sim() {
         &signer.secret_key,
     );
     let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
-    let result: SubmitResult = call_result.unwrap_borsh();
+    let result = match call_result.status() {
+        near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+            use borsh::BorshDeserialize;
+            SubmitResult::try_from_slice(&bytes).unwrap()
+        }
+        other => panic!("Unexpected status {other:?}"),
+    };
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state

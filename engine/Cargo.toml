@@ -21,7 +21,7 @@ aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false }
 bitflags = { version = "1.3", default-features = false }
-borsh = { version = "0.9.3", default-features = false }
+borsh = { version = "0.10", default-features = false }
 byte-slice-cast = { version = "1.0", default-features = false }
 ethabi = { version = "18.0", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false }
