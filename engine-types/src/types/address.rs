@@ -78,30 +78,34 @@ impl BorshSerialize for Address {
 #[cfg(not(feature = "borsh-compat"))]
 impl BorshDeserialize for Address {
     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
-        address_deserialize_reader(reader)
+        let mut buf = [0u8; 20];
+        let maybe_read = reader.read_exact(&mut buf);
+        if maybe_read.as_ref().err().map(io::Error::kind) == Some(io::ErrorKind::UnexpectedEof) {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("{}", error::AddressError::IncorrectLength),
+            ));
+        }
+        maybe_read?;
+        let address = Self(H160(buf));
+        Ok(address)
     }
 }
 
 #[cfg(feature = "borsh-compat")]
 impl BorshDeserialize for Address {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        address_deserialize_reader(buf)
+        if buf.len() < 20 {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("{}", error::AddressError::IncorrectLength),
+            ));
+        }
+        // Guaranty no panics. The length checked early
+        let address = Self(H160::from_slice(&buf[..20]));
+        *buf = &buf[20..];
+        Ok(address)
     }
-}
-
-#[inline]
-fn address_deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Address> {
-    let mut buf = [0u8; 20];
-    let maybe_read = reader.read_exact(&mut buf);
-    if maybe_read.as_ref().err().map(io::Error::kind) == Some(io::ErrorKind::UnexpectedEof) {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("{}", error::AddressError::IncorrectLength),
-        ));
-    }
-    maybe_read?;
-    let address = Address(H160(buf));
-    Ok(address)
 }
 
 impl Default for Address {
