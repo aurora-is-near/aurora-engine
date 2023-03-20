@@ -177,19 +177,19 @@ impl BorshDeserialize for NearPromise {
         match variant_byte {
             0x00 => {
                 let inner = SimpleNearPromise::deserialize_reader(reader)?;
-                Ok(NearPromise::Simple(inner))
+                Ok(Self::Simple(inner))
             }
             0x01 => {
                 let base = Self::deserialize_reader(reader)?;
                 let callback = SimpleNearPromise::deserialize_reader(reader)?;
-                Ok(NearPromise::Then {
+                Ok(Self::Then {
                     base: Box::new(base),
                     callback,
                 })
             }
             0x02 => {
-                let promises: Vec<NearPromise> = Vec::deserialize_reader(reader)?;
-                Ok(NearPromise::And(promises))
+                let promises: Vec<Self> = Vec::deserialize_reader(reader)?;
+                Ok(Self::And(promises))
             }
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

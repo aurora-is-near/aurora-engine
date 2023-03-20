@@ -93,7 +93,7 @@ impl BorshDeserialize for Address {
 fn address_deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Address> {
     let mut buf = [0u8; 20];
     let maybe_read = reader.read_exact(&mut buf);
-    if let Some(io::ErrorKind::UnexpectedEof) = maybe_read.as_ref().err().map(|e| e.kind()) {
+    if maybe_read.as_ref().err().map(io::Error::kind) == Some(io::ErrorKind::UnexpectedEof) {
         return Err(io::Error::new(
             io::ErrorKind::Other,
             format!("{}", error::AddressError::IncorrectLength),

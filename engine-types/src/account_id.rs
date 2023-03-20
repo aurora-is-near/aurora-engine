@@ -105,11 +105,10 @@ impl BorshDeserialize for AccountId {
 
         // It's for saving backward compatibility.
         if account.is_empty() {
-            return Ok(AccountId::default());
+            return Ok(Self::default());
         }
 
-        AccountId::new(&account)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
+        Self::new(&account).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
     }
 }
 
