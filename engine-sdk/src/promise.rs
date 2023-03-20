@@ -7,11 +7,13 @@ use aurora_engine_types::types::PromiseResult;
 pub struct PromiseId(u64);
 
 impl PromiseId {
-    pub fn new(id: u64) -> Self {
+    #[must_use]
+    pub const fn new(id: u64) -> Self {
         Self(id)
     }
 
-    pub fn raw(self) -> u64 {
+    #[must_use]
+    pub const fn raw(self) -> u64 {
         self.0
     }
 }
@@ -54,6 +56,25 @@ pub trait PromiseHandler {
     }
 
     fn read_only(&self) -> Self::ReadOnly;
+
+    /// Returns `None` if there were no prior promises
+    /// (i.e. the method was not called as a callback). Returns `Some(true)` if
+    /// there was at least one promise result and all results were successful.
+    /// Returns `Some(false)` if there was at least one failed promise result.
+    fn promise_result_check(&self) -> Option<bool> {
+        let num_promises = self.promise_results_count();
+        if num_promises == 0 {
+            return None;
+        }
+        for index in 0..num_promises {
+            if let Some(PromiseResult::Failed | PromiseResult::NotReady) =
+                self.promise_result(index)
+            {
+                return Some(false);
+            }
+        }
+        Some(true)
+    }
 }
 
 pub trait ReadOnlyPromiseHandler {

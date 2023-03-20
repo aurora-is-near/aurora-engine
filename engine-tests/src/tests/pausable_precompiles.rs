@@ -23,10 +23,10 @@ fn test_paused_precompile_is_shown_when_viewing() {
     let mut input: Vec<u8> = Vec::new();
     call_args.serialize(&mut input).unwrap();
 
-    let _ = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
+    let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
     let (outcome, error) = runner.call(PAUSED_PRECOMPILES, CALLED_ACCOUNT_ID, Vec::new());
 
-    assert!(error.is_none(), "{:?}", error);
+    assert!(error.is_none(), "{error:?}");
 
     let output: Vec<u8> = outcome
         .as_ref()
@@ -53,22 +53,22 @@ fn test_executing_paused_precompile_throws_error() {
     let mut input: Vec<u8> = Vec::new();
     call_args.serialize(&mut input).unwrap();
 
-    let _ = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
+    let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
     let is_to_near = false;
     let result = tester.withdraw(&mut runner, &mut signer, is_to_near);
 
-    assert!(result.is_err(), "{:?}", result);
+    assert!(result.is_err(), "{result:?}");
 
     let error = result.unwrap_err();
     match &error {
         VMError::FunctionCallError(fn_error) => match fn_error {
             FunctionCallError::HostError(err) => match err {
                 HostError::GuestPanic { panic_msg } => assert_eq!(panic_msg, "ERR_PAUSED"),
-                other => panic!("Unexpected host error {:?}", other),
+                other => panic!("Unexpected host error {other:?}"),
             },
-            other => panic!("Unexpected function call error {:?}", other),
+            other => panic!("Unexpected function call error {other:?}"),
         },
-        other => panic!("Unexpected VM error {:?}", other),
+        other => panic!("Unexpected VM error {other:?}"),
     };
 }
 
@@ -83,8 +83,8 @@ fn test_executing_paused_and_then_resumed_precompile_succeeds() {
     let mut input: Vec<u8> = Vec::new();
     call_args.serialize(&mut input).unwrap();
 
-    let _ = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
-    let _ = runner.call(RESUME_PRECOMPILES, CALLED_ACCOUNT_ID, input);
+    let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
+    let _res = runner.call(RESUME_PRECOMPILES, CALLED_ACCOUNT_ID, input);
     let is_to_near = false;
     let result = tester
         .withdraw(&mut runner, &mut signer, is_to_near)
@@ -92,7 +92,7 @@ fn test_executing_paused_and_then_resumed_precompile_succeeds() {
 
     let number = match result.status {
         TransactionStatus::Succeed(number) => U256::from(number.as_slice()),
-        _ => panic!("Unexpected status {:?}", result),
+        _ => panic!("Unexpected status {result:?}"),
     };
 
     assert_eq!(number, U256::zero());
@@ -109,7 +109,7 @@ fn test_resuming_precompile_does_not_throw_error() {
 
     let (_, error) = runner.call(RESUME_PRECOMPILES, CALLED_ACCOUNT_ID, input);
 
-    assert!(error.is_none(), "{:?}", error);
+    assert!(error.is_none(), "{error:?}");
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn test_pausing_precompile_does_not_throw_error() {
 
     let (_, error) = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input);
 
-    assert!(error.is_none(), "{:?}", error);
+    assert!(error.is_none(), "{error:?}");
 }
 
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {

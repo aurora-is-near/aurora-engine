@@ -1,26 +1,27 @@
 use crate::prelude::{Address, U256};
 use crate::test_utils::solidity;
 use aurora_engine_transactions::legacy::TransactionLegacy;
+use aurora_engine_types::types::Wei;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Once;
 
-pub(crate) struct FactoryConstructor(pub solidity::ContractConstructor);
+pub struct FactoryConstructor(pub solidity::ContractConstructor);
 
-pub(crate) struct Factory(pub solidity::DeployedContract);
+pub struct Factory(pub solidity::DeployedContract);
 
-pub(crate) struct Pool(pub solidity::DeployedContract);
+pub struct Pool(pub solidity::DeployedContract);
 
-pub(crate) struct PositionManagerConstructor(pub solidity::ContractConstructor);
+pub struct PositionManagerConstructor(pub solidity::ContractConstructor);
 
-pub(crate) struct PositionManager(pub solidity::DeployedContract);
+pub struct PositionManager(pub solidity::DeployedContract);
 
-pub(crate) struct SwapRouterConstructor(pub solidity::ContractConstructor);
+pub struct SwapRouterConstructor(pub solidity::ContractConstructor);
 
-pub(crate) struct SwapRouter(pub solidity::DeployedContract);
+pub struct SwapRouter(pub solidity::DeployedContract);
 
-pub(crate) struct MintParams {
+pub struct MintParams {
     pub token0: Address,
     pub token1: Address,
     pub fee: u64,
@@ -120,10 +121,10 @@ impl PositionManagerConstructor {
             .unwrap();
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: None,
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -151,10 +152,10 @@ impl Factory {
 
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -194,17 +195,17 @@ impl Pool {
 
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
 }
 
 impl PositionManager {
-    pub fn mint(&self, params: MintParams, nonce: U256) -> TransactionLegacy {
+    pub fn mint(&self, params: &MintParams, nonce: U256) -> TransactionLegacy {
         let tick_lower = Self::i64_to_u256(params.tick_lower);
         let tick_upper = Self::i64_to_u256(params.tick_upper);
         let data = self
@@ -229,10 +230,10 @@ impl PositionManager {
 
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -283,10 +284,10 @@ impl SwapRouterConstructor {
             .unwrap();
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: None,
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -316,7 +317,7 @@ pub struct ExactInputParams {
 impl SwapRouter {
     pub fn exact_output_single(
         &self,
-        params: ExactOutputSingleParams,
+        params: &ExactOutputSingleParams,
         nonce: U256,
     ) -> TransactionLegacy {
         let data = self
@@ -338,20 +339,20 @@ impl SwapRouter {
 
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
 
-    pub fn exact_input(&self, params: ExactInputParams, nonce: U256) -> TransactionLegacy {
+    pub fn exact_input(&self, params: &ExactInputParams, nonce: U256) -> TransactionLegacy {
         let path: Vec<u8> = {
             // The encoding here is 32-byte address, then 3-byte (24-bit) fee, alternating
             let mut result = Vec::with_capacity(32 + 35 * params.path.len());
             result.extend_from_slice(params.token_in.as_bytes());
-            for (fee, token) in params.path.iter() {
+            for (fee, token) in &params.path {
                 let fee_bytes = fee.to_be_bytes();
                 result.extend_from_slice(&fee_bytes[5..8]);
                 result.extend_from_slice(token.as_bytes());
@@ -374,10 +375,10 @@ impl SwapRouter {
 
         TransactionLegacy {
             nonce,
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
@@ -403,11 +404,10 @@ fn download_uniswap_artifacts() {
             .output()
             .unwrap();
 
-        if !output.status.success() {
-            panic!(
-                "Downloading uniswap npm package failed.\n{}",
-                String::from_utf8(output.stderr).unwrap()
-            );
-        }
+        assert!(
+            output.status.success(),
+            "Downloading uniswap npm package failed.\n{}",
+            String::from_utf8(output.stderr).unwrap()
+        );
     });
 }

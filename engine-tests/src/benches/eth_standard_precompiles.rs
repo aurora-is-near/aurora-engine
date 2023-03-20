@@ -9,7 +9,7 @@ use crate::test_utils::{address_from_secret_key, deploy_evm, sign_transaction, S
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 
-pub(crate) fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
+pub fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
     let mut runner = deploy_evm();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
@@ -52,8 +52,8 @@ pub(crate) fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
         let gas = output.burnt_gas;
         let eth_gas = crate::test_utils::parse_eth_gas(&output);
         // TODO(#45): capture this in a file
-        println!("ETH_STANDARD_PRECOMPILES_{} NEAR GAS: {:?}", name, gas);
-        println!("ETH_STANDARD_PRECOMPILES_{} ETH GAS: {:?}", name, eth_gas);
+        println!("ETH_STANDARD_PRECOMPILES_{name} NEAR GAS: {gas:?}");
+        println!("ETH_STANDARD_PRECOMPILES_{name} ETH GAS: {eth_gas:?}");
     }
 
     let mut group = c.benchmark_group("standard_precompiles");
@@ -65,7 +65,7 @@ pub(crate) fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
                 || (runner.one_shot(), calling_account_id, tx_bytes.clone()),
                 |(r, c, i)| r.call(SUBMIT, c, i),
                 BatchSize::SmallInput,
-            )
+            );
         });
     }
 

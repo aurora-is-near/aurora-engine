@@ -43,7 +43,7 @@ mod tests {
     }
 
     impl MockAdminControlled {
-        pub fn new() -> Self {
+        pub const fn new() -> Self {
             Self { mask: 0 }
         }
     }
@@ -54,7 +54,7 @@ mod tests {
         }
 
         fn set_paused(&mut self, paused: PausedMask) {
-            self.mask = paused
+            self.mask = paused;
         }
     }
 
