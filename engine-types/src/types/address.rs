@@ -1,6 +1,8 @@
 use crate::{format, String, H160};
-use borsh::maybestd::io;
-use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(not(feature = "borsh-compat"))]
+use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{maybestd::io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 /// Base Eth Address type
@@ -73,19 +75,33 @@ impl BorshSerialize for Address {
     }
 }
 
+#[cfg(not(feature = "borsh-compat"))]
+impl BorshDeserialize for Address {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        address_deserialize_reader(reader)
+    }
+}
+
+#[cfg(feature = "borsh-compat")]
 impl BorshDeserialize for Address {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() < 20 {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("{}", error::AddressError::IncorrectLength),
-            ));
-        }
-        // Guaranty no panics. The length checked early
-        let address = Self(H160::from_slice(&buf[..20]));
-        *buf = &buf[20..];
-        Ok(address)
+        address_deserialize_reader(buf)
     }
+}
+
+#[inline]
+fn address_deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Address> {
+    let mut buf = [0u8; 20];
+    let maybe_read = reader.read_exact(&mut buf);
+    if let Some(io::ErrorKind::UnexpectedEof) = maybe_read.as_ref().err().map(|e| e.kind()) {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("{}", error::AddressError::IncorrectLength),
+        ));
+    }
+    maybe_read?;
+    let address = Address(H160(buf));
+    Ok(address)
 }
 
 impl Default for Address {

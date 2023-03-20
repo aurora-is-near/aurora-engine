@@ -2,7 +2,10 @@ use crate::fmt::Formatter;
 use crate::types::balance::error;
 use crate::types::Fee;
 use crate::{format, Add, Display, Sub, SubAssign, ToString, U256};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);

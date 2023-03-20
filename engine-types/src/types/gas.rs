@@ -1,6 +1,9 @@
 use crate::fmt::Formatter;
 use crate::{Add, AddAssign, Display, Div, Mul, Sub};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 use core::num::NonZeroU64;
 use serde::{Deserialize, Serialize};
 

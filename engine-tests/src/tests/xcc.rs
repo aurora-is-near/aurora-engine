@@ -549,7 +549,12 @@ fn submit_xcc_transaction(
         0,
     );
     result.assert_success();
-    let submit_result: aurora_engine::parameters::SubmitResult = result.unwrap_borsh();
+    let submit_result = match result.status() {
+        near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+            aurora_engine::parameters::SubmitResult::try_from_slice(&bytes).unwrap()
+        }
+        other => panic!("Unexpected status {other:?}"),
+    };
     assert!(
         submit_result.status.is_ok(),
         "Unexpected result: {submit_result:?}",
