@@ -18,8 +18,8 @@ pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(5_000_000_000_000);
 pub const INITIALIZE_GAS: NearGas = NearGas::new(15_000_000_000_000);
 pub const UNWRAP_AND_REFUND_GAS: NearGas = NearGas::new(25_000_000_000_000);
 pub const WITHDRAW_GAS: NearGas = NearGas::new(30_000_000_000_000);
-/// Solidity selector for the withdrawToNear function
-/// https://www.4byte.directory/signatures/?bytes4_signature=0x6b351848
+/// Solidity selector for the `withdrawToNear` function
+/// `https://www.4byte.directory/signatures/?bytes4_signature=0x6b351848`
 pub const WITHDRAW_TO_NEAR_SELECTOR: [u8; 4] = [0x6b, 0x35, 0x18, 0x48];
 
 pub use aurora_engine_precompiles::xcc::state::{
@@ -32,11 +32,13 @@ pub use aurora_engine_precompiles::xcc::state::{
 pub struct RouterCode<'a>(pub Cow<'a, [u8]>);
 
 impl<'a> RouterCode<'a> {
+    #[must_use]
     pub fn new(bytes: Vec<u8>) -> Self {
         Self(Cow::Owned(bytes))
     }
 
-    pub fn borrowed(bytes: &'a [u8]) -> Self {
+    #[must_use]
+    pub const fn borrowed(bytes: &'a [u8]) -> Self {
         Self(Cow::Borrowed(bytes))
     }
 }
@@ -47,10 +49,11 @@ pub struct AddressVersionUpdateArgs {
     pub version: CodeVersion,
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn handle_precompile_promise<I, P>(
     io: &I,
     handler: &mut P,
-    promise: PromiseCreateArgs,
+    promise: &PromiseCreateArgs,
     required_near: Yocto,
     current_account_id: &AccountId,
 ) where
@@ -62,20 +65,15 @@ pub fn handle_precompile_promise<I, P>(
 
     // Confirm target_account is of the form `{address}.{aurora}`
     // Address prefix parsed above, so only need to check `.{aurora}`
-    assert_eq!(&target_account[40..41], ".", "{}", ERR_INVALID_ACCOUNT);
+    assert_eq!(&target_account[40..41], ".", "{ERR_INVALID_ACCOUNT}");
     assert_eq!(
         &target_account[41..],
         current_account_id.as_ref(),
-        "{}",
-        ERR_INVALID_ACCOUNT
+        "{ERR_INVALID_ACCOUNT}"
     );
     // Confirm there is 0 NEAR attached to the promise
     // (the precompile should not drain the engine's balance).
-    assert_eq!(
-        promise.attached_balance, ZERO_YOCTO,
-        "{}",
-        ERR_ATTACHED_NEAR
-    );
+    assert_eq!(promise.attached_balance, ZERO_YOCTO, "{ERR_ATTACHED_NEAR}");
 
     let latest_code_version = get_latest_code_version(io);
     let sender_code_version = get_code_version_of_address(io, &sender);
@@ -210,8 +208,8 @@ pub fn handle_precompile_promise<I, P>(
     // the engine make arbitrary calls.
     let _promise_id = unsafe {
         match withdraw_id {
-            None => handler.promise_create_call(&promise),
-            Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, &promise),
+            None => handler.promise_create_call(promise),
+            Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, promise),
         }
     };
 }
@@ -232,7 +230,7 @@ pub fn update_router_code<I: IO>(io: &mut I, code: &RouterCode) {
     set_latest_code_version(io, current_version.increment());
 }
 
-/// Set the address of the wNEAR ERC-20 contract
+/// Set the address of the `wNEAR` ERC-20 contract
 pub fn set_wnear_address<I: IO>(io: &mut I, address: &Address) {
     let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, WNEAR_KEY);
     io.write_storage(&key, address.as_bytes());

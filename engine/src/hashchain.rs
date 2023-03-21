@@ -41,8 +41,8 @@ pub fn set_state<I: IO>(
 /// Continually keeps track of the previous block hashchain through the blocks heights.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct BlockchainHashchain {
-    chain_id_hash: RawH256,
-    contract_account_id_hash: RawH256,
+    chain_id: [u8; 32],
+    contract_account_id: Vec<u8>,
     current_block_height: u64,
     previous_block_hashchain: RawH256,
     genesis_block_hashchain: RawH256,
@@ -51,15 +51,15 @@ pub struct BlockchainHashchain {
 
 impl BlockchainHashchain {
     pub fn new(
-        chain_id: &[u8; 32],
-        contract_account_id: &[u8],
+        chain_id: [u8; 32],
+        contract_account_id: Vec<u8>,
         current_block_height: u64,
         previous_block_hashchain: RawH256,
         genesis_block_hashchain: RawH256,
     ) -> Self {
         Self {
-            chain_id_hash: keccak(chain_id).0,
-            contract_account_id_hash: keccak(contract_account_id).0,
+            chain_id,
+            contract_account_id,
             current_block_height,
             previous_block_hashchain,
             genesis_block_hashchain,
@@ -100,12 +100,10 @@ impl BlockchainHashchain {
         }
 
         while self.current_block_height < next_block_height {
-            let current_block_height_hash = keccak(&self.current_block_height.to_be_bytes()).0;
-
             self.previous_block_hashchain = self.block_hashchain_computer.compute_block_hashchain(
-                self.chain_id_hash,
-                self.contract_account_id_hash,
-                current_block_height_hash,
+                &self.chain_id,
+                &self.contract_account_id,
+                self.current_block_height,
                 self.previous_block_hashchain,
             );
 
@@ -167,7 +165,7 @@ pub mod blockchain_hashchain_error {
 
 /// Block Hashchain Computer
 /// The order of operations should be:
-/// 1. Create the BlockHashchainComputer one time.
+/// 1. Create the `BlockHashchainComputer` one time.
 /// 2. Add transactions of the current block.
 /// 3. Compute the block hashchain for the current block once all the transactions were added.
 /// 4. Clear the transactions of the current block.
@@ -186,36 +184,40 @@ impl BlockHashchainComputer {
 
     /// Adds a transaction.
     pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8]) {
-        let method_name_hash = keccak(method_name.as_bytes()).0;
-        let input_hash = keccak(input).0;
-        let output_hash = keccak(output).0;
+        let data = [
+            &method_name.len().to_be_bytes(),
+            method_name.as_bytes(),
+            &input.len().to_be_bytes(),
+            input,
+            &output.len().to_be_bytes(),
+            output
+        ].concat();
 
-        let tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
-
+        let tx_hash = keccak(&data).0;
         self.txs_merkle_tree.add(tx_hash);
     }
 
     /// Computes the block hashchain.
     pub fn compute_block_hashchain(
         &self,
-        chain_id_hash: RawH256,
-        contract_account_id_hash: RawH256,
-        current_block_height_hash: RawH256,
+        chain_id: &[u8; 32],
+        contract_account_id: &[u8],
+        current_block_height: u64,
         previous_block_hashchain: RawH256,
     ) -> RawH256 {
+        let current_block_height_hash = keccak(&current_block_height.to_be_bytes()).0;
         let txs_hash = self.txs_merkle_tree.compute_hash();
 
-        keccak(
-            &[
-                chain_id_hash,
-                contract_account_id_hash,
-                current_block_height_hash,
-                previous_block_hashchain,
-                txs_hash,
+        let data = [
+            chain_id,
+            contract_account_id,
+            &current_block_height_hash,
+            &previous_block_hashchain,
+            &txs_hash,
             ]
-            .concat(),
-        )
-        .0
+            .concat();
+
+        keccak(&data).0
     }
 
     /// Clears the transactions added.
@@ -337,7 +339,7 @@ mod blockchain_hashchain_tests {
     #[test]
     fn add_tx_lower_height_test() {
         let mut blockchain_hashchain =
-            BlockchainHashchain::new(&[0; 32], &[], 2, [0u8; 32], [0u8; 32]);
+            BlockchainHashchain::new([0u8; 32], vec![], 2, [0u8; 32], [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[], &[]);
 
@@ -355,7 +357,7 @@ mod blockchain_hashchain_tests {
     #[test]
     fn add_tx_higger_height_test() {
         let mut blockchain_hashchain =
-            BlockchainHashchain::new(&[0; 32], &[], 1, [0u8; 32], [0u8; 32]);
+            BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32], [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(2, "foo", &[], &[]);
 
@@ -373,7 +375,7 @@ mod blockchain_hashchain_tests {
     #[test]
     fn add_tx_same_height_test() {
         let mut blockchain_hashchain =
-            BlockchainHashchain::new(&[0; 32], &[], 1, [0u8; 32], [0u8; 32]);
+            BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32], [0u8; 32]);
 
         let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[], &[]);
 
@@ -391,7 +393,7 @@ mod blockchain_hashchain_tests {
     #[test]
     fn move_to_block_lower_height_test() {
         let mut blockchain_hashchain =
-            BlockchainHashchain::new(&[0; 32], &[], 2, [0u8; 32], [0u8; 32]);
+            BlockchainHashchain::new([0u8; 32], vec![], 2, [0u8; 32], [0u8; 32]);
 
         let move_to_block_result = blockchain_hashchain.move_to_block(1);
         assert!(move_to_block_result.is_err());
@@ -400,7 +402,7 @@ mod blockchain_hashchain_tests {
     #[test]
     fn move_to_block_same_height_test() {
         let mut blockchain_hashchain =
-            BlockchainHashchain::new(&[0; 32], &[], 1, [0u8; 32], [0u8; 32]);
+            BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32], [0u8; 32]);
 
         let move_to_block_result = blockchain_hashchain.move_to_block(1);
         assert!(move_to_block_result.is_err());
@@ -408,19 +410,15 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn move_to_block_one_more_height_test() {
-        let chain_id = &[1; 32];
-        let chain_id_hash = keccak(chain_id).0;
-        let contract_account_id = "aurora".as_bytes();
-        let contract_account_id_hash = keccak(contract_account_id).0;
+        let chain_id = [1; 32];
+        let contract_account_id = "aurora".as_bytes().to_vec();
 
         let method_name = "foo";
         let input = "foo_input".as_bytes();
         let output = "foo_output".as_bytes();
 
-        let method_name_hash = keccak(method_name.as_bytes()).0;
-        let input_hash = keccak(input).0;
-        let output_hash = keccak(output).0;
-        let tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
+        let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
+        let tx_hash = keccak(&data).0;
 
         let block_height_2: u64 = 2;
         let block_height_hash_2 = keccak(&block_height_2.to_be_bytes()).0;
@@ -428,11 +426,11 @@ mod blockchain_hashchain_tests {
 
         let expected_block_hashchain_2 = keccak(
             &[
-                chain_id_hash,
-                contract_account_id_hash,
-                block_height_hash_2,
-                block_hashchain_1,
-                tx_hash,
+                &chain_id,
+                &contract_account_id[..],
+                &block_height_hash_2,
+                &block_hashchain_1,
+                &tx_hash,
             ]
             .concat(),
         )
@@ -464,19 +462,15 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn move_to_block_two_more_height_test() {
-        let chain_id = &[1; 32];
-        let chain_id_hash = keccak(chain_id).0;
-        let contract_account_id = "aurora".as_bytes();
-        let contract_account_id_hash = keccak(contract_account_id).0;
+        let chain_id = [1; 32];
+        let contract_account_id = "aurora".as_bytes().to_vec();
 
         let method_name = "foo";
         let input = "foo_input".as_bytes();
         let output = "foo_output".as_bytes();
 
-        let method_name_hash = keccak(method_name.as_bytes()).0;
-        let input_hash = keccak(input).0;
-        let output_hash = keccak(output).0;
-        let tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
+        let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
+        let tx_hash = keccak(&data).0;
 
         let block_hashchain_1 = keccak(&1u64.to_be_bytes()).0;
         let block_height_2: u64 = 2;
@@ -486,11 +480,11 @@ mod blockchain_hashchain_tests {
 
         let block_hashchain_2 = keccak(
             &[
-                chain_id_hash,
-                contract_account_id_hash,
-                block_height_hash_2,
-                block_hashchain_1,
-                tx_hash,
+                &chain_id,
+                &contract_account_id[..],
+                &block_height_hash_2,
+                &block_hashchain_1,
+                &tx_hash,
             ]
             .concat(),
         )
@@ -498,11 +492,11 @@ mod blockchain_hashchain_tests {
 
         let expected_block_hashchain_3 = keccak(
             &[
-                chain_id_hash,
-                contract_account_id_hash,
-                block_height_hash_3,
-                block_hashchain_2,
-                [0; 32],
+                &chain_id,
+                &contract_account_id[..],
+                &block_height_hash_3,
+                &block_hashchain_2,
+                &[0; 32],
             ]
             .concat(),
         )
@@ -543,10 +537,8 @@ mod block_hashchain_computer_tests {
         let input = "foo_input".as_bytes();
         let output = "foo_output".as_bytes();
 
-        let method_name_hash = keccak(method_name.as_bytes()).0;
-        let input_hash = keccak(input).0;
-        let output_hash = keccak(output).0;
-        let expected_tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
+        let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
+        let expected_tx_hash = keccak(&data).0;
 
         let mut block_hashchain_computer = BlockHashchainComputer::new();
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
@@ -562,10 +554,8 @@ mod block_hashchain_computer_tests {
 
     #[test]
     fn compute_block_hashchain_zero_txs_test() {
-        let chain_id = &[1; 32];
-        let chain_id_hash = keccak(chain_id).0;
-        let contract_account_id = "aurora".as_bytes();
-        let contract_account_id_hash = keccak(contract_account_id).0;
+        let chain_id = [1; 32];
+        let contract_account_id = "aurora".as_bytes().to_vec();
 
         let block_height: u64 = 2;
         let block_height_hash = keccak(&block_height.to_be_bytes()).0;
@@ -573,11 +563,11 @@ mod block_hashchain_computer_tests {
 
         let expected_block_hashchain = keccak(
             &[
-                chain_id_hash,
-                contract_account_id_hash,
-                block_height_hash,
-                previous_block_hashchain,
-                [0; 32],
+                &chain_id,
+                &contract_account_id[..],
+                &block_height_hash,
+                &previous_block_hashchain,
+                &[0; 32],
             ]
             .concat(),
         )
@@ -585,9 +575,9 @@ mod block_hashchain_computer_tests {
 
         let block_hashchain_computer = BlockHashchainComputer::new();
         let block_hashchain = block_hashchain_computer.compute_block_hashchain(
-            chain_id_hash,
-            contract_account_id_hash,
-            block_height_hash,
+            &chain_id,
+            &contract_account_id,
+            block_height,
             previous_block_hashchain,
         );
 
@@ -596,19 +586,15 @@ mod block_hashchain_computer_tests {
 
     #[test]
     fn compute_block_hashchain_one_txs_test() {
-        let chain_id = &[1; 32];
-        let chain_id_hash = keccak(chain_id).0;
-        let contract_account_id = "aurora".as_bytes();
-        let contract_account_id_hash = keccak(contract_account_id).0;
+        let chain_id = [1; 32];
+        let contract_account_id = "aurora".as_bytes().to_vec();
 
         let method_name = "foo";
         let input = "foo_input".as_bytes();
         let output = "foo_output".as_bytes();
 
-        let method_name_hash = keccak(method_name.as_bytes()).0;
-        let input_hash = keccak(input).0;
-        let output_hash = keccak(output).0;
-        let tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
+        let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
+        let tx_hash = keccak(&data).0;
 
         let block_height: u64 = 2;
         let block_height_hash = keccak(&block_height.to_be_bytes()).0;
@@ -616,11 +602,11 @@ mod block_hashchain_computer_tests {
 
         let expected_block_hashchain = keccak(
             &[
-                chain_id_hash,
-                contract_account_id_hash,
-                block_height_hash,
-                previous_block_hashchain,
-                tx_hash,
+                &chain_id,
+                &contract_account_id[..],
+                &block_height_hash,
+                &previous_block_hashchain,
+                &tx_hash,
             ]
             .concat(),
         )
@@ -629,9 +615,9 @@ mod block_hashchain_computer_tests {
         let mut block_hashchain_computer = BlockHashchainComputer::new();
         block_hashchain_computer.add_tx(method_name, input, output);
         let block_hashchain = block_hashchain_computer.compute_block_hashchain(
-            chain_id_hash,
-            contract_account_id_hash,
-            block_height_hash,
+            &chain_id,
+            &contract_account_id[..],
+            block_height,
             previous_block_hashchain,
         );
 

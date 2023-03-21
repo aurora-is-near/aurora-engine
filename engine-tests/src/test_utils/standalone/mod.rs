@@ -1,6 +1,7 @@
 use aurora_engine::engine;
 use aurora_engine::parameters::{
-    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SubmitResult, TransactionStatus,
+    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs, SubmitArgs,
+    SubmitResult, TransactionStatus,
 };
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
@@ -34,7 +35,7 @@ pub struct StandaloneRunner {
 
 impl StandaloneRunner {
     pub fn init_evm(&mut self) {
-        self.init_evm_with_chain_id(self.chain_id)
+        self.init_evm_with_chain_id(self.chain_id);
     }
 
     pub fn init_evm_with_chain_id(&mut self, chain_id: u64) {
@@ -83,7 +84,7 @@ impl StandaloneRunner {
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
 
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
-            mocks::mint_evm_account(address, balance, nonce, code, io, env)
+            mocks::mint_evm_account(address, balance, nonce, code, io, env);
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
@@ -184,6 +185,7 @@ impl StandaloneRunner {
         Ok(outcome)
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn submit_raw(
         &mut self,
         method_name: &str,
@@ -212,6 +214,18 @@ impl StandaloneRunner {
                 &mut self.cumulative_diff,
                 promise_results,
             )
+        } else if method_name == test_utils::SUBMIT_WITH_ARGS {
+            let submit_args = SubmitArgs::try_from_slice(&ctx.input).unwrap();
+            let transaction_hash = aurora_engine_sdk::keccak(&submit_args.tx_data);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::SubmitWithArgs(submit_args);
+
+            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            unwrap_result(outcome)
         } else if method_name == test_utils::CALL {
             let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
@@ -226,7 +240,7 @@ impl StandaloneRunner {
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
             self.cumulative_diff.append(outcome.diff.clone());
-            test_utils::standalone::storage::commit(storage, &outcome);
+            storage::commit(storage, &outcome);
 
             unwrap_result(outcome)
         } else if method_name == test_utils::DEPLOY_ERC20 {
@@ -243,12 +257,10 @@ impl StandaloneRunner {
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
             self.cumulative_diff.append(outcome.diff.clone());
-            test_utils::standalone::storage::commit(storage, &outcome);
+            storage::commit(storage, &outcome);
 
-            let address = match outcome.maybe_result.unwrap().unwrap() {
-                sync::TransactionExecutionResult::DeployErc20(address) => address,
-                _ => unreachable!(),
-            };
+            let sync::TransactionExecutionResult::DeployErc20(address) = outcome.maybe_result.unwrap().unwrap() else { unreachable!() };
+
             Ok(SubmitResult::new(
                 TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
                 0,
@@ -302,12 +314,31 @@ impl StandaloneRunner {
                 0,
                 Vec::new(),
             ))
+        } else if method_name == test_utils::SET_OWNER {
+            let input = &ctx.input[..];
+            let call_args =
+                SetOwnerArgs::try_from_slice(input).expect("Unable to parse input as SetOwnerArgs");
+
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::SetOwner(call_args);
+
+            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
         } else {
-            panic!("Unsupported standalone method {}", method_name);
+            panic!("Unsupported standalone method {method_name}");
         }
     }
 
-    pub fn get_current_state(&self) -> &Diff {
+    pub const fn get_current_state(&self) -> &Diff {
         &self.cumulative_diff
     }
 
@@ -353,7 +384,7 @@ impl StandaloneRunner {
             random_seed: env.random_seed,
         };
         storage
-            .set_block_data(block_hash, env.block_height, block_metadata)
+            .set_block_data(block_hash, env.block_height, &block_metadata)
             .unwrap();
         let promise_data = promise_results
             .iter()
@@ -375,10 +406,10 @@ impl StandaloneRunner {
         }
     }
 
-    fn internal_submit_transaction<'db>(
+    fn internal_submit_transaction(
         transaction_bytes: &[u8],
         transaction_position: u16,
-        storage: &'db mut Storage,
+        storage: &mut Storage,
         env: &mut env::Fixed,
         cumulative_diff: &mut Diff,
         promise_results: &[PromiseResult],

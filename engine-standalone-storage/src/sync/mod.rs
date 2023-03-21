@@ -1,3 +1,5 @@
+use aurora_engine::hashchain;
+use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
@@ -14,7 +16,10 @@ pub mod types;
 
 use crate::engine_state::EngineStateAccess;
 use crate::{BlockMetadata, Diff, Storage};
+use borsh::BorshSerialize;
 use types::{Message, TransactionKind, TransactionMessage};
+
+use self::types::InnerTransactionKind;
 
 pub fn consume_message(
     storage: &mut Storage,
@@ -26,7 +31,7 @@ pub fn consume_message(
             let block_height = block_message.height;
             let block_metadata = block_message.metadata;
             storage
-                .set_block_data(block_hash, block_height, block_metadata)
+                .set_block_data(block_hash, block_height, &block_metadata)
                 .map_err(crate::Error::Rocksdb)?;
             Ok(ConsumeMessageOutcome::BlockAdded)
         }
@@ -104,7 +109,7 @@ fn execute_transaction<'db>(
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
-    io: EngineStateAccess<'db, 'db, 'db>,
+    mut io: EngineStateAccess<'db, 'db, 'db>,
 ) -> (
     H256,
     Diff,
@@ -115,7 +120,7 @@ fn execute_transaction<'db>(
     let relayer_address =
         aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes());
     let near_receipt_id = transaction_message.near_receipt_id;
-    let current_account_id = engine_account_id;
+    let current_account_id = engine_account_id.clone();
     let env = env::Fixed {
         signer_account_id,
         current_account_id,
@@ -127,22 +132,25 @@ fn execute_transaction<'db>(
         prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
-    let (tx_hash, result) = match &transaction_message.transaction {
+    let (tx_hash, mut result) = match &transaction_message.transaction {
         TransactionKind::Submit(tx) => {
             // We can ignore promises in the standalone engine because it processes each receipt separately
             // and it is fed a stream of receipts (it does not schedule them)
             let mut handler = crate::promise::NoScheduler {
                 promise_data: &transaction_message.promise_data,
             };
-            let transaction_bytes: Vec<u8> = tx.into();
-            let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
-
+            let tx_data: Vec<u8> = tx.into();
+            let tx_hash = aurora_engine_sdk::keccak(&tx_data);
+            let args = SubmitArgs {
+                tx_data,
+                ..Default::default()
+            };
             let result = state::get_state(&io)
                 .map(|engine_state| {
                     let submit_result = engine::submit(
                         io,
                         &env,
-                        &transaction_bytes,
+                        &args,
                         engine_state,
                         env.current_account_id(),
                         relayer_address,
@@ -154,7 +162,28 @@ fn execute_transaction<'db>(
 
             (tx_hash, result)
         }
+        TransactionKind::SubmitWithArgs(args) => {
+            let mut handler = crate::promise::NoScheduler {
+                promise_data: &transaction_message.promise_data,
+            };
+            let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
+            let result = state::get_state(&io)
+                .map(|engine_state| {
+                    let submit_result = engine::submit(
+                        io,
+                        &env,
+                        args,
+                        engine_state,
+                        env.current_account_id(),
+                        relayer_address,
+                        &mut handler,
+                    );
+                    Some(TransactionExecutionResult::Submit(submit_result))
+                })
+                .map_err(Into::into);
 
+            (tx_hash, result)
+        }
         other => {
             let result = non_submit_execute(
                 other,
@@ -167,14 +196,27 @@ fn execute_transaction<'db>(
         }
     };
 
+    if let Ok(option_result) = &result {
+        if let Err(e) = update_hashchain(
+            &mut io,
+            block_height,
+            &engine_account_id,
+            &transaction_message.transaction,
+            option_result,
+        ) {
+            result = Err(e);
+        }
+    }
+
     let diff = io.get_transaction_diff();
 
     (tx_hash, diff, result)
 }
 
 /// Handles all transaction kinds other than `submit`.
-/// The `submit` transaction kind is special because it is the only one where the transaction hash is
-/// different than the NEAR receipt hash.
+/// The `submit` transaction kind is special because it is the only one where the transaction hash
+/// differs from the NEAR receipt hash.
+#[allow(clippy::too_many_lines)]
 fn non_submit_execute<'db>(
     transaction: &TransactionKind,
     mut io: EngineStateAccess<'db, 'db, 'db>,
@@ -248,14 +290,14 @@ fn non_submit_execute<'db>(
 
         TransactionKind::ResolveTransfer(args, promise_result) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_resolve_transfer(args.clone(), promise_result.clone());
+            connector.ft_resolve_transfer(args, promise_result.clone());
 
             None
         }
 
         TransactionKind::FtTransfer(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_transfer(&env.predecessor_account_id, args.clone())?;
+            connector.ft_transfer(&env.predecessor_account_id, args)?;
 
             None
         }
@@ -265,7 +307,7 @@ fn non_submit_execute<'db>(
             connector.withdraw_eth_from_near(
                 &env.current_account_id,
                 &env.predecessor_account_id,
-                args.clone(),
+                args,
             )?;
 
             None
@@ -296,7 +338,7 @@ fn non_submit_execute<'db>(
 
         TransactionKind::StorageDeposit(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _ = connector.storage_deposit(
+            let _promise = connector.storage_deposit(
                 env.predecessor_account_id,
                 Yocto::new(env.attached_deposit),
                 args.clone(),
@@ -307,21 +349,21 @@ fn non_submit_execute<'db>(
 
         TransactionKind::StorageUnregister(force) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
+            let _promise = connector.storage_unregister(env.predecessor_account_id, *force)?;
 
             None
         }
 
         TransactionKind::StorageWithdraw(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
+            connector.storage_withdraw(&env.predecessor_account_id, args)?;
 
             None
         }
 
         TransactionKind::SetPausedFlags(args) => {
             let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.set_paused_flags(args.clone());
+            connector.set_paused_flags(args);
 
             None
         }
@@ -342,7 +384,7 @@ fn non_submit_execute<'db>(
                         let mut handler = crate::promise::NoScheduler { promise_data };
                         let engine_state = state::get_state(&io)?;
                         let result =
-                            engine::refund_on_error(io, &env, engine_state, args, &mut handler);
+                            engine::refund_on_error(io, &env, engine_state, &args, &mut handler);
                         Ok(TransactionExecutionResult::Submit(result))
                     })
                     .transpose();
@@ -360,14 +402,14 @@ fn non_submit_execute<'db>(
         TransactionKind::NewConnector(args) => {
             connector::EthConnectorContract::create_contract(
                 io,
-                env.current_account_id,
+                &env.current_account_id,
                 args.clone(),
             )?;
 
             None
         }
         TransactionKind::NewEngine(args) => {
-            state::set_state(&mut io, args.clone().into())?;
+            state::set_state(&mut io, &args.clone().into())?;
 
             None
         }
@@ -389,7 +431,7 @@ fn non_submit_execute<'db>(
         }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
-        TransactionKind::Submit(_) => unreachable!(),
+        TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
         TransactionKind::PausePrecompiles(args) => {
             let precompiles_to_pause = PrecompileFlags::from_bits_truncate(args.paused_mask);
 
@@ -406,9 +448,96 @@ fn non_submit_execute<'db>(
 
             None
         }
+        TransactionKind::SetOwner(args) => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.owner_id = args.clone().new_owner;
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
     };
 
     Ok(result)
+}
+
+fn update_hashchain<'db>(
+    io: &mut EngineStateAccess<'db, 'db, 'db>,
+    block_height: u64,
+    engine_account_id: &AccountId,
+    transaction: &TransactionKind,
+    result: &Option<TransactionExecutionResult>,
+) -> Result<(), error::Error> {
+    let method_name = InnerTransactionKind::from(transaction).to_string();
+    let input = get_input(transaction)?;
+    let output = get_output(result)?;
+
+    let mut blockchain_hashchain = hashchain::get_state(io).unwrap_or_else(|_| {
+        hashchain::BlockchainHashchain::new(
+            state::get_state(io).unwrap().chain_id,
+            engine_account_id.as_bytes().to_vec(),
+            block_height,
+            [0; 32],
+            [0; 32],
+        )
+    });
+
+    if block_height > blockchain_hashchain.get_current_block_height() {
+        blockchain_hashchain.move_to_block(block_height)?;
+    }
+
+    blockchain_hashchain.add_block_tx(block_height, &method_name, &input, &output)?;
+
+    Ok(hashchain::set_state(io, blockchain_hashchain)?)
+}
+
+fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
+    match transaction {
+        TransactionKind::Submit(tx) => Ok(tx.into()),
+        TransactionKind::SubmitWithArgs(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::Call(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::PausePrecompiles(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::ResumePrecompiles(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::Deploy(input) => Ok(input.to_vec()),
+        TransactionKind::DeployErc20(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FtOnTransfer(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::Deposit(raw_proof) => Ok(raw_proof.to_vec()),
+        TransactionKind::FtTransferCall(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FinishDeposit(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::ResolveTransfer(args, _) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FtTransfer(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::Withdraw(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::StorageDeposit(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::StorageUnregister(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::StorageWithdraw(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::SetOwner(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::SetPausedFlags(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::RegisterRelayer(evm_address) => Ok(evm_address.as_bytes().to_vec()),
+        TransactionKind::RefundOnError(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::SetConnectorData(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::NewConnector(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::NewEngine(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FactoryUpdate(bytecode) => Ok(bytecode.to_vec()),
+        TransactionKind::FactoryUpdateAddressVersion(args) => {
+            args.try_to_vec().map_err(|e| e.into())
+        }
+        TransactionKind::FactorySetWNearAddress(address) => Ok(address.as_bytes().to_vec()),
+        TransactionKind::Unknown => Ok(vec![]),
+    }
+}
+
+fn get_output(result: &Option<TransactionExecutionResult>) -> Result<Vec<u8>, error::Error> {
+    match result {
+        None => Ok(vec![]),
+        Some(execution_result) => match execution_result {
+            TransactionExecutionResult::Promise(_) => Ok(vec![]),
+            TransactionExecutionResult::DeployErc20(address) => Ok(address.as_bytes().to_vec()),
+            TransactionExecutionResult::Submit(submit) => match submit {
+                Err(e) => Err(e.clone().into()),
+                Ok(submit_result) => submit_result.try_to_vec().map_err(|e| e.into()),
+            },
+        },
+    }
 }
 
 #[derive(Debug)]
@@ -434,7 +563,11 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine, fungible_token, state};
+    use aurora_engine::{
+        connector, engine, fungible_token,
+        hashchain::blockchain_hashchain_error::BlockchainHashchainError, state,
+    };
+    use std::io;
 
     #[derive(Debug)]
     pub enum Error {
@@ -450,6 +583,8 @@ pub mod error {
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
         ConnectorInit(connector::error::InitContractError),
         ConnectorStorage(connector::error::StorageReadError),
+        BlockchainHashchain(BlockchainHashchainError),
+        IO(io::Error),
     }
 
     impl From<state::EngineStateError> for Error {
@@ -521,6 +656,18 @@ pub mod error {
     impl From<connector::error::StorageReadError> for Error {
         fn from(e: connector::error::StorageReadError) -> Self {
             Self::ConnectorStorage(e)
+        }
+    }
+
+    impl From<BlockchainHashchainError> for Error {
+        fn from(e: BlockchainHashchainError) -> Self {
+            Self::BlockchainHashchain(e)
+        }
+    }
+
+    impl From<io::Error> for Error {
+        fn from(e: io::Error) -> Self {
+            Self::IO(e)
         }
     }
 }
