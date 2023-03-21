@@ -472,12 +472,12 @@ mod tests {
         let mod_val = U256::MAX;
 
         let mut input: Vec<u8> = Vec::new();
-        input.extend_from_slice(&u256_to_arr(&base_len));
-        input.extend_from_slice(&u256_to_arr(&exp_len));
-        input.extend_from_slice(&u256_to_arr(&mod_len));
-        input.extend_from_slice(&base.to_be_bytes());
-        input.extend_from_slice(&u256_to_arr(&exp));
-        input.extend_from_slice(&u256_to_arr(&mod_val));
+        input.extend(u256_to_arr(&base_len));
+        input.extend(u256_to_arr(&exp_len));
+        input.extend(u256_to_arr(&mod_len));
+        input.extend(base.to_be_bytes());
+        input.extend(u256_to_arr(&exp));
+        input.extend(u256_to_arr(&mod_val));
 
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();
@@ -492,11 +492,11 @@ mod tests {
         let exp = U256::MAX;
 
         let mut input: Vec<u8> = Vec::new();
-        input.extend_from_slice(&u256_to_arr(&base_len));
-        input.extend_from_slice(&u256_to_arr(&exp_len));
-        input.extend_from_slice(&u256_to_arr(&mod_len));
-        input.extend_from_slice(&base.to_be_bytes());
-        input.extend_from_slice(&u256_to_arr(&exp));
+        input.extend(u256_to_arr(&base_len));
+        input.extend(u256_to_arr(&exp_len));
+        input.extend(u256_to_arr(&mod_len));
+        input.extend(base.to_be_bytes());
+        input.extend(u256_to_arr(&exp));
 
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();
