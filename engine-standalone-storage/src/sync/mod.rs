@@ -474,8 +474,8 @@ fn update_hashchain<'db>(
 
     let mut blockchain_hashchain = hashchain::get_state(io).unwrap_or_else(|_| {
         hashchain::BlockchainHashchain::new(
-            &state::get_state(io).unwrap().chain_id,
-            engine_account_id.as_bytes(),
+            state::get_state(io).unwrap().chain_id,
+            engine_account_id.as_bytes().to_vec(),
             block_height,
             [0; 32],
             [0; 32],

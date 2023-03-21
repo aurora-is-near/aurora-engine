@@ -1227,8 +1227,8 @@ mod contract {
 
         let mut blockchain_hashchain = hashchain::get_state(io).unwrap_or_else(|_| {
             BlockchainHashchain::new(
-                &state::get_state(io).sdk_unwrap().chain_id,
-                io.current_account_id().as_bytes(),
+                state::get_state(io).sdk_unwrap().chain_id,
+                io.current_account_id().as_bytes().to_vec(),
                 block_height,
                 [0; 32],
                 [0; 32],
