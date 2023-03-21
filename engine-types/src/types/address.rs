@@ -1,6 +1,8 @@
 use crate::{format, String, H160};
-use borsh::maybestd::io;
-use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(not(feature = "borsh-compat"))]
+use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{maybestd::io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 /// Base Eth Address type
@@ -73,6 +75,24 @@ impl BorshSerialize for Address {
     }
 }
 
+#[cfg(not(feature = "borsh-compat"))]
+impl BorshDeserialize for Address {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 20];
+        let maybe_read = reader.read_exact(&mut buf);
+        if maybe_read.as_ref().err().map(io::Error::kind) == Some(io::ErrorKind::UnexpectedEof) {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("{}", error::AddressError::IncorrectLength),
+            ));
+        }
+        maybe_read?;
+        let address = Self(H160(buf));
+        Ok(address)
+    }
+}
+
+#[cfg(feature = "borsh-compat")]
 impl BorshDeserialize for Address {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
         if buf.len() < 20 {

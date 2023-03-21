@@ -95,6 +95,7 @@ impl<HF: HardFork> ModExp<HF> {
 }
 
 impl ModExp<Byzantium> {
+    const MIN_GAS: EthGas = EthGas::new(0);
     // ouput of this function is bounded by 2^128
     fn mul_complexity(x: usize) -> U256 {
         if x <= 64 {
@@ -113,12 +114,16 @@ impl ModExp<Byzantium> {
 impl Precompile for ModExp<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input)?;
-        let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
-        let iter_count = Self::calc_iter_count(exp_len, base_len, input);
-        // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
-        let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
+        if base_len == 0 && mod_len == 0 {
+            Ok(Self::MIN_GAS)
+        } else {
+            let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
+            let iter_count = Self::calc_iter_count(exp_len, base_len, input);
+            // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
+            let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
 
-        Ok(EthGas::new(saturating_round(gas)))
+            Ok(EthGas::new(saturating_round(gas)))
+        }
     }
 
     /// See: `https://eips.ethereum.org/EIPS/eip-198`
@@ -143,6 +148,7 @@ impl Precompile for ModExp<Byzantium> {
 }
 
 impl ModExp<Berlin> {
+    const MIN_GAS: EthGas = EthGas::new(200);
     // output bounded by 2^122
     fn mul_complexity(base_len: usize, mod_len: usize) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
@@ -154,12 +160,16 @@ impl ModExp<Berlin> {
 impl Precompile for ModExp<Berlin> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input)?;
-        let mul = Self::mul_complexity(base_len, mod_len);
-        let iter_count = Self::calc_iter_count(exp_len, base_len, input);
-        // mul * iter_count bounded by 2^189 (so no overflow)
-        let gas = mul * iter_count.max(U256::one()) / U256::from(3);
+        if base_len == 0 && mod_len == 0 {
+            Ok(Self::MIN_GAS)
+        } else {
+            let mul = Self::mul_complexity(base_len, mod_len);
+            let iter_count = Self::calc_iter_count(exp_len, base_len, input);
+            // mul * iter_count bounded by 2^189 (so no overflow)
+            let gas = mul * iter_count.max(U256::one()) / U256::from(3);
 
-        Ok(EthGas::new(core::cmp::max(200, saturating_round(gas))))
+            Ok(EthGas::new(core::cmp::max(200, saturating_round(gas))))
+        }
     }
 
     fn run(
@@ -479,6 +489,7 @@ mod tests {
         input.extend(u256_to_arr(&exp));
         input.extend(u256_to_arr(&mod_val));
 
+
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();
     }
@@ -647,5 +658,81 @@ mod tests {
             false,
         );
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_modexp_not_overflow() {
+        let base_len = U256::from(0);
+        let exp_len = U256::from(4294967200usize); // `usize::MAX` - 95
+        let mod_len = U256::from(0);
+        let base = U256::MAX;
+        let exp = U256::MAX;
+        let modulus = U256::MAX;
+
+        let mut input: Vec<u8> = Vec::new();
+        input.extend(u256_to_arr(&base_len));
+        input.extend(u256_to_arr(&exp_len));
+        input.extend(u256_to_arr(&mod_len));
+        input.extend(u256_to_arr(&base));
+        input.extend(u256_to_arr(&exp));
+        input.extend(u256_to_arr(&modulus));
+
+        let res = ModExp::<Byzantium>::new()
+            .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
+            .unwrap();
+        let expected = [0u8; 0];
+        assert_eq!(res.output, expected);
+
+        let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+        let min_gas = EthGas::new(0);
+        assert_eq!(gas, min_gas);
+
+        let res = ModExp::<Berlin>::new()
+            .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
+            .unwrap();
+        let expected = [0u8; 0];
+        assert_eq!(res.output, expected);
+
+        let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
+        let min_gas = EthGas::new(200);
+        assert_eq!(gas, min_gas);
+    }
+
+    #[test]
+    fn test_zero_base_len_zero_mod_len() {
+        let base_len = U256::from(0);
+        let exp_len = U256::from(1);
+        let mod_len = U256::from(0);
+        let base = U256::from(1);
+        let exp = U256::from(1);
+        let modulus = U256::from(1);
+
+        let mut input: Vec<u8> = Vec::new();
+        input.extend(u256_to_arr(&base_len));
+        input.extend(u256_to_arr(&exp_len));
+        input.extend(u256_to_arr(&mod_len));
+        input.extend(u256_to_arr(&base));
+        input.extend(u256_to_arr(&exp));
+        input.extend(u256_to_arr(&modulus));
+
+        let res = ModExp::<Byzantium>::new()
+            .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
+            .unwrap();
+        let expected = [0u8; 0];
+        assert_eq!(res.output, expected);
+
+        let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+        let min_gas = EthGas::new(0);
+        assert_eq!(gas, min_gas);
+
+        let res = ModExp::<Berlin>::new()
+            .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
+            .unwrap();
+        let expected = [0u8; 0];
+        assert_eq!(res.output, expected);
+
+        let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
+        let min_gas = EthGas::new(200);
+        assert_eq!(gas, min_gas);
     }
 }
