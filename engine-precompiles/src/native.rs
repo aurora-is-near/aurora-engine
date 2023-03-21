@@ -619,6 +619,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 }
 
 #[cfg(test)]
+mod tests {
     use super::{exit_to_ethereum, exit_to_near, validate_amount, validate_input_size};
     use crate::prelude::sdk::types::near_account_to_evm_address;
     use aurora_engine_types::U256;
@@ -674,6 +675,9 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         let input = [1u8; 55];
         validate_input_size(&input, 10, input.len()).unwrap();
         validate_input_size(&input, 0, input.len()).unwrap();
+    }
+
+    #[test]
     #[should_panic(expected = "ERR_INVALID_AMOUNT")]
     fn test_exit_with_invalid_amount() {
         validate_amount(U256::MAX).unwrap();
