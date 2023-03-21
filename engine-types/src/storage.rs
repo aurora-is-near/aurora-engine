@@ -1,6 +1,8 @@
-use crate::types::Address;
-use crate::*;
+use crate::{types::Address, Vec, H256};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 
 // NOTE: We start at 0x7 as our initial value as our original storage was not
 // version prefixed and ended as 0x6.
@@ -34,19 +36,18 @@ pub enum KeyPrefix {
 
 impl From<KeyPrefix> for u8 {
     fn from(k: KeyPrefix) -> Self {
-        use KeyPrefix::*;
         match k {
-            Config => 0x0,
-            Nonce => 0x1,
-            Balance => 0x2,
-            Code => 0x3,
-            Storage => 0x4,
-            RelayerEvmAddressMap => 0x5,
-            EthConnector => 0x6,
-            Generation => 0x7,
-            Nep141Erc20Map => 0x8,
-            Erc20Nep141Map => 0x9,
-            CrossContractCall => 0xa,
+            KeyPrefix::Config => 0x0,
+            KeyPrefix::Nonce => 0x1,
+            KeyPrefix::Balance => 0x2,
+            KeyPrefix::Code => 0x3,
+            KeyPrefix::Storage => 0x4,
+            KeyPrefix::RelayerEvmAddressMap => 0x5,
+            KeyPrefix::EthConnector => 0x6,
+            KeyPrefix::Generation => 0x7,
+            KeyPrefix::Nep141Erc20Map => 0x8,
+            KeyPrefix::Erc20Nep141Map => 0x9,
+            KeyPrefix::CrossContractCall => 0xa,
         }
     }
 }
@@ -64,14 +65,13 @@ pub enum EthConnectorStorageId {
 
 impl From<EthConnectorStorageId> for u8 {
     fn from(id: EthConnectorStorageId) -> Self {
-        use EthConnectorStorageId::*;
         match id {
-            Contract => 0x0,
-            FungibleToken => 0x1,
-            UsedEvent => 0x2,
-            PausedMask => 0x3,
-            StatisticsAuroraAccountsCounter => 0x4,
-            FungibleTokenMetadata => 0x5,
+            EthConnectorStorageId::Contract => 0x0,
+            EthConnectorStorageId::FungibleToken => 0x1,
+            EthConnectorStorageId::UsedEvent => 0x2,
+            EthConnectorStorageId::PausedMask => 0x3,
+            EthConnectorStorageId::StatisticsAuroraAccountsCounter => 0x4,
+            EthConnectorStorageId::FungibleTokenMetadata => 0x5,
         }
     }
 }
@@ -100,11 +100,13 @@ impl From<KeyPrefixU8> for KeyPrefix {
 }
 
 #[allow(dead_code)]
+#[must_use]
 pub fn bytes_to_key(prefix: KeyPrefix, bytes: &[u8]) -> Vec<u8> {
     [&[u8::from(VersionPrefix::V1)], &[u8::from(prefix)], bytes].concat()
 }
 
 #[allow(dead_code)]
+#[must_use]
 pub fn address_to_key(prefix: KeyPrefix, address: &Address) -> [u8; 22] {
     let mut result = [0u8; 22];
     result[0] = u8::from(VersionPrefix::V1);
@@ -120,14 +122,14 @@ pub enum StorageKeyKind {
 
 impl AsRef<[u8]> for StorageKeyKind {
     fn as_ref(&self) -> &[u8] {
-        use StorageKeyKind::*;
         match &self {
-            Normal(v) => v,
-            Generation(v) => v,
+            Self::Normal(v) => v,
+            Self::Generation(v) => v,
         }
     }
 }
 
+#[must_use]
 pub fn storage_to_key(address: &Address, key: &H256, generation: u32) -> StorageKeyKind {
     if generation == 0 {
         StorageKeyKind::Normal(normal_storage_key(address, key))

@@ -22,15 +22,16 @@ use std::path::Path;
 const WNEAR_AMOUNT: u128 = 10 * near_sdk_sim::STORAGE_AMOUNT;
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn test_xcc_eth_gas_cost() {
     let mut runner = test_utils::deploy_evm();
     runner.standalone_runner = None;
     let xcc_wasm_bytes = contract_bytes();
-    let _ = runner.call("factory_update", ORIGIN, xcc_wasm_bytes);
+    let _res = runner.call("factory_update", ORIGIN, xcc_wasm_bytes);
     let mut signer = test_utils::Signer::random();
     let mut baseline_signer = test_utils::Signer::random();
     runner.context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
-    // Need to use engine's deploy!
+    // Need to use for engine's deployment!
     let wnear_erc20 = deploy_erc20(&mut runner, &mut signer);
     approve_erc20(
         &wnear_erc20,
@@ -44,7 +45,7 @@ fn test_xcc_eth_gas_cost() {
         &mut runner,
         &mut signer,
     );
-    let _ = runner.call(
+    let _res = runner.call(
         "factory_set_wnear_address",
         ORIGIN,
         wnear_erc20.0.address.as_bytes().to_vec(),
@@ -63,9 +64,10 @@ fn test_xcc_eth_gas_cost() {
             )
         })
         .unwrap();
-    if !baseline_result.status.is_ok() {
-        panic!("Unexpected baseline status: {:?}", baseline_result);
-    }
+    assert!(
+        baseline_result.status.is_ok(),
+        "Unexpected baseline status: {baseline_result:?}",
+    );
 
     let mut profile_for_promise = |p: PromiseArgs| -> (u64, u64, u64) {
         let data = CrossContractCallArgs::Eager(p).try_to_vec().unwrap();
@@ -158,12 +160,12 @@ fn test_xcc_eth_gas_cost() {
 
 #[test]
 fn test_xcc_precompile_eager() {
-    test_xcc_precompile_common(false)
+    test_xcc_precompile_common(false);
 }
 
 #[test]
 fn test_xcc_precompile_scheduled() {
-    test_xcc_precompile_common(true)
+    test_xcc_precompile_common(true);
 }
 
 /// This test uses the XCC feature where the promise has many nested callbacks.
@@ -192,7 +194,7 @@ fn test_xcc_multiple_callbacks() {
     let n = 6;
     let promise = make_fib_promise(n, &fib_account_id);
     let xcc_args = CrossContractCallArgs::Delayed(PromiseArgs::Recursive(promise));
-    let _result = submit_xcc_transaction(xcc_args, &aurora, &mut signer, chain_id);
+    let _result = submit_xcc_transaction(&xcc_args, &aurora, &mut signer, chain_id);
 
     // 3. Make Fibonacci call
     let router_account = format!(
@@ -211,7 +213,7 @@ fn test_xcc_multiple_callbacks() {
 
     // 4. Check the result is correct
     let output = result.unwrap_json_value();
-    check_fib_result(output, n);
+    check_fib_result(&output, n);
 }
 
 /// This test is similar to `test_xcc_multiple_callbacks`, but instead of computing
@@ -257,7 +259,7 @@ fn test_xcc_and_combinator() {
         }),
     };
     let xcc_args = CrossContractCallArgs::Delayed(PromiseArgs::Recursive(promise));
-    let _result = submit_xcc_transaction(xcc_args, &aurora, &mut signer, chain_id);
+    let _result = submit_xcc_transaction(&xcc_args, &aurora, &mut signer, chain_id);
 
     // 3. Make Fibonacci call
     let router_account = format!(
@@ -276,10 +278,10 @@ fn test_xcc_and_combinator() {
 
     // 4. Check the result is correct
     let output = result.unwrap_json_value();
-    check_fib_result(output, usize::try_from(n).unwrap());
+    check_fib_result(&output, usize::try_from(n).unwrap());
 }
 
-fn check_fib_result(output: serde_json::Value, n: usize) {
+fn check_fib_result(output: &serde_json::Value, n: usize) {
     let fib_numbers: [u8; 8] = [0, 1, 1, 2, 3, 5, 8, 13];
     let get_number = |field_name: &str| -> u8 {
         output
@@ -298,6 +300,7 @@ fn check_fib_result(output: serde_json::Value, n: usize) {
     assert_eq!(b, fib_numbers[n + 1]);
 }
 
+#[allow(clippy::too_many_lines)]
 fn test_xcc_precompile_common(is_scheduled: bool) {
     let XccTestContext {
         aurora,
@@ -344,9 +347,9 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
 
     // 3. Give router some tokens
     let transfer_amount: u128 = 199;
-    let args = serde_json::json!({
+    let args = json!({
         "receiver_id": router_account,
-        "amount": format!("{}", transfer_amount),
+        "amount": format!("{transfer_amount}"),
     })
     .to_string();
     ft_owner
@@ -364,9 +367,9 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
     );
 
     // 4. Use xcc precompile to send those tokens back
-    let args = serde_json::json!({
+    let args = json!({
         "receiver_id": ft_owner.account_id.as_str(),
-        "amount": format!("{}", transfer_amount),
+        "amount": format!("{transfer_amount}"),
     })
     .to_string();
     let promise = PromiseCreateArgs {
@@ -379,7 +382,7 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
     let callback = PromiseCreateArgs {
         target_account_id: nep_141_token.account_id.as_str().parse().unwrap(),
         method: "ft_balance_of".into(),
-        args: format!("{{\"account_id\":\"{}\"}}", router_account).into_bytes(),
+        args: format!("{{\"account_id\":\"{router_account}\"}}").into_bytes(),
         attached_balance: Yocto::new(0),
         attached_gas: NearGas::new(2_000_000_000_000),
     };
@@ -393,7 +396,7 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
         CrossContractCallArgs::Eager(promise_args)
     };
     let engine_balance_before_xcc = get_engine_near_balance(&aurora);
-    let _result = submit_xcc_transaction(xcc_args, &aurora, &mut signer, chain_id);
+    let _result = submit_xcc_transaction(&xcc_args, &aurora, &mut signer, chain_id);
 
     print_outcomes(&aurora);
     let engine_balance_after_xcc = get_engine_near_balance(&aurora);
@@ -402,9 +405,7 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
         engine_balance_after_xcc.max(engine_balance_before_xcc)
             - engine_balance_after_xcc.min(engine_balance_before_xcc)
             < 10_000_000_000_000_000_000_000,
-        "Engine lost too much NEAR funding xcc: Before={:?} After={:?}",
-        engine_balance_before_xcc,
-        engine_balance_after_xcc,
+        "Engine lost too much NEAR funding xcc: Before={engine_balance_before_xcc} After={engine_balance_after_xcc}",
     );
     let router_balance = aurora
         .user
@@ -415,8 +416,7 @@ fn test_xcc_precompile_common(is_scheduled: bool) {
     assert!(
         // router loses less than 0.01 NEAR from its allocated funds
         xcc::state::STORAGE_AMOUNT.as_u128() - router_balance < 10_000_000_000_000_000_000_000,
-        "Router lost too much NEAR: Balance={:?}",
-        router_balance,
+        "Router lost too much NEAR: Balance={router_balance}",
     );
     // Router has no wNEAR balance because it all was unwrapped to actual NEAR
     assert_eq!(
@@ -526,7 +526,7 @@ struct XccTestContext {
 }
 
 fn submit_xcc_transaction(
-    xcc_args: CrossContractCallArgs,
+    xcc_args: &CrossContractCallArgs,
     aurora: &AuroraAccount,
     signer: &mut test_utils::Signer,
     chain_id: u64,
@@ -549,10 +549,16 @@ fn submit_xcc_transaction(
         0,
     );
     result.assert_success();
-    let submit_result: aurora_engine::parameters::SubmitResult = result.unwrap_borsh();
-    if !submit_result.status.is_ok() {
-        panic!("Unexpected result {:?}", submit_result);
-    }
+    let submit_result = match result.status() {
+        near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+            aurora_engine::parameters::SubmitResult::try_from_slice(&bytes).unwrap()
+        }
+        other => panic!("Unexpected status {other:?}"),
+    };
+    assert!(
+        submit_result.status.is_ok(),
+        "Unexpected result: {submit_result:?}",
+    );
     result
 }
 
@@ -567,7 +573,7 @@ fn get_engine_near_balance(aurora: &AuroraAccount) -> u128 {
 
 fn print_outcomes(aurora: &AuroraAccount) {
     let rt = aurora.user.borrow_runtime();
-    for id in rt.last_outcomes.iter() {
+    for id in &rt.last_outcomes {
         println!("{:?}=={:?}\n\n", id, rt.outcome(id).unwrap());
     }
 }
@@ -661,7 +667,7 @@ fn test_xcc_exec_gas() {
                     assert_eq!(function_call.deposit, promise.attached_balance.as_u128());
                     assert_eq!(function_call.gas, promise.attached_gas.as_u64());
                 }
-                other => panic!("Unexpected action {:?}", other),
+                other => panic!("Unexpected action {other:?}"),
             };
         }
     }
@@ -819,7 +825,7 @@ fn approve_erc20(
     assert!(approve_result.status.is_ok());
 }
 
-pub(crate) fn contract_bytes() -> Vec<u8> {
+pub fn contract_bytes() -> Vec<u8> {
     let base_path = Path::new("../etc").join("xcc-router");
     let output_path = base_path.join("target/wasm32-unknown-unknown/release/xcc_router.wasm");
     test_utils::rust::compile(base_path);

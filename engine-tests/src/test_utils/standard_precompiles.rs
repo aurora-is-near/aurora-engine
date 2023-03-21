@@ -2,9 +2,9 @@ use crate::prelude::{transactions::legacy::TransactionLegacy, U256};
 use crate::test_utils::solidity;
 use std::path::{Path, PathBuf};
 
-pub(crate) struct PrecompilesConstructor(pub solidity::ContractConstructor);
+pub struct PrecompilesConstructor(pub solidity::ContractConstructor);
 
-pub(crate) struct PrecompilesContract(pub solidity::DeployedContract);
+pub struct PrecompilesContract(pub solidity::DeployedContract);
 
 impl From<PrecompilesConstructor> for solidity::ContractConstructor {
     fn from(c: PrecompilesConstructor) -> Self {
@@ -40,7 +40,7 @@ impl PrecompilesContract {
         self.0.call_method_without_args(method_name, nonce)
     }
 
-    pub fn all_method_names() -> &'static [&'static str] {
+    pub const fn all_method_names() -> &'static [&'static str] {
         &[
             "test_ecrecover",
             "test_sha256",

@@ -50,11 +50,11 @@ impl Transaction1559 {
         s.append(&self.value.raw());
         s.append(&self.data);
         s.begin_list(self.access_list.len());
-        for tuple in self.access_list.iter() {
+        for tuple in &self.access_list {
             s.begin_list(2);
             s.append(&tuple.address);
             s.begin_list(tuple.storage_keys.len());
-            for key in tuple.storage_keys.iter() {
+            for key in &tuple.storage_keys {
                 s.append(key);
             }
         }

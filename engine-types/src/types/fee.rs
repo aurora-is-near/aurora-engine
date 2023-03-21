@@ -1,7 +1,10 @@
 use crate::fmt::Formatter;
 use crate::types::NEP141Wei;
 use crate::{Add, Display};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 
 #[derive(
     Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, BorshSerialize, BorshDeserialize,
@@ -17,21 +20,23 @@ impl Display for Fee {
 
 impl Fee {
     /// Constructs a new `Fee` with a given u128 value.
-    pub const fn new(fee: NEP141Wei) -> Fee {
+    #[must_use]
+    pub const fn new(fee: NEP141Wei) -> Self {
         Self(fee)
     }
 
     /// Consumes `Fee` and returns the underlying type.
-    pub fn as_u128(self) -> u128 {
+    #[must_use]
+    pub const fn as_u128(self) -> u128 {
         self.0.as_u128()
     }
 }
 
-impl Add<Fee> for Fee {
-    type Output = Fee;
+impl Add for Fee {
+    type Output = Self;
 
-    fn add(self, rhs: Fee) -> Self::Output {
-        Fee(self.0 + rhs.0)
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
     }
 }
 
