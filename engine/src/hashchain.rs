@@ -537,10 +537,8 @@ mod block_hashchain_computer_tests {
         let input = "foo_input".as_bytes();
         let output = "foo_output".as_bytes();
 
-        let method_name_hash = keccak(method_name.as_bytes()).0;
-        let input_hash = keccak(input).0;
-        let output_hash = keccak(output).0;
-        let expected_tx_hash = keccak(&[method_name_hash, input_hash, output_hash].concat()).0;
+        let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
+        let expected_tx_hash = keccak(&data).0;
 
         let mut block_hashchain_computer = BlockHashchainComputer::new();
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
