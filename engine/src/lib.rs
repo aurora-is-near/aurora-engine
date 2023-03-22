@@ -579,7 +579,8 @@ mod contract {
 
         if let Some(PromiseResult::Successful(_)) = io.promise_result(0) {
             // Promise succeeded -- nothing to do
-        } else {
+        }
+        else {
             // Exit call failed; need to refund tokens
             let input = io.read_input();
             let args: RefundCallArgs = input.to_value().sdk_unwrap();
@@ -591,7 +592,9 @@ mod contract {
                 sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
             }
 
-            update_hashchain(&mut io, function_name!(), &input.to_vec(), &[]);
+            let output = refund_result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
+
+            update_hashchain(&mut io, function_name!(), &input.to_vec(), &output);
         }
     }
 
