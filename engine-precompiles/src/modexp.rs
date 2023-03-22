@@ -24,13 +24,14 @@ impl<HF: HardFork> ModExp<HF> {
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
         let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
         let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
+
         let exp = parse_bytes(
             bytes,
             start.saturating_add(96),
             core::cmp::min(32, exp_len),
             // I don't understand why I need a closure here, but doesn't compile without one
             |x| U256::from(x),
-        );
+        )?;
 
         if exp_len <= 32 && exp.is_zero() {
             Ok(U256::zero())
@@ -43,7 +44,7 @@ impl<HF: HardFork> ModExp<HF> {
     }
 
     fn run_inner(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        let (base_len, exp_len, mod_len) = parse_lengths(input);
+        let (base_len, exp_len, mod_len) = parse_lengths(input)?;
         let base_len = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
         let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
         let mod_len = usize::try_from(mod_len).map_err(utils::err_usize_conv)?;
@@ -51,7 +52,7 @@ impl<HF: HardFork> ModExp<HF> {
         let base_start = 96;
 
         if base_len == 0 && mod_len == 0 && exp_len > usize::MAX.saturating_sub(base_start) {
-            return Err(ExitError::Other(Cow::Borrowed("INVALID_MODEXP_LENGTHS")))
+            return Err(ExitError::Other(Cow::Borrowed("INVALID_MODEXP_LENGTHS")));
         }
 
         let base_end = base_len.saturating_add(base_start);
@@ -61,9 +62,9 @@ impl<HF: HardFork> ModExp<HF> {
 
         let mod_start = exp_end;
 
-        let base = parse_bytes(input, base_start, base_len, BigUint::from_bytes_be);
-        let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
-        let modulus = parse_bytes(input, mod_start, mod_len, BigUint::from_bytes_be);
+        let base = parse_bytes(input, base_start, base_len, BigUint::from_bytes_be)?;
+        let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be)?;
+        let modulus = parse_bytes(input, mod_start, mod_len, BigUint::from_bytes_be)?;
 
         let output = {
             let computed_result = if modulus == BigUint::from(0u32) {
@@ -107,7 +108,7 @@ impl ModExp<Byzantium> {
 
 impl Precompile for ModExp<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
-        let (base_len, exp_len, mod_len) = parse_lengths(input);
+        let (base_len, exp_len, mod_len) = parse_lengths(input)?;
         if base_len == 0 && mod_len == 0 {
             Ok(Self::MIN_GAS)
         } else {
@@ -153,7 +154,7 @@ impl ModExp<Berlin> {
 
 impl Precompile for ModExp<Berlin> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
-        let (base_len, exp_len, mod_len) = parse_lengths(input);
+        let (base_len, exp_len, mod_len) = parse_lengths(input)?;
         if base_len == 0 && mod_len == 0 {
             Ok(Self::MIN_GAS)
         } else {
@@ -185,12 +186,21 @@ impl Precompile for ModExp<Berlin> {
     }
 }
 
-fn parse_bytes<T, F: FnOnce(&[u8]) -> T>(input: &[u8], start: usize, size: usize, f: F) -> T {
+fn parse_bytes<T, F: FnOnce(&[u8]) -> T>(
+    input: &[u8],
+    start: usize,
+    size: usize,
+    f: F,
+) -> Result<T, ExitError> {
     let len = input.len();
     if start >= len {
-        return f(&[]);
+        return Ok(f(&[]));
     }
     let end = start + size;
+
+    if end > usize::MAX.saturating_sub(96) {
+        return Err(ExitError::Other(Cow::Borrowed("INVALID_LENGTH")));
+    }
     if end > len {
         // Pad on the right with zeros if input is too short
         let bytes: Vec<u8> = input[start..]
@@ -199,9 +209,9 @@ fn parse_bytes<T, F: FnOnce(&[u8]) -> T>(input: &[u8], start: usize, size: usize
             .chain(core::iter::repeat(0u8))
             .take(size)
             .collect();
-        f(&bytes)
+        Ok(f(&bytes))
     } else {
-        f(&input[start..end])
+        Ok(f(&input[start..end]))
     }
 }
 
@@ -213,16 +223,17 @@ fn saturating_round(x: U256) -> u64 {
     }
 }
 
-fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
-    let parse = |start: usize| -> u64 {
+fn parse_lengths(input: &[u8]) -> Result<(u64, u64, u64), ExitError> {
+    let parse = |start: usize| -> Result<u64, ExitError> {
         // I don't understand why I need a closure here, but doesn't compile without one
-        saturating_round(parse_bytes(input, start, 32, |x| U256::from(x)))
+        let len = parse_bytes(input, start, 32, |x| U256::from(x))?;
+        Ok(saturating_round(len))
     };
-    let base_len = parse(0);
-    let exp_len = parse(32);
-    let mod_len = parse(64);
+    let base_len = parse(0)?;
+    let exp_len = parse(32)?;
+    let mod_len = parse(64)?;
 
-    (base_len, exp_len, mod_len)
+    Ok((base_len, exp_len, mod_len))
 }
 
 #[cfg(test)]
@@ -618,13 +629,9 @@ mod tests {
         input.extend(u256_to_arr(&modulus));
 
         // should panic with INVALID_MODEXP_LENGTHS due to out-of-memory error
-        let res = ModExp::<Berlin>::new().run(
-            &input,
-            Some(EthGas::new(100_000)),
-            &new_context(),
-            false,
-        );
-        assert!(res.is_ok())
+        let res =
+            ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
+        assert!(res.is_ok());
     }
 
     #[test]
@@ -646,18 +653,15 @@ mod tests {
         input.extend(u256_to_arr(&modulus));
 
         // should panic with INVALID_MODEXP_LENGTHS due to out-of-memory error
-        let res = ModExp::<Berlin>::new().run(
-            &input,
-            Some(EthGas::new(100_000)),
-            &new_context(),
-            false,
-        );
-        assert!(res.is_err())
+        let res =
+            ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
+        assert!(res.is_err());
     }
 
     #[test]
     fn test_modexp_add_to_overflow() {
-        // this test should panic with capacity overflow
+        // This test should avoid panicing with capacity overflow
+        // and instead panic with an ExitError
         let base_len = U256::from(0);
         let exp_len = U256::from(18446744073709551615usize); // `usize::MAX`
         let mod_len = U256::from(0);
@@ -674,12 +678,8 @@ mod tests {
         input.extend(u256_to_arr(&modulus));
 
         // should panic with INVALID_MODEXP_LENGTHS due to out-of-memory error
-        let res = ModExp::<Berlin>::new().run(
-            &input,
-            Some(EthGas::new(100_000)),
-            &new_context(),
-            false,
-        );
-        assert!(res.is_err())
+        let res =
+            ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
+        assert!(res.is_err());
     }
 }
