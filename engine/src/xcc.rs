@@ -91,6 +91,9 @@ where
 
             promise_actions.push(PromiseAction::CreateAccount);
         }
+        promise_actions.push(PromiseAction::Transfer {
+            amount: fund_amount,
+        });
         promise_actions.push(PromiseAction::DeployContract {
             code: get_router_code(io).0.into_owned(),
         });
@@ -115,12 +118,12 @@ where
             attached_yocto: ZERO_YOCTO,
             gas: INITIALIZE_GAS,
         });
+    } else {
+        // No matter what include the transfer of the funding amount
+        promise_actions.push(PromiseAction::Transfer {
+            amount: fund_amount,
+        });
     }
-
-    // No matter what include the transfer of the funding amount
-    promise_actions.push(PromiseAction::Transfer {
-        amount: fund_amount,
-    });
 
     let batch = PromiseBatchAction {
         target_account_id,
