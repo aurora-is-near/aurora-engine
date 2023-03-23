@@ -25,6 +25,7 @@ pub mod proof;
 
 pub mod accounting;
 pub mod admin_controlled;
+pub mod bloom;
 #[cfg_attr(feature = "contract", allow(dead_code))]
 pub mod connector;
 pub mod deposit_event;
@@ -79,6 +80,7 @@ mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
     use parameters::SetOwnerArgs;
 
+    use crate::bloom;
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
     use crate::fungible_token::FungibleTokenMetadata;
@@ -1249,6 +1251,15 @@ mod contract {
             .sdk_unwrap();
 
         hashchain::set_state(io, blockchain_hashchain).sdk_unwrap();
+    }
+
+    fn get_log_blooms(log: &ResultLog) -> Bloom {
+        let mut bloom = Bloom::default();
+        bloom.accrue(log.address.as_bytes());
+        for topic in log.topics.iter() {
+            bloom.accrue(&topic[..]);
+        }
+        bloom
     }
 
     mod exports {
