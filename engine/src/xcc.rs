@@ -340,6 +340,7 @@ pub fn set_code_version_of_address<I: IO>(io: &mut I, address: &Address, version
     io.write_storage(&key, &value_bytes);
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum FundXccError {
     InsufficientBalance,
     InvalidAccount,
