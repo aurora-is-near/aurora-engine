@@ -1,9 +1,4 @@
 #![cfg_attr(not(any(feature = "std", feature = "contracts-std")), no_std)]
-#![cfg_attr(
-    not(any(feature = "std", feature = "contracts-std")),
-    feature(alloc_error_handler)
-)]
-#![cfg_attr(feature = "log", feature(panic_info_message))]
 #![deny(clippy::pedantic, clippy::nursery)]
 #![allow(
     clippy::missing_errors_doc,
