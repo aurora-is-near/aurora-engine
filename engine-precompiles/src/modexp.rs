@@ -693,7 +693,7 @@ mod tests {
     fn test_modexp_capacity_overflow() {
         // this test should not panic with capacity overflow
         let base_len = U256::from(0);
-        let exp_len = U256::from(18446744073709551615usize - 96); // `usize::MAX` - 96
+        let exp_len = U256::from(usize::MAX - 96);
         let mod_len = U256::from(0);
         let base = U256::MAX;
         let exp = U256::MAX;
