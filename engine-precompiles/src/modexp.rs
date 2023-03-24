@@ -62,16 +62,11 @@ impl<HF: HardFork> ModExp<HF> {
         let base = parse_bytes(input, base_start, base_len, BigUint::from_bytes_be);
         let modulus = parse_bytes(input, mod_start, mod_len, BigUint::from_bytes_be);
 
-        // If the output size is bounded by the size of the modulus, skip parsing the exponent
-        if modulus == BigUint::from(0u32) {
-            return Ok(Vec::new());
-        }
-        let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
-
         let output = {
             let computed_result = if modulus == BigUint::from(0u32) {
                 Vec::new()
             } else {
+                let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
                 base.modpow(&exponent, &modulus).to_bytes_be()
             };
             // The result must be the same length as the input modulus.
