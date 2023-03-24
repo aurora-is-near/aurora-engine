@@ -2,6 +2,8 @@
 //! Link: https://github.com/paritytech/parity-common/blob/master/ethbloom/src/lib.rs
 //!
 //! Reimplemented here since there is a large miss match in types and dependencies.
+use aurora_engine_types::parameters::engine::ResultLog;
+use borsh::{BorshSerialize, BorshDeserialize};
 use fixed_hash::construct_fixed_hash;
 use impl_serde::impl_fixed_hash_serde;
 
@@ -12,6 +14,7 @@ const BLOOM_BITS: u32 = 3;
 
 construct_fixed_hash! {
     /// Bloom hash type with 256 bytes (2048 bits) size.
+    #[derive(BorshSerialize, BorshDeserialize)]
     pub struct Bloom(BLOOM_SIZE);
 }
 
@@ -24,7 +27,7 @@ fn log2(x: usize) -> u32 {
     }
 
     let n = x.leading_zeros();
-    std::mem::size_of::<usize>() as u32 * 8 - n
+    usize::BITS - n
 }
 
 impl Bloom {
@@ -55,4 +58,25 @@ impl Bloom {
             self.0[i] |= bloom.0[i];
         }
     }
+}
+
+pub fn get_logs_bloom(logs: &[ResultLog]) -> Bloom {
+    let mut logs_bloom = Bloom::default();
+
+    for log in logs {
+        logs_bloom.accrue_bloom(&get_log_bloom(log));
+    }
+
+    logs_bloom
+}
+
+pub fn get_log_bloom(log: &ResultLog) -> Bloom {
+    let mut log_bloom = Bloom::default();
+
+    log_bloom.accrue(log.address.as_bytes());
+    for topic in log.topics.iter() {
+        log_bloom.accrue(&topic[..]);
+    }
+
+    log_bloom
 }

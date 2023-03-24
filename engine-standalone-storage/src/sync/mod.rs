@@ -1,3 +1,4 @@
+use aurora_engine::bloom::{Bloom, self};
 use aurora_engine::hashchain;
 use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
@@ -470,7 +471,7 @@ fn update_hashchain<'db>(
 ) -> Result<(), error::Error> {
     let method_name = InnerTransactionKind::from(transaction).to_string();
     let input = get_input(transaction)?;
-    let output = get_output(result)?;
+    let (output, log_bloom) = get_output_and_log_bloom(result)?;
 
     let mut blockchain_hashchain = hashchain::get_state(io).unwrap_or_else(|_| {
         hashchain::BlockchainHashchain::new(
@@ -486,7 +487,7 @@ fn update_hashchain<'db>(
         blockchain_hashchain.move_to_block(block_height)?;
     }
 
-    blockchain_hashchain.add_block_tx(block_height, &method_name, &input, &output)?;
+    blockchain_hashchain.add_block_tx(block_height, &method_name, &input, &output, &log_bloom)?;
 
     Ok(hashchain::set_state(io, blockchain_hashchain)?)
 }
@@ -526,15 +527,21 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
     }
 }
 
-fn get_output(result: &Option<TransactionExecutionResult>) -> Result<Vec<u8>, error::Error> {
+fn get_output_and_log_bloom(result: &Option<TransactionExecutionResult>) -> Result<(Vec<u8>, Bloom), error::Error> {
     match result {
-        None => Ok(vec![]),
+        None => Ok((vec![], Bloom::default())),
         Some(execution_result) => match execution_result {
-            TransactionExecutionResult::Promise(_) => Ok(vec![]),
-            TransactionExecutionResult::DeployErc20(address) => Ok(address.as_bytes().to_vec()),
+            TransactionExecutionResult::Promise(_) => Ok((vec![], Bloom::default())),
+            TransactionExecutionResult::DeployErc20(address) => Ok((address.as_bytes().to_vec(), Bloom::default())),
             TransactionExecutionResult::Submit(submit) => match submit {
                 Err(e) => Err(e.clone().into()),
-                Ok(submit_result) => submit_result.try_to_vec().map_err(|e| e.into()),
+                Ok(submit_result) => {
+                    let result_output = submit_result.try_to_vec();
+                    match result_output {
+                        Err(e) => Err(e.into()),
+                        Ok(output) => Ok((output, bloom::get_logs_bloom(&submit_result.logs))),
+                    }
+                }
             },
         },
     }
