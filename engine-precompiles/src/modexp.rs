@@ -64,7 +64,6 @@ impl<HF: HardFork> ModExp<HF> {
 
         // If the output size is bounded by the size of the modulus, skip parsing the exponent
         if modulus == BigUint::from(0u32) {
-            
             return Ok(Vec::new());
         }
         let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
@@ -628,8 +627,44 @@ mod tests {
     }
 
     #[test]
+    fn test_max_exp_max_base_non_zero_mod() {
+        let input = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
+    fn test_max_exp_max_base_max_mod() {
+        let input = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000ffffffffffffff9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
     fn test_max_exp_non_zero_base_zero_mod() {
         let input = hex::decode("0000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
+    fn test_max_exp_zero_base_non_zero_mod() {
+        let input = hex::decode("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001");
         let res = ModExp::<Byzantium>::new().run(
             &input.unwrap(),
             Some(EthGas::new(100_000)),
