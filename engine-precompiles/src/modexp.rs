@@ -61,7 +61,10 @@ impl<HF: HardFork> ModExp<HF> {
 
         let base = parse_bytes(input, base_start, base_len, BigUint::from_bytes_be);
         let modulus = parse_bytes(input, mod_start, mod_len, BigUint::from_bytes_be);
+
+        // If the output size is bounded by the size of the modulus, skip parsing the exponent
         if modulus == BigUint::from(0u32) {
+            
             return Ok(Vec::new());
         }
         let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
@@ -601,7 +604,31 @@ mod tests {
     }
 
     #[test]
-    fn test_out_of_gas_with_max_exponent() {
+    fn test_max_exp_zero_base_zero_mod() {
+        let input = hex::decode("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_max_exp_max_base_zero_mod() {
+        let input = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
+    fn test_max_exp_non_zero_base_zero_mod() {
         let input = hex::decode("0000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         let res = ModExp::<Byzantium>::new().run(
             &input.unwrap(),
@@ -630,8 +657,6 @@ mod tests {
         input.extend(u256_to_arr(&exp));
         input.extend(u256_to_arr(&modulus));
 
-        // assert_eq!(encode(&input), encode(&vec![0u8]));
-        // should panic with INVALID_MODEXP_LENGTHS due to out-of-memory error
         let res =
             ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
         assert!(res.is_ok());
@@ -639,7 +664,7 @@ mod tests {
 
     #[test]
     fn test_modexp_capacity_overflow() {
-        // this test should panic with capacity overflow
+        // this test should not panic with capacity overflow
         let base_len = U256::from(0);
         let exp_len = U256::from(18446744073709551615usize - 96); // `usize::MAX` - 96
         let mod_len = U256::from(0);
@@ -655,7 +680,6 @@ mod tests {
         input.extend(u256_to_arr(&exp));
         input.extend(u256_to_arr(&modulus));
 
-        // should panic with INVALID_MODEXP_LENGTHS due to out-of-memory error
         let res =
             ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
         assert!(res.is_ok());
@@ -663,8 +687,7 @@ mod tests {
 
     #[test]
     fn test_modexp_add_to_overflow() {
-        // This test should avoid panicing with capacity overflow
-        // and instead panic with an ExitError
+        // This test should not panicing with capacity overflow
         let base_len = U256::from(0);
         let exp_len = U256::from(18446744073709551615usize); // `usize::MAX`
         let mod_len = U256::from(0);
@@ -680,9 +703,6 @@ mod tests {
         input.extend(u256_to_arr(&exp));
         input.extend(u256_to_arr(&modulus));
 
-        // assert_eq!(encode(&input), encode(&vec![0u8]));
-
-        // should panic with INVALID_MODEXP_LENGTHS due to out-of-memory error
         let res =
             ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
         assert!(res.is_ok());
