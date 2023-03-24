@@ -1,4 +1,4 @@
-use crate::prelude::{BorshDeserialize, BorshSerialize, Vec};
+use crate::{prelude::{BorshDeserialize, BorshSerialize, Vec}, bloom::Bloom};
 use aurora_engine_sdk::{
     io::{StorageIntermediate, IO},
     keccak,
@@ -75,13 +75,14 @@ impl BlockchainHashchain {
         method_name: &str,
         input: &[u8],
         output: &[u8],
+        log_bloom: &Bloom,
     ) -> Result<(), BlockchainHashchainError> {
         if block_height != self.current_block_height {
             return Err(BlockchainHashchainError::BlockHeightIncorrect);
         }
 
         self.block_hashchain_computer
-            .add_tx(method_name, input, output);
+            .add_tx(method_name, input, output, log_bloom);
 
         Ok(())
     }
@@ -89,6 +90,7 @@ impl BlockchainHashchain {
     /// Moves to the indicated block height if it is bigger than the current block height:
     /// -Updates the previous block hashchain computing the hash.
     /// -Updates the current block height.
+    /// -Clears the transactions.
     /// -Clears the transactions.
     /// Returns an error in other case.
     pub fn move_to_block(
@@ -108,7 +110,6 @@ impl BlockchainHashchain {
             );
 
             self.block_hashchain_computer.clear_txs();
-
             self.current_block_height += 1;
         }
 
@@ -172,18 +173,20 @@ pub mod blockchain_hashchain_error {
 /// 5. Go back to step 2 for the next block.
 #[derive(BorshSerialize, BorshDeserialize)]
 struct BlockHashchainComputer {
+    txs_logs_bloom: Bloom,
     txs_merkle_tree: StreamCompactMerkleTree,
 }
 
 impl BlockHashchainComputer {
     pub fn new() -> Self {
         Self {
+            txs_logs_bloom: Bloom::default(),
             txs_merkle_tree: StreamCompactMerkleTree::new(),
         }
     }
 
     /// Adds a transaction.
-    pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8]) {
+    pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8], log_bloom: &Bloom) {
         let data = [
             &method_name.len().to_be_bytes(),
             method_name.as_bytes(),
@@ -194,6 +197,8 @@ impl BlockHashchainComputer {
         ].concat();
 
         let tx_hash = keccak(&data).0;
+
+        self.txs_logs_bloom.accrue_bloom(log_bloom);
         self.txs_merkle_tree.add(tx_hash);
     }
 
@@ -205,15 +210,15 @@ impl BlockHashchainComputer {
         current_block_height: u64,
         previous_block_hashchain: RawH256,
     ) -> RawH256 {
-        let current_block_height_hash = keccak(&current_block_height.to_be_bytes()).0;
         let txs_hash = self.txs_merkle_tree.compute_hash();
 
         let data = [
             chain_id,
             contract_account_id,
-            &current_block_height_hash,
+            &current_block_height.to_be_bytes(),
             &previous_block_hashchain,
             &txs_hash,
+            self.txs_logs_bloom.as_bytes(),
             ]
             .concat();
 
@@ -222,6 +227,7 @@ impl BlockHashchainComputer {
 
     /// Clears the transactions added.
     pub fn clear_txs(&mut self) {
+        self.txs_logs_bloom = Bloom::default();
         self.txs_merkle_tree.clear();
     }
 }
@@ -341,7 +347,7 @@ mod blockchain_hashchain_tests {
         let mut blockchain_hashchain =
             BlockchainHashchain::new([0u8; 32], vec![], 2, [0u8; 32], [0u8; 32]);
 
-        let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[], &[]);
+        let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[], &[], &Bloom::default());
 
         assert!(add_tx_result.is_err());
         assert_eq!(
@@ -351,6 +357,11 @@ mod blockchain_hashchain_tests {
                 .subtrees
                 .len(),
             0
+        );
+        assert_eq!(
+            blockchain_hashchain
+                .block_hashchain_computer.txs_logs_bloom.0,
+                Bloom::default().0
         );
     }
 
@@ -359,7 +370,7 @@ mod blockchain_hashchain_tests {
         let mut blockchain_hashchain =
             BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32], [0u8; 32]);
 
-        let add_tx_result = blockchain_hashchain.add_block_tx(2, "foo", &[], &[]);
+        let add_tx_result = blockchain_hashchain.add_block_tx(2, "foo", &[], &[], &Bloom::default());
 
         assert!(add_tx_result.is_err());
         assert_eq!(
@@ -370,6 +381,11 @@ mod blockchain_hashchain_tests {
                 .len(),
             0
         );
+        assert_eq!(
+            blockchain_hashchain
+                .block_hashchain_computer.txs_logs_bloom.0,
+                Bloom::default().0
+        );
     }
 
     #[test]
@@ -377,7 +393,7 @@ mod blockchain_hashchain_tests {
         let mut blockchain_hashchain =
             BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32], [0u8; 32]);
 
-        let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[], &[]);
+        let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[], &[], &Bloom::default());
 
         assert!(add_tx_result.is_ok());
         assert_eq!(
@@ -387,6 +403,11 @@ mod blockchain_hashchain_tests {
                 .subtrees
                 .len(),
             1
+        );
+        assert_eq!(
+            blockchain_hashchain
+                .block_hashchain_computer.txs_logs_bloom.0,
+                Bloom::default().0
         );
     }
 
@@ -416,21 +437,23 @@ mod blockchain_hashchain_tests {
         let method_name = "foo";
         let input = "foo_input".as_bytes();
         let output = "foo_output".as_bytes();
+        let mut bloom = Bloom::default();
+        bloom.0[0] = 1;
 
         let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
         let tx_hash = keccak(&data).0;
 
         let block_height_2: u64 = 2;
-        let block_height_hash_2 = keccak(&block_height_2.to_be_bytes()).0;
         let block_hashchain_1 = keccak(&1u64.to_be_bytes()).0;
 
         let expected_block_hashchain_2 = keccak(
             &[
                 &chain_id,
                 &contract_account_id[..],
-                &block_height_hash_2,
+                &block_height_2.to_be_bytes(),
                 &block_hashchain_1,
                 &tx_hash,
+                bloom.as_bytes()
             ]
             .concat(),
         )
@@ -445,7 +468,7 @@ mod blockchain_hashchain_tests {
         );
 
         let move_add_block_tx_result =
-            blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);
+            blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output, &bloom);
         assert!(move_add_block_tx_result.is_ok());
         assert_eq!(
             blockchain_hashchain.previous_block_hashchain,
@@ -468,23 +491,24 @@ mod blockchain_hashchain_tests {
         let method_name = "foo";
         let input = "foo_input".as_bytes();
         let output = "foo_output".as_bytes();
+        let mut bloom = Bloom::default();
+        bloom.0[0] = 1;
 
         let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
         let tx_hash = keccak(&data).0;
 
         let block_hashchain_1 = keccak(&1u64.to_be_bytes()).0;
         let block_height_2: u64 = 2;
-        let block_height_hash_2 = keccak(&block_height_2.to_be_bytes()).0;
         let block_height_3: u64 = 3;
-        let block_height_hash_3 = keccak(&block_height_3.to_be_bytes()).0;
 
         let block_hashchain_2 = keccak(
             &[
                 &chain_id,
                 &contract_account_id[..],
-                &block_height_hash_2,
+                &block_height_2.to_be_bytes(),
                 &block_hashchain_1,
                 &tx_hash,
+                bloom.as_bytes()
             ]
             .concat(),
         )
@@ -494,9 +518,10 @@ mod blockchain_hashchain_tests {
             &[
                 &chain_id,
                 &contract_account_id[..],
-                &block_height_hash_3,
+                &block_height_3.to_be_bytes(),
                 &block_hashchain_2,
                 &[0; 32],
+                Bloom::default().as_bytes(),
             ]
             .concat(),
         )
@@ -511,7 +536,7 @@ mod blockchain_hashchain_tests {
         );
 
         let move_add_block_tx_result =
-            blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output);
+            blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output, &bloom);
         assert!(move_add_block_tx_result.is_ok());
         assert_eq!(
             blockchain_hashchain.previous_block_hashchain,
@@ -536,6 +561,8 @@ mod block_hashchain_computer_tests {
         let method_name = "foo";
         let input = "foo_input".as_bytes();
         let output = "foo_output".as_bytes();
+        let mut bloom = Bloom::default();
+        bloom.0[0] = 1;
 
         let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
         let expected_tx_hash = keccak(&data).0;
@@ -543,12 +570,16 @@ mod block_hashchain_computer_tests {
         let mut block_hashchain_computer = BlockHashchainComputer::new();
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
 
-        block_hashchain_computer.add_tx(method_name, input, output);
+        block_hashchain_computer.add_tx(method_name, input, output, &bloom);
 
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 1);
         assert_eq!(
             block_hashchain_computer.txs_merkle_tree.subtrees[0].hash,
             expected_tx_hash
+        );
+        assert_eq!(
+            block_hashchain_computer.txs_logs_bloom,
+            bloom
         );
     }
 
@@ -558,16 +589,16 @@ mod block_hashchain_computer_tests {
         let contract_account_id = "aurora".as_bytes().to_vec();
 
         let block_height: u64 = 2;
-        let block_height_hash = keccak(&block_height.to_be_bytes()).0;
         let previous_block_hashchain = keccak(&1u64.to_be_bytes()).0;
 
         let expected_block_hashchain = keccak(
             &[
                 &chain_id,
                 &contract_account_id[..],
-                &block_height_hash,
+                &block_height.to_be_bytes(),
                 &previous_block_hashchain,
                 &[0; 32],
+                Bloom::default().as_bytes()
             ]
             .concat(),
         )
@@ -592,28 +623,30 @@ mod block_hashchain_computer_tests {
         let method_name = "foo";
         let input = "foo_input".as_bytes();
         let output = "foo_output".as_bytes();
+        let mut bloom = Bloom::default();
+        bloom.0[0] = 1;
 
         let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
         let tx_hash = keccak(&data).0;
 
         let block_height: u64 = 2;
-        let block_height_hash = keccak(&block_height.to_be_bytes()).0;
         let previous_block_hashchain = keccak(&1u64.to_be_bytes()).0;
 
         let expected_block_hashchain = keccak(
             &[
                 &chain_id,
                 &contract_account_id[..],
-                &block_height_hash,
+                &block_height.to_be_bytes(),
                 &previous_block_hashchain,
                 &tx_hash,
+                bloom.as_bytes()
             ]
             .concat(),
         )
         .0;
 
         let mut block_hashchain_computer = BlockHashchainComputer::new();
-        block_hashchain_computer.add_tx(method_name, input, output);
+        block_hashchain_computer.add_tx(method_name, input, output, &bloom);
         let block_hashchain = block_hashchain_computer.compute_block_hashchain(
             &chain_id,
             &contract_account_id[..],
@@ -628,12 +661,18 @@ mod block_hashchain_computer_tests {
     fn clear_test() {
         let mut block_hashchain_computer = BlockHashchainComputer::new();
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
+        assert_eq!(block_hashchain_computer.txs_logs_bloom, Bloom::default());
 
-        block_hashchain_computer.add_tx("foo", "foo_input".as_bytes(), "foo_output".as_bytes());
+        let mut bloom = Bloom::default();
+        bloom.0[0] = 1;
+
+        block_hashchain_computer.add_tx("foo", "foo_input".as_bytes(), "foo_output".as_bytes(), &bloom);
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 1);
+        assert_eq!(block_hashchain_computer.txs_logs_bloom, bloom);
 
         block_hashchain_computer.clear_txs();
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 0);
+        assert_eq!(block_hashchain_computer.txs_logs_bloom, Bloom::default());
     }
 }
 
