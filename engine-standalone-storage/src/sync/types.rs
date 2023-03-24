@@ -111,6 +111,8 @@ pub enum TransactionKind {
     StorageWithdraw(parameters::StorageWithdrawCallArgs),
     /// Admin only method; used to transfer administration
     SetOwner(parameters::SetOwnerArgs),
+    /// Admin only method; used to change upgrade delay blocks
+    SetUpgradeDelayBlocks(parameters::SetUpgradeDelayBlocksArgs),
     /// Admin only method
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
@@ -349,6 +351,7 @@ impl TransactionKind {
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
+            Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
         }
     }
 
@@ -515,6 +518,7 @@ enum BorshableTransactionKind<'a> {
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
+    SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
 }
 
@@ -558,6 +562,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
             TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
+            TransactionKind::SetUpgradeDelayBlocks(x) => {
+                Self::SetUpgradeDelayBlocks(Cow::Borrowed(x))
+            }
         }
     }
 }
@@ -617,6 +624,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
             }
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
+            BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
+                Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
+            }
         }
     }
 }
