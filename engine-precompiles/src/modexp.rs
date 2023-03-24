@@ -49,9 +49,6 @@ impl<HF: HardFork> ModExp<HF> {
 
         let base_start = 96;
 
-        if base_len == 0 && mod_len == 0 && exp_len > usize::MAX.saturating_sub(base_start) {
-            return Ok(Vec::new());
-        }
         let base_end = base_len.saturating_add(base_start);
 
         let exp_start = base_end;
