@@ -700,7 +700,7 @@ mod tests {
         // This test should not panicing with capacity overflow
         let input = generate_modexp_test_input(
             U256::from(0),
-            U256::from(usize::MAX), // `isize::MAX`
+            U256::from(usize::MAX),
             U256::from(0),
             U256::MAX,
             U256::MAX,
