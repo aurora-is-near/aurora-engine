@@ -481,7 +481,7 @@ mod tests {
     fn test_berlin_modexp_big_input() {
         let input = generate_modexp_test_input(
             U256::from(4),
-            U256::from(u64::MAX), // `usize::MAX` - 95
+            U256::from(u64::MAX),
             U256::from(4),
             U256::from(1),
             U256::MAX,
