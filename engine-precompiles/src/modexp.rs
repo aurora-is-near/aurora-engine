@@ -668,7 +668,7 @@ mod tests {
         // this test should not panic if exp_len is `isize::MAX`
         let input = generate_modexp_test_input(
             U256::from(0),
-            U256::from(2147483647isize), // `isize::MAX`
+            U256::from(isize::MAX),
             U256::from(0),
             U256::MAX,
             U256::MAX,
