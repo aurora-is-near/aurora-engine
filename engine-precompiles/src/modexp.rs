@@ -563,7 +563,7 @@ mod tests {
     fn test_zero_base_len_zero_mod_len() {
         let input = generate_modexp_test_input(
             U256::from(0),
-            U256::from(1), // `isize::MAX`
+            U256::from(1),
             U256::from(0),
             U256::from(1),
             U256::from(1),
