@@ -48,7 +48,6 @@ impl<HF: HardFork> ModExp<HF> {
         let mod_len = usize::try_from(mod_len).map_err(utils::err_usize_conv)?;
 
         let base_start = 96;
-
         let base_end = base_len.saturating_add(base_start);
 
         let exp_start = base_end;
