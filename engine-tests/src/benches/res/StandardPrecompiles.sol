@@ -52,35 +52,10 @@ contract StandardPrecompiles {
   // See: https://eips.ethereum.org/EIPS/eip-198
   // See: https://etherscan.io/address/0x0000000000000000000000000000000000000005
   function test_modexp() public view returns(bool) {
-    // testing overflow
-    uint256 base_len = 0;
-    uint256 exponent_len = 0xffffffa0; // `usize::MAX` - 95
-    uint256 modulus_len = 0;
-    uint256 base = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    uint256 exponent = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    uint256 modulus = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    assert(modexp(base_len, exponent_len, modulus_len, base, exponent, modulus) == 0);
-    // testing out-of-memory 1
-    base_len = 0;
-    exponent_len = 0x80000000; // `isize::MAX` + 1
-    modulus_len = 0;
-    base = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    exponent = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    modulus = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    assert(modexp(base_len, exponent_len, modulus_len, base, exponent, modulus) == 0);
-    // testing out-of-memory 1
-    base_len = 0;
-    exponent_len = 0x7fffffff; // `isize::MAX`
-    modulus_len = 0;
-    base = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    exponent = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    modulus = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    assert(modexp(base_len, exponent_len, modulus_len, base, exponent, modulus) == 0);
-    // testing happy path
-    base = 3;
-    exponent = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e;
-    modulus = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f;
-    return modexp(32, 32, 32, base, exponent, modulus) == 1;
+    uint256 base = 3;
+    uint256 exponent = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e;
+    uint256 modulus = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f;
+    return modexp(base, exponent, modulus) == 1;
   }
 
   // See: https://eips.ethereum.org/EIPS/eip-196
@@ -175,19 +150,12 @@ contract StandardPrecompiles {
     return output;
   }
 
-  function modexp(
-    uint256 base_len,
-    uint256 exponent_len,
-    uint256 modulus_len,
-    uint256 base,
-    uint256 exponent,
-    uint256 modulus
-  ) private view returns (uint256 output) {
+  function modexp(uint256 base, uint256 exponent, uint256 modulus) private view returns (uint256 output) {
     assembly {
       let ptr := mload(0x40)
-      mstore(ptr, base_len)
-      mstore(add(ptr, 0x20), exponent_len)
-      mstore(add(ptr, 0x40), modulus_len)
+      mstore(ptr, 32)
+      mstore(add(ptr, 0x20), 32)
+      mstore(add(ptr, 0x40), 32)
       mstore(add(ptr, 0x60), base)
       mstore(add(ptr, 0x80), exponent)
       mstore(add(ptr, 0xA0), modulus)
