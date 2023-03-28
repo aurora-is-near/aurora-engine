@@ -1156,9 +1156,9 @@ fn test_set_upgrade_delay_blocks() {
     // check if the query goes through the standalone runner
     assert!(outcome.is_some() && error.is_none());
 
-    // check if the owner_id property has changed to 2
+    // check if the upgrade_delay_blocks property has changed to 2
     assert_eq!(
-        b"2",
+        [2, 0, 0, 0, 0, 0, 0, 0],
         outcome.unwrap().return_data.as_value().unwrap().as_slice()
     );
 }
