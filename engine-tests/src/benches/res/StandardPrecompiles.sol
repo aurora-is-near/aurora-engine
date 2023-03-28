@@ -80,7 +80,7 @@ contract StandardPrecompiles {
     base = 3;
     exponent = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e;
     modulus = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f;
-    return modexp(base, exponent, modulus) == 1;
+    return modexp(32, 32, 32, base, exponent, modulus) == 1;
   }
 
   // See: https://eips.ethereum.org/EIPS/eip-196
