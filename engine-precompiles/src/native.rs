@@ -433,7 +433,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
 
         Ok(PrecompileOutput {
             logs: vec![promise_log, exit_event_log],
-            ..Default::default()
+            cost: Self::required_gas(input)?,
+            output: Vec::new(),
         })
     }
 }
@@ -613,7 +614,8 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
         Ok(PrecompileOutput {
             logs: vec![promise_log, exit_event_log],
-            ..Default::default()
+            cost: Self::required_gas(input)?,
+            output: Vec::new(),
         })
     }
 }
