@@ -2,8 +2,11 @@
 //!
 //! Inspired by: `https://github.com/near/nearcore/tree/master/core/account-id`
 
-use crate::{fmt, str, str::FromStr, Box, String, Vec};
-use borsh::{BorshDeserialize, BorshSerialize};
+use crate::{fmt, str, str::FromStr, Box, String, ToString, Vec};
+#[cfg(not(feature = "borsh-compat"))]
+use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, maybestd::io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 pub const MIN_ACCOUNT_ID_LEN: usize = 2;
@@ -13,11 +16,10 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 ///
 /// This guarantees all properly constructed `AccountId`'s are valid for the NEAR network.
 #[derive(
+    Default,
     BorshSerialize,
-    BorshDeserialize,
     Serialize,
     Deserialize,
-    Default,
     Eq,
     Ord,
     Hash,
@@ -93,6 +95,34 @@ impl AccountId {
         let (prefix, suffix) = self.0.split_at(self.0.len() - parent_account_id.0.len());
 
         prefix.find('.') == Some(prefix.len() - 1) && suffix == parent_account_id.as_ref()
+    }
+}
+
+#[cfg(not(feature = "borsh-compat"))]
+impl BorshDeserialize for AccountId {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let account: String = BorshDeserialize::deserialize_reader(reader)?;
+
+        // It's for saving backward compatibility.
+        if account.is_empty() {
+            return Ok(Self::default());
+        }
+
+        Self::new(&account).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
+    }
+}
+
+#[cfg(feature = "borsh-compat")]
+impl BorshDeserialize for AccountId {
+    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
+        let account: String = BorshDeserialize::deserialize(buf)?;
+
+        // It's for saving backward compatibility.
+        if account.is_empty() {
+            return Ok(Self::default());
+        }
+
+        Self::new(&account).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
     }
 }
 
