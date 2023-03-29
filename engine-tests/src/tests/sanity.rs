@@ -7,7 +7,7 @@ use aurora_engine::parameters::{
     SetOwnerArgs, SetUpgradeDelayBlocksArgs, SubmitResult, TransactionStatus,
 };
 use aurora_engine_sdk as sdk;
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 use libsecp256k1::SecretKey;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
