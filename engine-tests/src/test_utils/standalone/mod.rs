@@ -311,7 +311,7 @@ impl StandaloneRunner {
                 Vec::new(),
             ))
         } else if method_name == test_utils::SET_UPGRADE_DELAY_BLOCKS {
-            let input = &ctx.input[..];
+            let input = &ctx.input;
             let call_args = SetUpgradeDelayBlocksArgs::try_from_slice(input)
                 .expect("Unable to parse input as SetUpgradeDelayBlocksArgs");
 
