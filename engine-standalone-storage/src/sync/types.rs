@@ -518,8 +518,8 @@ enum BorshableTransactionKind<'a> {
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
-    SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
+    SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {

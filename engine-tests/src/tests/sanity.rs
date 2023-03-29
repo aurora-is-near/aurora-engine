@@ -1157,10 +1157,11 @@ fn test_set_upgrade_delay_blocks() {
     assert!(outcome.is_some() && error.is_none());
 
     // check if the upgrade_delay_blocks property has changed to 2
-    assert_eq!(
-        [2, 0, 0, 0, 0, 0, 0, 0],
-        outcome.unwrap().return_data.as_value().unwrap().as_slice()
-    );
+    let result = SetUpgradeDelayBlocksArgs::try_from_slice(
+        outcome.unwrap().return_data.as_value().unwrap().as_slice(),
+    )
+    .unwrap();
+    assert_eq!(result.upgrade_delay_blocks, 2);
 }
 
 fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, Address) {
