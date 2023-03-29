@@ -523,7 +523,7 @@ fn test_ft_transfer_call_without_message() {
         "Expected failure in `ft_transfer_call` call, but call succeeded",
     );
 
-    // should not revert with `not enough balance` error when sending arbitray amount while sender_id = receiver_id with amount < balance
+    // should not revert with `not enough balance` error when sending arbitrary amount while sender_id == receiver_id with amount < balance
     let transfer_amount = 1;
     let res = recipient_account.call(
         CONTRACT_ACC.parse().unwrap(),
