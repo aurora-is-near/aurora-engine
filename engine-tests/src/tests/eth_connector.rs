@@ -501,7 +501,7 @@ fn test_ft_transfer_call_without_message() {
     let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_FEE);
 
-    // should revert with `not enough balance` error when sending arbitray amount while sender_id = receiver_id
+    // should revert with `not enough balance` error when sending arbitrary amount while sender_id == receiver_id
     let transfer_amount = 1000000000;
     let res = recipient_account.call(
         CONTRACT_ACC.parse().unwrap(),
