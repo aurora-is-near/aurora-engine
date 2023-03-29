@@ -239,14 +239,15 @@ mod tests {
         exp: U256,
         modulus: U256,
     ) -> Vec<u8> {
-        let mut input: Vec<u8> = Vec::new();
-        input.extend(u256_to_arr(&base_len));
-        input.extend(u256_to_arr(&exp_len));
-        input.extend(u256_to_arr(&mod_len));
-        input.extend(u256_to_arr(&base));
-        input.extend(u256_to_arr(&exp));
-        input.extend(u256_to_arr(&modulus));
-        input
+        [
+            u256_to_arr(&base_len),
+            u256_to_arr(&exp_len),
+            u256_to_arr(&mod_len),
+            u256_to_arr(&base),
+            u256_to_arr(&exp),
+            u256_to_arr(&modulus),
+        ]
+        .concat()
     }
 
     struct Test {
