@@ -56,13 +56,15 @@ impl<HF: HardFork> ModExp<HF> {
         let mod_start = exp_end;
 
         let base = parse_bytes(input, base_start, base_len, BigUint::from_bytes_be);
-        let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
         let modulus = parse_bytes(input, mod_start, mod_len, BigUint::from_bytes_be);
 
         let output = {
             let computed_result = if modulus == BigUint::from(0u32) {
                 Vec::new()
             } else {
+                // The OOM panic is no longer possible because if the modulus is non-zero
+                // then the required gas prevents passing a huge exponent.
+                let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
                 base.modpow(&exponent, &modulus).to_bytes_be()
             };
             // The result must be the same length as the input modulus.
@@ -228,6 +230,27 @@ mod tests {
 
     // Byzantium tests: https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp.json
     // Berlin tests:https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp_eip2565.json
+
+    struct ModExpTestInput {
+        base_len: U256,
+        exp_len: U256,
+        mod_len: U256,
+        base: U256,
+        exp: U256,
+        modulus: U256,
+    }
+
+    fn generate_modexp_test_input(test_input: &ModExpTestInput) -> Vec<u8> {
+        [
+            u256_to_arr(&test_input.base_len),
+            u256_to_arr(&test_input.exp_len),
+            u256_to_arr(&test_input.mod_len),
+            u256_to_arr(&test_input.base),
+            u256_to_arr(&test_input.exp),
+            u256_to_arr(&test_input.modulus),
+        ]
+        .concat()
+    }
 
     struct Test {
         input: &'static str,
@@ -459,38 +482,28 @@ mod tests {
 
     #[test]
     fn test_berlin_modexp_big_input() {
-        let base_len = U256::from(4);
-        let exp_len = U256::from(u64::MAX);
-        let mod_len = U256::from(4);
-        let base: u32 = 1;
-        let exp = U256::MAX;
-
-        let mut input: Vec<u8> = Vec::new();
-        input.extend(u256_to_arr(&base_len));
-        input.extend(u256_to_arr(&exp_len));
-        input.extend(u256_to_arr(&mod_len));
-        input.extend(base.to_be_bytes());
-        input.extend(u256_to_arr(&exp));
-
+        let input = generate_modexp_test_input(&ModExpTestInput {
+            base_len: U256::from(4),
+            exp_len: U256::from(u64::MAX),
+            mod_len: U256::from(4),
+            base: U256::from(1),
+            exp: U256::MAX,
+            modulus: U256::MAX,
+        });
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();
     }
 
     #[test]
     fn test_berlin_modexp_bigger_input() {
-        let base_len = U256::MAX;
-        let exp_len = U256::MAX;
-        let mod_len = U256::MAX;
-        let base: u32 = 1;
-        let exp = U256::MAX;
-
-        let mut input: Vec<u8> = Vec::new();
-        input.extend(u256_to_arr(&base_len));
-        input.extend(u256_to_arr(&exp_len));
-        input.extend(u256_to_arr(&mod_len));
-        input.extend(base.to_be_bytes());
-        input.extend(u256_to_arr(&exp));
-
+        let input = generate_modexp_test_input(&ModExpTestInput {
+            base_len: U256::MAX,
+            exp_len: U256::MAX,
+            mod_len: U256::MAX,
+            base: U256::from(1),
+            exp: U256::MAX,
+            modulus: U256::MAX,
+        });
         // completes without any overflow
         ModExp::<Berlin>::required_gas(&input).unwrap();
     }
@@ -519,20 +532,14 @@ mod tests {
 
     #[test]
     fn test_modexp_not_overflow() {
-        let base_len = U256::from(0);
-        let exp_len = U256::from(4294967200usize); // `usize::MAX` - 95
-        let mod_len = U256::from(0);
-        let base = U256::MAX;
-        let exp = U256::MAX;
-        let modulus = U256::MAX;
-
-        let mut input: Vec<u8> = Vec::new();
-        input.extend(u256_to_arr(&base_len));
-        input.extend(u256_to_arr(&exp_len));
-        input.extend(u256_to_arr(&mod_len));
-        input.extend(u256_to_arr(&base));
-        input.extend(u256_to_arr(&exp));
-        input.extend(u256_to_arr(&modulus));
+        let input = generate_modexp_test_input(&ModExpTestInput {
+            base_len: U256::from(0),
+            exp_len: U256::from(usize::MAX - 95),
+            mod_len: U256::from(0),
+            base: U256::MAX,
+            exp: U256::MAX,
+            modulus: U256::MAX,
+        });
 
         let res = ModExp::<Byzantium>::new()
             .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
@@ -557,21 +564,14 @@ mod tests {
 
     #[test]
     fn test_zero_base_len_zero_mod_len() {
-        let base_len = U256::from(0);
-        let exp_len = U256::from(1);
-        let mod_len = U256::from(0);
-        let base = U256::from(1);
-        let exp = U256::from(1);
-        let modulus = U256::from(1);
-
-        let mut input: Vec<u8> = Vec::new();
-        input.extend(u256_to_arr(&base_len));
-        input.extend(u256_to_arr(&exp_len));
-        input.extend(u256_to_arr(&mod_len));
-        input.extend(u256_to_arr(&base));
-        input.extend(u256_to_arr(&exp));
-        input.extend(u256_to_arr(&modulus));
-
+        let input = generate_modexp_test_input(&ModExpTestInput {
+            base_len: U256::from(0),
+            exp_len: U256::from(1),
+            mod_len: U256::from(0),
+            base: U256::from(1),
+            exp: U256::from(1),
+            modulus: U256::from(1),
+        });
         let res = ModExp::<Byzantium>::new()
             .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
             .unwrap();
@@ -591,5 +591,125 @@ mod tests {
         let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
         let min_gas = EthGas::new(200);
         assert_eq!(gas, min_gas);
+    }
+
+    #[test]
+    fn test_max_exp_zero_base_zero_mod() {
+        let input = hex::decode("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_max_exp_max_base_zero_mod() {
+        let input = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
+    fn test_max_exp_max_base_non_zero_mod() {
+        let input = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
+    fn test_max_exp_max_base_max_mod() {
+        let input = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000ffffffffffffff9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
+    fn test_max_exp_non_zero_base_zero_mod() {
+        let input = hex::decode("0000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
+    fn test_max_exp_zero_base_non_zero_mod() {
+        let input = hex::decode("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001");
+        let res = ModExp::<Byzantium>::new().run(
+            &input.unwrap(),
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
+        assert_eq!(Err(ExitError::OutOfGas), res);
+    }
+
+    #[test]
+    fn test_modexp_no_oom_with_isize_max() {
+        // this test should not panic if exp_len is `isize::MAX`
+        let input = generate_modexp_test_input(&ModExpTestInput {
+            base_len: U256::from(0),
+            exp_len: U256::from(isize::MAX),
+            mod_len: U256::from(0),
+            base: U256::MAX,
+            exp: U256::MAX,
+            modulus: U256::MAX,
+        });
+        let res =
+            ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_modexp_capacity_overflow() {
+        // this test should not panic with capacity overflow
+        let input = generate_modexp_test_input(&ModExpTestInput {
+            base_len: U256::from(0),
+            exp_len: U256::from(usize::MAX - 96),
+            mod_len: U256::from(0),
+            base: U256::MAX,
+            exp: U256::MAX,
+            modulus: U256::MAX,
+        });
+        let res =
+            ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_modexp_add_to_overflow() {
+        // This test should not panicing with capacity overflow
+        let input = generate_modexp_test_input(&ModExpTestInput {
+            base_len: U256::from(0),
+            exp_len: U256::from(usize::MAX),
+            mod_len: U256::from(0),
+            base: U256::MAX,
+            exp: U256::MAX,
+            modulus: U256::MAX,
+        });
+        let res =
+            ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
+        assert!(res.is_ok());
     }
 }
