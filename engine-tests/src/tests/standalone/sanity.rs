@@ -1,3 +1,4 @@
+use aurora_engine::state::EngineStateV1;
 use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
 use aurora_engine_test_doubles::io::{Storage, StoragePointer};
@@ -15,11 +16,12 @@ fn test_deploy_code() {
         buf
     };
     let owner_id: AccountId = "aurora".parse().unwrap();
-    let state = state::EngineState {
+    let state = state::EngineState::V1(EngineStateV1 {
         chain_id,
         owner_id: owner_id.clone(),
+        bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
-    };
+    });
     let origin = Address::new(H160([0u8; 20]));
     let storage = RefCell::new(Storage::default());
     let io = StoragePointer(&storage);

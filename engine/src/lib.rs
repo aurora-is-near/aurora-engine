@@ -144,7 +144,7 @@ mod contract {
     pub extern "C" fn get_owner() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        io.return_output(state.owner_id.as_bytes());
+        io.return_output(state.owner_id().as_bytes());
     }
 
     /// Set owner account id for this contract.
@@ -154,10 +154,10 @@ mod contract {
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
-        if state.owner_id == args.new_owner {
+        if state.owner_id() == args.new_owner {
             sdk::panic_utf8(errors::ERR_SAME_OWNER);
         } else {
-            state.owner_id = args.new_owner;
+            state.set_owner_id(args.new_owner);
             state::set_state(&mut io, &state).sdk_unwrap();
         }
     }
@@ -174,7 +174,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
         let mut io = Runtime;
-        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
+        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id());
     }
 
     #[no_mangle]
@@ -189,7 +189,7 @@ mod contract {
     pub extern "C" fn stage_upgrade() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        let delay_block_height = io.block_height() + state.upgrade_delay_blocks;
+        let delay_block_height = io.block_height() + state.upgrade_delay_blocks();
         require_owner_only(&state, &io.predecessor_account_id());
         io.read_input_and_store(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
         io.write_storage(
@@ -536,7 +536,7 @@ mod contract {
         let block_height = io.read_input_borsh().sdk_unwrap();
         let account_id = io.current_account_id();
         let chain_id = state::get_state(&io)
-            .map(|state| state.chain_id)
+            .map(|state| state.chain_id())
             .sdk_unwrap();
         let block_hash =
             crate::engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
@@ -1055,7 +1055,7 @@ mod contract {
     }
 
     fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
-        if &state.owner_id != predecessor_account_id {
+        if &state.owner_id() != predecessor_account_id {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
         }
     }

@@ -10,9 +10,69 @@ pub use error::EngineStateError;
 const STATE_KEY: &[u8; 5] = b"STATE";
 
 /// Engine internal state, mostly configuration.
+#[derive(BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq, Debug)]
+pub enum EngineState {
+    V2(EngineStateV2),
+    V1(EngineStateV1),
+}
+
+impl EngineState {
+    #[must_use]
+    pub const fn chain_id(&self) -> [u8; 32] {
+        match self {
+            Self::V2(state) => state.chain_id,
+            Self::V1(state) => state.chain_id,
+        }
+    }
+
+    pub fn set_chain_id(&mut self, chain_id: [u8; 32]) {
+        match self {
+            Self::V2(state) => state.chain_id = chain_id,
+            Self::V1(state) => state.chain_id = chain_id,
+        }
+    }
+
+    pub fn set_owner_id(&mut self, owner_id: AccountId) {
+        match self {
+            Self::V2(state) => state.owner_id = owner_id,
+            Self::V1(state) => state.owner_id = owner_id,
+        }
+    }
+
+    #[must_use]
+    pub fn owner_id(&self) -> AccountId {
+        match self {
+            Self::V2(state) => state.owner_id.clone(),
+            Self::V1(state) => state.owner_id.clone(),
+        }
+    }
+
+    #[must_use]
+    pub const fn upgrade_delay_blocks(&self) -> u64 {
+        match self {
+            Self::V2(state) => state.upgrade_delay_blocks,
+            Self::V1(state) => state.upgrade_delay_blocks,
+        }
+    }
+
+    #[must_use]
+    pub fn deserialize(bytes: &[u8]) -> Option<Self> {
+        Self::try_from_slice(bytes)
+            .or_else(|_| EngineStateV1::try_from_slice(bytes).map(Self::V1))
+            .ok()
+    }
+}
+
+impl Default for EngineState {
+    fn default() -> Self {
+        Self::V2(EngineStateV2::default())
+    }
+}
+
+/// Engine internal state V2, mostly configuration.
 /// Should not contain anything large or enumerable.
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
-pub struct EngineState {
+pub struct EngineStateV2 {
     /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],
     /// Account which can upgrade this contract.
@@ -22,26 +82,38 @@ pub struct EngineState {
     pub upgrade_delay_blocks: u64,
 }
 
+/// Engine internal state V1, mostly configuration.
+/// Should not contain anything large or enumerable.
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
+pub struct EngineStateV1 {
+    /// Chain id, according to the EIP-155 / ethereum-lists spec.
+    pub chain_id: [u8; 32],
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
+    /// Account of the bridge prover.
+    /// Use empty to not use base token as bridged asset.
+    pub bridge_prover_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
+}
+
 impl From<NewCallArgs> for EngineState {
     fn from(args: NewCallArgs) -> Self {
-        Self {
+        Self::V2(EngineStateV2 {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-        }
+        })
     }
 }
 
 /// Gets the state from storage, if it exists otherwise it will error.
-pub fn get_state<I: IO>(io: &I) -> Result<EngineState, error::EngineStateError> {
+pub fn get_state<I: IO>(io: &I) -> Result<EngineState, EngineStateError> {
     io.read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY))
-        .map_or_else(
-            || Err(EngineStateError::NotFound),
-            |bytes| {
-                EngineState::try_from_slice(&bytes.to_vec())
-                    .map_err(|_| EngineStateError::DeserializationFailed)
-            },
-        )
+        .map_or(Err(EngineStateError::NotFound), |bytes| {
+            EngineState::deserialize(&bytes.to_vec()).ok_or(EngineStateError::DeserializationFailed)
+        })
 }
 
 /// Saves state into the storage. Does not return the previous state.
@@ -99,7 +171,6 @@ mod tests {
         let actual_error = get_state(&io).unwrap_err();
         let actual_error = std::str::from_utf8(actual_error.as_ref()).unwrap();
         let expected_error = std::str::from_utf8(error::ERR_STATE_NOT_FOUND).unwrap();
-
         assert_eq!(expected_error, actual_error);
     }
 
@@ -112,7 +183,6 @@ mod tests {
         let actual_error = get_state(&io).unwrap_err();
         let actual_error = std::str::from_utf8(actual_error.as_ref()).unwrap();
         let expected_error = std::str::from_utf8(error::ERR_STATE_CORRUPTED).unwrap();
-
         assert_eq!(expected_error, actual_error);
     }
 }
