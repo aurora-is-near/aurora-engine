@@ -1,5 +1,6 @@
+use crate::errors::ERR_SERIALIZE;
 use crate::parameters::{CallArgs, FunctionCallArgsV2};
-use aurora_engine_precompiles::xcc::state;
+use aurora_engine_precompiles::xcc::state::{self, ERR_MISSING_WNEAR_ADDRESS};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
@@ -98,15 +99,17 @@ where
             code: get_router_code(io).0.into_owned(),
         });
         // Either we need to assume it is set in the Engine or we need to accept it as input.
-        let wnear_account = args.wnear_account_id.unwrap_or_else(|| {
+        let wnear_account = if let Some(wnear_account) = args.wnear_account_id {
+            wnear_account
+        } else {
             // If the wnear account is not specified then we must look it up based on the
             // bridged token registry for the engine.
             let wnear_address = get_wnear_address(io);
             crate::engine::nep141_erc20_map(*io)
                 .lookup_right(&crate::engine::ERC20Address(wnear_address))
-                .unwrap()
+                .ok_or(FundXccError::MissingWNearAddress)?
                 .0
-        });
+        };
         let init_args = format!(
             r#"{{"wnear_account": "{}", "must_register": {}}}"#,
             wnear_account.as_ref(),
@@ -143,7 +146,9 @@ where
         let callback = PromiseCreateArgs {
             target_account_id: current_account_id,
             method: "factory_update_address_version".into(),
-            args: args.try_to_vec().unwrap(),
+            args: args
+                .try_to_vec()
+                .map_err(|_| FundXccError::SerializationFailure)?,
             attached_balance: ZERO_YOCTO,
             attached_gas: VERSION_UPDATE_GAS,
         };
@@ -344,6 +349,8 @@ pub fn set_code_version_of_address<I: IO>(io: &mut I, address: &Address, version
 pub enum FundXccError {
     InsufficientBalance,
     InvalidAccount,
+    MissingWNearAddress,
+    SerializationFailure,
 }
 
 impl From<aurora_engine_types::account_id::ParseAccountError> for FundXccError {
@@ -357,6 +364,8 @@ impl AsRef<[u8]> for FundXccError {
         match self {
             Self::InsufficientBalance => b"ERR_INSUFFICIENT_FUNDING_OF_NEW_XCC_ACCOUNT",
             Self::InvalidAccount => ERR_INVALID_ACCOUNT.as_bytes(),
+            Self::MissingWNearAddress => ERR_MISSING_WNEAR_ADDRESS.as_bytes(),
+            Self::SerializationFailure => ERR_SERIALIZE.as_bytes(),
         }
     }
 }
