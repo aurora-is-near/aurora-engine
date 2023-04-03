@@ -1028,7 +1028,7 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
 pub fn get_authorizer<I: IO>(io: &I) -> EngineAuthorizer {
     // TODO: a temporary use the owner account only until the engine adapts std with near-plugins
     state::get_state(io)
-        .map(|state| EngineAuthorizer::from_accounts(once(state.owner_id)))
+        .map(|state| EngineAuthorizer::from_accounts(once(state.owner_id().clone())))
         .unwrap_or_default()
 }
 

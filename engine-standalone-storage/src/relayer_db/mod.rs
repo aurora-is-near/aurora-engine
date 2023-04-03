@@ -240,7 +240,7 @@ mod test {
                 state::set_state(&mut local_io, &engine_state).unwrap();
                 connector::EthConnectorContract::create_contract(
                     io,
-                    &engine_state.owner_id(),
+                    engine_state.owner_id(),
                     parameters::InitCallArgs {
                         prover_account: "prover.bridge.near".parse().unwrap(),
                         eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"

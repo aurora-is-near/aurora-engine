@@ -154,7 +154,7 @@ mod contract {
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
-        if state.owner_id() == args.new_owner {
+        if state.owner_id().clone() == args.new_owner {
             sdk::panic_utf8(errors::ERR_SAME_OWNER);
         } else {
             state.set_owner_id(args.new_owner);
@@ -1055,7 +1055,7 @@ mod contract {
     }
 
     fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
-        if &state.owner_id() != predecessor_account_id {
+        if &state.owner_id().clone() != predecessor_account_id {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
         }
     }
