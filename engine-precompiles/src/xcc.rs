@@ -318,7 +318,7 @@ fn transfer_from_args(from: H160, to: H160, amount: U256) -> Vec<u8> {
 fn create_target_account_id(sender: H160, engine_account_id: &str) -> AccountId {
     format!("{}.{}", hex::encode(sender.as_bytes()), engine_account_id)
         .parse()
-        .unwrap()
+        .unwrap_or_default()
 }
 
 fn revert_with_message(message: &str) -> PrecompileFailure {
