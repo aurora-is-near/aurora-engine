@@ -48,7 +48,7 @@ impl FtTransferMessageData {
         }
 
         // Parse the fee from the message slice. It should contain 32 bytes,
-        // but after that, it will be parsed to u128. 
+        // but after that, it will be parsed to u128.
         // This logic is for compatibility.
         let fee_u128: u128 = U256::from_little_endian(&msg[..32])
             .try_into()

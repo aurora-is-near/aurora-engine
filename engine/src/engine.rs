@@ -569,9 +569,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 
         let (values, logs) = executor.into_state().deconstruct();
         let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
-
-        // There is no way to return the logs to the NEAR log method as it only
-        // allows a return of UTF-8 strings.
+        // The logs could be encoded as base64 or hex string.
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult::new(status, used_gas, logs))
