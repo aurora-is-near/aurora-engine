@@ -337,7 +337,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
             0x1 => {
                 // ERC20 transfer
                 //
-                // This precompile branch is expected to be called from the ERC20 burn function\
+                // This precompile branch is expected to be called from the ERC20 burn function.
                 //
                 // Input slice format:
                 //      amount (U256 big-endian bytes) - the amount that was burned
