@@ -40,10 +40,10 @@ impl EngineState {
     }
 
     #[must_use]
-    pub fn owner_id(&self) -> AccountId {
+    pub fn owner_id(&self) -> &AccountId {
         match self {
-            Self::V2(state) => state.owner_id.clone(),
-            Self::V1(state) => state.owner_id.clone(),
+            Self::V2(state) => &state.owner_id,
+            Self::V1(state) => &state.owner_id,
         }
     }
 
