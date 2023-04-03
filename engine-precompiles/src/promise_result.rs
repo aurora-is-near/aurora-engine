@@ -63,7 +63,9 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         for i in 0..num_promises {
             if let Some(result) = self.handler.ro_promise_result(i) {
                 let n_bytes = u64::try_from(result.size()).map_err(crate::utils::err_usize_conv)?;
-                cost += n_bytes * costs::PROMISE_RESULT_BYTE_COST;
+                cost = cost
+                    .checked_add(n_bytes * costs::PROMISE_RESULT_BYTE_COST)
+                    .ok_or(ExitError::OutOfGas)?;
                 check_cost(cost)?;
                 results.push(result);
             }
