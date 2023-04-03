@@ -241,7 +241,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn pause_precompiles() {
         let io = Runtime;
-        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer();
+        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer(&io);
 
         if !authorizer.is_authorized(&io.predecessor_account_id()) {
             sdk::panic_utf8(b"ERR_UNAUTHORIZED");
