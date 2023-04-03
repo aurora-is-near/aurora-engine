@@ -10,11 +10,15 @@ fn test_modexp_oom() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let inputs = [
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007fffffff0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // exp_len: isize::MAX
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffff0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // exp_len: usize::MAX
+        // exp_len: i32::MAX
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007fffffff0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        // exp_len: u32::MAX
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffff0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        // exp_len: u64::MAX
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000c000000000000000000000000000000000000000000000000000000000000000071000000000000ff600000000000000000000000000000000000000000000000",
     ];
 
-    let outputs = [Vec::new(), Vec::new()];
+    let outputs = [Vec::new(), Vec::new(), Vec::new()];
 
     for (input, output) in inputs.iter().zip(outputs.iter()) {
         check_wasm_modexp(

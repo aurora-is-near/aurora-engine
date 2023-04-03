@@ -41,11 +41,11 @@ impl<HF: HardFork> ModExp<HF> {
         }
     }
 
-    fn run_inner(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+    fn run_inner(input: &[u8]) -> Vec<u8> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
-        let base_len = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
-        let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
-        let mod_len = usize::try_from(mod_len).map_err(utils::err_usize_conv)?;
+        let base_len = usize::try_from(base_len).unwrap_or(usize::MAX);
+        let exp_len = usize::try_from(exp_len).unwrap_or(usize::MAX);
+        let mod_len = usize::try_from(mod_len).unwrap_or(usize::MAX);
 
         let base_start = 96;
         let base_end = base_len.saturating_add(base_start);
@@ -58,29 +58,25 @@ impl<HF: HardFork> ModExp<HF> {
         let base = parse_bytes(input, base_start, base_len, BigUint::from_bytes_be);
         let modulus = parse_bytes(input, mod_start, mod_len, BigUint::from_bytes_be);
 
-        let output = {
-            let computed_result = if modulus == BigUint::from(0u32) {
-                Vec::new()
-            } else {
-                // The OOM panic is no longer possible because if the modulus is non-zero
-                // then the required gas prevents passing a huge exponent.
-                let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
-                base.modpow(&exponent, &modulus).to_bytes_be()
-            };
-            // The result must be the same length as the input modulus.
-            // To ensure this we pad on the left with zeros.
-            if mod_len > computed_result.len() {
-                let diff = mod_len - computed_result.len();
-                let mut padded_result = Vec::with_capacity(mod_len);
-                padded_result.extend(core::iter::repeat(0).take(diff));
-                padded_result.extend_from_slice(&computed_result);
-                padded_result
-            } else {
-                computed_result
-            }
+        let computed_result = if modulus == BigUint::from(0u32) {
+            Vec::new()
+        } else {
+            // The OOM panic is no longer possible because if the modulus is non-zero
+            // then the required gas prevents passing a huge exponent.
+            let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
+            base.modpow(&exponent, &modulus).to_bytes_be()
         };
-
-        Ok(output)
+        // The result must be the same length as the input modulus.
+        // To ensure this we pad on the left with zeros.
+        if mod_len > computed_result.len() {
+            let diff = mod_len - computed_result.len();
+            let mut padded_result = Vec::with_capacity(mod_len);
+            padded_result.extend(core::iter::repeat(0).take(diff));
+            padded_result.extend_from_slice(&computed_result);
+            padded_result
+        } else {
+            computed_result
+        }
     }
 }
 
@@ -132,7 +128,7 @@ impl Precompile for ModExp<Byzantium> {
             }
         }
 
-        let output = Self::run_inner(input)?;
+        let output = Self::run_inner(input);
         Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
@@ -176,7 +172,7 @@ impl Precompile for ModExp<Berlin> {
             }
         }
 
-        let output = Self::run_inner(input)?;
+        let output = Self::run_inner(input);
         Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
