@@ -34,7 +34,8 @@ pub fn ecrecover(
 fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
     use sha3::Digest;
 
-    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes()).unwrap();
+    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes())
+        .map_err(|_| ExitError::Other(Borrowed(sdk::ECRecoverErr.as_str())))?;
     let v = signature[64];
     let signature = libsecp256k1::Signature::parse_standard_slice(&signature[0..64])
         .map_err(|_| ExitError::Other(Borrowed(sdk::ECRecoverErr.as_str())))?;
