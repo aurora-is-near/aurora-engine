@@ -1,7 +1,7 @@
 use crate::prelude::types::{Address, EthGas};
 use crate::prelude::{sdk, vec::Vec, Borrowed, H256};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-#[allow(unused_imports)]
+#[cfg(not(feature = "contract"))]
 use aurora_engine_types::ToString;
 use evm::{Context, ExitError};
 
