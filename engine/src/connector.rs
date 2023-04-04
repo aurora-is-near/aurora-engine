@@ -589,7 +589,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (wei_fee, relayer) {
             (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
-                let eth_amount = Wei::new(U256::from(args.amount.as_u128()))
+                let eth_amount = Wei::new_u128(args.amount.as_u128())
                     .checked_sub(fee)
                     .ok_or(error::FtTransferCallError::InsufficientAmountForFee)?;
                 self.mint_eth_on_aurora(message_data.recipient, eth_amount)?;
