@@ -413,6 +413,12 @@ fn non_submit_execute<'db>(
 
             None
         }
+        TransactionKind::FundXccSubAccound(args) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            xcc::fund_xcc_sub_account(&io, &mut handler, &env, args.clone())?;
+
+            None
+        }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
         TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
@@ -476,7 +482,7 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine, fungible_token, state};
+    use aurora_engine::{connector, engine, fungible_token, state, xcc};
 
     #[derive(Debug)]
     pub enum Error {
@@ -492,6 +498,7 @@ pub mod error {
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
         ConnectorInit(connector::error::InitContractError),
         ConnectorStorage(connector::error::StorageReadError),
+        FundXccError(xcc::FundXccError),
     }
 
     impl From<state::EngineStateError> for Error {
@@ -563,6 +570,12 @@ pub mod error {
     impl From<connector::error::StorageReadError> for Error {
         fn from(e: connector::error::StorageReadError) -> Self {
             Self::ConnectorStorage(e)
+        }
+    }
+
+    impl From<xcc::FundXccError> for Error {
+        fn from(e: xcc::FundXccError) -> Self {
+            Self::FundXccError(e)
         }
     }
 }

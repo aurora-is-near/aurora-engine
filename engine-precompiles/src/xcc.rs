@@ -3,7 +3,7 @@
 //! Allow Aurora users interacting with NEAR smart contracts using cross contract call primitives.
 //! TODO: How they work (low level explanation with examples)
 
-use crate::{HandleBasedPrecompile, PrecompileOutput};
+use crate::{utils, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{
     account_id::AccountId,
@@ -100,6 +100,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
         let input = handle.input();
         let target_gas = handle.gas_limit().map(EthGas::new);
         let context = handle.context();
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let is_static = handle.is_static();
 
         // This only includes the cost we can easily derive without parsing the input.
@@ -317,7 +318,7 @@ fn transfer_from_args(from: H160, to: H160, amount: U256) -> Vec<u8> {
 fn create_target_account_id(sender: H160, engine_account_id: &str) -> AccountId {
     format!("{}.{}", hex::encode(sender.as_bytes()), engine_account_id)
         .parse()
-        .unwrap()
+        .unwrap_or_default()
 }
 
 fn revert_with_message(message: &str) -> PrecompileFailure {
