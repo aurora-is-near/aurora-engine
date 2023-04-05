@@ -1,6 +1,8 @@
 use crate::prelude::types::{Address, EthGas};
 use crate::prelude::{sdk, vec::Vec, Borrowed, H256};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+#[cfg(not(feature = "contract"))]
+use aurora_engine_types::ToString;
 use evm::{Context, ExitError};
 
 mod costs {
@@ -32,9 +34,11 @@ pub fn ecrecover(
 
 #[cfg(not(feature = "contract"))]
 fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
+    use aurora_engine_types::Cow::Owned;
     use sha3::Digest;
 
-    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes()).unwrap();
+    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes())
+        .map_err(|e| ExitError::Other(Owned(e.to_string())))?;
     let v = signature[64];
     let signature = libsecp256k1::Signature::parse_standard_slice(&signature[0..64])
         .map_err(|_| ExitError::Other(Borrowed(sdk::ECRecoverErr.as_str())))?;

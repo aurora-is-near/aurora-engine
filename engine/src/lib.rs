@@ -451,8 +451,8 @@ mod contract {
     /// Allow receiving NEP141 tokens to the EVM contract.
     ///
     /// This function returns the amount of tokens to return to the sender.
-    /// Either all tokens are transferred tokens are returned in case of an
-    /// error, or no token is returned if tx was successful.
+    /// Either all tokens are transferred and tokens are returned
+    /// in case of an error, or no token is returned if the transaction was successful.
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
         let io = Runtime;
