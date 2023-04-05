@@ -105,12 +105,9 @@ pub fn handle_precompile_promise<I, P>(
             });
             // After the deployment we call the contract's initialize function
             let wnear_address = get_wnear_address(io);
-            let wnear_account = match crate::engine::nep141_erc20_map(*io)
+            let wnear_account = crate::engine::nep141_erc20_map(*io)
                 .lookup_right(&crate::engine::ERC20Address(wnear_address))
-            {
-                Some(x) => x,
-                None => panic!("wnear account not found"),
-            };
+                .expect("wnear account not found");
             let init_args = format!(
                 r#"{{"wnear_account": "{}", "must_register": {}}}"#,
                 wnear_account.0.as_ref(),
