@@ -630,6 +630,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
             BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
                 Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
+            }
             BorshableTransactionKind::FundXccSubAccound(x) => {
                 Ok(Self::FundXccSubAccound(x.into_owned()))
             }
