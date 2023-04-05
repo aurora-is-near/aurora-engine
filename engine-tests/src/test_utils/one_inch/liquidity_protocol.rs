@@ -1,13 +1,14 @@
 use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
 use crate::test_utils::{self, solidity, ExecutionProfile};
+use aurora_engine_types::types::Wei;
 use std::path::PathBuf;
 use std::sync::Once;
 
 static DOWNLOAD_ONCE: Once = Once::new();
 static COMPILE_ONCE: Once = Once::new();
 
-pub(crate) struct Helper<'a> {
+pub struct Helper<'a> {
     pub runner: &'a mut test_utils::AuroraRunner,
     pub signer: &'a mut test_utils::Signer,
 }
@@ -29,10 +30,10 @@ impl<'a> Helper<'a> {
             .submit_with_signer_profiled(self.signer, |nonce| {
                 crate::prelude::transactions::legacy::TransactionLegacy {
                     nonce,
-                    gas_price: Default::default(),
+                    gas_price: U256::default(),
                     gas_limit: u64::MAX.into(),
                     to: None,
-                    value: Default::default(),
+                    value: Wei::default(),
                     data,
                 }
             })
@@ -153,7 +154,7 @@ impl<'a> Helper<'a> {
     pub(crate) fn pool_deposit(
         &mut self,
         pool: &Pool,
-        args: DepositArgs,
+        args: &DepositArgs,
     ) -> (SubmitResult, ExecutionProfile) {
         self.pool_call(
             pool,
@@ -174,7 +175,7 @@ impl<'a> Helper<'a> {
     pub(crate) fn pool_swap(
         &mut self,
         pool: &Pool,
-        args: SwapArgs,
+        args: &SwapArgs,
     ) -> (SubmitResult, ExecutionProfile) {
         self.pool_call(
             pool,
@@ -192,7 +193,7 @@ impl<'a> Helper<'a> {
     pub(crate) fn pool_withdraw(
         &mut self,
         pool: &Pool,
-        args: WithdrawArgs,
+        args: &WithdrawArgs,
     ) -> (SubmitResult, ExecutionProfile) {
         self.pool_call(
             pool,
@@ -224,20 +225,20 @@ impl<'a> Helper<'a> {
     }
 }
 
-pub(crate) struct PoolDeployer(solidity::DeployedContract);
+pub struct PoolDeployer(solidity::DeployedContract);
 
-pub(crate) struct PoolFactory(solidity::DeployedContract);
+pub struct PoolFactory(solidity::DeployedContract);
 
-pub(crate) struct Pool(solidity::DeployedContract);
+pub struct Pool(solidity::DeployedContract);
 
-pub(crate) struct DepositArgs {
+pub struct DepositArgs {
     pub min_token_a: U256,
     pub min_token_b: U256,
     pub max_token_a: U256,
     pub max_token_b: U256,
 }
 
-pub(crate) struct SwapArgs {
+pub struct SwapArgs {
     pub src_token: Address,
     pub dst_token: Address,
     pub amount: U256,
@@ -245,14 +246,14 @@ pub(crate) struct SwapArgs {
     pub referral: Address,
 }
 
-pub(crate) struct WithdrawArgs {
+pub struct WithdrawArgs {
     pub amount: U256,
     pub min_token_a: U256,
     pub min_token_b: U256,
 }
 
 impl Pool {
-    pub fn address(&self) -> Address {
+    pub const fn address(&self) -> Address {
         self.0.address
     }
 }

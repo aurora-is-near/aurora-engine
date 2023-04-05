@@ -2,7 +2,10 @@ use crate::fmt::Formatter;
 use crate::types::balance::error;
 use crate::types::Fee;
 use crate::{format, Add, Display, Sub, SubAssign, ToString, U256};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
@@ -39,7 +42,7 @@ impl<'de> Deserialize<'de> for NEP141Wei {
         Ok(Self(
             value
                 .as_str()
-                .ok_or_else(|| Error::custom(format!("Wait for a string but got: {}", value)))
+                .ok_or_else(|| Error::custom(format!("Wait for a string but got: {value}")))
                 .and_then(|value| value.parse().map_err(Error::custom))?,
         ))
     }
@@ -53,6 +56,7 @@ impl Display for NEP141Wei {
 
 impl NEP141Wei {
     /// Constructs a new `NEP141Wei` with a given u128 value.
+    #[must_use]
     pub const fn new(amount: u128) -> Self {
         Self(amount)
     }
@@ -66,12 +70,13 @@ impl NEP141Wei {
     }
 
     /// Consumes `NEP141Wei` and returns the underlying type.
-    pub fn as_u128(self) -> u128 {
+    #[must_use]
+    pub const fn as_u128(self) -> u128 {
         self.0
     }
 }
 
-impl Sub<NEP141Wei> for NEP141Wei {
+impl Sub for NEP141Wei {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -79,7 +84,7 @@ impl Sub<NEP141Wei> for NEP141Wei {
     }
 }
 
-impl Add<NEP141Wei> for NEP141Wei {
+impl Add for NEP141Wei {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -87,23 +92,25 @@ impl Add<NEP141Wei> for NEP141Wei {
     }
 }
 
-impl SubAssign<NEP141Wei> for NEP141Wei {
+impl SubAssign for NEP141Wei {
     fn sub_assign(&mut self, rhs: Self) {
         *self = *self - rhs;
     }
 }
 
-/// Newtype to distinguish balances (denominated in Wei) from other U256 types.
+/// New type to distinguish balances (denominated in Wei) from other U256 types.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Wei(U256);
 
 impl Wei {
     const ETH_TO_WEI: U256 = U256([1_000_000_000_000_000_000, 0, 0, 0]);
 
+    #[must_use]
     pub const fn zero() -> Self {
         Self(U256([0, 0, 0, 0]))
     }
 
+    #[must_use]
     pub const fn new(amount: U256) -> Self {
         Self(amount)
     }
@@ -113,23 +120,34 @@ impl Wei {
     // `amount.into()` without thinking too hard about the units. Explicitly writing
     // `Wei` reminds the developer to think about whether the amount they enter is really
     // in units of `Wei` or not.
+    #[must_use]
     pub const fn new_u64(amount: u64) -> Self {
         Self(U256([amount, 0, 0, 0]))
     }
 
+    #[must_use]
+    pub fn new_u128(amount: u128) -> Self {
+        Self::new(U256::from(amount))
+    }
+
+    #[must_use]
     pub fn from_eth(amount: U256) -> Option<Self> {
         amount.checked_mul(Self::ETH_TO_WEI).map(Self)
     }
 
+    #[must_use]
     pub fn to_bytes(self) -> [u8; 32] {
         u256_to_arr(&self.0)
     }
 
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // older version of primitive-types has non-const `is_zero()`
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
 
-    pub fn raw(self) -> U256 {
+    #[must_use]
+    pub const fn raw(self) -> U256 {
         self.0
     }
 
@@ -154,16 +172,16 @@ impl Display for Wei {
     }
 }
 
-impl Add<Self> for Wei {
-    type Output = Wei;
+impl Add for Wei {
+    type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
         Self(self.0 + rhs.0)
     }
 }
 
-impl Sub<Self> for Wei {
-    type Output = Wei;
+impl Sub for Wei {
+    type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self(self.0 - rhs.0)
@@ -173,23 +191,24 @@ impl Sub<Self> for Wei {
 /// Type casting from Wei compatible Borsh-encoded raw value into the Wei value, to attach an ETH balance to the transaction
 impl From<WeiU256> for Wei {
     fn from(value: WeiU256) -> Self {
-        Wei(U256::from_big_endian(&value))
+        Self(U256::from_big_endian(&value))
     }
 }
 
 impl From<Fee> for Wei {
     fn from(value: Fee) -> Self {
-        Wei(U256::from(value.as_u128()))
+        Self(U256::from(value.as_u128()))
     }
 }
 
 impl From<NEP141Wei> for Wei {
     fn from(value: NEP141Wei) -> Self {
-        Wei(U256::from(value.as_u128()))
+        Self(U256::from(value.as_u128()))
     }
 }
 
 #[allow(dead_code)]
+#[must_use]
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {
     let mut result = [0u8; 32];
     value.to_big_endian(&mut result);

@@ -4,7 +4,7 @@ use crate::prelude::{
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use near_vm_errors::VMError;
 
-pub(crate) struct TesterConstructor(pub solidity::ContractConstructor);
+pub struct TesterConstructor(pub solidity::ContractConstructor);
 
 const DEPLOY_CONTRACT_GAS: u64 = 1_000_000_000;
 pub const DEST_ACCOUNT: &str = "target.aurora";
@@ -36,16 +36,16 @@ impl TesterConstructor {
 
         TransactionLegacy {
             nonce: nonce.into(),
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: U256::from(DEPLOY_CONTRACT_GAS),
             to: None,
-            value: Default::default(),
+            value: Wei::default(),
             data,
         }
     }
 }
 
-pub(crate) struct Tester {
+pub struct Tester {
     pub contract: solidity::DeployedContract,
 }
 
@@ -80,7 +80,7 @@ impl Tester {
 
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
-            gas_price: Default::default(),
+            gas_price: U256::default(),
             gas_limit: U256::from(DEPLOY_CONTRACT_GAS),
             to: Some(self.contract.address),
             value,
@@ -94,7 +94,7 @@ impl Tester {
         match result.status {
             aurora_engine::parameters::TransactionStatus::Succeed(_) => Ok(result),
             aurora_engine::parameters::TransactionStatus::Revert(bytes) => Err(Revert(bytes)),
-            other => panic!("Unexpected status {:?}", other),
+            other => panic!("Unexpected status {other:?}"),
         }
     }
 
@@ -222,4 +222,4 @@ impl Tester {
 }
 
 #[derive(Debug)]
-pub(crate) struct Revert(Vec<u8>);
+pub struct Revert(Vec<u8>);

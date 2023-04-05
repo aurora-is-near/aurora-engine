@@ -70,7 +70,7 @@ fn test_promise_result_gas_cost() {
         .unwrap();
 
     let mut profile_for_promises = |promise_data: Vec<PromiseResult>| -> (u64, u64, u64) {
-        let input_length: usize = promise_data.iter().map(|p| p.size()).sum();
+        let input_length: usize = promise_data.iter().map(PromiseResult::size).sum();
         runner.promise_results = promise_data;
         let (submit_result, profile) = runner
             .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {

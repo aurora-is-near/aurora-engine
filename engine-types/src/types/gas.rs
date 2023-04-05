@@ -1,6 +1,10 @@
 use crate::fmt::Formatter;
 use crate::{Add, AddAssign, Display, Div, Mul, Sub};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
+use core::num::NonZeroU64;
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -15,30 +19,32 @@ impl Display for NearGas {
     }
 }
 
-impl Sub<NearGas> for NearGas {
-    type Output = NearGas;
+impl Sub for NearGas {
+    type Output = Self;
 
-    fn sub(self, rhs: NearGas) -> Self::Output {
+    fn sub(self, rhs: Self) -> Self::Output {
         Self(self.0 - rhs.0)
     }
 }
 
-impl Add<NearGas> for NearGas {
-    type Output = NearGas;
+impl Add for NearGas {
+    type Output = Self;
 
-    fn add(self, rhs: NearGas) -> Self::Output {
+    fn add(self, rhs: Self) -> Self::Output {
         Self(self.0 + rhs.0)
     }
 }
 
 impl NearGas {
     /// Constructs a new `NearGas` with a given u64 value.
-    pub const fn new(gas: u64) -> NearGas {
+    #[must_use]
+    pub const fn new(gas: u64) -> Self {
         Self(gas)
     }
 
     /// Consumes `NearGas` and returns the underlying type.
-    pub fn as_u64(self) -> u64 {
+    #[must_use]
+    pub const fn as_u64(self) -> u64 {
         self.0
     }
 }
@@ -55,35 +61,49 @@ impl Display for EthGas {
 
 impl EthGas {
     /// Constructs a new `EthGas` with a given u64 value.
-    pub const fn new(gas: u64) -> EthGas {
+    #[must_use]
+    pub const fn new(gas: u64) -> Self {
         Self(gas)
     }
 
     /// Consumes `EthGas` and returns the underlying type.
-    pub fn as_u64(self) -> u64 {
+    #[must_use]
+    pub const fn as_u64(self) -> u64 {
         self.0
     }
-}
 
-impl Add<EthGas> for EthGas {
-    type Output = EthGas;
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.checked_sub(rhs.0).map(Self)
+    }
 
-    fn add(self, rhs: EthGas) -> Self::Output {
-        EthGas(self.0 + rhs.0)
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0).map(Self)
+    }
+
+    pub fn checked_mul(self, rhs: Self) -> Option<Self> {
+        self.0.checked_mul(rhs.0).map(Self)
     }
 }
 
-impl AddAssign<EthGas> for EthGas {
-    fn add_assign(&mut self, rhs: EthGas) {
-        self.0 += rhs.0
+impl Add for EthGas {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
     }
 }
 
-impl Div<u64> for EthGas {
-    type Output = EthGas;
+impl AddAssign for EthGas {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
 
-    fn div(self, rhs: u64) -> Self::Output {
-        EthGas(self.0 / rhs)
+impl Div<NonZeroU64> for EthGas {
+    type Output = Self;
+
+    fn div(self, rhs: NonZeroU64) -> Self::Output {
+        Self(self.0 / rhs)
     }
 }
 
@@ -96,18 +116,18 @@ impl Mul<EthGas> for u32 {
 }
 
 impl Mul<u32> for EthGas {
-    type Output = EthGas;
+    type Output = Self;
 
     fn mul(self, rhs: u32) -> Self::Output {
-        EthGas(self.0 * u64::from(rhs))
+        Self(self.0 * u64::from(rhs))
     }
 }
 
 impl Mul<u64> for EthGas {
-    type Output = EthGas;
+    type Output = Self;
 
     fn mul(self, rhs: u64) -> Self::Output {
-        EthGas(self.0 * rhs)
+        Self(self.0 * rhs)
     }
 }
 

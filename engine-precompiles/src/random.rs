@@ -1,7 +1,7 @@
 use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::{Address, EthGas};
 use crate::prelude::H256;
-use crate::PrecompileOutput;
+use crate::{utils, PrecompileOutput};
 use evm::{Context, ExitError};
 
 mod costs {
@@ -25,7 +25,8 @@ impl RandomSeed {
     pub const ADDRESS: Address =
         super::make_address(0xc104f484, 0x0573bed437190daf5d2898c2bdf928ac);
 
-    pub fn new(random_seed: H256) -> Self {
+    #[must_use]
+    pub const fn new(random_seed: H256) -> Self {
         Self { random_seed }
     }
 }
@@ -39,9 +40,10 @@ impl Precompile for RandomSeed {
         &self,
         input: &[u8],
         target_gas: Option<EthGas>,
-        _context: &Context,
+        context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -65,7 +67,7 @@ mod tests {
     fn test_precompile_id() {
         assert_eq!(
             RandomSeed::ADDRESS,
-            near_account_to_evm_address("randomSeed".as_bytes())
+            near_account_to_evm_address(b"randomSeed")
         );
     }
 }

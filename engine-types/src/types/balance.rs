@@ -1,6 +1,9 @@
 use crate::fmt::Formatter;
 use crate::{format, Add, Display, Sub, ToString};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
@@ -23,12 +26,14 @@ impl Display for Balance {
 
 impl Balance {
     /// Constructs a new `Balance` with a given u128 value.
-    pub const fn new(amount: u128) -> Balance {
+    #[must_use]
+    pub const fn new(amount: u128) -> Self {
         Self(amount)
     }
 
     /// Consumes `Balance` and returns the underlying type.
-    pub fn as_u128(self) -> u128 {
+    #[must_use]
+    pub const fn as_u128(self) -> u128 {
         self.0
     }
 }
@@ -55,7 +60,7 @@ impl<'de> Deserialize<'de> for Balance {
         Ok(Self(
             value
                 .as_str()
-                .ok_or_else(|| Error::custom(format!("Wait for a string but got: {}", value)))
+                .ok_or_else(|| Error::custom(format!("Wait for a string but got: {value}")))
                 .and_then(|value| value.parse().map_err(Error::custom))?,
         ))
     }
@@ -76,7 +81,7 @@ impl<'de> Deserialize<'de> for Balance {
     PartialOrd,
 )]
 /// Near Yocto type which wraps an underlying u128.
-/// 1 NEAR = 10^24 yoctoNEAR
+/// 1 NEAR = 10^24 `yoctoNEAR`
 pub struct Yocto(u128);
 
 impl Display for Yocto {
@@ -87,17 +92,19 @@ impl Display for Yocto {
 
 impl Yocto {
     /// Constructs a new `Yocto NEAR` with a given u128 value.
-    pub const fn new(yocto: u128) -> Yocto {
+    #[must_use]
+    pub const fn new(yocto: u128) -> Self {
         Self(yocto)
     }
 
     /// Consumes `Yocto NEAR` and returns the underlying type.
-    pub fn as_u128(self) -> u128 {
+    #[must_use]
+    pub const fn as_u128(self) -> u128 {
         self.0
     }
 }
 
-impl Add<Yocto> for Yocto {
+impl Add for Yocto {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -105,7 +112,7 @@ impl Add<Yocto> for Yocto {
     }
 }
 
-impl Sub<Yocto> for Yocto {
+impl Sub for Yocto {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -128,7 +135,7 @@ pub mod error {
     impl fmt::Display for BalanceOverflowError {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
-            write!(f, "{}", msg)
+            write!(f, "{msg}")
         }
     }
 }
@@ -158,7 +165,7 @@ mod tests {
     fn test_serialize_balance() {
         let json = r#"{"balance":"340282366920938463463374607431768211455"}"#;
         let result = SomeStruct {
-            balance: Balance::new(340282366920938463463374607431768211455),
+            balance: Balance::new(340_282_366_920_938_463_463_374_607_431_768_211_455),
         };
 
         assert_eq!(&serde_json::to_string(&result).unwrap(), json);

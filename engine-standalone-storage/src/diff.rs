@@ -12,6 +12,7 @@ pub enum DiffValue {
 }
 
 impl DiffValue {
+    #[must_use]
     pub fn value(&self) -> Option<&[u8]> {
         match self {
             Self::Deleted => None,
@@ -19,6 +20,8 @@ impl DiffValue {
         }
     }
 
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn take_value(self) -> Option<Vec<u8>> {
         match self {
             Self::Deleted => None,
@@ -51,9 +54,10 @@ impl Diff {
     }
 
     pub fn clear(&mut self) {
-        self.0.clear()
+        self.0.clear();
     }
 
+    #[must_use]
     pub fn get(&self, key: &[u8]) -> Option<&DiffValue> {
         self.0.get(key)
     }
@@ -66,6 +70,7 @@ impl Diff {
         self.0.iter()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

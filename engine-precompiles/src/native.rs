@@ -15,7 +15,7 @@ use crate::prelude::{
 
 use crate::prelude::types::EthGas;
 use crate::PrecompileOutput;
-use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::{account_id::AccountId, types::NEP141Wei};
 use evm::backend::Log;
 use evm::{Context, ExitError};
 
@@ -31,7 +31,7 @@ mod costs {
     pub(super) const EXIT_TO_ETHEREUM_GAS: EthGas = EthGas::new(0);
 
     /// Value determined experimentally based on tests and mainnet data. Example:
-    /// https://explorer.mainnet.near.org/transactions/5CD7NrqWpK3H8MAAU4mYEPuuWz9AqR9uJkkZJzw5b8PM#D1b5NVRrAsJKUX2ZGs3poKViu1Rgt4RJZXtTfMgdxH4S
+    /// `https://explorer.mainnet.near.org/transactions/5CD7NrqWpK3H8MAAU4mYEPuuWz9AqR9uJkkZJzw5b8PM#D1b5NVRrAsJKUX2ZGs3poKViu1Rgt4RJZXtTfMgdxH4S`
     pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
     /// Value determined experimentally based on tests.
@@ -46,12 +46,12 @@ mod costs {
 pub mod events {
     use crate::prelude::{types::Address, vec, String, ToString, H160, H256, U256};
 
-    /// Derived from event signature (see tests::test_exit_signatures)
+    /// Derived from event signature (see `tests::test_exit_signatures`)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
         0x5a91b8bc9c1981673db8fb226dbd8fcd,
         0xd0c23f45cd28abb31403a5392f6dd0c7,
     );
-    /// Derived from event signature (see tests::test_exit_signatures)
+    /// Derived from event signature (see `tests::test_exit_signatures`)
     pub const EXIT_TO_ETH_SIGNATURE: H256 = crate::make_h256(
         0xd046c2bb01a5622bc4b9696332391d87,
         0x491373762eeac0831c48400e2d5a5f07,
@@ -63,9 +63,9 @@ pub mod events {
     /// used for this purpose.
     pub const ETH_ADDRESS: Address = Address::new(H160([0; 20]));
 
-    /// ExitToNear(
+    /// `ExitToNear`(
     ///    Address indexed sender,
-    ///    Address indexed erc20_address,
+    ///    Address indexed `erc20_address`,
     ///    string indexed dest,
     ///    uint amount
     /// )
@@ -81,6 +81,7 @@ pub mod events {
     }
 
     impl ExitToNear {
+        #[must_use]
         pub fn encode(self) -> ethabi::RawLog {
             let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
             let topics = vec![
@@ -94,9 +95,9 @@ pub mod events {
         }
     }
 
-    /// ExitToEth(
+    /// `ExitToEth`(
     ///    Address indexed sender,
-    ///    Address indexed erc20_address,
+    ///    Address indexed `erc20_address`,
     ///    string indexed dest,
     ///    uint amount
     /// )
@@ -112,6 +113,7 @@ pub mod events {
     }
 
     impl ExitToEth {
+        #[must_use]
         pub fn encode(self) -> ethabi::RawLog {
             let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
             let topics = vec![
@@ -131,6 +133,7 @@ pub mod events {
         H256(result)
     }
 
+    #[must_use]
     pub fn exit_to_near_schema() -> ethabi::Event {
         ethabi::Event {
             name: "ExitToNear".to_string(),
@@ -160,6 +163,7 @@ pub mod events {
         }
     }
 
+    #[must_use]
     pub fn exit_to_eth_schema() -> ethabi::Event {
         ethabi::Event {
             name: "ExitToEth".to_string(),
@@ -208,12 +212,19 @@ pub mod exit_to_near {
 }
 
 impl<I> ExitToNear<I> {
-    pub fn new(current_account_id: AccountId, io: I) -> Self {
+    pub const fn new(current_account_id: AccountId, io: I) -> Self {
         Self {
             current_account_id,
             io,
         }
     }
+}
+
+fn validate_input_size(input: &[u8], min: usize, max: usize) -> Result<(), ExitError> {
+    if input.len() < min || input.len() > max {
+        return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));
+    }
+    Ok(())
 }
 
 fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId, ExitError> {
@@ -225,11 +236,19 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
 }
 
+fn validate_amount(amount: U256) -> Result<(), ExitError> {
+    if amount > U256::from(u128::MAX) {
+        return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
+    }
+    Ok(())
+}
+
 impl<I: IO> Precompile for ExitToNear<I> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn run(
         &self,
         input: &[u8],
@@ -237,17 +256,27 @@ impl<I: IO> Precompile for ExitToNear<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
+        // ETH transfer input format: (85 bytes)
+        //  - flag (1 byte)
+        //  - refund_address (20 bytes)
+        //  - recipient_account_id (max 64 bytes)
+        // ERC20 transfer input format: (117 bytes)
+        //  - flag (1 byte)
+        //  - refund_address (20 bytes)
+        //  - amount (32 bytes)
+        //  - recipient_account_id (max 64 bytes)
         #[cfg(feature = "error_refund")]
         fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
-            if input.len() < 21 {
-                return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));
-            }
-            let refund_address = Address::try_from_slice(&input[1..21]).unwrap();
+            validate_input_size(input, 21, 117)?;
+            let mut buffer = [0; 20];
+            buffer.copy_from_slice(&input[1..21]);
+            let refund_address = Address::from_array(buffer);
             Ok((refund_address, &input[21..]))
         }
         #[cfg(not(feature = "error_refund"))]
-        fn parse_input(input: &[u8]) -> &[u8] {
-            &input[1..]
+        fn parse_input(input: &[u8]) -> Result<&[u8], ExitError> {
+            validate_input_size(input, 3, 117)?;
+            Ok(&input[1..])
         }
 
         if let Some(target_gas) = target_gas {
@@ -270,7 +299,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
         #[cfg(feature = "error_refund")]
         let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
-        let mut input = parse_input(input);
+        let mut input = parse_input(input)?;
         let current_account_id = self.current_account_id.clone();
         #[cfg(feature = "error_refund")]
         let refund_on_error_target = current_account_id.clone();
@@ -308,7 +337,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
             0x1 => {
                 // ERC20 transfer
                 //
-                // This precompile branch is expected to be called from the ERC20 burn function\
+                // This precompile branch is expected to be called from the ERC20 burn function.
                 //
                 // Input slice format:
                 //      amount (U256 big-endian bytes) - the amount that was burned
@@ -325,6 +354,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
 
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
+
+                validate_amount(amount)?;
 
                 if let Ok(receiver_account_id) = AccountId::try_from(input) {
                     (
@@ -402,7 +433,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
 
         Ok(PrecompileOutput {
             logs: vec![promise_log, exit_event_log],
-            ..Default::default()
+            cost: Self::required_gas(input)?,
+            output: Vec::new(),
         })
     }
 }
@@ -424,7 +456,7 @@ pub mod exit_to_ethereum {
 }
 
 impl<I> ExitToEthereum<I> {
-    pub fn new(current_account_id: AccountId, io: I) -> Self {
+    pub const fn new(current_account_id: AccountId, io: I) -> Self {
         Self {
             current_account_id,
             io,
@@ -444,7 +476,14 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        use crate::prelude::types::NEP141Wei;
+        // ETH transfer input format (min size 21 bytes)
+        //  - flag (1 byte)
+        //  - eth_recipient (20 bytes)
+        // ERC20 transfer input format: max 53 bytes
+        //  - flag (1 byte)
+        //  - amount (32 bytes)
+        //  - eth_recipient (20 bytes)
+        validate_input_size(input, 21, 53)?;
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);
@@ -514,6 +553,8 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                 let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
 
+                validate_amount(amount)?;
+
                 if input.len() == 20 {
                     // Parse ethereum address in hex
                     let eth_recipient: String = hex::encode(input);
@@ -573,25 +614,27 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
         Ok(PrecompileOutput {
             logs: vec![promise_log, exit_event_log],
-            ..Default::default()
+            cost: Self::required_gas(input)?,
+            output: Vec::new(),
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{exit_to_ethereum, exit_to_near};
+    use super::{exit_to_ethereum, exit_to_near, validate_amount, validate_input_size};
     use crate::prelude::sdk::types::near_account_to_evm_address;
+    use aurora_engine_types::U256;
 
     #[test]
     fn test_precompile_id() {
         assert_eq!(
             exit_to_ethereum::ADDRESS,
-            near_account_to_evm_address("exitToEthereum".as_bytes())
+            near_account_to_evm_address(b"exitToEthereum")
         );
         assert_eq!(
             exit_to_near::ADDRESS,
-            near_account_to_evm_address("exitToNear".as_bytes())
+            near_account_to_evm_address(b"exitToNear")
         );
     }
 
@@ -608,5 +651,42 @@ mod tests {
             exit_to_eth.signature(),
             super::events::EXIT_TO_ETH_SIGNATURE
         );
+    }
+
+    #[test]
+    fn test_check_invalid_input_lt_min() {
+        let input = [0u8; 4];
+        assert!(validate_input_size(&input, 10, 20).is_err());
+        assert!(validate_input_size(&input, 5, 0).is_err());
+    }
+
+    #[test]
+    fn test_check_invalid_max_value_for_input() {
+        let input = [0u8; 4];
+        assert!(validate_input_size(&input, 5, 0).is_err());
+    }
+
+    #[test]
+    fn test_check_invalid_input_gt_max() {
+        let input = [1u8; 55];
+        assert!(validate_input_size(&input, 10, 54).is_err());
+    }
+
+    #[test]
+    fn test_check_valid_input() {
+        let input = [1u8; 55];
+        validate_input_size(&input, 10, input.len()).unwrap();
+        validate_input_size(&input, 0, input.len()).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_INVALID_AMOUNT")]
+    fn test_exit_with_invalid_amount() {
+        validate_amount(U256::MAX).unwrap();
+    }
+
+    #[test]
+    fn test_exit_with_valid_amount() {
+        validate_amount(U256::from(u128::MAX)).unwrap();
     }
 }

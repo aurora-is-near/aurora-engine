@@ -83,8 +83,8 @@ impl PromiseHandler for PromiseTracker {
         Self {
             internal_index: 0,
             promise_results: self.promise_results.clone(),
-            scheduled_promises: Default::default(),
-            returned_promise: Default::default(),
+            scheduled_promises: HashMap::default(),
+            returned_promise: Option::default(),
         }
     }
 }

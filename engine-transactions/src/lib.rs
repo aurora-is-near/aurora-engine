@@ -1,6 +1,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
-#![deny(clippy::as_conversions)]
+#![deny(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::similar_names,
+    clippy::module_name_repetitions,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc
+)]
 
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
@@ -12,7 +17,7 @@ pub mod eip_1559;
 pub mod eip_2930;
 pub mod legacy;
 
-/// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
+/// Typed Transaction Envelope (see `https://eips.ethereum.org/EIPS/eip-2718`)
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum EthTransactionKind {
     Legacy(legacy::LegacyEthSignedTransaction),
@@ -84,7 +89,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
     type Error = Error;
 
     fn try_from(kind: EthTransactionKind) -> Result<Self, Self::Error> {
-        use EthTransactionKind::*;
+        use EthTransactionKind::{Eip1559, Eip2930, Legacy};
         Ok(match kind {
             Legacy(tx) => Self {
                 address: tx.sender()?,
@@ -127,6 +132,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
 }
 
 impl NormalizedEthTransaction {
+    #[allow(clippy::naive_bytecount)]
     pub fn intrinsic_gas(&self, config: &evm::Config) -> Result<u64, Error> {
         let is_contract_creation = self.to.is_none();
 
@@ -196,11 +202,12 @@ pub enum Error {
 
 #[cfg(feature = "serde")]
 fn decoder_err_to_str<S: serde::Serializer>(err: &DecoderError, ser: S) -> Result<S::Ok, S::Error> {
-    ser.serialize_str(&format!("{:?}", err))
+    ser.serialize_str(&format!("{err:?}"))
 }
 
 impl Error {
-    pub fn as_str(&self) -> &str {
+    #[must_use]
+    pub const fn as_str(&self) -> &str {
         match self {
             Self::UnknownTransactionType => "ERR_UNKNOWN_TX_TYPE",
             Self::EmptyInput => "ERR_EMPTY_TX_INPUT",

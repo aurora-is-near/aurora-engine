@@ -109,21 +109,21 @@ fn test_transaction_to_zero_address() {
     context.input = tx_bytes;
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
-    context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT - 1;
+    context.block_index = ZERO_ADDRESS_FIX_HEIGHT - 1;
     let result = runner
         .submit_raw(test_utils::SUBMIT, &context, &[])
         .unwrap();
     assert_eq!(result.gas_used, 53_000);
-    runner.env.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT;
+    runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
-    context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT;
+    context.block_index = ZERO_ADDRESS_FIX_HEIGHT;
     let result = runner
         .submit_raw(test_utils::SUBMIT, &context, &[])
         .unwrap();
     assert_eq!(result.gas_used, 21_000);
-    runner.env.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT + 1;
     assert_eq!(runner.get_nonce(&address), U256::one());
 }
 
@@ -370,12 +370,12 @@ fn test_solidity_pure_bench() {
         near_vm_runner::VMResult::Ok(outcome) => (Some(outcome), None),
     };
     if let Some(e) = error {
-        panic!("{:?}", e);
+        panic!("{e:?}");
     }
     let outcome = outcome.unwrap();
     let profile = test_utils::ExecutionProfile::new(&outcome);
     // Check the contract actually did the work.
-    assert_eq!(&outcome.logs, &[format!("Done {} iterations!", loop_limit)]);
+    assert_eq!(&outcome.logs, &[format!("Done {loop_limit} iterations!")]);
     assert!(profile.all_gas() < 1_000_000_000_000); // Less than 1 Tgas used!
 }
 
@@ -442,7 +442,7 @@ fn test_call_too_deep_error() {
     // visible to users.
     match result.status {
         TransactionStatus::Revert(_) => (),
-        other => panic!("Unexpected status {:?}", other),
+        other => panic!("Unexpected status {other:?}"),
     }
 }
 
@@ -497,9 +497,9 @@ fn test_timestamp() {
     let t = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap();
-    let t_ns = t.as_nanos();
-    let t_s = U256::from(t.as_secs());
-    runner.context.block_timestamp = u64::try_from(t_ns).unwrap();
+    let nanos = t.as_nanos();
+    let secs = U256::from(t.as_secs());
+    runner.context.block_timestamp = u64::try_from(nanos).unwrap();
 
     // call contract
     let result = runner
@@ -512,7 +512,7 @@ fn test_timestamp() {
     // Check time is correct.
     // The `+1`  is needed here because the runner increments the context
     // timestamp by 1 second automatically before each transaction.
-    assert_eq!(t_s + 1, timestamp);
+    assert_eq!(secs + 1, timestamp);
 }
 
 #[test]
@@ -535,10 +535,10 @@ fn test_override_state() {
         .submit_with_signer(&mut account1, |nonce| {
             crate::prelude::transactions::legacy::TransactionLegacy {
                 nonce,
-                gas_price: Default::default(),
+                gas_price: U256::default(),
                 gas_limit: u64::MAX.into(),
                 to: None,
-                value: Default::default(),
+                value: Wei::default(),
                 data: contract.code.clone(),
             }
         })
@@ -549,7 +549,7 @@ fn test_override_state() {
     // define functions to interact with the contract
     let get_address = |runner: &test_utils::AuroraRunner| {
         let result = runner
-            .view_call(test_utils::as_view_call(
+            .view_call(&test_utils::as_view_call(
                 contract.call_method_without_args("get", U256::zero()),
                 viewer_address,
             ))
@@ -594,8 +594,7 @@ fn test_num_wasm_functions() {
     let num_functions = module.funcs.iter().count();
     assert!(
         num_functions <= 1440,
-        "{} is not less than 1440",
-        num_functions
+        "{num_functions} is not less than 1440",
     );
 }
 
@@ -695,7 +694,7 @@ fn test_eth_transfer_incorrect_nonce() {
             test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce + 1)
         })
         .unwrap_err();
-    let error_message = format!("{:?}", err);
+    let error_message = format!("{err:?}");
     assert!(error_message.contains("ERR_INCORRECT_NONCE"));
 
     // validate post-state (which is the same as pre-state in this case)
@@ -731,7 +730,7 @@ fn test_eth_transfer_not_enough_gas() {
     let err = runner
         .submit_with_signer(&mut source_account, transaction)
         .unwrap_err();
-    let error_message = format!("{:?}", err);
+    let error_message = format!("{err:?}");
     assert!(error_message.contains("ERR_INTRINSIC_GAS"));
 
     // validate post-state (which is the same as pre-state in this case)
@@ -846,7 +845,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     test_utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
 }
 
-pub(crate) fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
+pub fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
     // set up Aurora runner and accounts
     let mut runner = test_utils::deploy_evm();
     let mut rng = rand::thread_rng();
@@ -860,6 +859,7 @@ pub(crate) fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Si
     (runner, signer, dest_address)
 }
 
+use aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT;
 use aurora_engine_types::H160;
 use sha3::Digest;
 
@@ -900,13 +900,13 @@ fn test_block_hash_api() {
         block_height.try_to_vec().unwrap(),
     );
     if let Some(error) = maybe_error {
-        panic!("Call failed: {:?}", error);
+        panic!("Call failed: {error:?}");
     }
     let outcome = maybe_outcome.unwrap();
     let block_hash = outcome.return_data.as_value().unwrap();
 
     assert_eq!(
-        hex::encode(&block_hash).as_str(),
+        hex::encode(block_hash).as_str(),
         "c4a46f076b64877cbd8c5dbfd7bfbbea21a5653b79e3b6d06b6dfb5c88f1c384",
     );
 }
@@ -973,7 +973,13 @@ fn test_eth_transfer_insufficient_balance_sim() {
         &signer.secret_key,
     );
     let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
-    let result: SubmitResult = call_result.unwrap_borsh();
+    let result = match call_result.status() {
+        near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+            use borsh::BorshDeserialize;
+            SubmitResult::try_from_slice(&bytes).unwrap()
+        }
+        other => panic!("Unexpected status {other:?}"),
+    };
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
@@ -1023,6 +1029,48 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
     );
 }
 
+/// Tests transfer Eth from one account to another with custom argument `max_gas_price`.
+#[test]
+fn test_eth_transfer_with_max_gas_price() {
+    // set up Aurora runner and accounts
+    let (mut runner, source_account, dest_address) = initialize_transfer();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+
+    // validate pre-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        INITIAL_BALANCE,
+        INITIAL_NONCE.into(),
+    );
+    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+
+    // perform transfer
+    let max_gas_price = 5;
+    let mut transaction = test_utils::transfer(dest_address, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    transaction.gas_price = 10.into();
+    transaction.gas_limit = 30_000.into();
+
+    let result = runner
+        .submit_transaction_with_args(&source_account.secret_key, transaction, max_gas_price, None)
+        .unwrap();
+
+    let fee = u128::from(result.gas_used) * max_gas_price;
+    // validate post-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - Wei::new_u128(fee),
+        (INITIAL_NONCE + 1).into(),
+    );
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        dest_address,
+        TRANSFER_AMOUNT,
+        0.into(),
+    );
+}
+
 #[test]
 fn test_set_owner() {
     let mut runner = test_utils::deploy_evm();
@@ -1050,8 +1098,8 @@ fn test_set_owner() {
 
     // check if the owner_id property has changed to new_owner.near
     assert_eq!(
-        "new_owner.near".as_bytes(),
-        outcome.unwrap().return_data.as_value().unwrap()
+        b"new_owner.near",
+        outcome.unwrap().return_data.as_value().unwrap().as_slice()
     );
 }
 
@@ -1112,6 +1160,6 @@ fn query_address_sim(
     let x = aurora.call(method, address.as_bytes());
     match &x.outcome().status {
         near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(b),
-        other => panic!("Unexpected outcome: {:?}", other),
+        other => panic!("Unexpected outcome: {other:?}"),
     }
 }

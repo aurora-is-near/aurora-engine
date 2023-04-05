@@ -1,4 +1,6 @@
-use crate::parameters::{CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitResult, ViewCallArgs};
+use crate::parameters::{
+    CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs,
+};
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
@@ -39,12 +41,12 @@ const BLOCK_HASH_PREFIX_SIZE: usize = 1;
 const BLOCK_HEIGHT_SIZE: usize = 8;
 const CHAIN_ID_SIZE: usize = 32;
 
-#[cfg(not(feature = "contract"))]
 /// Block height where the bug fix for parsing transactions to the zero address
 /// is deployed. The current value is only approximate; will be updated once the
 /// fix is actually deployed.
-pub const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61200152;
+pub const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61_200_152;
 
+#[must_use]
 pub fn current_address(current_account_id: &AccountId) -> Address {
     aurora_engine_sdk::types::near_account_to_evm_address(current_account_id.as_bytes())
 }
@@ -111,34 +113,34 @@ pub enum EngineErrorKind {
 }
 
 impl EngineErrorKind {
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        use EngineErrorKind::*;
         match self {
-            EvmError(ExitError::StackUnderflow) => errors::ERR_STACK_UNDERFLOW,
-            EvmError(ExitError::StackOverflow) => errors::ERR_STACK_OVERFLOW,
-            EvmError(ExitError::InvalidJump) => errors::ERR_INVALID_JUMP,
-            EvmError(ExitError::InvalidRange) => errors::ERR_INVALID_RANGE,
-            EvmError(ExitError::DesignatedInvalid) => errors::ERR_DESIGNATED_INVALID,
-            EvmError(ExitError::CallTooDeep) => errors::ERR_CALL_TOO_DEEP,
-            EvmError(ExitError::CreateCollision) => errors::ERR_CREATE_COLLISION,
-            EvmError(ExitError::CreateContractLimit) => errors::ERR_CREATE_CONTRACT_LIMIT,
-            EvmError(ExitError::OutOfOffset) => errors::ERR_OUT_OF_OFFSET,
-            EvmError(ExitError::OutOfGas) => errors::ERR_OUT_OF_GAS,
-            EvmError(ExitError::OutOfFund) => errors::ERR_OUT_OF_FUND,
-            EvmError(ExitError::Other(m)) => m.as_bytes(),
-            EvmError(_) => unreachable!(), // unused misc
-            EvmFatal(ExitFatal::NotSupported) => errors::ERR_NOT_SUPPORTED,
-            EvmFatal(ExitFatal::UnhandledInterrupt) => errors::ERR_UNHANDLED_INTERRUPT,
-            EvmFatal(ExitFatal::Other(m)) => m.as_bytes(),
-            EvmFatal(_) => unreachable!(), // unused misc
-            IncorrectNonce => errors::ERR_INCORRECT_NONCE,
-            FailedTransactionParse(e) => e.as_ref(),
-            InvalidChainId => errors::ERR_INVALID_CHAIN_ID,
-            InvalidSignature => errors::ERR_INVALID_ECDSA_SIGNATURE,
-            IntrinsicGasNotMet => errors::ERR_INTRINSIC_GAS,
-            MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
-            GasPayment(e) => e.as_ref(),
-            GasOverflow => errors::ERR_GAS_OVERFLOW,
+            Self::EvmError(ExitError::StackUnderflow) => errors::ERR_STACK_UNDERFLOW,
+            Self::EvmError(ExitError::StackOverflow) => errors::ERR_STACK_OVERFLOW,
+            Self::EvmError(ExitError::InvalidJump) => errors::ERR_INVALID_JUMP,
+            Self::EvmError(ExitError::InvalidRange) => errors::ERR_INVALID_RANGE,
+            Self::EvmError(ExitError::DesignatedInvalid) => errors::ERR_DESIGNATED_INVALID,
+            Self::EvmError(ExitError::CallTooDeep) => errors::ERR_CALL_TOO_DEEP,
+            Self::EvmError(ExitError::CreateCollision) => errors::ERR_CREATE_COLLISION,
+            Self::EvmError(ExitError::CreateContractLimit) => errors::ERR_CREATE_CONTRACT_LIMIT,
+            Self::EvmError(ExitError::OutOfOffset) => errors::ERR_OUT_OF_OFFSET,
+            Self::EvmError(ExitError::OutOfGas) => errors::ERR_OUT_OF_GAS,
+            Self::EvmError(ExitError::OutOfFund) => errors::ERR_OUT_OF_FUND,
+            Self::EvmFatal(ExitFatal::NotSupported) => errors::ERR_NOT_SUPPORTED,
+            Self::EvmFatal(ExitFatal::UnhandledInterrupt) => errors::ERR_UNHANDLED_INTERRUPT,
+            Self::EvmError(ExitError::Other(m)) | Self::EvmFatal(ExitFatal::Other(m)) => {
+                m.as_bytes()
+            }
+            Self::IncorrectNonce => errors::ERR_INCORRECT_NONCE,
+            Self::FailedTransactionParse(e) => e.as_ref(),
+            Self::InvalidChainId => errors::ERR_INVALID_CHAIN_ID,
+            Self::InvalidSignature => errors::ERR_INVALID_ECDSA_SIGNATURE,
+            Self::IntrinsicGasNotMet => errors::ERR_INTRINSIC_GAS,
+            Self::MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
+            Self::GasPayment(e) => e.as_ref(),
+            Self::GasOverflow => errors::ERR_GAS_OVERFLOW,
+            Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
 }
@@ -151,13 +153,13 @@ impl AsRef<[u8]> for EngineErrorKind {
 
 impl From<ExitError> for EngineErrorKind {
     fn from(e: ExitError) -> Self {
-        EngineErrorKind::EvmError(e)
+        Self::EvmError(e)
     }
 }
 
 impl From<ExitFatal> for EngineErrorKind {
     fn from(e: ExitFatal) -> Self {
-        EngineErrorKind::EvmFatal(e)
+        Self::EvmFatal(e)
     }
 }
 
@@ -171,15 +173,14 @@ trait ExitIntoResult {
 
 impl ExitIntoResult for ExitReason {
     fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
-        use ExitReason::*;
         match self {
-            Succeed(_) => Ok(TransactionStatus::Succeed(data)),
-            Revert(_) => Ok(TransactionStatus::Revert(data)),
-            Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
-            Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
-            Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
-            Error(e) => Err(e.into()),
-            Fatal(e) => Err(e.into()),
+            Self::Succeed(_) => Ok(TransactionStatus::Succeed(data)),
+            Self::Revert(_) => Ok(TransactionStatus::Revert(data)),
+            Self::Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
+            Self::Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
+            Self::Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
+            Self::Error(e) => Err(e.into()),
+            Self::Fatal(e) => Err(e.into()),
         }
     }
 }
@@ -296,7 +297,8 @@ pub enum GetErc20FromNep141Error {
 }
 
 impl GetErc20FromNep141Error {
-    pub fn to_str(&self) -> &str {
+    #[must_use]
+    pub const fn to_str(&self) -> &str {
         match self {
             Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
             Self::Nep141NotFound => "ERR_NEP141_NOT_FOUND",
@@ -317,7 +319,8 @@ pub enum RegisterTokenError {
 }
 
 impl RegisterTokenError {
-    pub fn to_str(&self) -> &str {
+    #[must_use]
+    pub const fn to_str(&self) -> &str {
         match self {
             Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
             Self::TokenAlreadyRegistered => "ERR_NEP141_TOKEN_ALREADY_REGISTERED",
@@ -337,7 +340,7 @@ pub struct StackExecutorParams<'a, I, E, H> {
 }
 
 impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<'env, I, E, H> {
-    fn new(gas_limit: u64, precompiles: Precompiles<'env, I, E, H>) -> Self {
+    const fn new(gas_limit: u64, precompiles: Precompiles<'env, I, E, H>) -> Self {
         Self {
             precompiles,
             gas_limit,
@@ -417,6 +420,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         &mut self,
         sender: &Address,
         transaction: &NormalizedEthTransaction,
+        max_gas_price: Option<U256>,
     ) -> Result<GasPaymentResult, GasPaymentError> {
         if transaction.max_fee_per_gas.is_zero() {
             return Ok(GasPaymentResult::default());
@@ -425,6 +429,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let priority_fee_per_gas = transaction
             .max_priority_fee_per_gas
             .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
+        let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
+            price.min(priority_fee_per_gas)
+        });
         let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
         let gas_limit = transaction.gas_limit;
         let prepaid_amount = gas_limit
@@ -562,9 +569,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 
         let (values, logs) = executor.into_state().deconstruct();
         let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
-
-        // There is no way to return the logs to the NEAR log method as it only
-        // allows a return of UTF-8 strings.
+        // The logs could be encoded as base64 or hex string.
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult::new(status, used_gas, logs))
@@ -673,7 +678,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     /// with the input, or 0 if tokens were minted successfully.
     ///
     /// The output will be serialized as a String
-    /// https://github.com/near/NEPs/discussions/146
+    /// `https://github.com/near/NEPs/discussions/146`
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
@@ -695,7 +700,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
 
             Address::new(H160(unwrap_res_or_finish!(
-                hex::decode(&message[..40]).unwrap().as_slice().try_into(),
+                unwrap_res_or_finish!(hex::decode(&message[..40]), output_on_fail, self.io)
+                    .as_slice()
+                    .try_into(),
                 output_on_fail,
                 self.io
             )))
@@ -807,7 +814,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     mut io: I,
     env: &E,
-    transaction_bytes: &[u8],
+    args: &SubmitArgs,
     state: EngineState,
     current_account_id: AccountId,
     relayer_address: Address,
@@ -815,7 +822,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 ) -> EngineResult<SubmitResult> {
     #[cfg(feature = "contract")]
     let transaction = NormalizedEthTransaction::try_from(
-        EthTransactionKind::try_from(transaction_bytes)
+        EthTransactionKind::try_from(args.tx_data.as_slice())
             .map_err(EngineErrorKind::FailedTransactionParse)?,
     )
     .map_err(|_e| EngineErrorKind::InvalidSignature)?;
@@ -831,7 +838,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
             );
         let block_height = env.block_height();
         let tx: EthTransactionKind = adapter
-            .try_parse_bytes(transaction_bytes, block_height)
+            .try_parse_bytes(args.tx_data.as_slice(), block_height)
             .map_err(EngineErrorKind::FailedTransactionParse)?;
         tx.try_into()
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
@@ -868,12 +875,13 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     }
 
     let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
-    let prepaid_amount = match engine.charge_gas(&sender, &transaction) {
-        Ok(gas_result) => gas_result,
-        Err(err) => {
-            return Err(EngineErrorKind::GasPayment(err).into());
-        }
-    };
+    let prepaid_amount =
+        match engine.charge_gas(&sender, &transaction, args.max_gas_price.map(Into::into)) {
+            Ok(gas_result) => gas_result,
+            Err(err) => {
+                return Err(EngineErrorKind::GasPayment(err).into());
+            }
+        };
     let gas_limit: u64 = transaction
         .gas_limit
         .try_into()
@@ -912,17 +920,23 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         Ok(submit_result) => submit_result.gas_used,
         Err(engine_err) => engine_err.gas_used,
     };
-    refund_unused_gas(&mut io, &sender, gas_used, prepaid_amount, &relayer_address).map_err(
-        |e| EngineError {
-            gas_used,
-            kind: EngineErrorKind::GasPayment(e),
-        },
-    )?;
+    refund_unused_gas(
+        &mut io,
+        &sender,
+        gas_used,
+        &prepaid_amount,
+        &relayer_address,
+    )
+    .map_err(|e| EngineError {
+        gas_used,
+        kind: EngineErrorKind::GasPayment(e),
+    })?;
 
     // return result to user
     result
 }
 
+#[must_use]
 pub fn setup_refund_on_error_input(amount: U256, refund_address: Address) -> Vec<u8> {
     let selector = ERC20_MINT_SELECTOR;
     let mint_args = ethabi::encode(&[
@@ -937,51 +951,47 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
     io: I,
     env: &E,
     state: EngineState,
-    args: RefundCallArgs,
+    args: &RefundCallArgs,
     handler: &mut P,
 ) -> EngineResult<SubmitResult> {
     let current_account_id = env.current_account_id();
-    match args.erc20_address {
+    if let Some(erc20_address) = args.erc20_address {
         // ERC-20 exit; re-mint burned tokens
-        Some(erc20_address) => {
-            let erc20_admin_address = current_address(&current_account_id);
-            let mut engine =
-                Engine::new_with_state(state, erc20_admin_address, current_account_id, io, env);
-            let erc20_address = erc20_address;
-            let refund_address = args.recipient_address;
-            let amount = U256::from_big_endian(&args.amount);
-            let input = setup_refund_on_error_input(amount, refund_address);
+        let erc20_admin_address = current_address(&current_account_id);
+        let mut engine =
+            Engine::new_with_state(state, erc20_admin_address, current_account_id, io, env);
+        let erc20_address = erc20_address;
+        let refund_address = args.recipient_address;
+        let amount = U256::from_big_endian(&args.amount);
+        let input = setup_refund_on_error_input(amount, refund_address);
 
-            engine.call(
-                &erc20_admin_address,
-                &erc20_address,
-                Wei::zero(),
-                input,
-                u64::MAX,
-                Vec::new(),
-                handler,
-            )
-        }
+        engine.call(
+            &erc20_admin_address,
+            &erc20_address,
+            Wei::zero(),
+            input,
+            u64::MAX,
+            Vec::new(),
+            handler,
+        )
+    } else {
         // ETH exit; transfer ETH back from precompile address
-        None => {
-            let exit_address = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
-            let mut engine =
-                Engine::new_with_state(state, exit_address, current_account_id, io, env);
-            let refund_address = args.recipient_address;
-            let amount = Wei::new(U256::from_big_endian(&args.amount));
-            engine.call(
-                &exit_address,
-                &refund_address,
-                amount,
-                Vec::new(),
-                u64::MAX,
-                vec![
-                    (exit_address.raw(), Vec::new()),
-                    (refund_address.raw(), Vec::new()),
-                ],
-                handler,
-            )
-        }
+        let exit_address = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
+        let mut engine = Engine::new_with_state(state, exit_address, current_account_id, io, env);
+        let refund_address = args.recipient_address;
+        let amount = Wei::new(U256::from_big_endian(&args.amount));
+        engine.call(
+            &exit_address,
+            &refund_address,
+            amount,
+            Vec::new(),
+            u64::MAX,
+            vec![
+                (exit_address.raw(), Vec::new()),
+                (refund_address.raw(), Vec::new()),
+            ],
+            handler,
+        )
     }
 }
 
@@ -996,6 +1006,7 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
 ///     engine_account_id,
 /// ))
 /// ```
+#[must_use]
 pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u8]) -> H256 {
     debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, mem::size_of_val(&BLOCK_HASH_PREFIX));
     debug_assert_eq!(BLOCK_HEIGHT_SIZE, mem::size_of_val(&block_height));
@@ -1011,18 +1022,19 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
     sdk::sha256(&data)
 }
 
-pub fn get_authorizer() -> EngineAuthorizer {
-    // TODO: a temporary account until the engine adapts std with near-plugins
-    let account = AccountId::new("aurora").expect("Failed to parse account from string");
-
-    EngineAuthorizer::from_accounts(once(account))
+#[must_use]
+pub fn get_authorizer<I: IO>(io: &I) -> EngineAuthorizer {
+    // TODO: a temporary use the owner account only until the engine adapts std with near-plugins
+    state::get_state(io)
+        .map(|state| EngineAuthorizer::from_accounts(once(state.owner_id)))
+        .unwrap_or_default()
 }
 
 pub fn refund_unused_gas<I: IO>(
     io: &mut I,
     sender: &Address,
     gas_used: u64,
-    gas_result: GasPaymentResult,
+    gas_result: &GasPaymentResult,
     relayer: &Address,
 ) -> Result<(), GasPaymentError> {
     if gas_result.effective_gas_price.is_zero() {
@@ -1050,6 +1062,7 @@ pub fn refund_unused_gas<I: IO>(
     Ok(())
 }
 
+#[must_use]
 pub fn setup_receive_erc20_tokens_input(
     args: &NEP141FtOnTransferArgs,
     recipient: &Address,
@@ -1063,6 +1076,7 @@ pub fn setup_receive_erc20_tokens_input(
     [selector, tail.as_slice()].concat()
 }
 
+#[must_use]
 pub fn setup_deploy_erc20_input(current_account_id: &AccountId) -> Vec<u8> {
     #[cfg(feature = "error_refund")]
     let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20V2.bin");
@@ -1078,7 +1092,7 @@ pub fn setup_deploy_erc20_input(current_account_id: &AccountId) -> Vec<u8> {
         ethabi::Token::Address(erc20_admin_address.raw()),
     ]);
 
-    ([erc20_contract, deploy_args.as_slice()].concat()).to_vec()
+    [erc20_contract, deploy_args.as_slice()].concat()
 }
 
 /// Used to bridge NEP-141 tokens from NEAR to Aurora. On Aurora the NEP-141 becomes an ERC-20.
@@ -1177,6 +1191,7 @@ pub fn increment_nonce<I: IO>(io: &mut I, address: &Address) {
     set_nonce(io, address, &new_nonce);
 }
 
+#[must_use]
 pub fn create_legacy_address(caller: &Address, nonce: &U256) -> Address {
     let mut stream = rlp::RlpStream::new_list(2);
     stream.append(&caller.raw());
@@ -1186,7 +1201,8 @@ pub fn create_legacy_address(caller: &Address, nonce: &U256) -> Address {
     Address::try_from_slice(&hash_bytes[12..]).unwrap()
 }
 
-pub fn nep141_erc20_map<I: IO>(io: I) -> BijectionMap<NEP141Account, ERC20Address, I> {
+#[must_use]
+pub const fn nep141_erc20_map<I: IO>(io: I) -> BijectionMap<NEP141Account, ERC20Address, I> {
     BijectionMap::new(KeyPrefix::Nep141Erc20Map, KeyPrefix::Erc20Nep141Map, io)
 }
 
@@ -1273,12 +1289,11 @@ pub fn set_generation<I: IO>(io: &mut I, address: &Address, generation: u32) {
 
 pub fn get_generation<I: IO>(io: &I, address: &Address) -> u32 {
     io.read_storage(&address_to_key(KeyPrefix::Generation, address))
-        .map(|value| {
+        .map_or(0, |value| {
             let mut bytes = [0u8; 4];
             value.copy_to_slice(&mut bytes);
             u32::from_be_bytes(bytes)
         })
-        .unwrap_or(0)
 }
 
 /// Removes all storage for the given address.
@@ -1359,7 +1374,7 @@ where
                         crate::xcc::handle_precompile_promise(
                             io,
                             handler,
-                            promise,
+                            &promise,
                             required_near,
                             current_account_id,
                         );
@@ -1439,7 +1454,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     /// [nearcore#3456](https://github.com/near/nearcore/issues/3456) for more
     /// details.
     ///
-    /// See: https://doc.aurora.dev/develop/compat/evm#blockhash
+    /// See: `https://doc.aurora.dev/develop/compat/evm#blockhash`
     fn block_hash(&self, number: U256) -> H256 {
         let idx = U256::from(self.env.block_height());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
@@ -1462,7 +1477,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     /// Returns a mocked coinbase which is the EVM address for the Aurora
     /// account, being 0x4444588443C3a91288c5002483449Aba1054192b.
     ///
-    /// See: https://doc.aurora.dev/develop/compat/evm#coinbase
+    /// See: `https://doc.aurora.dev/develop/compat/evm#coinbase`
     fn block_coinbase(&self) -> H160 {
         H160([
             0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
@@ -1477,7 +1492,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
 
     /// Returns the current block difficulty.
     ///
-    /// See: https://doc.aurora.dev/develop/compat/evm#difficulty
+    /// See: `https://doc.aurora.dev/develop/compat/evm#difficulty`
     fn block_difficulty(&self) -> U256 {
         U256::zero()
     }
@@ -1488,7 +1503,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     /// as there isn't a gas limit alternative right now but this may change in
     /// the future.
     ///
-    /// See: https://doc.aurora.dev/develop/compat/evm#gaslimit
+    /// See: `https://doc.aurora.dev/develop/compat/evm#gaslimit`
     fn block_gas_limit(&self) -> U256 {
         U256::max_value()
     }
@@ -1566,7 +1581,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
 
     /// Get original storage value of address at index, if available.
     ///
-    /// Since SputnikVM collects storage changes in memory until the transaction is over,
+    /// Since `SputnikVM` collects storage changes in memory until the transaction is over,
     /// the "original storage" will always be the same as the storage because no values
     /// are written to storage until after the transaction is complete.
     fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
@@ -1626,9 +1641,9 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
 
                     for (index, value) in storage {
                         if value == H256::default() {
-                            remove_storage(&mut self.io, &address, &index, next_generation)
+                            remove_storage(&mut self.io, &address, &index, next_generation);
                         } else {
-                            set_storage(&mut self.io, &address, &index, &value, next_generation)
+                            set_storage(&mut self.io, &address, &index, &value, next_generation);
                         }
                         writes_counter += 1;
                     }
@@ -1707,7 +1722,7 @@ mod tests {
     use aurora_engine_sdk::promise::Noop;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use aurora_engine_test_doubles::promise::PromiseTracker;
-    use aurora_engine_types::types::RawU256;
+    use aurora_engine_types::types::{Balance, NearGas, RawU256};
     use std::cell::RefCell;
 
     #[test]
@@ -1914,8 +1929,8 @@ mod tests {
         let erc20_token = make_address(4, 5);
         let nep141_token = AccountId::new("testcoin").unwrap();
         let args = NEP141FtOnTransferArgs {
-            sender_id: Default::default(),
-            amount: Default::default(),
+            sender_id: AccountId::default(),
+            amount: Balance::default(),
             msg: receiver.encode(),
         };
         let mut handler = Noop;
@@ -1940,7 +1955,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        state::set_state(&mut io, EngineState::default()).unwrap();
+        state::set_state(&mut io, &EngineState::default()).unwrap();
 
         let nep141_token = AccountId::new("testcoin").unwrap();
         let mut handler = Noop;
@@ -1966,18 +1981,18 @@ mod tests {
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let transaction = NormalizedEthTransaction {
-            address: Default::default(),
+            address: Address::default(),
             chain_id: None,
-            nonce: Default::default(),
+            nonce: U256::default(),
             gas_limit: U256::MAX,
-            max_priority_fee_per_gas: Default::default(),
+            max_priority_fee_per_gas: U256::default(),
             max_fee_per_gas: U256::MAX,
             to: None,
-            value: Default::default(),
+            value: Wei::default(),
             data: vec![],
             access_list: vec![],
         };
-        let actual_result = engine.charge_gas(&origin, &transaction).unwrap();
+        let actual_result = engine.charge_gas(&origin, &transaction, None).unwrap();
 
         let expected_result = GasPaymentResult {
             prepaid_amount: Wei::zero(),
@@ -1995,11 +2010,11 @@ mod tests {
 
         let mut promise_tracker = PromiseTracker::default();
         let args = PromiseCreateArgs {
-            target_account_id: Default::default(),
-            method: "".to_string(),
+            target_account_id: AccountId::default(),
+            method: String::new(),
             args: vec![],
-            attached_balance: Default::default(),
-            attached_gas: Default::default(),
+            attached_balance: Yocto::default(),
+            attached_gas: NearGas::default(),
         };
         // This is safe because it's just a test
         let actual_id = unsafe { schedule_promise(&mut promise_tracker, &args) };
@@ -2020,11 +2035,11 @@ mod tests {
 
         let mut promise_tracker = PromiseTracker::default();
         let args = PromiseCreateArgs {
-            target_account_id: Default::default(),
-            method: "".to_string(),
+            target_account_id: AccountId::default(),
+            method: String::new(),
             args: vec![],
-            attached_balance: Default::default(),
-            attached_gas: Default::default(),
+            attached_balance: Yocto::default(),
+            attached_gas: NearGas::default(),
         };
         let base_id = PromiseId::new(6);
         // This is safe because it's just a test
@@ -2072,7 +2087,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        state::set_state(&mut io, expected_state.clone()).unwrap();
+        state::set_state(&mut io, &expected_state).unwrap();
         let engine = Engine::new(origin, current_account_id, io, &env).unwrap();
         let actual_state = engine.state;
 
@@ -2088,14 +2103,14 @@ mod tests {
         let expected_state = EngineState::default();
         let refund_amount = Wei::new_u64(1000);
         add_balance(&mut io, &exit_to_near::ADDRESS, refund_amount).unwrap();
-        state::set_state(&mut io, expected_state.clone()).unwrap();
+        state::set_state(&mut io, &expected_state).unwrap();
         let args = RefundCallArgs {
             recipient_address,
             erc20_address: None,
             amount: RawU256::from(refund_amount.raw()),
         };
         let mut handler = Noop;
-        let actual_result = refund_on_error(io, &env, expected_state, args, &mut handler).unwrap();
+        let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();
         let expected_result =
             SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 25800, Vec::new());
 
@@ -2109,15 +2124,15 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        state::set_state(&mut io, expected_state.clone()).unwrap();
+        state::set_state(&mut io, &expected_state).unwrap();
         let value = Wei::new_u64(1000);
         let args = RefundCallArgs {
-            recipient_address: Default::default(),
+            recipient_address: Address::default(),
             erc20_address: Some(origin),
             amount: RawU256::from(value.raw()),
         };
         let mut handler = Noop;
-        let actual_result = refund_on_error(io, &env, expected_state, args, &mut handler).unwrap();
+        let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();
         let expected_result =
             SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 21344, Vec::new());
 
@@ -2130,15 +2145,15 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        state::set_state(&mut io, expected_state).unwrap();
+        state::set_state(&mut io, &expected_state).unwrap();
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
-            prepaid_amount: Default::default(),
+            prepaid_amount: Wei::default(),
             effective_gas_price: U256::zero(),
             priority_fee_per_gas: U256::zero(),
         };
 
-        refund_unused_gas(&mut io, &origin, 1000, gas_result, &relayer).unwrap();
+        refund_unused_gas(&mut io, &origin, 1000, &gas_result, &relayer).unwrap();
     }
 
     #[test]
@@ -2147,7 +2162,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
-        state::set_state(&mut io, expected_state).unwrap();
+        state::set_state(&mut io, &expected_state).unwrap();
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
             prepaid_amount: Wei::new_u64(8000),
@@ -2156,7 +2171,7 @@ mod tests {
         };
         let gas_used = 4000;
 
-        refund_unused_gas(&mut io, &origin, gas_used, gas_result, &relayer).unwrap();
+        refund_unused_gas(&mut io, &origin, gas_used, &gas_result, &relayer).unwrap();
 
         let actual_refund = get_balance(&io, &origin);
         let expected_refund = Wei::new_u64(gas_used);
@@ -2206,14 +2221,14 @@ mod tests {
         let current_account_id = AccountId::default();
         let mut handler = Noop;
         let logs = vec![Log {
-            address: Default::default(),
+            address: H160::default(),
             topics: vec![],
             data: vec![],
         }];
 
         let actual_logs = filter_promises_from_logs(&io, &mut handler, logs, &current_account_id);
         let expected_logs = vec![ResultLog {
-            address: Default::default(),
+            address: Address::default(),
             topics: vec![],
             data: vec![],
         }];

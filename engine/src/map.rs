@@ -15,7 +15,7 @@ pub struct BijectionMap<L, R, I> {
 impl<L: AsRef<[u8]> + TryFrom<Vec<u8>>, R: AsRef<[u8]> + TryFrom<Vec<u8>>, I: IO>
     BijectionMap<L, R, I>
 {
-    pub fn new(left_prefix: KeyPrefix, right_prefix: KeyPrefix, io: I) -> Self {
+    pub const fn new(left_prefix: KeyPrefix, right_prefix: KeyPrefix, io: I) -> Self {
         Self {
             left_prefix,
             right_prefix,

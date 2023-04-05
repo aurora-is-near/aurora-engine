@@ -1,12 +1,12 @@
 use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::{Address, EthGas};
-use crate::PrecompileOutput;
+use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{Cow, Vec};
 use borsh::BorshSerialize;
 use evm::{Context, ExitError};
 
-/// get_promise_results precompile address
+/// `get_promise_results` precompile address
 ///
 /// Address: `0x0a3540f79be10ef14890e87c1a0040a68cc6af71`
 /// This address is computed as: `&keccak("getPromiseResults")[12..]`
@@ -26,7 +26,7 @@ pub struct PromiseResult<H> {
 }
 
 impl<H> PromiseResult<H> {
-    pub fn new(handler: H) -> Self {
+    pub const fn new(handler: H) -> Self {
         Self { handler }
     }
 }
@@ -42,9 +42,10 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         &self,
         input: &[u8],
         target_gas: Option<EthGas>,
-        _context: &Context,
+        context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let mut cost = Self::required_gas(input)?;
         let check_cost = |cost: EthGas| -> Result<(), ExitError> {
             if let Some(target_gas) = target_gas {
@@ -62,7 +63,10 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         for i in 0..num_promises {
             if let Some(result) = self.handler.ro_promise_result(i) {
                 let n_bytes = u64::try_from(result.size()).map_err(crate::utils::err_usize_conv)?;
-                cost += n_bytes * costs::PROMISE_RESULT_BYTE_COST;
+                cost = EthGas::new(n_bytes)
+                    .checked_mul(costs::PROMISE_RESULT_BYTE_COST)
+                    .and_then(|result| result.checked_add(cost))
+                    .ok_or(ExitError::Other(Cow::Borrowed("ERR_OVERFLOW_NUMBER")))?;
                 check_cost(cost)?;
                 results.push(result);
             }
@@ -84,7 +88,7 @@ mod tests {
     fn test_get_promise_results_precompile_id() {
         assert_eq!(
             promise_result::ADDRESS,
-            near_account_to_evm_address("getPromiseResults".as_bytes())
+            near_account_to_evm_address(b"getPromiseResults")
         );
     }
 }
