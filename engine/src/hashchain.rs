@@ -40,6 +40,7 @@ pub fn set_state<I: IO>(
 /// Blockchain Hashchain
 /// Continually keeps track of the previous block hashchain through the blocks heights.
 #[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug)]
 pub struct BlockchainHashchain {
     chain_id: [u8; 32],
     contract_account_id: Vec<u8>,
@@ -172,6 +173,7 @@ pub mod blockchain_hashchain_error {
 /// 4. Clear the transactions of the current block.
 /// 5. Go back to step 2 for the next block.
 #[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug)]
 struct BlockHashchainComputer {
     txs_logs_bloom: Bloom,
     txs_merkle_tree: StreamCompactMerkleTree,
@@ -188,11 +190,11 @@ impl BlockHashchainComputer {
     /// Adds a transaction.
     pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8], log_bloom: &Bloom) {
         let data = [
-            &method_name.len().to_be_bytes(),
+            &(method_name.len() as u32).to_be_bytes(),
             method_name.as_bytes(),
-            &input.len().to_be_bytes(),
+            &(input.len() as u32).to_be_bytes(),
             input,
-            &output.len().to_be_bytes(),
+            &(output.len() as u32).to_be_bytes(),
             output
         ].concat();
 
@@ -237,6 +239,7 @@ impl BlockHashchainComputer {
 /// Internally, compacts full binary subtrees maintaining only the growing branch.
 /// Space used is O(log n) where n is the number of leaf hashes added. It is usually less.
 #[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug)]
 struct StreamCompactMerkleTree {
     /// Complete binary merkle subtrees.
     /// Left subtrees are strictly higher (bigger).
@@ -330,6 +333,7 @@ impl StreamCompactMerkleTree {
 /// For leaves, this represents only the leaf node with height 1 and the hash of the leaf.
 /// For bigger subtrees, this represents the entire balanced subtree with its height and merkle hash.
 #[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Debug)]
 struct CompactMerkleSubtree {
     /// Height of the subtree.
     height: u8,
@@ -440,7 +444,7 @@ mod blockchain_hashchain_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
+        let data = [&3u32.to_be_bytes(), method_name.as_bytes(), &9u32.to_be_bytes(), input, &10u32.to_be_bytes(), output].concat();
         let tx_hash = keccak(&data).0;
 
         let block_height_2: u64 = 2;
@@ -494,7 +498,7 @@ mod blockchain_hashchain_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
+        let data = [&3u32.to_be_bytes(), method_name.as_bytes(), &9u32.to_be_bytes(), input, &10u32.to_be_bytes(), output].concat();
         let tx_hash = keccak(&data).0;
 
         let block_hashchain_1 = keccak(&1u64.to_be_bytes()).0;
@@ -564,7 +568,7 @@ mod block_hashchain_computer_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
+        let data = [&3u32.to_be_bytes(), method_name.as_bytes(), &9u32.to_be_bytes(), input, &10u32.to_be_bytes(), output].concat();
         let expected_tx_hash = keccak(&data).0;
 
         let mut block_hashchain_computer = BlockHashchainComputer::new();
@@ -626,7 +630,7 @@ mod block_hashchain_computer_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        let data = [&3usize.to_be_bytes(), method_name.as_bytes(), &9usize.to_be_bytes(), input, &10usize.to_be_bytes(), output].concat();
+        let data = [&3u32.to_be_bytes(), method_name.as_bytes(), &9u32.to_be_bytes(), input, &10u32.to_be_bytes(), output].concat();
         let tx_hash = keccak(&data).0;
 
         let block_height: u64 = 2;

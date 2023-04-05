@@ -1,7 +1,7 @@
 use aurora_engine::engine;
 use aurora_engine::parameters::{
-    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs, SubmitArgs,
-    SubmitResult, TransactionStatus,
+    CallArgs, DeployErc20TokenArgs, InitCallArgs, NewCallArgs, PausePrecompilesCallArgs,
+    SetOwnerArgs, SubmitArgs, SubmitResult, TransactionStatus,
 };
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
@@ -48,7 +48,7 @@ impl StandaloneRunner {
         let transaction_hash = H256::zero();
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
-            mocks::init_evm(io, env, chain_id);
+            //mocks::init_evm(io, env, chain_id);
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
@@ -301,6 +301,36 @@ impl StandaloneRunner {
                 Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::SetOwner(call_args);
 
+            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
+        } else if method_name == test_utils::NEW {
+            let call_args = NewCallArgs::try_from_slice(&ctx.input).unwrap();
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::NewEngine(call_args);
+            
+            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
+        } else if method_name == test_utils::NEW_ETH_CONNECTOR {
+            let call_args = InitCallArgs::try_from_slice(&ctx.input).unwrap();
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::NewConnector(call_args);
+            
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
             self.cumulative_diff.append(outcome.diff.clone());
             storage::commit(storage, &outcome);

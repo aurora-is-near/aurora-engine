@@ -35,6 +35,8 @@ pub const PAUSE_PRECOMPILES: &str = "pause_precompiles";
 pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const SET_OWNER: &str = "set_owner";
+pub const NEW: &str = "new";
+pub const NEW_ETH_CONNECTOR: &str = "new_eth_connector";
 
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
@@ -233,7 +235,9 @@ impl AuroraRunner {
                     || method_name == DEPLOY_ERC20
                     || method_name == PAUSE_PRECOMPILES
                     || method_name == RESUME_PRECOMPILES
-                    || method_name == SET_OWNER)
+                    || method_name == SET_OWNER
+                    || method_name == NEW
+                    || method_name == NEW_ETH_CONNECTOR)
             {
                 standalone_runner
                     .submit_raw(method_name, &self.context, &self.promise_results)
@@ -659,7 +663,12 @@ impl ExecutionProfile {
 }
 
 pub fn deploy_evm() -> AuroraRunner {
+    let mut standalone_runner = standalone::StandaloneRunner::default();
+    standalone_runner.init_evm();
+
     let mut runner = AuroraRunner::default();
+    runner.standalone_runner = Some(standalone_runner);
+
     let args = NewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: str_to_account_id(runner.aurora_account_id.as_str()),
@@ -682,12 +691,7 @@ pub fn deploy_evm() -> AuroraRunner {
 
     assert!(maybe_error.is_none());
 
-    let mut standalone_runner = standalone::StandaloneRunner::default();
-    standalone_runner.init_evm();
-
-    runner.standalone_runner = Some(standalone_runner);
     runner.validate_standalone();
-
     runner
 }
 
