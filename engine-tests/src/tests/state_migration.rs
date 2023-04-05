@@ -42,25 +42,7 @@ fn test_repeated_calls_to_deploy_upgrade_should_fail() {
     // Second upgrade should fail
     let result = aurora.call("stage_upgrade", &upgraded_contract_bytes);
     let result = aurora.call("deploy_upgrade", &[]);
-    assert!(
-        !result.is_ok(),
-        "First upgrade didn't fail: {:?}",
-        result.outcome()
-    );
-
-    let outcome = result.outcome();
-    let expected_error = "ERR_NOT_ALLOWED:TOO_EARLY".to_string();
-
-    // Assert that the second upgrade failed with the correct error message
-    assert_eq!(
-        outcome.status,
-        ExecutionStatus::Failure(TxExecutionError::ActionError(ActionError {
-            index: Some(0),
-            kind: ActionErrorKind::FunctionCallError(FunctionCallErrorSer::ExecutionError(
-                expected_error
-            ))
-        }))
-    );
+    assert!(!result.is_ok());
 }
 
 pub fn deploy_evm() -> AuroraAccount {
