@@ -3,7 +3,10 @@ use crate::test_utils::{self, str_to_account_id, AuroraRunner};
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
 use borsh::BorshSerialize;
+use near_primitives::errors::{ActionError, ActionErrorKind, TxExecutionError};
+use near_primitives::transaction::ExecutionStatus;
 use near_sdk_sim::{ExecutionResult, UserAccount};
+use near_vm_errors::FunctionCallErrorSer;
 use std::fs;
 use std::path::Path;
 
@@ -23,6 +26,41 @@ fn test_state_migration() {
     result.assert_success();
     let some_numbers: [u32; 7] = result.unwrap_borsh();
     assert_eq!(some_numbers, [3, 1, 4, 1, 5, 9, 2]);
+}
+
+#[test]
+fn test_repeated_calls_to_deploy_upgrade_should_fail() {
+    let aurora = deploy_evm();
+
+    // First upgrade should succeed
+    let upgraded_contract_bytes = contract_bytes();
+    aurora
+        .call("stage_upgrade", &upgraded_contract_bytes)
+        .assert_success();
+    aurora.call("deploy_upgrade", &[]).assert_success();
+
+    // Second upgrade should fail
+    let result = aurora.call("stage_upgrade", &upgraded_contract_bytes);
+    let result = aurora.call("deploy_upgrade", &[]);
+    assert!(
+        !result.is_ok(),
+        "First upgrade didn't fail: {:?}",
+        result.outcome()
+    );
+
+    let outcome = result.outcome();
+    let expected_error = "ERR_NOT_ALLOWED:TOO_EARLY".to_string();
+
+    // Assert that the second upgrade failed with the correct error message
+    assert_eq!(
+        outcome.status,
+        ExecutionStatus::Failure(TxExecutionError::ActionError(ActionError {
+            index: Some(0),
+            kind: ActionErrorKind::FunctionCallError(FunctionCallErrorSer::ExecutionError(
+                expected_error
+            ))
+        }))
+    );
 }
 
 pub fn deploy_evm() -> AuroraAccount {
