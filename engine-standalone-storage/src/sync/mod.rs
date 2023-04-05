@@ -443,7 +443,7 @@ fn non_submit_execute<'db>(
         TransactionKind::SetUpgradeDelayBlocks(args) => {
             let mut prev = state::get_state(&io)?;
 
-            prev.upgrade_delay_blocks = args.clone().upgrade_delay_blocks;
+            prev.upgrade_delay_blocks = args.upgrade_delay_blocks;
             state::set_state(&mut io, &prev)?;
 
             None
