@@ -19,19 +19,19 @@ fn test_consume_snapshot() {
     // check accounts to see they were written properly
     runner.env.block_height = snapshot.result.block_height + 1;
     for entry in snapshot.result.values {
-        let key = base64::decode(entry.key).unwrap();
-        let value = base64::decode(entry.value).unwrap();
+        let key = aurora_engine_sdk::base64::decode(entry.key).unwrap();
+        let value = aurora_engine_sdk::base64::decode(entry.value).unwrap();
         if key.as_slice().starts_with(&NONCE_PREFIX) {
             let address = address_from_key(&key);
             let nonce = U256::from_big_endian(&value);
-            assert_eq!(nonce, runner.get_nonce(&address))
+            assert_eq!(nonce, runner.get_nonce(&address));
         } else if key.as_slice().starts_with(&BALANCE_PREFIX) {
             let address = address_from_key(&key);
             let balance = U256::from_big_endian(&value);
-            assert_eq!(balance, runner.get_balance(&address).raw())
+            assert_eq!(balance, runner.get_balance(&address).raw());
         } else if key.as_slice().starts_with(&CODE_PREFIX) {
             let address = address_from_key(&key);
-            assert_eq!(value, runner.get_code(&address))
+            assert_eq!(value, runner.get_code(&address));
         }
     }
 
@@ -45,7 +45,7 @@ fn test_produce_snapshot() {
     )
     .unwrap();
     let mut runner = standalone::StandaloneRunner {
-        chain_id: 1313161554,
+        chain_id: 1_313_161_554,
         ..Default::default()
     };
     runner
@@ -79,9 +79,9 @@ fn test_produce_snapshot() {
         .unwrap();
 
     // Computed snapshot should exactly the same keys from initial snapshot
-    for entry in snapshot.result.values.iter() {
-        let key = base64::decode(&entry.key).unwrap();
-        let value = base64::decode(&entry.value).unwrap();
+    for entry in &snapshot.result.values {
+        let key = aurora_engine_sdk::base64::decode(&entry.key).unwrap();
+        let value = aurora_engine_sdk::base64::decode(&entry.value).unwrap();
         assert_eq!(computed_snapshot.remove(&key).unwrap(), value);
     }
     assert!(computed_snapshot.is_empty());
@@ -94,12 +94,12 @@ fn test_produce_snapshot() {
 
     // New snapshot should still contain all keys from initial snapshot
     for entry in snapshot.result.values {
-        let key = base64::decode(entry.key).unwrap();
+        let key = aurora_engine_sdk::base64::decode(entry.key).unwrap();
         // skip the eth-connector keys; they were changed by minting the new account
         if key[0..3] == [7, 6, 1] {
             continue;
         }
-        let value = base64::decode(entry.value).unwrap();
+        let value = aurora_engine_sdk::base64::decode(entry.value).unwrap();
         assert_eq!(computed_snapshot.get(&key).unwrap(), &value);
     }
 

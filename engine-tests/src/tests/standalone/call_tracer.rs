@@ -1,3 +1,4 @@
+use crate::prelude::H256;
 use crate::test_utils::{self, standalone};
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
@@ -11,6 +12,34 @@ use engine_standalone_tracing::{
     sputnik,
     types::call_tracer::{self, CallTracer},
 };
+
+#[test]
+fn test_trace_contract_deploy() {
+    let mut runner = standalone::StandaloneRunner::default();
+    let mut signer = test_utils::Signer::random();
+
+    runner.init_evm();
+
+    let constructor = test_utils::erc20::ERC20Constructor::load();
+    let deploy_tx = constructor.deploy("Test", "TST", signer.use_nonce().into());
+    let mut listener = CallTracer::default();
+    let deploy_result = sputnik::traced_call(&mut listener, || {
+        runner
+            .submit_transaction(&signer.secret_key, deploy_tx)
+            .unwrap()
+    });
+    let contract_address = {
+        let bytes = test_utils::unwrap_success_slice(&deploy_result);
+        Address::try_from_slice(bytes).unwrap()
+    };
+    let code = runner.get_code(&contract_address);
+
+    assert_eq!(listener.call_stack.len(), 1);
+    let trace = listener.call_stack.pop().unwrap();
+
+    assert_eq!(trace.to, Some(contract_address));
+    assert_eq!(trace.output, code);
+}
 
 #[test]
 fn test_trace_precompile_direct_call() {
@@ -120,14 +149,15 @@ fn test_trace_contract_with_sub_call() {
 
     context.approve_erc20(&token_a, context.swap_router.0.address, U256::MAX);
     context.approve_erc20(&token_b, context.swap_router.0.address, U256::MAX);
-    let params = context.exact_output_single_params(OUTPUT_AMOUNT.into(), &token_a, &token_b);
+    let params =
+        UniswapTestContext::exact_output_single_params(OUTPUT_AMOUNT.into(), &token_a, &token_b);
 
     let mut listener = CallTracer::default();
     let (_amount_in, _profile) = sputnik::traced_call(&mut listener, || {
         context
             .runner
             .submit_with_signer_profiled(&mut context.signer, |nonce| {
-                context.swap_router.exact_output_single(params, nonce)
+                context.swap_router.exact_output_single(&params, nonce)
             })
             .unwrap()
     });
@@ -253,7 +283,7 @@ fn test_trace_precompiles_with_subcalls() {
         let env = &runner.env;
 
         let mut tx =
-            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, Default::default(), &[]);
+            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
         tx.transaction = sync::types::TransactionKind::DeployErc20(
             aurora_engine::parameters::DeployErc20TokenArgs {
                 nep141: "wrap.near".parse().unwrap(),
@@ -278,7 +308,7 @@ fn test_trace_precompiles_with_subcalls() {
         let env = &runner.env;
 
         let mut tx =
-            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, Default::default(), &[]);
+            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
         tx.transaction = sync::types::TransactionKind::FactoryUpdate(xcc_router_bytes);
         tx
     };
@@ -290,7 +320,7 @@ fn test_trace_precompiles_with_subcalls() {
         let env = &runner.env;
 
         let mut tx =
-            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, Default::default(), &[]);
+            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
         tx.transaction = sync::types::TransactionKind::FactorySetWNearAddress(wnear_address);
         tx
     };
@@ -338,9 +368,9 @@ fn test_trace_precompiles_with_subcalls() {
 /// The `path` gives the index to pull out of each `calls` array.
 /// For example `path == []` simply returns the given `root`, while
 /// `path == [2, 0]` will return `root.calls[2].calls[0]`.
-fn subcall_lense<'a, 'b>(
+fn subcall_lense<'a>(
     root: &'a call_tracer::CallFrame,
-    path: &'b [usize],
+    path: &[usize],
 ) -> &'a call_tracer::CallFrame {
     let mut result = root;
     for index in path {

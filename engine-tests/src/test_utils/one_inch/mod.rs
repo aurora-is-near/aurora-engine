@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Once;
 
-pub(crate) mod liquidity_protocol;
+pub mod liquidity_protocol;
 
-pub(crate) fn download_and_compile_solidity_sources(
+pub fn download_and_compile_solidity_sources(
     repo_name: &str,
     download_once: &'static Once,
     compile_once: &'static Once,
@@ -14,7 +14,7 @@ pub(crate) fn download_and_compile_solidity_sources(
         // Contracts not already present, so download them (but only once, even
         // if multiple tests running in parallel saw `contracts_dir` does not exist).
         download_once.call_once(|| {
-            let url = format!("https://github.com/1inch/{}", repo_name);
+            let url = format!("https://github.com/1inch/{repo_name}");
             let repo = git2::Repository::clone(&url, &sources_dir).unwrap();
             if repo_name == "limit-order-protocol" {
                 // We need to checkout a specific commit because the code in the current `master`

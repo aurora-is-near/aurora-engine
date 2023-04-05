@@ -40,7 +40,7 @@ pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 /// Contains:
 /// * connector specific data
 /// * Fungible token data
-/// * paused_mask - admin control flow data
+/// * `paused_mask` - admin control flow data
 /// * io - I/O trait handler
 pub struct EthConnectorContract<I: IO> {
     contract: EthConnector,
@@ -64,10 +64,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Used as single point of contract access for various contract actions
     pub fn init_instance(io: I) -> Result<Self, error::StorageReadError> {
         Ok(Self {
-            contract: get_contract_data(&io, &EthConnectorStorageId::Contract)?,
-            ft: get_contract_data::<FungibleToken, I>(&io, &EthConnectorStorageId::FungibleToken)?
+            contract: get_contract_data(&io, EthConnectorStorageId::Contract)?,
+            ft: get_contract_data::<FungibleToken, I>(&io, EthConnectorStorageId::FungibleToken)?
                 .ops(io),
-            paused_mask: get_contract_data(&io, &EthConnectorStorageId::PausedMask)?,
+            paused_mask: get_contract_data(&io, EthConnectorStorageId::PausedMask)?,
             io,
         })
     }
@@ -77,12 +77,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// Initialized contract data stored in the storage.
     pub fn create_contract(
         mut io: I,
-        owner_id: AccountId,
+        owner_id: &AccountId,
         args: InitCallArgs,
     ) -> Result<(), error::InitContractError> {
         // Check is it already initialized
         let contract_key_exists =
-            io.storage_has_key(&construct_contract_key(&EthConnectorStorageId::Contract));
+            io.storage_has_key(&construct_contract_key(EthConnectorStorageId::Contract));
         if contract_key_exists {
             return Err(error::InitContractError::AlreadyInitialized);
         }
@@ -101,11 +101,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         let mut ft = FungibleTokenOps::new(io);
         // Register FT account for current contract
-        ft.internal_register_account(&owner_id);
+        ft.internal_register_account(owner_id);
 
         let paused_mask = UNPAUSE_ALL;
         io.write_borsh(
-            &construct_contract_key(&EthConnectorStorageId::PausedMask),
+            &construct_contract_key(EthConnectorStorageId::PausedMask),
             &paused_mask,
         );
 
@@ -257,7 +257,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         // Mint tokens to recipient minus fee
         if let Some(msg) = data.msg {
             // Mint - calculate new balances
-            self.mint_eth_on_near(data.new_owner_id, data.amount)?;
+            self.mint_eth_on_near(&data.new_owner_id, data.amount)?;
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key)?;
             // Save new contract data
@@ -273,10 +273,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         } else {
             // Mint - calculate new balances
             self.mint_eth_on_near(
-                data.new_owner_id.clone(),
+                &data.new_owner_id.clone(),
                 data.amount - NEP141Wei::new(data.fee.as_u128()),
             )?;
-            self.mint_eth_on_near(data.relayer_id, NEP141Wei::new(data.fee.as_u128()))?;
+            self.mint_eth_on_near(&data.relayer_id, NEP141Wei::new(data.fee.as_u128()))?;
             // Store proof only after `mint` calculations
             self.record_proof(&data.proof_key)?;
             // Save new contract data
@@ -307,18 +307,18 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
-    ///  Mint nETH tokens
+    ///  Mint `nETH` tokens
     fn mint_eth_on_near(
         &mut self,
-        owner_id: AccountId,
+        owner_id: &AccountId,
         amount: NEP141Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
         sdk::log!("Mint {} nETH tokens for: {}", amount, owner_id);
 
-        if self.ft.get_account_eth_balance(&owner_id).is_none() {
-            self.ft.accounts_insert(&owner_id, ZERO_NEP141_WEI);
+        if self.ft.get_account_eth_balance(owner_id).is_none() {
+            self.ft.accounts_insert(owner_id, ZERO_NEP141_WEI);
         }
-        self.ft.internal_deposit_eth_to_near(&owner_id, amount)
+        self.ft.internal_deposit_eth_to_near(owner_id, amount)
     }
 
     ///  Mint ETH tokens
@@ -339,13 +339,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         self.ft.internal_withdraw_eth_from_aurora(amount)
     }
 
-    /// Withdraw nETH from NEAR accounts
+    /// Withdraw `nETH` from NEAR accounts
     /// NOTE: it should be without any log data
     pub fn withdraw_eth_from_near(
         &mut self,
         current_account_id: &AccountId,
         predecessor_account_id: &AccountId,
-        args: WithdrawCallArgs,
+        args: &WithdrawCallArgs,
     ) -> Result<WithdrawResult, error::WithdrawError> {
         // Check is current account id is owner
         let is_owner = current_account_id == predecessor_account_id;
@@ -366,12 +366,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         })
     }
 
-    /// Returns total ETH supply on NEAR (nETH as NEP-141 token)
+    /// Returns total ETH supply on NEAR (`nETH` as NEP-141 token)
     pub fn ft_total_eth_supply_on_near(&mut self) {
         let total_supply = self.ft.ft_total_eth_supply_on_near();
         sdk::log!("Total ETH supply on NEAR: {}", total_supply);
         self.io
-            .return_output(format!("\"{}\"", total_supply).as_bytes());
+            .return_output(format!("\"{total_supply}\"").as_bytes());
     }
 
     /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
@@ -379,27 +379,27 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let total_supply = self.ft.ft_total_eth_supply_on_aurora();
         sdk::log!("Total ETH supply on Aurora: {}", total_supply);
         self.io
-            .return_output(format!("\"{}\"", total_supply).as_bytes());
+            .return_output(format!("\"{total_supply}\"").as_bytes());
     }
 
-    /// Return balance of nETH (ETH on Near)
-    pub fn ft_balance_of(&mut self, args: BalanceOfCallArgs) {
+    /// Return balance of `nETH` (ETH on Near)
+    pub fn ft_balance_of(&mut self, args: &BalanceOfCallArgs) {
         let balance = self.ft.ft_balance_of(&args.account_id);
         sdk::log!("Balance of nETH [{}]: {}", args.account_id, balance);
 
-        self.io.return_output(format!("\"{}\"", balance).as_bytes());
+        self.io.return_output(format!("\"{balance}\"").as_bytes());
     }
 
     /// Return balance of ETH (ETH in Aurora EVM)
     pub fn ft_balance_of_eth_on_aurora(
         &mut self,
-        args: BalanceOfEthCallArgs,
+        args: &BalanceOfEthCallArgs,
     ) -> Result<(), crate::prelude::types::balance::error::BalanceOverflowError> {
         let balance = self
             .ft
             .internal_unwrap_balance_of_eth_on_aurora(&args.address);
         sdk::log!("Balance of ETH [{}]: {}", args.address.encode(), balance);
-        self.io.return_output(format!("\"{}\"", balance).as_bytes());
+        self.io.return_output(format!("\"{balance}\"").as_bytes());
         Ok(())
     }
 
@@ -407,7 +407,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_transfer(
         &mut self,
         predecessor_account_id: &AccountId,
-        args: TransferCallArgs,
+        args: &TransferCallArgs,
     ) -> Result<(), fungible_token::error::TransferError> {
         self.ft.internal_transfer_eth_on_near(
             predecessor_account_id,
@@ -428,7 +428,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     /// FT resolve transfer logic
     pub fn ft_resolve_transfer(
         &mut self,
-        args: ResolveTransferCallArgs,
+        args: &ResolveTransferCallArgs,
         promise_result: PromiseResult,
     ) {
         let amount = self.ft.ft_resolve_transfer(
@@ -444,7 +444,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         );
         // `ft_resolve_transfer` can change `total_supply` so we should save the contract
         self.save_ft_contract();
-        self.io.return_output(format!("\"{}\"", amount).as_bytes());
+        self.io.return_output(format!("\"{amount}\"").as_bytes());
     }
 
     /// FT transfer call from sender account (invoker account) to receiver
@@ -558,7 +558,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn storage_withdraw(
         &mut self,
         account_id: &AccountId,
-        args: StorageWithdrawCallArgs,
+        args: &StorageWithdrawCallArgs,
     ) -> Result<(), fungible_token::error::StorageFundingError> {
         let res = self.ft.storage_withdraw(account_id, args.amount)?;
         self.save_ft_contract();
@@ -567,15 +567,15 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Get balance of storage
-    pub fn storage_balance_of(&mut self, args: StorageBalanceOfCallArgs) {
+    pub fn storage_balance_of(&mut self, args: &StorageBalanceOfCallArgs) {
         self.io
             .return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
     }
 
-    /// ft_on_transfer callback function
-    pub fn ft_on_transfer<'env, E: Env>(
+    /// `ft_on_transfer` callback function
+    pub fn ft_on_transfer<E: Env>(
         &mut self,
-        engine: &Engine<'env, I, E>,
+        engine: &Engine<I, E>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
@@ -589,10 +589,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
         match (wei_fee, relayer) {
             (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
-                self.mint_eth_on_aurora(
-                    message_data.recipient,
-                    Wei::new(U256::from(args.amount.as_u128())) - fee,
-                )?;
+                let eth_amount = Wei::new_u128(args.amount.as_u128())
+                    .checked_sub(fee)
+                    .ok_or(error::FtTransferCallError::InsufficientAmountForFee)?;
+                self.mint_eth_on_aurora(message_data.recipient, eth_amount)?;
                 self.mint_eth_on_aurora(evm_relayer_address, fee)?;
             }
             _ => self.mint_eth_on_aurora(
@@ -601,7 +601,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             )?,
         }
         self.save_ft_contract();
-        self.io.return_output("\"0\"".as_bytes());
+        self.io.return_output(b"\"0\"");
         Ok(())
     }
 
@@ -612,37 +612,37 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .return_output(&self.ft.get_accounts_counter().to_le_bytes());
     }
 
-    pub fn get_bridge_prover(&self) -> &AccountId {
+    pub const fn get_bridge_prover(&self) -> &AccountId {
         &self.contract.prover_account
     }
 
     /// Save eth-connector fungible token contract data
     fn save_ft_contract(&mut self) {
         self.io.write_borsh(
-            &construct_contract_key(&EthConnectorStorageId::FungibleToken),
+            &construct_contract_key(EthConnectorStorageId::FungibleToken),
             &self.ft.data(),
         );
     }
 
     /// Generate key for used events from Proof
-    fn used_event_key(&self, key: &str) -> Vec<u8> {
-        let mut v = construct_contract_key(&EthConnectorStorageId::UsedEvent).to_vec();
+    fn used_event_key(key: &str) -> Vec<u8> {
+        let mut v = construct_contract_key(EthConnectorStorageId::UsedEvent);
         v.extend_from_slice(key.as_bytes());
         v
     }
 
     /// Save already used event proof as hash key
     fn save_used_event(&mut self, key: &str) {
-        self.io.write_borsh(&self.used_event_key(key), &0u8);
+        self.io.write_borsh(&Self::used_event_key(key), &0u8);
     }
 
     /// Check is event of proof already used
     fn is_used_event(&self, key: &str) -> bool {
-        self.io.storage_has_key(&self.used_event_key(key))
+        self.io.storage_has_key(&Self::used_event_key(key))
     }
 
     /// Checks whether the provided proof was already used
-    pub fn is_used_proof(&self, proof: Proof) -> bool {
+    pub fn is_used_proof(&self, proof: &Proof) -> bool {
         self.is_used_event(&proof.key())
     }
 
@@ -652,7 +652,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Set Eth connector paused flags
-    pub fn set_paused_flags(&mut self, args: PauseEthConnectorCallArgs) {
+    pub fn set_paused_flags(&mut self, args: &PauseEthConnectorCallArgs) {
         self.set_paused(args.paused_mask);
     }
 }
@@ -667,19 +667,19 @@ impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
     fn set_paused(&mut self, paused_mask: PausedMask) {
         self.paused_mask = paused_mask;
         self.io.write_borsh(
-            &construct_contract_key(&EthConnectorStorageId::PausedMask),
+            &construct_contract_key(EthConnectorStorageId::PausedMask),
             &self.paused_mask,
         );
     }
 }
 
-fn construct_contract_key(suffix: &EthConnectorStorageId) -> Vec<u8> {
-    crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[u8::from(*suffix)])
+fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
+    crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[u8::from(suffix)])
 }
 
 fn get_contract_data<T: BorshDeserialize, I: IO>(
     io: &I,
-    suffix: &EthConnectorStorageId,
+    suffix: EthConnectorStorageId,
 ) -> Result<T, error::StorageReadError> {
     io.read_storage(&construct_contract_key(suffix))
         .ok_or(error::StorageReadError::KeyNotFound)
@@ -701,22 +701,22 @@ pub fn set_contract_data<I: IO>(
     };
     // Save eth-connector specific data
     io.write_borsh(
-        &construct_contract_key(&EthConnectorStorageId::Contract),
+        &construct_contract_key(EthConnectorStorageId::Contract),
         &contract_data,
     );
 
     io.write_borsh(
-        &construct_contract_key(&EthConnectorStorageId::FungibleTokenMetadata),
+        &construct_contract_key(EthConnectorStorageId::FungibleTokenMetadata),
         &args.metadata,
     );
 
     Ok(contract_data)
 }
 
-/// Return metdata
+/// Return metadata
 pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
     io.read_storage(&construct_contract_key(
-        &EthConnectorStorageId::FungibleTokenMetadata,
+        EthConnectorStorageId::FungibleTokenMetadata,
     ))
     .and_then(|data| data.to_value().ok())
 }

@@ -43,6 +43,9 @@ fn test_exploit_fix() {
     let input = view_call_args.try_to_vec().unwrap();
 
     let (_outcome, maybe_error) = runner.one_shot().call("view", "viewer", input);
-    let error_message = format!("{:?}", maybe_error);
-    assert!(error_message.contains("ERR_ILLEGAL_RETURN"));
+    let error_message = format!("{maybe_error:?}");
+    assert!(
+        error_message.contains("ERR_ILLEGAL_RETURN"),
+        "{error_message}",
+    );
 }

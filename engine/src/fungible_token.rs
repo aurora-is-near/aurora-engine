@@ -1,18 +1,18 @@
 use crate::connector::ZERO_ATTACHED_BALANCE;
 use crate::engine;
-use crate::json::{parse_json, JsonValue};
 use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
 use crate::prelude::account_id::AccountId;
 use crate::prelude::Wei;
 use crate::prelude::{
-    sdk, storage, vec, Address, BTreeMap, Balance, BorshDeserialize, BorshSerialize, NearGas,
-    PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseResult, PromiseWithCallbackArgs,
+    sdk, storage, vec, Address, Balance, BorshDeserialize, BorshSerialize, NearGas, PromiseAction,
+    PromiseBatchAction, PromiseCreateArgs, PromiseResult, PromiseWithCallbackArgs,
     StorageBalanceBounds, StorageUsage, String, ToString, Vec,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::types::{NEP141Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO};
+use serde::{Deserialize, Serialize};
 
-/// Gas for `resolve_transfer`: 5 TGas
+/// Gas for `resolve_transfer`: 5 `TGas`
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
 /// Gas for `ft_on_transfer`
 const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(35_000_000_000_000);
@@ -56,14 +56,15 @@ pub struct FungibleTokenOps<I: IO> {
 }
 
 /// Fungible token Reference hash type.
-/// Used for FungibleTokenMetadata
-#[derive(Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
+/// Used for `FungibleTokenMetadata`
+#[derive(Debug, BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct FungibleReferenceHash([u8; 32]);
 
 impl FungibleReferenceHash {
     /// Encode to base64-encoded string
+    #[must_use]
     pub fn encode(&self) -> String {
-        base64::encode(self)
+        aurora_engine_sdk::base64::encode(self)
     }
 }
 
@@ -73,7 +74,7 @@ impl AsRef<[u8]> for FungibleReferenceHash {
     }
 }
 
-#[derive(Debug, BorshDeserialize, BorshSerialize, Clone, PartialEq, Eq)]
+#[derive(Debug, BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct FungibleTokenMetadata {
     pub spec: String,
     pub name: String,
@@ -95,42 +96,6 @@ impl Default for FungibleTokenMetadata {
             reference_hash: None,
             decimals: 18,
         }
-    }
-}
-
-impl From<FungibleTokenMetadata> for JsonValue {
-    fn from(metadata: FungibleTokenMetadata) -> Self {
-        let mut kvs = BTreeMap::new();
-        kvs.insert("spec".to_string(), JsonValue::String(metadata.spec));
-        kvs.insert("name".to_string(), JsonValue::String(metadata.name));
-        kvs.insert("symbol".to_string(), JsonValue::String(metadata.symbol));
-        kvs.insert(
-            "icon".to_string(),
-            metadata
-                .icon
-                .map(JsonValue::String)
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "reference".to_string(),
-            metadata
-                .reference
-                .map(JsonValue::String)
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "reference_hash".to_string(),
-            metadata
-                .reference_hash
-                .map(|hash| JsonValue::String(hash.encode()))
-                .unwrap_or(JsonValue::Null),
-        );
-        kvs.insert(
-            "decimals".to_string(),
-            JsonValue::U64(u64::from(metadata.decimals)),
-        );
-
-        JsonValue::Object(kvs)
     }
 }
 
@@ -156,7 +121,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         engine::get_balance(&self.io, address)
     }
 
-    /// Internal ETH deposit to NEAR - nETH (NEP-141)
+    /// Internal ETH deposit to NEAR - `nETH` (NEP-141)
     pub fn internal_deposit_eth_to_near(
         &mut self,
         account_id: &AccountId,
@@ -246,7 +211,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             // Register receiver_id account with 0 balance. We need it because
             // when we retire to get the balance of `receiver_id` it will fail
             // if it does not exist.
-            self.internal_register_account(receiver_id)
+            self.internal_register_account(receiver_id);
         }
         self.internal_withdraw_eth_from_near(sender_id, amount)?;
         self.internal_deposit_eth_to_near(receiver_id, amount)?;
@@ -259,14 +224,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     }
 
     pub fn internal_register_account(&mut self, account_id: &AccountId) {
-        self.accounts_insert(account_id, ZERO_NEP141_WEI)
+        self.accounts_insert(account_id, ZERO_NEP141_WEI);
     }
 
-    pub fn ft_total_eth_supply_on_near(&self) -> NEP141Wei {
+    pub const fn ft_total_eth_supply_on_near(&self) -> NEP141Wei {
         self.total_eth_supply_on_near
     }
 
-    pub fn ft_total_eth_supply_on_aurora(&self) -> Wei {
+    pub const fn ft_total_eth_supply_on_aurora(&self) -> Wei {
         self.total_eth_supply_on_aurora
     }
 
@@ -286,16 +251,22 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         current_account_id: AccountId,
         prepaid_gas: NearGas,
     ) -> Result<PromiseWithCallbackArgs, error::TransferError> {
+        // check balance to prevent setting an arbitrary value for `amount` for (receiver_id == receiver_id).
+        let balance = self
+            .get_account_eth_balance(&sender_id)
+            .unwrap_or(ZERO_NEP141_WEI);
+        if amount > balance {
+            return Err(error::TransferError::InsufficientFunds);
+        }
         // Special case for Aurora transfer itself - we shouldn't transfer
         if sender_id != receiver_id {
             self.internal_transfer_eth_on_near(&sender_id, &receiver_id, amount, memo)?;
         }
-        let data1: String = NEP141FtOnTransferArgs {
+        let args = serde_json::to_vec(&NEP141FtOnTransferArgs {
+            sender_id: sender_id.clone(),
             amount: Balance::new(amount.as_u128()),
             msg,
-            sender_id: sender_id.clone(),
-        }
-        .try_into()
+        })
         .unwrap();
 
         let data2 = ResolveTransferCallArgs {
@@ -309,7 +280,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         let ft_on_transfer_call = PromiseCreateArgs {
             target_account_id: receiver_id,
             method: "ft_on_transfer".to_string(),
-            args: data1.into_bytes(),
+            args,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: prepaid_gas - GAS_FOR_FT_TRANSFER_CALL - GAS_FOR_RESOLVE_TRANSFER,
         };
@@ -336,20 +307,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         // Get the unused amount from the `ft_on_transfer` call result.
         let unused_amount = match promise_result {
             PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(value) => {
-                if let Some(raw_unused_amount) =
-                    parse_json(value.as_slice()).and_then(|x| (&x).try_into().ok())
-                {
-                    let unused_amount = NEP141Wei::new(raw_unused_amount);
-                    // let unused_amount = Balance::from(raw_unused_amount);
+            PromiseResult::Successful(bytes) => {
+                serde_json::from_slice(&bytes).map_or(amount, |unused_amount| {
                     if amount > unused_amount {
                         unused_amount
                     } else {
                         amount
                     }
-                } else {
-                    amount
-                }
+                })
             }
             PromiseResult::Failed => amount,
         };
@@ -503,24 +468,24 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         Ok((balance, promise))
     }
 
+    #[allow(clippy::option_if_let_else)]
     pub fn storage_withdraw(
         &mut self,
         account_id: &AccountId,
         amount: Option<Yocto>,
     ) -> Result<StorageBalance, error::StorageFundingError> {
-        if let Some(storage_balance) = self.internal_storage_balance_of(account_id) {
-            match amount {
+        self.internal_storage_balance_of(account_id).map_or(
+            Err(error::StorageFundingError::NotRegistered),
+            |storage_balance| match amount {
                 Some(amount) if amount > ZERO_YOCTO => {
                     // The available balance is always zero because `StorageBalanceBounds::max` is
-                    // equal to `StorageBalanceBounds::min`. Therefore it is impossible to withdraw
+                    // equal to `StorageBalanceBounds::min`. Therefore, it is impossible to withdraw
                     // a positive amount.
                     Err(error::StorageFundingError::NoAvailableBalance)
                 }
                 _ => Ok(storage_balance),
-            }
-        } else {
-            Err(error::StorageFundingError::NotRegistered)
-        }
+            },
+        )
     }
 
     /// Insert account.
@@ -554,7 +519,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         self.io.remove_storage(&Self::account_to_key(account_id));
     }
 
-    /// Balance of nETH (ETH on NEAR token)
+    /// Balance of `nETH` (ETH on NEAR token)
     pub fn get_account_eth_balance(&self, account_id: &AccountId) -> Option<NEP141Wei> {
         self.io
             .read_storage(&Self::account_to_key(account_id))

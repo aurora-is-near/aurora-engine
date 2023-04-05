@@ -15,21 +15,20 @@ autobenches = false
 [dependencies]
 
 [dev-dependencies]
-aurora-engine = { path = "../engine", default-features = false, features = ["std", "tracing"] }
+aurora-engine = { path = "../engine", default-features = false, features = ["std", "tracing", "impl-serde"] }
 aurora-engine-test-doubles = { path = "../engine-test-doubles", default-features = false }
-aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
+aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std", "impl-serde"] }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false, features = ["std"] }
-aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
+aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std", "impl-serde"] }
 engine-standalone-storage = { path = "../engine-standalone-storage" }
 engine-standalone-tracing = { path = "../engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
-borsh = { version = "0.9.3", default-features = false }
+borsh = { version = "0.10", default-features = false }
 sha3 = { version = "0.10.2", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.3-aurora", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.3-aurora", default-features = false, features = ["std", "tracing"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.3-aurora", default-features = false, features = ["std", "tracing"] }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
 rlp = { version = "0.5.0", default-features = false }
-base64 = "0.13.0"
 bstr = "1.0.1"
 byte-slice-cast = { version = "1.0", default-features = false }
 ethabi = "18.0"
@@ -47,7 +46,7 @@ near-primitives = { git = "https://github.com/birchmd/nearcore.git", rev = "6033
 libsecp256k1 = { version = "0.7.0", default-features = false }
 rand = "0.8.5"
 criterion = "0.4.0"
-git2 = "0.15"
+git2 = "0.16"
 tempfile = "3.2.0"
 walrus = "0.19"
 

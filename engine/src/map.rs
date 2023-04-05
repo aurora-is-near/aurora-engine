@@ -15,7 +15,7 @@ pub struct BijectionMap<L, R, I> {
 impl<L: AsRef<[u8]> + TryFrom<Vec<u8>>, R: AsRef<[u8]> + TryFrom<Vec<u8>>, I: IO>
     BijectionMap<L, R, I>
 {
-    pub fn new(left_prefix: KeyPrefix, right_prefix: KeyPrefix, io: I) -> Self {
+    pub const fn new(left_prefix: KeyPrefix, right_prefix: KeyPrefix, io: I) -> Self {
         Self {
             left_prefix,
             right_prefix,
@@ -66,9 +66,9 @@ mod tests {
         use aurora_engine_test_doubles::io::{Storage, StoragePointer};
         use aurora_engine_types::account_id::AccountId;
         use aurora_engine_types::types::Address;
-        use std::sync::RwLock;
+        use std::cell::RefCell;
 
-        let storage = RwLock::new(Storage::default());
+        let storage = RefCell::new(Storage::default());
         let storage = StoragePointer(&storage);
         let left_prefix = KeyPrefix::Nep141Erc20Map;
         let right_prefix = KeyPrefix::Erc20Nep141Map;

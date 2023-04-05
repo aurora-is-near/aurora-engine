@@ -1,3 +1,10 @@
+#![deny(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::similar_names,
+    clippy::module_name_repetitions,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc
+)]
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{account_id::AccountId, H256};
 use rocksdb::DB;
@@ -35,6 +42,21 @@ pub enum StoragePrefix {
     Engine = 0x05,
     BlockMetadata = 0x06,
     EngineAccountId = 0x07,
+}
+
+impl From<StoragePrefix> for u8 {
+    fn from(value: StoragePrefix) -> Self {
+        match value {
+            StoragePrefix::BlockHash => 0x00,
+            StoragePrefix::BlockHeight => 0x01,
+            StoragePrefix::TransactionData => 0x02,
+            StoragePrefix::TransactionHash => 0x03,
+            StoragePrefix::Diff => 0x04,
+            StoragePrefix::Engine => 0x05,
+            StoragePrefix::BlockMetadata => 0x06,
+            StoragePrefix::EngineAccountId => 0x07,
+        }
+    }
 }
 
 const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
@@ -129,7 +151,7 @@ impl Storage {
         &mut self,
         block_hash: H256,
         block_height: u64,
-        block_metadata: BlockMetadata,
+        block_metadata: &BlockMetadata,
     ) -> Result<(), rocksdb::Error> {
         let block_height_bytes = block_height.to_be_bytes();
 
@@ -191,7 +213,7 @@ impl Storage {
     ) -> Result<(), error::Error> {
         let batch = rocksdb::WriteBatch::default();
         self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, value| {
-            batch.put(key, value)
+            batch.put(key, value);
         })
     }
 
@@ -203,7 +225,7 @@ impl Storage {
     ) -> Result<(), error::Error> {
         let batch = rocksdb::WriteBatch::default();
         self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, _value| {
-            batch.delete(key)
+            batch.delete(key);
         })
     }
 
@@ -277,7 +299,7 @@ impl Storage {
             let tx_hash = self
                 .get_transaction_by_position(tx_included)
                 .unwrap_or_default();
-            result.push((block_height, tx_hash, value))
+            result.push((block_height, tx_hash, value));
         }
         Ok(result)
     }
@@ -315,11 +337,11 @@ impl Storage {
 
                 let value = if iter.valid() {
                     let bytes = iter.value().unwrap();
-                    diff::DiffValue::try_from_bytes(bytes).unwrap_or_else(|e| {
+                    DiffValue::try_from_bytes(bytes).unwrap_or_else(|e| {
                         panic!(
                             "Could not deserialize key={} value={} error={:?}",
-                            base64::encode(&db_key),
-                            base64::encode(bytes),
+                            aurora_engine_sdk::base64::encode(&db_key),
+                            aurora_engine_sdk::base64::encode(bytes),
                             e,
                         )
                     })
@@ -334,14 +356,11 @@ impl Storage {
 
             // move to the next key by skipping all other DB keys corresponding to the same engine key
             while iter.valid()
-                && iter
-                    .key()
-                    .map(|db_key| {
-                        db_key[0..engine_prefix_len] == engine_prefix
-                            && &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)]
-                                == engine_key
-                    })
-                    .unwrap_or(false)
+                && iter.key().map_or(false, |db_key| {
+                    db_key[0..engine_prefix_len] == engine_prefix
+                        && &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)]
+                            == engine_key
+                })
             {
                 iter.next();
             }
@@ -405,6 +424,7 @@ pub struct TransactionIncluded {
 }
 
 impl TransactionIncluded {
+    #[must_use]
     pub fn to_bytes(self) -> [u8; 34] {
         let mut bytes = [0u8; 34];
 
@@ -414,6 +434,7 @@ impl TransactionIncluded {
         bytes
     }
 
+    #[must_use]
     pub fn from_bytes(bytes: [u8; 34]) -> Self {
         let block_hash = H256::from_slice(&bytes[0..32]);
         let mut position = [0u8; 2];
@@ -436,6 +457,7 @@ pub struct BlockMetadata {
 }
 
 impl BlockMetadata {
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 40] {
         let mut buf = [0u8; 40];
         buf[0..8].copy_from_slice(&self.timestamp.nanos().to_be_bytes());
@@ -443,6 +465,7 @@ impl BlockMetadata {
         buf
     }
 
+    #[must_use]
     pub fn from_bytes(bytes: [u8; 40]) -> Self {
         let nanos = {
             let mut buf = [0u8; 8];
@@ -463,7 +486,7 @@ impl BlockMetadata {
 }
 
 fn construct_storage_key(prefix: StoragePrefix, key: &[u8]) -> Vec<u8> {
-    [&[VERSION], &[prefix as u8], key].concat()
+    [&[VERSION], &[u8::from(prefix)], key].concat()
 }
 
 fn construct_engine_key(key: &[u8], block_height: u64, transaction_position: u16) -> Vec<u8> {

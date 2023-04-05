@@ -3,7 +3,7 @@
 //! Allow Aurora users interacting with NEAR smart contracts using cross contract call primitives.
 //! TODO: How they work (low level explanation with examples)
 
-use crate::{HandleBasedPrecompile, PrecompileOutput};
+use crate::{utils, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{
     account_id::AccountId,
@@ -36,7 +36,7 @@ pub mod costs {
     /// See `CROSS_CONTRACT_CALL_BASE` for estimation methodology.
     pub const CROSS_CONTRACT_CALL_BYTE: EthGas = EthGas::new(3);
     /// EVM gas cost per NEAR gas attached to the created promise.
-    /// This value is derived from the gas report https://hackmd.io/@birchmd/Sy4piXQ29
+    /// This value is derived from the gas report `https://hackmd.io/@birchmd/Sy4piXQ29`
     /// The units on this quantity are `NEAR Gas / EVM Gas`.
     /// The report gives a value `0.175 T(NEAR_gas) / k(EVM_gas)`. To convert the units to
     /// `NEAR Gas / EVM Gas`, we simply multiply `0.175 * 10^12 / 10^3 = 175 * 10^6`.
@@ -55,7 +55,7 @@ mod consts {
     pub(super) const ROUTER_EXEC_NAME: &str = "execute";
     pub(super) const ROUTER_SCHEDULE_NAME: &str = "schedule";
     /// Solidity selector for the ERC-20 transferFrom function
-    /// https://www.4byte.directory/signatures/?bytes4_signature=0x23b872dd
+    /// `https://www.4byte.directory/signatures/?bytes4_signature=0x23b872dd`
     pub(super) const TRANSFER_FROM_SELECTOR: [u8; 4] = [0x23, 0xb8, 0x72, 0xdd];
 }
 
@@ -65,7 +65,7 @@ pub struct CrossContractCall<I> {
 }
 
 impl<I> CrossContractCall<I> {
-    pub fn new(engine_account_id: AccountId, io: I) -> Self {
+    pub const fn new(engine_account_id: AccountId, io: I) -> Self {
         Self {
             io,
             engine_account_id,
@@ -85,11 +85,14 @@ pub mod cross_contract_call {
 
     /// Sentinel value used to indicate the following topic field is how much NEAR the
     /// cross-contract call will require.
-    pub const AMOUNT_TOPIC: H256 =
-        crate::make_h256(0x72657175697265645f6e656172, 0x72657175697265645f6e656172);
+    pub const AMOUNT_TOPIC: H256 = crate::make_h256(
+        0x0072657175697265645f6e656172,
+        0x0072657175697265645f6e656172,
+    );
 }
 
 impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
+    #[allow(clippy::too_many_lines)]
     fn run_with_handle(
         &self,
         handle: &mut impl PrecompileHandle,
@@ -97,6 +100,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
         let input = handle.input();
         let target_gas = handle.gas_limit().map(EthGas::new);
         let context = handle.context();
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let is_static = handle.is_static();
 
         // This only includes the cost we can easily derive without parsing the input.
@@ -261,18 +265,23 @@ pub mod state {
     pub struct CodeVersion(pub u32);
 
     impl CodeVersion {
-        pub fn increment(self) -> Self {
+        #[must_use]
+        pub const fn increment(self) -> Self {
             Self(self.0 + 1)
         }
     }
 
-    /// Get the address of the wNEAR ERC-20 contract
+    /// Get the address of the `wNEAR` ERC-20 contract
+    ///
+    /// # Panics
+    ///
+    /// Panic is ok here because there is no sense to continue with corrupted storage.
     pub fn get_wnear_address<I: IO>(io: &I) -> Address {
         let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, WNEAR_KEY);
-        match io.read_storage(&key) {
-            Some(bytes) => Address::try_from_slice(&bytes.to_vec()).expect(ERR_CORRUPTED_STORAGE),
-            None => panic!("{}", ERR_MISSING_WNEAR_ADDRESS),
-        }
+        io.read_storage(&key).map_or_else(
+            || panic!("{ERR_MISSING_WNEAR_ADDRESS}"),
+            |bytes| Address::try_from_slice(&bytes.to_vec()).expect(ERR_CORRUPTED_STORAGE),
+        )
     }
 
     /// Get the latest router contract version.
@@ -309,7 +318,7 @@ fn transfer_from_args(from: H160, to: H160, amount: U256) -> Vec<u8> {
 fn create_target_account_id(sender: H160, engine_account_id: &str) -> AccountId {
     format!("{}.{}", hex::encode(sender.as_bytes()), engine_account_id)
         .parse()
-        .unwrap()
+        .unwrap_or_default()
 }
 
 fn revert_with_message(message: &str) -> PrecompileFailure {
@@ -330,7 +339,7 @@ mod tests {
     fn test_precompile_id() {
         assert_eq!(
             cross_contract_call::ADDRESS,
-            near_account_to_evm_address("nearCrossContractCall".as_bytes())
+            near_account_to_evm_address(b"nearCrossContractCall")
         );
     }
 
@@ -366,7 +375,7 @@ mod tests {
                 },
             ],
             outputs: vec![ethabi::Param {
-                name: "".into(),
+                name: String::new(),
                 kind: ethabi::ParamType::Bool,
                 internal_type: None,
             }],

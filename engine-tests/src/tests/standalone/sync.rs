@@ -33,7 +33,7 @@ fn test_consume_block_message() {
         block_message.metadata,
     );
 
-    runner.close()
+    runner.close();
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn test_consume_deposit_message() {
     .unwrap();
     let outcome = match outcome {
         sync::ConsumeMessageOutcome::TransactionIncluded(outcome) => outcome,
-        other => panic!("Unexpected outcome {:?}", other),
+        other => panic!("Unexpected outcome {other:?}"),
     };
 
     let finish_deposit_args = match outcome.maybe_result.unwrap().unwrap() {
@@ -71,7 +71,7 @@ fn test_consume_deposit_message() {
             let bytes = promise_args.callback.args;
             aurora_engine::parameters::FinishDepositCallArgs::try_from_slice(&bytes).unwrap()
         }
-        other => panic!("Unexpected result {:?}", other),
+        other => panic!("Unexpected result {other:?}"),
     };
     // Now executing aurora callbacks, so predecessor_account_id = current_account_id
     runner.env.predecessor_account_id = runner.env.current_account_id.clone();
@@ -95,18 +95,15 @@ fn test_consume_deposit_message() {
     .unwrap();
     let outcome = match outcome {
         sync::ConsumeMessageOutcome::TransactionIncluded(outcome) => outcome,
-        other => panic!("Unexpected outcome {:?}", other),
+        other => panic!("Unexpected outcome {other:?}"),
     };
 
     let ft_on_transfer_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
             let bytes = promise_args.base.args;
-            let json = aurora_engine::json::parse_json(&bytes).unwrap();
-            aurora_engine::parameters::NEP141FtOnTransferArgs::try_from(json)
-                .ok()
-                .unwrap()
+            serde_json::from_slice(&bytes).unwrap()
         }
-        other => panic!("Unexpected result {:?}", other),
+        other => panic!("Unexpected result {other:?}"),
     };
 
     let transaction_message = sync::types::TransactionMessage {
@@ -129,7 +126,7 @@ fn test_consume_deposit_message() {
 
     assert_eq!(runner.get_balance(&recipient_address), deposit_amount);
 
-    runner.close()
+    runner.close();
 }
 
 #[test]
@@ -177,7 +174,7 @@ fn test_consume_deploy_message() {
 
     assert_eq!(runner.get_code(&deployed_address), code);
 
-    runner.close()
+    runner.close();
 }
 
 #[test]

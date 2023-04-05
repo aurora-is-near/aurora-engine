@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use aurora_engine::engine::{self, EngineState};
+use aurora_engine::state;
 use aurora_engine_sdk::near_runtime::Runtime;
 use aurora_engine_sdk::io::{IO, StorageIntermediate};
 use aurora_engine_types::storage;
@@ -11,14 +11,14 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(BorshDeserialize, BorshSerialize)]
 struct NewFancyState {
-    old_state: EngineState,
+    old_state: state::EngineState,
     some_other_numbers: [u32; 7],
 }
 
 #[no_mangle]
 pub extern "C" fn state_migration() {
     let mut io = Runtime;
-    let old_state = match engine::get_state(&io) {
+    let old_state = match state::get_state(&io) {
         Ok(state) => state,
         Err(e) => aurora_engine_sdk::panic_utf8(e.as_ref()),
     };

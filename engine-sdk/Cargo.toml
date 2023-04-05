@@ -14,12 +14,14 @@ autobenches = false
 
 [dependencies]
 aurora-engine-types = { path = "../engine-types", default-features = false }
-borsh = { version = "0.9.3", default-features = false }
-sha3 = { version = "0.10.2", default-features = false }
-sha2 = { version = "0.10.2", default-features = false }
+
+base64 = { version = "0.21", default-features = false, features = [ "alloc" ] }
+borsh = { version = "0.10", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+sha3 = { version = "0.10", default-features = false }
 
 [features]
-std = ["aurora-engine-types/std", "borsh/std", "sha3/std", "sha2/std"]
+std = ["aurora-engine-types/std", "borsh/std", "sha3/std", "sha2/std", "base64/std" ]
 contract = []
 log = []
 all-promise-actions = []

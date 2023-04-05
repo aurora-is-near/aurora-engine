@@ -1,0 +1,18 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: aurora-engine-standalone-tracing
+  description: |-
+    Aurora engine standalone tracing library. Provides functions and types for extracing geth-like traces from standalone engine execution.
+  tags:
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "2"
+spec:
+  owner: engine-team
+  type: contract-tests
+  lifecycle: production
+  system: aurora-engine
+  interactsWith: []

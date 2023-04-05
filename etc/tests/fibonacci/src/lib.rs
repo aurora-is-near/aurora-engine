@@ -57,7 +57,7 @@ impl Fib {
         p
     }
 
-    /// An alternative version of `accumulate`. Rather then performing the recursion
+    /// An alternative version of `accumulate`. Rather than performing the recursion
     /// with a single input which contains the previous two Fibonacci values, this function
     /// takes the previous two terms as separate inputs. This gives an alternate way to compute
     /// Fibonacci numbers using this contract: `fib(n - 1).and(fib(n - 2)).then(sum)`.

@@ -1,7 +1,10 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
-#![cfg_attr(feature = "log", feature(panic_info_message))]
-#![deny(clippy::as_conversions)]
+#![cfg_attr(not(any(feature = "std", feature = "contracts-std")), no_std)]
+#![deny(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions
+)]
 
 pub mod account_id;
 pub mod parameters;

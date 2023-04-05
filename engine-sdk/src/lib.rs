@@ -1,11 +1,18 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![deny(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc,
+    clippy::as_conversions
+)]
 
 #[cfg(feature = "contract")]
 use crate::prelude::{Address, Vec, U256};
 use crate::prelude::{H256, STORAGE_PRICE_PER_BYTE};
 pub use types::keccak;
 
+pub mod base64;
 pub mod caching;
 pub mod env;
 pub mod error;
@@ -43,17 +50,19 @@ pub fn log_utf8(bytes: &[u8]) {
 
 /// Calls environment sha256 on given input.
 #[cfg(feature = "contract")]
+#[must_use]
 pub fn sha256(input: &[u8]) -> H256 {
     unsafe {
         const REGISTER_ID: u64 = 1;
         exports::sha256(input.len() as u64, input.as_ptr() as u64, 1);
         let bytes = H256::zero();
-        exports::read_register(REGISTER_ID, bytes.0.as_ptr() as *const u64 as u64);
+        exports::read_register(REGISTER_ID, bytes.0.as_ptr() as u64);
         bytes
     }
 }
 
 #[cfg(not(feature = "contract"))]
+#[must_use]
 pub fn sha256(input: &[u8]) -> H256 {
     use sha2::Digest;
 
@@ -63,6 +72,7 @@ pub fn sha256(input: &[u8]) -> H256 {
 
 /// Calls environment ripemd160 on given input.
 #[cfg(feature = "contract")]
+#[must_use]
 pub fn ripemd160(input: &[u8]) -> [u8; 20] {
     unsafe {
         const REGISTER_ID: u64 = 1;
@@ -74,6 +84,7 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
 }
 
 #[cfg(feature = "contract")]
+#[must_use]
 pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
     let mut bytes = Vec::with_capacity(64 * 2 + 2); // 64 bytes per G1 + 2 positive integer bytes.
 
@@ -99,6 +110,7 @@ pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
 }
 
 #[cfg(feature = "contract")]
+#[must_use]
 pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
     let mut bytes = [0u8; 96];
     bytes[0..64].copy_from_slice(&g1);
@@ -146,20 +158,21 @@ where
 #[cfg(feature = "contract")]
 pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> {
     unsafe {
-        let hash_ptr = hash.as_ptr() as u64;
-        let sig_ptr = signature.as_ptr() as u64;
         const RECOVER_REGISTER_ID: u64 = 1;
         const KECCACK_REGISTER_ID: u64 = 2;
+
+        let hash_ptr = hash.as_ptr() as u64;
+        let sig_ptr = signature.as_ptr() as u64;
         let result = exports::ecrecover(
             ECRECOVER_MESSAGE_SIZE,
             hash_ptr,
             ECRECOVER_SIGNATURE_LENGTH,
             sig_ptr,
-            signature[64] as u64,
+            u64::from(signature[64]),
             ECRECOVER_MALLEABILITY_FLAG,
             RECOVER_REGISTER_ID,
         );
-        if result == (true as u64) {
+        if result == u64::from(true) {
             // The result from the ecrecover call is in a register; we can use this
             // register directly for the input to keccak256. This is why the length is
             // set to `u64::MAX`.
@@ -175,10 +188,11 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
 
 #[cfg(feature = "contract")]
 pub fn log(data: &str) {
-    log_utf8(data.as_bytes())
+    log_utf8(data.as_bytes());
 }
 
 #[cfg(not(feature = "contract"))]
+#[allow(clippy::missing_const_for_fn)]
 pub fn log(_data: &str) {
     // TODO: standalone logging
 }
@@ -191,14 +205,16 @@ macro_rules! log {
     };
 }
 
-pub fn storage_byte_cost() -> u128 {
+#[must_use]
+pub const fn storage_byte_cost() -> u128 {
     STORAGE_PRICE_PER_BYTE
 }
 
 pub struct ECRecoverErr;
 
 impl ECRecoverErr {
-    pub fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
         "ERR_ECRECOVER"
     }
 }

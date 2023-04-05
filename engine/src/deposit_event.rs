@@ -47,12 +47,10 @@ impl FtTransferMessageData {
             return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
         }
 
-        // Parse fee from message slice. It should contain 32 bytes
-        // But after that in will be parse to u128
-        // That logic for compatability.
-        let mut raw_fee: [u8; 32] = Default::default();
-        raw_fee.copy_from_slice(&msg[..32]);
-        let fee_u128: u128 = U256::from_little_endian(&raw_fee)
+        // Parse the fee from the message slice. It should contain 32 bytes,
+        // but after that, it will be parsed to u128.
+        // This logic is for compatibility.
+        let fee_u128: u128 = U256::from_little_endian(&msg[..32])
             .try_into()
             .map_err(|_| error::ParseOnTransferMessageError::OverflowNumber)?;
         let fee: Fee = fee_u128.into();
@@ -60,7 +58,7 @@ impl FtTransferMessageData {
         // Get recipient Eth address from message slice
         let recipient = Address::try_from_slice(&msg[32..52]).unwrap();
 
-        Ok(FtTransferMessageData {
+        Ok(Self {
             relayer: account_id,
             recipient,
             fee,
@@ -68,6 +66,7 @@ impl FtTransferMessageData {
     }
 
     /// Encode to String with specific rules
+    #[must_use]
     pub fn encode(&self) -> String {
         // The first data section should contain fee data.
         // Pay attention, that for compatibility reasons we used U256 type
@@ -132,7 +131,7 @@ impl TokenMessageData {
     pub fn parse_event_message_and_prepare_token_message_data(
         message: &str,
         fee: Fee,
-    ) -> Result<TokenMessageData, error::ParseEventMessageError> {
+    ) -> Result<Self, error::ParseEventMessageError> {
         let data: Vec<_> = message.split(':').collect();
         // Data array can contain 1 or 2 elements
         if data.len() >= 3 {
@@ -143,7 +142,7 @@ impl TokenMessageData {
 
         // If data array contain only one element it should return NEAR account id
         if data.len() == 1 {
-            Ok(TokenMessageData::Near(account_id))
+            Ok(Self::Near(account_id))
         } else {
             let raw_message = data[1].into();
             let message = FtTransferMessageData::prepare_message_for_on_transfer(
@@ -152,7 +151,7 @@ impl TokenMessageData {
                 raw_message,
             )?;
 
-            Ok(TokenMessageData::Eth {
+            Ok(Self::Eth {
                 receiver_id: account_id,
                 message,
             })
@@ -160,6 +159,7 @@ impl TokenMessageData {
     }
 
     // Get recipient account id from Eth part of Token message data
+    #[must_use]
     pub fn recipient(&self) -> AccountId {
         match self {
             Self::Near(acc) => acc.clone(),
@@ -221,6 +221,7 @@ pub struct DepositedEvent {
 
 impl DepositedEvent {
     #[allow(dead_code)]
+    #[must_use]
     pub fn event_params() -> EventParams {
         vec![
             EventParam {
@@ -295,7 +296,7 @@ impl DepositedEvent {
 }
 
 pub mod error {
-    use super::*;
+    use super::AddressError;
     use crate::errors;
 
     #[derive(Debug)]

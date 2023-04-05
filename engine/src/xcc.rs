@@ -1,5 +1,7 @@
+use crate::errors::ERR_SERIALIZE;
 use crate::parameters::{CallArgs, FunctionCallArgsV2};
-use aurora_engine_precompiles::xcc::state;
+use aurora_engine_precompiles::xcc::state::{self, ERR_MISSING_WNEAR_ADDRESS};
+use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::account_id::AccountId;
@@ -18,8 +20,8 @@ pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(5_000_000_000_000);
 pub const INITIALIZE_GAS: NearGas = NearGas::new(15_000_000_000_000);
 pub const UNWRAP_AND_REFUND_GAS: NearGas = NearGas::new(25_000_000_000_000);
 pub const WITHDRAW_GAS: NearGas = NearGas::new(30_000_000_000_000);
-/// Solidity selector for the withdrawToNear function
-/// https://www.4byte.directory/signatures/?bytes4_signature=0x6b351848
+/// Solidity selector for the `withdrawToNear` function
+/// `https://www.4byte.directory/signatures/?bytes4_signature=0x6b351848`
 pub const WITHDRAW_TO_NEAR_SELECTOR: [u8; 4] = [0x6b, 0x35, 0x18, 0x48];
 
 pub use aurora_engine_precompiles::xcc::state::{
@@ -32,11 +34,13 @@ pub use aurora_engine_precompiles::xcc::state::{
 pub struct RouterCode<'a>(pub Cow<'a, [u8]>);
 
 impl<'a> RouterCode<'a> {
+    #[must_use]
     pub fn new(bytes: Vec<u8>) -> Self {
         Self(Cow::Owned(bytes))
     }
 
-    pub fn borrowed(bytes: &'a [u8]) -> Self {
+    #[must_use]
+    pub const fn borrowed(bytes: &'a [u8]) -> Self {
         Self(Cow::Borrowed(bytes))
     }
 }
@@ -47,10 +51,119 @@ pub struct AddressVersionUpdateArgs {
     pub version: CodeVersion,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
+pub struct FundXccArgs {
+    pub target: Address,
+    pub wnear_account_id: Option<AccountId>,
+}
+
+pub fn fund_xcc_sub_account<I, P, E>(
+    io: &I,
+    handler: &mut P,
+    env: &E,
+    args: FundXccArgs,
+) -> Result<(), FundXccError>
+where
+    P: PromiseHandler,
+    I: IO + Copy,
+    E: Env,
+{
+    let current_account_id = env.current_account_id();
+    let target_account_id = AccountId::new(&format!(
+        "{}.{}",
+        args.target.encode(),
+        current_account_id.as_ref()
+    ))?;
+
+    let latest_code_version = get_latest_code_version(io);
+    let target_code_version = get_code_version_of_address(io, &args.target);
+    let deploy_needed = AddressVersionStatus::new(latest_code_version, target_code_version);
+
+    let fund_amount = Yocto::new(env.attached_deposit());
+
+    let mut promise_actions = Vec::with_capacity(4);
+
+    // If account needs to be created and/or updated then include those actions.
+    if let AddressVersionStatus::DeployNeeded { create_needed } = deploy_needed {
+        if create_needed {
+            if fund_amount < STORAGE_AMOUNT {
+                return Err(FundXccError::InsufficientBalance);
+            }
+
+            promise_actions.push(PromiseAction::CreateAccount);
+        }
+        promise_actions.push(PromiseAction::Transfer {
+            amount: fund_amount,
+        });
+        promise_actions.push(PromiseAction::DeployContract {
+            code: get_router_code(io).0.into_owned(),
+        });
+        // Either we need to assume it is set in the Engine or we need to accept it as input.
+        let wnear_account = if let Some(wnear_account) = args.wnear_account_id {
+            wnear_account
+        } else {
+            // If the wnear account is not specified then we must look it up based on the
+            // bridged token registry for the engine.
+            let wnear_address = get_wnear_address(io);
+            crate::engine::nep141_erc20_map(*io)
+                .lookup_right(&crate::engine::ERC20Address(wnear_address))
+                .ok_or(FundXccError::MissingWNearAddress)?
+                .0
+        };
+        let init_args = format!(
+            r#"{{"wnear_account": "{}", "must_register": {}}}"#,
+            wnear_account.as_ref(),
+            create_needed,
+        );
+        promise_actions.push(PromiseAction::FunctionCall {
+            name: "initialize".into(),
+            args: init_args.into_bytes(),
+            attached_yocto: ZERO_YOCTO,
+            gas: INITIALIZE_GAS,
+        });
+    } else {
+        // No matter what include the transfer of the funding amount
+        promise_actions.push(PromiseAction::Transfer {
+            amount: fund_amount,
+        });
+    }
+
+    let batch = PromiseBatchAction {
+        target_account_id,
+        actions: promise_actions,
+    };
+    // Safety: same as safety in `handle_precompile_promise`
+    let promise_id = unsafe { handler.promise_create_batch(&batch) };
+
+    if let AddressVersionStatus::DeployNeeded { .. } = deploy_needed {
+        // If a create and/or deploy was needed then we must attach a callback to update
+        // the Engine's record of the account.
+
+        let args = AddressVersionUpdateArgs {
+            address: args.target,
+            version: latest_code_version,
+        };
+        let callback = PromiseCreateArgs {
+            target_account_id: current_account_id,
+            method: "factory_update_address_version".into(),
+            args: args
+                .try_to_vec()
+                .map_err(|_| FundXccError::SerializationFailure)?,
+            attached_balance: ZERO_YOCTO,
+            attached_gas: VERSION_UPDATE_GAS,
+        };
+        // Safety: same as safety in `handle_precompile_promise`
+        let _promise_id = unsafe { handler.promise_attach_callback(promise_id, &callback) };
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_lines)]
 pub fn handle_precompile_promise<I, P>(
     io: &I,
     handler: &mut P,
-    promise: PromiseCreateArgs,
+    promise: &PromiseCreateArgs,
     required_near: Yocto,
     current_account_id: &AccountId,
 ) where
@@ -62,32 +175,19 @@ pub fn handle_precompile_promise<I, P>(
 
     // Confirm target_account is of the form `{address}.{aurora}`
     // Address prefix parsed above, so only need to check `.{aurora}`
-    assert_eq!(&target_account[40..41], ".", "{}", ERR_INVALID_ACCOUNT);
+    assert_eq!(&target_account[40..41], ".", "{ERR_INVALID_ACCOUNT}");
     assert_eq!(
         &target_account[41..],
         current_account_id.as_ref(),
-        "{}",
-        ERR_INVALID_ACCOUNT
+        "{ERR_INVALID_ACCOUNT}"
     );
     // Confirm there is 0 NEAR attached to the promise
     // (the precompile should not drain the engine's balance).
-    assert_eq!(
-        promise.attached_balance, ZERO_YOCTO,
-        "{}",
-        ERR_ATTACHED_NEAR
-    );
+    assert_eq!(promise.attached_balance, ZERO_YOCTO, "{ERR_ATTACHED_NEAR}");
 
     let latest_code_version = get_latest_code_version(io);
     let sender_code_version = get_code_version_of_address(io, &sender);
-    let deploy_needed = match sender_code_version {
-        None => AddressVersionStatus::DeployNeeded {
-            create_needed: true,
-        },
-        Some(version) if version < latest_code_version => AddressVersionStatus::DeployNeeded {
-            create_needed: false,
-        },
-        Some(_version) => AddressVersionStatus::UpToDate,
-    };
+    let deploy_needed = AddressVersionStatus::new(latest_code_version, sender_code_version);
     // 1. If the router contract account does not exist or is out of date then we start
     //    with a batch transaction to deploy the router. This batch also has an attached
     //    callback to update the engine's storage with the new version of that router account.
@@ -103,8 +203,8 @@ pub fn handle_precompile_promise<I, P>(
             promise_actions.push(PromiseAction::DeployContract {
                 code: get_router_code(io).0.into_owned(),
             });
-            // After a deploy we call the contract's initialize function
-            let wnear_address = state::get_wnear_address(io);
+            // After the deployment we call the contract's initialize function
+            let wnear_address = get_wnear_address(io);
             let wnear_account = crate::engine::nep141_erc20_map(*io)
                 .lookup_right(&crate::engine::ERC20Address(wnear_address))
                 .unwrap();
@@ -210,8 +310,8 @@ pub fn handle_precompile_promise<I, P>(
     // the engine make arbitrary calls.
     let _promise_id = unsafe {
         match withdraw_id {
-            None => handler.promise_create_call(&promise),
-            Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, &promise),
+            None => handler.promise_create_call(promise),
+            Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, promise),
         }
     };
 }
@@ -232,7 +332,7 @@ pub fn update_router_code<I: IO>(io: &mut I, code: &RouterCode) {
     set_latest_code_version(io, current_version.increment());
 }
 
-/// Set the address of the wNEAR ERC-20 contract
+/// Set the address of the `wNEAR` ERC-20 contract
 pub fn set_wnear_address<I: IO>(io: &mut I, address: &Address) {
     let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, WNEAR_KEY);
     io.write_storage(&key, address.as_bytes());
@@ -243,6 +343,31 @@ pub fn set_code_version_of_address<I: IO>(io: &mut I, address: &Address, version
     let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, address.as_bytes());
     let value_bytes = version.0.to_le_bytes();
     io.write_storage(&key, &value_bytes);
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FundXccError {
+    InsufficientBalance,
+    InvalidAccount,
+    MissingWNearAddress,
+    SerializationFailure,
+}
+
+impl From<aurora_engine_types::account_id::ParseAccountError> for FundXccError {
+    fn from(_: aurora_engine_types::account_id::ParseAccountError) -> Self {
+        Self::InvalidAccount
+    }
+}
+
+impl AsRef<[u8]> for FundXccError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::InsufficientBalance => b"ERR_INSUFFICIENT_FUNDING_OF_NEW_XCC_ACCOUNT",
+            Self::InvalidAccount => ERR_INVALID_ACCOUNT.as_bytes(),
+            Self::MissingWNearAddress => ERR_MISSING_WNEAR_ADDRESS.as_bytes(),
+            Self::SerializationFailure => ERR_SERIALIZE.as_bytes(),
+        }
+    }
 }
 
 /// Sets the latest router contract version. This function is intentionally private because
@@ -257,6 +382,20 @@ fn set_latest_code_version<I: IO>(io: &mut I, version: CodeVersion) {
 enum AddressVersionStatus {
     UpToDate,
     DeployNeeded { create_needed: bool },
+}
+
+impl AddressVersionStatus {
+    fn new(latest_code_version: CodeVersion, target_code_version: Option<CodeVersion>) -> Self {
+        match target_code_version {
+            None => Self::DeployNeeded {
+                create_needed: true,
+            },
+            Some(version) if version < latest_code_version => Self::DeployNeeded {
+                create_needed: false,
+            },
+            Some(_version) => Self::UpToDate,
+        }
+    }
 }
 
 fn withdraw_to_near_args(recipient: &AccountId, amount: Yocto) -> Vec<u8> {

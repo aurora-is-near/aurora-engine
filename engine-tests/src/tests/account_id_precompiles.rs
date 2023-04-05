@@ -45,7 +45,7 @@ fn test_account_id_precompiles() {
     let tx = contract.call_method_without_args("predecessorAccountId", 0.into());
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
     let result = runner
-        .view_call(test_utils::as_view_call(tx, sender))
+        .view_call(&test_utils::as_view_call(tx, sender))
         .unwrap();
     assert!(result.is_ok());
 

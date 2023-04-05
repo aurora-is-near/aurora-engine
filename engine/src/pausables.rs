@@ -15,22 +15,21 @@ bitflags! {
 }
 
 impl PrecompileFlags {
+    #[must_use]
     pub fn from_address(address: &Address) -> Option<Self> {
         Some(if address == &exit_to_ethereum::ADDRESS {
-            PrecompileFlags::EXIT_TO_ETHEREUM
+            Self::EXIT_TO_ETHEREUM
         } else if address == &exit_to_near::ADDRESS {
-            PrecompileFlags::EXIT_TO_NEAR
+            Self::EXIT_TO_NEAR
         } else {
             return None;
         })
     }
 
     /// Checks if the precompile belonging to the `address` is marked as paused.
+    #[must_use]
     pub fn is_paused_by_address(&self, address: &Address) -> bool {
-        match Self::from_address(address) {
-            Some(precompile_flag) => self.contains(precompile_flag),
-            None => false,
-        }
+        Self::from_address(address).map_or(false, |precompile_flag| self.contains(precompile_flag))
     }
 }
 
@@ -89,7 +88,7 @@ pub struct EngineAuthorizer {
 }
 
 impl EngineAuthorizer {
-    /// Creates new [EngineAuthorizer] and grants permission to pause precompiles for all given `accounts`.
+    /// Creates new [`EngineAuthorizer`] and grants permission to pause precompiles for all given `accounts`.
     pub fn from_accounts(accounts: impl Iterator<Item = AccountId>) -> Self {
         Self {
             acl: accounts.collect(),
@@ -104,31 +103,24 @@ pub struct EnginePrecompilesPauser<I: IO> {
 }
 
 impl<I: IO> EnginePrecompilesPauser<I> {
-    /// Key for storing [PrecompileFlags].
+    /// Key for storing [`PrecompileFlags`].
     const PAUSE_FLAGS_KEY: &'static [u8; 11] = b"PAUSE_FLAGS";
 
-    /// Creates new [EnginePrecompilesPauser] instance that reads from and writes into storage accessed using `io`.
-    pub fn from_io(io: I) -> Self {
+    /// Creates new [`EnginePrecompilesPauser`] instance that reads from and writes into storage accessed using `io`.
+    pub const fn from_io(io: I) -> Self {
         Self { io }
     }
 
     fn read_flags_from_storage(&self) -> PrecompileFlags {
-        match self.io.read_storage(&Self::storage_key()) {
-            None => PrecompileFlags::empty(),
-            Some(bytes) => {
-                let int_length = core::mem::size_of::<u32>();
-                let input = bytes.to_vec();
-
-                if input.len() < int_length {
-                    return PrecompileFlags::empty();
-                }
-
-                let (int_bytes, _) = input.split_at(int_length);
-                PrecompileFlags::from_bits_truncate(u32::from_le_bytes(
-                    int_bytes.try_into().unwrap(),
-                ))
-            }
-        }
+        self.io
+            .read_storage(&Self::storage_key())
+            .map_or_else(PrecompileFlags::empty, |bytes| {
+                const U32_SIZE: usize = core::mem::size_of::<u32>();
+                assert_eq!(bytes.len(), U32_SIZE, "PrecompileFlags value is corrupted");
+                let mut buffer = [0u8; U32_SIZE];
+                bytes.copy_to_slice(&mut buffer);
+                PrecompileFlags::from_bits_truncate(u32::from_le_bytes(buffer))
+            })
     }
 
     fn write_flags_into_storage(&mut self, pause_flags: PrecompileFlags) {
@@ -175,8 +167,8 @@ impl<I: IO> PausedPrecompilesManager for EnginePrecompilesPauser<I> {
 mod tests {
     use super::*;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
+    use std::cell::RefCell;
     use std::iter::once;
-    use std::sync::RwLock;
     use test_case::test_case;
 
     #[test_case(PrecompileFlags::EXIT_TO_ETHEREUM, exit_to_ethereum::ADDRESS)]
@@ -198,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_pausing_precompile_marks_it_as_paused() {
-        let storage = RwLock::new(Storage::default());
+        let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         let flags = PrecompileFlags::EXIT_TO_NEAR;
@@ -210,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_resuming_precompile_removes_its_mark_as_paused() {
-        let storage = RwLock::new(Storage::default());
+        let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         let flags = PrecompileFlags::EXIT_TO_NEAR;
@@ -238,15 +230,13 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_no_precompile_is_paused_if_storage_contains_too_few_bytes() {
         let key = EnginePrecompilesPauser::<StoragePointer>::storage_key();
-        let storage = RwLock::new(Storage::default());
+        let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         io.write_storage(key.as_slice(), &[7u8]);
         let pauser = EnginePrecompilesPauser::from_io(io);
-
-        let expected_paused = PrecompileFlags::empty();
-        let actual_paused = pauser.paused();
-        assert_eq!(expected_paused, actual_paused);
+        let _paused = pauser.paused(); // panic here !!!
     }
 }

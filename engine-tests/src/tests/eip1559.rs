@@ -24,7 +24,7 @@ const EXAMPLE_TX_HEX: &str = "02f8c101010a8207d0833d090094cccccccccccccccccccccc
 // TODO(#170): generally support Ethereum tests
 #[test]
 fn test_eip_1559_tx_encoding_decoding() {
-    let secret_key = exmaple_signer().secret_key;
+    let secret_key = example_signer().secret_key;
     let transaction = example_transaction();
 
     let signed_tx = test_utils::sign_eip_1559_transaction(transaction, &secret_key);
@@ -36,7 +36,7 @@ fn test_eip_1559_tx_encoding_decoding() {
     let decoded_tx = match EthTransactionKind::try_from(expected_bytes.as_slice()) {
         Ok(EthTransactionKind::Eip1559(tx)) => tx,
         Ok(_) => panic!("Unexpected transaction type"),
-        Err(_) => panic!("Transaction parsing failed"),
+        Err(e) => panic!("Transaction parsing failed: {e:?}"),
     };
 
     assert_eq!(signed_tx, decoded_tx);
@@ -44,7 +44,7 @@ fn test_eip_1559_tx_encoding_decoding() {
     assert_eq!(
         signed_tx.sender().unwrap(),
         test_utils::address_from_secret_key(&secret_key)
-    )
+    );
 }
 
 // Test inspired by https://github.com/ethereum/tests/blob/develop/GeneralStateTests/stExample/eip1559.json
@@ -52,7 +52,7 @@ fn test_eip_1559_tx_encoding_decoding() {
 #[test]
 fn test_eip_1559_example() {
     let mut runner = test_utils::deploy_evm();
-    let mut signer = exmaple_signer();
+    let mut signer = example_signer();
     let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
     let contract_address = test_utils::address_from_hex(CONTRACT_ADDRESS);
     let contract_code = hex::decode(CONTRACT_CODE).unwrap();
@@ -112,7 +112,7 @@ fn encode_tx(signed_tx: &SignedTransaction1559) -> Vec<u8> {
         .collect()
 }
 
-fn exmaple_signer() -> test_utils::Signer {
+fn example_signer() -> test_utils::Signer {
     let secret_key =
         libsecp256k1::SecretKey::parse_slice(&hex::decode(SECRET_KEY).unwrap()).unwrap();
 
@@ -146,7 +146,7 @@ fn h256_from_hex(hex: &str) -> H256 {
     H256(result)
 }
 
-fn one() -> H256 {
+const fn one() -> H256 {
     let mut x = [0u8; 32];
     x[31] = 1;
     H256(x)

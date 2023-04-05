@@ -1,5 +1,5 @@
 use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
-use crate::test_utils::{origin, AuroraRunner, Signer};
+use crate::test_utils::{AuroraRunner, Signer, ORIGIN};
 
 use crate::test_utils;
 use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS};
@@ -25,9 +25,17 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
         )
         .into();
 
-    runner.mint(token, tester.contract.address, 1_000_000_000, origin());
+    runner.mint(token, tester.contract.address, 1_000_000_000, ORIGIN);
 
     (runner, signer, token, tester)
+}
+
+#[test]
+#[should_panic]
+fn test_deploy_erc20_token_with_invalid_account_id() {
+    let mut runner = AuroraRunner::new();
+    let invalid_nep141 = "_";
+    runner.deploy_erc20_token(invalid_nep141);
 }
 
 #[test]
@@ -35,7 +43,7 @@ fn hello_world_solidity() {
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let name = "AuroraG".to_string();
-    let expected = format!("Hello {}!", name);
+    let expected = format!("Hello {name}!");
 
     let result = tester.hello_world(&mut runner, &mut signer, name);
     assert_eq!(expected, result);
@@ -156,7 +164,7 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
     ];
 
     for (flag, expected) in test_data {
-        println!("{}", flag);
+        println!("{flag}");
         assert!(tester
             .try_withdraw_and_avoid_fail_and_succeed(&mut runner, &mut signer, flag)
             .is_ok());
