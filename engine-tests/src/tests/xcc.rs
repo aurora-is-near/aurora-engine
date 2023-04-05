@@ -20,6 +20,7 @@ use std::fs;
 use std::path::Path;
 
 const WNEAR_AMOUNT: u128 = 10 * near_sdk_sim::STORAGE_AMOUNT;
+const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -155,6 +156,90 @@ fn test_xcc_eth_gas_cost() {
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / costs::CROSS_CONTRACT_CALL_NEAR_GAS
+    );
+}
+
+#[test]
+fn test_xcc_external_fund() {
+    // In this test we intentionally do not bridge wNEAR into the Engine.
+    // The purpose of the `fund_xcc_sub_account` functionality is to allow using
+    // the XCC feature in an Engine instance where there is no bridged wNEAR.
+
+    // Set up Engine contract
+    let aurora = deploy_evm();
+    let chain_id = AuroraRunner::default().chain_id;
+    let mut signer = test_utils::Signer::new(libsecp256k1::SecretKey::parse(&[0xab; 32]).unwrap());
+    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let xcc_wasm_bytes = contract_bytes();
+    aurora
+        .user
+        .call(
+            aurora.contract.account_id(),
+            "factory_update",
+            &xcc_wasm_bytes,
+            near_sdk_sim::DEFAULT_GAS,
+            0,
+        )
+        .assert_success();
+    let wnear_account = deploy_wnear(&aurora);
+
+    // Fund XCC sub-account
+    let fund_amount = 5 * ONE_NEAR;
+    let fund_args = aurora_engine::xcc::FundXccArgs {
+        target: signer_address,
+        wnear_account_id: Some(wnear_account.account_id.as_str().parse().unwrap()),
+    };
+    aurora
+        .user
+        .call(
+            aurora.contract.account_id(),
+            "fund_xcc_sub_account",
+            &fund_args.try_to_vec().unwrap(),
+            near_sdk_sim::DEFAULT_GAS,
+            fund_amount,
+        )
+        .assert_success();
+
+    let sub_account_id = format!(
+        "{}.{}",
+        signer_address.encode(),
+        aurora.contract.account_id.as_str()
+    );
+    let sub_account = aurora
+        .user
+        .borrow_runtime()
+        .view_account(&sub_account_id)
+        .unwrap();
+    assert_eq!((fund_amount - sub_account.amount()) / ONE_NEAR, 0);
+
+    // Do an XCC call. This XCC call is to the Aurora Engine itself to deploy an EVM contract,
+    // but that is just for this test. The call could be to any contract to do any action.
+    let expected_code = hex::decode("deadbeef").unwrap();
+    let deploy_code =
+        test_utils::create_deploy_transaction(expected_code.clone(), U256::zero()).data;
+    let promise = PromiseCreateArgs {
+        target_account_id: aurora.contract.account_id.as_str().parse().unwrap(),
+        method: "deploy_code".into(),
+        args: deploy_code,
+        attached_balance: Yocto::new(0),
+        attached_gas: NearGas::new(10_000_000_000_000),
+    };
+    let xcc_args = CrossContractCallArgs::Eager(PromiseArgs::Create(promise));
+    let _result = submit_xcc_transaction(&xcc_args, &aurora, &mut signer, chain_id);
+
+    // This is known because we are using a fixed private key for the signer
+    let deployed_address = Address::decode("bda6e7f87c816d25718c38b1c753e280f9455350").unwrap();
+    let code = match aurora
+        .call("get_code", deployed_address.as_bytes())
+        .status()
+    {
+        near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => bytes,
+        other => panic!("Unexpected status {other:?}"),
+    };
+
+    assert_eq!(
+        code, expected_code,
+        "Failed to properly deploy EVM code via XCC"
     );
 }
 
