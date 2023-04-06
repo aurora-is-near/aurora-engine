@@ -262,7 +262,7 @@ mod contract {
     #[named]
     pub extern "C" fn pause_precompiles() {
         let mut io = Runtime;
-        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer();
+        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer(&io);
 
         if !authorizer.is_authorized(&io.predecessor_account_id()) {
             sdk::panic_utf8(b"ERR_UNAUTHORIZED");
@@ -496,11 +496,27 @@ mod contract {
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
+    /// Create and/or fund an XCC sub-account directly (as opposed to having one be automatically
+    /// created via the XCC precompile in the EVM). The purpose of this method is to enable
+    /// XCC on engine instances where wrapped NEAR (WNEAR) is not bridged.
+    #[no_mangle]
+    pub extern "C" fn fund_xcc_sub_account() {
+        let io = Runtime;
+        let state = state::get_state(&io).sdk_unwrap();
+        // This method can only be called by the owner because it allows specifying the
+        // account ID of the wNEAR account. This information must be accurate for the
+        // sub-account to work properly, therefore this method can only be called by
+        // a trusted user.
+        require_owner_only(&state, &io.predecessor_account_id());
+        let args: crate::xcc::FundXccArgs = io.read_input_borsh().sdk_unwrap();
+        crate::xcc::fund_xcc_sub_account(&io, &mut Runtime, &io, args).sdk_unwrap();
+    }
+
     /// Allow receiving NEP141 tokens to the EVM contract.
     ///
     /// This function returns the amount of tokens to return to the sender.
-    /// Either all tokens are transferred tokens are returned in case of an
-    /// error, or no token is returned if tx was successful.
+    /// Either all tokens are transferred and tokens are returned
+    /// in case of an error, or no token is returned if the transaction was successful.
     #[no_mangle]
     #[named]
     pub extern "C" fn ft_on_transfer() {

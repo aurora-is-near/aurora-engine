@@ -1,6 +1,6 @@
 use crate::Storage;
 use aurora_engine::parameters;
-use aurora_engine::xcc::AddressVersionUpdateArgs;
+use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::Address;
@@ -129,6 +129,7 @@ pub enum TransactionKind {
     /// Update the version of a deployed xcc-router contract
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
     FactorySetWNearAddress(Address),
+    FundXccSubAccound(FundXccArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -350,6 +351,7 @@ impl TransactionKind {
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
+            Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
         }
     }
 
@@ -623,6 +625,7 @@ enum BorshableTransactionKind<'a> {
     Unknown,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
+    FundXccSubAccound(Cow<'a, FundXccArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -665,6 +668,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
             TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
+            TransactionKind::FundXccSubAccound(x) => Self::FundXccSubAccound(Cow::Borrowed(x)),
         }
     }
 }
@@ -724,6 +728,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
             }
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
+            BorshableTransactionKind::FundXccSubAccound(x) => {
+                Ok(Self::FundXccSubAccound(x.into_owned()))
+            }
         }
     }
 }

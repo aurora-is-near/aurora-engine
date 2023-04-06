@@ -1,5 +1,8 @@
 use crate::{types::Address, Vec, H256};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 
 // NOTE: We start at 0x7 as our initial value as our original storage was not
 // version prefixed and ended as 0x6.

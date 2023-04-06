@@ -430,6 +430,12 @@ fn non_submit_execute<'db>(
 
             None
         }
+        TransactionKind::FundXccSubAccound(args) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            xcc::fund_xcc_sub_account(&io, &mut handler, &env, args.clone())?;
+
+            None
+        }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
         TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
@@ -570,11 +576,7 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{
-        connector, engine, fungible_token,
-        hashchain::blockchain_hashchain_error::BlockchainHashchainError, state,
-    };
-    use std::io;
+    use aurora_engine::{connector, engine, fungible_token, hashchain, state, xcc};
 
     #[derive(Debug)]
     pub enum Error {
@@ -590,7 +592,8 @@ pub mod error {
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
         ConnectorInit(connector::error::InitContractError),
         ConnectorStorage(connector::error::StorageReadError),
-        BlockchainHashchain(BlockchainHashchainError),
+        FundXccError(xcc::FundXccError),
+        BlockchainHashchain(hashchain::blockchain_hashchain_error::BlockchainHashchainError),
         IO(io::Error),
     }
 
@@ -666,8 +669,14 @@ pub mod error {
         }
     }
 
-    impl From<BlockchainHashchainError> for Error {
-        fn from(e: BlockchainHashchainError) -> Self {
+    impl From<xcc::FundXccError> for Error {
+        fn from(e: xcc::FundXccError) -> Self {
+            Self::FundXccError(e)
+        }
+    }
+
+    impl From<hashchain::blockchain_hashchain_error::BlockchainHashchainError> for Error {
+        fn from(e: hashchain::blockchain_hashchain_error::BlockchainHashchainError) -> Self {
             Self::BlockchainHashchain(e)
         }
     }

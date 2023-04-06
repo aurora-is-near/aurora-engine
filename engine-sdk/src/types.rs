@@ -25,8 +25,8 @@ pub fn keccak(data: &[u8]) -> H256 {
 }
 
 #[must_use]
-pub fn near_account_to_evm_address(addr: &[u8]) -> Address {
-    Address::try_from_slice(&keccak(addr)[12..]).unwrap()
+pub fn near_account_to_evm_address(account_id: &[u8]) -> Address {
+    Address::try_from_slice(&keccak(account_id)[12..]).unwrap()
 }
 
 #[cfg(feature = "contract")]
