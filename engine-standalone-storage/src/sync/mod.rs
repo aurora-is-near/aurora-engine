@@ -435,7 +435,7 @@ fn non_submit_execute<'db>(
         TransactionKind::SetOwner(args) => {
             let mut prev = state::get_state(&io)?;
 
-            prev.set_owner_id(args.clone().new_owner);
+            prev.owner_id = args.clone().new_owner;
             state::set_state(&mut io, &prev)?;
 
             None

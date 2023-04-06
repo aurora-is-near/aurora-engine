@@ -202,7 +202,6 @@ mod test {
     use crate::relayer_db::types::ConnectionParams;
     use crate::sync::types::{TransactionKind, TransactionMessage};
     use aurora_engine::fungible_token::FungibleTokenMetadata;
-    use aurora_engine::state::EngineStateV1;
     use aurora_engine::{connector, parameters, state};
     use aurora_engine_types::H256;
 
@@ -216,12 +215,12 @@ mod test {
     fn test_fill_db() {
         let mut storage = crate::Storage::open("rocks_tmp/").unwrap();
         let mut connection = super::connect_without_tls(&ConnectionParams::default()).unwrap();
-        let engine_state = state::EngineState::V1(EngineStateV1 {
+        let engine_state = state::EngineState {
             chain_id: aurora_engine_types::types::u256_to_arr(&1_313_161_555.into()),
             owner_id: "aurora".parse().unwrap(),
             bridge_prover_id: "prover.bridge.near".parse().unwrap(),
             upgrade_delay_blocks: 0,
-        });
+        };
 
         // Initialize engine and connector states in storage.
         // Use explicit scope so borrows against `storage` are dropped before processing DB rows.
@@ -240,7 +239,7 @@ mod test {
                 state::set_state(&mut local_io, &engine_state).unwrap();
                 connector::EthConnectorContract::create_contract(
                     io,
-                    engine_state.owner_id(),
+                    &engine_state.owner_id,
                     parameters::InitCallArgs {
                         prover_account: "prover.bridge.near".parse().unwrap(),
                         eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"

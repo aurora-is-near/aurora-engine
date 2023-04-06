@@ -848,7 +848,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
-        if U256::from(chain_id) != U256::from(state.chain_id()) {
+        if U256::from(chain_id) != U256::from(state.chain_id) {
             return Err(EngineErrorKind::InvalidChainId.into());
         }
     }
@@ -1028,7 +1028,7 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
 pub fn get_authorizer<I: IO>(io: &I) -> EngineAuthorizer {
     // TODO: a temporary use the owner account only until the engine adapts std with near-plugins
     state::get_state(io)
-        .map(|state| EngineAuthorizer::from_accounts(once(state.owner_id().clone())))
+        .map(|state| EngineAuthorizer::from_accounts(once(state.owner_id)))
         .unwrap_or_default()
 }
 
@@ -1462,7 +1462,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
             // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
             compute_block_hash(
-                self.state.chain_id(),
+                self.state.chain_id,
                 number.low_u64(),
                 self.current_account_id.as_bytes(),
             )
@@ -1522,7 +1522,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
 
     /// Returns the states chain ID.
     fn chain_id(&self) -> U256 {
-        U256::from(self.state.chain_id())
+        U256::from(self.state.chain_id)
     }
 
     /// Checks if an address exists.

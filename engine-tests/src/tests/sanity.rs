@@ -141,12 +141,12 @@ fn test_state_format() {
     };
     let state: aurora_engine::state::EngineState = args.into();
     let expected_hex: String = [
-        "00000000000000000000000000000000000000000000000000000000000000029a",
+        "01000000000000000000000000000000000000000000000000000000000000029a",
         "04000000626f7373",
         "0300000000000000",
     ]
     .concat();
-    assert_eq!(hex::encode(state.try_to_vec().unwrap()), expected_hex);
+    assert_eq!(hex::encode(state.to_bytes()), expected_hex);
 }
 
 fn generate_code(len: usize) -> Vec<u8> {
