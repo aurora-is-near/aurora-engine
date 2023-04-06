@@ -500,16 +500,20 @@ mod contract {
     /// created via the XCC precompile in the EVM). The purpose of this method is to enable
     /// XCC on engine instances where wrapped NEAR (WNEAR) is not bridged.
     #[no_mangle]
+    #[named]
     pub extern "C" fn fund_xcc_sub_account() {
-        let io = Runtime;
+        let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         // This method can only be called by the owner because it allows specifying the
         // account ID of the wNEAR account. This information must be accurate for the
         // sub-account to work properly, therefore this method can only be called by
         // a trusted user.
         require_owner_only(&state, &io.predecessor_account_id());
-        let args: crate::xcc::FundXccArgs = io.read_input_borsh().sdk_unwrap();
+        let input = io.read_input();
+        let args: crate::xcc::FundXccArgs = input.to_value().sdk_unwrap();
         crate::xcc::fund_xcc_sub_account(&io, &mut Runtime, &io, args).sdk_unwrap();
+
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &[], &Bloom::default());
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.

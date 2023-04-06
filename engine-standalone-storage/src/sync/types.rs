@@ -446,6 +446,8 @@ pub enum InnerTransactionKind {
     FactoryUpdateAddressVersion,
     #[strum(serialize = "factory_set_wnear_address")]
     FactorySetWNearAddress,
+    #[strum(serialize = "fund_xcc_sub_account")]
+    FundXccSubAccound,
     Unknown,
 }
 
@@ -491,6 +493,7 @@ impl From<&TransactionKind> for InnerTransactionKind {
             TransactionKind::FactorySetWNearAddress(_) => {
                 InnerTransactionKind::FactorySetWNearAddress
             }
+            TransactionKind::FundXccSubAccound(_) => InnerTransactionKind::FundXccSubAccound,
             TransactionKind::Unknown => InnerTransactionKind::Unknown,
         }
     }

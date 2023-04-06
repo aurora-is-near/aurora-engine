@@ -529,6 +529,7 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
             args.try_to_vec().map_err(|e| e.into())
         }
         TransactionKind::FactorySetWNearAddress(address) => Ok(address.as_bytes().to_vec()),
+        TransactionKind::FundXccSubAccound(args) => args.try_to_vec().map_err(|e| e.into()),
         TransactionKind::Unknown => Ok(vec![]),
     }
 }
@@ -577,6 +578,7 @@ pub enum TransactionExecutionResult {
 
 pub mod error {
     use aurora_engine::{connector, engine, fungible_token, hashchain, state, xcc};
+    use std::io;
 
     #[derive(Debug)]
     pub enum Error {
