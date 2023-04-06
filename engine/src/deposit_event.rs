@@ -47,9 +47,9 @@ impl FtTransferMessageData {
             return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
         }
 
-        // Parse fee from message slice. It should contain 32 bytes
-        // But after that it will be parsed to u128
-        // That logic for compatability.
+        // Parse the fee from the message slice. It should contain 32 bytes,
+        // but after that, it will be parsed to u128.
+        // This logic is for compatibility.
         let fee_u128: u128 = U256::from_little_endian(&msg[..32])
             .try_into()
             .map_err(|_| error::ParseOnTransferMessageError::OverflowNumber)?;
