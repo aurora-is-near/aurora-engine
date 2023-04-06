@@ -352,8 +352,8 @@ impl TransactionKind {
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
-            Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
             Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
+            Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
         }
     }
 
@@ -521,8 +521,8 @@ enum BorshableTransactionKind<'a> {
     Unknown,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
-    SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
     FundXccSubAccound(Cow<'a, FundXccArgs>),
+    SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -565,10 +565,10 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
             TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
+            TransactionKind::FundXccSubAccound(x) => Self::FundXccSubAccound(Cow::Borrowed(x)),
             TransactionKind::SetUpgradeDelayBlocks(x) => {
                 Self::SetUpgradeDelayBlocks(Cow::Borrowed(x))
             }
-            TransactionKind::FundXccSubAccound(x) => Self::FundXccSubAccound(Cow::Borrowed(x)),
         }
     }
 }
@@ -628,11 +628,12 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
             }
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
+            BorshableTransactionKind::FundXccSubAccound(x) => {
+                Ok(Self::FundXccSubAccound(x.into_owned()))
+            }
             BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
                 Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
             }
-            BorshableTransactionKind::FundXccSubAccound(x) => {
-                Ok(Self::FundXccSubAccound(x.into_owned()))
         }
     }
 }
