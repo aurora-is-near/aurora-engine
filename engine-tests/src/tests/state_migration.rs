@@ -3,10 +3,7 @@ use crate::test_utils::{self, str_to_account_id, AuroraRunner};
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
 use borsh::BorshSerialize;
-use near_primitives::errors::{ActionError, ActionErrorKind, TxExecutionError};
-use near_primitives::transaction::ExecutionStatus;
 use near_sdk_sim::{ExecutionResult, UserAccount};
-use near_vm_errors::FunctionCallErrorSer;
 use std::fs;
 use std::path::Path;
 
@@ -40,7 +37,7 @@ fn test_repeated_calls_to_deploy_upgrade_should_fail() {
     aurora.call("deploy_upgrade", &[]).assert_success();
 
     // Second upgrade should fail
-    let result = aurora.call("stage_upgrade", &upgraded_contract_bytes);
+    aurora.call("stage_upgrade", &upgraded_contract_bytes);
     let result = aurora.call("deploy_upgrade", &[]);
     assert!(!result.is_ok());
 }
