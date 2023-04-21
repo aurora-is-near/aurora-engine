@@ -318,15 +318,17 @@ impl Storage {
         while iter.valid() {
             // unwrap is safe because the iterator is valid
             let db_key = iter.key().unwrap().to_vec();
-            if db_key.get_mut(0..engine_prefix_len) != Some(&mut engine_prefix) {
+            if db_key.get(0..engine_prefix_len) != Some(&engine_prefix) {
                 break;
             }
             // raw engine key skips the 2-byte prefix and the block+position suffix
-            let engine_key = &db_key.get_mut(engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)).unwrap();
+            let engine_key = &db_key
+                .get(engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN))
+                .unwrap();
             let key_block_height = {
                 let n = engine_prefix_len + engine_key.len();
                 let mut buf = [0u8; 8];
-                buf.copy_from_slic(&db_key.get_mut(n..(n + 8)).unwrap());
+                buf.copy_from_slice(db_key.get(n..(n + 8)).unwrap());
                 u64::from_be_bytes(buf)
             };
             // If the key was created after the block height we want then we can skip it
@@ -359,7 +361,7 @@ impl Storage {
                 && iter.key().map_or(false, |db_key| {
                     db_key[0..engine_prefix_len] == engine_prefix
                         && &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)]
-                            == engine_key
+                            == *engine_key
                 })
             {
                 iter.next();
