@@ -25,6 +25,23 @@ fn test_state_migration() {
     assert_eq!(some_numbers, [3, 1, 4, 1, 5, 9, 2]);
 }
 
+#[test]
+fn test_repeated_calls_to_deploy_upgrade_should_fail() {
+    let aurora = deploy_evm();
+
+    // First upgrade should succeed
+    let upgraded_contract_bytes = contract_bytes();
+    aurora
+        .call("stage_upgrade", &upgraded_contract_bytes)
+        .assert_success();
+    aurora.call("deploy_upgrade", &[]).assert_success();
+
+    // Second upgrade should fail
+    aurora.call("stage_upgrade", &upgraded_contract_bytes);
+    let result = aurora.call("deploy_upgrade", &[]);
+    assert!(!result.is_ok());
+}
+
 pub fn deploy_evm() -> AuroraAccount {
     let aurora_runner = AuroraRunner::default();
     let main_account = near_sdk_sim::init_simulator(None);
