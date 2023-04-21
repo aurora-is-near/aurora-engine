@@ -75,7 +75,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
-    use parameters::SetOwnerArgs;
+    use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
@@ -122,8 +122,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn new() {
         let mut io = Runtime;
-        if let Ok(state) = state::get_state(&io) {
-            require_owner_only(&state, &io.predecessor_account_id());
+
+        if state::get_state(&io).is_ok() {
+            sdk::panic_utf8(b"ERR_ALREADY_INITIALIZED");
         }
 
         let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
@@ -175,6 +176,23 @@ mod contract {
     pub extern "C" fn get_chain_id() {
         let mut io = Runtime;
         io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_upgrade_delay_blocks() {
+        let mut io = Runtime;
+        let state = state::get_state(&io).sdk_unwrap();
+        io.return_output(&state.upgrade_delay_blocks.to_le_bytes());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_upgrade_delay_blocks() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let args: SetUpgradeDelayBlocksArgs = io.read_input_borsh().sdk_unwrap();
+        state.upgrade_delay_blocks = args.upgrade_delay_blocks;
+        state::set_state(&mut io, &state).sdk_unwrap();
     }
 
     #[no_mangle]
