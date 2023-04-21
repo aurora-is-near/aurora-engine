@@ -318,11 +318,20 @@ impl Storage {
         while iter.valid() {
             // unwrap is safe because the iterator is valid
             let db_key = iter.key().unwrap().to_vec();
+            if db_key.len() <= engine_prefix_len {
+                break;
+            }
             if db_key[0..engine_prefix_len] != engine_prefix {
                 break;
             }
             // raw engine key skips the 2-byte prefix and the block+position suffix
+            if db_key.len() <= ENGINE_KEY_SUFFIX_LEN {
+                break;
+            }
             let engine_key = &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)];
+            if db_key.len() <= n + 8 {
+                break;
+            }
             let key_block_height = {
                 let n = engine_prefix_len + engine_key.len();
                 let mut buf = [0u8; 8];
