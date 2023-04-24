@@ -233,7 +233,7 @@ impl Index<usize> for Logs {
     type Output = TraceLog;
 
     fn index(&self, index: usize) -> &Self::Output {
-        self.0.get(index).unwrap()
+        self.0.get(index).expect("index out of bounds")
     }
 }
 
