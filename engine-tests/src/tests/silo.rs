@@ -429,6 +429,57 @@ fn test_submit_with_disabled_whitelist() {
 }
 
 #[test]
+fn test_submit_with_removing_entries() {
+    let (mut runner, signer, receiver) = initialize_transfer();
+    let sender = test_utils::address_from_secret_key(&signer.secret_key);
+    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
+    let transaction = test_utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+
+    set_fixed_gas_cost(&mut runner, Some(FEE));
+
+    // Allow to submit transactions.
+    add_account_to_whitelist(&mut runner, caller.clone());
+    add_address_to_whitelist(&mut runner, sender);
+
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+
+    // perform transfer
+    let result = runner
+        .submit_transaction(&signer.secret_key, transaction.clone())
+        .unwrap();
+    assert!(matches!(result.status, TransactionStatus::Succeed(_)));
+
+    // validate post-state
+    validate_address_balance_and_nonce(
+        &runner,
+        sender,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - FEE,
+        (INITIAL_NONCE + 1).into(),
+    );
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+
+    // Remove account id and address from white lists.
+    remove_account_from_whitelist(&mut runner, caller);
+    remove_address_from_whitelist(&mut runner, sender);
+
+    // perform transfer
+    let err = runner
+        .submit_transaction(&signer.secret_key, transaction)
+        .unwrap_err();
+    assert!(err.to_string().contains("ERR_NOT_ALLOWED"));
+
+    // validate post-state
+    validate_address_balance_and_nonce(
+        &runner,
+        sender,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - FEE,
+        (INITIAL_NONCE + 1).into(),
+    );
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+}
+
+#[test]
 fn test_deploy_access_rights() {
     let (mut runner, signer, _) = initialize_transfer();
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
@@ -671,6 +722,22 @@ fn add_address_to_whitelist(runner: &mut AuroraRunner, address: Address) {
         address,
     });
     call_function(runner, "add_entry_to_whitelist", args);
+}
+
+fn remove_account_from_whitelist(runner: &mut AuroraRunner, account_id: AccountId) {
+    let args = WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
+        kind: WhitelistKind::Account,
+        account_id,
+    });
+    call_function(runner, "remove_entry_from_whitelist", args);
+}
+
+fn remove_address_from_whitelist(runner: &mut AuroraRunner, address: Address) {
+    let args = WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
+        kind: WhitelistKind::Address,
+        address,
+    });
+    call_function(runner, "remove_entry_from_whitelist", args);
 }
 
 fn set_fixed_gas_cost(runner: &mut AuroraRunner, cost: Option<Wei>) {
