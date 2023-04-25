@@ -28,10 +28,9 @@ pub struct EngineState {
 }
 
 impl EngineState {
-    #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, BorshError> {
         let borshable: BorshableEngineState = self.into();
-        borshable.try_to_vec().unwrap()
+        borshable.try_to_vec()
     }
 
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, EngineStateError> {
@@ -53,7 +52,7 @@ impl From<BorshError> for EngineStateError {
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
-enum BorshableEngineState {
+pub enum BorshableEngineState {
     V1(BorshableEngineStateV1),
     V2(BorshableEngineStateV2),
 }
@@ -118,6 +117,16 @@ impl From<&EngineState> for BorshableEngineState {
     }
 }
 
+impl From<EngineState> for BorshableEngineState {
+    fn from(state: EngineState) -> Self {
+        Self::V2(BorshableEngineStateV2 {
+            chain_id: state.chain_id,
+            owner_id: state.owner_id,
+            upgrade_delay_blocks: state.upgrade_delay_blocks,
+        })
+    }
+}
+
 impl From<NewCallArgs> for EngineState {
     fn from(args: NewCallArgs) -> Self {
         Self {
@@ -145,7 +154,7 @@ pub fn get_state<I: IO>(io: &I) -> Result<EngineState, EngineStateError> {
 pub fn set_state<I: IO>(io: &mut I, state: &EngineState) -> Result<(), EngineStateError> {
     io.write_storage(
         &bytes_to_key(KeyPrefix::Config, STATE_KEY),
-        &state.to_bytes(),
+        &state.to_bytes()?,
     );
 
     Ok(())

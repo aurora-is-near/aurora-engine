@@ -11,7 +11,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(BorshDeserialize, BorshSerialize)]
 struct NewFancyState {
-    old_state: state::EngineState,
+    old_state: state::BorshableEngineState,
     some_other_numbers: [u32; 7],
 }
 
@@ -22,9 +22,10 @@ pub extern "C" fn state_migration() {
         Ok(state) => state,
         Err(e) => aurora_engine_sdk::panic_utf8(e.as_ref()),
     };
+    // let state = old_state.into();
 
     let new_state = NewFancyState {
-        old_state,
+        old_state: old_state.into(),
         some_other_numbers: [3, 1, 4, 1, 5, 9, 2],
     };
 
