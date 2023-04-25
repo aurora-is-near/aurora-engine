@@ -306,14 +306,14 @@ mod contract {
         )
         .sdk_unwrap();
 
-        let result = Engine::deploy_code_with_input(&mut engine, input.clone(), &mut Runtime);
-        let result = result.sdk_expect(errors::ERR_SERIALIZE);
-        let output = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
-        let log_bloom = bloom::get_logs_bloom(&result.logs);
-
-        update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
-
-        Ok::<aurora_engine_types::Vec<u8>, EngineError>(output).sdk_process();
+        Engine::deploy_code_with_input(&mut engine, input.clone(), &mut Runtime)
+            .map(|res| {
+                let output = res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
+                let log_bloom = bloom::get_logs_bloom(&res.logs);
+                update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
+                output
+                })
+            .sdk_process();
         // TODO: charge for storage
     }
 
@@ -346,14 +346,14 @@ mod contract {
         )
         .sdk_unwrap();
 
-        let result = Engine::call_with_args(&mut engine, args, &mut Runtime);
-        let result = result.sdk_expect(errors::ERR_SERIALIZE);
-        let output = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
-        let log_bloom = bloom::get_logs_bloom(&result.logs);
-
-        update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
-
-        Ok::<aurora_engine_types::Vec<u8>, EngineError>(output).sdk_process();
+        Engine::call_with_args(&mut engine, args, &mut Runtime)
+            .map(|res| {
+                let output = res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
+                let log_bloom = bloom::get_logs_bloom(&res.logs);
+                update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
+                output
+                })
+            .sdk_process();
         // TODO: charge for storage
     }
 
@@ -381,13 +381,15 @@ mod contract {
             relayer_address,
             &mut Runtime,
         );
-        let result = result.sdk_expect(errors::ERR_SERIALIZE);
-        let output = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
-        let log_bloom = bloom::get_logs_bloom(&result.logs);
 
-        update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
-
-        Ok::<aurora_engine_types::Vec<u8>, EngineError>(output).sdk_process();
+        result
+            .map(|res| {
+                let output = res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
+                let log_bloom = bloom::get_logs_bloom(&res.logs);
+                update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
+                output
+                })
+            .sdk_process();
     }
 
     /// Analog of the `submit` function, but waits for the `SubmitArgs` structure rather than
@@ -411,13 +413,15 @@ mod contract {
             relayer_address,
             &mut Runtime,
         );
-        let result = result.sdk_expect(errors::ERR_SERIALIZE);
-        let output = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
-        let log_bloom = bloom::get_logs_bloom(&result.logs);
 
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &output, &log_bloom);
-
-        Ok::<aurora_engine_types::Vec<u8>, EngineError>(output).sdk_process();
+        result
+            .map(|res| {
+                let output = res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
+                let log_bloom = bloom::get_logs_bloom(&res.logs);
+                update_hashchain(&mut io, function_name!(), &input.to_vec(), &output, &log_bloom);
+                output
+                })
+            .sdk_process();
     }
 
     #[no_mangle]
@@ -440,7 +444,6 @@ mod contract {
             predecessor_account_id.as_bytes(),
             Address::from_array(relayer_address),
         );
-
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
@@ -453,11 +456,10 @@ mod contract {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
-        let bytes = io.read_input().to_vec();
-        let router_bytecode = crate::xcc::RouterCode::new(bytes.clone());
+        let input = io.read_input().to_vec();
+        let router_bytecode = crate::xcc::RouterCode::new(input.clone());
         crate::xcc::update_router_code(&mut io, &router_bytecode);
-
-        update_hashchain(&mut io, function_name!(), &bytes, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     /// Updates the bytecode version for the given account. This is only called as a callback
@@ -477,7 +479,6 @@ mod contract {
         let input = io.read_input();
         let args: crate::xcc::AddressVersionUpdateArgs = input.to_value().sdk_unwrap();
         crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
-
         update_hashchain(&mut io, function_name!(), &input.to_vec(), &[], &Bloom::default());
     }
 
@@ -492,7 +493,6 @@ mod contract {
         let input = io.read_input().to_vec();
         let address = io.read_input_arr20().sdk_unwrap();
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
-
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
@@ -512,7 +512,6 @@ mod contract {
         let input = io.read_input();
         let args: crate::xcc::FundXccArgs = input.to_value().sdk_unwrap();
         crate::xcc::fund_xcc_sub_account(&io, &mut Runtime, &io, args).sdk_unwrap();
-
         update_hashchain(&mut io, function_name!(), &input.to_vec(), &[], &Bloom::default());
     }
 
@@ -567,21 +566,10 @@ mod contract {
         let args: DeployErc20TokenArgs = input.to_value().sdk_unwrap();
 
         let address = engine::deploy_erc20_token(args, io, &io, &mut Runtime).sdk_unwrap();
+        let address_vec = &address.as_bytes().try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
 
-        io.return_output(
-            &address
-                .as_bytes()
-                .try_to_vec()
-                .sdk_expect(errors::ERR_SERIALIZE),
-        );
-
-        update_hashchain(
-            &mut io,
-            function_name!(),
-            &input.to_vec(),
-            &address.as_bytes(),
-            &Bloom::default(),
-        );
+        io.return_output(address_vec);
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), address_vec, &Bloom::default());
         // TODO: charge for storage
     }
 
@@ -760,7 +748,6 @@ mod contract {
         let owner_id = io.current_account_id();
 
         EthConnectorContract::create_contract(io, &owner_id, args).sdk_unwrap();
-
         update_hashchain(&mut io, function_name!(), &input.to_vec(), &[], &Bloom::default());
     }
 
@@ -777,8 +764,8 @@ mod contract {
 
         let input = io.read_input();
         let args: SetContractDataCallArgs = input.to_value().sdk_unwrap();
-        connector::set_contract_data(&mut io, args).sdk_unwrap();
 
+        connector::set_contract_data(&mut io, args).sdk_unwrap();
         update_hashchain(&mut io, function_name!(), &input.to_vec(), &[], &Bloom::default());
     }
 
@@ -795,18 +782,17 @@ mod contract {
             .sdk_unwrap()
             .withdraw_eth_from_near(&current_account_id, &predecessor_account_id, &args)
             .sdk_unwrap();
-        let result_bytes = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
+        let output = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
         // We intentionally do not go through the `io` struct here because we must bypass
         // the check that prevents output that is accepted by the eth_custodian
         #[allow(clippy::as_conversions)]
         unsafe {
             exports::value_return(
-                u64::try_from(result_bytes.len()).sdk_expect(errors::ERR_VALUE_CONVERSION),
-                result_bytes.as_ptr() as u64,
+                u64::try_from(output.len()).sdk_expect(errors::ERR_VALUE_CONVERSION),
+                output.as_ptr() as u64,
             );
         }
-
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), &result_bytes, &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input.to_vec(), &output, &Bloom::default());
     }
 
     #[no_mangle]
@@ -829,7 +815,6 @@ mod contract {
         // as a callback.
         let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
         io.promise_return(promise_id);
-
         update_hashchain(&mut io, function_name!(), &raw_proof, &[], &Bloom::default());
     }
 
@@ -945,11 +930,11 @@ mod contract {
         let args: parameters::TransferCallArgs = serde_json::from_slice(&input)
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
+
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_transfer(&predecessor_account_id, &args)
             .sdk_unwrap();
-
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
@@ -970,7 +955,6 @@ mod contract {
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_resolve_transfer(&args, promise_result);
-
         update_hashchain(&mut io, function_name!(), &input.to_vec(), &[], &Bloom::default());
     }
 
@@ -980,6 +964,7 @@ mod contract {
         let mut io = Runtime;
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
+
         let input = io.read_input().to_vec();
         let args: TransferCallCallArgs = serde_json::from_slice(&input)
             .map_err(Into::<ParseTypeFromJsonError>::into)
@@ -999,7 +984,6 @@ mod contract {
         // creates a call to another contract's `ft_on_transfer` method.
         let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
         io.promise_return(promise_id);
-
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
@@ -1022,7 +1006,6 @@ mod contract {
             // that they over paid for their deposit.
             unsafe { io.promise_create_batch(&promise) };
         }
-
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
@@ -1044,7 +1027,6 @@ mod contract {
             // Safety: This call is safe. It is only a transfer back to the user for their deposit.
             unsafe { io.promise_create_batch(&promise) };
         }
-
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
@@ -1062,7 +1044,6 @@ mod contract {
             .sdk_unwrap()
             .storage_withdraw(&predecessor_account_id, &args)
             .sdk_unwrap();
-
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
@@ -1102,7 +1083,6 @@ mod contract {
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .set_paused_flags(&args);
-
         update_hashchain(&mut io, function_name!(), &input.to_vec(), &[], &Bloom::default());
     }
 
