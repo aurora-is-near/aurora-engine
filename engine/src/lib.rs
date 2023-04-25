@@ -34,6 +34,7 @@ pub mod fungible_token;
 pub mod log_entry;
 pub mod pausables;
 mod prelude;
+pub mod silo;
 pub mod state;
 pub mod xcc;
 
@@ -76,17 +77,16 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
     use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
+    use serde::de::DeserializeOwned;
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
     use crate::fungible_token::FungibleTokenMetadata;
-    use crate::parameters::error::ParseTypeFromJsonError;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
-        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitArgs,
-        TransferCallCallArgs, ViewCallArgs,
+        IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs,
+        PausePrecompilesCallArgs, SetContractDataCallArgs, StorageUnregisterArgs, SubmitArgs,
+        ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -100,8 +100,13 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
-    use crate::{errors, pausables, state};
+    use crate::prelude::{
+        sdk, u256_to_arr, Address, PromiseResult, ToString, Vec, Yocto, ERR_FAILED_PARSE, H256,
+    };
+    use crate::silo::parameters::{
+        FixedGasCostArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+    };
+    use crate::{errors, pausables, silo, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
@@ -154,6 +159,7 @@ mod contract {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
+
         let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
         if state.owner_id == args.new_owner {
             sdk::panic_utf8(errors::ERR_SAME_OWNER);
@@ -263,7 +269,7 @@ mod contract {
         let authorizer: pausables::EngineAuthorizer = engine::get_authorizer(&io);
 
         if !authorizer.is_authorized(&io.predecessor_account_id()) {
-            sdk::panic_utf8(b"ERR_UNAUTHORIZED");
+            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
         }
 
         let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
@@ -279,7 +285,7 @@ mod contract {
         let mut io = Runtime;
         let pauser = EnginePrecompilesPauser::from_io(io);
         let data = pauser.paused().bits().to_le_bytes();
-        io.return_output(&data[..]);
+        io.return_output(&data);
     }
 
     ///
@@ -484,10 +490,7 @@ mod contract {
             &io,
         )
         .sdk_unwrap();
-
-        let args: NEP141FtOnTransferArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
-            .sdk_unwrap();
+        let args: NEP141FtOnTransferArgs = read_json_args(&io).sdk_unwrap();
 
         if predecessor_account_id == current_account_id {
             EthConnectorContract::init_instance(io)
@@ -510,7 +513,6 @@ mod contract {
         let mut io = Runtime;
         // Id of the NEP141 token in Near
         let args: DeployErc20TokenArgs = io.read_input_borsh().sdk_unwrap();
-
         let address = engine::deploy_erc20_token(args, io, &io, &mut Runtime).sdk_unwrap();
 
         io.return_output(
@@ -573,8 +575,7 @@ mod contract {
         let chain_id = state::get_state(&io)
             .map(|state| state.chain_id)
             .sdk_unwrap();
-        let block_hash =
-            crate::engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
+        let block_hash = engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
         io.return_output(block_hash.as_bytes());
     }
 
@@ -657,7 +658,7 @@ mod contract {
             require_owner_only(&state, &io.predecessor_account_id());
         }
 
-        let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
+        let args = io.read_input_borsh().sdk_unwrap();
         let owner_id = io.current_account_id();
 
         EthConnectorContract::create_contract(io, &owner_id, args).sdk_unwrap();
@@ -762,12 +763,12 @@ mod contract {
     pub extern "C" fn is_used_proof() {
         let mut io = Runtime;
         let args: IsUsedProofCallArgs = io.read_input_borsh().sdk_unwrap();
-
         let is_used_proof = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .is_used_proof(&args.proof);
         let res = is_used_proof.try_to_vec().unwrap();
-        io.return_output(&res[..]);
+
+        io.return_output(&res);
     }
 
     #[no_mangle]
@@ -797,9 +798,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
-        let args: parameters::BalanceOfCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
-            .sdk_unwrap();
+        let args = read_json_args(&io).sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_balance_of(&args);
@@ -808,7 +807,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
-        let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
+        let args = io.read_input_borsh().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_balance_of_eth_on_aurora(&args)
@@ -820,9 +819,7 @@ mod contract {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
-        let args: parameters::TransferCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
-            .sdk_unwrap();
+        let args = read_json_args(&io).sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_transfer(&predecessor_account_id, &args)
@@ -838,7 +835,7 @@ mod contract {
             sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
         }
 
-        let args: ResolveTransferCallArgs = io.read_input().to_value().sdk_unwrap();
+        let args = io.read_input_borsh().sdk_unwrap();
         let promise_result = io.promise_result(0).sdk_unwrap();
 
         EthConnectorContract::init_instance(io)
@@ -852,9 +849,7 @@ mod contract {
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
 
-        let args: TransferCallCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
-            .sdk_unwrap();
+        let args = read_json_args(&io).sdk_unwrap();
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
         let promise_args = EthConnectorContract::init_instance(io)
@@ -875,9 +870,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
         let mut io = Runtime;
-        let args: StorageDepositCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
-            .sdk_unwrap();
+        let args = read_json_args(&io).sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
         let amount = Yocto::new(io.attached_deposit());
         let maybe_promise = EthConnectorContract::init_instance(io)
@@ -896,9 +889,9 @@ mod contract {
         let mut io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
-        let force = serde_json::from_slice::<serde_json::Value>(&io.read_input().to_vec())
-            .ok()
-            .and_then(|args| args["force"].as_bool());
+        let force = read_json_args(&io)
+            .map(|args: StorageUnregisterArgs| args.force)
+            .ok();
         let maybe_promise = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_unregister(predecessor_account_id, force)
@@ -913,9 +906,7 @@ mod contract {
     pub extern "C" fn storage_withdraw() {
         let io = Runtime;
         io.assert_one_yocto().sdk_unwrap();
-        let args: StorageWithdrawCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
-            .sdk_unwrap();
+        let args = read_json_args(&io).sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
@@ -926,10 +917,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_balance_of() {
         let io = Runtime;
-        let args: parameters::StorageBalanceOfCallArgs =
-            serde_json::from_slice(&io.read_input().to_vec())
-                .map_err(Into::<ParseTypeFromJsonError>::into)
-                .sdk_unwrap();
+        let args = read_json_args(&io).sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .storage_balance_of(&args);
@@ -942,7 +930,7 @@ mod contract {
             .sdk_unwrap()
             .get_paused_flags();
         let data = paused_flags.try_to_vec().expect(ERR_FAILED_PARSE);
-        io.return_output(&data[..]);
+        io.return_output(&data);
     }
 
     #[no_mangle]
@@ -982,8 +970,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_nep141_from_erc20() {
         let mut io = Runtime;
-        let erc20_address: crate::engine::ERC20Address =
-            io.read_input().to_vec().try_into().sdk_unwrap();
+        let erc20_address: engine::ERC20Address = io.read_input().to_vec().try_into().sdk_unwrap();
+
         io.return_output(
             engine::nep141_erc20_map(io)
                 .lookup_right(&erc20_address)
@@ -1006,7 +994,7 @@ mod contract {
         sdk::log!("Call from verify_log_entry");
         let mut io = Runtime;
         let data = true.try_to_vec().unwrap();
-        io.return_output(&data[..]);
+        io.return_output(&data);
     }
 
     /// Function used to create accounts for tests
@@ -1075,6 +1063,74 @@ mod contract {
     }
 
     ///
+    /// Silo
+    ///
+    #[no_mangle]
+    pub extern "C" fn get_fixed_gas_cost() {
+        let mut io = Runtime;
+        let cost = FixedGasCostArgs {
+            cost: silo::get_fixed_gas_cost(&io),
+        };
+
+        io.return_output(&cost.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_fixed_gas_cost() {
+        let mut io = Runtime;
+        silo::assert_admin(&io);
+        let args: FixedGasCostArgs = io.read_input_borsh().sdk_unwrap();
+        silo::set_fixed_gas_cost(&mut io, args.cost);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_whitelist_status() {
+        let io = Runtime;
+        silo::assert_admin(&io);
+        let args: WhitelistStatusArgs = io.read_input_borsh().sdk_unwrap();
+        silo::set_whitelist_status(&io, &args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_whitelist_status() {
+        let mut io = Runtime;
+        let args: WhitelistKindArgs = io.read_input_borsh().sdk_unwrap();
+        let status = silo::get_whitelist_status(&io, &args)
+            .try_to_vec()
+            .map_err(|e| e.to_string())
+            .sdk_unwrap();
+
+        io.return_output(&status);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn add_entry_to_whitelist() {
+        let io = Runtime;
+        silo::assert_admin(&io);
+
+        let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
+        silo::add_entity_to_whitelist(&io, &args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn add_entry_to_whitelist_batch() {
+        let io = Runtime;
+        silo::assert_admin(&io);
+
+        let args: Vec<WhitelistArgs> = io.read_input_borsh().sdk_unwrap();
+        silo::add_entry_to_whitelist_batch(&io, args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn remove_entry_from_whitelist() {
+        let io = Runtime;
+        silo::assert_admin(&io);
+
+        let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
+        silo::remove_entry_from_whitelist(&io, &args);
+    }
+
+    ///
     /// Utility methods.
     ///
 
@@ -1091,12 +1147,20 @@ mod contract {
 
     fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
         if &state.owner_id != predecessor_account_id {
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
+            sdk::panic_utf8(errors::ERR_NOT_OWNER);
         }
     }
 
     fn predecessor_address(predecessor_account_id: &AccountId) -> Address {
         near_account_to_evm_address(predecessor_account_id.as_bytes())
+    }
+
+    fn read_json_args<I: IO, T>(io: &I) -> Result<T, parameters::error::ParseArgsError>
+    where
+        T: DeserializeOwned,
+    {
+        let bytes = io.read_input().to_vec();
+        parameters::parse_json_args(&bytes)
     }
 
     mod exports {

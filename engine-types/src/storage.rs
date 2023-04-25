@@ -32,6 +32,8 @@ pub enum KeyPrefix {
     Nep141Erc20Map = 0x8,
     Erc20Nep141Map = 0x9,
     CrossContractCall = 0xa,
+    FixedGasCost = 0xb,
+    WhiteList = 0xc,
 }
 
 impl From<KeyPrefix> for u8 {
@@ -48,6 +50,8 @@ impl From<KeyPrefix> for u8 {
             KeyPrefix::Nep141Erc20Map => 0x8,
             KeyPrefix::Erc20Nep141Map => 0x9,
             KeyPrefix::CrossContractCall => 0xa,
+            KeyPrefix::FixedGasCost => 0xb,
+            KeyPrefix::WhiteList => 0xc,
         }
     }
 }
@@ -94,6 +98,8 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x8 => Self::Nep141Erc20Map,
             0x9 => Self::Erc20Nep141Map,
             0xa => Self::CrossContractCall,
+            0xb => Self::FixedGasCost,
+            0xc => Self::WhiteList,
             _ => unreachable!(),
         }
     }

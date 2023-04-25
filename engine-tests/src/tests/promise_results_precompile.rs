@@ -133,7 +133,7 @@ fn test_promise_result_gas_cost() {
         total_gas1 / NEAR_GAS_PER_EVM
     );
     assert!(
-        test_utils::within_x_percent(6, evm2, total_gas2 / NEAR_GAS_PER_EVM),
+        test_utils::within_x_percent(7, evm2, total_gas2 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / NEAR_GAS_PER_EVM

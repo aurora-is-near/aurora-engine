@@ -1,4 +1,4 @@
-use crate::{format, String, H160};
+use crate::{format, AsBytes, String, H160};
 #[cfg(not(feature = "borsh-compat"))]
 use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
 #[cfg(feature = "borsh-compat")]
@@ -66,6 +66,12 @@ impl TryFrom<&[u8]> for Address {
 
     fn try_from(raw_addr: &[u8]) -> Result<Self, Self::Error> {
         Self::try_from_slice(raw_addr).map_err(|_| error::AddressError::IncorrectLength)
+    }
+}
+
+impl AsBytes for Address {
+    fn as_bytes(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 

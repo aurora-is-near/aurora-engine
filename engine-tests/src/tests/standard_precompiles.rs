@@ -60,13 +60,13 @@ fn profile_modexp() {
 #[test]
 fn profile_ecadd() {
     let profile = precompile_execution_profile("test_ecadd");
-    test_utils::assert_gas_bound(profile.all_gas(), 5);
+    test_utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
 #[test]
 fn profile_ecmul() {
     let profile = precompile_execution_profile("test_ecmul");
-    test_utils::assert_gas_bound(profile.all_gas(), 6);
+    test_utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
 #[test]

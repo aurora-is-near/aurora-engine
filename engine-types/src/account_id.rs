@@ -2,7 +2,7 @@
 //!
 //! Inspired by: `https://github.com/near/nearcore/tree/master/core/account-id`
 
-use crate::{fmt, str, str::FromStr, Box, String, ToString, Vec};
+use crate::{fmt, str, str::FromStr, AsBytes, Box, String, ToString, Vec};
 #[cfg(not(feature = "borsh-compat"))]
 use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
 #[cfg(feature = "borsh-compat")]
@@ -181,6 +181,12 @@ impl From<AccountId> for Box<str> {
 impl From<AccountId> for Vec<u8> {
     fn from(account_id: AccountId) -> Self {
         account_id.as_bytes().to_vec()
+    }
+}
+
+impl AsBytes for AccountId {
+    fn as_bytes(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 

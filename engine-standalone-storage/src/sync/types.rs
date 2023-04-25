@@ -1,5 +1,6 @@
 use crate::Storage;
 use aurora_engine::parameters;
+use aurora_engine::silo;
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -130,7 +131,13 @@ pub enum TransactionKind {
     /// Update the version of a deployed xcc-router contract
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
     FactorySetWNearAddress(Address),
-    FundXccSubAccound(FundXccArgs),
+    FundXccSubAccount(FundXccArgs),
+    /// Silo operations
+    SetFixedGasCost(silo::parameters::FixedGasCostArgs),
+    AddEntryToWhitelist(silo::parameters::WhitelistArgs),
+    AddEntryToWhitelistBatch(Vec<silo::parameters::WhitelistArgs>),
+    RemoveEntryFromWhitelist(silo::parameters::WhitelistArgs),
+    SetWhitelistStatus(silo::parameters::WhitelistStatusArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -353,7 +360,16 @@ impl TransactionKind {
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
             Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
-            Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
+            Self::FundXccSubAccount(_) => Self::no_evm_execution("fund_xcc_sub_account"),
+            Self::SetFixedGasCost(_) => Self::no_evm_execution("set_fixed_gas_cost"),
+            Self::AddEntryToWhitelist(_) => Self::no_evm_execution("add_entry_to_whitelist"),
+            Self::AddEntryToWhitelistBatch(_) => {
+                Self::no_evm_execution("add_entry_to_whitelist_batch")
+            }
+            Self::RemoveEntryFromWhitelist(_) => {
+                Self::no_evm_execution("remove_entry_from_whitelist")
+            }
+            Self::SetWhitelistStatus(_) => Self::no_evm_execution("set_whitelist_status"),
         }
     }
 
@@ -521,8 +537,13 @@ enum BorshableTransactionKind<'a> {
     Unknown,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
-    FundXccSubAccound(Cow<'a, FundXccArgs>),
+    FundXccSubAccount(Cow<'a, FundXccArgs>),
     SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
+    SetFixedGasCost(Cow<'a, silo::parameters::FixedGasCostArgs>),
+    AddEntryToWhitelist(Cow<'a, silo::parameters::WhitelistArgs>),
+    AddEntryToWhitelistBatch(Cow<'a, Vec<silo::parameters::WhitelistArgs>>),
+    RemoveEntryFromWhitelist(Cow<'a, silo::parameters::WhitelistArgs>),
+    SetWhitelistStatus(Cow<'a, silo::parameters::WhitelistStatusArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -565,10 +586,19 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
             TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
-            TransactionKind::FundXccSubAccound(x) => Self::FundXccSubAccound(Cow::Borrowed(x)),
+            TransactionKind::FundXccSubAccount(x) => Self::FundXccSubAccount(Cow::Borrowed(x)),
             TransactionKind::SetUpgradeDelayBlocks(x) => {
                 Self::SetUpgradeDelayBlocks(Cow::Borrowed(x))
             }
+            TransactionKind::SetFixedGasCost(x) => Self::SetFixedGasCost(Cow::Borrowed(x)),
+            TransactionKind::AddEntryToWhitelist(x) => Self::AddEntryToWhitelist(Cow::Borrowed(x)),
+            TransactionKind::AddEntryToWhitelistBatch(x) => {
+                Self::AddEntryToWhitelistBatch(Cow::Borrowed(x))
+            }
+            TransactionKind::RemoveEntryFromWhitelist(x) => {
+                Self::RemoveEntryFromWhitelist(Cow::Borrowed(x))
+            }
+            TransactionKind::SetWhitelistStatus(x) => Self::SetWhitelistStatus(Cow::Borrowed(x)),
         }
     }
 }
@@ -628,11 +658,26 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
             }
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
-            BorshableTransactionKind::FundXccSubAccound(x) => {
-                Ok(Self::FundXccSubAccound(x.into_owned()))
+            BorshableTransactionKind::FundXccSubAccount(x) => {
+                Ok(Self::FundXccSubAccount(x.into_owned()))
             }
             BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
                 Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
+            }
+            BorshableTransactionKind::SetFixedGasCost(x) => {
+                Ok(Self::SetFixedGasCost(x.into_owned()))
+            }
+            BorshableTransactionKind::AddEntryToWhitelist(x) => {
+                Ok(Self::AddEntryToWhitelist(x.into_owned()))
+            }
+            BorshableTransactionKind::AddEntryToWhitelistBatch(x) => {
+                Ok(Self::AddEntryToWhitelistBatch(x.into_owned()))
+            }
+            BorshableTransactionKind::RemoveEntryFromWhitelist(x) => {
+                Ok(Self::RemoveEntryFromWhitelist(x.into_owned()))
+            }
+            BorshableTransactionKind::SetWhitelistStatus(x) => {
+                Ok(Self::SetWhitelistStatus(x.into_owned()))
             }
         }
     }

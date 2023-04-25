@@ -242,28 +242,39 @@ pub struct PausePrecompilesCallArgs {
     pub paused_mask: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct StorageUnregisterArgs {
+    pub force: bool,
+}
+
+pub fn parse_json_args<'de, T: Deserialize<'de>>(
+    bytes: &'de [u8],
+) -> Result<T, error::ParseArgsError> {
+    serde_json::from_slice(bytes).map_err(Into::into)
+}
+
 pub mod error {
     use aurora_engine_types::{account_id::ParseAccountError, String, ToString};
 
     #[derive(Debug)]
-    pub enum ParseTypeFromJsonError {
+    pub enum ParseArgsError {
         Json(String),
         InvalidAccount(ParseAccountError),
     }
 
-    impl From<serde_json::Error> for ParseTypeFromJsonError {
+    impl From<serde_json::Error> for ParseArgsError {
         fn from(e: serde_json::Error) -> Self {
             Self::Json(e.to_string())
         }
     }
 
-    impl From<ParseAccountError> for ParseTypeFromJsonError {
+    impl From<ParseAccountError> for ParseArgsError {
         fn from(e: ParseAccountError) -> Self {
             Self::InvalidAccount(e)
         }
     }
 
-    impl AsRef<[u8]> for ParseTypeFromJsonError {
+    impl AsRef<[u8]> for ParseArgsError {
         fn as_ref(&self) -> &[u8] {
             match self {
                 Self::Json(e) => e.as_bytes(),

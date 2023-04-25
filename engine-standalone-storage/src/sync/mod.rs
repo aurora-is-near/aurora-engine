@@ -2,7 +2,7 @@ use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
-use aurora_engine::{connector, engine, parameters::SubmitResult, state, xcc};
+use aurora_engine::{connector, engine, parameters::SubmitResult, silo, state, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::{
     account_id::AccountId,
@@ -413,7 +413,7 @@ fn non_submit_execute<'db>(
 
             None
         }
-        TransactionKind::FundXccSubAccound(args) => {
+        TransactionKind::FundXccSubAccount(args) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
             xcc::fund_xcc_sub_account(&io, &mut handler, &env, args.clone())?;
 
@@ -452,6 +452,26 @@ fn non_submit_execute<'db>(
             prev.upgrade_delay_blocks = args.upgrade_delay_blocks;
             state::set_state(&mut io, &prev)?;
 
+            None
+        }
+        TransactionKind::SetFixedGasCost(args) => {
+            silo::set_fixed_gas_cost(&mut io, args.cost);
+            None
+        }
+        TransactionKind::AddEntryToWhitelist(args) => {
+            silo::add_entity_to_whitelist(&io, args);
+            None
+        }
+        TransactionKind::AddEntryToWhitelistBatch(args) => {
+            silo::add_entry_to_whitelist_batch(&io, args.clone());
+            None
+        }
+        TransactionKind::RemoveEntryFromWhitelist(args) => {
+            silo::remove_entry_from_whitelist(&io, args);
+            None
+        }
+        TransactionKind::SetWhitelistStatus(args) => {
+            silo::set_whitelist_status(&io, args);
             None
         }
     };

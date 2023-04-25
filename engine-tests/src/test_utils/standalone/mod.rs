@@ -3,6 +3,7 @@ use aurora_engine::parameters::{
     CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs,
     SetUpgradeDelayBlocksArgs, SubmitArgs, SubmitResult, TransactionStatus,
 };
+use aurora_engine::silo::parameters::{FixedGasCostArgs, WhitelistArgs, WhitelistStatusArgs};
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
@@ -194,143 +195,238 @@ impl StandaloneRunner {
         let mut env = self.env.clone();
         env.block_height = ctx.block_index;
         env.attached_deposit = ctx.attached_deposit;
-        env.block_timestamp = aurora_engine_sdk::env::Timestamp::new(ctx.block_timestamp);
+        env.block_timestamp = env::Timestamp::new(ctx.block_timestamp);
         env.predecessor_account_id = ctx.predecessor_account_id.as_ref().parse().unwrap();
         env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
         env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
 
         let storage = &mut self.storage;
-        if method_name == test_utils::SUBMIT {
-            let transaction_bytes = &ctx.input;
-            Self::internal_submit_transaction(
-                transaction_bytes,
-                0,
-                storage,
-                &mut env,
-                &mut self.cumulative_diff,
-                promise_results,
-            )
-        } else if method_name == test_utils::SUBMIT_WITH_ARGS {
-            let submit_args = SubmitArgs::try_from_slice(&ctx.input).unwrap();
-            let transaction_hash = aurora_engine_sdk::keccak(&submit_args.tx_data);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::SubmitWithArgs(submit_args);
 
-            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
+        match method_name {
+            test_utils::SUBMIT => {
+                let transaction_bytes = &ctx.input;
+                Self::internal_submit_transaction(
+                    transaction_bytes,
+                    0,
+                    storage,
+                    &mut env,
+                    &mut self.cumulative_diff,
+                    promise_results,
+                )
+            }
+            test_utils::SUBMIT_WITH_ARGS => {
+                let submit_args = SubmitArgs::try_from_slice(&ctx.input).unwrap();
+                let transaction_hash = aurora_engine_sdk::keccak(&submit_args.tx_data);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::SubmitWithArgs(submit_args);
 
-            unwrap_result(outcome)
-        } else if method_name == test_utils::CALL {
-            let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::Call(call_args);
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
 
-            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
+                unwrap_result(outcome)
+            }
+            test_utils::CALL => {
+                let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::Call(call_args);
 
-            unwrap_result(outcome)
-        } else if method_name == test_utils::DEPLOY_ERC20 {
-            let deploy_args = DeployErc20TokenArgs::try_from_slice(&ctx.input).unwrap();
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::DeployErc20(deploy_args);
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
 
-            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
+                unwrap_result(outcome)
+            }
+            test_utils::DEPLOY_ERC20 => {
+                let deploy_args = DeployErc20TokenArgs::try_from_slice(&ctx.input).unwrap();
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::DeployErc20(deploy_args);
 
-            let sync::TransactionExecutionResult::DeployErc20(address) = outcome.maybe_result.unwrap().unwrap() else { unreachable!() };
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
 
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
-                0,
-                Vec::new(),
-            ))
-        } else if method_name == test_utils::RESUME_PRECOMPILES {
-            let input = &ctx.input[..];
-            let call_args = PausePrecompilesCallArgs::try_from_slice(input)
-                .expect("Unable to parse input as PausePrecompilesCallArgs");
+                let sync::TransactionExecutionResult::DeployErc20(address) = outcome.maybe_result.unwrap().unwrap() else { unreachable!() };
 
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::ResumePrecompiles(call_args);
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::RESUME_PRECOMPILES => {
+                let call_args = PausePrecompilesCallArgs::try_from_slice(&ctx.input)
+                    .expect("Unable to parse input as PausePrecompilesCallArgs");
 
-            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::ResumePrecompiles(call_args);
 
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else if method_name == test_utils::PAUSE_PRECOMPILES {
-            let input = &ctx.input[..];
-            let call_args = PausePrecompilesCallArgs::try_from_slice(input)
-                .expect("Unable to parse input as PausePrecompilesCallArgs");
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
 
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::PausePrecompiles(call_args);
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::PAUSE_PRECOMPILES => {
+                let call_args = PausePrecompilesCallArgs::try_from_slice(&ctx.input)
+                    .expect("Unable to parse input as PausePrecompilesCallArgs");
 
-            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::PausePrecompiles(call_args);
 
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else if method_name == test_utils::SET_OWNER {
-            let input = &ctx.input[..];
-            let call_args =
-                SetOwnerArgs::try_from_slice(input).expect("Unable to parse input as SetOwnerArgs");
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
 
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::SetOwner(call_args);
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::SET_OWNER => {
+                let call_args = SetOwnerArgs::try_from_slice(&ctx.input)
+                    .expect("Unable to parse input as SetOwnerArgs");
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::SetOwner(call_args);
 
-            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
 
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else if method_name == test_utils::SET_UPGRADE_DELAY_BLOCKS {
-            let input = &ctx.input;
-            let call_args = SetUpgradeDelayBlocksArgs::try_from_slice(input)
-                .expect("Unable to parse input as SetUpgradeDelayBlocksArgs");
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::SET_UPGRADE_DELAY_BLOCKS => {
+                let input = &ctx.input;
+                let call_args = SetUpgradeDelayBlocksArgs::try_from_slice(input)
+                    .expect("Unable to parse input as SetUpgradeDelayBlocksArgs");
 
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::SetUpgradeDelayBlocks(call_args);
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::SetUpgradeDelayBlocks(call_args);
 
-            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
 
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else {
-            panic!("Unsupported standalone method {method_name}");
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::SET_FIXED_GAS_COST => {
+                let call_args = FixedGasCostArgs::try_from_slice(&ctx.input)
+                    .expect("Unable to parse input as FixedGasCostArgs");
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::SetFixedGasCost(call_args);
+
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
+
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::ADD_ENTRY_TO_WHITELIST => {
+                let call_args = WhitelistArgs::try_from_slice(&ctx.input)
+                    .expect("Unable to parse input as WhitelistArgs");
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::AddEntryToWhitelist(call_args);
+
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
+
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::ADD_ENTRY_TO_WHITELIST_BATCH => {
+                let call_args: Vec<WhitelistArgs> = BorshDeserialize::try_from_slice(&ctx.input)
+                    .expect("Unable to parse input as vector of WhitelistArgs");
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::AddEntryToWhitelistBatch(call_args);
+
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
+
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::REMOVE_ENTRY_FROM_WHITELIST => {
+                let call_args = WhitelistArgs::try_from_slice(&ctx.input)
+                    .expect("Unable to parse WhitelistArgs");
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::RemoveEntryFromWhitelist(call_args);
+
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
+
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::SET_WHITELIST_STATUS => {
+                let call_args = WhitelistStatusArgs::try_from_slice(&ctx.input)
+                    .expect("Unable to parse WhitelistStatusArgs");
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::SetWhitelistStatus(call_args);
+
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
+
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            _ => panic!("Unsupported standalone method {method_name}"),
         }
     }
 
@@ -422,7 +518,7 @@ impl StandaloneRunner {
 
         let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
         cumulative_diff.append(outcome.diff.clone());
-        test_utils::standalone::storage::commit(storage, &outcome);
+        storage::commit(storage, &outcome);
 
         unwrap_result(outcome)
     }

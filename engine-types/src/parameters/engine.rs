@@ -155,6 +155,7 @@ pub struct GetStorageAtArgs {
 
 pub mod errors {
     pub const ERR_REVERT: &[u8; 10] = b"ERR_REVERT";
+    pub const ERR_NOT_ALLOWED: &[u8; 15] = b"ERR_NOT_ALLOWED";
     pub const ERR_OUT_OF_FUNDS: &[u8; 16] = b"ERR_OUT_OF_FUNDS";
     pub const ERR_CALL_TOO_DEEP: &[u8; 17] = b"ERR_CALL_TOO_DEEP";
     pub const ERR_OUT_OF_OFFSET: &[u8; 17] = b"ERR_OUT_OF_OFFSET";

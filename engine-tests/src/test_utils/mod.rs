@@ -1,4 +1,5 @@
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
+use aurora_engine::silo::parameters::FixedGasCostArgs;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -36,6 +37,11 @@ pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const SET_OWNER: &str = "set_owner";
 pub const SET_UPGRADE_DELAY_BLOCKS: &str = "set_upgrade_delay_blocks";
+pub const SET_FIXED_GAS_COST: &str = "set_fixed_gas_cost";
+pub const ADD_ENTRY_TO_WHITELIST: &str = "add_entry_to_whitelist";
+pub const ADD_ENTRY_TO_WHITELIST_BATCH: &str = "add_entry_to_whitelist_batch";
+pub const REMOVE_ENTRY_FROM_WHITELIST: &str = "remove_entry_from_whitelist";
+pub const SET_WHITELIST_STATUS: &str = "set_whitelist_status";
 
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
@@ -235,7 +241,12 @@ impl AuroraRunner {
                     || method_name == PAUSE_PRECOMPILES
                     || method_name == RESUME_PRECOMPILES
                     || method_name == SET_OWNER
-                    || method_name == SET_UPGRADE_DELAY_BLOCKS)
+                    || method_name == SET_UPGRADE_DELAY_BLOCKS
+                    || method_name == SET_FIXED_GAS_COST
+                    || method_name == ADD_ENTRY_TO_WHITELIST
+                    || method_name == ADD_ENTRY_TO_WHITELIST_BATCH
+                    || method_name == REMOVE_ENTRY_FROM_WHITELIST
+                    || method_name == SET_WHITELIST_STATUS)
             {
                 standalone_runner
                     .submit_raw(method_name, &self.context, &self.promise_results)
@@ -518,6 +529,13 @@ impl AuroraRunner {
         self.getter_method_call("get_code", address)
     }
 
+    pub fn get_fixed_gas_cost(&mut self) -> Option<Wei> {
+        let (res, err) = self.one_shot().call("get_fixed_gas_cost", "getter", vec![]);
+        assert!(err.is_none(), "get_fixed_gas_cost: {:?}", err);
+        let val = res.unwrap().return_data.as_value()?;
+        FixedGasCostArgs::try_from_slice(&val).unwrap().cost
+    }
+
     pub fn get_storage(&self, address: Address, key: H256) -> H256 {
         let input = aurora_engine::parameters::GetStorageAtArgs {
             address,
@@ -571,13 +589,32 @@ impl AuroraRunner {
             let standalone_state = standalone_runner.get_current_state();
             // The number of keys in standalone_state may be larger because values are never deleted
             // (they are replaced with a Deleted identifier instead; this is important for replaying transactions).
-            assert!(self.ext.underlying.fake_trie.len() <= standalone_state.iter().count());
+            let fake_trie_len = self.ext.underlying.fake_trie.len();
+            let stand_alone_len = standalone_state.iter().count();
+
+            if fake_trie_len > stand_alone_len {
+                let fake_keys = self
+                    .ext
+                    .underlying
+                    .fake_trie
+                    .keys()
+                    .map(Clone::clone)
+                    .collect::<std::collections::HashSet<_>>();
+                let standalone_keys = standalone_state
+                    .iter()
+                    .map(|x| x.0.clone())
+                    .collect::<std::collections::HashSet<_>>();
+                let diff = fake_keys.difference(&standalone_keys).collect::<Vec<_>>();
+
+                panic!("The standalone state has less amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {:?}", diff);
+            }
+
             for (key, value) in standalone_state.iter() {
                 let trie_value = self.ext.underlying.fake_trie.get(key).map(Vec::as_slice);
                 let standalone_value = value.value();
                 assert_eq!(
                     trie_value, standalone_value,
-                    "Standalone mismatch at {key:?}.\nStandlaone: {standalone_value:?}\nWasm: {trie_value:?}",
+                    "Standalone mismatch at {key:?}.\nStandalone: {standalone_value:?}\nWasm: {trie_value:?}",
                 );
             }
         }

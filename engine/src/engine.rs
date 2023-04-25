@@ -29,6 +29,7 @@ use crate::prelude::{
     BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, Vec, Wei,
     Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
+use crate::silo;
 use crate::state::EngineState;
 use aurora_engine_precompiles::PrecompileConstructorContext;
 use core::cell::RefCell;
@@ -110,6 +111,8 @@ pub enum EngineErrorKind {
     MaxPriorityGasFeeTooLarge,
     GasPayment(GasPaymentError),
     GasOverflow,
+    NotAllowed,
+    NotOwner,
 }
 
 impl EngineErrorKind {
@@ -140,6 +143,8 @@ impl EngineErrorKind {
             Self::MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
             Self::GasPayment(e) => e.as_ref(),
             Self::GasOverflow => errors::ERR_GAS_OVERFLOW,
+            Self::NotAllowed => errors::ERR_NOT_ALLOWED,
+            Self::NotOwner => errors::ERR_NOT_OWNER,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
@@ -421,8 +426,9 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         sender: &Address,
         transaction: &NormalizedEthTransaction,
         max_gas_price: Option<U256>,
+        fixed_gas_cost: Option<Wei>,
     ) -> Result<GasPaymentResult, GasPaymentError> {
-        if transaction.max_fee_per_gas.is_zero() {
+        if transaction.max_fee_per_gas.is_zero() && fixed_gas_cost.is_none() {
             return Ok(GasPaymentResult::default());
         }
 
@@ -433,11 +439,16 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             price.min(priority_fee_per_gas)
         });
         let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
-        let gas_limit = transaction.gas_limit;
-        let prepaid_amount = gas_limit
-            .checked_mul(effective_gas_price)
-            .map(Wei::new)
-            .ok_or(GasPaymentError::EthAmountOverflow)?;
+        let prepaid_amount = fixed_gas_cost.map_or_else(
+            || {
+                transaction
+                    .gas_limit
+                    .checked_mul(effective_gas_price)
+                    .map(Wei::new)
+                    .ok_or(GasPaymentError::EthAmountOverflow)
+            },
+            Ok,
+        )?;
 
         let new_balance = get_balance(&self.io, sender)
             .checked_sub(prepaid_amount)
@@ -811,6 +822,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     mut io: I,
     env: &E,
@@ -844,6 +856,19 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
 
+    let fixed_gas_cost = silo::get_fixed_gas_cost(&io);
+    let transaction = if fixed_gas_cost.is_some() {
+        // Change `gas_limit` to the max value for EVM. Gas costs always fixed.
+        let mut tx = transaction;
+        tx.gas_limit = u64::MAX.into();
+        tx
+    } else {
+        transaction
+    };
+
+    // Check if the sender has rights to submit transactions or deploy code on SILO mode.
+    assert_access(&io, env, &fixed_gas_cost, &transaction)?;
+
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
         if U256::from(chain_id) != U256::from(state.chain_id) {
@@ -858,14 +883,16 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     check_nonce(&io, &sender, &transaction.nonce)?;
 
-    // Check intrinsic gas is covered by transaction gas limit
-    match transaction.intrinsic_gas(crate::engine::CONFIG) {
-        Err(_e) => {
-            return Err(EngineErrorKind::GasOverflow.into());
-        }
-        Ok(intrinsic_gas) => {
-            if transaction.gas_limit < intrinsic_gas.into() {
-                return Err(EngineErrorKind::IntrinsicGasNotMet.into());
+    if fixed_gas_cost.is_none() {
+        // Check intrinsic gas is covered by transaction gas limit
+        match transaction.intrinsic_gas(CONFIG) {
+            Err(_e) => {
+                return Err(EngineErrorKind::GasOverflow.into());
+            }
+            Ok(intrinsic_gas) => {
+                if transaction.gas_limit < intrinsic_gas.into() {
+                    return Err(EngineErrorKind::IntrinsicGasNotMet.into());
+                }
             }
         }
     }
@@ -875,14 +902,15 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     }
 
     let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
+    let max_gas_price = args.max_gas_price.map(Into::into);
     let prepaid_amount =
-        match engine.charge_gas(&sender, &transaction, args.max_gas_price.map(Into::into)) {
+        match engine.charge_gas(&sender, &transaction, max_gas_price, fixed_gas_cost) {
             Ok(gas_result) => gas_result,
             Err(err) => {
                 return Err(EngineErrorKind::GasPayment(err).into());
             }
         };
-    let gas_limit: u64 = transaction
+    let gas_limit = transaction
         .gas_limit
         .try_into()
         .map_err(|_| EngineErrorKind::GasOverflow)?;
@@ -915,22 +943,24 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         // TODO: charge for storage
     };
 
-    // Give refund
-    let gas_used = match &result {
-        Ok(submit_result) => submit_result.gas_used,
-        Err(engine_err) => engine_err.gas_used,
-    };
-    refund_unused_gas(
-        &mut io,
-        &sender,
-        gas_used,
-        &prepaid_amount,
-        &relayer_address,
-    )
-    .map_err(|e| EngineError {
-        gas_used,
-        kind: EngineErrorKind::GasPayment(e),
-    })?;
+    if fixed_gas_cost.is_none() {
+        // Give refund. There is no refund if fixed gas cost.
+        let gas_used = match &result {
+            Ok(submit_result) => submit_result.gas_used,
+            Err(engine_err) => engine_err.gas_used,
+        };
+        refund_unused_gas(
+            &mut io,
+            &sender,
+            gas_used,
+            &prepaid_amount,
+            &relayer_address,
+        )
+        .map_err(|e| EngineError {
+            gas_used,
+            kind: EngineErrorKind::GasPayment(e),
+        })?;
+    }
 
     // return result to user
     result
@@ -1425,6 +1455,30 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
         promise.method
     );
     handler.promise_attach_callback(base_id, promise)
+}
+
+fn assert_access<I: IO + Copy, E: Env>(
+    io: &I,
+    env: &E,
+    fixed_gas_cost: &Option<Wei>,
+    transaction: &NormalizedEthTransaction,
+) -> Result<(), EngineError> {
+    if fixed_gas_cost.is_some() {
+        let is_allow = if transaction.to.is_some() {
+            silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
+        } else {
+            silo::is_allow_deploy(io, &env.predecessor_account_id(), &transaction.address)
+        };
+
+        if !is_allow {
+            return Err(EngineError {
+                kind: EngineErrorKind::NotAllowed,
+                gas_used: 0,
+            });
+        }
+    }
+
+    Ok(())
 }
 
 impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
@@ -1992,7 +2046,9 @@ mod tests {
             data: vec![],
             access_list: vec![],
         };
-        let actual_result = engine.charge_gas(&origin, &transaction, None).unwrap();
+        let actual_result = engine
+            .charge_gas(&origin, &transaction, None, None)
+            .unwrap();
 
         let expected_result = GasPaymentResult {
             prepaid_amount: Wei::zero(),
