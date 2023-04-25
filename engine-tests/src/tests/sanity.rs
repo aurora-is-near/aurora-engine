@@ -3,9 +3,11 @@ use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::test_utils::{self, str_to_account_id};
 use crate::tests::state_migration;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
-use aurora_engine::parameters::{SetOwnerArgs, SubmitResult, TransactionStatus};
+use aurora_engine::parameters::{
+    SetOwnerArgs, SetUpgradeDelayBlocksArgs, SubmitResult, TransactionStatus,
+};
 use aurora_engine_sdk as sdk;
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 use libsecp256k1::SecretKey;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
@@ -1126,6 +1128,39 @@ fn test_set_owner_fail_on_same_owner() {
         error.unwrap().to_string(),
         "Smart contract panicked: ERR_SAME_OWNER"
     );
+}
+
+#[test]
+fn test_set_upgrade_delay_blocks() {
+    let mut runner = test_utils::deploy_evm();
+    let aurora_account_id = runner.aurora_account_id.clone();
+
+    // set upgrade_delay_blocks args
+    let set_upgrade_delay_blocks = SetUpgradeDelayBlocksArgs {
+        upgrade_delay_blocks: 2,
+    };
+
+    let (outcome, error) = runner.call(
+        "set_upgrade_delay_blocks",
+        &aurora_account_id,
+        set_upgrade_delay_blocks.try_to_vec().unwrap(),
+    );
+
+    // should succeed
+    assert!(outcome.is_some() && error.is_none());
+
+    // get upgrade_delay_blocks to see if the upgrade_delay_blocks property has changed
+    let (outcome, error) = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+
+    // check if the query goes through the standalone runner
+    assert!(outcome.is_some() && error.is_none());
+
+    // check if the upgrade_delay_blocks property has changed to 2
+    let result = SetUpgradeDelayBlocksArgs::try_from_slice(
+        outcome.unwrap().return_data.as_value().unwrap().as_slice(),
+    )
+    .unwrap();
+    assert_eq!(result.upgrade_delay_blocks, 2);
 }
 
 fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, Address) {
