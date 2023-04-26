@@ -501,6 +501,46 @@ fn test_ft_transfer_call_without_message() {
     let balance = get_eth_on_near_balance(&master_account, CONTRACT_ACC, CONTRACT_ACC);
     assert_eq!(balance, DEPOSITED_FEE);
 
+    // should revert with `not enough balance` error when sending arbitrary amount while sender_id == receiver_id
+    let transfer_amount = 1000000000;
+    let res = recipient_account.call(
+        CONTRACT_ACC.parse().unwrap(),
+        "ft_transfer_call",
+        json!({
+            "receiver_id": recipient_account.signer.account_id.to_string(),
+            "amount": transfer_amount.to_string(),
+            "msg": "",
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+
+    assert_execution_status_failure(
+        res.outcome().clone().status,
+        "ExecutionError(\"Smart contract panicked: ERR_NOT_ENOUGH_BALANCE\")",
+        "Expected failure in `ft_transfer_call` call, but call succeeded",
+    );
+
+    // should not revert with `not enough balance` error when sending arbitrary amount while sender_id == receiver_id with amount < balance
+    let transfer_amount = 1;
+    let res = recipient_account.call(
+        CONTRACT_ACC.parse().unwrap(),
+        "ft_transfer_call",
+        json!({
+            "receiver_id": recipient_account.signer.account_id.to_string(),
+            "amount": transfer_amount.to_string(),
+            "msg": "",
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
+        1,
+    );
+
+    res.assert_success();
+
     // Sending to random account should not change balances
     let transfer_amount = 22;
     let res = recipient_account.call(

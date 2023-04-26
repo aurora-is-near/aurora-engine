@@ -75,7 +75,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use borsh::{BorshDeserialize, BorshSerialize};
-    use parameters::SetOwnerArgs;
+    use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
@@ -122,8 +122,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn new() {
         let mut io = Runtime;
-        if let Ok(state) = state::get_state(&io) {
-            require_owner_only(&state, &io.predecessor_account_id());
+
+        if state::get_state(&io).is_ok() {
+            sdk::panic_utf8(b"ERR_ALREADY_INITIALIZED");
         }
 
         let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
@@ -178,6 +179,23 @@ mod contract {
     }
 
     #[no_mangle]
+    pub extern "C" fn get_upgrade_delay_blocks() {
+        let mut io = Runtime;
+        let state = state::get_state(&io).sdk_unwrap();
+        io.return_output(&state.upgrade_delay_blocks.to_le_bytes());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_upgrade_delay_blocks() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let args: SetUpgradeDelayBlocksArgs = io.read_input_borsh().sdk_unwrap();
+        state.upgrade_delay_blocks = args.upgrade_delay_blocks;
+        state::set_state(&mut io, &state).sdk_unwrap();
+    }
+
+    #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let mut io = Runtime;
         let index = internal_get_upgrade_index();
@@ -201,7 +219,7 @@ mod contract {
     /// Deploy staged upgrade.
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
-        let io = Runtime;
+        let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let index = internal_get_upgrade_index();
@@ -209,6 +227,7 @@ mod contract {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED_TOO_EARLY);
         }
         Runtime::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
+        io.remove_storage(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY));
     }
 
     /// Called as part of the upgrade process (see `engine-sdk::self_deploy`). This function is meant
@@ -241,7 +260,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn pause_precompiles() {
         let io = Runtime;
-        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer();
+        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer(&io);
 
         if !authorizer.is_authorized(&io.predecessor_account_id()) {
             sdk::panic_utf8(b"ERR_UNAUTHORIZED");
@@ -412,11 +431,27 @@ mod contract {
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
     }
 
+    /// Create and/or fund an XCC sub-account directly (as opposed to having one be automatically
+    /// created via the XCC precompile in the EVM). The purpose of this method is to enable
+    /// XCC on engine instances where wrapped NEAR (WNEAR) is not bridged.
+    #[no_mangle]
+    pub extern "C" fn fund_xcc_sub_account() {
+        let io = Runtime;
+        let state = state::get_state(&io).sdk_unwrap();
+        // This method can only be called by the owner because it allows specifying the
+        // account ID of the wNEAR account. This information must be accurate for the
+        // sub-account to work properly, therefore this method can only be called by
+        // a trusted user.
+        require_owner_only(&state, &io.predecessor_account_id());
+        let args: crate::xcc::FundXccArgs = io.read_input_borsh().sdk_unwrap();
+        crate::xcc::fund_xcc_sub_account(&io, &mut Runtime, &io, args).sdk_unwrap();
+    }
+
     /// Allow receiving NEP141 tokens to the EVM contract.
     ///
     /// This function returns the amount of tokens to return to the sender.
-    /// Either all tokens are transferred tokens are returned in case of an
-    /// error, or no token is returned if tx was successful.
+    /// Either all tokens are transferred and tokens are returned
+    /// in case of an error, or no token is returned if the transaction was successful.
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
         let io = Runtime;

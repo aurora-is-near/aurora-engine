@@ -1,7 +1,7 @@
 use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::{Address, EthGas};
 use crate::prelude::H256;
-use crate::PrecompileOutput;
+use crate::{utils, PrecompileOutput};
 use evm::{Context, ExitError};
 
 mod costs {
@@ -40,9 +40,10 @@ impl Precompile for RandomSeed {
         &self,
         input: &[u8],
         target_gas: Option<EthGas>,
-        _context: &Context,
+        context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {

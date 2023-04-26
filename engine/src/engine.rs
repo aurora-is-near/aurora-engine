@@ -569,9 +569,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 
         let (values, logs) = executor.into_state().deconstruct();
         let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
-
-        // There is no way to return the logs to the NEAR log method as it only
-        // allows a return of UTF-8 strings.
+        // The logs could be encoded as base64 or hex string.
         self.apply(values, Vec::<Log>::new(), true);
 
         Ok(SubmitResult::new(status, used_gas, logs))
@@ -1010,11 +1008,11 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
 }
 
 #[must_use]
-pub fn get_authorizer() -> EngineAuthorizer {
-    // TODO: a temporary account until the engine adapts std with near-plugins
-    let account = AccountId::new("aurora").expect("Failed to parse account from string");
-
-    EngineAuthorizer::from_accounts(once(account))
+pub fn get_authorizer<I: IO>(io: &I) -> EngineAuthorizer {
+    // TODO: a temporary use the owner account only until the engine adapts std with near-plugins
+    state::get_state(io)
+        .map(|state| EngineAuthorizer::from_accounts(once(state.owner_id)))
+        .unwrap_or_default()
 }
 
 pub fn refund_unused_gas<I: IO>(
