@@ -288,7 +288,7 @@ impl TestContract {
     }
 
     pub async fn get_eth_balance(&self, address: &Address) -> anyhow::Result<u128> {
-        use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+        use borsh::{self, BorshDeserialize, BorshSerialize};
         #[derive(BorshSerialize, BorshDeserialize)]
         pub struct BalanceOfEthCallArgs {
             pub address: Address,

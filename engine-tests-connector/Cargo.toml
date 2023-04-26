@@ -27,6 +27,7 @@ hex = "0.4.3"
 ethabi = "18.0"
 rlp = { version = "0.5.0", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
+borsh = { version = "0.10", default-features = false }
 
 [features]
 mainnet-test = []
