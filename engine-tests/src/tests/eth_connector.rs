@@ -50,8 +50,11 @@ pub struct IsUsedProofResult {
 
 fn init(custodian_address: &str) -> (UserAccount, UserAccount) {
     let master_account = near_sdk_sim::init_simulator(None);
-    let contract = init_contract(&master_account, CONTRACT_ACC, custodian_address);
-    (master_account, contract)
+    let contract_account = near_sdk_sim::init_simulator(None);
+    init_contract(&master_account, CONTRACT_ACC, custodian_address);
+    // let contract = init_contract(&master_account, CONTRACT_ACC, custodian_address);
+    // (master_account, contract)
+    (master_account, contract_account)
 }
 
 fn init_contract(
