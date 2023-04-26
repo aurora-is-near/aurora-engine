@@ -3,6 +3,7 @@ use crate::prelude::{Borrowed, PhantomData, Vec};
 use crate::utils;
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
 use bn::Group;
+use core::num::{NonZeroU64, NonZeroUsize};
 use evm::{Context, ExitError};
 
 /// bn128 costs.
@@ -67,6 +68,15 @@ mod consts {
 }
 
 #[cfg(feature = "contract")]
+mod type_arith {
+    pub struct Double<const P: usize>;
+    pub trait Is<const S: usize> {}
+    impl Is<128> for Double<64> {}
+    impl Is<64> for Double<32> {}
+    impl Is<32> for Double<16> {}
+}
+
+#[cfg(feature = "contract")]
 trait HostFnEncode {
     type Encoded;
 
@@ -74,10 +84,13 @@ trait HostFnEncode {
 }
 
 #[cfg(feature = "contract")]
-fn concat_low_high<const P: usize, const S: usize>(low: [u8; P], high: [u8; P]) -> [u8; S] {
+fn concat_low_high<const P: usize, const S: usize>(low: [u8; P], high: [u8; P]) -> [u8; S]
+where
+    type_arith::Double<P>: type_arith::Is<S>,
+{
     let mut bytes = [0u8; S];
     bytes[0..P].copy_from_slice(&low);
-    bytes[P..P * 2].copy_from_slice(&high);
+    bytes[P..S].copy_from_slice(&high);
     bytes
 }
 
@@ -151,6 +164,9 @@ impl HostFnEncode for bn::G2 {
 /// Reads the `x` and `y` points from an input at a given position.
 fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
     use bn::{AffineG1, Fq, G1};
+    if input.len() < (pos + consts::SCALAR_LEN * 2) {
+        return Err(ExitError::Other(Borrowed("INVALID_INPUT_LENGTH")));
+    }
 
     let px = Fq::from_slice(&input[pos..(pos + consts::SCALAR_LEN)])
         .map_err(|_e| ExitError::Other(Borrowed("ERR_FQ_INCORRECT")))?;
@@ -491,8 +507,9 @@ impl<HF: HardFork> Bn256Pair<HF> {
 impl Precompile for Bn256Pair<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
-        let pair_element_len =
-            u64::try_from(consts::PAIR_ELEMENT_LEN).map_err(utils::err_usize_conv)?;
+        let pair_element_len = NonZeroUsize::try_from(consts::PAIR_ELEMENT_LEN)
+            .and_then(NonZeroU64::try_from)
+            .map_err(utils::err_usize_conv)?;
         Ok(
             costs::BYZANTIUM_PAIR_PER_POINT * input_len / pair_element_len
                 + costs::BYZANTIUM_PAIR_BASE,
@@ -525,8 +542,9 @@ impl Precompile for Bn256Pair<Byzantium> {
 impl Precompile for Bn256Pair<Istanbul> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
-        let pair_element_len =
-            u64::try_from(consts::PAIR_ELEMENT_LEN).map_err(utils::err_usize_conv)?;
+        let pair_element_len = NonZeroUsize::try_from(consts::PAIR_ELEMENT_LEN)
+            .and_then(NonZeroU64::try_from)
+            .map_err(utils::err_usize_conv)?;
         Ok(
             costs::ISTANBUL_PAIR_PER_POINT * input_len / pair_element_len
                 + costs::ISTANBUL_PAIR_BASE,

@@ -82,7 +82,53 @@ command = "${CARGO}"
 args = [
     "clippy",
     "--all-targets",
-    "--all-features",
+    "--",
+    "-D",
+    "warnings",
+    "-D",
+    "clippy::as_conversions",
+]
+
+[tasks.clippy-contract]
+category = "Check"
+command = "${CARGO}"
+args = [
+    "clippy",
+    "--all-targets",
+    "--features",
+    "contract",
+    "--",
+    "-D",
+    "warnings",
+    "-D",
+    "clippy::as_conversions",
+]
+
+[tasks.clippy-contract-refund]
+category = "Check"
+command = "${CARGO}"
+args = [
+    "clippy",
+    "--all-targets",
+    "--features",
+    "contract,error_refund",
+    "--",
+    "-D",
+    "warnings",
+    "-D",
+    "clippy::as_conversions",
+]
+
+[tasks.clippy-borsh-compat]
+category = "Check"
+command = "${CARGO}"
+args = [
+    "clippy",
+    "-p",
+    "aurora-engine-types",
+    "--all-targets",
+    "--features",
+    "borsh-compat",
     "--",
     "-D",
     "warnings",
@@ -113,6 +159,9 @@ dependencies = [
     "check-contracts",
     "check-fmt",
     "clippy",
+    "clippy-contract",
+    "clippy-contract-refund",
+    "clippy-borsh-compat",
     "udeps",
 ]
 

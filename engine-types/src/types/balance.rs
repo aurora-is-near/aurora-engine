@@ -1,6 +1,9 @@
 use crate::fmt::Formatter;
 use crate::{format, Add, Display, Sub, ToString};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);

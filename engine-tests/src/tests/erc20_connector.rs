@@ -683,7 +683,12 @@ pub mod sim_tests {
         // deploy contract with simple exit to near method
         let constructor = TesterConstructor::load();
         let deploy_data = constructor.deploy(0, Address::zero()).data;
-        let submit_result: SubmitResult = aurora.call("deploy_code", &deploy_data).unwrap_borsh();
+        let submit_result = match aurora.call("deploy_code", &deploy_data).status() {
+            near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+                SubmitResult::try_from_slice(&bytes).unwrap()
+            }
+            other => panic!("Unexpected status {other:?}"),
+        };
         let tester_address =
             Address::try_from_slice(&test_utils::unwrap_success(submit_result)).unwrap();
 
@@ -853,7 +858,12 @@ pub mod sim_tests {
             input: balance_tx.data,
         });
         let result = aurora.call("call", &call_args.try_to_vec().unwrap());
-        let submit_result: SubmitResult = result.unwrap_borsh();
+        let submit_result = match result.status() {
+            near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+                SubmitResult::try_from_slice(&bytes).unwrap()
+            }
+            other => panic!("Unexpected status {other:?}"),
+        };
         U256::from_big_endian(&test_utils::unwrap_success(submit_result))
     }
 

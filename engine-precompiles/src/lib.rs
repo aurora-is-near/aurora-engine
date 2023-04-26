@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 #![deny(clippy::pedantic, clippy::nursery)]
 #![allow(
     clippy::similar_names,

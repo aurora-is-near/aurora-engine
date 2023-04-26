@@ -72,12 +72,20 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::BorshSerialize;
+    use borsh::{BorshDeserialize, BorshSerialize};
+    use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
 
     use crate::admin_controlled::AdminControlled;
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
     use crate::parameters::error::ParseTypeFromJsonError;
+    use crate::parameters::{
+        self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
+        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+        PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
+        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitArgs,
+        TransferCallCallArgs, ViewCallArgs,
+    };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{
@@ -95,7 +103,7 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, ERR_FAILED_PARSE, H256};
+    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -114,8 +122,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn new() {
         let mut io = Runtime;
-        if let Ok(state) = state::get_state(&io) {
-            require_owner_only(&state, &io.predecessor_account_id());
+
+        if state::get_state(&io).is_ok() {
+            sdk::panic_utf8(b"ERR_ALREADY_INITIALIZED");
         }
 
         let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
@@ -173,11 +182,27 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn get_upgrade_index() {
+    pub extern "C" fn get_upgrade_delay_blocks() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
+        io.return_output(&state.upgrade_delay_blocks.to_le_bytes());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_upgrade_delay_blocks() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        let args: SetUpgradeDelayBlocksArgs = io.read_input_borsh().sdk_unwrap();
+        state.upgrade_delay_blocks = args.upgrade_delay_blocks;
+        state::set_state(&mut io, &state).sdk_unwrap();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_upgrade_index() {
+        let mut io = Runtime;
         let index = internal_get_upgrade_index();
-        io.return_output(&(index + state.upgrade_delay_blocks).to_le_bytes());
+        io.return_output(&index.to_le_bytes());
     }
 
     /// Stage new code for deployment.
@@ -185,26 +210,27 @@ mod contract {
     pub extern "C" fn stage_upgrade() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        let block_height = io.block_height();
+        let delay_block_height = io.block_height() + state.upgrade_delay_blocks;
         require_owner_only(&state, &io.predecessor_account_id());
         io.read_input_and_store(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
         io.write_storage(
             &bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY),
-            &block_height.to_le_bytes(),
+            &delay_block_height.to_le_bytes(),
         );
     }
 
     /// Deploy staged upgrade.
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
-        let io = Runtime;
+        let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
         let index = internal_get_upgrade_index();
-        if io.block_height() <= index + state.upgrade_delay_blocks {
+        if io.block_height() <= index {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED_TOO_EARLY);
         }
         Runtime::self_deploy(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
+        io.remove_storage(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY));
     }
 
     /// Called as part of the upgrade process (see `engine-sdk::self_deploy`). This function is meant
@@ -237,7 +263,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn pause_precompiles() {
         let io = Runtime;
-        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer();
+        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer(&io);
 
         if !authorizer.is_authorized(&io.predecessor_account_id()) {
             sdk::panic_utf8(b"ERR_UNAUTHORIZED");
@@ -320,14 +346,42 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn submit() {
         let io = Runtime;
-        let input = io.read_input().to_vec();
+        let tx_data = io.read_input().to_vec();
+        let current_account_id = io.current_account_id();
+        let state = state::get_state(&io).sdk_unwrap();
+        let relayer_address = predecessor_address(&io.predecessor_account_id());
+        let args = SubmitArgs {
+            tx_data,
+            ..Default::default()
+        };
+        let result = engine::submit(
+            io,
+            &io,
+            &args,
+            state,
+            current_account_id,
+            relayer_address,
+            &mut Runtime,
+        );
+
+        result
+            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
+            .sdk_process();
+    }
+
+    /// Analog of the `submit` function, but waits for the `SubmitArgs` structure rather than
+    /// the array of bytes representing the transaction.
+    #[no_mangle]
+    pub extern "C" fn submit_with_args() {
+        let io = Runtime;
+        let args: SubmitArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
         let state = state::get_state(&io).sdk_unwrap();
         let relayer_address = predecessor_address(&io.predecessor_account_id());
         let result = engine::submit(
             io,
             &io,
-            &input,
+            &args,
             state,
             current_account_id,
             relayer_address,
@@ -398,6 +452,59 @@ mod contract {
         require_owner_only(&state, &io.predecessor_account_id());
         let address = io.read_input_arr20().sdk_unwrap();
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
+    }
+
+    /// Create and/or fund an XCC sub-account directly (as opposed to having one be automatically
+    /// created via the XCC precompile in the EVM). The purpose of this method is to enable
+    /// XCC on engine instances where wrapped NEAR (WNEAR) is not bridged.
+    #[no_mangle]
+    pub extern "C" fn fund_xcc_sub_account() {
+        let io = Runtime;
+        let state = state::get_state(&io).sdk_unwrap();
+        // This method can only be called by the owner because it allows specifying the
+        // account ID of the wNEAR account. This information must be accurate for the
+        // sub-account to work properly, therefore this method can only be called by
+        // a trusted user.
+        require_owner_only(&state, &io.predecessor_account_id());
+        let args: crate::xcc::FundXccArgs = io.read_input_borsh().sdk_unwrap();
+        crate::xcc::fund_xcc_sub_account(&io, &mut Runtime, &io, args).sdk_unwrap();
+    }
+
+    /// Allow receiving NEP141 tokens to the EVM contract.
+    ///
+    /// This function returns the amount of tokens to return to the sender.
+    /// Either all tokens are transferred and tokens are returned
+    /// in case of an error, or no token is returned if the transaction was successful.
+    #[no_mangle]
+    pub extern "C" fn ft_on_transfer() {
+        let io = Runtime;
+        let current_account_id = io.current_account_id();
+        let predecessor_account_id = io.predecessor_account_id();
+        let mut engine = Engine::new(
+            predecessor_address(&predecessor_account_id),
+            current_account_id.clone(),
+            io,
+            &io,
+        )
+        .sdk_unwrap();
+
+        let args: NEP141FtOnTransferArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .sdk_unwrap();
+
+        if predecessor_account_id == current_account_id {
+            EthConnectorContract::init_instance(io)
+                .sdk_unwrap()
+                .ft_on_transfer(&engine, &args)
+                .sdk_unwrap();
+        } else {
+            engine.receive_erc20_tokens(
+                &predecessor_account_id,
+                &args,
+                &current_account_id,
+                &mut Runtime,
+            );
+        }
     }
 
     /// Deploy ERC20 token mapped to a NEP141

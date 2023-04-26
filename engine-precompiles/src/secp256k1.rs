@@ -1,6 +1,8 @@
 use crate::prelude::types::{Address, EthGas};
 use crate::prelude::{sdk, vec::Vec, Borrowed, H256};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+#[cfg(not(feature = "contract"))]
+use aurora_engine_types::ToString;
 use evm::{Context, ExitError};
 
 mod costs {
@@ -11,6 +13,7 @@ mod costs {
 
 mod consts {
     pub(super) const INPUT_LEN: usize = 128;
+    pub(super) const SIGNATURE_LENGTH: usize = 65;
 }
 
 /// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
@@ -18,9 +21,10 @@ mod consts {
 /// See: `https://etherscan.io/address/0000000000000000000000000000000000000001`
 // Quite a few library methods rely on this and that should be changed. This
 // should only be for precompiles.
-pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
-    assert_eq!(signature.len(), 65);
-
+pub fn ecrecover(
+    hash: H256,
+    signature: &[u8; consts::SIGNATURE_LENGTH],
+) -> Result<Address, ExitError> {
     #[cfg(feature = "contract")]
     return sdk::ecrecover(hash, signature).map_err(|e| ExitError::Other(Borrowed(e.as_str())));
 
@@ -30,9 +34,11 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
 
 #[cfg(not(feature = "contract"))]
 fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
+    use aurora_engine_types::Cow::Owned;
     use sha3::Digest;
 
-    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes()).unwrap();
+    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes())
+        .map_err(|e| ExitError::Other(Owned(e.to_string())))?;
     let v = signature[64];
     let signature = libsecp256k1::Signature::parse_standard_slice(&signature[0..64])
         .map_err(|_| ExitError::Other(Borrowed(sdk::ECRecoverErr.as_str())))?;
@@ -87,7 +93,7 @@ impl Precompile for ECRecover {
         let mut v = [0; 32];
         v.copy_from_slice(&input[32..64]);
 
-        let mut signature = [0; 65]; // signature is (r, s, v), typed (uint256, uint256, uint8)
+        let mut signature = [0; consts::SIGNATURE_LENGTH]; // signature is (r, s, v), typed (uint256, uint256, uint8)
         signature[0..32].copy_from_slice(&input[64..96]); // r
         signature[32..64].copy_from_slice(&input[96..128]); // s
 
@@ -118,7 +124,7 @@ mod tests {
     use crate::utils::new_context;
 
     fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
-        matches!(ecrecover(hash, signature), Ok(s) if s == signer)
+        matches!(ecrecover(hash, signature[0..super::consts::SIGNATURE_LENGTH].try_into().unwrap()), Ok(s) if s == signer)
     }
 
     #[test]
@@ -241,6 +247,19 @@ mod tests {
 
         let input = hex::decode("18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000001000000000000000000000011c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549").unwrap();
         let expected: Vec<u8> = Vec::new();
+        let res = ECRecover
+            .run(&input, Some(EthGas::new(3_000)), &new_context(), false)
+            .unwrap()
+            .output;
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn test_extra_input_length() {
+        let input = hex::decode("18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000000000000000000000000000001c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549aabbccddeeff").unwrap();
+        let expected =
+            hex::decode("000000000000000000000000a94f5374fce5edbc8e2a8697c15331677e6ebf0b")
+                .unwrap();
         let res = ECRecover
             .run(&input, Some(EthGas::new(3_000)), &new_context(), false)
             .unwrap()

@@ -31,12 +31,29 @@ pub struct SetOwnerArgs {
     pub new_owner: AccountId,
 }
 
+/// Borsh-encoded parameters for the `set_upgrade_delay_blocks` function.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct SetUpgradeDelayBlocksArgs {
+    pub upgrade_delay_blocks: u64,
+}
+
 /// Borsh-encoded (genesis) account balance used by the `begin_chain` function.
 #[cfg(feature = "evm_bully")]
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct AccountBalance {
     pub address: Address,
     pub balance: RawU256,
+}
+
+/// Borsh-encoded submit arguments used by the `submit_with_args` function.
+#[derive(Default, Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct SubmitArgs {
+    /// Bytes of the transaction.
+    pub tx_data: Vec<u8>,
+    /// Max gas price the user is ready to pay for the transaction.
+    pub max_gas_price: Option<u128>,
+    /// Address of the `ERC20` token the user prefers to pay in.
+    pub gas_token_address: Option<Address>,
 }
 
 /// Borsh-encoded parameters for the `begin_chain` function.

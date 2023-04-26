@@ -2,7 +2,10 @@ use crate::fmt::Formatter;
 use crate::types::balance::error;
 use crate::types::Fee;
 use crate::{format, Add, Display, Sub, SubAssign, ToString, U256};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
@@ -95,7 +98,7 @@ impl SubAssign for NEP141Wei {
     }
 }
 
-/// Newtype to distinguish balances (denominated in Wei) from other U256 types.
+/// New type to distinguish balances (denominated in Wei) from other U256 types.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Wei(U256);
 
@@ -120,6 +123,11 @@ impl Wei {
     #[must_use]
     pub const fn new_u64(amount: u64) -> Self {
         Self(U256([amount, 0, 0, 0]))
+    }
+
+    #[must_use]
+    pub fn new_u128(amount: u128) -> Self {
+        Self::new(U256::from(amount))
     }
 
     #[must_use]

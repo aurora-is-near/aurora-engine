@@ -2,9 +2,12 @@ use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::test_utils::{self, str_to_account_id};
 use crate::tests::state_migration;
-use aurora_engine::parameters::{SetOwnerArgs, SubmitResult, TransactionStatus};
+use aurora_engine::fungible_token::FungibleTokenMetadata;
+use aurora_engine::parameters::{
+    SetOwnerArgs, SetUpgradeDelayBlocksArgs, SubmitResult, TransactionStatus,
+};
 use aurora_engine_sdk as sdk;
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 use libsecp256k1::SecretKey;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
@@ -942,7 +945,13 @@ fn test_eth_transfer_insufficient_balance_sim() {
         &signer.secret_key,
     );
     let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
-    let result: SubmitResult = call_result.unwrap_borsh();
+    let result = match call_result.status() {
+        near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+            use borsh::BorshDeserialize;
+            SubmitResult::try_from_slice(&bytes).unwrap()
+        }
+        other => panic!("Unexpected status {other:?}"),
+    };
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
@@ -989,6 +998,48 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
     assert_eq!(
         query_address_sim(&address, "get_balance", &aurora),
         INITIAL_BALANCE.raw(),
+    );
+}
+
+/// Tests transfer Eth from one account to another with custom argument `max_gas_price`.
+#[test]
+fn test_eth_transfer_with_max_gas_price() {
+    // set up Aurora runner and accounts
+    let (mut runner, source_account, dest_address) = initialize_transfer();
+    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+
+    // validate pre-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        INITIAL_BALANCE,
+        INITIAL_NONCE.into(),
+    );
+    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+
+    // perform transfer
+    let max_gas_price = 5;
+    let mut transaction = test_utils::transfer(dest_address, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    transaction.gas_price = 10.into();
+    transaction.gas_limit = 30_000.into();
+
+    let result = runner
+        .submit_transaction_with_args(&source_account.secret_key, transaction, max_gas_price, None)
+        .unwrap();
+
+    let fee = u128::from(result.gas_used) * max_gas_price;
+    // validate post-state
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        source_address,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - Wei::new_u128(fee),
+        (INITIAL_NONCE + 1).into(),
+    );
+    test_utils::validate_address_balance_and_nonce(
+        &runner,
+        dest_address,
+        TRANSFER_AMOUNT,
+        0.into(),
     );
 }
 
@@ -1048,6 +1099,39 @@ fn test_set_owner_fail_on_same_owner() {
         error.unwrap().to_string(),
         "Smart contract panicked: ERR_SAME_OWNER"
     );
+}
+
+#[test]
+fn test_set_upgrade_delay_blocks() {
+    let mut runner = test_utils::deploy_evm();
+    let aurora_account_id = runner.aurora_account_id.clone();
+
+    // set upgrade_delay_blocks args
+    let set_upgrade_delay_blocks = SetUpgradeDelayBlocksArgs {
+        upgrade_delay_blocks: 2,
+    };
+
+    let (outcome, error) = runner.call(
+        "set_upgrade_delay_blocks",
+        &aurora_account_id,
+        set_upgrade_delay_blocks.try_to_vec().unwrap(),
+    );
+
+    // should succeed
+    assert!(outcome.is_some() && error.is_none());
+
+    // get upgrade_delay_blocks to see if the upgrade_delay_blocks property has changed
+    let (outcome, error) = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+
+    // check if the query goes through the standalone runner
+    assert!(outcome.is_some() && error.is_none());
+
+    // check if the upgrade_delay_blocks property has changed to 2
+    let result = SetUpgradeDelayBlocksArgs::try_from_slice(
+        outcome.unwrap().return_data.as_value().unwrap().as_slice(),
+    )
+    .unwrap();
+    assert_eq!(result.upgrade_delay_blocks, 2);
 }
 
 fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, Address) {

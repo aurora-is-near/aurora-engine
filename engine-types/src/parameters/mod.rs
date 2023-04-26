@@ -3,7 +3,10 @@ use crate::{
     types::{Address, NEP141Wei, NearGas, RawU256, Yocto},
     Box, String, Vec,
 };
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, maybestd::io, BorshDeserialize, BorshSerialize};
 
 pub mod engine;
 
@@ -163,6 +166,40 @@ impl BorshSerialize for NearPromise {
     }
 }
 
+#[cfg(not(feature = "borsh-compat"))]
+impl BorshDeserialize for NearPromise {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let variant_byte = {
+            let mut buf = [0u8; 1];
+            reader.read_exact(&mut buf)?;
+            buf[0]
+        };
+        match variant_byte {
+            0x00 => {
+                let inner = SimpleNearPromise::deserialize_reader(reader)?;
+                Ok(Self::Simple(inner))
+            }
+            0x01 => {
+                let base = Self::deserialize_reader(reader)?;
+                let callback = SimpleNearPromise::deserialize_reader(reader)?;
+                Ok(Self::Then {
+                    base: Box::new(base),
+                    callback,
+                })
+            }
+            0x02 => {
+                let promises: Vec<Self> = Vec::deserialize_reader(reader)?;
+                Ok(Self::And(promises))
+            }
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Invalid variant byte for NearPromise",
+            )),
+        }
+    }
+}
+
+#[cfg(feature = "borsh-compat")]
 impl BorshDeserialize for NearPromise {
     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
         let variant_byte = buf[0];

@@ -1,8 +1,8 @@
-use aurora_engine::pausables::PausedPrecompilesManager;
-use aurora_engine::pausables::PrecompileFlags;
-use aurora_engine::{
-    engine, parameters::SubmitResult, pausables::EnginePrecompilesPauser, state, xcc,
+use aurora_engine::parameters::SubmitArgs;
+use aurora_engine::pausables::{
+    EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
+use aurora_engine::{engine, parameters::SubmitResult, state, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_standalone_nep141_legacy::legacy_connector;
 use aurora_engine_types::{
@@ -136,15 +136,18 @@ fn execute_transaction<'db>(
             let mut handler = crate::promise::NoScheduler {
                 promise_data: &transaction_message.promise_data,
             };
-            let transaction_bytes: Vec<u8> = tx.into();
-            let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
-
+            let tx_data: Vec<u8> = tx.into();
+            let tx_hash = aurora_engine_sdk::keccak(&tx_data);
+            let args = SubmitArgs {
+                tx_data,
+                ..Default::default()
+            };
             let result = state::get_state(&io)
                 .map(|engine_state| {
                     let submit_result = engine::submit(
                         io,
                         &env,
-                        &transaction_bytes,
+                        &args,
                         engine_state,
                         env.current_account_id(),
                         relayer_address,
@@ -156,7 +159,28 @@ fn execute_transaction<'db>(
 
             (tx_hash, result)
         }
+        TransactionKind::SubmitWithArgs(args) => {
+            let mut handler = crate::promise::NoScheduler {
+                promise_data: &transaction_message.promise_data,
+            };
+            let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
+            let result = state::get_state(&io)
+                .map(|engine_state| {
+                    let submit_result = engine::submit(
+                        io,
+                        &env,
+                        args,
+                        engine_state,
+                        env.current_account_id(),
+                        relayer_address,
+                        &mut handler,
+                    );
+                    Some(TransactionExecutionResult::Submit(submit_result))
+                })
+                .map_err(Into::into);
 
+            (tx_hash, result)
+        }
         other => {
             let result = non_submit_execute(
                 other,
@@ -422,9 +446,15 @@ fn non_submit_execute<'db>(
 
             None
         }
+        TransactionKind::FundXccSubAccound(args) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            xcc::fund_xcc_sub_account(&io, &mut handler, &env, args.clone())?;
+
+            None
+        }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
-        TransactionKind::Submit(_) => unreachable!(),
+        TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
         TransactionKind::PausePrecompiles(args) => {
             let precompiles_to_pause = PrecompileFlags::from_bits_truncate(args.paused_mask);
 
@@ -445,6 +475,14 @@ fn non_submit_execute<'db>(
             let mut prev = state::get_state(&io)?;
 
             prev.owner_id = args.clone().new_owner;
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
+        TransactionKind::SetUpgradeDelayBlocks(args) => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.upgrade_delay_blocks = args.upgrade_delay_blocks;
             state::set_state(&mut io, &prev)?;
 
             None
@@ -477,7 +515,7 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{engine, state};
+    use aurora_engine::{engine, state, xcc};
     use aurora_engine_standalone_nep141_legacy::{fungible_token, legacy_connector};
 
     #[derive(Debug)]
@@ -495,6 +533,7 @@ pub mod error {
         ConnectorInit(legacy_connector::error::InitContractError),
         LegacyConnectorStorage(legacy_connector::error::StorageReadError),
         ConnectorStorage(aurora_engine::connector::error::StorageReadError),
+        FundXccError(xcc::FundXccError),
     }
 
     impl From<state::EngineStateError> for Error {
@@ -572,6 +611,12 @@ pub mod error {
     impl From<aurora_engine::connector::error::StorageReadError> for Error {
         fn from(e: aurora_engine::connector::error::StorageReadError) -> Self {
             Self::ConnectorStorage(e)
+        }
+    }
+
+    impl From<xcc::FundXccError> for Error {
+        fn from(e: xcc::FundXccError) -> Self {
+            Self::FundXccError(e)
         }
     }
 }

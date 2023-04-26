@@ -1,7 +1,7 @@
 use aurora_engine::engine;
 use aurora_engine::parameters::{
-    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs, SubmitResult,
-    TransactionStatus,
+    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs,
+    SetUpgradeDelayBlocksArgs, SubmitArgs, SubmitResult, TransactionStatus,
 };
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
@@ -189,6 +189,7 @@ impl StandaloneRunner {
         Ok(outcome)
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn submit_raw(
         &mut self,
         method_name: &str,
@@ -215,6 +216,18 @@ impl StandaloneRunner {
                 &mut self.cumulative_diff,
                 promise_results,
             )
+        } else if method_name == test_utils::SUBMIT_WITH_ARGS {
+            let submit_args = SubmitArgs::try_from_slice(&ctx.input).unwrap();
+            let transaction_hash = aurora_engine_sdk::keccak(&submit_args.tx_data);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::SubmitWithArgs(submit_args);
+
+            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            unwrap_result(outcome)
         } else if method_name == test_utils::CALL {
             let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
@@ -224,7 +237,7 @@ impl StandaloneRunner {
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
             self.cumulative_diff.append(outcome.diff.clone());
-            test_utils::standalone::storage::commit(storage, &outcome);
+            storage::commit(storage, &outcome);
 
             unwrap_result(outcome)
         } else if method_name == test_utils::DEPLOY_ERC20 {
@@ -292,6 +305,25 @@ impl StandaloneRunner {
             let mut tx_msg =
                 Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::SetOwner(call_args);
+
+            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
+        } else if method_name == test_utils::SET_UPGRADE_DELAY_BLOCKS {
+            let input = &ctx.input;
+            let call_args = SetUpgradeDelayBlocksArgs::try_from_slice(input)
+                .expect("Unable to parse input as SetUpgradeDelayBlocksArgs");
+
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::SetUpgradeDelayBlocks(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
             self.cumulative_diff.append(outcome.diff.clone());

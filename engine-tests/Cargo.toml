@@ -24,7 +24,6 @@ aurora-engine-transactions = { path = "../engine-transactions", default-features
 engine-standalone-storage = { path = "../engine-standalone-storage" }
 engine-standalone-tracing = { path = "../engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 aurora-engine-standalone-nep141-legacy = { path = "../engine-standalone-nep141-legacy", default-features = false }
-borsh = { version = "0.9.3", default-features = false }
 sha3 = { version = "0.10.2", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }

@@ -1,6 +1,10 @@
 use crate::fmt::Formatter;
 use crate::{Add, AddAssign, Display, Div, Mul, Sub};
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
+use core::num::NonZeroU64;
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -67,6 +71,18 @@ impl EthGas {
     pub const fn as_u64(self) -> u64 {
         self.0
     }
+
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.checked_sub(rhs.0).map(Self)
+    }
+
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0).map(Self)
+    }
+
+    pub fn checked_mul(self, rhs: Self) -> Option<Self> {
+        self.0.checked_mul(rhs.0).map(Self)
+    }
 }
 
 impl Add for EthGas {
@@ -83,10 +99,10 @@ impl AddAssign for EthGas {
     }
 }
 
-impl Div<u64> for EthGas {
+impl Div<NonZeroU64> for EthGas {
     type Output = Self;
 
-    fn div(self, rhs: u64) -> Self::Output {
+    fn div(self, rhs: NonZeroU64) -> Self::Output {
         Self(self.0 / rhs)
     }
 }

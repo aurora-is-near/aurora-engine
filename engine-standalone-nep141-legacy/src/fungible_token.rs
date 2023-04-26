@@ -257,6 +257,13 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         current_account_id: AccountId,
         prepaid_gas: NearGas,
     ) -> Result<PromiseWithCallbackArgs, error::TransferError> {
+        // check balance to prevent setting an arbitrary value for `amount` for (receiver_id == receiver_id).
+        let balance = self
+            .get_account_eth_balance(&sender_id)
+            .unwrap_or(ZERO_NEP141_WEI);
+        if amount > balance {
+            return Err(error::TransferError::InsufficientFunds);
+        }
         // Special case for Aurora transfer itself - we shouldn't transfer
         if sender_id != receiver_id {
             self.internal_transfer_eth_on_near(&sender_id, &receiver_id, amount, memo)?;
