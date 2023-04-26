@@ -463,6 +463,14 @@ fn non_submit_execute<'db>(
 
             None
         }
+        TransactionKind::SetUpgradeDelayBlocks(args) => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.upgrade_delay_blocks = args.upgrade_delay_blocks;
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
     };
 
     Ok(result)
@@ -531,6 +539,7 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
         TransactionKind::FactorySetWNearAddress(address) => Ok(address.as_bytes().to_vec()),
         TransactionKind::FundXccSubAccound(args) => args.try_to_vec().map_err(|e| e.into()),
         TransactionKind::Unknown => Ok(vec![]),
+        TransactionKind::SetUpgradeDelayBlocks(args) => args.try_to_vec().map_err(|e| e.into()),
     }
 }
 

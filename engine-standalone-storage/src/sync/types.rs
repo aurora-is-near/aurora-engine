@@ -112,6 +112,8 @@ pub enum TransactionKind {
     StorageWithdraw(parameters::StorageWithdrawCallArgs),
     /// Admin only method; used to transfer administration
     SetOwner(parameters::SetOwnerArgs),
+    /// Admin only method; used to change upgrade delay blocks
+    SetUpgradeDelayBlocks(parameters::SetUpgradeDelayBlocksArgs),
     /// Admin only method
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
@@ -351,6 +353,7 @@ impl TransactionKind {
             Self::PausePrecompiles(_) => Self::no_evm_execution("pause_precompiles"),
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
+            Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
             Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
         }
     }
@@ -430,6 +433,8 @@ pub enum InnerTransactionKind {
     SetOwner,
     #[strum(serialize = "set_paused_flags")]
     SetPausedFlags,
+    #[strum(serialize = "set_upgrade_delay_blocks")]
+    SetUpgradeDelayBlocks,
     #[strum(serialize = "register_relayer")]
     RegisterRelayer,
     #[strum(serialize = "refund_on_error")]
@@ -495,6 +500,7 @@ impl From<&TransactionKind> for InnerTransactionKind {
             }
             TransactionKind::FundXccSubAccound(_) => InnerTransactionKind::FundXccSubAccound,
             TransactionKind::Unknown => InnerTransactionKind::Unknown,
+            TransactionKind::SetUpgradeDelayBlocks(_) => InnerTransactionKind::SetUpgradeDelayBlocks,
         }
     }
 }
@@ -629,6 +635,7 @@ enum BorshableTransactionKind<'a> {
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccound(Cow<'a, FundXccArgs>),
+    SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -672,6 +679,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
             TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
             TransactionKind::FundXccSubAccound(x) => Self::FundXccSubAccound(Cow::Borrowed(x)),
+            TransactionKind::SetUpgradeDelayBlocks(x) => {
+                Self::SetUpgradeDelayBlocks(Cow::Borrowed(x))
+            }
         }
     }
 }
@@ -733,6 +743,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
             BorshableTransactionKind::FundXccSubAccound(x) => {
                 Ok(Self::FundXccSubAccound(x.into_owned()))
+            }
+            BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
+                Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
             }
         }
     }
