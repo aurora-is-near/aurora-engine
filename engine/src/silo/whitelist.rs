@@ -61,7 +61,7 @@ where
     }
 
     fn key(&self, value: &[u8]) -> Vec<u8> {
-        let mut bytes = Vec::new();
+        let mut bytes = Vec::with_capacity(1 + value.len());
 
         bytes.push(u8::from(self.kind));
         bytes.extend_from_slice(value);

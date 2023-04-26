@@ -432,23 +432,25 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             return Ok(GasPaymentResult::default());
         }
 
-        let priority_fee_per_gas = transaction
-            .max_priority_fee_per_gas
-            .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
-        let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
-            price.min(priority_fee_per_gas)
-        });
-        let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
-        let prepaid_amount = fixed_gas_cost.map_or_else(
-            || {
-                transaction
+        let (prepaid_amount, effective_gas_price, priority_fee_per_gas) =
+            if let Some(cost) = fixed_gas_cost {
+                (cost, cost.raw(), cost.raw())
+            } else {
+                let priority_fee_per_gas = transaction
+                    .max_priority_fee_per_gas
+                    .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
+                let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
+                    price.min(priority_fee_per_gas)
+                });
+                let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
+                let prepaid_amount = transaction
                     .gas_limit
                     .checked_mul(effective_gas_price)
                     .map(Wei::new)
-                    .ok_or(GasPaymentError::EthAmountOverflow)
-            },
-            Ok,
-        )?;
+                    .ok_or(GasPaymentError::EthAmountOverflow)?;
+
+                (prepaid_amount, effective_gas_price, priority_fee_per_gas)
+            };
 
         let new_balance = get_balance(&self.io, sender)
             .checked_sub(prepaid_amount)
@@ -943,24 +945,24 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         // TODO: charge for storage
     };
 
-    if fixed_gas_cost.is_none() {
-        // Give refund. There is no refund if fixed gas cost.
-        let gas_used = match &result {
-            Ok(submit_result) => submit_result.gas_used,
-            Err(engine_err) => engine_err.gas_used,
-        };
-        refund_unused_gas(
-            &mut io,
-            &sender,
-            gas_used,
-            &prepaid_amount,
-            &relayer_address,
-        )
-        .map_err(|e| EngineError {
-            gas_used,
-            kind: EngineErrorKind::GasPayment(e),
-        })?;
-    }
+    // Give refund.
+    let gas_used = match &result {
+        Ok(submit_result) => submit_result.gas_used,
+        Err(engine_err) => engine_err.gas_used,
+    };
+
+    refund_unused_gas(
+        &mut io,
+        &sender,
+        gas_used,
+        &prepaid_amount,
+        &relayer_address,
+        fixed_gas_cost,
+    )
+    .map_err(|e| EngineError {
+        gas_used,
+        kind: EngineErrorKind::GasPayment(e),
+    })?;
 
     // return result to user
     result
@@ -1066,28 +1068,40 @@ pub fn refund_unused_gas<I: IO>(
     gas_used: u64,
     gas_result: &GasPaymentResult,
     relayer: &Address,
+    fixed_gas_cost: Option<Wei>,
 ) -> Result<(), GasPaymentError> {
     if gas_result.effective_gas_price.is_zero() {
         return Ok(());
     }
 
-    let gas_to_wei = |price: U256| {
-        U256::from(gas_used)
-            .checked_mul(price)
-            .map(Wei::new)
-            .ok_or(GasPaymentError::EthAmountOverflow)
+    let (refund, relayer_reward) = if let Some(fixed_cost) = fixed_gas_cost {
+        (Wei::zero(), fixed_cost)
+    } else {
+        let gas_to_wei = |price: U256| {
+            U256::from(gas_used)
+                .checked_mul(price)
+                .map(Wei::new)
+                .ok_or(GasPaymentError::EthAmountOverflow)
+        };
+
+        let spent_amount = gas_to_wei(gas_result.effective_gas_price)?;
+        let reward_amount = gas_to_wei(gas_result.priority_fee_per_gas)?;
+
+        let refund = gas_result
+            .prepaid_amount
+            .checked_sub(spent_amount)
+            .ok_or(GasPaymentError::EthAmountOverflow)?;
+
+        (refund, reward_amount)
     };
 
-    let spent_amount = gas_to_wei(gas_result.effective_gas_price)?;
-    let reward_amount = gas_to_wei(gas_result.priority_fee_per_gas)?;
+    if !refund.is_zero() {
+        add_balance(io, sender, refund)?;
+    }
 
-    let refund = gas_result
-        .prepaid_amount
-        .checked_sub(spent_amount)
-        .ok_or(GasPaymentError::EthAmountOverflow)?;
-
-    add_balance(io, sender, refund)?;
-    add_balance(io, relayer, reward_amount)?;
+    if !relayer_reward.is_zero() {
+        add_balance(io, relayer, relayer_reward)?;
+    }
 
     Ok(())
 }
@@ -2060,6 +2074,54 @@ mod tests {
     }
 
     #[test]
+    fn test_gas_charge_for_non_empty_transaction() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(2_000_000)).unwrap();
+        let mut engine =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        let transaction = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: None,
+            nonce: U256::default(),
+            gas_limit: 67_000.into(),
+            max_priority_fee_per_gas: 20.into(),
+            max_fee_per_gas: 10.into(),
+            to: None,
+            value: Wei::default(),
+            data: vec![],
+            access_list: vec![],
+        };
+        let actual_result = engine
+            .charge_gas(&origin, &transaction, None, None)
+            .unwrap();
+
+        let expected_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(67_000 * 10),
+            effective_gas_price: 10.into(),
+            priority_fee_per_gas: 10.into(),
+        };
+
+        assert_eq!(expected_result, actual_result);
+
+        let actual_result = engine
+            .charge_gas(&origin, &transaction, Some(5.into()), None)
+            .unwrap();
+
+        let expected_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(67_000 * 5),
+            effective_gas_price: 5.into(),
+            priority_fee_per_gas: 5.into(),
+        };
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
     fn test_scheduling_promise_creates_it() {
         use aurora_engine_test_doubles::promise::PromiseArgs;
         use std::collections::HashMap;
@@ -2209,7 +2271,7 @@ mod tests {
             priority_fee_per_gas: U256::zero(),
         };
 
-        refund_unused_gas(&mut io, &origin, 1000, &gas_result, &relayer).unwrap();
+        refund_unused_gas(&mut io, &origin, 1000, &gas_result, &relayer, None).unwrap();
     }
 
     #[test]
@@ -2222,16 +2284,19 @@ mod tests {
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
             prepaid_amount: Wei::new_u64(8000),
-            effective_gas_price: Wei::new_u64(1).raw(),
-            priority_fee_per_gas: U256::zero(),
+            effective_gas_price: 1.into(),
+            priority_fee_per_gas: 2.into(),
         };
         let gas_used = 4000;
 
-        refund_unused_gas(&mut io, &origin, gas_used, &gas_result, &relayer).unwrap();
+        refund_unused_gas(&mut io, &origin, gas_used, &gas_result, &relayer, None).unwrap();
 
         let actual_refund = get_balance(&io, &origin);
         let expected_refund = Wei::new_u64(gas_used);
+        assert_eq!(expected_refund, actual_refund);
 
+        let actual_refund = get_balance(&io, &relayer);
+        let expected_refund = Wei::new_u64(gas_used * 2);
         assert_eq!(expected_refund, actual_refund);
     }
 

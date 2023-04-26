@@ -214,9 +214,6 @@ fn test_relayer_balance_after_transfer() {
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = test_utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
-    let relayer = sdk::types::near_account_to_evm_address(
-        runner.context.predecessor_account_id.as_ref().as_bytes(),
-    );
     let transaction = |nonce| test_utils::transfer(receiver, TRANSFER_AMOUNT, nonce);
 
     set_fixed_gas_cost(&mut runner, Some(FEE));
@@ -232,6 +229,10 @@ fn test_relayer_balance_after_transfer() {
         .submit_with_signer(&mut source_account, transaction)
         .unwrap();
 
+    let relayer = sdk::types::near_account_to_evm_address(
+        runner.context.predecessor_account_id.as_ref().as_bytes(),
+    );
+
     // validate post-state
     validate_address_balance_and_nonce(
         &runner,
@@ -240,7 +241,7 @@ fn test_relayer_balance_after_transfer() {
         (INITIAL_NONCE + 1).into(),
     );
     validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, relayer, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, relayer, FEE, INITIAL_NONCE.into());
 }
 
 #[test]
