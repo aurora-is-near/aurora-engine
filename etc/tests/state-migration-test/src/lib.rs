@@ -22,7 +22,6 @@ pub extern "C" fn state_migration() {
         Ok(state) => state,
         Err(e) => aurora_engine_sdk::panic_utf8(e.as_ref()),
     };
-    // let state = old_state.into();
 
     let new_state = NewFancyState {
         old_state: old_state.into(),
