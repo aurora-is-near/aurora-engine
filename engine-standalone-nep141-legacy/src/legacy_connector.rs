@@ -79,7 +79,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             contract: get_contract_data(&io, &EthConnectorStorageId::Contract)?,
             ft: get_contract_data::<FungibleToken, I>(&io, &EthConnectorStorageId::FungibleToken)?
                 .ops(io),
-            paused_mask: get_contract_data(&io, &EthConnectorStorageId::PausedMask).unwrap_or(UNPAUSED_ALL),
+            paused_mask: get_contract_data(&io, &EthConnectorStorageId::PausedMask)
+                .unwrap_or(UNPAUSE_ALL),
             io,
         })
     }
