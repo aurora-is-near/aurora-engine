@@ -138,7 +138,6 @@ fn test_state_format() {
     let args = aurora_engine::parameters::NewCallArgs {
         chain_id: aurora_engine_types::types::u256_to_arr(&666.into()),
         owner_id: "boss".parse().unwrap(),
-        bridge_prover_id: "prover_mcprovy_face".parse().unwrap(),
         upgrade_delay_blocks: 3,
     };
     let state: aurora_engine::state::EngineState = args.into();

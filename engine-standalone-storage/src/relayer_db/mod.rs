@@ -218,7 +218,6 @@ mod test {
         let engine_state = state::EngineState {
             chain_id: aurora_engine_types::types::u256_to_arr(&1_313_161_555.into()),
             owner_id: "aurora".parse().unwrap(),
-            bridge_prover_id: "prover.bridge.near".parse().unwrap(),
             upgrade_delay_blocks: 0,
         };
 

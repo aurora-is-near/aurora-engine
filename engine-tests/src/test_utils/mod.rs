@@ -665,7 +665,6 @@ pub fn deploy_evm() -> AuroraRunner {
     let args = NewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: str_to_account_id(runner.aurora_account_id.as_str()),
-        bridge_prover_id: str_to_account_id("bridge_prover.near"),
         upgrade_delay_blocks: 1,
     };
 

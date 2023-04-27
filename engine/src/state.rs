@@ -20,9 +20,6 @@ pub struct EngineState {
     /// Account which can upgrade this contract.
     /// Use empty to disable updatability.
     pub owner_id: AccountId,
-    /// Account of the bridge prover.
-    /// Use empty to not use base token as bridged asset.
-    pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
 }
@@ -94,13 +91,11 @@ impl TryFrom<BorshableEngineState> for EngineState {
             BorshableEngineState::V1(state) => Ok(Self {
                 chain_id: state.chain_id,
                 owner_id: state.owner_id,
-                bridge_prover_id: state.bridge_prover_id,
                 upgrade_delay_blocks: state.upgrade_delay_blocks,
             }),
             BorshableEngineState::V2(state) => Ok(Self {
                 chain_id: state.chain_id,
                 owner_id: state.owner_id,
-                bridge_prover_id: AccountId::default(),
                 upgrade_delay_blocks: state.upgrade_delay_blocks,
             }),
         }
@@ -132,7 +127,6 @@ impl From<NewCallArgs> for EngineState {
         Self {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
-            bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
         }
     }
