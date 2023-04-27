@@ -587,9 +587,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// ft_on_transfer callback function
-    pub fn ft_on_transfer<'env, E: Env>(
+    pub fn ft_on_transfer<E: Env>(
         &mut self,
-        engine: &Engine<'env, I, E>,
+        engine: &Engine<'_, I, E>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");

@@ -115,7 +115,7 @@ impl<'de> Deserialize<'de> for Yocto {
         Ok(Self(
             value
                 .as_str()
-                .ok_or_else(|| Error::custom(format!("Wait for a string but got: {}", value)))
+                .ok_or_else(|| Error::custom(format!("Wait for a string but got: {value}")))
                 .and_then(|value| value.parse().map_err(Error::custom))?,
         ))
     }

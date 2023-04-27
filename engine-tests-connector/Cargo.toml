@@ -21,7 +21,7 @@ byte-slice-cast = { version = "1.0", default-features = false }
 near-sdk = "4.1"
 near-units = "0.2"
 tokio = { version = "1.14", features = ["full"] }
-workspaces = "0.7"
+workspaces = { git = "https://github.com/aleksuss/workspaces-rs" }
 anyhow = "1.0"
 hex = "0.4.3"
 ethabi = "18.0"
