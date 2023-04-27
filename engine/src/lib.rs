@@ -79,6 +79,7 @@ mod contract {
     use ::function_name::named;
     use borsh::{BorshDeserialize, BorshSerialize};
     use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
+    use sdk::keccak;
 
     use crate::bloom::{self, Bloom};
     use crate::connector::{self, EthConnectorContract};
@@ -580,15 +581,15 @@ mod contract {
     #[named]
     pub extern "C" fn deploy_erc20_token() {
         let mut io = Runtime;
-        let input = io.read_input();
         // Id of the NEP141 token in Near
-        let args: DeployErc20TokenArgs = input.to_value().sdk_unwrap();
+        let args: DeployErc20TokenArgs = io.read_input_borsh().sdk_unwrap();
+        let input = &args.try_to_vec().unwrap();
 
         let address = engine::deploy_erc20_token(args, io, &io, &mut Runtime).sdk_unwrap();
         let address_vec = &address.as_bytes().try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
 
         io.return_output(address_vec);
-        update_hashchain(&mut io, function_name!(), &input.to_vec(), address_vec, &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, address_vec, &Bloom::default());
         // TODO: charge for storage
     }
 
@@ -1248,7 +1249,26 @@ mod contract {
     fn update_hashchain(io: &mut Runtime, method_name: &str, input: &[u8], output: &[u8], bloom: &Bloom) {
         let block_height = io.block_height();
 
+        //***----
+        sdk::log!("wasm update_hashchain------");
+        sdk::log!("block_height: {}", block_height);
+        sdk::log!("method_name: {}", method_name);
+        let input_hash = keccak(input);
+        sdk::log!("input_hash: {:?}", input_hash);
+        let output_hash = keccak(output);
+        sdk::log!("output_hash: {:?}", output_hash);
+        let bloom_hash = keccak(&bloom.0);
+        sdk::log!("bloom_hash: {:?}", bloom_hash);
+
         let mut blockchain_hashchain = hashchain::get_state(io).unwrap_or_else(|_| {
+
+            //***-----
+            // sdk::log!("new--");
+            // sdk::log!("chain_id: {:?}", state::get_state(io).sdk_unwrap().chain_id);
+            // sdk::log!("contract_account_id: {:?}", io.current_account_id().as_bytes().to_vec());
+            // sdk::log!("block_height: {}", block_height);
+            // sdk::log!("--new");
+
             BlockchainHashchain::new(
                 state::get_state(io).sdk_unwrap().chain_id,
                 io.current_account_id().as_bytes().to_vec(),
@@ -1259,14 +1279,27 @@ mod contract {
         });
 
         if block_height > blockchain_hashchain.get_current_block_height() {
+
+            //***-----
+            // sdk::log!("move_to_block--");
+            // sdk::log!("block_height: {}", block_height);
+            // sdk::log!("blockchain_hashchain.get_current_block_height: {}", blockchain_hashchain.get_current_block_height());
+            // sdk::log!("--move_to_block");
+
             blockchain_hashchain
                 .move_to_block(block_height)
                 .sdk_unwrap();
         }
 
+        //***-----
+        //sdk::log!("hashchain add_block_tx");
+
         blockchain_hashchain
             .add_block_tx(block_height, method_name, input, output, bloom)
             .sdk_unwrap();
+
+        //***-----
+        sdk::log!("------wasm update_hashchain");
 
         hashchain::set_state(io, blockchain_hashchain).sdk_unwrap();
     }

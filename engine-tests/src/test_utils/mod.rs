@@ -195,7 +195,7 @@ impl AuroraRunner {
             &mut self.context,
             caller_account_id,
             signer_account_id,
-            input,
+            input.clone(), //***---- input
         );
 
         let vm_promise_results: Vec<_> = self
@@ -227,6 +227,19 @@ impl AuroraRunner {
             self.context.storage_usage = outcome.storage_usage;
             self.previous_logs = outcome.logs.clone();
         }
+
+        //***----
+        println!("----------------------------------------------");
+        println!("call_with_signer------");
+        println!("method_name: {}", method_name);
+        let input_hash = crate::test_utils::sdk::keccak(&input);
+        println!("input_hash: {:?}", input_hash);
+        println!("wasm logs--");
+        for log in &self.previous_logs {
+            println!("{}", log);
+        }
+        println!("--wasm logs");
+        println!("------call_with_signer");
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             if maybe_error.is_none()
