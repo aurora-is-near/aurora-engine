@@ -81,7 +81,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn withdraw_eth_from_near(&self, data: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
-            method: "withdraw".to_string(),
+            method: "engine_withdraw".to_string(),
             args: data,
             attached_balance: Yocto::new(1),
             attached_gas: GAS_FOR_WITHDRAW,
