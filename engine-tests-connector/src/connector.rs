@@ -646,12 +646,15 @@ async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
     assert!(res.is_success());
     Ok(())
 }
-/**
+
 #[tokio::test]
 async fn test_access_right() -> anyhow::Result<()> {
     let acc_name = AccountId::try_from("some_user.root".to_string()).unwrap();
     let contract = TestContract::new_with_owner(acc_name).await?;
-    let user_acc = contract.create_sub_account("some_user").await?;
+    contract.call_deposit_eth_to_near().await?;
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
 
     let res = contract
         .eth_connector_contract
@@ -662,8 +665,21 @@ async fn test_access_right() -> anyhow::Result<()> {
         .unwrap();
     assert_eq!(&res, contract.engine_contract.id());
 
+    let withdraw_amount = NEP141Wei::new(100);
+    let recipient_addr = validate_eth_address(RECIPIENT_ETH_ADDRESS);
     let res = user_acc
-        .call(contract.eth_connector_contract.id(), "set_access_right")
+        .call(contract.eth_connector_contract.id(), "engine_withdraw")
+        .args_borsh((user_acc.id(), recipient_addr, withdraw_amount))
+        .gas(DEFAULT_GAS)
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    assert!(res.is_failure());
+    assert!(contract.check_error_message(res, "ERR_ACCESS_RIGHT"));
+
+    let res = contract
+        .eth_connector_contract
+        .call("set_access_right")
         .args_json((user_acc.id(),))
         .gas(DEFAULT_GAS)
         .transact()
@@ -679,47 +695,33 @@ async fn test_access_right() -> anyhow::Result<()> {
         .unwrap();
     assert_eq!(&res, user_acc.id());
 
-    let res = contract
-        .engine_contract
-        .call("deposit")
-        .args_borsh(&contract.get_proof(PROOF_DATA_NEAR))
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?;
-    assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_ACCESS_RIGHT"));
-    assert_eq!(contract.total_supply().await?, 0);
-
     let res = user_acc
-        .call(contract.eth_connector_contract.id(), "set_access_right")
-        .args_json((contract.engine_contract.id(),))
+        .call(contract.eth_connector_contract.id(), "engine_withdraw")
+        .args_borsh((user_acc.id(), recipient_addr, withdraw_amount))
         .gas(DEFAULT_GAS)
+        .deposit(ONE_YOCTO)
         .transact()
         .await?;
     assert!(res.is_success());
 
-    let res = contract
-        .eth_connector_contract
-        .call("get_access_right")
-        .view()
-        .await?
-        .json::<AccountId>()
-        .unwrap();
-    assert_eq!(&res, contract.engine_contract.id());
+    let data: WithdrawResult = res.borsh()?;
+    let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
+    assert_eq!(data.recipient_id, recipient_addr);
+    assert_eq!(data.amount, withdraw_amount);
+    assert_eq!(data.eth_custodian_address, custodian_addr);
 
-    let res = contract
-        .engine_contract
-        .call("deposit")
-        .args_borsh(&contract.get_proof(PROOF_DATA_NEAR))
-        .gas(DEFAULT_GAS)
-        .transact()
-        .await?;
-    assert!(res.is_success());
-    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
+    assert_eq!(
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
+        DEPOSITED_AMOUNT - withdraw_amount.as_u128(),
+    );
+    assert_eq!(
+        contract.total_supply().await?,
+        DEPOSITED_AMOUNT - withdraw_amount.as_u128(),
+    );
 
     Ok(())
 }
-*/
+
 #[tokio::test]
 async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
     let acc_name = AccountId::try_from("some_user.root".to_string()).unwrap();
