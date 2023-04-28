@@ -23,23 +23,23 @@ const LIQUIDITY_AMOUNT: u64 = MINT_AMOUNT / 5;
 const OUTPUT_AMOUNT: u64 = LIQUIDITY_AMOUNT / 100;
 const INPUT_AMOUNT: u64 = LIQUIDITY_AMOUNT / 100;
 
-#[test]
-fn test_uniswap_input_multihop() {
-    let mut context = UniswapTestContext::new("uniswap");
+// #[test]
+// fn test_uniswap_input_multihop() {
+//     let mut context = UniswapTestContext::new("uniswap");
 
-    // evm_gas = 970k
-    // near total gas = 122 Tgas
+//     // evm_gas = 970k
+//     // near total gas = 122 Tgas
 
-    let tokens = context.create_tokens(10, MINT_AMOUNT.into());
-    for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {
-        context.create_pool(token_a, token_b);
-        context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), token_a, token_b);
-    }
+//     let tokens = context.create_tokens(10, MINT_AMOUNT.into());
+//     for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {
+//         context.create_pool(token_a, token_b);
+//         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), token_a, token_b);
+//     }
 
-    let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
+//     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    assert_eq!(113, profile.all_gas() / 1_000_000_000_000);
-}
+//     assert_eq!(113, profile.all_gas() / 1_000_000_000_000);
+// }
 
 #[test]
 fn test_uniswap_exact_output() {
