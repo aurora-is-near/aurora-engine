@@ -2,7 +2,6 @@ use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::test_utils::{self, str_to_account_id};
 use crate::tests::state_migration;
-use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     SetOwnerArgs, SetUpgradeDelayBlocksArgs, SubmitResult, TransactionStatus,
 };

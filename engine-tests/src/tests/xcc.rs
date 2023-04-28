@@ -18,7 +18,6 @@ use near_sdk_sim::UserAccount;
 use serde_json::json;
 use std::fs;
 use std::path::Path;
-use near_primitives::borsh;
 
 const WNEAR_AMOUNT: u128 = 10 * near_sdk_sim::STORAGE_AMOUNT;
 const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;

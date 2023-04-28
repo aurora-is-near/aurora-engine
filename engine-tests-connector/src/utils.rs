@@ -2,6 +2,7 @@ use aurora_engine::metadata::FungibleTokenMetadata;
 use aurora_engine::parameters::SetEthConnectorContractAccountArgs;
 use aurora_engine::proof::Proof;
 use aurora_engine_types::types::{Address, Wei};
+use borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::serde_json::json;
 use near_sdk::{json_types::U128, serde_json};
 use std::path::Path;
@@ -288,7 +289,6 @@ impl TestContract {
     }
 
     pub async fn get_eth_balance(&self, address: &Address) -> anyhow::Result<u128> {
-        use borsh::{self, BorshDeserialize, BorshSerialize};
         #[derive(BorshSerialize, BorshDeserialize)]
         pub struct BalanceOfEthCallArgs {
             pub address: Address,

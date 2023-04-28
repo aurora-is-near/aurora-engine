@@ -7,10 +7,7 @@ use aurora_engine_types::{
 };
 use byte_slice_cast::AsByteSlice;
 use near_sdk::serde_json::json;
-use near_sdk::{
-    json_types::{U128, U64},
-    serde, ONE_YOCTO,
-};
+use near_sdk::{json_types::U128, serde, ONE_YOCTO};
 use std::str::FromStr;
 use workspaces::AccountId;
 
@@ -969,9 +966,9 @@ async fn test_get_accounts_counter() -> anyhow::Result<()> {
         .gas(DEFAULT_GAS)
         .transact()
         .await?
-        .borsh::<U64>()
+        .borsh::<u64>()
         .unwrap();
-    assert_eq!(res.0, 2);
+    assert_eq!(res, 2);
     Ok(())
 }
 
@@ -986,9 +983,9 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
         .gas(DEFAULT_GAS)
         .transact()
         .await?
-        .borsh::<U64>()
+        .borsh::<u64>()
         .unwrap();
-    assert_eq!(res.0, 2);
+    assert_eq!(res, 2);
 
     let user_acc = contract
         .create_sub_account(DEPOSITED_RECIPIENT_NAME)
@@ -1027,9 +1024,9 @@ async fn test_get_accounts_counter_and_transfer() -> anyhow::Result<()> {
         .gas(DEFAULT_GAS)
         .transact()
         .await?
-        .borsh::<U64>()
+        .borsh::<u64>()
         .unwrap();
-    assert_eq!(res.0, 3);
+    assert_eq!(res, 3);
     Ok(())
 }
 

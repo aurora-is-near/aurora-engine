@@ -152,8 +152,8 @@ impl UniswapTestContext {
     }
 
     pub fn create_tokens(&mut self, n: usize, mint_amount: U256) -> Vec<ERC20> {
-        let names = ('a'..='z').into_iter().map(|c| format!("token_{c}"));
-        let symbols = ('A'..='Z').into_iter().map(|c| format!("{c}{c}{c}"));
+        let names = ('a'..='z').map(|c| format!("token_{c}"));
+        let symbols = ('A'..='Z').map(|c| format!("{c}{c}{c}"));
         let mut result: Vec<ERC20> = names
             .zip(symbols)
             .take(n)

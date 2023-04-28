@@ -72,7 +72,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::{BorshDeserialize, BorshSerialize};
+    use borsh::BorshSerialize;
     use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
 
     use crate::admin_controlled::AdminControlled;
@@ -81,18 +81,12 @@ mod contract {
     use crate::parameters::error::ParseTypeFromJsonError;
     use crate::parameters::{
         self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
-        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitArgs,
+        NEP141FtOnTransferArgs, NewCallArgs, PausePrecompilesCallArgs, SetContractDataCallArgs,
+        SetEthConnectorContractAccountArgs, StorageDepositCallArgs, SubmitArgs,
         TransferCallCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::parameters::{
-        CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        NEP141FtOnTransferArgs, NewCallArgs, PausePrecompilesCallArgs, SetContractDataCallArgs,
-        SetEthConnectorContractAccountArgs, SetOwnerArgs, TransferCallCallArgs, ViewCallArgs,
-    };
     use crate::pausables::{
         Authorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PausedPrecompilesManager,
         PrecompileFlags,
@@ -103,7 +97,7 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
+    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, ERR_FAILED_PARSE, H256};
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -470,43 +464,6 @@ mod contract {
         crate::xcc::fund_xcc_sub_account(&io, &mut Runtime, &io, args).sdk_unwrap();
     }
 
-    /// Allow receiving NEP141 tokens to the EVM contract.
-    ///
-    /// This function returns the amount of tokens to return to the sender.
-    /// Either all tokens are transferred and tokens are returned
-    /// in case of an error, or no token is returned if the transaction was successful.
-    #[no_mangle]
-    pub extern "C" fn ft_on_transfer() {
-        let io = Runtime;
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let mut engine = Engine::new(
-            predecessor_address(&predecessor_account_id),
-            current_account_id.clone(),
-            io,
-            &io,
-        )
-        .sdk_unwrap();
-
-        let args: NEP141FtOnTransferArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
-            .sdk_unwrap();
-
-        if predecessor_account_id == current_account_id {
-            EthConnectorContract::init_instance(io)
-                .sdk_unwrap()
-                .ft_on_transfer(&engine, &args)
-                .sdk_unwrap();
-        } else {
-            engine.receive_erc20_tokens(
-                &predecessor_account_id,
-                &args,
-                &current_account_id,
-                &mut Runtime,
-            );
-        }
-    }
-
     /// Deploy ERC20 token mapped to a NEP141
     #[no_mangle]
     pub extern "C" fn deploy_erc20_token() {
@@ -761,7 +718,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
-        let args: crate::parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
+        let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_balance_of_eth_on_aurora(&args)
@@ -854,8 +811,6 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
-        use crate::parameters::StorageDepositCallArgs;
-
         let mut io = Runtime;
         let input = serde_json::from_slice::<StorageDepositCallArgs>(&io.read_input().to_vec())
             .and_then(|args| {
