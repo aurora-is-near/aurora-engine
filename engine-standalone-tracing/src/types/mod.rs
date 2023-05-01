@@ -319,6 +319,8 @@ impl StepTransactionTrace {
     /// `None`.
     #[allow(dead_code)]
     pub fn step(&mut self) -> Option<&TraceLog> {
+        /// We subtract 2 from the length to avoid "index out of bounds" error,
+        /// given the else block increments the step by 1.
         if self.step > self.inner.struct_logs.len() - 2 {
             None
         } else {
