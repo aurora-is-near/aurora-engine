@@ -860,8 +860,10 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     let fixed_gas_cost = silo::get_fixed_gas_cost(&io);
     let transaction = if fixed_gas_cost.is_some() {
-        // Change `gas_limit` to the max value for EVM. Gas costs always fixed.
         let mut tx = transaction;
+        // In the case of SILO, we don't care about gas value because the price is fixed.
+        // So we can change `gas_limit` to the max value for EVM. It excludes the ERR_INTRINSIC_GAS
+        // error if a user sets a gas limit value lower than needed for transaction execution.
         tx.gas_limit = u64::MAX.into();
         tx
     } else {
@@ -1478,13 +1480,13 @@ fn assert_access<I: IO + Copy, E: Env>(
     transaction: &NormalizedEthTransaction,
 ) -> Result<(), EngineError> {
     if fixed_gas_cost.is_some() {
-        let is_allow = if transaction.to.is_some() {
+        let allowed = if transaction.to.is_some() {
             silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
         } else {
             silo::is_allow_deploy(io, &env.predecessor_account_id(), &transaction.address)
         };
 
-        if !is_allow {
+        if !allowed {
             return Err(EngineError {
                 kind: EngineErrorKind::NotAllowed,
                 gas_used: 0,

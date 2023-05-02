@@ -606,7 +606,7 @@ impl AuroraRunner {
                     .collect::<std::collections::HashSet<_>>();
                 let diff = fake_keys.difference(&standalone_keys).collect::<Vec<_>>();
 
-                panic!("The standalone state has less amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {:?}", diff);
+                panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {:?}", diff);
             }
 
             for (key, value) in standalone_state.iter() {

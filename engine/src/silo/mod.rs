@@ -9,7 +9,7 @@ use aurora_engine_types::AsBytes;
 use crate::prelude::Vec;
 
 use parameters::{WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs};
-use whitelist::WhiteList;
+use whitelist::Whitelist;
 pub use whitelist::WhitelistKind;
 
 pub mod parameters;
@@ -37,7 +37,7 @@ pub fn set_fixed_gas_cost<I: IO>(io: &mut I, cost: Option<Wei>) {
 /// Add an entry to a white list depending on a kind of list types in provided arguments.
 pub fn add_entity_to_whitelist<I: IO + Copy>(io: &I, args: &WhitelistArgs) {
     let (kind, entry) = get_kind_and_entry(args);
-    WhiteList::init(io, kind).add(entry);
+    Whitelist::init(io, kind).add(entry);
 }
 
 /// Add an entries to a white list depending on a kind of list types in provided arguments.
@@ -53,7 +53,7 @@ pub fn add_entry_to_whitelist_batch<I: IO + Copy, A: IntoIterator<Item = Whiteli
 /// Remove an entries to a white list depending on a kind of list types in provided arguments.
 pub fn remove_entry_from_whitelist<I: IO + Copy>(io: &I, args: &WhitelistArgs) {
     let (kind, entry) = get_kind_and_entry(args);
-    WhiteList::init(io, kind).remove(entry);
+    Whitelist::init(io, kind).remove(entry);
 }
 
 /// Set status of the provided white list.
@@ -76,8 +76,8 @@ pub fn assert_admin<I: IO + Env + Copy>(io: &I) {
 
 /// Check if user has writes to deploy EVM code.
 pub fn is_allow_deploy<I: IO + Copy>(io: &I, account: &AccountId, address: &Address) -> bool {
-    let admin_list = WhiteList::init(io, WhitelistKind::Admin);
-    let evm_admin_list = WhiteList::init(io, WhitelistKind::EvmAdmin);
+    let admin_list = Whitelist::init(io, WhitelistKind::Admin);
+    let evm_admin_list = Whitelist::init(io, WhitelistKind::EvmAdmin);
 
     (!admin_list.is_enabled() || admin_list.is_exist(account))
         && (!evm_admin_list.is_enabled() || evm_admin_list.is_exist(address))
@@ -90,7 +90,7 @@ pub fn is_allow_submit<I: IO + Copy>(io: &I, account: &AccountId, address: &Addr
 
 #[cfg(feature = "contract")]
 fn is_admin<I: IO + Env + Copy>(io: &I) -> bool {
-    let list = WhiteList::init(io, WhitelistKind::Admin);
+    let list = Whitelist::init(io, WhitelistKind::Admin);
     !list.is_enabled() || list.is_exist(&io.predecessor_account_id())
 }
 
@@ -101,12 +101,12 @@ fn is_owner<I: IO + Env>(io: &I) -> bool {
 }
 
 fn is_address_allowed<I: IO + Copy>(io: &I, address: &Address) -> bool {
-    let list = WhiteList::init(io, WhitelistKind::Address);
+    let list = Whitelist::init(io, WhitelistKind::Address);
     !list.is_enabled() || list.is_exist(address)
 }
 
 fn is_account_allowed<I: IO + Copy>(io: &I, account: &AccountId) -> bool {
-    let list = WhiteList::init(io, WhitelistKind::Account);
+    let list = Whitelist::init(io, WhitelistKind::Account);
     !list.is_enabled() || list.is_exist(account)
 }
 
@@ -144,13 +144,13 @@ mod access_test {
         let io = StoragePointer(&storage);
         let account_id = "some-account.near".parse().unwrap();
         let address = Address::zero();
-        let mut list = WhiteList::init(&io, WhitelistKind::Account);
+        let mut list = Whitelist::init(&io, WhitelistKind::Account);
 
         assert!(!is_account_allowed(&io, &account_id));
         list.add(&account_id);
         assert!(is_account_allowed(&io, &account_id));
 
-        let mut list = WhiteList::init(&io, WhitelistKind::Address);
+        let mut list = Whitelist::init(&io, WhitelistKind::Address);
         assert!(!is_address_allowed(&io, &address));
         list.add(&address);
         assert!(is_address_allowed(&io, &address));
