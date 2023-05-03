@@ -7,7 +7,7 @@ use aurora_engine::connector::{
 };
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
-    InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
+    InitCallArgs, LegacyNewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
 use aurora_engine_types::types::{Fee, NEP141Wei};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -67,7 +67,7 @@ fn init_contract(
         .call(
             contract_name.parse().unwrap(),
             "new",
-            &NewCallArgs {
+            &LegacyNewCallArgs {
                 chain_id: [0u8; 32],
                 owner_id: str_to_account_id(master_account.account_id.clone().as_str()),
                 bridge_prover_id: str_to_account_id("bridge.prover.near"),

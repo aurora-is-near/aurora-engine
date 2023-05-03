@@ -20,7 +20,9 @@ use rlp::RlpStream;
 use std::borrow::Cow;
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
+use crate::prelude::parameters::{
+    InitCallArgs, LegacyNewCallArgs, SubmitResult, TransactionStatus,
+};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -635,7 +637,7 @@ impl ExecutionProfile {
 
 pub fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
-    let args = NewCallArgs {
+    let args = LegacyNewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: str_to_account_id(runner.aurora_account_id.as_str()),
         bridge_prover_id: str_to_account_id("bridge_prover.near"),

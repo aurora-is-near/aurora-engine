@@ -140,10 +140,9 @@ fn test_state_format() {
     // change the binary format of the `EngineState` then we will know
     // about it. This is important because changing the state format will
     // break the contract unless we do a state migration.
-    let args = aurora_engine::parameters::NewCallArgs {
+    let args = aurora_engine::parameters::NewCallArgsV2 {
         chain_id: aurora_engine_types::types::u256_to_arr(&666.into()),
         owner_id: "boss".parse().unwrap(),
-        bridge_prover_id: "prover_mcprovy_face".parse().unwrap(),
         upgrade_delay_blocks: 3,
     };
     let state: aurora_engine::state::EngineState = args.into();

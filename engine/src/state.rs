@@ -1,4 +1,4 @@
-use crate::parameters::NewCallArgs;
+use crate::parameters::{LegacyNewCallArgs, NewCallArgs, NewCallArgsV2};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
@@ -112,12 +112,31 @@ impl<'a> From<BorshableEngineStateV2<'a>> for EngineState {
     }
 }
 
-impl From<NewCallArgs> for EngineState {
-    fn from(args: NewCallArgs) -> Self {
+impl From<LegacyNewCallArgs> for EngineState {
+    fn from(args: LegacyNewCallArgs) -> Self {
         Self {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
+        }
+    }
+}
+
+impl From<NewCallArgsV2> for EngineState {
+    fn from(args: NewCallArgsV2) -> Self {
+        Self {
+            chain_id: args.chain_id,
+            owner_id: args.owner_id,
+            upgrade_delay_blocks: args.upgrade_delay_blocks,
+        }
+    }
+}
+
+impl From<NewCallArgs> for EngineState {
+    fn from(args: NewCallArgs) -> Self {
+        match args {
+            NewCallArgs::V1(args) => args.into(),
+            NewCallArgs::V2(args) => args.into(),
         }
     }
 }
