@@ -2,27 +2,114 @@ use crate::parameters::NewCallArgs;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
+use aurora_engine_types::{Cow, Vec};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub use error::EngineStateError;
 
 /// Key for storing the state of the engine.
-const STATE_KEY: &[u8; 5] = b"STATE";
+pub const STATE_KEY: &[u8; 5] = b"STATE";
 
 /// Engine internal state, mostly configuration.
 /// Should not contain anything large or enumerable.
-#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct EngineState {
     /// Chain id, according to the EIP-155 / ethereum-lists spec.
     pub chain_id: [u8; 32],
     /// Account which can upgrade this contract.
     /// Use empty to disable updatability.
     pub owner_id: AccountId,
-    /// Account of the bridge prover.
-    /// Use empty to not use base token as bridged asset.
-    pub bridge_prover_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
+}
+
+impl EngineState {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, error::EngineStateError> {
+        let borshable: BorshableEngineState = self.into();
+        borshable
+            .try_to_vec()
+            .map_err(|_| EngineStateError::SerializationFailed)
+    }
+
+    /// Deserialization with lazy state migration.
+    pub fn try_from_slice<I: IO + Copy>(
+        bytes: &[u8],
+        io: &I,
+    ) -> Result<Self, error::EngineStateError> {
+        let borshable = if let Ok(s) = BorshableEngineState::try_from_slice(bytes) {
+            s
+        } else {
+            let legacy = BorshableEngineStateV1::try_from_slice(bytes)
+                .map_err(|_| EngineStateError::DeserializationFailed)?;
+            let result = legacy.into();
+
+            let mut io = *io;
+            set_state(&mut io, &result)?;
+
+            return Ok(result);
+        };
+        Ok(borshable.into())
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq, Debug)]
+pub enum BorshableEngineState<'a> {
+    V1(BorshableEngineStateV1<'a>),
+    V2(BorshableEngineStateV2<'a>),
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
+pub struct BorshableEngineStateV1<'a> {
+    pub chain_id: [u8; 32],
+    pub owner_id: Cow<'a, AccountId>,
+    pub bridge_prover_id: Cow<'a, AccountId>,
+    pub upgrade_delay_blocks: u64,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
+pub struct BorshableEngineStateV2<'a> {
+    pub chain_id: [u8; 32],
+    pub owner_id: Cow<'a, AccountId>,
+    pub upgrade_delay_blocks: u64,
+}
+
+impl<'a> From<&'a EngineState> for BorshableEngineState<'a> {
+    fn from(state: &'a EngineState) -> Self {
+        Self::V2(BorshableEngineStateV2 {
+            chain_id: state.chain_id,
+            owner_id: Cow::Borrowed(&state.owner_id),
+            upgrade_delay_blocks: state.upgrade_delay_blocks,
+        })
+    }
+}
+
+impl<'a> From<BorshableEngineState<'a>> for EngineState {
+    fn from(state: BorshableEngineState<'a>) -> Self {
+        match state {
+            BorshableEngineState::V1(state) => state.into(),
+            BorshableEngineState::V2(state) => state.into(),
+        }
+    }
+}
+
+impl<'a> From<BorshableEngineStateV1<'a>> for EngineState {
+    fn from(state: BorshableEngineStateV1<'a>) -> Self {
+        Self {
+            chain_id: state.chain_id,
+            owner_id: state.owner_id.into_owned(),
+            upgrade_delay_blocks: state.upgrade_delay_blocks,
+        }
+    }
+}
+
+impl<'a> From<BorshableEngineStateV2<'a>> for EngineState {
+    fn from(state: BorshableEngineStateV2<'a>) -> Self {
+        Self {
+            chain_id: state.chain_id,
+            owner_id: state.owner_id.into_owned(),
+            upgrade_delay_blocks: state.upgrade_delay_blocks,
+        }
+    }
 }
 
 impl From<NewCallArgs> for EngineState {
@@ -30,21 +117,17 @@ impl From<NewCallArgs> for EngineState {
         Self {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
-            bridge_prover_id: args.bridge_prover_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
         }
     }
 }
 
 /// Gets the state from storage, if it exists otherwise it will error.
-pub fn get_state<I: IO>(io: &I) -> Result<EngineState, error::EngineStateError> {
+pub fn get_state<I: IO + Copy>(io: &I) -> Result<EngineState, error::EngineStateError> {
     io.read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY))
         .map_or_else(
             || Err(EngineStateError::NotFound),
-            |bytes| {
-                EngineState::try_from_slice(&bytes.to_vec())
-                    .map_err(|_| EngineStateError::DeserializationFailed)
-            },
+            |bytes| EngineState::try_from_slice(&bytes.to_vec(), io),
         )
 }
 
@@ -52,9 +135,7 @@ pub fn get_state<I: IO>(io: &I) -> Result<EngineState, error::EngineStateError> 
 pub fn set_state<I: IO>(io: &mut I, state: &EngineState) -> Result<(), EngineStateError> {
     io.write_storage(
         &bytes_to_key(KeyPrefix::Config, STATE_KEY),
-        &state
-            .try_to_vec()
-            .map_err(|_| error::EngineStateError::SerializationFailed)?,
+        &state.to_bytes()?,
     );
 
     Ok(())
