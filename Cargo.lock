@@ -284,9 +284,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-modexp"
+version = "1.0.0"
+dependencies = [
+ "hex",
+ "ibig",
+ "num",
+]
+
+[[package]]
 name = "aurora-engine-precompiles"
 version = "1.0.0"
 dependencies = [
+ "aurora-engine-modexp",
  "aurora-engine-sdk",
  "aurora-engine-test-doubles",
  "aurora-engine-types",
@@ -2171,6 +2181,17 @@ checksum = "0703ae284fc167426161c2e3f1da3ea71d94b21bedbcc9494e92b28e334e3dca"
 dependencies = [
  "cxx",
  "cxx-build",
+]
+
+[[package]]
+name = "ibig"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1fcc7f316b2c079dde77564a1360639c1a956a23fa96122732e416cb10717bb"
+dependencies = [
+ "cfg-if 1.0.0",
+ "num-traits",
+ "static_assertions",
 ]
 
 [[package]]

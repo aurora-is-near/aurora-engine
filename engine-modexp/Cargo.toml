@@ -1,0 +1,25 @@
+[package]
+name = "aurora-engine-modexp"
+version = "1.0.0"
+authors = ["Aurora Labs <hello@aurora.dev>"]
+edition = "2021"
+description = ""
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "CC0-1.0"
+publish = false
+autobenches = false
+
+[dependencies]
+ibig = { version = "0.3.6", default-features = false, features = ["num-traits"], optional = true }
+num = { version = "0.4.0", default-features = false, features = ["alloc"] }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+
+[features]
+default = ["std"]
+std = ["num/std", "hex/std"]
+bench = ["ibig"]
