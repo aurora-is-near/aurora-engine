@@ -431,17 +431,18 @@ impl<I: IO> Precompile for ExitToNear<I> {
             transfer_near: transfer_near_args,
         };
 
-        let callback_promise = if precompile_call_args != Default::default() {
-            Some(PromiseCreateArgs {
-                target_account_id: self.current_account_id.clone(),
-                method: "exit_to_near_precompile_callback".to_string(),
-                args: precompile_call_args.try_to_vec().unwrap(),
-                attached_balance: Yocto::new(0),
-                attached_gas: costs::EXIT_TO_NEAR_CALLBACK_GAS,
-            })
-        } else {
-            None
-        };
+        let callback_promise =
+            if precompile_call_args == ExitToNearPrecompileCallbackCallArgs::default() {
+                None
+            } else {
+                Some(PromiseCreateArgs {
+                    target_account_id: self.current_account_id.clone(),
+                    method: "exit_to_near_precompile_callback".to_string(),
+                    args: precompile_call_args.try_to_vec().unwrap(),
+                    attached_balance: Yocto::new(0),
+                    attached_gas: costs::EXIT_TO_NEAR_CALLBACK_GAS,
+                })
+            };
 
         let transfer_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
