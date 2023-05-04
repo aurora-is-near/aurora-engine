@@ -95,12 +95,16 @@ mod contract {
         PrecompileFlags,
     };
     use crate::prelude::account_id::AccountId;
-    use crate::prelude::parameters::RefundCallArgs;
+    use crate::prelude::parameters::{
+        ExitToNearPrecompileCallbackCallArgs, PromiseAction, PromiseBatchAction,
+    };
     use crate::prelude::sdk::types::{
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
+    use crate::prelude::{
+        sdk, u256_to_arr, vec, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256,
+    };
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -524,10 +528,10 @@ mod contract {
     }
 
     /// Callback invoked by exit to NEAR precompile to handle potential
-    /// errors in the exit call.
+    /// errors in the exit call or to perform the near tokens transfer.
     #[no_mangle]
-    pub extern "C" fn refund_on_error() {
-        let io = Runtime;
+    pub extern "C" fn exit_to_near_precompile_callback() {
+        let mut io = Runtime;
         io.assert_private_call().sdk_unwrap();
 
         // This function should only be called as the callback of
@@ -536,17 +540,30 @@ mod contract {
             sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
         }
 
-        if let Some(PromiseResult::Successful(_)) = io.promise_result(0) {
-            // Promise succeeded -- nothing to do
-        } else {
-            // Exit call failed; need to refund tokens
-            let args: RefundCallArgs = io.read_input_borsh().sdk_unwrap();
-            let state = state::get_state(&io).sdk_unwrap();
-            let refund_result =
-                engine::refund_on_error(io, &io, state, &args, &mut Runtime).sdk_unwrap();
+        let args: ExitToNearPrecompileCallbackCallArgs = io.read_input_borsh().sdk_unwrap();
 
-            if !refund_result.status.is_ok() {
-                sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
+        if let Some(PromiseResult::Successful(_)) = io.promise_result(0) {
+            if let Some(args) = args.transfer_near {
+                let action = PromiseAction::Transfer {
+                    amount: Yocto::new(args.amount),
+                };
+                let promise = PromiseBatchAction {
+                    target_account_id: args.target_account_id,
+                    actions: vec![action],
+                };
+
+                unsafe { io.promise_create_batch(&promise) };
+            }
+        } else {
+            if let Some(args) = args.refund {
+                // Exit call failed; need to refund tokens
+                let state = state::get_state(&io).sdk_unwrap();
+                let refund_result =
+                    engine::refund_on_error(io, &io, state, &args, &mut Runtime).sdk_unwrap();
+
+                if !refund_result.status.is_ok() {
+                    sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
+                }
             }
         }
     }

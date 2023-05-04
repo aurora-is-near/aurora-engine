@@ -1,21 +1,30 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::{
-    format,
-    parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
-    sdk::io::{StorageIntermediate, IO},
-    storage::{bytes_to_key, KeyPrefix},
-    types::{Address, Yocto},
-    vec, BorshSerialize, Cow, String, ToString, Vec, U256,
-};
 #[cfg(feature = "error_refund")]
 use crate::prelude::{
     parameters::{PromiseWithCallbackArgs, RefundCallArgs},
     types,
 };
+use crate::{
+    prelude::{
+        format,
+        parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
+        sdk::io::{StorageIntermediate, IO},
+        storage::{bytes_to_key, KeyPrefix},
+        types::{Address, Yocto},
+        vec, BorshSerialize, Cow, String, ToString, Vec, U256,
+    },
+    xcc::state::get_wnear_address,
+};
 
 use crate::prelude::types::EthGas;
 use crate::PrecompileOutput;
-use aurora_engine_types::{account_id::AccountId, types::NEP141Wei};
+use aurora_engine_types::{
+    account_id::AccountId,
+    parameters::{
+        ExitToNearPrecompileCallbackCallArgs, PromiseWithCallbackArgs, TransferNearCallArgs,
+    },
+    types::NEP141Wei,
+};
 use evm::backend::Log;
 use evm::{Context, ExitError};
 
@@ -35,9 +44,7 @@ mod costs {
     pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
     /// Value determined experimentally based on tests.
-    /// (No mainnet data available since this feature is not enabled)
-    #[cfg(feature = "error_refund")]
-    pub(super) const REFUND_ON_ERROR_GAS: NearGas = NearGas::new(5_000_000_000_000);
+    pub(super) const EXIT_TO_NEAR_CALLBACK_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
     // TODO(#332): Determine the correct amount of gas
     pub(super) const WITHDRAWAL_GAS: NearGas = NearGas::new(100_000_000_000_000);
@@ -301,10 +308,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input)?;
         let current_account_id = self.current_account_id.clone();
-        #[cfg(feature = "error_refund")]
-        let refund_on_error_target = current_account_id.clone();
 
-        let (nep141_address, args, exit_event) = match flag {
+        let (nep141_address, args, exit_event, method, transfer_near_args) = match flag {
             0x0 => {
                 // ETH transfer
                 //
@@ -327,6 +332,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
                             dest: dest_account.to_string(),
                             amount: context.apparent_value,
                         },
+                        "ft_transfer",
+                        None,
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from(
@@ -358,21 +365,41 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 validate_amount(amount)?;
 
                 if let Ok(receiver_account_id) = AccountId::try_from(input) {
+                    let (args, method, transfer_near_args) =
+                        if erc20_address == get_wnear_address(&self.io).raw() {
+                            (
+                                format!(r#"{{"amount": "{}"}}"#, amount.as_u128()),
+                                "near_withdraw",
+                                Some(TransferNearCallArgs {
+                                    target_account_id: receiver_account_id.clone(),
+                                    amount: amount.as_u128(),
+                                }),
+                            )
+                        } else {
+                            // There is no way to inject json, given the encoding of both arguments
+                            // as decimal and valid account id respectively.
+                            (
+                                format!(
+                                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                                    receiver_account_id,
+                                    amount.as_u128()
+                                ),
+                                "ft_transfer",
+                                None,
+                            )
+                        };
+
                     (
                         nep141_address,
-                        // There is no way to inject json, given the encoding of both arguments
-                        // as decimal and valid account id respectively.
-                        format!(
-                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            receiver_account_id,
-                            amount.as_u128()
-                        ),
+                        args,
                         events::ExitToNear {
                             sender: Address::new(erc20_address),
                             erc20_address: Address::new(erc20_address),
                             dest: receiver_account_id.to_string(),
                             amount,
                         },
+                        method,
+                        transfer_near_args,
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from(
@@ -395,30 +422,43 @@ impl<I: IO> Precompile for ExitToNear<I> {
             erc20_address,
             amount: types::u256_to_arr(&exit_event.amount),
         };
-        #[cfg(feature = "error_refund")]
-        let refund_promise = PromiseCreateArgs {
-            target_account_id: refund_on_error_target,
-            method: "refund_on_error".to_string(),
-            args: refund_args.try_to_vec().unwrap(),
-            attached_balance: Yocto::new(0),
-            attached_gas: costs::REFUND_ON_ERROR_GAS,
+
+        let precompile_call_args = ExitToNearPrecompileCallbackCallArgs {
+            #[cfg(feature = "error_refund")]
+            refund: refund_args,
+            #[cfg(not(feature = "error_refund"))]
+            refund: None,
+            transfer_near: transfer_near_args,
         };
+
+        let callback_promise = if precompile_call_args != Default::default() {
+            Some(PromiseCreateArgs {
+                target_account_id: self.current_account_id.clone(),
+                method: "exit_to_near_precompile_callback".to_string(),
+                args: precompile_call_args.try_to_vec().unwrap(),
+                attached_balance: Yocto::new(0),
+                attached_gas: costs::EXIT_TO_NEAR_CALLBACK_GAS,
+            })
+        } else {
+            None
+        };
+
         let transfer_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
-            method: "ft_transfer".to_string(),
+            method: method.to_string(),
             args: args.as_bytes().to_vec(),
             attached_balance: Yocto::new(1),
             attached_gas: costs::FT_TRANSFER_GAS,
         };
 
-        #[cfg(feature = "error_refund")]
-        let promise = PromiseArgs::Callback(PromiseWithCallbackArgs {
-            base: transfer_promise,
-            callback: refund_promise,
-        });
-        #[cfg(not(feature = "error_refund"))]
-        let promise = PromiseArgs::Create(transfer_promise);
-
+        let promise = if let Some(callback) = callback_promise {
+            PromiseArgs::Callback(PromiseWithCallbackArgs {
+                base: transfer_promise,
+                callback,
+            })
+        } else {
+            PromiseArgs::Create(transfer_promise)
+        };
         let promise_log = Log {
             address: exit_to_near::ADDRESS.raw(),
             topics: Vec::new(),
