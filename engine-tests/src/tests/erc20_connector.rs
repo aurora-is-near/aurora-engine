@@ -792,36 +792,12 @@ pub mod sim_tests {
             .assert_success();
 
         // 4. Transfer wnear to `ft_owner` and bridge it to aurora
-        aurora
-            .user
-            .call(
-                wnear.account_id(),
-                "storage_deposit",
-                json!({
-                    "account_id": ft_owner.account_id(),
-                })
-                .to_string()
-                .as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                near_sdk_sim::STORAGE_AMOUNT,
-            )
-            .assert_success();
-
-        aurora
-            .user
-            .call(
-                wnear.account_id(),
-                "ft_transfer",
-                format!(
-                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                    ft_owner.account_id(),
-                    FT_TOTAL_SUPPLY,
-                )
-                .as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                1,
-            )
-            .assert_success();
+        transfer_nep_141(
+            &wnear,
+            &aurora.user,
+            ft_owner.account_id().as_str(),
+            FT_TOTAL_SUPPLY,
+        );
 
         transfer_nep_141_to_erc_20(
             &wnear,
@@ -930,6 +906,36 @@ pub mod sim_tests {
         );
         result.assert_success();
         result
+    }
+
+    pub fn transfer_nep_141(nep_141: &UserAccount, source: &UserAccount, dest: &str, amount: u128) {
+        source
+            .call(
+                nep_141.account_id(),
+                "storage_deposit",
+                json!({
+                    "account_id": dest,
+                })
+                .to_string()
+                .as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                near_sdk_sim::STORAGE_AMOUNT,
+            )
+            .assert_success();
+
+        source
+            .call(
+                nep_141.account_id(),
+                "ft_transfer",
+                format!(
+                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                    dest, amount,
+                )
+                .as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                1,
+            )
+            .assert_success();
     }
 
     pub fn transfer_nep_141_to_erc_20(
