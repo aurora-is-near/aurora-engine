@@ -225,6 +225,16 @@ impl AuroraRunner {
             relayer_address.try_to_vec().unwrap(),
         )
     }
+
+    pub fn factory_set_wnear_address(&mut self, wnear_address: Address) -> CallResult {
+        let result = self.make_call(
+            "factory_set_wnear_address",
+            ORIGIN,
+            wnear_address.try_to_vec().unwrap(),
+        );
+        result.check_ok();
+        result
+    }
 }
 
 #[test]
@@ -720,7 +730,14 @@ pub mod sim_tests {
             )
             .assert_success();
 
-        // 3. Deploy NEP-141
+        // 3. Deploy wnear and set wnear address
+        let wnear = crate::tests::xcc::deploy_wnear(&aurora);
+        let erc20 = deploy_erc20_from_nep_141(&wnear, &aurora);
+        aurora
+            .call("factory_set_wnear_address", erc20.0.address.as_bytes())
+            .assert_success();
+
+        // 4. Deploy NEP-141
         let nep_141 = deploy_nep_141(
             FT_ACCOUNT,
             ft_owner.account_id.as_ref(),
@@ -733,7 +750,7 @@ pub mod sim_tests {
             FT_TOTAL_SUPPLY
         );
 
-        // 4. Deploy ERC-20 from NEP-141 and bridge value to Aurora
+        // 5. Deploy ERC-20 from NEP-141 and bridge value to Aurora
         let erc20 = deploy_erc20_from_nep_141(&nep_141, &aurora);
         transfer_nep_141_to_erc_20(
             &nep_141,

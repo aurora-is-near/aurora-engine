@@ -794,7 +794,7 @@ fn deploy_router() -> AuroraRunner {
     router
 }
 
-fn deploy_wnear(aurora: &AuroraAccount) -> UserAccount {
+pub fn deploy_wnear(aurora: &AuroraAccount) -> UserAccount {
     let contract_bytes = std::fs::read("src/tests/res/w_near.wasm").unwrap();
 
     let account_id = format!("wrap.{}", aurora.user.account_id.as_str());

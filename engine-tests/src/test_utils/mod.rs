@@ -36,6 +36,7 @@ pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const SET_OWNER: &str = "set_owner";
 pub const SET_UPGRADE_DELAY_BLOCKS: &str = "set_upgrade_delay_blocks";
+pub const FACTORY_SET_WNEAR_ADDRESS: &str = "factory_set_wnear_address";
 
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
@@ -235,7 +236,8 @@ impl AuroraRunner {
                     || method_name == PAUSE_PRECOMPILES
                     || method_name == RESUME_PRECOMPILES
                     || method_name == SET_OWNER
-                    || method_name == SET_UPGRADE_DELAY_BLOCKS)
+                    || method_name == SET_UPGRADE_DELAY_BLOCKS
+                    || method_name == FACTORY_SET_WNEAR_ADDRESS)
             {
                 standalone_runner
                     .submit_raw(method_name, &self.context, &self.promise_results)

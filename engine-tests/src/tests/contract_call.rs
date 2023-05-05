@@ -6,6 +6,8 @@ use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT
 
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
+    let wnear_token_address = runner.deploy_erc20_token("wrap.testnet");
+    runner.factory_set_wnear_address(wnear_token_address);
     let token = runner.deploy_erc20_token("tt.testnet");
     let mut signer = test_utils::Signer::random();
     runner.create_address(
