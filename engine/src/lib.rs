@@ -552,7 +552,10 @@ mod contract {
                     actions: vec![action],
                 };
 
-                unsafe { io.promise_create_batch(&promise) };
+                // Safety: this call is safe because it comes from the exit to near precompile, not users.
+                // The call is to transfer the unwrapped wnear tokens.
+                let promise_id = unsafe { io.promise_create_batch(&promise) };
+                io.promise_return(promise_id);
             }
         } else {
             if let Some(args) = args.refund {
