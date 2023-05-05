@@ -403,7 +403,7 @@ pub mod sim_tests {
     };
     use aurora_engine_types::types::Address;
     use borsh::{BorshDeserialize, BorshSerialize};
-    use near_sdk_sim::UserAccount;
+    use near_sdk_sim::{ExecutionResult, UserAccount};
     use serde_json::json;
 
     const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
@@ -486,6 +486,7 @@ pub mod sim_tests {
             nep_141,
             erc20,
             aurora,
+            ..
         } = test_exit_to_near_common();
 
         // Call exit function on ERC-20; observe ERC-20 burned + NEP-141 transferred
@@ -512,6 +513,55 @@ pub mod sim_tests {
     }
 
     #[test]
+    fn test_exit_to_near_wnear() {
+        // Deploy Aurora; deploy wnear; bridge wnear to ERC-20 on Aurora
+        let TestExitToNearContext {
+            ft_owner,
+            ft_owner_address,
+            aurora,
+            wnear,
+            wnear_erc20,
+            ..
+        } = test_exit_to_near_common();
+
+        let ft_owner_balance = get_account_balance(ft_owner.account_id.as_str(), &aurora);
+
+        // Call exit function on ERC-20; observe ERC-20 burned + near tokens transferred
+        let result = exit_to_near(
+            &ft_owner,
+            ft_owner.account_id.as_str(),
+            FT_EXIT_AMOUNT,
+            &wnear_erc20,
+            &aurora,
+        );
+        let total_tokens_burnt: u128 = result
+            .promise_results()
+            .iter()
+            .map(|r| r.as_ref().unwrap().outcome().tokens_burnt)
+            .sum();
+
+        // Check that the wnear tokens are properly unwrapped and transferred to `ft_owner`
+        assert_eq!(
+            get_account_balance(ft_owner.account_id.as_str(), &aurora),
+            ft_owner_balance - total_tokens_burnt + FT_EXIT_AMOUNT
+        );
+
+        // Check wnear balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &wnear, &aurora),
+            FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT
+        );
+        assert_eq!(
+            nep_141_balance_of(aurora.contract.account_id.as_str(), &wnear, &aurora),
+            FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT
+        );
+        assert_eq!(
+            erc20_balance(&wnear_erc20, ft_owner_address, &aurora),
+            (FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT).into()
+        );
+    }
+
+    #[test]
     fn test_exit_to_near_refund() {
         // Deploy Aurora; deploy NEP-141; bridge NEP-141 to ERC-20 on Aurora
         let TestExitToNearContext {
@@ -520,6 +570,7 @@ pub mod sim_tests {
             nep_141,
             erc20,
             aurora,
+            ..
         } = test_exit_to_near_common();
 
         // Call exit on ERC-20; ft_transfer promise fails; expect refund on Aurora;
@@ -732,12 +783,69 @@ pub mod sim_tests {
 
         // 3. Deploy wnear and set wnear address
         let wnear = crate::tests::xcc::deploy_wnear(&aurora);
-        let erc20 = deploy_erc20_from_nep_141(&wnear, &aurora);
+        let wnear_erc20 = deploy_erc20_from_nep_141(&wnear, &aurora);
         aurora
-            .call("factory_set_wnear_address", erc20.0.address.as_bytes())
+            .call(
+                "factory_set_wnear_address",
+                wnear_erc20.0.address.as_bytes(),
+            )
             .assert_success();
 
-        // 4. Deploy NEP-141
+        // 4. Transfer wnear to `ft_owner` and bridge it to aurora
+        aurora
+            .user
+            .call(
+                wnear.account_id(),
+                "storage_deposit",
+                json!({
+                    "account_id": ft_owner.account_id(),
+                })
+                .to_string()
+                .as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                near_sdk_sim::STORAGE_AMOUNT,
+            )
+            .assert_success();
+
+        aurora
+            .user
+            .call(
+                wnear.account_id(),
+                "ft_transfer",
+                format!(
+                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                    ft_owner.account_id(),
+                    FT_TOTAL_SUPPLY,
+                )
+                .as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                1,
+            )
+            .assert_success();
+
+        transfer_nep_141_to_erc_20(
+            &wnear,
+            &wnear_erc20,
+            &ft_owner,
+            ft_owner_address,
+            FT_TRANSFER_AMOUNT,
+            &aurora,
+        );
+
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &wnear, &aurora),
+            FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT
+        );
+        assert_eq!(
+            nep_141_balance_of(aurora.contract.account_id.as_str(), &wnear, &aurora),
+            FT_TRANSFER_AMOUNT
+        );
+        assert_eq!(
+            erc20_balance(&wnear_erc20, ft_owner_address, &aurora),
+            FT_TRANSFER_AMOUNT.into()
+        );
+
+        // 5. Deploy NEP-141
         let nep_141 = deploy_nep_141(
             FT_ACCOUNT,
             ft_owner.account_id.as_ref(),
@@ -750,7 +858,7 @@ pub mod sim_tests {
             FT_TOTAL_SUPPLY
         );
 
-        // 5. Deploy ERC-20 from NEP-141 and bridge value to Aurora
+        // 6. Deploy ERC-20 from NEP-141 and bridge value to Aurora
         let erc20 = deploy_erc20_from_nep_141(&nep_141, &aurora);
         transfer_nep_141_to_erc_20(
             &nep_141,
@@ -780,7 +888,18 @@ pub mod sim_tests {
             nep_141,
             erc20,
             aurora,
+            wnear,
+            wnear_erc20,
         }
+    }
+
+    fn get_account_balance(account: &str, aurora: &AuroraAccount) -> u128 {
+        aurora
+            .user
+            .borrow_runtime()
+            .view_account(account)
+            .unwrap()
+            .amount()
     }
 
     fn exit_to_near(
@@ -789,7 +908,7 @@ pub mod sim_tests {
         amount: u128,
         erc20: &ERC20,
         aurora: &AuroraAccount,
-    ) {
+    ) -> ExecutionResult {
         let input = super::build_input(
             "withdrawToNear(bytes,uint256)",
             &[
@@ -802,15 +921,15 @@ pub mod sim_tests {
             value: WeiU256::default(),
             input,
         });
-        source
-            .call(
-                aurora.contract.account_id(),
-                "call",
-                &call_args.try_to_vec().unwrap(),
-                near_sdk_sim::DEFAULT_GAS,
-                0,
-            )
-            .assert_success();
+        let result = source.call(
+            aurora.contract.account_id(),
+            "call",
+            &call_args.try_to_vec().unwrap(),
+            near_sdk_sim::DEFAULT_GAS,
+            0,
+        );
+        result.assert_success();
+        result
     }
 
     pub fn transfer_nep_141_to_erc_20(
@@ -973,6 +1092,8 @@ pub mod sim_tests {
         nep_141: UserAccount,
         erc20: ERC20,
         aurora: AuroraAccount,
+        wnear: UserAccount,
+        wnear_erc20: ERC20,
     }
 
     struct TestExitToNearEthContext {
