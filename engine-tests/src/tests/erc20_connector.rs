@@ -1,42 +1,18 @@
 use crate::prelude::{Address, Balance, Wei, WeiU256, U256};
 use crate::test_utils::{self, create_eth_transaction, AuroraRunner, ORIGIN};
-use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
+use aurora_engine::engine::EngineError;
+use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
 use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
+use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
 use libsecp256k1::SecretKey;
 use near_vm_logic::VMOutcome;
-use near_vm_runner::VMError;
 use serde_json::json;
 use sha3::Digest;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
-
-pub struct CallResult {
-    outcome: Option<VMOutcome>,
-    error: Option<VMError>,
-}
-
-impl CallResult {
-    fn check_ok(&self) {
-        assert!(self.error.is_none());
-    }
-
-    fn value(&self) -> Vec<u8> {
-        self.outcome
-            .as_ref()
-            .unwrap()
-            .return_data
-            .clone()
-            .as_value()
-            .unwrap()
-    }
-
-    fn submit_result(&self) -> SubmitResult {
-        SubmitResult::try_from_slice(self.value().as_slice()).unwrap()
-    }
-}
 
 fn keccak256(input: &[u8]) -> Vec<u8> {
     sha3::Keccak256::digest(input).to_vec()
@@ -73,9 +49,8 @@ impl AuroraRunner {
         method_name: &str,
         caller_account_id: &str,
         input: Vec<u8>,
-    ) -> CallResult {
-        let (outcome, error) = self.call(method_name, caller_account_id, input);
-        CallResult { outcome, error }
+    ) -> anyhow::Result<VMOutcome, EngineError> {
+        self.call(method_name, caller_account_id, input)
     }
 
     pub fn make_call_with_signer(
@@ -84,13 +59,16 @@ impl AuroraRunner {
         caller_account_id: &str,
         signer_account_id: &str,
         input: Vec<u8>,
-    ) -> CallResult {
-        let (outcome, error) =
-            self.call_with_signer(method_name, caller_account_id, signer_account_id, input);
-        CallResult { outcome, error }
+    ) -> anyhow::Result<VMOutcome, EngineError> {
+        self.call_with_signer(method_name, caller_account_id, signer_account_id, input)
     }
 
-    pub fn evm_call(&mut self, contract: Address, input: Vec<u8>, origin: &str) -> CallResult {
+    pub fn evm_call(
+        &mut self,
+        contract: Address,
+        input: Vec<u8>,
+        origin: &str,
+    ) -> anyhow::Result<VMOutcome, EngineError> {
         self.make_call(
             "call",
             origin,
@@ -104,20 +82,24 @@ impl AuroraRunner {
         )
     }
 
-    pub fn evm_submit(&mut self, input: &LegacyEthSignedTransaction, origin: &str) -> CallResult {
+    pub fn evm_submit(
+        &mut self,
+        input: &LegacyEthSignedTransaction,
+        origin: &str,
+    ) -> anyhow::Result<VMOutcome, EngineError> {
         self.make_call("submit", origin, rlp::encode(input).to_vec())
     }
 
     pub fn deploy_erc20_token(&mut self, nep141: &str) -> Address {
-        let result = self.make_call("deploy_erc20_token", ORIGIN, nep141.try_to_vec().unwrap());
+        let result = self
+            .make_call("deploy_erc20_token", ORIGIN, nep141.try_to_vec().unwrap())
+            .unwrap();
 
-        result.check_ok();
-
-        let raw_address: [u8; 20] = Vec::<u8>::try_from_slice(result.value().as_slice())
+        Vec::try_from_slice(&result.return_data.as_value().unwrap())
             .unwrap()
             .try_into()
-            .unwrap();
-        Address::try_from_slice(&raw_address).unwrap()
+            .map(Address::from_array)
+            .unwrap()
     }
 
     pub fn create_account(&mut self) -> EthereumAddress {
@@ -133,10 +115,14 @@ impl AuroraRunner {
 
     pub fn balance_of(&mut self, token: Address, target: Address, origin: &str) -> U256 {
         let input = build_input("balanceOf(address)", &[Token::Address(target.raw())]);
-        let result = self.evm_call(token, input, origin);
-        result.check_ok();
-        let output = test_utils::unwrap_success(result.submit_result());
-        U256::from_big_endian(output.as_slice())
+        let result = self.evm_call(token, input, origin).unwrap();
+        let output = result.return_data.as_value().unwrap();
+        let result = SubmitResult::try_from_slice(&output).unwrap();
+
+        match result.status {
+            TransactionStatus::Succeed(bytes) => U256::from_big_endian(&bytes),
+            other => panic!("Wrong EVM transaction status: {other:?}"),
+        }
     }
 
     pub fn mint(
@@ -145,7 +131,7 @@ impl AuroraRunner {
         target: Address,
         amount: u64,
         origin: &str,
-    ) -> CallResult {
+    ) -> anyhow::Result<VMOutcome, EngineError> {
         let input = build_input(
             "mint(address,uint256)",
             &[
@@ -153,17 +139,18 @@ impl AuroraRunner {
                 Token::Uint(U256::from(amount)),
             ],
         );
-        let result = self.evm_call(token, input, origin);
-        result.check_ok();
-        result
+
+        self.evm_call(token, input, origin)
     }
 
     #[allow(dead_code)]
-    pub fn admin(&mut self, token: Address, origin: &str) -> CallResult {
+    pub fn admin(
+        &mut self,
+        token: Address,
+        origin: &str,
+    ) -> anyhow::Result<VMOutcome, EngineError> {
         let input = build_input("admin()", &[]);
-        let result = self.evm_call(token, input, origin);
-        result.check_ok();
-        result
+        self.evm_call(token, input, origin)
     }
 
     pub fn transfer_erc20(
@@ -173,7 +160,7 @@ impl AuroraRunner {
         receiver: Address,
         amount: u64,
         origin: &str,
-    ) -> CallResult {
+    ) -> anyhow::Result<VMOutcome, EngineError> {
         // transfer(address recipient, uint256 amount)
         let input = build_input(
             "transfer(address,uint256)",
@@ -182,12 +169,8 @@ impl AuroraRunner {
                 Token::Uint(U256::from(amount)),
             ],
         );
-
         let input = create_eth_transaction(Some(token), Wei::zero(), input, None, &sender);
-
-        let result = self.evm_submit(&input, origin); // create_eth_transaction()
-        result.check_ok();
-        result
+        self.evm_submit(&input, origin) // create_eth_transaction()
     }
 
     pub fn ft_on_transfer(
@@ -210,15 +193,15 @@ impl AuroraRunner {
             .to_string()
             .into_bytes(),
         );
-        res.check_ok();
-        String::from_utf8(res.value()).unwrap()
+        assert!(res.is_ok());
+        String::from_utf8(res.unwrap().return_data.as_value().unwrap()).unwrap()
     }
 
     pub fn register_relayer(
         &mut self,
         relayer_account_id: &str,
         relayer_address: Address,
-    ) -> CallResult {
+    ) -> anyhow::Result<VMOutcome, EngineError> {
         self.make_call(
             "register_relayer",
             relayer_account_id,
@@ -254,7 +237,7 @@ fn test_mint_not_admin() {
     let balance = runner.balance_of(token, address, ORIGIN);
     assert_eq!(balance, U256::from(0));
     let amount = 10;
-    runner.mint(token, address, amount, "not_admin");
+    runner.mint(token, address, amount, "not_admin").unwrap();
     let balance = runner.balance_of(token, address, ORIGIN);
     assert_eq!(balance, U256::from(0));
 }
@@ -311,7 +294,7 @@ fn test_relayer_charge_fee() {
     assert_eq!(recipient_balance, INITIAL_BALANCE);
 
     let relayer = create_ethereum_address();
-    runner.register_relayer(alice, relayer);
+    runner.register_relayer(alice, relayer).unwrap();
     let relayer_balance = runner.get_balance(relayer);
     assert_eq!(relayer_balance, Wei::zero());
 
@@ -360,14 +343,16 @@ fn test_transfer_erc20_token() {
         U256::zero()
     );
 
-    runner.mint(token, peer0.address, to_mint, ORIGIN);
+    runner.mint(token, peer0.address, to_mint, ORIGIN).unwrap();
 
     assert_eq!(
         runner.balance_of(token, peer0.address, ORIGIN),
         U256::from(to_mint)
     );
 
-    runner.transfer_erc20(token, peer0.secret_key, peer1.address, to_transfer, ORIGIN);
+    runner
+        .transfer_erc20(token, peer0.secret_key, peer1.address, to_transfer, ORIGIN)
+        .unwrap();
     assert_eq!(
         runner.balance_of(token, peer0.address, ORIGIN),
         U256::from(to_mint - to_transfer)
@@ -683,7 +668,7 @@ pub mod sim_tests {
         let constructor = TesterConstructor::load();
         let deploy_data = constructor.deploy(0, Address::zero()).data;
         let submit_result = match aurora.call("deploy_code", &deploy_data).status() {
-            near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+            near_sdk_sim::transaction::ExecutionStatus::SuccessValue(bytes) => {
                 SubmitResult::try_from_slice(&bytes).unwrap()
             }
             other => panic!("Unexpected status {other:?}"),
@@ -858,7 +843,7 @@ pub mod sim_tests {
         });
         let result = aurora.call("call", &call_args.try_to_vec().unwrap());
         let submit_result = match result.status() {
-            near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+            near_sdk_sim::transaction::ExecutionStatus::SuccessValue(bytes) => {
                 SubmitResult::try_from_slice(&bytes).unwrap()
             }
             other => panic!("Unexpected status {other:?}"),
