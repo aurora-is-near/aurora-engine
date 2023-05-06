@@ -252,15 +252,15 @@ fn validate_amount(amount: U256) -> Result<(), ExitError> {
     Ok(())
 }
 
-pub struct Recipient {
-    pub receiver_account_id: AccountId,
-    pub message: Option<String>,
+struct Recipient {
+    receiver_account_id: AccountId,
+    message: Option<String>,
 }
 
-pub fn parse_recipient(recipient: &[u8]) -> Option<Recipient> {
+fn parse_recipient(recipient: &[u8]) -> Option<Recipient> {
     let mut iter = str::from_utf8(recipient).ok()?.splitn(2, ':');
     let receiver_account_id = iter.next()?.parse().ok()?;
-    let message = iter.next().map(|s| s.to_string());
+    let message = iter.next().map(ToString::to_string);
 
     Some(Recipient {
         receiver_account_id,
