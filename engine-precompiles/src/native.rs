@@ -10,6 +10,7 @@ use crate::{
         parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
         sdk::io::{StorageIntermediate, IO},
         storage::{bytes_to_key, KeyPrefix},
+        str,
         types::{Address, Yocto},
         vec, BorshSerialize, Cow, String, ToString, Vec, U256,
     },
@@ -29,6 +30,7 @@ use evm::backend::Log;
 use evm::{Context, ExitError};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
+const UNWRAP_WNEAR_MSG: &str = "unwrap";
 
 mod costs {
     use crate::prelude::types::{EthGas, NearGas};
@@ -250,6 +252,22 @@ fn validate_amount(amount: U256) -> Result<(), ExitError> {
     Ok(())
 }
 
+pub struct Recipient {
+    pub receiver_account_id: AccountId,
+    pub message: Option<String>,
+}
+
+pub fn parse_recipient(recipient: &[u8]) -> Option<Recipient> {
+    let mut iter = str::from_utf8(recipient).ok()?.splitn(2, ':');
+    let receiver_account_id = iter.next()?.parse().ok()?;
+    let message = iter.next().map(|s| s.to_string());
+
+    Some(Recipient {
+        receiver_account_id,
+        message,
+    })
+}
+
 impl<I: IO> Precompile for ExitToNear<I> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
@@ -364,14 +382,16 @@ impl<I: IO> Precompile for ExitToNear<I> {
 
                 validate_amount(amount)?;
 
-                if let Ok(receiver_account_id) = AccountId::try_from(input) {
+                if let Some(recipient) = parse_recipient(input) {
                     let (args, method, transfer_near_args) =
-                        if erc20_address == get_wnear_address(&self.io).raw() {
+                        if recipient.message.unwrap_or_default() == UNWRAP_WNEAR_MSG
+                            && erc20_address == get_wnear_address(&self.io).raw()
+                        {
                             (
                                 format!(r#"{{"amount": "{}"}}"#, amount.as_u128()),
                                 "near_withdraw",
                                 Some(TransferNearCallArgs {
-                                    target_account_id: receiver_account_id.clone(),
+                                    target_account_id: recipient.receiver_account_id.clone(),
                                     amount: amount.as_u128(),
                                 }),
                             )
@@ -381,7 +401,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                             (
                                 format!(
                                     r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                                    receiver_account_id,
+                                    recipient.receiver_account_id,
                                     amount.as_u128()
                                 ),
                                 "ft_transfer",
@@ -395,7 +415,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                         events::ExitToNear {
                             sender: Address::new(erc20_address),
                             erc20_address: Address::new(erc20_address),
-                            dest: receiver_account_id.to_string(),
+                            dest: recipient.receiver_account_id.to_string(),
                             amount,
                         },
                         method,

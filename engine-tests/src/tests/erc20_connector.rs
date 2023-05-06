@@ -513,7 +513,7 @@ pub mod sim_tests {
     }
 
     #[test]
-    fn test_exit_to_near_wnear() {
+    fn test_exit_to_near_wnear_unwrapped() {
         // Deploy Aurora; deploy wnear; bridge wnear to ERC-20 on Aurora
         let TestExitToNearContext {
             ft_owner,
@@ -529,7 +529,7 @@ pub mod sim_tests {
         // Call exit function on ERC-20; observe ERC-20 burned + near tokens transferred
         let result = exit_to_near(
             &ft_owner,
-            ft_owner.account_id.as_str(),
+            &format!("{}:unwrap", ft_owner.account_id.as_str()),
             FT_EXIT_AMOUNT,
             &wnear_erc20,
             &aurora,
@@ -550,6 +550,55 @@ pub mod sim_tests {
         assert_eq!(
             nep_141_balance_of(ft_owner.account_id.as_str(), &wnear, &aurora),
             FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT
+        );
+        assert_eq!(
+            nep_141_balance_of(aurora.contract.account_id.as_str(), &wnear, &aurora),
+            FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT
+        );
+        assert_eq!(
+            erc20_balance(&wnear_erc20, ft_owner_address, &aurora),
+            (FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT).into()
+        );
+    }
+
+    #[test]
+    fn test_exit_to_near_wnear() {
+        // Deploy Aurora; deploy wnear; bridge wnear to ERC-20 on Aurora
+        let TestExitToNearContext {
+            ft_owner,
+            ft_owner_address,
+            aurora,
+            wnear,
+            wnear_erc20,
+            ..
+        } = test_exit_to_near_common();
+
+        let ft_owner_balance = get_account_balance(ft_owner.account_id.as_str(), &aurora);
+
+        // Call exit function on ERC-20; observe ERC-20 burned + wnear tokens transferred
+        let result = exit_to_near(
+            &ft_owner,
+            ft_owner.account_id.as_str(),
+            FT_EXIT_AMOUNT,
+            &wnear_erc20,
+            &aurora,
+        );
+        let total_tokens_burnt: u128 = result
+            .promise_results()
+            .iter()
+            .map(|r| r.as_ref().unwrap().outcome().tokens_burnt)
+            .sum();
+
+        // Check that there were no near tokens transferred to `ft_owner`
+        assert_eq!(
+            get_account_balance(ft_owner.account_id.as_str(), &aurora),
+            ft_owner_balance - total_tokens_burnt
+        );
+
+        // Check wnear balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &wnear, &aurora),
+            FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT + FT_EXIT_AMOUNT
         );
         assert_eq!(
             nep_141_balance_of(aurora.contract.account_id.as_str(), &wnear, &aurora),
