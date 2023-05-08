@@ -10,7 +10,6 @@ use aurora_engine::parameters::{
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::H160;
 use borsh::{BorshDeserialize, BorshSerialize};
-use evm::ExitFatal;
 use libsecp256k1::SecretKey;
 use near_sdk_sim::errors::TxExecutionError;
 use near_sdk_sim::transaction::ExecutionStatus;
@@ -1107,10 +1106,7 @@ fn test_set_owner_fail_on_same_owner() {
         .unwrap_err();
 
     // check error equality
-    assert_eq!(
-        error.kind,
-        EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_SAME_OWNER".into()))
-    );
+    assert_eq!(error.kind, EngineErrorKind::SameOwner);
 }
 
 #[test]

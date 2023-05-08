@@ -1078,7 +1078,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_fixed_gas_cost() {
         let mut io = Runtime;
-        silo::assert_admin(&io);
+        silo::assert_admin(&io).sdk_unwrap();
         let args: FixedGasCostArgs = io.read_input_borsh().sdk_unwrap();
         silo::set_fixed_gas_cost(&mut io, args.cost);
     }
@@ -1086,7 +1086,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_whitelist_status() {
         let io = Runtime;
-        silo::assert_admin(&io);
+        silo::assert_admin(&io).sdk_unwrap();
         let args: WhitelistStatusArgs = io.read_input_borsh().sdk_unwrap();
         silo::set_whitelist_status(&io, &args);
     }
@@ -1106,7 +1106,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn add_entry_to_whitelist() {
         let io = Runtime;
-        silo::assert_admin(&io);
+        silo::assert_admin(&io).sdk_unwrap();
 
         let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
         silo::add_entity_to_whitelist(&io, &args);
@@ -1115,7 +1115,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn add_entry_to_whitelist_batch() {
         let io = Runtime;
-        silo::assert_admin(&io);
+        silo::assert_admin(&io).sdk_unwrap();
 
         let args: Vec<WhitelistArgs> = io.read_input_borsh().sdk_unwrap();
         silo::add_entry_to_whitelist_batch(&io, args);
@@ -1124,7 +1124,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn remove_entry_from_whitelist() {
         let io = Runtime;
-        silo::assert_admin(&io);
+        silo::assert_admin(&io).sdk_unwrap();
 
         let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
         silo::remove_entry_from_whitelist(&io, &args);

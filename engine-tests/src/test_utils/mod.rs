@@ -253,7 +253,7 @@ impl AuroraRunner {
                 || method_name == ADD_ENTRY_TO_WHITELIST
                 || method_name == ADD_ENTRY_TO_WHITELIST_BATCH
                 || method_name == REMOVE_ENTRY_FROM_WHITELIST
-                || method_name == SET_WHITELIST_STATUS)
+                || method_name == SET_WHITELIST_STATUS
             {
                 standalone_runner.submit_raw(method_name, &self.context, &self.promise_results)?;
                 self.validate_standalone();
@@ -518,9 +518,11 @@ impl AuroraRunner {
     }
 
     pub fn get_fixed_gas_cost(&mut self) -> Option<Wei> {
-        let (res, err) = self.one_shot().call("get_fixed_gas_cost", "getter", vec![]);
-        assert!(err.is_none(), "get_fixed_gas_cost: {:?}", err);
-        let val = res.unwrap().return_data.as_value()?;
+        let outcome = self
+            .one_shot()
+            .call("get_fixed_gas_cost", "getter", vec![])
+            .unwrap();
+        let val = outcome.return_data.as_value()?;
         FixedGasCostArgs::try_from_slice(&val).unwrap().cost
     }
 
@@ -581,7 +583,7 @@ impl AuroraRunner {
                     .collect::<std::collections::HashSet<_>>();
                 let diff = fake_keys.difference(&standalone_keys).collect::<Vec<_>>();
 
-                panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {:?}", diff);
+                panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
             }
 
             for (key, value) in standalone_state.iter() {
@@ -935,6 +937,8 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
                 "ERR_GAS_OVERFLOW" => EngineErrorKind::GasOverflow,
                 "ERR_INTRINSIC_GAS" => EngineErrorKind::IntrinsicGasNotMet,
                 "ERR_INCORRECT_NONCE" => EngineErrorKind::IncorrectNonce,
+                "ERR_NOT_ALLOWED" => EngineErrorKind::NotAllowed,
+                "ERR_SAME_OWNER" => EngineErrorKind::SameOwner,
                 "ERR_PAUSED" => EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_PAUSED".into())),
                 msg => EngineErrorKind::EvmFatal(ExitFatal::Other(Cow::Owned(msg.into()))),
             }

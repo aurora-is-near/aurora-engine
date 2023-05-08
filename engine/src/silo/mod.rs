@@ -6,6 +6,8 @@ use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::AsBytes;
 
+#[cfg(feature = "contract")]
+use crate::engine::EngineErrorKind;
 use crate::prelude::Vec;
 
 use parameters::{WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs};
@@ -68,10 +70,12 @@ pub fn get_whitelist_status<I: IO + Copy>(io: &I, args: &WhitelistKindArgs) -> W
 
 /// Check if the calling user is admin or owner.
 #[cfg(feature = "contract")]
-pub fn assert_admin<I: IO + Env + Copy>(io: &I) {
+pub fn assert_admin<I: IO + Env + Copy>(io: &I) -> Result<(), EngineErrorKind> {
     if !is_owner(io) && !is_admin(io) {
-        aurora_engine_sdk::panic_utf8(crate::errors::ERR_NOT_ALLOWED);
+        return Err(EngineErrorKind::NotAllowed);
     }
+
+    Ok(())
 }
 
 /// Check if user has writes to deploy EVM code.

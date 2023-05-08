@@ -1,3 +1,4 @@
+use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::silo::parameters::{
     FixedGasCostArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
     WhitelistStatusArgs,
@@ -168,7 +169,7 @@ fn test_eth_transfer_incorrect_nonce() {
             test_utils::transfer(receiver, TRANSFER_AMOUNT, nonce + 1)
         })
         .unwrap_err();
-    assert!(err.to_string().contains("ERR_INCORRECT_NONCE"));
+    assert_eq!(err.kind, EngineErrorKind::IncorrectNonce);
 
     // validate post-state (which is the same as pre-state in this case)
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
@@ -266,17 +267,21 @@ fn test_admin_access_right() {
     .try_to_vec()
     .unwrap();
 
-    let (_, err) = runner.call("add_entry_to_whitelist", caller.as_ref(), account.clone());
-    assert!(err.unwrap().to_string().contains("ERR_NOT_ALLOWED"));
-    let (_, err) = runner.call("add_entry_to_whitelist", caller.as_ref(), address.clone());
-    assert!(err.unwrap().to_string().contains("ERR_NOT_ALLOWED"));
+    let err = runner
+        .call("add_entry_to_whitelist", caller.as_ref(), account.clone())
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
+    let err = runner
+        .call("add_entry_to_whitelist", caller.as_ref(), address.clone())
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     add_admin(&mut runner, caller.clone());
 
-    let (_, err) = runner.call("add_entry_to_whitelist", caller.as_ref(), account);
-    assert!(err.is_none());
-    let (_, err) = runner.call("add_entry_to_whitelist", caller.as_ref(), address);
-    assert!(err.is_none());
+    let result = runner.call("add_entry_to_whitelist", caller.as_ref(), account);
+    assert!(result.is_ok());
+    let result = runner.call("add_entry_to_whitelist", caller.as_ref(), address);
+    assert!(result.is_ok());
 }
 
 #[test]
@@ -297,7 +302,7 @@ fn test_submit_access_right() {
     let err = runner
         .submit_transaction(&signer.secret_key, transaction.clone())
         .unwrap_err();
-    assert!(err.to_string().contains("ERR_NOT_ALLOWED"));
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // validate post-state
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
@@ -341,7 +346,7 @@ fn test_submit_access_right_via_batch() {
     let err = runner
         .submit_transaction(&signer.secret_key, transaction.clone())
         .unwrap_err();
-    assert!(err.to_string().contains("ERR_NOT_ALLOWED"));
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // validate post-state
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
@@ -394,7 +399,7 @@ fn test_submit_with_disabled_whitelist() {
     let err = runner
         .submit_transaction(&signer.secret_key, transaction.clone())
         .unwrap_err();
-    assert!(err.to_string().contains("ERR_NOT_ALLOWED"));
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // validate post-state
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
@@ -426,7 +431,7 @@ fn test_submit_with_disabled_whitelist() {
     let err = runner
         .submit_transaction(&signer.secret_key, transaction)
         .unwrap_err();
-    assert!(err.to_string().contains("ERR_NOT_ALLOWED"));
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 }
 
 #[test]
@@ -468,7 +473,7 @@ fn test_submit_with_removing_entries() {
     let err = runner
         .submit_transaction(&signer.secret_key, transaction)
         .unwrap_err();
-    assert!(err.to_string().contains("ERR_NOT_ALLOWED"));
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // validate post-state
     validate_address_balance_and_nonce(
@@ -503,7 +508,7 @@ fn test_deploy_access_rights() {
     let err = runner
         .submit_transaction(&signer.secret_key, deploy_tx.clone())
         .unwrap_err();
-    assert!(err.to_string().contains("ERR_NOT_ALLOWED"));
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // Check that the balance and the nonce haven't been changed.
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
@@ -553,7 +558,7 @@ fn test_deploy_with_disabled_whitelist() {
     let err = runner
         .submit_transaction(&signer.secret_key, deploy_tx.clone())
         .unwrap_err();
-    assert!(err.to_string().contains("ERR_NOT_ALLOWED"));
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // Check that the balance and the nonce haven't been changed.
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
@@ -748,6 +753,12 @@ fn set_fixed_gas_cost(runner: &mut AuroraRunner, cost: Option<Wei>) {
 
 fn call_function<T: BorshSerialize + Debug>(runner: &mut AuroraRunner, func: &str, args: T) {
     let input = args.try_to_vec().unwrap();
-    let (_, err) = runner.call(func, &runner.aurora_account_id.clone(), input);
-    assert!(err.is_none(), "{}: {:?}, args: {:?}", func, err, args);
+    let result = runner.call(func, &runner.aurora_account_id.clone(), input);
+    assert!(
+        result.is_ok(),
+        "{}: {:?}, args: {:?}",
+        func,
+        result.unwrap_err(),
+        args
+    );
 }

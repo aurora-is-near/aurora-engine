@@ -112,6 +112,7 @@ pub enum EngineErrorKind {
     GasPayment(GasPaymentError),
     GasOverflow,
     NotAllowed,
+    SameOwner,
     NotOwner,
 }
 
@@ -144,6 +145,7 @@ impl EngineErrorKind {
             Self::GasPayment(e) => e.as_ref(),
             Self::GasOverflow => errors::ERR_GAS_OVERFLOW,
             Self::NotAllowed => errors::ERR_NOT_ALLOWED,
+            Self::SameOwner => errors::ERR_SAME_OWNER,
             Self::NotOwner => errors::ERR_NOT_OWNER,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
