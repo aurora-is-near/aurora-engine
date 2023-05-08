@@ -41,11 +41,10 @@ fn test_exploit_fix() {
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
     let view_call_args = test_utils::as_view_call(tx, sender);
     let input = view_call_args.try_to_vec().unwrap();
+    let error = runner.one_shot().call("view", "viewer", input).unwrap_err();
 
-    let (_outcome, maybe_error) = runner.one_shot().call("view", "viewer", input);
-    let error_message = format!("{maybe_error:?}");
     assert!(
-        error_message.contains("ERR_ILLEGAL_RETURN"),
-        "{error_message}",
+        error.kind.as_bytes().starts_with(b"ERR_ILLEGAL_RETURN"),
+        "{error:?}"
     );
 }

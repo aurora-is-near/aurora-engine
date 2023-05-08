@@ -78,11 +78,10 @@ fn test_eip_1559_example() {
     let signed_tx = test_utils::sign_eip_1559_transaction(transaction, &signer.secret_key);
 
     let sender = "relay.aurora";
-    let (maybe_outcome, maybe_err) = runner.call(test_utils::SUBMIT, sender, encode_tx(&signed_tx));
-    assert!(maybe_err.is_none());
-    let result =
-        SubmitResult::try_from_slice(&maybe_outcome.unwrap().return_data.as_value().unwrap())
-            .unwrap();
+    let outcome = runner
+        .call(test_utils::SUBMIT, sender, encode_tx(&signed_tx))
+        .unwrap();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert_eq!(result.gas_used, 0xb8d2);
 
     // Check post state:
