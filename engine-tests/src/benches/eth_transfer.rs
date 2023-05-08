@@ -29,11 +29,11 @@ pub fn eth_transfer_benchmark(c: &mut Criterion) {
     let calling_account_id = "some-account.near";
 
     // measure gas usage
-    let (output, maybe_err) = runner
+    let output = runner
         .one_shot()
-        .call(SUBMIT, calling_account_id, input.clone());
-    assert!(maybe_err.is_none());
-    let gas = output.unwrap().burnt_gas;
+        .call(SUBMIT, calling_account_id, input.clone())
+        .unwrap();
+    let gas = output.burnt_gas;
     // TODO(#45): capture this in a file
     println!("ETH_TRANSFER NEAR GAS: {gas:?}");
     println!("ETH_TRANSFER ETH GAS: 21_000");
