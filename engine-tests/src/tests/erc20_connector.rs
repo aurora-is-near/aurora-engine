@@ -49,7 +49,7 @@ impl AuroraRunner {
         method_name: &str,
         caller_account_id: &str,
         input: Vec<u8>,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    ) -> Result<VMOutcome, EngineError> {
         self.call(method_name, caller_account_id, input)
     }
 
@@ -59,7 +59,7 @@ impl AuroraRunner {
         caller_account_id: &str,
         signer_account_id: &str,
         input: Vec<u8>,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    ) -> Result<VMOutcome, EngineError> {
         self.call_with_signer(method_name, caller_account_id, signer_account_id, input)
     }
 
@@ -68,7 +68,7 @@ impl AuroraRunner {
         contract: Address,
         input: Vec<u8>,
         origin: &str,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    ) -> Result<VMOutcome, EngineError> {
         self.make_call(
             "call",
             origin,
@@ -86,7 +86,7 @@ impl AuroraRunner {
         &mut self,
         input: &LegacyEthSignedTransaction,
         origin: &str,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    ) -> Result<VMOutcome, EngineError> {
         self.make_call("submit", origin, rlp::encode(input).to_vec())
     }
 
@@ -131,7 +131,7 @@ impl AuroraRunner {
         target: Address,
         amount: u64,
         origin: &str,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    ) -> Result<VMOutcome, EngineError> {
         let input = build_input(
             "mint(address,uint256)",
             &[
@@ -144,11 +144,7 @@ impl AuroraRunner {
     }
 
     #[allow(dead_code)]
-    pub fn admin(
-        &mut self,
-        token: Address,
-        origin: &str,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    pub fn admin(&mut self, token: Address, origin: &str) -> Result<VMOutcome, EngineError> {
         let input = build_input("admin()", &[]);
         self.evm_call(token, input, origin)
     }
@@ -160,7 +156,7 @@ impl AuroraRunner {
         receiver: Address,
         amount: u64,
         origin: &str,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    ) -> Result<VMOutcome, EngineError> {
         // transfer(address recipient, uint256 amount)
         let input = build_input(
             "transfer(address,uint256)",
@@ -201,7 +197,7 @@ impl AuroraRunner {
         &mut self,
         relayer_account_id: &str,
         relayer_address: Address,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    ) -> Result<VMOutcome, EngineError> {
         self.make_call(
             "register_relayer",
             relayer_account_id,

@@ -1,8 +1,9 @@
-use aurora_engine::engine::EngineError;
+use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
+use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
 use near_primitives::version::PROTOCOL_VERSION;
@@ -10,11 +11,13 @@ use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
 use near_primitives_core::profile::ProfileDataV3;
 use near_primitives_core::runtime::fees::RuntimeFeesConfig;
+use near_vm_errors::{FunctionCallError, HostError};
 use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
 use near_vm_runner::MockCompiledContractCache;
 use rlp::RlpStream;
+use std::borrow::Cow;
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
@@ -113,7 +116,7 @@ impl<'a> OneShotAuroraRunner<'a> {
         method_name: &str,
         caller_account_id: &str,
         input: Vec<u8>,
-    ) -> anyhow::Result<(VMOutcome, ExecutionProfile)> {
+    ) -> Result<(VMOutcome, ExecutionProfile), EngineError> {
         self.call(method_name, caller_account_id, input)
             .map(|outcome| {
                 let profile = ExecutionProfile::new(&outcome);
@@ -126,7 +129,7 @@ impl<'a> OneShotAuroraRunner<'a> {
         method_name: &str,
         caller_account_id: &str,
         input: Vec<u8>,
-    ) -> anyhow::Result<VMOutcome> {
+    ) -> Result<VMOutcome, EngineError> {
         AuroraRunner::update_context(
             &mut self.context,
             caller_account_id,
@@ -144,9 +147,14 @@ impl<'a> OneShotAuroraRunner<'a> {
             &[],
             self.base.current_protocol_version,
             Some(&self.base.cache),
-        )?;
+        )
+        .unwrap();
 
-        Ok(outcome)
+        if let Some(aborted) = outcome.aborted.as_ref() {
+            Err(into_engine_error(outcome.used_gas, aborted))
+        } else {
+            Ok(outcome)
+        }
     }
 }
 
@@ -177,7 +185,7 @@ impl AuroraRunner {
         method_name: &str,
         caller_account_id: &str,
         input: Vec<u8>,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    ) -> Result<VMOutcome, EngineError> {
         self.call_with_signer(method_name, caller_account_id, caller_account_id, input)
     }
 
@@ -187,7 +195,7 @@ impl AuroraRunner {
         caller_account_id: &str,
         signer_account_id: &str,
         input: Vec<u8>,
-    ) -> anyhow::Result<VMOutcome, EngineError> {
+    ) -> Result<VMOutcome, EngineError> {
         Self::update_context(
             &mut self.context,
             caller_account_id,
@@ -218,6 +226,10 @@ impl AuroraRunner {
             Some(&self.cache),
         )
         .unwrap();
+
+        if let Some(error) = outcome.aborted.as_ref() {
+            return Err(into_engine_error(outcome.used_gas, error));
+        }
 
         self.context.storage_usage = outcome.storage_usage;
         self.previous_logs = outcome.logs.clone();
@@ -252,19 +264,14 @@ impl AuroraRunner {
         }
     }
 
-    pub fn create_address(
-        &mut self,
-        address: Address,
-        init_balance: crate::prelude::Wei,
-        init_nonce: U256,
-    ) {
+    pub fn create_address(&mut self, address: Address, init_balance: Wei, init_nonce: U256) {
         self.internal_create_address(address, init_balance, init_nonce, None);
     }
 
     pub fn create_address_with_code(
         &mut self,
         address: Address,
-        init_balance: crate::prelude::Wei,
+        init_balance: Wei,
         init_nonce: U256,
         code: Vec<u8>,
     ) {
@@ -274,7 +281,7 @@ impl AuroraRunner {
     fn internal_create_address(
         &mut self,
         address: Address,
-        init_balance: crate::prelude::Wei,
+        init_balance: Wei,
         init_nonce: U256,
         code: Option<Vec<u8>>,
     ) {
@@ -359,7 +366,7 @@ impl AuroraRunner {
         &mut self,
         signer: &mut Signer,
         make_tx: F,
-    ) -> anyhow::Result<SubmitResult, EngineError> {
+    ) -> Result<SubmitResult, EngineError> {
         self.submit_with_signer_profiled(signer, make_tx)
             .map(|(result, _)| result)
     }
@@ -368,7 +375,7 @@ impl AuroraRunner {
         &mut self,
         signer: &mut Signer,
         make_tx: F,
-    ) -> anyhow::Result<(SubmitResult, ExecutionProfile), EngineError> {
+    ) -> Result<(SubmitResult, ExecutionProfile), EngineError> {
         let nonce = signer.use_nonce();
         let tx = make_tx(nonce.into());
         self.submit_transaction_profiled(&signer.secret_key, tx)
@@ -378,7 +385,7 @@ impl AuroraRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> anyhow::Result<SubmitResult, EngineError> {
+    ) -> Result<SubmitResult, EngineError> {
         self.submit_transaction_profiled(account, transaction)
             .map(|(result, _)| result)
     }
@@ -387,7 +394,7 @@ impl AuroraRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> anyhow::Result<(SubmitResult, ExecutionProfile), EngineError> {
+    ) -> Result<(SubmitResult, ExecutionProfile), EngineError> {
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
         self.call(SUBMIT, CALLER_ACCOUNT_ID, rlp::encode(&signed_tx).to_vec())
             .map(Self::profile_outcome)
@@ -399,7 +406,7 @@ impl AuroraRunner {
         transaction: TransactionLegacy,
         max_gas_price: u128,
         gas_token_address: Option<Address>,
-    ) -> anyhow::Result<SubmitResult, EngineError> {
+    ) -> Result<SubmitResult, EngineError> {
         self.submit_transaction_with_args_profiled(
             account,
             transaction,
@@ -415,7 +422,7 @@ impl AuroraRunner {
         transaction: TransactionLegacy,
         max_gas_price: u128,
         gas_token_address: Option<Address>,
-    ) -> anyhow::Result<(SubmitResult, ExecutionProfile), EngineError> {
+    ) -> Result<(SubmitResult, ExecutionProfile), EngineError> {
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
         let args = SubmitArgs {
             tx_data: rlp::encode(&signed_tx).to_vec(),
@@ -459,7 +466,7 @@ impl AuroraRunner {
         }
     }
 
-    pub fn view_call(&self, args: &ViewCallArgs) -> anyhow::Result<TransactionStatus> {
+    pub fn view_call(&self, args: &ViewCallArgs) -> Result<TransactionStatus, EngineError> {
         let input = args.try_to_vec().unwrap();
         let mut runner = self.one_shot();
         runner.context.view_config = Some(ViewConfig {
@@ -474,7 +481,7 @@ impl AuroraRunner {
     pub fn profiled_view_call(
         &self,
         args: &ViewCallArgs,
-    ) -> anyhow::Result<(TransactionStatus, ExecutionProfile)> {
+    ) -> Result<(TransactionStatus, ExecutionProfile), EngineError> {
         let input = args.try_to_vec().unwrap();
         let mut runner = self.one_shot();
         runner.context.view_config = Some(ViewConfig {
@@ -880,4 +887,23 @@ pub const fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
     let (larger, smaller) = if a < b { (b, a) } else { (a, b) };
 
     (100 / x) * (larger - smaller) <= larger
+}
+
+fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError {
+    let kind = match aborted {
+        FunctionCallError::HostError(HostError::GuestPanic { panic_msg }) => {
+            match panic_msg.as_str() {
+                "ERR_INVALID_CHAIN_ID" => EngineErrorKind::InvalidChainId,
+                "ERR_OUT_OF_FUND" => EngineErrorKind::GasPayment(GasPaymentError::OutOfFund),
+                "ERR_GAS_OVERFLOW" => EngineErrorKind::GasOverflow,
+                "ERR_INTRINSIC_GAS" => EngineErrorKind::IntrinsicGasNotMet,
+                "ERR_INCORRECT_NONCE" => EngineErrorKind::IncorrectNonce,
+                "ERR_PAUSED" => EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_PAUSED".into())),
+                msg => EngineErrorKind::EvmFatal(ExitFatal::Other(Cow::Owned(msg.into()))),
+            }
+        }
+        other => panic!("Other FunctionCallError: {other:?}"),
+    };
+
+    EngineError { kind, gas_used }
 }

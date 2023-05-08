@@ -41,15 +41,10 @@ fn test_exploit_fix() {
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
     let view_call_args = test_utils::as_view_call(tx, sender);
     let input = view_call_args.try_to_vec().unwrap();
-    let outcome = runner.one_shot().call("view", "viewer", input).unwrap();
+    let error = runner.one_shot().call("view", "viewer", input).unwrap_err();
 
     assert!(
-        outcome
-            .aborted
-            .as_ref()
-            .unwrap()
-            .to_string()
-            .contains("Smart contract panicked: ERR_ILLEGAL_RETURN"),
-        "{outcome:?}",
+        error.kind.as_bytes().starts_with(b"ERR_ILLEGAL_RETURN"),
+        "{error:?}"
     );
 }

@@ -10,6 +10,7 @@ use aurora_engine::parameters::{
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::H160;
 use borsh::{BorshDeserialize, BorshSerialize};
+use evm::ExitFatal;
 use libsecp256k1::SecretKey;
 use near_sdk_sim::errors::TxExecutionError;
 use near_sdk_sim::transaction::ExecutionStatus;
@@ -1097,18 +1098,18 @@ fn test_set_owner_fail_on_same_owner() {
         new_owner: str_to_account_id(&aurora_account_id),
     };
 
-    let outcome = runner
+    let error = runner
         .call(
             "set_owner",
             &aurora_account_id,
             set_owner_args.try_to_vec().unwrap(),
         )
-        .unwrap();
+        .unwrap_err();
 
     // check error equality
     assert_eq!(
-        outcome.aborted.unwrap().to_string(),
-        "Smart contract panicked: ERR_SAME_OWNER"
+        error.kind,
+        EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_SAME_OWNER".into()))
     );
 }
 

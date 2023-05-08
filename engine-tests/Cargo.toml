@@ -15,7 +15,6 @@ autobenches = false
 [dependencies]
 
 [dev-dependencies]
-anyhow = "1"
 aurora-engine = { path = "../engine", default-features = false, features = ["std", "tracing", "impl-serde"] }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false, features = ["std"] }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }

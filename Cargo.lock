@@ -331,7 +331,6 @@ dependencies = [
 name = "aurora-engine-tests"
 version = "1.0.0"
 dependencies = [
- "anyhow",
  "aurora-engine",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
