@@ -133,13 +133,13 @@ fn deploy_1_inch_limit_order_contract(
         data: constructor.code,
     };
     let tx = test_utils::sign_transaction(deploy_tx, Some(runner.chain_id), &signer.secret_key);
-
-    let (outcome, error) = runner.call(
+    let outcome = runner.call(
         test_utils::SUBMIT,
         "any_account.near",
         rlp::encode(&tx).to_vec(),
     );
-    assert!(error.is_none());
+
+    assert!(outcome.is_ok());
     outcome.unwrap()
 }
 

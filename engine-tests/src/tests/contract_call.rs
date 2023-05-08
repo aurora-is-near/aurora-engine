@@ -25,7 +25,9 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
         )
         .into();
 
-    runner.mint(token, tester.contract.address, 1_000_000_000, ORIGIN);
+    runner
+        .mint(token, tester.contract.address, 1_000_000_000, ORIGIN)
+        .unwrap();
 
     (runner, signer, token, tester)
 }

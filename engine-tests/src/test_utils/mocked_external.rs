@@ -53,10 +53,11 @@ impl near_vm_logic::External for MockedExternalWithTrie {
     fn storage_get<'a>(
         &'a self,
         key: &[u8],
+        mode: near_vm_logic::StorageGetMode,
     ) -> Result<Option<Box<dyn near_vm_logic::ValuePtr + 'a>>, near_vm_logic::VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TOUCHED_TRIE_PER_READ);
         self.increment_cached_trie_node_count(MAINNET_AVERAGE_READ_CACHED_TRIE_PER_READ);
-        self.underlying.storage_get(key)
+        self.underlying.storage_get(key, mode)
     }
 
     fn storage_remove(&mut self, key: &[u8]) -> Result<(), near_vm_logic::VMLogicError> {
