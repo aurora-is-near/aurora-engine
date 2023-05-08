@@ -2,13 +2,18 @@ use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::test_utils::{self, str_to_account_id};
 use crate::tests::state_migration;
+use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_HEIGHT};
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     SetOwnerArgs, SetUpgradeDelayBlocksArgs, SubmitResult, TransactionStatus,
 };
 use aurora_engine_sdk as sdk;
+use aurora_engine_types::H160;
 use borsh::{BorshDeserialize, BorshSerialize};
+use evm::ExitFatal;
 use libsecp256k1::SecretKey;
+use near_sdk_sim::errors::TxExecutionError;
+use near_sdk_sim::transaction::ExecutionStatus;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
 
@@ -45,8 +50,8 @@ fn test_total_supply_accounting() {
     };
 
     let get_total_supply = |runner: &mut test_utils::AuroraRunner| -> Wei {
-        let (outcome, _) = runner.call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
-        let amount: u128 = String::from_utf8(outcome.unwrap().return_data.as_value().unwrap())
+        let result = runner.call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
+        let amount: u128 = String::from_utf8(result.unwrap().return_data.as_value().unwrap())
             .unwrap()
             .replace('"', "")
             .parse()
@@ -111,7 +116,7 @@ fn test_transaction_to_zero_address() {
     context.input = tx_bytes;
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
-    context.block_index = ZERO_ADDRESS_FIX_HEIGHT - 1;
+    context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
     let result = runner
         .submit_raw(test_utils::SUBMIT, &context, &[])
         .unwrap();
@@ -120,7 +125,7 @@ fn test_transaction_to_zero_address() {
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
-    context.block_index = ZERO_ADDRESS_FIX_HEIGHT;
+    context.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     let result = runner
         .submit_raw(test_utils::SUBMIT, &context, &[])
         .unwrap();
@@ -357,7 +362,7 @@ fn test_solidity_pure_bench() {
     let code = near_primitives_core::contract::ContractCode::new(contract_bytes, None);
     let mut context = runner.context.clone();
     context.input = loop_limit.to_le_bytes().to_vec();
-    let (outcome, error) = match near_vm_runner::run(
+    let outcome = near_vm_runner::run(
         &code,
         "cpu_ram_soak_test",
         &mut runner.ext,
@@ -367,15 +372,10 @@ fn test_solidity_pure_bench() {
         &[],
         runner.current_protocol_version,
         Some(&runner.cache),
-    ) {
-        near_vm_runner::VMResult::Aborted(outcome, error) => (Some(outcome), Some(error)),
-        near_vm_runner::VMResult::Ok(outcome) => (Some(outcome), None),
-    };
-    if let Some(e) = error {
-        panic!("{e:?}");
-    }
-    let outcome = outcome.unwrap();
+    )
+    .unwrap();
     let profile = test_utils::ExecutionProfile::new(&outcome);
+
     // Check the contract actually did the work.
     assert_eq!(&outcome.logs, &[format!("Done {loop_limit} iterations!")]);
     assert!(profile.all_gas() < 1_000_000_000_000); // Less than 1 Tgas used!
@@ -690,14 +690,13 @@ fn test_eth_transfer_incorrect_nonce() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
-    let err = runner
+    let error = runner
         .submit_with_signer(&mut source_account, |nonce| {
             // creating transaction with incorrect nonce
             test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce + 1)
         })
         .unwrap_err();
-    let error_message = format!("{err:?}");
-    assert!(error_message.contains("ERR_INCORRECT_NONCE"));
+    assert_eq!(error.kind, EngineErrorKind::IncorrectNonce);
 
     // validate post-state (which is the same as pre-state in this case)
     test_utils::validate_address_balance_and_nonce(
@@ -729,11 +728,10 @@ fn test_eth_transfer_not_enough_gas() {
     test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
-    let err = runner
+    let error = runner
         .submit_with_signer(&mut source_account, transaction)
         .unwrap_err();
-    let error_message = format!("{err:?}");
-    assert!(error_message.contains("ERR_INTRINSIC_GAS"));
+    assert_eq!(error.kind, EngineErrorKind::IntrinsicGasNotMet);
 
     // validate post-state (which is the same as pre-state in this case)
     test_utils::validate_address_balance_and_nonce(
@@ -800,8 +798,6 @@ fn test_transfer_charging_gas_success() {
 
 #[test]
 fn test_eth_transfer_charging_gas_not_enough_balance() {
-    use near_vm_errors::{FunctionCallError, HostError, VMError};
-
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
@@ -826,10 +822,10 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     let error = runner
         .submit_with_signer(&mut source_account, transaction)
         .unwrap_err();
-    assert!(matches!(error, VMError::FunctionCallError(
-        FunctionCallError::HostError(
-            HostError::GuestPanic { panic_msg })) if panic_msg == "ERR_OUT_OF_FUND"
-    ));
+    assert_eq!(
+        error.kind,
+        EngineErrorKind::GasPayment(GasPaymentError::OutOfFund)
+    );
 
     // validate post-state
     let relayer = sdk::types::near_account_to_evm_address(
@@ -861,15 +857,12 @@ pub fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, A
     (runner, signer, dest_address)
 }
 
-use aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT;
-use aurora_engine_types::H160;
-use sha3::Digest;
-
 #[test]
 fn check_selector() {
     // Selector to call mint function in ERC 20 contract
     //
     // keccak("mint(address,uint256)".as_bytes())[..4];
+    use sha3::Digest;
     let mut hasher = sha3::Keccak256::default();
     hasher.update(b"mint(address,uint256)");
     assert_eq!(hasher.finalize()[..4].to_vec(), ERC20_MINT_SELECTOR);
@@ -894,17 +887,14 @@ fn test_block_hash() {
 #[test]
 fn test_block_hash_api() {
     let mut runner = test_utils::deploy_evm();
-
     let block_height: u64 = 10;
-    let (maybe_outcome, maybe_error) = runner.call(
-        "get_block_hash",
-        "any.near",
-        block_height.try_to_vec().unwrap(),
-    );
-    if let Some(error) = maybe_error {
-        panic!("Call failed: {error:?}");
-    }
-    let outcome = maybe_outcome.unwrap();
+    let outcome = runner
+        .call(
+            "get_block_hash",
+            "any.near",
+            block_height.try_to_vec().unwrap(),
+        )
+        .unwrap();
     let block_hash = outcome.return_data.as_value().unwrap();
 
     assert_eq!(
@@ -941,11 +931,8 @@ fn test_block_hash_contract() {
 #[test]
 fn test_ft_metadata() {
     let mut runner = test_utils::deploy_evm();
-
     let account_id: String = runner.context.signer_account_id.clone().into();
-    let (maybe_outcome, maybe_error) = runner.call("ft_metadata", &account_id, Vec::new());
-    assert!(maybe_error.is_none());
-    let outcome = maybe_outcome.unwrap();
+    let outcome = runner.call("ft_metadata", &account_id, Vec::new()).unwrap();
     let metadata =
         serde_json::from_slice::<FungibleTokenMetadata>(&outcome.return_data.as_value().unwrap())
             .unwrap();
@@ -976,7 +963,7 @@ fn test_eth_transfer_insufficient_balance_sim() {
     );
     let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
     let result = match call_result.status() {
-        near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+        ExecutionStatus::SuccessValue(bytes) => {
             use borsh::BorshDeserialize;
             SubmitResult::try_from_slice(&bytes).unwrap()
         }
@@ -998,8 +985,6 @@ fn test_eth_transfer_insufficient_balance_sim() {
 // Same as `test_eth_transfer_charging_gas_not_enough_balance` but run through `near-sdk-sim`.
 #[test]
 fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
-    use near_primitives::{errors::TxExecutionError, transaction::ExecutionStatus};
-
     let (aurora, mut signer, address) = initialize_evm_sim();
 
     // Run transaction which will fail (not enough balance to cover gas)
@@ -1014,9 +999,8 @@ fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
     );
     let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
     let outcome = call_result.outcome();
-    assert!(matches!(
-    &outcome.status,
-    ExecutionStatus::Failure(
+
+    assert!(matches!(&outcome.status, ExecutionStatus::Failure(
         TxExecutionError::ActionError(e)) if e.to_string().contains("ERR_OUT_OF_FUND")
     ));
 
@@ -1083,25 +1067,24 @@ fn test_set_owner() {
         new_owner: str_to_account_id("new_owner.near"),
     };
 
-    let (outcome, error) = runner.call(
+    let result = runner.call(
         "set_owner",
         &aurora_account_id,
         set_owner_args.try_to_vec().unwrap(),
     );
 
     // setting owner from the owner with same owner id should succeed
-    assert!(outcome.is_some() && error.is_none());
+    assert!(result.is_ok());
 
     // get owner to see if the owner_id property has changed
-    let (outcome, error) = runner.call("get_owner", &aurora_account_id, vec![]);
-
-    // check if the query goes through the standalone runner
-    assert!(outcome.is_some() && error.is_none());
+    let outcome = runner
+        .call("get_owner", &aurora_account_id, vec![])
+        .unwrap();
 
     // check if the owner_id property has changed to new_owner.near
     assert_eq!(
         b"new_owner.near",
-        outcome.unwrap().return_data.as_value().unwrap().as_slice()
+        outcome.return_data.as_value().unwrap().as_slice()
     );
 }
 
@@ -1115,19 +1098,18 @@ fn test_set_owner_fail_on_same_owner() {
         new_owner: str_to_account_id(&aurora_account_id),
     };
 
-    let (outcome, error) = runner.call(
-        "set_owner",
-        &aurora_account_id,
-        set_owner_args.try_to_vec().unwrap(),
-    );
-
-    // setting owner from the owner with same owner id should fail
-    assert!(outcome.is_some() && error.is_some());
+    let error = runner
+        .call(
+            "set_owner",
+            &aurora_account_id,
+            set_owner_args.try_to_vec().unwrap(),
+        )
+        .unwrap_err();
 
     // check error equality
     assert_eq!(
-        error.unwrap().to_string(),
-        "Smart contract panicked: ERR_SAME_OWNER"
+        error.kind,
+        EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_SAME_OWNER".into()))
     );
 }
 
@@ -1141,24 +1123,24 @@ fn test_set_upgrade_delay_blocks() {
         upgrade_delay_blocks: 2,
     };
 
-    let (outcome, error) = runner.call(
+    let result = runner.call(
         "set_upgrade_delay_blocks",
         &aurora_account_id,
         set_upgrade_delay_blocks.try_to_vec().unwrap(),
     );
 
     // should succeed
-    assert!(outcome.is_some() && error.is_none());
+    assert!(result.is_ok());
 
     // get upgrade_delay_blocks to see if the upgrade_delay_blocks property has changed
-    let (outcome, error) = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
 
     // check if the query goes through the standalone runner
-    assert!(outcome.is_some() && error.is_none());
+    assert!(result.is_ok());
 
     // check if the upgrade_delay_blocks property has changed to 2
     let result = SetUpgradeDelayBlocksArgs::try_from_slice(
-        outcome.unwrap().return_data.as_value().unwrap().as_slice(),
+        result.unwrap().return_data.as_value().unwrap().as_slice(),
     )
     .unwrap();
     assert_eq!(result.upgrade_delay_blocks, 2);
@@ -1194,7 +1176,7 @@ fn query_address_sim(
 ) -> U256 {
     let x = aurora.call(method, address.as_bytes());
     match &x.outcome().status {
-        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(b) => U256::from_big_endian(b),
+        ExecutionStatus::SuccessValue(b) => U256::from_big_endian(b),
         other => panic!("Unexpected outcome: {other:?}"),
     }
 }
