@@ -798,6 +798,8 @@ fn test_transfer_charging_gas_success() {
 
 #[test]
 fn test_eth_transfer_charging_gas_not_enough_balance() {
+    use near_vm_errors::{FunctionCallError, HostError, VMError};
+
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
@@ -985,6 +987,8 @@ fn test_eth_transfer_insufficient_balance_sim() {
 // Same as `test_eth_transfer_charging_gas_not_enough_balance` but run through `near-sdk-sim`.
 #[test]
 fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
+    use near_primitives::{errors::TxExecutionError, transaction::ExecutionStatus};
+
     let (aurora, mut signer, address) = initialize_evm_sim();
 
     // Run transaction which will fail (not enough balance to cover gas)
