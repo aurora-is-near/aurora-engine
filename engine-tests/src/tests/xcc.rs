@@ -31,7 +31,7 @@ fn test_xcc_eth_gas_cost() {
     let _res = runner.call("factory_update", ORIGIN, xcc_wasm_bytes);
     let mut signer = test_utils::Signer::random();
     let mut baseline_signer = test_utils::Signer::random();
-    runner.context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    runner.context.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
     // Need to use for engine's deployment!
     let wnear_erc20 = deploy_erc20(&mut runner, &mut signer);
     approve_erc20(
@@ -233,7 +233,7 @@ fn test_xcc_external_fund() {
         .call("get_code", deployed_address.as_bytes())
         .status()
     {
-        near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => bytes,
+        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(bytes) => bytes,
         other => panic!("Unexpected status {other:?}"),
     };
 
@@ -635,7 +635,7 @@ fn submit_xcc_transaction(
     );
     result.assert_success();
     let submit_result = match result.status() {
-        near_primitives::transaction::ExecutionStatus::SuccessValue(bytes) => {
+        near_sdk_sim::transaction::ExecutionStatus::SuccessValue(bytes) => {
             aurora_engine::parameters::SubmitResult::try_from_slice(&bytes).unwrap()
         }
         other => panic!("Unexpected status {other:?}"),
@@ -675,13 +675,13 @@ fn test_xcc_schedule_gas() {
         attached_gas: NearGas::new(100_000_000_000_000),
     };
 
-    let (maybe_outcome, maybe_error) = router.call(
-        "schedule",
-        ORIGIN,
-        PromiseArgs::Create(promise).try_to_vec().unwrap(),
-    );
-    assert!(maybe_error.is_none());
-    let outcome = maybe_outcome.unwrap();
+    let outcome = router
+        .call(
+            "schedule",
+            ORIGIN,
+            PromiseArgs::Create(promise).try_to_vec().unwrap(),
+        )
+        .unwrap();
     assert!(
         outcome.burnt_gas < costs::ROUTER_SCHEDULE.as_u64(),
         "{:?} not less than {:?}",
@@ -719,11 +719,9 @@ fn test_xcc_exec_gas() {
         let x = create_promise_chain(&promise, callback_count);
         let args = PromiseArgs::Recursive(x);
 
-        let (maybe_outcome, maybe_error) =
-            router.call("execute", ORIGIN, args.try_to_vec().unwrap());
-        assert!(maybe_error.is_none());
-        let outcome = maybe_outcome.unwrap();
-
+        let outcome = router
+            .call("execute", ORIGIN, args.try_to_vec().unwrap())
+            .unwrap();
         let callback_count = args.promise_count() - 1;
         let router_exec_cost = costs::ROUTER_EXEC_BASE
             + NearGas::new(callback_count * costs::ROUTER_EXEC_PER_CALLBACK.as_u64());
@@ -785,10 +783,9 @@ fn deploy_router() -> AuroraRunner {
     router.context.predecessor_account_id = ORIGIN.parse().unwrap();
 
     let init_args = r#"{"wnear_account": "wrap.near", "must_register": true}"#;
-    let (maybe_outcome, maybe_error) =
-        router.call("initialize", ORIGIN, init_args.as_bytes().to_vec());
-    assert!(maybe_error.is_none());
-    let outcome = maybe_outcome.unwrap();
+    let outcome = router
+        .call("initialize", ORIGIN, init_args.as_bytes().to_vec())
+        .unwrap();
     assert!(outcome.used_gas < aurora_engine::xcc::INITIALIZE_GAS.as_u64());
 
     router
@@ -867,16 +864,16 @@ fn deploy_erc20(runner: &mut AuroraRunner, signer: &mut test_utils::Signer) -> E
     let args = aurora_engine::parameters::DeployErc20TokenArgs {
         nep141: "wrap.near".parse().unwrap(),
     };
-    let (maybe_output, maybe_error) = runner.call(
-        "deploy_erc20_token",
-        &engine_account,
-        args.try_to_vec().unwrap(),
-    );
-    assert!(maybe_error.is_none());
-    let output = maybe_output.unwrap();
+    let outcome = runner
+        .call(
+            "deploy_erc20_token",
+            &engine_account,
+            args.try_to_vec().unwrap(),
+        )
+        .unwrap();
     let address = {
         let bytes: Vec<u8> =
-            BorshDeserialize::try_from_slice(output.return_data.as_value().as_ref().unwrap())
+            BorshDeserialize::try_from_slice(outcome.return_data.as_value().as_ref().unwrap())
                 .unwrap();
         Address::try_from_slice(&bytes).unwrap()
     };
@@ -890,8 +887,8 @@ fn deploy_erc20(runner: &mut AuroraRunner, signer: &mut test_utils::Signer) -> E
                 .mint(dest_address, WNEAR_AMOUNT.into(), U256::zero())
                 .data,
         });
-    let (_, maybe_error) = runner.call("call", &engine_account, call_args.try_to_vec().unwrap());
-    assert!(maybe_error.is_none());
+    let result = runner.call("call", &engine_account, call_args.try_to_vec().unwrap());
+    assert!(result.is_ok());
 
     contract
 }

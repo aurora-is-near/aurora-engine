@@ -55,7 +55,7 @@ fn test_promise_result_gas_cost() {
     standalone.init_evm();
     runner.standalone_runner = Some(standalone);
     let mut signer = test_utils::Signer::random();
-    runner.context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    runner.context.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
 
     // Baseline transaction that does essentially nothing.
     let (_, baseline) = runner

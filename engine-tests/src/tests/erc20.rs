@@ -5,6 +5,7 @@ use crate::test_utils::{
     erc20::{ERC20Constructor, ERC20},
     Signer,
 };
+use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::parameters::TransactionStatus;
 use aurora_engine_sdk as sdk;
 use bstr::ByteSlice;
@@ -61,10 +62,10 @@ fn erc20_mint_out_of_gas() {
         .intrinsic_gas(&evm::Config::istanbul())
         .unwrap();
     mint_tx.gas_limit = (intrinsic_gas - 1).into();
-    let outcome = runner.submit_transaction(&source_account.secret_key, mint_tx.clone());
-    let error = outcome.unwrap_err();
-    let error_message = format!("{error:?}");
-    assert!(error_message.contains("ERR_INTRINSIC_GAS"));
+    let error = runner
+        .submit_transaction(&source_account.secret_key, mint_tx.clone())
+        .unwrap_err();
+    assert_eq!(error.kind, EngineErrorKind::IntrinsicGasNotMet);
 
     // not enough gas to complete transaction
     mint_tx.gas_limit = U256::from(GAS_LIMIT);
@@ -102,9 +103,10 @@ fn profile_erc20_get_balance() {
     assert!(outcome.is_ok());
 
     let balance_tx = contract.balance_of(source_address, U256::zero());
-    let (result, profile) =
-        runner.profiled_view_call(&test_utils::as_view_call(balance_tx, source_address));
-    assert!(result.is_ok());
+    let (status, profile) = runner
+        .profiled_view_call(&test_utils::as_view_call(balance_tx, source_address))
+        .unwrap();
+    assert!(status.is_ok());
 
     // call costs less than 2 Tgas
     test_utils::assert_gas_bound(profile.all_gas(), 2);
@@ -215,10 +217,10 @@ fn deploy_erc_20_out_of_gas() {
         .intrinsic_gas(&evm::Config::istanbul())
         .unwrap();
     deploy_transaction.gas_limit = (intrinsic_gas - 1).into();
-    let outcome = runner.submit_transaction(&source_account, deploy_transaction.clone());
-    let error = outcome.unwrap_err();
-    let error_message = format!("{error:?}");
-    assert!(error_message.contains("ERR_INTRINSIC_GAS"));
+    let error = runner
+        .submit_transaction(&source_account, deploy_transaction.clone())
+        .unwrap_err();
+    assert_eq!(error.kind, EngineErrorKind::IntrinsicGasNotMet);
 
     // not enough gas to complete transaction
     deploy_transaction.gas_limit = U256::from(intrinsic_gas + 1);
