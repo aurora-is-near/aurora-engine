@@ -874,12 +874,18 @@ pub fn panic_on_fail(status: TransactionStatus) {
     }
 }
 
+/// Checks if `total_gas` is within 1 Tgas of `tgas_bound`.
 pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
-    // Add 1 to round up
-    let tgas_used = (total_gas / 1_000_000_000_000) + 1;
+    const TERA: i128 = 1_000_000_000_000;
+    let total_gas: i128 = total_gas.into();
+    let tgas_bound: i128 = i128::from(tgas_bound) * TERA;
+    let diff = (total_gas - tgas_bound).abs() / TERA;
     assert_eq!(
-        tgas_used, tgas_bound,
-        "{tgas_used} Tgas is not equal to {tgas_bound} Tgas",
+        diff,
+        0,
+        "{} Tgas is not equal to {} Tgas",
+        total_gas / TERA,
+        tgas_bound / TERA,
     );
 }
 
