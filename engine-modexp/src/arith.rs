@@ -540,7 +540,7 @@ fn test_in_place_shl() {
         let mut x = MPNat::from_big_endian(&n.to_be_bytes());
         in_place_shl(&mut x.digits, shift);
         let result = mp_nat_to_u128(&x);
-        let mask = (BASE as u128)
+        let mask = BASE
             .overflowing_pow(x.digits.len() as u32)
             .0
             .wrapping_sub(1);
@@ -608,11 +608,7 @@ fn test_big_wrapping_mul() {
     check_big_wrapping_mul(7, 6, 1);
     check_big_wrapping_mul(Word::MAX.into(), Word::MAX.into(), 2);
     check_big_wrapping_mul(Word::MAX.into(), Word::MAX.into(), 1);
-    check_big_wrapping_mul(
-        (DoubleWord::MAX - 5) as u128,
-        (DoubleWord::MAX - 6) as u128,
-        2,
-    );
+    check_big_wrapping_mul(DoubleWord::MAX - 5, DoubleWord::MAX - 6, 2);
     check_big_wrapping_mul(0xa945_aa5e_429a_6d1a, 0x4072_d45d_3355_237b, 3);
     check_big_wrapping_mul(
         0x8ae1_5515_fc92_b1c0_b473_8ce8_6bbf_7218,
