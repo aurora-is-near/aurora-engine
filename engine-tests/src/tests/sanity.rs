@@ -152,7 +152,7 @@ fn test_state_format() {
         "0300000000000000",
     ]
     .concat();
-    assert_eq!(hex::encode(state.to_bytes().unwrap()), expected_hex);
+    assert_eq!(hex::encode(state.borsh_serialize().unwrap()), expected_hex);
 }
 
 fn generate_code(len: usize) -> Vec<u8> {

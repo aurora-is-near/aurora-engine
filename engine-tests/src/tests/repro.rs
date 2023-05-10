@@ -153,7 +153,9 @@ fn repro_common(context: &ReproContext) {
     let tx_bytes = hex::decode(tx_hex.trim()).unwrap();
 
     // Make a random call that touches the Engine state to force the lazy migration
-    runner.call("get_chain_id", "relay.aurora", Vec::new()).unwrap();
+    runner
+        .call("get_chain_id", "relay.aurora", Vec::new())
+        .unwrap();
     // Run benchmark post-migration
     let outcome = runner.call("submit", "relay.aurora", tx_bytes).unwrap();
     let profile = ExecutionProfile::new(&outcome);

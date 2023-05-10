@@ -24,7 +24,7 @@ pub struct EngineState {
 }
 
 impl EngineState {
-    pub fn to_bytes(&self) -> Result<Vec<u8>, error::EngineStateError> {
+    pub fn borsh_serialize(&self) -> Result<Vec<u8>, error::EngineStateError> {
         let borshable: BorshableEngineState = self.into();
         borshable
             .try_to_vec()
@@ -36,9 +36,7 @@ impl EngineState {
         bytes: &[u8],
         io: &I,
     ) -> Result<Self, error::EngineStateError> {
-        let borshable = if let Ok(s) = BorshableEngineState::try_from_slice(bytes) {
-            s
-        } else {
+        let Ok(borshable) = BorshableEngineState::try_from_slice(bytes) else {
             let legacy = BorshableEngineStateV1::try_from_slice(bytes)
                 .map_err(|_| EngineStateError::DeserializationFailed)?;
             let result = legacy.into();
@@ -154,7 +152,7 @@ pub fn get_state<I: IO + Copy>(io: &I) -> Result<EngineState, error::EngineState
 pub fn set_state<I: IO>(io: &mut I, state: &EngineState) -> Result<(), EngineStateError> {
     io.write_storage(
         &bytes_to_key(KeyPrefix::Config, STATE_KEY),
-        &state.to_bytes()?,
+        &state.borsh_serialize()?,
     );
 
     Ok(())
