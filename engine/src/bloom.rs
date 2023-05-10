@@ -1,9 +1,9 @@
 //! Based on Parity Common Eth Bloom implementation
-//! Link: https://github.com/paritytech/parity-common/blob/master/ethbloom/src/lib.rs
+//! Link: <https://github.com/paritytech/parity-common/blob/master/ethbloom/src/lib.rs>
 //!
 //! Reimplemented here since there is a large miss match in types and dependencies.
 use aurora_engine_types::parameters::engine::ResultLog;
-use borsh::{BorshSerialize, BorshDeserialize};
+use borsh::{BorshDeserialize, BorshSerialize};
 use fixed_hash::construct_fixed_hash;
 use impl_serde::impl_fixed_hash_serde;
 
@@ -21,7 +21,7 @@ construct_fixed_hash! {
 impl_fixed_hash_serde!(Bloom, BLOOM_SIZE);
 
 /// Returns log2.
-fn log2(x: usize) -> u32 {
+const fn log2(x: usize) -> u32 {
     if x <= 1 {
         return 0;
     }
@@ -53,7 +53,7 @@ impl Bloom {
     }
 
     /// Merge two bloom filters
-    pub fn accrue_bloom(&mut self, bloom: &Bloom) {
+    pub fn accrue_bloom(&mut self, bloom: &Self) {
         for i in 0..BLOOM_SIZE {
             self.0[i] |= bloom.0[i];
         }
@@ -74,7 +74,7 @@ pub fn get_log_bloom(log: &ResultLog) -> Bloom {
     let mut log_bloom = Bloom::default();
 
     log_bloom.accrue(log.address.as_bytes());
-    for topic in log.topics.iter() {
+    for topic in &log.topics {
         log_bloom.accrue(&topic[..]);
     }
 

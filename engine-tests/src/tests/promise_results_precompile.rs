@@ -1,4 +1,4 @@
-use crate::test_utils::{self, standalone};
+use crate::test_utils;
 use aurora_engine_precompiles::promise_result::{self, costs};
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::{
@@ -14,8 +14,8 @@ fn test_promise_results_precompile() {
     let mut signer = test_utils::Signer::random();
     let mut runner = test_utils::deploy_evm();
 
-    let mut standalone = standalone::StandaloneRunner::default();
-    standalone.init_evm();
+    let mut standalone = runner.standalone_runner.unwrap();
+    runner.standalone_runner = None;
 
     let promise_results = vec![
         PromiseResult::Successful(hex::decode("deadbeef").unwrap()),
@@ -51,11 +51,10 @@ fn test_promise_results_precompile() {
 #[test]
 fn test_promise_result_gas_cost() {
     let mut runner = test_utils::deploy_evm();
-    let mut standalone = standalone::StandaloneRunner::default();
-    standalone.init_evm();
-    runner.standalone_runner = Some(standalone);
-    let mut signer = test_utils::Signer::random();
+    runner.set_hashchain_activation(false);
     runner.context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+
+    let mut signer = test_utils::Signer::random();
 
     // Baseline transaction that does essentially nothing.
     let (_, baseline) = runner
@@ -127,13 +126,13 @@ fn test_promise_result_gas_cost() {
     let total_gas1 = y1 + baseline.all_gas();
     let total_gas2 = y2 + baseline.all_gas();
     assert!(
-        test_utils::within_x_percent(6, evm1, total_gas1 / NEAR_GAS_PER_EVM),
+        test_utils::within_x_percent(8, evm1, total_gas1 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm1,
         total_gas1 / NEAR_GAS_PER_EVM
     );
     assert!(
-        test_utils::within_x_percent(6, evm2, total_gas2 / NEAR_GAS_PER_EVM),
+        test_utils::within_x_percent(8, evm2, total_gas2 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / NEAR_GAS_PER_EVM

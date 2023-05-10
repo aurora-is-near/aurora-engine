@@ -195,7 +195,7 @@ impl AuroraRunner {
             &mut self.context,
             caller_account_id,
             signer_account_id,
-            input.clone(), //***---- input
+            input.clone(),
         );
 
         let vm_promise_results: Vec<_> = self
@@ -227,19 +227,6 @@ impl AuroraRunner {
             self.context.storage_usage = outcome.storage_usage;
             self.previous_logs = outcome.logs.clone();
         }
-
-        //***----
-        println!("----------------------------------------------");
-        println!("call_with_signer------");
-        println!("method_name: {}", method_name);
-        let input_hash = crate::test_utils::sdk::keccak(&input);
-        println!("input_hash: {:?}", input_hash);
-        println!("wasm logs--");
-        for log in &self.previous_logs {
-            println!("{}", log);
-        }
-        println!("--wasm logs");
-        println!("------call_with_signer");
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             if maybe_error.is_none()
@@ -550,6 +537,22 @@ impl AuroraRunner {
         H256(result)
     }
 
+    pub fn set_hashchain_activation(&mut self, active: bool) {
+        let (_, maybe_error) = self.call(
+            "set_hashchain_activation",
+            "hashchain",
+            active.try_to_vec().unwrap(),
+        );
+        assert!(maybe_error.is_none(), "{:?}", maybe_error.unwrap());
+
+        if let Some(standalone_runner) = &mut self.standalone_runner {
+            standalone_runner.env.block_height = self.context.block_index;
+            let standalone_result = standalone_runner.set_hashchain_activation(active);
+            assert!(standalone_result.is_ok(), "{:?}", standalone_result);
+            self.validate_standalone();
+        }
+    }
+
     fn u256_getter_method_call(&self, method_name: &str, address: Address) -> U256 {
         let bytes = self.getter_method_call(method_name, address);
         U256::from_big_endian(&bytes)
@@ -679,7 +682,7 @@ impl ExecutionProfile {
 
 pub fn deploy_evm() -> AuroraRunner {
     let mut standalone_runner = standalone::StandaloneRunner::default();
-    standalone_runner.init_evm();
+    standalone_runner.init_evm_no_state();
 
     let mut runner = AuroraRunner::default();
     runner.standalone_runner = Some(standalone_runner);

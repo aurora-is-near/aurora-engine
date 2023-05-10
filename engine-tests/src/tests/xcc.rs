@@ -27,6 +27,7 @@ const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 fn test_xcc_eth_gas_cost() {
     let mut runner = test_utils::deploy_evm();
     runner.standalone_runner = None;
+    runner.set_hashchain_activation(false);
     let xcc_wasm_bytes = contract_bytes();
     let _res = runner.call("factory_update", ORIGIN, xcc_wasm_bytes);
     let mut signer = test_utils::Signer::random();

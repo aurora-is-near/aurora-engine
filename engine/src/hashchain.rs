@@ -1,46 +1,14 @@
-use crate::{prelude::{BorshDeserialize, BorshSerialize, Vec}, bloom::Bloom};
-use aurora_engine_sdk::{
-    io::{StorageIntermediate, IO},
-    keccak,
-};
-use aurora_engine_types::{
-    storage::{bytes_to_key, KeyPrefix},
-    types::RawH256,
-};
-
 use self::blockchain_hashchain_error::BlockchainHashchainError;
+use crate::{
+    bloom::Bloom,
+    prelude::{BorshDeserialize, BorshSerialize, Vec},
+};
+use aurora_engine_sdk::keccak;
+use aurora_engine_types::types::RawH256;
 
-/// Key for storing the state of the blockchain hashchain.
-const HASHCHAIN_KEY: &[u8; 9] = b"HASHCHAIN";
-
-/// Gets the state from storage, if it exists otherwise it will error.
-pub fn get_state<I: IO>(io: &I) -> Result<BlockchainHashchain, BlockchainHashchainError> {
-    match io.read_storage(&bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_KEY)) {
-        None => Err(BlockchainHashchainError::NotFound),
-        Some(bytes) => BlockchainHashchain::try_from_slice(&bytes.to_vec())
-            .map_err(|_| BlockchainHashchainError::DeserializationFailed),
-    }
-}
-
-/// Saves state into the storage. Does not return the previous state.
-pub fn set_state<I: IO>(
-    io: &mut I,
-    state: BlockchainHashchain,
-) -> Result<(), BlockchainHashchainError> {
-    io.write_storage(
-        &bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_KEY),
-        &state
-            .try_to_vec()
-            .map_err(|_| BlockchainHashchainError::SerializationFailed)?,
-    );
-
-    Ok(())
-}
-
-/// Blockchain Hashchain
+/// Blockchain Hashchain.
 /// Continually keeps track of the previous block hashchain through the blocks heights.
-#[derive(BorshSerialize, BorshDeserialize)]
-#[derive(Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct BlockchainHashchain {
     chain_id: [u8; 32],
     contract_account_id: Vec<u8>,
@@ -118,62 +86,29 @@ impl BlockchainHashchain {
     }
 
     /// Gets the current block height of the structure.
-    pub fn get_current_block_height(&self) -> u64 {
+    pub const fn get_current_block_height(&self) -> u64 {
         self.current_block_height
     }
 
     /// Gets the previous block hashchain of the structure.
-    pub fn get_previous_block_hashchain(&self) -> RawH256 {
+    pub const fn get_previous_block_hashchain(&self) -> RawH256 {
         self.previous_block_hashchain
     }
 
     /// Gets the genesis block hashchain of the structure.
-    pub fn get_genesis_block_hashchain(&self) -> RawH256 {
+    pub const fn get_genesis_block_hashchain(&self) -> RawH256 {
         self.genesis_block_hashchain
     }
 }
 
-/// Blockchain Hashchain error module.
-pub mod blockchain_hashchain_error {
-    pub const ERR_STATE_NOT_FOUND: &[u8; 19] = b"ERR_STATE_NOT_FOUND";
-    pub const ERR_STATE_SERIALIZATION_FAILED: &[u8; 26] = b"ERR_STATE_SERIALIZE_FAILED";
-    pub const ERR_STATE_CORRUPTED: &[u8; 19] = b"ERR_STATE_CORRUPTED";
-    pub const ERR_BLOCK_HEIGHT_INCORRECT: &[u8; 26] = b"ERR_BLOCK_HEIGHT_INCORRECT";
-
-    #[derive(Debug)]
-    /// Blockchain Hashchain Error
-    pub enum BlockchainHashchainError {
-        /// The state is missing from storage, need to initialize with contract `new` method.
-        NotFound,
-        /// The state serialized had failed.
-        SerializationFailed,
-        /// The state is corrupted, possibly due to failed state migration.
-        DeserializationFailed,
-        /// The block height is incorrect regarding the current block height.
-        BlockHeightIncorrect,
-    }
-
-    impl AsRef<[u8]> for BlockchainHashchainError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::NotFound => ERR_STATE_NOT_FOUND,
-                Self::SerializationFailed => ERR_STATE_SERIALIZATION_FAILED,
-                Self::DeserializationFailed => ERR_STATE_CORRUPTED,
-                Self::BlockHeightIncorrect => ERR_BLOCK_HEIGHT_INCORRECT,
-            }
-        }
-    }
-}
-
-/// Block Hashchain Computer
+/// Block Hashchain Computer.
 /// The order of operations should be:
 /// 1. Create the `BlockHashchainComputer` one time.
 /// 2. Add transactions of the current block.
 /// 3. Compute the block hashchain for the current block once all the transactions were added.
 /// 4. Clear the transactions of the current block.
 /// 5. Go back to step 2 for the next block.
-#[derive(BorshSerialize, BorshDeserialize)]
-#[derive(Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
 struct BlockHashchainComputer {
     txs_logs_bloom: Bloom,
     txs_merkle_tree: StreamCompactMerkleTree,
@@ -195,8 +130,9 @@ impl BlockHashchainComputer {
             &(input.len() as u32).to_be_bytes(),
             input,
             &(output.len() as u32).to_be_bytes(),
-            output
-        ].concat();
+            output,
+        ]
+        .concat();
 
         let tx_hash = keccak(&data).0;
 
@@ -221,8 +157,8 @@ impl BlockHashchainComputer {
             &previous_block_hashchain,
             &txs_hash,
             self.txs_logs_bloom.as_bytes(),
-            ]
-            .concat();
+        ]
+        .concat();
 
         keccak(&data).0
     }
@@ -234,12 +170,11 @@ impl BlockHashchainComputer {
     }
 }
 
-/// Stream Compact Merkle Tree
+/// Stream Compact Merkle Tree.
 /// It can be feed by a stream of hashes (leaves) adding them to the right of the tree.
 /// Internally, compacts full binary subtrees maintaining only the growing branch.
 /// Space used is O(log n) where n is the number of leaf hashes added. It is usually less.
-#[derive(BorshSerialize, BorshDeserialize)]
-#[derive(Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
 struct StreamCompactMerkleTree {
     /// Complete binary merkle subtrees.
     /// Left subtrees are strictly higher (bigger).
@@ -248,7 +183,7 @@ struct StreamCompactMerkleTree {
 }
 
 impl StreamCompactMerkleTree {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             subtrees: Vec::new(),
         }
@@ -329,17 +264,131 @@ impl StreamCompactMerkleTree {
     }
 }
 
-/// Compact Merkle Subtree
+/// Compact Merkle Subtree.
 /// For leaves, this represents only the leaf node with height 1 and the hash of the leaf.
 /// For bigger subtrees, this represents the entire balanced subtree with its height and merkle hash.
-#[derive(BorshSerialize, BorshDeserialize)]
-#[derive(Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
 struct CompactMerkleSubtree {
     /// Height of the subtree.
     height: u8,
 
     /// Merkle tree hash of the subtree.
     hash: RawH256,
+}
+
+/// Storage module.
+pub mod storage {
+    use super::{blockchain_hashchain_error::BlockchainHashchainError, BlockchainHashchain};
+    use aurora_engine_sdk::io::{StorageIntermediate, IO};
+    use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
+    use borsh::{BorshDeserialize, BorshSerialize};
+
+    /// Key for storing the state of the blockchain hashchain.
+    const HASHCHAIN_KEY: &[u8; 9] = b"HASHCHAIN";
+
+    /// Gets the state from storage if it exists, otherwise it will error.
+    pub fn get_state<I: IO>(io: &I) -> Result<BlockchainHashchain, BlockchainHashchainError> {
+        match io.read_storage(&bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_KEY)) {
+            None => Err(BlockchainHashchainError::NotFound),
+            Some(bytes) => BlockchainHashchain::try_from_slice(&bytes.to_vec())
+                .map_err(|_| BlockchainHashchainError::DeserializationFailed),
+        }
+    }
+
+    /// Saves state into the storage.
+    pub fn set_state<I: IO>(
+        io: &mut I,
+        state: &BlockchainHashchain,
+    ) -> Result<(), BlockchainHashchainError> {
+        io.write_storage(
+            &bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_KEY),
+            &state
+                .try_to_vec()
+                .map_err(|_| BlockchainHashchainError::SerializationFailed)?,
+        );
+
+        Ok(())
+    }
+
+    #[cfg(feature = "integration-test")]
+    /// Key for storing the hashchain activation flag.
+    const HASHCHAIN_ACTIVATION_KEY: &[u8; 20] = b"HASHCHAIN_ACTIVATION";
+
+    /// Gets the hashchain activation flag from storage if it exists, otherwise it returns true.
+    pub fn get_activation<I: IO>(_io: &I) -> Result<bool, BlockchainHashchainError> {
+        #[cfg(feature = "integration-test")]
+        {
+            return match _io.read_storage(&bytes_to_key(
+                KeyPrefix::Hashchain,
+                HASHCHAIN_ACTIVATION_KEY,
+            )) {
+                None => Ok(true),
+                Some(bytes) => bool::try_from_slice(&bytes.to_vec())
+                    .map_err(|_| BlockchainHashchainError::DeserializationFailed),
+            };
+        }
+
+        #[cfg(not(feature = "integration-test"))]
+        Ok(true)
+    }
+
+    /// Saves the hashchain activation flag into the storage.
+    pub fn set_activation<I: IO>(
+        _io: &mut I,
+        _active: bool,
+    ) -> Result<(), BlockchainHashchainError> {
+        #[cfg(feature = "integration-test")]
+        {
+            _io.write_storage(
+                &bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_ACTIVATION_KEY),
+                &_active
+                    .try_to_vec()
+                    .map_err(|_| BlockchainHashchainError::SerializationFailed)?,
+            );
+
+            Ok(())
+        }
+
+        #[cfg(not(feature = "integration-test"))]
+        Err(BlockchainHashchainError::RequiresFeatureIntegrationTest)
+    }
+}
+
+/// Blockchain Hashchain error module.
+pub mod blockchain_hashchain_error {
+    pub const ERR_STATE_NOT_FOUND: &[u8; 19] = b"ERR_STATE_NOT_FOUND";
+    pub const ERR_STATE_SERIALIZATION_FAILED: &[u8; 26] = b"ERR_STATE_SERIALIZE_FAILED";
+    pub const ERR_STATE_CORRUPTED: &[u8; 19] = b"ERR_STATE_CORRUPTED";
+    pub const ERR_BLOCK_HEIGHT_INCORRECT: &[u8; 26] = b"ERR_BLOCK_HEIGHT_INCORRECT";
+    pub const ERR_REQUIRES_FEATURE_INTEGRATION_TEST: &[u8; 37] =
+        b"ERR_REQUIRES_FEATURE_INTEGRATION_TEST";
+
+    #[derive(Debug)]
+    /// Blockchain Hashchain Error
+    pub enum BlockchainHashchainError {
+        /// The state is missing from storage, need to initialize with contract `new` method.
+        NotFound,
+        /// The state serialized had failed.
+        SerializationFailed,
+        /// The state is corrupted, possibly due to failed state migration.
+        DeserializationFailed,
+        /// The block height is incorrect regarding the current block height.
+        BlockHeightIncorrect,
+        /// Some functionality requires integration-test feature.
+        RequiresFeatureIntegrationTest,
+    }
+
+    impl AsRef<[u8]> for BlockchainHashchainError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::NotFound => ERR_STATE_NOT_FOUND,
+                Self::SerializationFailed => ERR_STATE_SERIALIZATION_FAILED,
+                Self::DeserializationFailed => ERR_STATE_CORRUPTED,
+                Self::BlockHeightIncorrect => ERR_BLOCK_HEIGHT_INCORRECT,
+                Self::RequiresFeatureIntegrationTest => ERR_REQUIRES_FEATURE_INTEGRATION_TEST,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -351,7 +400,8 @@ mod blockchain_hashchain_tests {
         let mut blockchain_hashchain =
             BlockchainHashchain::new([0u8; 32], vec![], 2, [0u8; 32], [0u8; 32]);
 
-        let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[], &[], &Bloom::default());
+        let add_tx_result =
+            blockchain_hashchain.add_block_tx(1, "foo", &[], &[], &Bloom::default());
 
         assert!(add_tx_result.is_err());
         assert_eq!(
@@ -364,8 +414,10 @@ mod blockchain_hashchain_tests {
         );
         assert_eq!(
             blockchain_hashchain
-                .block_hashchain_computer.txs_logs_bloom.0,
-                Bloom::default().0
+                .block_hashchain_computer
+                .txs_logs_bloom
+                .0,
+            Bloom::default().0
         );
     }
 
@@ -374,7 +426,8 @@ mod blockchain_hashchain_tests {
         let mut blockchain_hashchain =
             BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32], [0u8; 32]);
 
-        let add_tx_result = blockchain_hashchain.add_block_tx(2, "foo", &[], &[], &Bloom::default());
+        let add_tx_result =
+            blockchain_hashchain.add_block_tx(2, "foo", &[], &[], &Bloom::default());
 
         assert!(add_tx_result.is_err());
         assert_eq!(
@@ -387,8 +440,10 @@ mod blockchain_hashchain_tests {
         );
         assert_eq!(
             blockchain_hashchain
-                .block_hashchain_computer.txs_logs_bloom.0,
-                Bloom::default().0
+                .block_hashchain_computer
+                .txs_logs_bloom
+                .0,
+            Bloom::default().0
         );
     }
 
@@ -397,7 +452,8 @@ mod blockchain_hashchain_tests {
         let mut blockchain_hashchain =
             BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32], [0u8; 32]);
 
-        let add_tx_result = blockchain_hashchain.add_block_tx(1, "foo", &[], &[], &Bloom::default());
+        let add_tx_result =
+            blockchain_hashchain.add_block_tx(1, "foo", &[], &[], &Bloom::default());
 
         assert!(add_tx_result.is_ok());
         assert_eq!(
@@ -410,8 +466,10 @@ mod blockchain_hashchain_tests {
         );
         assert_eq!(
             blockchain_hashchain
-                .block_hashchain_computer.txs_logs_bloom.0,
-                Bloom::default().0
+                .block_hashchain_computer
+                .txs_logs_bloom
+                .0,
+            Bloom::default().0
         );
     }
 
@@ -444,7 +502,15 @@ mod blockchain_hashchain_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        let data = [&3u32.to_be_bytes(), method_name.as_bytes(), &9u32.to_be_bytes(), input, &10u32.to_be_bytes(), output].concat();
+        let data = [
+            &3u32.to_be_bytes(),
+            method_name.as_bytes(),
+            &9u32.to_be_bytes(),
+            input,
+            &10u32.to_be_bytes(),
+            output,
+        ]
+        .concat();
         let tx_hash = keccak(&data).0;
 
         let block_height_2: u64 = 2;
@@ -457,7 +523,7 @@ mod blockchain_hashchain_tests {
                 &block_height_2.to_be_bytes(),
                 &block_hashchain_1,
                 &tx_hash,
-                bloom.as_bytes()
+                bloom.as_bytes(),
             ]
             .concat(),
         )
@@ -498,7 +564,15 @@ mod blockchain_hashchain_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        let data = [&3u32.to_be_bytes(), method_name.as_bytes(), &9u32.to_be_bytes(), input, &10u32.to_be_bytes(), output].concat();
+        let data = [
+            &3u32.to_be_bytes(),
+            method_name.as_bytes(),
+            &9u32.to_be_bytes(),
+            input,
+            &10u32.to_be_bytes(),
+            output,
+        ]
+        .concat();
         let tx_hash = keccak(&data).0;
 
         let block_hashchain_1 = keccak(&1u64.to_be_bytes()).0;
@@ -512,7 +586,7 @@ mod blockchain_hashchain_tests {
                 &block_height_2.to_be_bytes(),
                 &block_hashchain_1,
                 &tx_hash,
-                bloom.as_bytes()
+                bloom.as_bytes(),
             ]
             .concat(),
         )
@@ -568,7 +642,15 @@ mod block_hashchain_computer_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        let data = [&3u32.to_be_bytes(), method_name.as_bytes(), &9u32.to_be_bytes(), input, &10u32.to_be_bytes(), output].concat();
+        let data = [
+            &3u32.to_be_bytes(),
+            method_name.as_bytes(),
+            &9u32.to_be_bytes(),
+            input,
+            &10u32.to_be_bytes(),
+            output,
+        ]
+        .concat();
         let expected_tx_hash = keccak(&data).0;
 
         let mut block_hashchain_computer = BlockHashchainComputer::new();
@@ -581,10 +663,7 @@ mod block_hashchain_computer_tests {
             block_hashchain_computer.txs_merkle_tree.subtrees[0].hash,
             expected_tx_hash
         );
-        assert_eq!(
-            block_hashchain_computer.txs_logs_bloom,
-            bloom
-        );
+        assert_eq!(block_hashchain_computer.txs_logs_bloom, bloom);
     }
 
     #[test]
@@ -602,7 +681,7 @@ mod block_hashchain_computer_tests {
                 &block_height.to_be_bytes(),
                 &previous_block_hashchain,
                 &[0; 32],
-                Bloom::default().as_bytes()
+                Bloom::default().as_bytes(),
             ]
             .concat(),
         )
@@ -630,7 +709,15 @@ mod block_hashchain_computer_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        let data = [&3u32.to_be_bytes(), method_name.as_bytes(), &9u32.to_be_bytes(), input, &10u32.to_be_bytes(), output].concat();
+        let data = [
+            &3u32.to_be_bytes(),
+            method_name.as_bytes(),
+            &9u32.to_be_bytes(),
+            input,
+            &10u32.to_be_bytes(),
+            output,
+        ]
+        .concat();
         let tx_hash = keccak(&data).0;
 
         let block_height: u64 = 2;
@@ -643,7 +730,7 @@ mod block_hashchain_computer_tests {
                 &block_height.to_be_bytes(),
                 &previous_block_hashchain,
                 &tx_hash,
-                bloom.as_bytes()
+                bloom.as_bytes(),
             ]
             .concat(),
         )
@@ -670,7 +757,12 @@ mod block_hashchain_computer_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        block_hashchain_computer.add_tx("foo", "foo_input".as_bytes(), "foo_output".as_bytes(), &bloom);
+        block_hashchain_computer.add_tx(
+            "foo",
+            "foo_input".as_bytes(),
+            "foo_output".as_bytes(),
+            &bloom,
+        );
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 1);
         assert_eq!(block_hashchain_computer.txs_logs_bloom, bloom);
 

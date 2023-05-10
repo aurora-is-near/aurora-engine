@@ -1,4 +1,4 @@
-use aurora_engine::bloom::{Bloom, self};
+use aurora_engine::bloom::{self, Bloom};
 use aurora_engine::hashchain;
 use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
@@ -6,7 +6,6 @@ use aurora_engine::pausables::{
 };
 use aurora_engine::{connector, engine, parameters::SubmitResult, state, xcc};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
-use aurora_engine_sdk::keccak;
 use aurora_engine_types::{
     account_id::AccountId,
     parameters::PromiseWithCallbackArgs,
@@ -484,30 +483,15 @@ fn update_hashchain<'db>(
     transaction: &TransactionKind,
     result: &Option<TransactionExecutionResult>,
 ) -> Result<(), error::Error> {
+    if !hashchain::storage::get_activation(io)? {
+        return Ok(());
+    }
+
     let method_name = InnerTransactionKind::from(transaction).to_string();
     let input = get_input(transaction)?;
     let (output, log_bloom) = get_output_and_log_bloom(result)?;
 
-    //***------
-    println!("standalone update_hashchain------");
-    println!("block_height: {:?}", block_height);
-    println!("method_name: {}", method_name);
-    let input_hash = keccak(&input);
-    println!("input_hash: {:?}", input_hash);
-    let output_hash = keccak(&output);
-    println!("output_hash: {:?}", output_hash);
-    let bloom_hash = keccak(&log_bloom.0);
-    println!("bloom_hash: {:?}", bloom_hash);
-
-    let mut blockchain_hashchain = hashchain::get_state(io).unwrap_or_else(|_| {
-
-        //***-----
-        // println!("new--");
-        // println!("chain_id: {:?}", state::get_state(io).unwrap().chain_id);
-        // println!("engine_account_id: {:?}", engine_account_id.as_bytes().to_vec());
-        // println!("block_height: {:?}", block_height);
-        // println!("--new");
-
+    let mut blockchain_hashchain = hashchain::storage::get_state(io).unwrap_or_else(|_| {
         hashchain::BlockchainHashchain::new(
             state::get_state(io).unwrap().chain_id,
             engine_account_id.as_bytes().to_vec(),
@@ -518,25 +502,12 @@ fn update_hashchain<'db>(
     });
 
     if block_height > blockchain_hashchain.get_current_block_height() {
-
-        //***-----
-        // println!("move_to_block--");
-        // println!("block_height: {:?}", block_height);
-        // println!("blockchain_hashchain.get_current_block_height: {:?}", blockchain_hashchain.get_current_block_height());
-        // println!("--move_to_block");
-
         blockchain_hashchain.move_to_block(block_height)?;
     }
 
-    //***-----
-    //println!("add_block_tx");
-
     blockchain_hashchain.add_block_tx(block_height, &method_name, &input, &output, &log_bloom)?;
 
-    //***-----
-    println!("------standalone update_hashchain");
-
-    Ok(hashchain::set_state(io, blockchain_hashchain)?)
+    Ok(hashchain::storage::set_state(io, &blockchain_hashchain)?)
 }
 
 fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
@@ -576,12 +547,16 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
     }
 }
 
-fn get_output_and_log_bloom(result: &Option<TransactionExecutionResult>) -> Result<(Vec<u8>, Bloom), error::Error> {
+fn get_output_and_log_bloom(
+    result: &Option<TransactionExecutionResult>,
+) -> Result<(Vec<u8>, Bloom), error::Error> {
     match result {
         None => Ok((vec![], Bloom::default())),
         Some(execution_result) => match execution_result {
             TransactionExecutionResult::Promise(_) => Ok((vec![], Bloom::default())),
-            TransactionExecutionResult::DeployErc20(address) => Ok((address.as_bytes().try_to_vec().unwrap(), Bloom::default())),
+            TransactionExecutionResult::DeployErc20(address) => {
+                Ok((address.as_bytes().try_to_vec().unwrap(), Bloom::default()))
+            }
             TransactionExecutionResult::Submit(submit) => match submit {
                 Err(e) => Err(e.clone().into()),
                 Ok(submit_result) => {

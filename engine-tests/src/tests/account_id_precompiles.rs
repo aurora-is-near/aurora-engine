@@ -1,14 +1,10 @@
-use crate::test_utils::{self, standalone};
+use crate::test_utils;
 use aurora_engine::parameters::SubmitResult;
 
 #[test]
 fn test_account_id_precompiles() {
     let mut signer = test_utils::Signer::random();
     let mut runner = test_utils::deploy_evm();
-    let mut standalone = standalone::StandaloneRunner::default();
-
-    standalone.init_evm();
-    runner.standalone_runner = Some(standalone);
 
     let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
         "src/tests/res",

@@ -1,7 +1,9 @@
 use aurora_engine::engine;
+use aurora_engine::hashchain;
+use aurora_engine::hashchain::blockchain_hashchain_error::BlockchainHashchainError;
 use aurora_engine::parameters::{
-    CallArgs, DeployErc20TokenArgs, InitCallArgs, NewCallArgs, PausePrecompilesCallArgs, SetOwnerArgs,
-    SetUpgradeDelayBlocksArgs, SubmitArgs, SubmitResult, TransactionStatus,
+    CallArgs, DeployErc20TokenArgs, InitCallArgs, NewCallArgs, PausePrecompilesCallArgs,
+    SetOwnerArgs, SetUpgradeDelayBlocksArgs, SubmitArgs, SubmitResult, TransactionStatus,
 };
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
@@ -48,7 +50,7 @@ impl StandaloneRunner {
         let transaction_hash = H256::zero();
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
-            //mocks::init_evm(io, env, chain_id);
+            mocks::init_evm(io, env, chain_id);
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
@@ -58,6 +60,15 @@ impl StandaloneRunner {
         };
         self.cumulative_diff.append(outcome.diff.clone());
         test_utils::standalone::storage::commit(storage, &outcome);
+    }
+
+    pub fn init_evm_no_state(&mut self) {
+        let storage = &mut self.storage;
+        let env = &mut self.env;
+        storage
+            .set_engine_account_id(&env.current_account_id)
+            .unwrap();
+        env.block_height += 1;
     }
 
     pub fn mint_account(
@@ -332,7 +343,8 @@ impl StandaloneRunner {
         } else if method_name == test_utils::NEW {
             let call_args = NewCallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::NewEngine(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -347,7 +359,8 @@ impl StandaloneRunner {
         } else if method_name == test_utils::NEW_ETH_CONNECTOR {
             let call_args = InitCallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::NewConnector(call_args);
 
             let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
@@ -430,6 +443,41 @@ impl StandaloneRunner {
             transaction: TransactionKind::Unknown,
             promise_data,
         }
+    }
+
+    pub fn set_hashchain_activation(
+        &mut self,
+        active: bool,
+    ) -> Result<(), BlockchainHashchainError> {
+        let result = self
+            .storage
+            .with_engine_access(self.env.block_height, 0, &[], |io| {
+                Self::set_hashchain_activation_internal(io, active)
+            });
+
+        result.result?;
+
+        let random_hash = H256::random();
+        let dummy_message =
+            Self::template_tx_msg(&mut self.storage, &self.env, 0, random_hash, &[]);
+        let dummy_outcome = engine_standalone_storage::sync::TransactionIncludedOutcome {
+            hash: random_hash,
+            info: dummy_message,
+            diff: result.diff,
+            maybe_result: Ok(None),
+        };
+
+        self.cumulative_diff.append(dummy_outcome.diff.clone());
+        storage::commit(&mut self.storage, &dummy_outcome);
+
+        Ok(())
+    }
+
+    fn set_hashchain_activation_internal<'db>(
+        mut io: engine_standalone_storage::engine_state::EngineStateAccess<'db, 'db, 'db>,
+        active: bool,
+    ) -> Result<(), BlockchainHashchainError> {
+        hashchain::storage::set_activation(&mut io, active)
     }
 
     fn internal_submit_transaction(

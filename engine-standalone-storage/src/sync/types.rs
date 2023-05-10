@@ -500,7 +500,9 @@ impl From<&TransactionKind> for InnerTransactionKind {
             }
             TransactionKind::FundXccSubAccound(_) => InnerTransactionKind::FundXccSubAccound,
             TransactionKind::Unknown => InnerTransactionKind::Unknown,
-            TransactionKind::SetUpgradeDelayBlocks(_) => InnerTransactionKind::SetUpgradeDelayBlocks,
+            TransactionKind::SetUpgradeDelayBlocks(_) => {
+                InnerTransactionKind::SetUpgradeDelayBlocks
+            }
         }
     }
 }
