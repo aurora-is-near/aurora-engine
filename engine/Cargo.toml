@@ -42,7 +42,7 @@ test-case = "2.1"
 digest = "0.10"
 
 [features]
-default = ["std", "contract"]
+default = ["std"]
 std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "borsh/std", "byte-slice-cast/std", "ethabi/std", "evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
 evm_bully = []
