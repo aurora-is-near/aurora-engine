@@ -1,7 +1,7 @@
 use crate::test_utils;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
-    FinishDepositCallArgs, InitCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+    FinishDepositCallArgs, InitCallArgs, NEP141FtOnTransferArgs, NewCallArgsV2,
 };
 use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
@@ -49,10 +49,9 @@ pub fn default_env(block_height: u64) -> aurora_engine_sdk::env::Fixed {
 }
 
 pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
-    let new_args = NewCallArgs {
+    let new_args = NewCallArgsV2 {
         chain_id: aurora_engine_types::types::u256_to_arr(&U256::from(chain_id)),
         owner_id: env.current_account_id(),
-        bridge_prover_id: test_utils::str_to_account_id("bridge_prover.near"),
         upgrade_delay_blocks: 1,
     };
 

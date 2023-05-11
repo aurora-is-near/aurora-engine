@@ -11,9 +11,25 @@ pub use aurora_engine_types::parameters::engine::{
 use aurora_engine_types::types::{Fee, NEP141Wei, Yocto};
 use serde::{Deserialize, Serialize};
 
-/// Borsh-encoded parameters for the `new` function.
+/// Parameters for the `new` function.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct NewCallArgs {
+pub enum NewCallArgs {
+    V1(LegacyNewCallArgs),
+    V2(NewCallArgsV2),
+}
+
+impl NewCallArgs {
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, borsh::maybestd::io::Error> {
+        Self::try_from_slice(bytes).map_or_else(
+            |_| LegacyNewCallArgs::try_from_slice(bytes).map(Self::V1),
+            Ok,
+        )
+    }
+}
+
+/// Old Borsh-encoded parameters for the `new` function.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct LegacyNewCallArgs {
     /// Chain id, according to the EIP-115 / ethereum-lists spec.
     pub chain_id: RawU256,
     /// Account which can upgrade this contract.
@@ -22,6 +38,17 @@ pub struct NewCallArgs {
     /// Account of the bridge prover.
     /// Use empty to not use base token as bridged asset.
     pub bridge_prover_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct NewCallArgsV2 {
+    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    pub chain_id: RawU256,
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
 }
