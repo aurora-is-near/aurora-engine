@@ -1,8 +1,8 @@
 ---
 on:
   push:
-    branches:
-      - master
+    tags:
+      - '*'
 name: Build
 jobs:
   release:
@@ -26,16 +26,19 @@ jobs:
         with:
           name: aurora-${{ matrix.profile }}.wasm
           path: bin/aurora-${{ matrix.profile }}.wasm
+      - name: Upload the aurora-factory-${{ matrix.profile }}.wasm artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: aurora-factory-${{ matrix.profile }}.wasm
+          path: bin/aurora-factory-${{ matrix.profile }}.wasm
       - name: Update the latest releases
         uses: svenstaro/upload-release-action@v2
         with:
-          tag: latest
+          tag: ${{ github.ref }}
           file: bin/aurora*-${{ matrix.profile }}.wasm
           overwrite: true
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
-      - name: Update the latest tag
-        uses: EndBug/latest-tag@latest
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
