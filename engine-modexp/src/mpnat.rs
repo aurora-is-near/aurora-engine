@@ -145,6 +145,9 @@ impl MPNat {
                 tmp.digits
                     .copy_from_slice(&modulus.digits[trailing_zeros..]);
             }
+            while tmp.digits.last() == Some(&0) {
+                tmp.digits.pop();
+            }
             tmp
         };
         debug_assert!(power_of_two.is_power_of_two(), "Factored out power of two");
@@ -523,6 +526,30 @@ fn test_modpow_even() {
         0x8e35fc05d490bb138f73c2bc284a67a7,
         0x6c237160750d78400000000000000000,
         0x3fe14e11392c6c6be8efe956c965d5af,
+    );
+
+    let base: Vec<u8> = vec![
+        0x36, 0xAB, 0xD4, 0x52, 0x4E, 0x89, 0xA3, 0x4C, 0x89, 0xC4, 0x20, 0x94, 0x25, 0x47, 0xE1,
+        0x2C, 0x7B, 0xE1,
+    ];
+    let exponent: Vec<u8> = vec![0x01, 0x00, 0x00, 0x00, 0x00, 0x05, 0x17, 0xEA, 0x78];
+    let modulus: Vec<u8> = vec![
+        0x02, 0xF0, 0x75, 0x8C, 0x6A, 0x04, 0x20, 0x09, 0x55, 0xB6, 0x49, 0xC3, 0x57, 0x22, 0xB8,
+        0x00, 0x00, 0x00, 0x00,
+    ];
+    let result = crate::modexp(&base, &exponent, &modulus);
+    assert_eq!(
+        result,
+        vec![2, 63, 79, 118, 41, 54, 235, 9, 115, 212, 107, 110, 173, 181, 157, 104, 208, 97, 1]
+    );
+
+    let base = hex::decode("36abd4524e89a34c89c420942547e12c7be1").unwrap();
+    let exponent = hex::decode("01000000000517ea78").unwrap();
+    let modulus = hex::decode("02f0758c6a04200955b649c35722b800000000").unwrap();
+    let result = crate::modexp(&base, &exponent, &modulus);
+    assert_eq!(
+        hex::encode(result),
+        "023f4f762936eb0973d46b6eadb59d68d06101"
     );
 
     fn check_modpow_even(base: u128, exp: u128, modulus: u128, expected: u128) {
