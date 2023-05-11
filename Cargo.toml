@@ -32,6 +32,7 @@ resolver = "2"
 members = [
     "engine",
     "engine-test-doubles",
+    "engine-modexp",
     "engine-precompiles",
     "engine-sdk",
     "engine-standalone-storage",
@@ -46,5 +47,6 @@ exclude = [
     "etc/tests/benchmark-contract",
     "etc/tests/self-contained-5bEgfRQ",
     "etc/tests/fibonacci",
+    "etc/tests/modexp-bench",
     "etc/xcc-router",
 ]
