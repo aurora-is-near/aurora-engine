@@ -1,6 +1,7 @@
 use crate::prelude::{Address, Wei, U256};
 use crate::test_utils::{self, solidity};
 use aurora_engine_transactions::legacy::TransactionLegacy;
+use aurora_engine_types::parameters::engine::TransactionStatus;
 use libsecp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -42,10 +43,11 @@ pub fn measure_gas_usage(total_tokens: usize, data_size: usize, tokens_per_page:
     // show them
     let nonce = source_account.nonce;
     let tx = marketplace.get_page(tokens_per_page, 0, nonce.into());
-    let (result, profile) = runner.profiled_view_call(&test_utils::as_view_call(tx, dest_address));
+    let (status, profile) = runner
+        .profiled_view_call(&test_utils::as_view_call(tx, dest_address))
+        .unwrap();
 
-    let status = result.unwrap();
-    assert!(status.is_ok());
+    assert!(matches!(status, TransactionStatus::Succeed(_)));
     profile.all_gas()
 }
 

@@ -52,7 +52,7 @@ fn test_promise_results_precompile() {
 fn test_promise_result_gas_cost() {
     let mut runner = test_utils::deploy_evm();
     runner.set_hashchain_activation(false);
-    runner.context.block_index = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    runner.context.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
 
     let mut signer = test_utils::Signer::random();
 

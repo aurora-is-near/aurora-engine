@@ -23,7 +23,7 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, deployer_address) = helper.create_mooniswap_deployer();
     assert!(result.gas_used >= 5_100_000); // more than 5.1M EVM gas used
-    assert_gas_bound(profile.all_gas(), 12); // less than 12 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 11); // less than 12 NEAR Tgas used
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
@@ -133,13 +133,13 @@ fn deploy_1_inch_limit_order_contract(
         data: constructor.code,
     };
     let tx = test_utils::sign_transaction(deploy_tx, Some(runner.chain_id), &signer.secret_key);
-
-    let (outcome, error) = runner.call(
+    let outcome = runner.call(
         test_utils::SUBMIT,
         "any_account.near",
         rlp::encode(&tx).to_vec(),
     );
-    assert!(error.is_none());
+
+    assert!(outcome.is_ok());
     outcome.unwrap()
 }
 

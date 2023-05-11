@@ -59,7 +59,7 @@ impl StandaloneRunner {
             maybe_result: Ok(None),
         };
         self.cumulative_diff.append(outcome.diff.clone());
-        test_utils::standalone::storage::commit(storage, &outcome);
+        storage::commit(storage, &outcome);
     }
 
     pub fn init_evm_no_state(&mut self) {
@@ -203,9 +203,9 @@ impl StandaloneRunner {
         promise_results: &[PromiseResult],
     ) -> Result<SubmitResult, engine::EngineError> {
         let mut env = self.env.clone();
-        env.block_height = ctx.block_index;
+        env.block_height = ctx.block_height;
         env.attached_deposit = ctx.attached_deposit;
-        env.block_timestamp = aurora_engine_sdk::env::Timestamp::new(ctx.block_timestamp);
+        env.block_timestamp = env::Timestamp::new(ctx.block_timestamp);
         env.predecessor_account_id = ctx.predecessor_account_id.as_ref().parse().unwrap();
         env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
@@ -500,7 +500,7 @@ impl StandaloneRunner {
 
         let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
         cumulative_diff.append(outcome.diff.clone());
-        test_utils::standalone::storage::commit(storage, &outcome);
+        storage::commit(storage, &outcome);
 
         unwrap_result(outcome)
     }

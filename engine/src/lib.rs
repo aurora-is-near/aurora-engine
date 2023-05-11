@@ -408,9 +408,6 @@ mod contract {
             &mut Runtime,
         );
 
-        //***---
-        //sdk::log!("submit -> result: {:?}", result);
-
         result
             .map(|res| {
                 let output = res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);

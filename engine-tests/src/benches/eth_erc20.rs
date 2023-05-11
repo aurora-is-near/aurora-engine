@@ -62,9 +62,9 @@ pub fn eth_erc20_benchmark(c: &mut Criterion) {
 
     // Measure mint gas usage; don't use `one_shot` because we want to keep this state change for
     // the next benchmark where we transfer some of the minted tokens.
-    let (output, maybe_error) = runner.call(SUBMIT, calling_account_id, mint_tx_bytes.clone());
-    assert!(maybe_error.is_none());
-    let output = output.unwrap();
+    let output = runner
+        .call(SUBMIT, calling_account_id, mint_tx_bytes.clone())
+        .unwrap();
     let gas = output.burnt_gas;
     let eth_gas = crate::test_utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
@@ -72,12 +72,10 @@ pub fn eth_erc20_benchmark(c: &mut Criterion) {
     println!("ETH_ERC20_MINT ETH GAS: {eth_gas:?}");
 
     // Measure transfer gas usage
-    let (output, maybe_err) =
-        runner
-            .one_shot()
-            .call(SUBMIT, calling_account_id, transfer_tx_bytes.clone());
-    assert!(maybe_err.is_none());
-    let output = output.unwrap();
+    let output = runner
+        .one_shot()
+        .call(SUBMIT, calling_account_id, transfer_tx_bytes.clone())
+        .unwrap();
     let gas = output.burnt_gas;
     let eth_gas = crate::test_utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file

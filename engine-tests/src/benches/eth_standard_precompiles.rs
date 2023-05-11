@@ -43,12 +43,10 @@ pub fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
 
     // measure gas usage
     for (tx_bytes, name) in transactions.iter().zip(test_names.iter()) {
-        let (output, maybe_err) =
-            runner
-                .one_shot()
-                .call(SUBMIT, calling_account_id, tx_bytes.clone());
-        assert!(maybe_err.is_none());
-        let output = output.unwrap();
+        let output = runner
+            .one_shot()
+            .call(SUBMIT, calling_account_id, tx_bytes.clone())
+            .unwrap();
         let gas = output.burnt_gas;
         let eth_gas = crate::test_utils::parse_eth_gas(&output);
         // TODO(#45): capture this in a file

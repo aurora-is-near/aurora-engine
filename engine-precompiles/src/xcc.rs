@@ -31,7 +31,7 @@ pub mod costs {
     ///
     /// This process is done in the `test_xcc_eth_gas_cost` test in
     /// `engine-tests/src/tests/xcc.rs`.
-    pub const CROSS_CONTRACT_CALL_BASE: EthGas = EthGas::new(323_000);
+    pub const CROSS_CONTRACT_CALL_BASE: EthGas = EthGas::new(343_650);
     /// Additional EVM gas cost per bytes of input given.
     /// See `CROSS_CONTRACT_CALL_BASE` for estimation methodology.
     pub const CROSS_CONTRACT_CALL_BYTE: EthGas = EthGas::new(3);

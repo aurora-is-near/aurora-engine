@@ -16,38 +16,37 @@ autobenches = false
 
 [dev-dependencies]
 aurora-engine = { path = "../engine", default-features = false, features = ["std", "tracing", "impl-serde"] }
-aurora-engine-test-doubles = { path = "../engine-test-doubles", default-features = false }
-aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std", "impl-serde"] }
-aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false, features = ["std"] }
+aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
+aurora-engine-test-doubles = { path = "../engine-test-doubles", default-features = false }
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std", "impl-serde"] }
-engine-standalone-storage = { path = "../engine-standalone-storage" }
-engine-standalone-tracing = { path = "../engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
+aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std", "impl-serde"] }
 borsh = { version = "0.10", default-features = false }
-sha3 = { version = "0.10.2", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
-rlp = { version = "0.5.0", default-features = false }
 bstr = "1.0.1"
 byte-slice-cast = { version = "1.0", default-features = false }
+criterion = "0.4.0"
+engine-standalone-storage = { path = "../engine-standalone-storage" }
+engine-standalone-tracing = { path = "../engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 ethabi = "18.0"
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
+git2 = "0.17"
+hex = { version = "0.4.3", default-features = false }
+libsecp256k1 = { version = "0.7.0", default-features = false }
+near-crypto = "0.16"
+near-primitives = "0.16"
+near-primitives-core = "0.16"
+near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "cc4d4aaf2e1f7297aa060b342ca3ef3ff8e67003" }
+near-vm-errors = "0.16"
+near-vm-logic = "0.16"
+near-vm-runner = { version = "0.16", default-features = false, features = [ "wasmer2_vm", "wasmtime_vm" ] }
+rand = "0.8.5"
+rlp = { version = "0.5.0", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-hex = { version = "0.4.3", default-features = false }
-near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "a4634850023fd115053970f17e10861779d5167d" }
-near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "a4634850023fd115053970f17e10861779d5167d" }
-near-crypto = { git = "https://github.com/birchmd/nearcore.git", rev = "6033903be2037d67510188450f289b2d6e033f04" }
-near-vm-errors = { git = "https://github.com/birchmd/nearcore.git", rev = "6033903be2037d67510188450f289b2d6e033f04" }
-near-vm-runner = { git = "https://github.com/birchmd/nearcore.git", rev = "6033903be2037d67510188450f289b2d6e033f04", default-features = false, features = [ "wasmer2_vm" ] }
-near-vm-logic = { git = "https://github.com/birchmd/nearcore.git", rev = "6033903be2037d67510188450f289b2d6e033f04" }
-near-primitives-core = { git = "https://github.com/birchmd/nearcore.git", rev = "6033903be2037d67510188450f289b2d6e033f04" }
-near-primitives = { git = "https://github.com/birchmd/nearcore.git", rev = "6033903be2037d67510188450f289b2d6e033f04", default-features = false, features = [ "nightly_protocol" ] }
-libsecp256k1 = { version = "0.7.0", default-features = false }
-rand = "0.8.5"
-criterion = "0.4.0"
-git2 = "0.16"
-tempfile = "3.2.0"
+sha3 = { version = "0.10.2", default-features = false }
+tempfile = "3"
 walrus = "0.19"
 
 [features]
