@@ -207,7 +207,7 @@ pub fn handle_precompile_promise<I, P>(
             let wnear_address = get_wnear_address(io);
             let wnear_account = crate::engine::nep141_erc20_map(*io)
                 .lookup_right(&crate::engine::ERC20Address(wnear_address))
-                .unwrap();
+                .expect("wnear account not found");
             let init_args = format!(
                 r#"{{"wnear_account": "{}", "must_register": {}}}"#,
                 wnear_account.0.as_ref(),

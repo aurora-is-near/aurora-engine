@@ -94,7 +94,7 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x8 => Self::Nep141Erc20Map,
             0x9 => Self::Erc20Nep141Map,
             0xa => Self::CrossContractCall,
-            _ => unreachable!(),
+            _ => unreachable!("Unknown key prefix"),
         }
     }
 }
