@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "2.9.0"
+version = "2.9.1"
 dependencies = [
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
