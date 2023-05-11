@@ -1,0 +1,20 @@
+[package]
+name = "modexp_bench"
+version = "1.0.0"
+authors = ["Aurora <hello@aurora.dev>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+codegen-units = 1
+opt-level = 3
+lto = true
+debug = false
+panic = "abort"
+
+[dependencies]
+aurora-engine-modexp = { path = "../../../engine-modexp", default-features = false, features = ["bench", "std"] }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+near-sdk = "4.1"

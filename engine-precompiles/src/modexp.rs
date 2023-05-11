@@ -1,10 +1,10 @@
 use crate::prelude::types::{Address, EthGas};
-use crate::prelude::{PhantomData, Vec, U256};
+use crate::prelude::{Cow, PhantomData, Vec, U256};
 use crate::{
     utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
 };
 use evm::{Context, ExitError};
-use num::{BigUint, Integer};
+use num::{Integer, Zero};
 
 #[derive(Default)]
 pub struct ModExp<HF: HardFork>(PhantomData<HF>);
@@ -55,17 +55,15 @@ impl<HF: HardFork> ModExp<HF> {
 
         let mod_start = exp_end;
 
-        let base = parse_bytes(input, base_start, base_len, BigUint::from_bytes_be);
-        let modulus = parse_bytes(input, mod_start, mod_len, BigUint::from_bytes_be);
-
-        let computed_result = if modulus == BigUint::from(0u32) {
+        let modulus = parse_input_range_to_slice(input, mod_start, mod_len);
+        let computed_result = if modulus.iter().all(Zero::is_zero) {
             Vec::new()
         } else {
-            // The OOM panic is no longer possible because if the modulus is non-zero
-            // then the required gas prevents passing a huge exponent.
-            let exponent = parse_bytes(input, exp_start, exp_len, BigUint::from_bytes_be);
-            base.modpow(&exponent, &modulus).to_bytes_be()
+            let base = parse_input_range_to_slice(input, base_start, base_len);
+            let exponent = parse_input_range_to_slice(input, exp_start, exp_len);
+            aurora_engine_modexp::modexp(&base, &exponent, &modulus)
         };
+
         // The result must be the same length as the input modulus.
         // To ensure this we pad on the left with zeros.
         if mod_len > computed_result.len() {
@@ -174,6 +172,25 @@ impl Precompile for ModExp<Berlin> {
 
         let output = Self::run_inner(input);
         Ok(PrecompileOutput::without_logs(cost, output))
+    }
+}
+
+fn parse_input_range_to_slice(input: &[u8], start: usize, size: usize) -> Cow<[u8]> {
+    let len = input.len();
+    if start >= len {
+        return Cow::Owned(Vec::new());
+    }
+    let end = start.saturating_add(size);
+    if end > len {
+        let bytes: Vec<u8> = input[start..]
+            .iter()
+            .copied()
+            .chain(core::iter::repeat(0u8))
+            .take(size)
+            .collect();
+        Cow::Owned(bytes)
+    } else {
+        Cow::Borrowed(&input[start..end])
     }
 }
 
