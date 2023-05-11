@@ -218,7 +218,6 @@ mod test {
         let engine_state = state::EngineState {
             chain_id: aurora_engine_types::types::u256_to_arr(&1_313_161_555.into()),
             owner_id: "aurora".parse().unwrap(),
-            bridge_prover_id: "prover.bridge.near".parse().unwrap(),
             upgrade_delay_blocks: 0,
         };
 
@@ -241,7 +240,7 @@ mod test {
                     io,
                     &engine_state.owner_id,
                     parameters::InitCallArgs {
-                        prover_account: engine_state.bridge_prover_id.clone(),
+                        prover_account: "prover.bridge.near".parse().unwrap(),
                         eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"
                             .to_string(),
                         metadata: FungibleTokenMetadata::default(),
