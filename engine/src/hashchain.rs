@@ -19,6 +19,7 @@ pub struct BlockchainHashchain {
 }
 
 impl BlockchainHashchain {
+    #[must_use]
     pub fn new(
         chain_id: [u8; 32],
         contract_account_id: Vec<u8>,
@@ -86,16 +87,19 @@ impl BlockchainHashchain {
     }
 
     /// Gets the current block height of the structure.
+    #[must_use]
     pub const fn get_current_block_height(&self) -> u64 {
         self.current_block_height
     }
 
     /// Gets the previous block hashchain of the structure.
+    #[must_use]
     pub const fn get_previous_block_hashchain(&self) -> RawH256 {
         self.previous_block_hashchain
     }
 
     /// Gets the genesis block hashchain of the structure.
+    #[must_use]
     pub const fn get_genesis_block_hashchain(&self) -> RawH256 {
         self.genesis_block_hashchain
     }
@@ -123,6 +127,7 @@ impl BlockHashchainComputer {
     }
 
     /// Adds a transaction.
+    #[allow(clippy::cast_possible_truncation)]
     pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8], log_bloom: &Bloom) {
         let data = [
             &(method_name.len() as u32).to_be_bytes(),
@@ -288,11 +293,11 @@ pub mod storage {
 
     /// Gets the state from storage if it exists, otherwise it will error.
     pub fn get_state<I: IO>(io: &I) -> Result<BlockchainHashchain, BlockchainHashchainError> {
-        match io.read_storage(&bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_KEY)) {
-            None => Err(BlockchainHashchainError::NotFound),
-            Some(bytes) => BlockchainHashchain::try_from_slice(&bytes.to_vec())
-                .map_err(|_| BlockchainHashchainError::DeserializationFailed),
-        }
+        io.read_storage(&bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_KEY))
+            .map_or(Err(BlockchainHashchainError::NotFound), |bytes| {
+                BlockchainHashchain::try_from_slice(&bytes.to_vec())
+                    .map_err(|_| BlockchainHashchainError::DeserializationFailed)
+            })
     }
 
     /// Saves state into the storage.
@@ -494,11 +499,11 @@ mod blockchain_hashchain_tests {
     #[test]
     fn move_to_block_one_more_height_test() {
         let chain_id = [1; 32];
-        let contract_account_id = "aurora".as_bytes().to_vec();
+        let contract_account_id = b"aurora".to_vec();
 
         let method_name = "foo";
-        let input = "foo_input".as_bytes();
-        let output = "foo_output".as_bytes();
+        let input = b"foo_input";
+        let output = b"foo_output";
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
@@ -556,11 +561,11 @@ mod blockchain_hashchain_tests {
     #[test]
     fn move_to_block_two_more_height_test() {
         let chain_id = [1; 32];
-        let contract_account_id = "aurora".as_bytes().to_vec();
+        let contract_account_id = b"aurora".to_vec();
 
         let method_name = "foo";
-        let input = "foo_input".as_bytes();
-        let output = "foo_output".as_bytes();
+        let input = b"foo_input";
+        let output = b"foo_output";
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
@@ -637,8 +642,8 @@ mod block_hashchain_computer_tests {
     #[test]
     fn add_tx_test() {
         let method_name = "foo";
-        let input = "foo_input".as_bytes();
-        let output = "foo_output".as_bytes();
+        let input = b"foo_input";
+        let output = b"foo_output";
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
@@ -669,7 +674,7 @@ mod block_hashchain_computer_tests {
     #[test]
     fn compute_block_hashchain_zero_txs_test() {
         let chain_id = [1; 32];
-        let contract_account_id = "aurora".as_bytes().to_vec();
+        let contract_account_id = b"aurora".to_vec();
 
         let block_height: u64 = 2;
         let previous_block_hashchain = keccak(&1u64.to_be_bytes()).0;
@@ -701,11 +706,11 @@ mod block_hashchain_computer_tests {
     #[test]
     fn compute_block_hashchain_one_txs_test() {
         let chain_id = [1; 32];
-        let contract_account_id = "aurora".as_bytes().to_vec();
+        let contract_account_id = b"aurora".to_vec();
 
         let method_name = "foo";
-        let input = "foo_input".as_bytes();
-        let output = "foo_output".as_bytes();
+        let input = b"foo_input";
+        let output = b"foo_output";
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
@@ -759,8 +764,8 @@ mod block_hashchain_computer_tests {
 
         block_hashchain_computer.add_tx(
             "foo",
-            "foo_input".as_bytes(),
-            "foo_output".as_bytes(),
+            b"foo_input",
+            b"foo_output",
             &bloom,
         );
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 1);

@@ -12,6 +12,7 @@ use aurora_engine_sdk::keccak;
 const BLOOM_SIZE: usize = 256;
 const BLOOM_BITS: u32 = 3;
 
+#[allow(clippy::expl_impl_clone_on_copy)]
 construct_fixed_hash! {
     /// Bloom hash type with 256 bytes (2048 bits) size.
     #[derive(BorshSerialize, BorshDeserialize)]
@@ -32,6 +33,7 @@ const fn log2(x: usize) -> u32 {
 
 impl Bloom {
     /// Add a new element to the bloom filter
+    #[allow(clippy::cast_possible_truncation)]
     pub fn accrue(&mut self, input: &[u8]) {
         let m = self.0.len();
         let bloom_bits = m * 8;
@@ -60,6 +62,7 @@ impl Bloom {
     }
 }
 
+#[must_use]
 pub fn get_logs_bloom(logs: &[ResultLog]) -> Bloom {
     let mut logs_bloom = Bloom::default();
 
@@ -70,6 +73,7 @@ pub fn get_logs_bloom(logs: &[ResultLog]) -> Bloom {
     logs_bloom
 }
 
+#[must_use]
 pub fn get_log_bloom(log: &ResultLog) -> Bloom {
     let mut log_bloom = Bloom::default();
 
