@@ -127,7 +127,7 @@ impl BlockHashchainComputer {
     }
 
     /// Adds a transaction.
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::as_conversions)]
     pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8], log_bloom: &Bloom) {
         let data = [
             &(method_name.len() as u32).to_be_bytes(),
@@ -320,6 +320,7 @@ pub mod storage {
     const HASHCHAIN_ACTIVATION_KEY: &[u8; 20] = b"HASHCHAIN_ACTIVATION";
 
     /// Gets the hashchain activation flag from storage if it exists, otherwise it returns true.
+    #[allow(clippy::missing_const_for_fn)]
     pub fn get_activation<I: IO>(_io: &I) -> Result<bool, BlockchainHashchainError> {
         #[cfg(feature = "integration-test")]
         {
@@ -762,12 +763,7 @@ mod block_hashchain_computer_tests {
         let mut bloom = Bloom::default();
         bloom.0[0] = 1;
 
-        block_hashchain_computer.add_tx(
-            "foo",
-            b"foo_input",
-            b"foo_output",
-            &bloom,
-        );
+        block_hashchain_computer.add_tx("foo", b"foo_input", b"foo_output", &bloom);
         assert_eq!(block_hashchain_computer.txs_merkle_tree.subtrees.len(), 1);
         assert_eq!(block_hashchain_computer.txs_logs_bloom, bloom);
 

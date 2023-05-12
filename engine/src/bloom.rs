@@ -2,6 +2,8 @@
 //! Link: <https://github.com/paritytech/parity-common/blob/master/ethbloom/src/lib.rs>
 //!
 //! Reimplemented here since there is a large miss match in types and dependencies.
+#![allow(clippy::expl_impl_clone_on_copy)]
+
 use aurora_engine_types::parameters::engine::ResultLog;
 use borsh::{BorshDeserialize, BorshSerialize};
 use fixed_hash::construct_fixed_hash;
@@ -14,7 +16,6 @@ const BLOOM_BITS: u32 = 3;
 
 construct_fixed_hash! {
     /// Bloom hash type with 256 bytes (2048 bits) size.
-    #[allow(clippy::expl_impl_clone_on_copy)]
     #[derive(BorshSerialize, BorshDeserialize)]
     pub struct Bloom(BLOOM_SIZE);
 }
@@ -33,7 +34,7 @@ const fn log2(x: usize) -> u32 {
 
 impl Bloom {
     /// Add a new element to the bloom filter
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::as_conversions)]
     pub fn accrue(&mut self, input: &[u8]) {
         let m = self.0.len();
         let bloom_bits = m * 8;
