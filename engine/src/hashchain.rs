@@ -128,6 +128,7 @@ impl BlockHashchainComputer {
 
     /// Adds a transaction.
     #[allow(clippy::as_conversions)]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8], log_bloom: &Bloom) {
         let data = [
             &(method_name.len() as u32).to_be_bytes(),
