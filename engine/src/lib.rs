@@ -107,7 +107,6 @@ mod contract {
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
-    use crate::state::EngineState;
     use crate::{errors, hashchain, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -136,10 +135,8 @@ mod contract {
         }
 
         let input = io.read_input().to_vec();
-        let args = NewCallArgs::try_from_slice(&input).sdk_expect(errors::ERR_SERIALIZE);
-        let state: EngineState = args.into();
-
-        state::set_state(&mut io, &state).sdk_unwrap();
+        let args = NewCallArgs::deserialize(&input).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
+        state::set_state(&mut io, &args.into()).sdk_unwrap();
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 

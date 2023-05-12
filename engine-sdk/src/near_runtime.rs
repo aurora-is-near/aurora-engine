@@ -78,7 +78,7 @@ impl Runtime {
     /// by a previous call.
     fn read_account_id() -> AccountId {
         let bytes = Self::ENV_REGISTER_ID.to_vec();
-        AccountId::try_from(bytes).map_or_else(|_| unreachable!(), |account_id| account_id)
+        AccountId::try_from(bytes).expect("Invalid Account Id")
     }
 
     /// Convenience wrapper around `exports::promise_batch_action_function_call`

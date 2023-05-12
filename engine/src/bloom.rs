@@ -12,9 +12,9 @@ use aurora_engine_sdk::keccak;
 const BLOOM_SIZE: usize = 256;
 const BLOOM_BITS: u32 = 3;
 
-#[allow(clippy::expl_impl_clone_on_copy)]
 construct_fixed_hash! {
     /// Bloom hash type with 256 bytes (2048 bits) size.
+    #[allow(clippy::expl_impl_clone_on_copy)]
     #[derive(BorshSerialize, BorshDeserialize)]
     pub struct Bloom(BLOOM_SIZE);
 }

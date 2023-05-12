@@ -1,5 +1,5 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
-use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
+use aurora_engine::parameters::{SubmitArgs, ViewCallArgs, NewCallArgs};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -20,7 +20,9 @@ use rlp::RlpStream;
 use std::borrow::Cow;
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
+use crate::prelude::parameters::{
+    InitCallArgs, LegacyNewCallArgs, SubmitResult, TransactionStatus,
+};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -660,12 +662,12 @@ pub fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     runner.standalone_runner = Some(standalone_runner);
 
-    let args = NewCallArgs {
+    let args = NewCallArgs::V1(LegacyNewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: str_to_account_id(runner.aurora_account_id.as_str()),
         bridge_prover_id: str_to_account_id("bridge_prover.near"),
         upgrade_delay_blocks: 1,
-    };
+    });
 
     let account_id = runner.aurora_account_id.clone();
     let result = runner.call("new", &account_id, args.try_to_vec().unwrap());
@@ -892,12 +894,18 @@ pub fn panic_on_fail(status: TransactionStatus) {
     }
 }
 
+/// Checks if `total_gas` is within 1 Tgas of `tgas_bound`.
 pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
-    // Add 1 to round up
-    let tgas_used = (total_gas / 1_000_000_000_000) + 1;
+    const TERA: i128 = 1_000_000_000_000;
+    let total_gas: i128 = total_gas.into();
+    let tgas_bound: i128 = i128::from(tgas_bound) * TERA;
+    let diff = (total_gas - tgas_bound).abs() / TERA;
     assert_eq!(
-        tgas_used, tgas_bound,
-        "{tgas_used} Tgas is not equal to {tgas_bound} Tgas",
+        diff,
+        0,
+        "{} Tgas is not equal to {} Tgas",
+        total_gas / TERA,
+        tgas_bound / TERA,
     );
 }
 

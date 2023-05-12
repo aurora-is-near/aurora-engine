@@ -341,7 +341,7 @@ impl StandaloneRunner {
                 Vec::new(),
             ))
         } else if method_name == test_utils::NEW {
-            let call_args = NewCallArgs::try_from_slice(&ctx.input).unwrap();
+            let call_args = NewCallArgs::deserialize(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
             let mut tx_msg =
                 Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
