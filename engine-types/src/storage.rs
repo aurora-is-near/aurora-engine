@@ -100,7 +100,7 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0xa => Self::CrossContractCall,
             0xb => Self::FixedGasCost,
             0xc => Self::Whitelist,
-            _ => unreachable!(),
+            _ => unreachable!("Unknown key prefix"),
         }
     }
 }

@@ -126,7 +126,7 @@ fn repro_Emufid2() {
         block_timestamp: 1_662_118_048_636_713_538,
         input_path: "src/tests/res/input_Emufid2.hex",
         evm_gas_used: 1_156_364,
-        near_gas_used: 304,
+        near_gas_used: 296,
     });
 }
 
@@ -152,6 +152,11 @@ fn repro_common(context: &ReproContext) {
     let tx_hex = std::fs::read_to_string(input_path).unwrap();
     let tx_bytes = hex::decode(tx_hex.trim()).unwrap();
 
+    // Make a random call that touches the Engine state to force the lazy migration
+    runner
+        .call("get_chain_id", "relay.aurora", Vec::new())
+        .unwrap();
+    // Run benchmark post-migration
     let outcome = runner.call("submit", "relay.aurora", tx_bytes).unwrap();
     let profile = ExecutionProfile::new(&outcome);
     let submit_result =

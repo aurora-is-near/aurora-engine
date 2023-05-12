@@ -139,21 +139,19 @@ fn test_state_format() {
     // change the binary format of the `EngineState` then we will know
     // about it. This is important because changing the state format will
     // break the contract unless we do a state migration.
-    let args = aurora_engine::parameters::NewCallArgs {
+    let args = aurora_engine::parameters::NewCallArgsV2 {
         chain_id: aurora_engine_types::types::u256_to_arr(&666.into()),
         owner_id: "boss".parse().unwrap(),
-        bridge_prover_id: "prover_mcprovy_face".parse().unwrap(),
         upgrade_delay_blocks: 3,
     };
     let state: aurora_engine::state::EngineState = args.into();
     let expected_hex: String = [
-        "000000000000000000000000000000000000000000000000000000000000029a",
+        "01000000000000000000000000000000000000000000000000000000000000029a",
         "04000000626f7373",
-        "1300000070726f7665725f6d6370726f76795f66616365",
         "0300000000000000",
     ]
     .concat();
-    assert_eq!(hex::encode(state.try_to_vec().unwrap()), expected_hex);
+    assert_eq!(hex::encode(state.borsh_serialize().unwrap()), expected_hex);
 }
 
 fn generate_code(len: usize) -> Vec<u8> {

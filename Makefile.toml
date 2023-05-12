@@ -39,6 +39,7 @@ rm -Rf etc/eth-contracts/cache
 rm -Rf etc/tests/benchmark-contract/target
 rm -Rf etc/tests/ft-receiver/target
 rm -Rf etc/tests/self-contained-5bEgfRQ/target
+rm -Rf etc/xcc-router/target
 '''
 
 [tasks.clean-bin]
@@ -173,6 +174,21 @@ echo "    CARGO_MAKE_PROFILE:   ${CARGO_MAKE_PROFILE}"
 echo "    IS_PROD:              ${IS_PROD}"
 echo "    CARGO_FEATURES:       ${CARGO_FEATURES}"
 echo "    WASM_FILE:            ${WASM_FILE}"
+echo "    SIZE_WASM_FILE:       $(du -h bin/${WASM_FILE} | cut -f1)"
+echo "    TARGET_DIR:           ${TARGET_DIR}"
+echo "    RUSTFLAGS:            ${RUSTFLAGS}"
+echo "    Extra build args:     ${RELEASE} ${@}"
+'''
+
+[tasks.post-xcc-router-build-env]
+category = "Tools"
+script = '''
+echo "Environment:"
+echo "    CARGO_MAKE_PROFILE:   ${CARGO_MAKE_PROFILE}"
+echo "    IS_PROD:              ${IS_PROD}"
+echo "    CARGO_FEATURES:       ${CARGO_FEATURES}"
+echo "    WASM_FILE:            ${XCC_ROUTER_WASM_FILE}"
+echo "    SIZE_WASM_FILE:       $(du -h bin/${XCC_ROUTER_WASM_FILE} | cut -f1)"
 echo "    TARGET_DIR:           ${TARGET_DIR}"
 echo "    RUSTFLAGS:            ${RUSTFLAGS}"
 echo "    Extra build args:     ${RELEASE} ${@}"
@@ -184,6 +200,14 @@ command = "cp"
 args = [
     "target/wasm32-unknown-unknown/${TARGET_DIR}/aurora_engine.wasm",
     "bin/${WASM_FILE}",
+]
+
+[tasks.copy-xcc-router-build]
+category = "Post"
+command = "cp"
+args = [
+    "etc/xcc-router/target/wasm32-unknown-unknown/${TARGET_DIR}/xcc_router.wasm",
+    "bin/${XCC_ROUTER_WASM_FILE}",
 ]
 
 [tasks.make-bin-directory]
@@ -219,6 +243,14 @@ args = [
     "${@}",
 ]
 
+[tasks.build-xcc-router]
+category = "Build"
+script = '''
+cd etc/xcc-router
+cargo build --verbose --target ${ENGINE_CARGO_TARGET} -Z avoid-dev-deps ${@} --release
+cd ../..
+'''
+
 [tasks.build-engine-flow]
 category = "Build"
 dependencies = [
@@ -236,6 +268,15 @@ dependencies = [
     "make-bin-directory",
     "copy-engine-build",
     "post-engine-build-env",
+]
+
+[tasks.build-xcc-router-flow-docker]
+category = "Build"
+dependencies = [
+    "build-xcc-router",
+    "make-bin-directory",
+    "copy-xcc-router-build",
+    "post-xcc-router-build-env",
 ]
 
 [tasks.build-test]
@@ -262,6 +303,18 @@ script = '''
 docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-b8fc60809b907543d909ee75fcc1bd7b68cbe2fd-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
 '''
 
+[tasks.build-xcc-router-docker-inner]
+condition = { profiles = ["mainnet", "testnet"] }
+env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+category = "Build"
+run_task = "build-xcc-router-flow-docker"
+
+[tasks.build-xcc-docker]
+category = "Build"
+script = '''
+docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-b8fc60809b907543d909ee75fcc1bd7b68cbe2fd-amd64 ./scripts/docker-xcc-router-entrypoint.sh ${PROFILE}
+'''
+
 [tasks.test-contracts]
 category = "Test"
 script = '''
@@ -280,12 +333,27 @@ args = [
     "${CARGO_FEATURES_TEST}",
 ]
 
+[tasks.bench-modexp]
+condition = { profiles = ["mainnet", "testnet", "custom"] }
+category = "Test"
+command = "${CARGO}"
+args = [
+    "test",
+    "--release",
+    "--features",
+    "${CARGO_FEATURES_TEST}",
+    "bench_modexp_standalone",
+    "--",
+    "--ignored",
+]
+
 [tasks.test-flow]
 category = "Test"
 dependencies = [
     "build-test",
     "test-contracts",
     "test-workspace",
+    "bench-modexp",
 ]
 
 [tasks.test]
