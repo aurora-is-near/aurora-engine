@@ -99,7 +99,7 @@ fn is_admin<I: IO + Env + Copy>(io: &I) -> bool {
 }
 
 #[cfg(feature = "contract")]
-fn is_owner<I: IO + Env>(io: &I) -> bool {
+fn is_owner<I: IO + Env + Copy>(io: &I) -> bool {
     let state = crate::state::get_state(io).sdk_unwrap();
     state.owner_id == io.predecessor_account_id()
 }
