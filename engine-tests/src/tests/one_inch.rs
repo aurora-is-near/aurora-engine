@@ -58,7 +58,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
-    assert_gas_bound(profile.all_gas(), 23);
+    assert_gas_bound(profile.all_gas(), 22);
 
     // Same here
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
@@ -133,13 +133,13 @@ fn deploy_1_inch_limit_order_contract(
         data: constructor.code,
     };
     let tx = test_utils::sign_transaction(deploy_tx, Some(runner.chain_id), &signer.secret_key);
-
-    let (outcome, error) = runner.call(
+    let outcome = runner.call(
         test_utils::SUBMIT,
         "any_account.near",
         rlp::encode(&tx).to_vec(),
     );
-    assert!(error.is_none());
+
+    assert!(outcome.is_ok());
     outcome.unwrap()
 }
 

@@ -23,11 +23,11 @@ fn repro_GdASJ3KESs() {
     // in the transaction. This pruned snapshot contains precisely those keys, and no others.
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_GdASJ3KESs.json",
-        block_index: 83_596_945,
+        block_height: 83_596_945,
         block_timestamp: 1_645_717_564_644_206_730,
         input_path: "src/tests/res/input_GdASJ3KESs.hex",
         evm_gas_used: 706_713,
-        near_gas_used: 122,
+        near_gas_used: 121,
     });
 }
 
@@ -48,11 +48,11 @@ fn repro_8ru7VEA() {
     // in the transaction. This pruned snapshot contains precisely those keys, and no others.
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_8ru7VEA.json",
-        block_index: 62_625_815,
+        block_height: 62_625_815,
         block_timestamp: 1_648_829_935_343_349_589,
         input_path: "src/tests/res/input_8ru7VEA.hex",
         evm_gas_used: 1_732_181,
-        near_gas_used: 223,
+        near_gas_used: 220,
     });
 }
 
@@ -68,11 +68,11 @@ fn repro_8ru7VEA() {
 fn repro_FRcorNv() {
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_FRcorNv.json",
-        block_index: 64_328_524,
+        block_height: 64_328_524,
         block_timestamp: 1_650_960_438_774_745_116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1_239_721,
-        near_gas_used: 181,
+        near_gas_used: 179,
     });
 }
 
@@ -85,11 +85,11 @@ fn repro_FRcorNv() {
 fn repro_5bEgfRQ() {
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_5bEgfRQ.json",
-        block_index: 64_417_403,
+        block_height: 64_417_403,
         block_timestamp: 1_651_073_772_931_594_646,
         input_path: "src/tests/res/input_5bEgfRQ.hex",
         evm_gas_used: 6_414_105,
-        near_gas_used: 657,
+        near_gas_used: 654,
     });
 }
 
@@ -103,11 +103,11 @@ fn repro_5bEgfRQ() {
 fn repro_D98vwmi() {
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_D98vwmi.json",
-        block_index: 64_945_381,
+        block_height: 64_945_381,
         block_timestamp: 1_651_753_443_421_003_245,
         input_path: "src/tests/res/input_D98vwmi.hex",
         evm_gas_used: 1_035_348,
-        near_gas_used: 182,
+        near_gas_used: 180,
     });
 }
 
@@ -122,18 +122,18 @@ fn repro_D98vwmi() {
 fn repro_Emufid2() {
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_Emufid2.json",
-        block_index: 99_197_180,
+        block_height: 99_197_180,
         block_timestamp: 1_662_118_048_636_713_538,
         input_path: "src/tests/res/input_Emufid2.hex",
         evm_gas_used: 1_156_364,
-        near_gas_used: 306,
+        near_gas_used: 296,
     });
 }
 
 fn repro_common(context: &ReproContext) {
     let ReproContext {
         snapshot_path,
-        block_index,
+        block_height,
         block_timestamp,
         input_path,
         evm_gas_used,
@@ -146,18 +146,19 @@ fn repro_common(context: &ReproContext) {
     runner.wasm_config.limit_config.max_gas_burnt = 3_000_000_000_000_000;
     runner.context.storage_usage = 1_000_000_000;
     runner.consume_json_snapshot(snapshot.clone());
-    runner.context.block_index = *block_index;
+    runner.context.block_height = *block_height;
     runner.context.block_timestamp = *block_timestamp;
 
     let tx_hex = std::fs::read_to_string(input_path).unwrap();
     let tx_bytes = hex::decode(tx_hex.trim()).unwrap();
 
-    let (outcome, error) = runner.call("submit", "relay.aurora", tx_bytes);
-    let outcome = outcome.unwrap();
+    // Make a random call that touches the Engine state to force the lazy migration
+    runner
+        .call("get_chain_id", "relay.aurora", Vec::new())
+        .unwrap();
+    // Run benchmark post-migration
+    let outcome = runner.call("submit", "relay.aurora", tx_bytes).unwrap();
     let profile = ExecutionProfile::new(&outcome);
-    if let Some(error) = error {
-        panic!("{error:?}");
-    }
     let submit_result =
         SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
@@ -183,7 +184,7 @@ fn repro_common(context: &ReproContext) {
 
 struct ReproContext<'a> {
     snapshot_path: &'a str,
-    block_index: u64,
+    block_height: u64,
     block_timestamp: u64,
     input_path: &'a str,
     evm_gas_used: u64,

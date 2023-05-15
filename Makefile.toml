@@ -300,7 +300,7 @@ run_task = "build-engine-flow-docker"
 [tasks.build-docker]
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-b8fc60809b907543d909ee75fcc1bd7b68cbe2fd-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
+docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-66f060ef807b2f323f7527e7e7f983299f9c2b16-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
 '''
 
 [tasks.build-xcc-router-docker-inner]
@@ -312,7 +312,7 @@ run_task = "build-xcc-router-flow-docker"
 [tasks.build-xcc-docker]
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-b8fc60809b907543d909ee75fcc1bd7b68cbe2fd-amd64 ./scripts/docker-xcc-router-entrypoint.sh ${PROFILE}
+docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-66f060ef807b2f323f7527e7e7f983299f9c2b16-amd64 ./scripts/docker-xcc-router-entrypoint.sh ${PROFILE}
 '''
 
 [tasks.test-contracts]
@@ -333,12 +333,27 @@ args = [
     "${CARGO_FEATURES_TEST}",
 ]
 
+[tasks.bench-modexp]
+condition = { profiles = ["mainnet", "testnet", "custom"] }
+category = "Test"
+command = "${CARGO}"
+args = [
+    "test",
+    "--release",
+    "--features",
+    "${CARGO_FEATURES_TEST}",
+    "bench_modexp_standalone",
+    "--",
+    "--ignored",
+]
+
 [tasks.test-flow]
 category = "Test"
 dependencies = [
     "build-test",
     "test-contracts",
     "test-workspace",
+    "bench-modexp",
 ]
 
 [tasks.test]

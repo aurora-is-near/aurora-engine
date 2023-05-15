@@ -58,28 +58,24 @@ pub fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestContext) {
 
     // Measure add_liquidity gas usage; don't use `one_shot` because we want to keep
     // this state change for the next benchmark where we swap some tokens in the pool.
-    let (output, maybe_error) =
-        context
-            .runner
-            .call(SUBMIT, calling_account_id, liquidity_tx_bytes.clone());
-    assert!(maybe_error.is_none());
-    let output = output.unwrap();
+    let result = context
+        .runner
+        .call(SUBMIT, calling_account_id, liquidity_tx_bytes.clone());
+    let output = result.unwrap();
     let gas = output.burnt_gas;
-    let eth_gas = crate::test_utils::parse_eth_gas(&output);
+    let eth_gas = test_utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("UNISWAP_ADD_LIQUIDITY NEAR GAS: {gas:?}");
     println!("UNISWAP_ADD_LIQUIDITY ETH GAS: {eth_gas:?}");
 
     // Measure swap gas usage
-    let (output, maybe_error) =
-        context
-            .runner
-            .one_shot()
-            .call(SUBMIT, calling_account_id, swap_tx_bytes.clone());
-    assert!(maybe_error.is_none());
-    let output = output.unwrap();
+    let output = context
+        .runner
+        .one_shot()
+        .call(SUBMIT, calling_account_id, swap_tx_bytes.clone())
+        .unwrap();
     let gas = output.burnt_gas;
-    let eth_gas = crate::test_utils::parse_eth_gas(&output);
+    let eth_gas = test_utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("UNISWAP_SWAP NEAR GAS: {gas:?}");
     println!("UNISWAP_SWAP ETH GAS: {eth_gas:?}");

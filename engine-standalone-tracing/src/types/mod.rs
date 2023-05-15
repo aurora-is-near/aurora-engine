@@ -233,7 +233,7 @@ impl Index<usize> for Logs {
     type Output = TraceLog;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
+        self.0.get(index).expect("index out of bounds")
     }
 }
 
@@ -319,7 +319,9 @@ impl StepTransactionTrace {
     /// `None`.
     #[allow(dead_code)]
     pub fn step(&mut self) -> Option<&TraceLog> {
-        if self.step > self.inner.struct_logs.len() {
+        // We subtract 2 from the length to avoid "index out of bounds" error,
+        // given the else block increments the step by 1.
+        if self.step > self.inner.struct_logs.len() - 2 {
             None
         } else {
             self.step += 1;

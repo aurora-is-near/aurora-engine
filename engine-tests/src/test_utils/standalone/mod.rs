@@ -1,7 +1,7 @@
 use aurora_engine::engine;
 use aurora_engine::parameters::{
-    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs, SubmitArgs,
-    SubmitResult, TransactionStatus,
+    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs,
+    SetUpgradeDelayBlocksArgs, SubmitArgs, SubmitResult, TransactionStatus,
 };
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
@@ -57,7 +57,7 @@ impl StandaloneRunner {
             maybe_result: Ok(None),
         };
         self.cumulative_diff.append(outcome.diff.clone());
-        test_utils::standalone::storage::commit(storage, &outcome);
+        storage::commit(storage, &outcome);
     }
 
     pub fn mint_account(
@@ -192,9 +192,9 @@ impl StandaloneRunner {
         promise_results: &[PromiseResult],
     ) -> Result<SubmitResult, engine::EngineError> {
         let mut env = self.env.clone();
-        env.block_height = ctx.block_index;
+        env.block_height = ctx.block_height;
         env.attached_deposit = ctx.attached_deposit;
-        env.block_timestamp = aurora_engine_sdk::env::Timestamp::new(ctx.block_timestamp);
+        env.block_timestamp = env::Timestamp::new(ctx.block_timestamp);
         env.predecessor_account_id = ctx.predecessor_account_id.as_ref().parse().unwrap();
         env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
@@ -310,6 +310,25 @@ impl StandaloneRunner {
                 0,
                 Vec::new(),
             ))
+        } else if method_name == test_utils::SET_UPGRADE_DELAY_BLOCKS {
+            let input = &ctx.input;
+            let call_args = SetUpgradeDelayBlocksArgs::try_from_slice(input)
+                .expect("Unable to parse input as SetUpgradeDelayBlocksArgs");
+
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::SetUpgradeDelayBlocks(call_args);
+
+            let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
         } else {
             panic!("Unsupported standalone method {method_name}");
         }
@@ -403,7 +422,7 @@ impl StandaloneRunner {
 
         let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
         cumulative_diff.append(outcome.diff.clone());
-        test_utils::standalone::storage::commit(storage, &outcome);
+        storage::commit(storage, &outcome);
 
         unwrap_result(outcome)
     }

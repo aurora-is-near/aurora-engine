@@ -7,13 +7,12 @@ use aurora_engine::connector::{
 };
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
-    InitCallArgs, NewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
+    InitCallArgs, LegacyNewCallArgs, RegisterRelayerCallArgs, WithdrawResult,
 };
 use aurora_engine_types::types::{Fee, NEP141Wei};
 use borsh::{BorshDeserialize, BorshSerialize};
 use byte_slice_cast::AsByteSlice;
 use ethabi::ethereum_types::U256;
-use near_sdk::test_utils::accounts;
 use near_sdk_sim::transaction::ExecutionStatus;
 use near_sdk_sim::{to_yocto, ExecutionResult, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT};
 use serde_json::json;
@@ -68,10 +67,10 @@ fn init_contract(
         .call(
             contract_name.parse().unwrap(),
             "new",
-            &NewCallArgs {
+            &LegacyNewCallArgs {
                 chain_id: [0u8; 32],
                 owner_id: str_to_account_id(master_account.account_id.clone().as_str()),
-                bridge_prover_id: str_to_account_id(accounts(0).as_str()),
+                bridge_prover_id: str_to_account_id("bridge.prover.near"),
                 upgrade_delay_blocks: 1,
             }
             .try_to_vec()

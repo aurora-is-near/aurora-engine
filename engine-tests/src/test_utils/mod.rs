@@ -1,22 +1,28 @@
+use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
+use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
 use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives_core::config::VMConfig;
 use near_primitives_core::contract::ContractCode;
-use near_primitives_core::profile::ProfileData;
+use near_primitives_core::profile::ProfileDataV3;
 use near_primitives_core::runtime::fees::RuntimeFeesConfig;
+use near_vm_errors::{FunctionCallError, HostError};
 use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
 use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
-use near_vm_runner::{MockCompiledContractCache, VMError};
+use near_vm_runner::MockCompiledContractCache;
 use rlp::RlpStream;
+use std::borrow::Cow;
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::prelude::parameters::{InitCallArgs, NewCallArgs, SubmitResult, TransactionStatus};
+use crate::prelude::parameters::{
+    InitCallArgs, LegacyNewCallArgs, SubmitResult, TransactionStatus,
+};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -35,6 +41,7 @@ pub const PAUSE_PRECOMPILES: &str = "pause_precompiles";
 pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const SET_OWNER: &str = "set_owner";
+pub const SET_UPGRADE_DELAY_BLOCKS: &str = "set_upgrade_delay_blocks";
 
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
@@ -111,13 +118,12 @@ impl<'a> OneShotAuroraRunner<'a> {
         method_name: &str,
         caller_account_id: &str,
         input: Vec<u8>,
-    ) -> (Option<VMOutcome>, Option<VMError>, ExecutionProfile) {
-        let (outcome, error) = self.call(method_name, caller_account_id, input);
-        let profile = outcome
-            .as_ref()
-            .map(ExecutionProfile::new)
-            .unwrap_or_default();
-        (outcome, error, profile)
+    ) -> Result<(VMOutcome, ExecutionProfile), EngineError> {
+        self.call(method_name, caller_account_id, input)
+            .map(|outcome| {
+                let profile = ExecutionProfile::new(&outcome);
+                (outcome, profile)
+            })
     }
 
     pub fn call(
@@ -125,7 +131,7 @@ impl<'a> OneShotAuroraRunner<'a> {
         method_name: &str,
         caller_account_id: &str,
         input: Vec<u8>,
-    ) -> (Option<VMOutcome>, Option<VMError>) {
+    ) -> Result<VMOutcome, EngineError> {
         AuroraRunner::update_context(
             &mut self.context,
             caller_account_id,
@@ -133,7 +139,7 @@ impl<'a> OneShotAuroraRunner<'a> {
             input,
         );
 
-        match near_vm_runner::run(
+        let outcome = near_vm_runner::run(
             &self.base.code,
             method_name,
             &mut self.ext,
@@ -143,9 +149,13 @@ impl<'a> OneShotAuroraRunner<'a> {
             &[],
             self.base.current_protocol_version,
             Some(&self.base.cache),
-        ) {
-            near_vm_runner::VMResult::Aborted(outcome, error) => (Some(outcome), Some(error)),
-            near_vm_runner::VMResult::Ok(outcome) => (Some(outcome), None),
+        )
+        .unwrap();
+
+        if let Some(aborted) = outcome.aborted.as_ref() {
+            Err(into_engine_error(outcome.used_gas, aborted))
+        } else {
+            Ok(outcome)
         }
     }
 }
@@ -165,7 +175,7 @@ impl AuroraRunner {
         signer_account_id: &str,
         input: Vec<u8>,
     ) {
-        context.block_index += 1;
+        context.block_height += 1;
         context.block_timestamp += 1_000_000_000;
         context.input = input;
         context.signer_account_id = as_account_id(signer_account_id);
@@ -177,7 +187,7 @@ impl AuroraRunner {
         method_name: &str,
         caller_account_id: &str,
         input: Vec<u8>,
-    ) -> (Option<VMOutcome>, Option<VMError>) {
+    ) -> Result<VMOutcome, EngineError> {
         self.call_with_signer(method_name, caller_account_id, caller_account_id, input)
     }
 
@@ -187,7 +197,7 @@ impl AuroraRunner {
         caller_account_id: &str,
         signer_account_id: &str,
         input: Vec<u8>,
-    ) -> (Option<VMOutcome>, Option<VMError>) {
+    ) -> Result<VMOutcome, EngineError> {
         Self::update_context(
             &mut self.context,
             caller_account_id,
@@ -206,7 +216,7 @@ impl AuroraRunner {
                 }
             })
             .collect();
-        let (maybe_outcome, maybe_error) = match near_vm_runner::run(
+        let outcome = near_vm_runner::run(
             &self.code,
             method_name,
             &mut self.ext,
@@ -216,33 +226,32 @@ impl AuroraRunner {
             &vm_promise_results,
             self.current_protocol_version,
             Some(&self.cache),
-        ) {
-            near_vm_runner::VMResult::Aborted(outcome, error) => (Some(outcome), Some(error)),
-            near_vm_runner::VMResult::Ok(outcome) => (Some(outcome), None),
-        };
-        if let Some(outcome) = &maybe_outcome {
-            self.context.storage_usage = outcome.storage_usage;
-            self.previous_logs = outcome.logs.clone();
+        )
+        .unwrap();
+
+        if let Some(error) = outcome.aborted.as_ref() {
+            return Err(into_engine_error(outcome.used_gas, error));
         }
 
+        self.context.storage_usage = outcome.storage_usage;
+        self.previous_logs = outcome.logs.clone();
+
         if let Some(standalone_runner) = &mut self.standalone_runner {
-            if maybe_error.is_none()
-                && (method_name == SUBMIT
-                    || method_name == SUBMIT_WITH_ARGS
-                    || method_name == CALL
-                    || method_name == DEPLOY_ERC20
-                    || method_name == PAUSE_PRECOMPILES
-                    || method_name == RESUME_PRECOMPILES
-                    || method_name == SET_OWNER)
+            if method_name == SUBMIT
+                || method_name == SUBMIT_WITH_ARGS
+                || method_name == CALL
+                || method_name == DEPLOY_ERC20
+                || method_name == PAUSE_PRECOMPILES
+                || method_name == RESUME_PRECOMPILES
+                || method_name == SET_OWNER
+                || method_name == SET_UPGRADE_DELAY_BLOCKS
             {
-                standalone_runner
-                    .submit_raw(method_name, &self.context, &self.promise_results)
-                    .unwrap();
+                standalone_runner.submit_raw(method_name, &self.context, &self.promise_results)?;
                 self.validate_standalone();
             }
         }
 
-        (maybe_outcome, maybe_error)
+        Ok(outcome)
     }
 
     pub fn consume_json_snapshot(
@@ -257,19 +266,14 @@ impl AuroraRunner {
         }
     }
 
-    pub fn create_address(
-        &mut self,
-        address: Address,
-        init_balance: crate::prelude::Wei,
-        init_nonce: U256,
-    ) {
+    pub fn create_address(&mut self, address: Address, init_balance: Wei, init_nonce: U256) {
         self.internal_create_address(address, init_balance, init_nonce, None);
     }
 
     pub fn create_address_with_code(
         &mut self,
         address: Address,
-        init_balance: crate::prelude::Wei,
+        init_balance: Wei,
         init_nonce: U256,
         code: Vec<u8>,
     ) {
@@ -279,7 +283,7 @@ impl AuroraRunner {
     fn internal_create_address(
         &mut self,
         address: Address,
-        init_balance: crate::prelude::Wei,
+        init_balance: Wei,
         init_nonce: U256,
         code: Option<Vec<u8>>,
     ) {
@@ -352,19 +356,19 @@ impl AuroraRunner {
         );
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
-            standalone_runner.env.block_height = self.context.block_index;
+            standalone_runner.env.block_height = self.context.block_height;
             standalone_runner.mint_account(address, init_balance, init_nonce, code);
             self.validate_standalone();
         }
 
-        self.context.block_index += 1;
+        self.context.block_height += 1;
     }
 
     pub fn submit_with_signer<F: FnOnce(U256) -> TransactionLegacy>(
         &mut self,
         signer: &mut Signer,
         make_tx: F,
-    ) -> Result<SubmitResult, VMError> {
+    ) -> Result<SubmitResult, EngineError> {
         self.submit_with_signer_profiled(signer, make_tx)
             .map(|(result, _)| result)
     }
@@ -373,7 +377,7 @@ impl AuroraRunner {
         &mut self,
         signer: &mut Signer,
         make_tx: F,
-    ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
+    ) -> Result<(SubmitResult, ExecutionProfile), EngineError> {
         let nonce = signer.use_nonce();
         let tx = make_tx(nonce.into());
         self.submit_transaction_profiled(&signer.secret_key, tx)
@@ -383,7 +387,7 @@ impl AuroraRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<SubmitResult, VMError> {
+    ) -> Result<SubmitResult, EngineError> {
         self.submit_transaction_profiled(account, transaction)
             .map(|(result, _)| result)
     }
@@ -392,12 +396,10 @@ impl AuroraRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
+    ) -> Result<(SubmitResult, ExecutionProfile), EngineError> {
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
-        let (output, maybe_err) =
-            self.call(SUBMIT, CALLER_ACCOUNT_ID, rlp::encode(&signed_tx).to_vec());
-
-        Self::profile_outcome(output, maybe_err)
+        self.call(SUBMIT, CALLER_ACCOUNT_ID, rlp::encode(&signed_tx).to_vec())
+            .map(Self::profile_outcome)
     }
 
     pub fn submit_transaction_with_args(
@@ -406,7 +408,7 @@ impl AuroraRunner {
         transaction: TransactionLegacy,
         max_gas_price: u128,
         gas_token_address: Option<Address>,
-    ) -> Result<SubmitResult, VMError> {
+    ) -> Result<SubmitResult, EngineError> {
         self.submit_transaction_with_args_profiled(
             account,
             transaction,
@@ -422,36 +424,28 @@ impl AuroraRunner {
         transaction: TransactionLegacy,
         max_gas_price: u128,
         gas_token_address: Option<Address>,
-    ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
+    ) -> Result<(SubmitResult, ExecutionProfile), EngineError> {
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
         let args = SubmitArgs {
             tx_data: rlp::encode(&signed_tx).to_vec(),
             max_gas_price: Some(max_gas_price),
             gas_token_address,
         };
-        let (output, maybe_err) = self.call(
+
+        self.call(
             SUBMIT_WITH_ARGS,
             CALLER_ACCOUNT_ID,
             args.try_to_vec().unwrap(),
-        );
-
-        Self::profile_outcome(output, maybe_err)
+        )
+        .map(Self::profile_outcome)
     }
 
-    fn profile_outcome(
-        output: Option<VMOutcome>,
-        error: Option<VMError>,
-    ) -> Result<(SubmitResult, ExecutionProfile), VMError> {
-        error.map_or_else(
-            || {
-                let output = output.unwrap();
-                let profile = ExecutionProfile::new(&output);
-                let submit_result =
-                    SubmitResult::try_from_slice(&output.return_data.as_value().unwrap()).unwrap();
-                Ok((submit_result, profile))
-            },
-            Err,
-        )
+    fn profile_outcome(outcome: VMOutcome) -> (SubmitResult, ExecutionProfile) {
+        let profile = ExecutionProfile::new(&outcome);
+        let submit_result =
+            SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+
+        (submit_result, profile)
     }
 
     pub fn deploy_contract<F: FnOnce(&T) -> TransactionLegacy, T: Into<ContractConstructor>>(
@@ -462,11 +456,10 @@ impl AuroraRunner {
     ) -> DeployedContract {
         let tx = constructor_tx(&contract_constructor);
         let signed_tx = sign_transaction(tx, Some(self.chain_id), account);
-        let (output, maybe_err) =
-            self.call(SUBMIT, CALLER_ACCOUNT_ID, rlp::encode(&signed_tx).to_vec());
-        assert!(maybe_err.is_none());
+        let outcome = self.call(SUBMIT, CALLER_ACCOUNT_ID, rlp::encode(&signed_tx).to_vec());
         let submit_result =
-            SubmitResult::try_from_slice(&output.unwrap().return_data.as_value().unwrap()).unwrap();
+            SubmitResult::try_from_slice(&outcome.unwrap().return_data.as_value().unwrap())
+                .unwrap();
         let address = Address::try_from_slice(&unwrap_success(submit_result)).unwrap();
         let contract_constructor: ContractConstructor = contract_constructor.into();
         DeployedContract {
@@ -475,33 +468,32 @@ impl AuroraRunner {
         }
     }
 
-    pub fn view_call(&self, args: &ViewCallArgs) -> Result<TransactionStatus, VMError> {
+    pub fn view_call(&self, args: &ViewCallArgs) -> Result<TransactionStatus, EngineError> {
         let input = args.try_to_vec().unwrap();
         let mut runner = self.one_shot();
         runner.context.view_config = Some(ViewConfig {
             max_gas_burnt: u64::MAX,
         });
-        let (outcome, maybe_error) = runner.call("view", "viewer", input);
-        Ok(
-            TransactionStatus::try_from_slice(&Self::bytes_from_outcome(outcome, maybe_error)?)
-                .unwrap(),
-        )
+
+        runner.call("view", "viewer", input).map(|outcome| {
+            TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap()
+        })
     }
 
     pub fn profiled_view_call(
         &self,
         args: &ViewCallArgs,
-    ) -> (Result<TransactionStatus, VMError>, ExecutionProfile) {
+    ) -> Result<(TransactionStatus, ExecutionProfile), EngineError> {
         let input = args.try_to_vec().unwrap();
         let mut runner = self.one_shot();
         runner.context.view_config = Some(ViewConfig {
             max_gas_burnt: u64::MAX,
         });
-        let (outcome, maybe_error, profile) = runner.profiled_call("view", "viewer", input);
-        let status = Self::bytes_from_outcome(outcome, maybe_error)
-            .map(|bytes| TransactionStatus::try_from_slice(&bytes).unwrap());
+        let (outcome, profile) = runner.profiled_call("view", "viewer", input)?;
+        let status =
+            TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
-        (status, profile)
+        Ok((status, profile))
     }
 
     pub fn get_balance(&self, address: Address) -> Wei {
@@ -521,11 +513,11 @@ impl AuroraRunner {
             address,
             key: key.0,
         };
-        let (outcome, maybe_error) =
-            self.one_shot()
-                .call("get_storage_at", "getter", input.try_to_vec().unwrap());
-        assert!(maybe_error.is_none());
-        let output = outcome.unwrap().return_data.as_value().unwrap();
+        let outcome = self
+            .one_shot()
+            .call("get_storage_at", "getter", input.try_to_vec().unwrap())
+            .unwrap();
+        let output = outcome.return_data.as_value().unwrap();
         let mut result = [0u8; 32];
         result.copy_from_slice(&output);
         H256(result)
@@ -539,24 +531,11 @@ impl AuroraRunner {
     // Used in `get_balance` and `get_nonce`. This function exists to avoid code duplication
     // since the contract's `get_nonce` and `get_balance` have the same type signature.
     fn getter_method_call(&self, method_name: &str, address: Address) -> Vec<u8> {
-        let (outcome, maybe_error) =
-            self.one_shot()
-                .call(method_name, "getter", address.as_bytes().to_vec());
-        assert!(maybe_error.is_none());
-        outcome.unwrap().return_data.as_value().unwrap()
-    }
-
-    fn bytes_from_outcome(
-        maybe_outcome: Option<VMOutcome>,
-        maybe_error: Option<VMError>,
-    ) -> Result<Vec<u8>, VMError> {
-        maybe_error.map_or_else(
-            || {
-                let bytes = maybe_outcome.unwrap().return_data.as_value().unwrap();
-                Ok(bytes)
-            },
-            Err,
-        )
+        let outcome = self
+            .one_shot()
+            .call(method_name, "getter", address.as_bytes().to_vec())
+            .unwrap();
+        outcome.return_data.as_value().unwrap()
     }
 
     pub fn with_random_seed(mut self, random_seed: H256) -> Self {
@@ -609,7 +588,7 @@ impl Default for AuroraRunner {
                 signer_account_pk: vec![],
                 predecessor_account_id: as_account_id(ORIGIN),
                 input: vec![],
-                block_index: 0,
+                block_height: 0,
                 block_timestamp: 0,
                 epoch_height: 0,
                 account_balance: 10u128.pow(25),
@@ -635,32 +614,30 @@ impl Default for AuroraRunner {
 /// (which was removed in `https://github.com/near/nearcore/pull/4438`).
 #[derive(Debug, Default, Clone)]
 pub struct ExecutionProfile {
-    pub host_breakdown: ProfileData,
-    wasm_gas: u64,
+    pub host_breakdown: ProfileDataV3,
+    total_gas_cost: u64,
 }
 
 impl ExecutionProfile {
     pub fn new(outcome: &VMOutcome) -> Self {
-        let wasm_gas =
-            outcome.burnt_gas - outcome.profile.host_gas() - outcome.profile.action_gas();
         Self {
             host_breakdown: outcome.profile.clone(),
-            wasm_gas,
+            total_gas_cost: outcome.burnt_gas,
         }
     }
 
-    pub const fn wasm_gas(&self) -> u64 {
-        self.wasm_gas
+    pub fn wasm_gas(&self) -> u64 {
+        self.host_breakdown.get_wasm_cost()
     }
 
-    pub fn all_gas(&self) -> u64 {
-        self.wasm_gas + self.host_breakdown.host_gas() + self.host_breakdown.action_gas()
+    pub const fn all_gas(&self) -> u64 {
+        self.total_gas_cost
     }
 }
 
 pub fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
-    let args = NewCallArgs {
+    let args = LegacyNewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: str_to_account_id(runner.aurora_account_id.as_str()),
         bridge_prover_id: str_to_account_id("bridge_prover.near"),
@@ -668,19 +645,18 @@ pub fn deploy_evm() -> AuroraRunner {
     };
 
     let account_id = runner.aurora_account_id.clone();
-    let (_, maybe_error) = runner.call("new", &account_id, args.try_to_vec().unwrap());
+    let result = runner.call("new", &account_id, args.try_to_vec().unwrap());
 
-    assert!(maybe_error.is_none());
+    assert!(result.is_ok());
 
     let args = InitCallArgs {
         prover_account: str_to_account_id("prover.near"),
         eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
         metadata: FungibleTokenMetadata::default(),
     };
-    let (_, maybe_error) =
-        runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
+    let result = runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
 
-    assert!(maybe_error.is_none());
+    assert!(result.is_ok());
 
     let mut standalone_runner = standalone::StandaloneRunner::default();
     standalone_runner.init_evm();
@@ -898,12 +874,18 @@ pub fn panic_on_fail(status: TransactionStatus) {
     }
 }
 
+/// Checks if `total_gas` is within 1 Tgas of `tgas_bound`.
 pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
-    // Add 1 to round up
-    let tgas_used = (total_gas / 1_000_000_000_000) + 1;
+    const TERA: i128 = 1_000_000_000_000;
+    let total_gas: i128 = total_gas.into();
+    let tgas_bound: i128 = i128::from(tgas_bound) * TERA;
+    let diff = (total_gas - tgas_bound).abs() / TERA;
     assert_eq!(
-        tgas_used, tgas_bound,
-        "{tgas_used} Tgas is not equal to {tgas_bound} Tgas",
+        diff,
+        0,
+        "{} Tgas is not equal to {} Tgas",
+        total_gas / TERA,
+        tgas_bound / TERA,
     );
 }
 
@@ -913,4 +895,23 @@ pub const fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
     let (larger, smaller) = if a < b { (b, a) } else { (a, b) };
 
     (100 / x) * (larger - smaller) <= larger
+}
+
+fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError {
+    let kind = match aborted {
+        FunctionCallError::HostError(HostError::GuestPanic { panic_msg }) => {
+            match panic_msg.as_str() {
+                "ERR_INVALID_CHAIN_ID" => EngineErrorKind::InvalidChainId,
+                "ERR_OUT_OF_FUND" => EngineErrorKind::GasPayment(GasPaymentError::OutOfFund),
+                "ERR_GAS_OVERFLOW" => EngineErrorKind::GasOverflow,
+                "ERR_INTRINSIC_GAS" => EngineErrorKind::IntrinsicGasNotMet,
+                "ERR_INCORRECT_NONCE" => EngineErrorKind::IncorrectNonce,
+                "ERR_PAUSED" => EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_PAUSED".into())),
+                msg => EngineErrorKind::EvmFatal(ExitFatal::Other(Cow::Owned(msg.into()))),
+            }
+        }
+        other => panic!("Other FunctionCallError: {other:?}"),
+    };
+
+    EngineError { kind, gas_used }
 }

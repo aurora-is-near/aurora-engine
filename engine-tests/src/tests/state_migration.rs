@@ -1,7 +1,7 @@
 use crate::prelude::U256;
 use crate::test_utils::{self, str_to_account_id, AuroraRunner};
 use aurora_engine::fungible_token::FungibleTokenMetadata;
-use aurora_engine::parameters::{InitCallArgs, NewCallArgs};
+use aurora_engine::parameters::{InitCallArgs, NewCallArgs, NewCallArgsV2};
 use borsh::BorshSerialize;
 use near_sdk_sim::{ExecutionResult, UserAccount};
 use std::fs;
@@ -25,6 +25,23 @@ fn test_state_migration() {
     assert_eq!(some_numbers, [3, 1, 4, 1, 5, 9, 2]);
 }
 
+#[test]
+fn test_repeated_calls_to_deploy_upgrade_should_fail() {
+    let aurora = deploy_evm();
+
+    // First upgrade should succeed
+    let upgraded_contract_bytes = contract_bytes();
+    aurora
+        .call("stage_upgrade", &upgraded_contract_bytes)
+        .assert_success();
+    aurora.call("deploy_upgrade", &[]).assert_success();
+
+    // Second upgrade should fail
+    aurora.call("stage_upgrade", &upgraded_contract_bytes);
+    let result = aurora.call("deploy_upgrade", &[]);
+    assert!(!result.is_ok());
+}
+
 pub fn deploy_evm() -> AuroraAccount {
     let aurora_runner = AuroraRunner::default();
     let main_account = near_sdk_sim::init_simulator(None);
@@ -39,12 +56,11 @@ pub fn deploy_evm() -> AuroraAccount {
         5 * near_sdk_sim::STORAGE_AMOUNT,
     );
     let prover_account = str_to_account_id("prover.near");
-    let new_args = NewCallArgs {
+    let new_args = NewCallArgs::V2(NewCallArgsV2 {
         chain_id: crate::prelude::u256_to_arr(&U256::from(aurora_runner.chain_id)),
         owner_id: str_to_account_id(main_account.account_id.as_str()),
-        bridge_prover_id: prover_account.clone(),
         upgrade_delay_blocks: 1,
-    };
+    });
     main_account
         .call(
             contract_account.account_id.clone(),
