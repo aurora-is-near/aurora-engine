@@ -18,7 +18,6 @@ fn test_deploy_code() {
     let state = state::EngineState {
         chain_id,
         owner_id: owner_id.clone(),
-        bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
     };
     let origin = Address::new(H160([0u8; 20]));

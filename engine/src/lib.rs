@@ -131,7 +131,8 @@ mod contract {
             sdk::panic_utf8(b"ERR_ALREADY_INITIALIZED");
         }
 
-        let args: NewCallArgs = io.read_input_borsh().sdk_unwrap();
+        let bytes = io.read_input().to_vec();
+        let args = NewCallArgs::deserialize(&bytes).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
         state::set_state(&mut io, &args.into()).sdk_unwrap();
     }
 
