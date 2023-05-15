@@ -205,14 +205,15 @@ impl AuroraRunner {
         )
     }
 
-    pub fn factory_set_wnear_address(&mut self, wnear_address: Address) -> CallResult {
-        let result = self.make_call(
+    pub fn factory_set_wnear_address(
+        &mut self,
+        wnear_address: Address,
+    ) -> Result<VMOutcome, EngineError> {
+        self.make_call(
             "factory_set_wnear_address",
             ORIGIN,
             wnear_address.try_to_vec().unwrap(),
-        );
-        result.check_ok();
-        result
+        )
     }
 }
 
