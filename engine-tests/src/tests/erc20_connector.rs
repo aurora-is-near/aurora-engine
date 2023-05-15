@@ -958,11 +958,8 @@ pub mod sim_tests {
             .call(
                 nep_141.account_id(),
                 "ft_transfer",
-                format!(
-                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                    dest, amount,
-                )
-                .as_bytes(),
+                format!(r#"{{"receiver_id": "{dest}", "amount": "{amount}", "memo": null}}"#)
+                    .as_bytes(),
                 near_sdk_sim::DEFAULT_GAS,
                 1,
             )
