@@ -9,6 +9,7 @@ use crate::silo::parameters::{WhitelistKindArgs, WhitelistStatusArgs};
 const STATUS: &[u8] = b"LIST_STATUS";
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum WhitelistKind {
     /// The whitelist of this type is for storing NEAR accounts. Accounts stored in this whitelist
     /// have an admin role. The admin role allows to add new admins and add new entities

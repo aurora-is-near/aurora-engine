@@ -10,18 +10,25 @@ pub struct FixedGasCostArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(
+    feature = "impl-serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(untagged)
+)]
 pub enum WhitelistArgs {
     WhitelistAddressArgs(WhitelistAddressArgs),
     WhitelistAccountArgs(WhitelistAccountArgs),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WhitelistAddressArgs {
     pub kind: WhitelistKind,
     pub address: Address,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WhitelistAccountArgs {
     pub kind: WhitelistKind,
     pub account_id: AccountId,
