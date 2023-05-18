@@ -1110,7 +1110,7 @@ mod contract {
         silo::assert_admin(&io).sdk_unwrap();
 
         let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
-        silo::add_entity_to_whitelist(&io, &args);
+        silo::add_entry_to_whitelist(&io, &args);
     }
 
     #[no_mangle]

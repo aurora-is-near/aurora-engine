@@ -459,7 +459,7 @@ fn non_submit_execute<'db>(
             None
         }
         TransactionKind::AddEntryToWhitelist(args) => {
-            silo::add_entity_to_whitelist(&io, args);
+            silo::add_entry_to_whitelist(&io, args);
             None
         }
         TransactionKind::AddEntryToWhitelistBatch(args) => {
