@@ -757,7 +757,7 @@ mod tests {
     #[test]
     fn test_parse_recipient() {
         assert_eq!(
-            parse_recipient("test.near".as_bytes()).unwrap(),
+            parse_recipient(b"test.near").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
                 message: None
@@ -765,7 +765,7 @@ mod tests {
         );
 
         assert_eq!(
-            parse_recipient("test.near:unwrap".as_bytes()).unwrap(),
+            parse_recipient(b"test.near:unwrap").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
                 message: Some("unwrap".to_owned())
@@ -773,7 +773,7 @@ mod tests {
         );
 
         assert_eq!(
-            parse_recipient("test.near:some_msg:with_extra_colon".as_bytes()).unwrap(),
+            parse_recipient(b"test.near:some_msg:with_extra_colon").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
                 message: Some("some_msg:with_extra_colon".to_owned())
@@ -781,18 +781,18 @@ mod tests {
         );
 
         assert_eq!(
-            parse_recipient("test.near:".as_bytes()).unwrap(),
+            parse_recipient(b"test.near:").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some("".to_owned())
+                message: Some(String::new())
             }
         );
     }
 
     #[test]
     fn test_parse_invalid_recipient() {
-        assert!(parse_recipient("test@.near".as_bytes()).is_err());
-        assert!(parse_recipient("test@.near:msg".as_bytes()).is_err());
+        assert!(parse_recipient(b"test@.near").is_err());
+        assert!(parse_recipient(b"test@.near:msg").is_err());
         assert!(parse_recipient(&[0xc2]).is_err());
     }
 }
