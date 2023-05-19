@@ -257,13 +257,18 @@ struct Recipient {
     message: Option<String>,
 }
 
-fn parse_recipient(recipient: &[u8]) -> Option<Recipient> {
-    let mut iter = str::from_utf8(recipient).ok()?.splitn(2, ':');
-    let receiver_account_id = iter.next()?.parse().ok()?;
-    let message = iter.next().map(ToString::to_string);
+fn parse_recipient(recipient: &[u8]) -> Result<Recipient, ExitError> {
+    let recipient = str::from_utf8(recipient)
+        .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECEIVER_ACCOUNT_ID")))?;
+    let (receiver_account_id, message) = recipient.split_once(':').map_or_else(
+        || (recipient, None),
+        |(recipient, msg)| (recipient, Some(msg.to_string())),
+    );
 
-    Some(Recipient {
-        receiver_account_id,
+    Ok(Recipient {
+        receiver_account_id: receiver_account_id
+            .parse()
+            .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECEIVER_ACCOUNT_ID")))?,
         message,
     })
 }
@@ -381,51 +386,46 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 input = &input[32..];
 
                 validate_amount(amount)?;
+                let recipient = parse_recipient(input)?;
 
-                if let Some(recipient) = parse_recipient(input) {
-                    let (args, method, transfer_near_args) = if recipient.message
-                        == Some(UNWRAP_WNEAR_MSG.to_string())
-                        && erc20_address == get_wnear_address(&self.io).raw()
-                    {
-                        (
-                            format!(r#"{{"amount": "{}"}}"#, amount.as_u128()),
-                            "near_withdraw",
-                            Some(TransferNearCallArgs {
-                                target_account_id: recipient.receiver_account_id.clone(),
-                                amount: amount.as_u128(),
-                            }),
-                        )
-                    } else {
-                        // There is no way to inject json, given the encoding of both arguments
-                        // as decimal and valid account id respectively.
-                        (
-                            format!(
-                                r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                                recipient.receiver_account_id,
-                                amount.as_u128()
-                            ),
-                            "ft_transfer",
-                            None,
-                        )
-                    };
-
+                let (args, method, transfer_near_args) = if recipient.message
+                    == Some(UNWRAP_WNEAR_MSG.to_string())
+                    && erc20_address == get_wnear_address(&self.io).raw()
+                {
                     (
-                        nep141_address,
-                        args,
-                        events::ExitToNear {
-                            sender: Address::new(erc20_address),
-                            erc20_address: Address::new(erc20_address),
-                            dest: recipient.receiver_account_id.to_string(),
-                            amount,
-                        },
-                        method,
-                        transfer_near_args,
+                        format!(r#"{{"amount": "{}"}}"#, amount.as_u128()),
+                        "near_withdraw",
+                        Some(TransferNearCallArgs {
+                            target_account_id: recipient.receiver_account_id.clone(),
+                            amount: amount.as_u128(),
+                        }),
                     )
                 } else {
-                    return Err(ExitError::Other(Cow::from(
-                        "ERR_INVALID_RECEIVER_ACCOUNT_ID",
-                    )));
-                }
+                    // There is no way to inject json, given the encoding of both arguments
+                    // as decimal and valid account id respectively.
+                    (
+                        format!(
+                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                            recipient.receiver_account_id,
+                            amount.as_u128()
+                        ),
+                        "ft_transfer",
+                        None,
+                    )
+                };
+
+                (
+                    nep141_address,
+                    args,
+                    events::ExitToNear {
+                        sender: Address::new(erc20_address),
+                        erc20_address: Address::new(erc20_address),
+                        dest: recipient.receiver_account_id.to_string(),
+                        amount,
+                    },
+                    method,
+                    transfer_near_args,
+                )
             }
             _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
         };
