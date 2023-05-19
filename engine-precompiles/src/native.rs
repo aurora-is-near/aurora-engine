@@ -252,6 +252,7 @@ fn validate_amount(amount: U256) -> Result<(), ExitError> {
     Ok(())
 }
 
+#[derive(Debug, PartialEq)]
 struct Recipient {
     receiver_account_id: AccountId,
     message: Option<String>,
@@ -683,8 +684,10 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
 #[cfg(test)]
 mod tests {
-    use super::{exit_to_ethereum, exit_to_near, validate_amount, validate_input_size};
-    use crate::prelude::sdk::types::near_account_to_evm_address;
+    use super::{
+        exit_to_ethereum, exit_to_near, parse_recipient, validate_amount, validate_input_size,
+    };
+    use crate::{native::Recipient, prelude::sdk::types::near_account_to_evm_address};
     use aurora_engine_types::U256;
 
     #[test]
@@ -749,5 +752,47 @@ mod tests {
     #[test]
     fn test_exit_with_valid_amount() {
         validate_amount(U256::from(u128::MAX)).unwrap();
+    }
+
+    #[test]
+    fn test_parse_recipient() {
+        assert_eq!(
+            parse_recipient("test.near".as_bytes()).unwrap(),
+            Recipient {
+                receiver_account_id: "test.near".parse().unwrap(),
+                message: None
+            }
+        );
+
+        assert_eq!(
+            parse_recipient("test.near:unwrap".as_bytes()).unwrap(),
+            Recipient {
+                receiver_account_id: "test.near".parse().unwrap(),
+                message: Some("unwrap".to_owned())
+            }
+        );
+
+        assert_eq!(
+            parse_recipient("test.near:some_msg:with_extra_colon".as_bytes()).unwrap(),
+            Recipient {
+                receiver_account_id: "test.near".parse().unwrap(),
+                message: Some("some_msg:with_extra_colon".to_owned())
+            }
+        );
+
+        assert_eq!(
+            parse_recipient("test.near:".as_bytes()).unwrap(),
+            Recipient {
+                receiver_account_id: "test.near".parse().unwrap(),
+                message: Some("".to_owned())
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_invalid_recipient() {
+        assert!(parse_recipient("test@.near".as_bytes()).is_err());
+        assert!(parse_recipient("test@.near:msg".as_bytes()).is_err());
+        assert!(parse_recipient(&[0xc2]).is_err());
     }
 }
