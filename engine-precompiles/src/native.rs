@@ -388,8 +388,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 validate_amount(amount)?;
                 let recipient = parse_recipient(input)?;
 
-                let (args, method, transfer_near_args) = if recipient.message
-                    == Some(UNWRAP_WNEAR_MSG.to_string())
+                let (args, method, transfer_near_args) = if recipient.message.as_deref()
+                    == Some(UNWRAP_WNEAR_MSG)
                     && erc20_address == get_wnear_address(&self.io).raw()
                 {
                     (
