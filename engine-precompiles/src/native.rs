@@ -383,31 +383,31 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 validate_amount(amount)?;
 
                 if let Some(recipient) = parse_recipient(input) {
-                    let (args, method, transfer_near_args) =
-                        if recipient.message.unwrap_or_default() == UNWRAP_WNEAR_MSG
-                            && erc20_address == get_wnear_address(&self.io).raw()
-                        {
-                            (
-                                format!(r#"{{"amount": "{}"}}"#, amount.as_u128()),
-                                "near_withdraw",
-                                Some(TransferNearCallArgs {
-                                    target_account_id: recipient.receiver_account_id.clone(),
-                                    amount: amount.as_u128(),
-                                }),
-                            )
-                        } else {
-                            // There is no way to inject json, given the encoding of both arguments
-                            // as decimal and valid account id respectively.
-                            (
-                                format!(
-                                    r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                                    recipient.receiver_account_id,
-                                    amount.as_u128()
-                                ),
-                                "ft_transfer",
-                                None,
-                            )
-                        };
+                    let (args, method, transfer_near_args) = if recipient.message
+                        == Some(UNWRAP_WNEAR_MSG.to_string())
+                        && erc20_address == get_wnear_address(&self.io).raw()
+                    {
+                        (
+                            format!(r#"{{"amount": "{}"}}"#, amount.as_u128()),
+                            "near_withdraw",
+                            Some(TransferNearCallArgs {
+                                target_account_id: recipient.receiver_account_id.clone(),
+                                amount: amount.as_u128(),
+                            }),
+                        )
+                    } else {
+                        // There is no way to inject json, given the encoding of both arguments
+                        // as decimal and valid account id respectively.
+                        (
+                            format!(
+                                r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                                recipient.receiver_account_id,
+                                amount.as_u128()
+                            ),
+                            "ft_transfer",
+                            None,
+                        )
+                    };
 
                     (
                         nep141_address,
