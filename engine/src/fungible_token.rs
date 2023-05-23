@@ -116,12 +116,12 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         }
     }
 
-    /// Balance of ETH (ETH on Aurora)
+    /// Balance of ETH (ETH on Aurora).
     pub fn internal_unwrap_balance_of_eth_on_aurora(&self, address: &Address) -> Wei {
         engine::get_balance(&self.io, address)
     }
 
-    /// Internal ETH deposit to NEAR - `nETH` (NEP-141)
+    /// Internal `nETH` deposit (ETH on NEAR).
     pub fn internal_deposit_eth_to_near(
         &mut self,
         account_id: &AccountId,
@@ -141,7 +141,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         Ok(())
     }
 
-    /// Internal ETH deposit to Aurora
+    /// Internal `ETH` deposit (ETH on Aurora).
     pub fn internal_deposit_eth_to_aurora(
         &mut self,
         address: Address,
@@ -159,7 +159,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         Ok(())
     }
 
-    /// Withdraw NEAR tokens
+    /// Withdraw `nETH` tokens (ETH on NEAR).
     pub fn internal_withdraw_eth_from_near(
         &mut self,
         account_id: &AccountId,
@@ -179,7 +179,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         Ok(())
     }
 
-    /// Withdraw ETH tokens
+    /// Withdraw `ETH` tokens (ETH on Aurora).
     pub fn internal_withdraw_eth_from_aurora(
         &mut self,
         amount: Wei,
@@ -191,7 +191,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         Ok(())
     }
 
-    /// Transfer NEAR tokens
+    /// Transfer `nETH` tokens (ETH on NEAR).
     pub fn internal_transfer_eth_on_near(
         &mut self,
         sender_id: &AccountId,
@@ -223,18 +223,22 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         Ok(())
     }
 
+    /// Register a new account with zero balance.
     pub fn internal_register_account(&mut self, account_id: &AccountId) {
         self.accounts_insert(account_id, ZERO_NEP141_WEI);
     }
 
+    /// Return total `nETH` supply (ETH on NEAR).
     pub const fn ft_total_eth_supply_on_near(&self) -> NEP141Wei {
         self.total_eth_supply_on_near
     }
 
+    /// Return total `ETH` supply (ETH on Aurora).
     pub const fn ft_total_eth_supply_on_aurora(&self) -> Wei {
         self.total_eth_supply_on_aurora
     }
 
+    /// Return `nETH` balance of the account (ETH on NEAR).
     pub fn ft_balance_of(&self, account_id: &AccountId) -> NEP141Wei {
         self.get_account_eth_balance(account_id)
             .unwrap_or(ZERO_NEP141_WEI)
@@ -356,6 +360,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
                 };
             }
         }
+
         (amount, ZERO_NEP141_WEI)
     }
 
@@ -435,36 +440,29 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
     ) -> Result<(StorageBalance, Option<PromiseBatchAction>), error::StorageFundingError> {
         let promise = if self.accounts_contains_key(account_id) {
             sdk::log!("The account is already registered, refunding the deposit");
-            if amount > ZERO_YOCTO {
-                let action = PromiseAction::Transfer { amount };
-                let promise = PromiseBatchAction {
-                    target_account_id: predecessor_account_id,
-                    actions: vec![action],
-                };
-                Some(promise)
-            } else {
-                None
-            }
+            amount
         } else {
             let min_balance = self.storage_balance_bounds().min;
+
             if amount < min_balance {
                 return Err(error::StorageFundingError::InsufficientDeposit);
             }
 
             self.internal_register_account(account_id);
-            let refund = amount - min_balance;
-            if refund > ZERO_YOCTO {
-                let action = PromiseAction::Transfer { amount: refund };
-                let promise = PromiseBatchAction {
-                    target_account_id: predecessor_account_id,
-                    actions: vec![action],
-                };
-                Some(promise)
-            } else {
-                None
-            }
+            amount - min_balance
+        };
+        let promise = if amount > ZERO_YOCTO {
+            let action = PromiseAction::Transfer { amount };
+            let promise = PromiseBatchAction {
+                target_account_id: predecessor_account_id,
+                actions: vec![action],
+            };
+            Some(promise)
+        } else {
+            None
         };
         let balance = self.internal_storage_balance_of(account_id).unwrap();
+
         Ok((balance, promise))
     }
 
@@ -488,27 +486,26 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         )
     }
 
-    /// Insert account.
-    /// Calculate total unique accounts
+    /// Set account's balance and increment the account counter if the account doesn't exist.
     pub fn accounts_insert(&mut self, account_id: &AccountId, amount: NEP141Wei) {
         if !self.accounts_contains_key(account_id) {
-            let key = Self::get_statistic_key();
-            let accounts_counter = self
-                .io
-                .read_u64(&key)
-                .unwrap_or(0)
-                .checked_add(1)
-                .expect(crate::errors::ERR_ACCOUNTS_COUNTER_OVERFLOW);
-            self.io.write_storage(&key, &accounts_counter.to_le_bytes());
+            self.increment_account_counter();
         }
+
         self.io
             .write_borsh(&Self::account_to_key(account_id), &amount);
     }
 
-    /// Get accounts counter for statistics
-    /// It represents total unique accounts.
+    /// Get total unique accounts number. It represents total unique accounts.
     pub fn get_accounts_counter(&self) -> u64 {
         self.io.read_u64(&Self::get_statistic_key()).unwrap_or(0)
+    }
+
+    /// Balance of `nETH` (ETH on NEAR).
+    pub fn get_account_eth_balance(&self, account_id: &AccountId) -> Option<NEP141Wei> {
+        self.io
+            .read_storage(&Self::account_to_key(account_id))
+            .and_then(|s| NEP141Wei::try_from_slice(&s.to_vec()).ok())
     }
 
     fn accounts_contains_key(&self, account_id: &AccountId) -> bool {
@@ -519,14 +516,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         self.io.remove_storage(&Self::account_to_key(account_id));
     }
 
-    /// Balance of `nETH` (ETH on NEAR token)
-    pub fn get_account_eth_balance(&self, account_id: &AccountId) -> Option<NEP141Wei> {
-        self.io
-            .read_storage(&Self::account_to_key(account_id))
-            .and_then(|s| NEP141Wei::try_from_slice(&s.to_vec()).ok())
-    }
-
-    /// Fungible token key
+    /// Fungible token key for account id.
     fn account_to_key(account_id: &AccountId) -> Vec<u8> {
         let mut key = storage::bytes_to_key(
             storage::KeyPrefix::EthConnector,
@@ -536,14 +526,25 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         key
     }
 
-    /// Key for store contract statistics data
+    /// Key for storing contract statistics data.
     fn get_statistic_key() -> Vec<u8> {
         storage::bytes_to_key(
-            crate::prelude::storage::KeyPrefix::EthConnector,
+            storage::KeyPrefix::EthConnector,
             &[u8::from(
                 crate::prelude::EthConnectorStorageId::StatisticsAuroraAccountsCounter,
             )],
         )
+    }
+
+    fn increment_account_counter(&mut self) {
+        let key = Self::get_statistic_key();
+        let accounts_counter = self
+            .io
+            .read_u64(&key)
+            .unwrap_or(0)
+            .checked_add(1)
+            .expect(crate::errors::ERR_ACCOUNTS_COUNTER_OVERFLOW);
+        self.io.write_storage(&key, &accounts_counter.to_le_bytes());
     }
 }
 

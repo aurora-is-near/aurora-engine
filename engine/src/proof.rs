@@ -17,7 +17,7 @@ impl Proof {
         let mut data = self.log_index.try_to_vec().unwrap();
         data.extend(self.receipt_index.try_to_vec().unwrap());
         data.extend(self.header_data.clone());
-        sdk::sha256(&data[..])
+        sdk::sha256(&data)
             .0
             .iter()
             .map(ToString::to_string)
@@ -41,7 +41,7 @@ mod tests {
     fn test_proof_key_generates_successfully() {
         let recipient_address = Address::new(H160([22u8; 20]));
         let deposit_amount = Wei::new_u64(123_456_789);
-        let proof = self::create_proof(recipient_address, deposit_amount);
+        let proof = create_proof(recipient_address, deposit_amount);
 
         let expected_key =
             "1297721518512077871939115641114233180253108247225100248224214775219368216419218177247";
