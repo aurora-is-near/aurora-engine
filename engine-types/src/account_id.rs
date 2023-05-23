@@ -123,7 +123,7 @@ impl<'de> Deserialize<'de> for AccountId {
         D::Error: serde::de::Error,
     {
         let account = <String as Deserialize>::deserialize(deserializer)?;
-        Ok(Self::new(&account).map_err(serde::de::Error::custom)?)
+        Self::new(&account).map_err(serde::de::Error::custom)
     }
 }
 
@@ -503,7 +503,7 @@ mod tests {
 
     #[test]
     fn test_json_deserialize_account_id() {
-        assert!(serde_json::from_str::<AccountId>(&r#""test.near""#).is_ok());
-        assert!(serde_json::from_str::<AccountId>(&r#""test@.near""#).is_err());
+        assert!(serde_json::from_str::<AccountId>(r#""test.near""#).is_ok());
+        assert!(serde_json::from_str::<AccountId>(r#""test@.near""#).is_err());
     }
 }
