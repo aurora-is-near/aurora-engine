@@ -708,7 +708,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         let output_on_fail = str_amount.as_bytes();
 
         // Parse message to determine recipient
-        let recipient = {
+        let mut recipient = {
             // Message format:
             //      Recipient of the transaction - 40 characters (Address in hex)
             let message = args.msg.as_bytes();
@@ -721,6 +721,12 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
                 output_on_fail,
                 self.io
             )))
+        };
+
+        if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io) {
+            if silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
+                recipient = fallback_address;
+            }
         };
 
         let erc20_token = Address::from_array(unwrap_res_or_finish!(

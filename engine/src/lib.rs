@@ -104,7 +104,8 @@ mod contract {
         sdk, u256_to_arr, Address, PromiseResult, ToString, Vec, Yocto, ERR_FAILED_PARSE, H256,
     };
     use crate::silo::parameters::{
-        FixedGasCostArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+        Erc20FallbackAddressArgs, FixedGasCostArgs, WhitelistArgs, WhitelistKindArgs,
+        WhitelistStatusArgs,
     };
     use crate::{errors, pausables, silo, state};
     use aurora_engine_sdk::env::Env;
@@ -1082,6 +1083,24 @@ mod contract {
         silo::assert_admin(&io).sdk_unwrap();
         let args: FixedGasCostArgs = io.read_input_borsh().sdk_unwrap();
         silo::set_fixed_gas_cost(&mut io, args.cost);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_erc20_fallback_address() {
+        let mut io = Runtime;
+        let address = Erc20FallbackAddressArgs {
+            address: silo::get_erc20_fallback_address(&io),
+        };
+
+        io.return_output(&address.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_erc20_fallback_address() {
+        let mut io = Runtime;
+        silo::assert_admin(&io).sdk_unwrap();
+        let args: Erc20FallbackAddressArgs = io.read_input_borsh().sdk_unwrap();
+        silo::set_erc20_fallback_address(&mut io, args.address);
     }
 
     #[no_mangle]

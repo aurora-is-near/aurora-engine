@@ -10,6 +10,11 @@ pub struct FixedGasCostArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct Erc20FallbackAddressArgs {
+    pub address: Option<Address>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(
     feature = "impl-serde",
     derive(serde::Serialize, serde::Deserialize),
