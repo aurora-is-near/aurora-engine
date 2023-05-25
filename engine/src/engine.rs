@@ -724,7 +724,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
         };
 
         if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io) {
-            if silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
+            if !silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
                 recipient = fallback_address;
             }
         };
