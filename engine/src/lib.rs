@@ -1078,7 +1078,7 @@ mod contract {
     pub extern "C" fn set_silo_params() {
         let mut io = Runtime;
         silo::assert_admin(&io).sdk_unwrap();
-        let args: SiloParamsArgs = io.read_input_borsh().sdk_unwrap();
+        let args: Option<SiloParamsArgs> = io.read_input_borsh().sdk_unwrap();
         silo::set_silo_params(&mut io, args);
     }
 

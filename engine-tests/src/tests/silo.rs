@@ -1,7 +1,6 @@
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::silo::parameters::{
-    SiloParamsArgs, SiloParamsInnerArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
-    WhitelistStatusArgs,
+    SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistStatusArgs,
 };
 use aurora_engine::silo::WhitelistKind;
 use aurora_engine_sdk as sdk;
@@ -747,12 +746,11 @@ fn remove_address_from_whitelist(runner: &mut AuroraRunner, address: Address) {
 }
 
 fn set_fixed_gas_cost(runner: &mut AuroraRunner, fixed_gas_cost: Option<Wei>) {
-    let args = SiloParamsArgs {
-        params: fixed_gas_cost.map(|cost| SiloParamsInnerArgs {
-            fixed_gas_cost: cost,
-            erc20_fallback_address: Address::zero(),
-        }),
-    };
+    let args = fixed_gas_cost.map(|cost| SiloParamsArgs {
+        fixed_gas_cost: cost,
+        erc20_fallback_address: Address::zero(),
+    });
+
     call_function(runner, "set_silo_params", args);
 }
 

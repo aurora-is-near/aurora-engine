@@ -525,10 +525,9 @@ impl AuroraRunner {
             .call("get_silo_params", "getter", vec![])
             .unwrap();
         let val = outcome.return_data.as_value()?;
-        SiloParamsArgs::try_from_slice(&val)
-            .unwrap()
-            .params
-            .map(|params| params.fixed_gas_cost)
+        let params: Option<SiloParamsArgs> = BorshDeserialize::try_from_slice(&val).unwrap();
+
+        params.map(|params| params.fixed_gas_cost)
     }
 
     pub fn get_storage(&self, address: Address, key: H256) -> H256 {

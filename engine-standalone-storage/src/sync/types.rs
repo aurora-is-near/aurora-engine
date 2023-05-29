@@ -133,7 +133,7 @@ pub enum TransactionKind {
     FactorySetWNearAddress(Address),
     FundXccSubAccount(FundXccArgs),
     /// Silo operations
-    SetSiloParams(silo::parameters::SiloParamsArgs),
+    SetSiloParams(Option<silo::parameters::SiloParamsArgs>),
     AddEntryToWhitelist(silo::parameters::WhitelistArgs),
     AddEntryToWhitelistBatch(Vec<silo::parameters::WhitelistArgs>),
     RemoveEntryFromWhitelist(silo::parameters::WhitelistArgs),
@@ -539,7 +539,7 @@ enum BorshableTransactionKind<'a> {
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccount(Cow<'a, FundXccArgs>),
     SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
-    SetSiloParams(Cow<'a, silo::parameters::SiloParamsArgs>),
+    SetSiloParams(Cow<'a, Option<silo::parameters::SiloParamsArgs>>),
     AddEntryToWhitelist(Cow<'a, silo::parameters::WhitelistArgs>),
     AddEntryToWhitelistBatch(Cow<'a, Vec<silo::parameters::WhitelistArgs>>),
     RemoveEntryFromWhitelist(Cow<'a, silo::parameters::WhitelistArgs>),

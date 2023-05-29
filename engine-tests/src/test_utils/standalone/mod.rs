@@ -337,8 +337,9 @@ impl StandaloneRunner {
                 ))
             }
             test_utils::SET_SILO_PARAMS => {
-                let call_args = SiloParamsArgs::try_from_slice(&ctx.input)
-                    .expect("Unable to parse input as SiloParamsArgs");
+                let call_args: Option<SiloParamsArgs> =
+                    BorshDeserialize::try_from_slice(&ctx.input)
+                        .expect("Unable to parse input as SiloParamsArgs");
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
                 let mut tx_msg =
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);

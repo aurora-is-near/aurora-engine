@@ -10,9 +10,7 @@ use aurora_engine_types::AsBytes;
 use crate::engine::EngineErrorKind;
 use crate::prelude::Vec;
 
-use parameters::{
-    SiloParamsArgs, SiloParamsInnerArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
-};
+use parameters::{SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs};
 use whitelist::Whitelist;
 pub use whitelist::WhitelistKind;
 
@@ -23,21 +21,19 @@ const GAS_COST_KEY: &[u8] = b"GAS_COST_KEY";
 const ERC20_FALLBACK_KEY: &[u8] = b"ERC20_FALLBACK_KEY";
 
 /// Return SILO parameters.
-pub fn get_silo_params<I: IO>(io: &I) -> SiloParamsArgs {
+pub fn get_silo_params<I: IO>(io: &I) -> Option<SiloParamsArgs> {
     let params = get_fixed_gas_cost(io)
         .and_then(|cost| get_erc20_fallback_address(io).map(|address| (cost, address)));
 
-    SiloParamsArgs {
-        params: params.map(|(cost, address)| SiloParamsInnerArgs {
-            fixed_gas_cost: cost,
-            erc20_fallback_address: address,
-        }),
-    }
+    params.map(|(cost, address)| SiloParamsArgs {
+        fixed_gas_cost: cost,
+        erc20_fallback_address: address,
+    })
 }
 
 /// Set SILO parameters.
-pub fn set_silo_params<I: IO>(io: &mut I, args: SiloParamsArgs) {
-    let (cost, address) = args.params.map_or((None, None), |params| {
+pub fn set_silo_params<I: IO>(io: &mut I, args: Option<SiloParamsArgs>) {
+    let (cost, address) = args.map_or((None, None), |params| {
         (
             Some(params.fixed_gas_cost),
             Some(params.erc20_fallback_address),

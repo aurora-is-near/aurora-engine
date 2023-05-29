@@ -6,11 +6,6 @@ use crate::silo::whitelist::WhitelistKind;
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SiloParamsArgs {
-    pub params: Option<SiloParamsInnerArgs>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct SiloParamsInnerArgs {
     pub fixed_gas_cost: Wei,
     pub erc20_fallback_address: Address,
 }
