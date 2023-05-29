@@ -1069,10 +1069,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_silo_params() {
         let mut io = Runtime;
-        let params = SiloParamsArgs {
-            fixed_gas_cost: silo::get_fixed_gas_cost(&io),
-            erc20_fallback_address: silo::get_erc20_fallback_address(&io),
-        };
+        let params = silo::get_silo_params(&io);
 
         io.return_output(&params.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
     }
@@ -1082,8 +1079,7 @@ mod contract {
         let mut io = Runtime;
         silo::assert_admin(&io).sdk_unwrap();
         let args: SiloParamsArgs = io.read_input_borsh().sdk_unwrap();
-        silo::set_fixed_gas_cost(&mut io, args.fixed_gas_cost);
-        silo::set_erc20_fallback_address(&mut io, args.erc20_fallback_address);
+        silo::set_silo_params(&mut io, args);
     }
 
     #[no_mangle]

@@ -10,7 +10,9 @@ use aurora_engine_types::AsBytes;
 use crate::engine::EngineErrorKind;
 use crate::prelude::Vec;
 
-use parameters::{WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs};
+use parameters::{
+    SiloParamsArgs, SiloParamsInnerArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+};
 use whitelist::Whitelist;
 pub use whitelist::WhitelistKind;
 
@@ -19,6 +21,32 @@ mod whitelist;
 
 const GAS_COST_KEY: &[u8] = b"GAS_COST_KEY";
 const ERC20_FALLBACK_KEY: &[u8] = b"ERC20_FALLBACK_KEY";
+
+/// Return SILO parameters.
+pub fn get_silo_params<I: IO>(io: &I) -> SiloParamsArgs {
+    let params = get_fixed_gas_cost(io)
+        .and_then(|cost| get_erc20_fallback_address(io).map(|address| (cost, address)));
+
+    SiloParamsArgs {
+        params: params.map(|(cost, address)| SiloParamsInnerArgs {
+            fixed_gas_cost: cost,
+            erc20_fallback_address: address,
+        }),
+    }
+}
+
+/// Set SILO parameters.
+pub fn set_silo_params<I: IO>(io: &mut I, args: SiloParamsArgs) {
+    let (cost, address) = args.params.map_or((None, None), |params| {
+        (
+            Some(params.fixed_gas_cost),
+            Some(params.erc20_fallback_address),
+        )
+    });
+
+    set_fixed_gas_cost(io, cost);
+    set_erc20_fallback_address(io, address);
+}
 
 /// Return fixed gas cost.
 pub fn get_fixed_gas_cost<I: IO>(io: &I) -> Option<Wei> {
@@ -37,13 +65,13 @@ pub fn set_fixed_gas_cost<I: IO>(io: &mut I, cost: Option<Wei>) {
     }
 }
 
-/// Return erc20 fallback address.
+/// Return ERC-20 fallback address.
 pub fn get_erc20_fallback_address<I: IO>(io: &I) -> Option<Address> {
     let key = erc20_fallback_address_key();
     io.read_storage(&key)?.to_value().ok()
 }
 
-/// Set erc20 fallback address.
+/// Set ERC-20 fallback address.
 pub fn set_erc20_fallback_address<I: IO>(io: &mut I, address: Option<Address>) {
     let key = erc20_fallback_address_key();
 
