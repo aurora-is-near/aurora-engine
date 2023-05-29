@@ -765,3 +765,219 @@ fn call_function<T: BorshSerialize + Debug>(runner: &mut AuroraRunner, func: &st
         args
     );
 }
+
+pub mod sim_tests {
+    use super::FEE;
+    use crate::test_utils::erc20::ERC20;
+    use crate::tests::erc20_connector::sim_tests::{
+        self, deploy_nep_141, erc20_balance, exit_to_near, nep_141_balance_of,
+    };
+    use crate::tests::state_migration::{deploy_evm, AuroraAccount};
+    use aurora_engine::silo::parameters::{SiloParamsArgs, WhitelistStatusArgs};
+    use aurora_engine::silo::WhitelistKind;
+    use aurora_engine_types::types::Address;
+    use borsh::BorshSerialize;
+    use near_sdk_sim::UserAccount;
+    use serde_json::json;
+
+    const FT_ACCOUNT: &str = "test_token.root";
+    const FT_TOTAL_SUPPLY: u128 = 1_000_000;
+
+    #[test]
+    fn test_access_right_on_transfer_nep141() {
+        let SiloTestContext {
+            aurora,
+            fallback_account,
+            fallback_address,
+            ft_owner,
+            ft_owner_address,
+            nep_141,
+            erc20,
+        } = init_silo();
+
+        set_whitelist_status(&aurora, WhitelistKind::Address, true);
+
+        let ft_transfer_amount = 300_000;
+
+        // Transfer tokens from `ft_owner` to non-whitelisted address `ft_owner_address`
+        transfer_nep_141_to_erc_20(
+            &nep_141,
+            &ft_owner,
+            ft_owner_address,
+            ft_transfer_amount,
+            &aurora,
+        );
+
+        // Verify the nep141 and erc20 tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY - ft_transfer_amount
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            0
+        );
+        assert_eq!(erc20_balance(&erc20, ft_owner_address, &aurora), 0.into());
+        assert_eq!(
+            erc20_balance(&erc20, fallback_address, &aurora),
+            ft_transfer_amount.into()
+        );
+
+        // Transfer tokens from fallback address to fallback near account
+        exit_to_near(
+            &fallback_account,
+            fallback_account.account_id.as_str(),
+            ft_transfer_amount,
+            &erc20,
+            &aurora,
+        );
+
+        // Verify the nep141 and erc20 tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY - ft_transfer_amount
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            ft_transfer_amount
+        );
+        assert_eq!(erc20_balance(&erc20, ft_owner_address, &aurora), 0.into());
+        assert_eq!(erc20_balance(&erc20, fallback_address, &aurora), 0.into());
+    }
+
+    struct SiloTestContext {
+        pub aurora: AuroraAccount,
+        pub fallback_account: UserAccount,
+        pub fallback_address: Address,
+        pub ft_owner: UserAccount,
+        pub ft_owner_address: Address,
+        pub nep_141: UserAccount,
+        pub erc20: ERC20,
+    }
+
+    fn set_whitelist_status(aurora: &AuroraAccount, kind: WhitelistKind, active: bool) {
+        let args = WhitelistStatusArgs { kind, active };
+        aurora
+            .user
+            .call(
+                aurora.contract.account_id(),
+                "set_whitelist_status",
+                &args.try_to_vec().unwrap(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .assert_success();
+    }
+
+    pub fn transfer_nep_141_to_erc_20(
+        nep_141: &UserAccount,
+        source: &UserAccount,
+        dest: Address,
+        amount: u128,
+        aurora: &AuroraAccount,
+    ) {
+        let transfer_args = json!({
+            "receiver_id": aurora.contract.account_id.as_str(),
+            "amount": format!("{amount}"),
+            "msg": dest.encode(),
+        });
+        source
+            .call(
+                nep_141.account_id(),
+                "ft_transfer_call",
+                transfer_args.to_string().as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                1,
+            )
+            .assert_success();
+    }
+
+    /// Deploys the EVM, deploys nep141 contract, and calls `set_silo_params`
+    fn init_silo() -> SiloTestContext {
+        // Deploy Aurora
+        let aurora: AuroraAccount = deploy_evm();
+
+        // Create fallback account and evm address
+        let fallback_account = aurora.user.create_user(
+            "fallback.root".parse().unwrap(),
+            near_sdk_sim::STORAGE_AMOUNT,
+        );
+        let fallback_address = aurora_engine_sdk::types::near_account_to_evm_address(
+            fallback_account.account_id.as_bytes(),
+        );
+
+        // Set silo mode
+        let args = Some(SiloParamsArgs {
+            fixed_gas_cost: FEE,
+            erc20_fallback_address: fallback_address,
+        });
+
+        aurora
+            .user
+            .call(
+                aurora.contract.account_id(),
+                "set_silo_params",
+                &args.try_to_vec().unwrap(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .assert_success();
+
+        // Create `ft_owner` account and evm address
+        let ft_owner = aurora.user.create_user(
+            "ft_owner.root".parse().unwrap(),
+            near_sdk_sim::STORAGE_AMOUNT,
+        );
+        let ft_owner_address =
+            aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.account_id.as_bytes());
+
+        // Deploy nep141 token
+        let nep_141 = deploy_nep_141(
+            FT_ACCOUNT,
+            ft_owner.account_id.as_ref(),
+            FT_TOTAL_SUPPLY,
+            &aurora,
+        );
+
+        // Call storage deposit for fallback account
+        aurora
+            .user
+            .call(
+                nep_141.account_id(),
+                "storage_deposit",
+                json!({
+                    "account_id": fallback_account.account_id.as_str(),
+                })
+                .to_string()
+                .as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                near_sdk_sim::STORAGE_AMOUNT,
+            )
+            .assert_success();
+
+        // Deploy erc20 token
+        let erc20 = sim_tests::deploy_erc20_from_nep_141(&nep_141, &aurora);
+
+        // Verify tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            0
+        );
+        assert_eq!(erc20_balance(&erc20, ft_owner_address, &aurora), 0.into());
+        assert_eq!(erc20_balance(&erc20, fallback_address, &aurora), 0.into());
+
+        SiloTestContext {
+            aurora,
+            fallback_account,
+            fallback_address,
+            ft_owner,
+            ft_owner_address,
+            nep_141,
+            erc20,
+        }
+    }
+}
