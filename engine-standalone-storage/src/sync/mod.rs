@@ -454,8 +454,9 @@ fn non_submit_execute<'db>(
 
             None
         }
-        TransactionKind::SetFixedGasCost(args) => {
-            silo::set_fixed_gas_cost(&mut io, args.cost);
+        TransactionKind::SetSiloParams(args) => {
+            silo::set_fixed_gas_cost(&mut io, args.fixed_gas_cost);
+            silo::set_erc20_fallback_address(&mut io, args.erc20_fallback_address);
             None
         }
         TransactionKind::AddEntryToWhitelist(args) => {

@@ -5,13 +5,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::silo::whitelist::WhitelistKind;
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct FixedGasCostArgs {
-    pub cost: Option<Wei>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct Erc20FallbackAddressArgs {
-    pub address: Option<Address>,
+pub struct SiloParamsArgs {
+    pub fixed_gas_cost: Option<Wei>,
+    pub erc20_fallback_address: Option<Address>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]

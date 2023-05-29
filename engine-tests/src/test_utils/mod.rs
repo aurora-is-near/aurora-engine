@@ -1,6 +1,6 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
-use aurora_engine::silo::parameters::FixedGasCostArgs;
+use aurora_engine::silo::parameters::SiloParamsArgs;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -43,7 +43,7 @@ pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const SET_OWNER: &str = "set_owner";
 pub const SET_UPGRADE_DELAY_BLOCKS: &str = "set_upgrade_delay_blocks";
-pub const SET_FIXED_GAS_COST: &str = "set_fixed_gas_cost";
+pub const SET_SILO_PARAMS: &str = "set_silo_params";
 pub const ADD_ENTRY_TO_WHITELIST: &str = "add_entry_to_whitelist";
 pub const ADD_ENTRY_TO_WHITELIST_BATCH: &str = "add_entry_to_whitelist_batch";
 pub const REMOVE_ENTRY_FROM_WHITELIST: &str = "remove_entry_from_whitelist";
@@ -251,7 +251,7 @@ impl AuroraRunner {
                 || method_name == RESUME_PRECOMPILES
                 || method_name == SET_OWNER
                 || method_name == SET_UPGRADE_DELAY_BLOCKS
-                || method_name == SET_FIXED_GAS_COST
+                || method_name == SET_SILO_PARAMS
                 || method_name == ADD_ENTRY_TO_WHITELIST
                 || method_name == ADD_ENTRY_TO_WHITELIST_BATCH
                 || method_name == REMOVE_ENTRY_FROM_WHITELIST
@@ -522,10 +522,10 @@ impl AuroraRunner {
     pub fn get_fixed_gas_cost(&mut self) -> Option<Wei> {
         let outcome = self
             .one_shot()
-            .call("get_fixed_gas_cost", "getter", vec![])
+            .call("get_silo_params", "getter", vec![])
             .unwrap();
         let val = outcome.return_data.as_value()?;
-        FixedGasCostArgs::try_from_slice(&val).unwrap().cost
+        SiloParamsArgs::try_from_slice(&val).unwrap().fixed_gas_cost
     }
 
     pub fn get_storage(&self, address: Address, key: H256) -> H256 {
