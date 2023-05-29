@@ -250,17 +250,17 @@ fn validate_amount(amount: U256) -> Result<(), ExitError> {
 }
 
 #[derive(Debug, PartialEq)]
-struct Recipient {
+struct Recipient<'a> {
     receiver_account_id: AccountId,
-    message: Option<String>,
+    message: Option<&'a str>,
 }
 
-fn parse_recipient(recipient: &[u8]) -> Result<Recipient, ExitError> {
+fn parse_recipient(recipient: &[u8]) -> Result<Recipient<'_>, ExitError> {
     let recipient = str::from_utf8(recipient)
         .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECEIVER_ACCOUNT_ID")))?;
     let (receiver_account_id, message) = recipient.split_once(':').map_or_else(
         || (recipient, None),
-        |(recipient, msg)| (recipient, Some(msg.to_string())),
+        |(recipient, msg)| (recipient, Some(msg)),
     );
 
     Ok(Recipient {
@@ -386,7 +386,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 validate_amount(amount)?;
                 let recipient = parse_recipient(input)?;
 
-                let (args, method, transfer_near_args) = if recipient.message.as_deref()
+                let (args, method, transfer_near_args) = if recipient.message
                     == Some(UNWRAP_WNEAR_MSG)
                     && erc20_address == get_wnear_address(&self.io).raw()
                 {
@@ -765,7 +765,7 @@ mod tests {
             parse_recipient(b"test.near:unwrap").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some("unwrap".to_owned())
+                message: Some("unwrap")
             }
         );
 
@@ -773,7 +773,7 @@ mod tests {
             parse_recipient(b"test.near:some_msg:with_extra_colon").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some("some_msg:with_extra_colon".to_owned())
+                message: Some("some_msg:with_extra_colon")
             }
         );
 
@@ -781,7 +781,7 @@ mod tests {
             parse_recipient(b"test.near:").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some(String::new())
+                message: Some("")
             }
         );
     }
