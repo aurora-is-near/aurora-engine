@@ -1,9 +1,6 @@
 use super::{EvmPrecompileResult, Precompile};
 #[cfg(feature = "error_refund")]
-use crate::prelude::{
-    parameters::{PromiseWithCallbackArgs, RefundCallArgs},
-    types,
-};
+use crate::prelude::{parameters::RefundCallArgs, types};
 use crate::{
     prelude::{
         format,
@@ -446,7 +443,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
 
         let precompile_call_args = ExitToNearPrecompileCallbackCallArgs {
             #[cfg(feature = "error_refund")]
-            refund: refund_args,
+            refund: Some(refund_args),
             #[cfg(not(feature = "error_refund"))]
             refund: None,
             transfer_near: transfer_near_args,

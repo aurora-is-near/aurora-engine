@@ -558,16 +558,14 @@ mod contract {
                 let promise_id = unsafe { io.promise_create_batch(&promise) };
                 io.promise_return(promise_id);
             }
-        } else {
-            if let Some(args) = args.refund {
-                // Exit call failed; need to refund tokens
-                let state = state::get_state(&io).sdk_unwrap();
-                let refund_result =
-                    engine::refund_on_error(io, &io, state, &args, &mut Runtime).sdk_unwrap();
+        } else if let Some(args) = args.refund {
+            // Exit call failed; need to refund tokens
+            let state = state::get_state(&io).sdk_unwrap();
+            let refund_result =
+                engine::refund_on_error(io, &io, state, &args, &mut Runtime).sdk_unwrap();
 
-                if !refund_result.status.is_ok() {
-                    sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
-                }
+            if !refund_result.status.is_ok() {
+                sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
             }
         }
     }
