@@ -773,7 +773,7 @@ pub mod sim_tests {
         self, deploy_nep_141, erc20_balance, exit_to_near, nep_141_balance_of,
     };
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
-    use aurora_engine::silo::parameters::{SiloParamsArgs, WhitelistStatusArgs};
+    use aurora_engine::silo::parameters::{SiloParamsArgs, WhitelistAddressArgs, WhitelistArgs};
     use aurora_engine::silo::WhitelistKind;
     use aurora_engine_types::types::Address;
     use borsh::BorshSerialize;
@@ -784,7 +784,7 @@ pub mod sim_tests {
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;
 
     #[test]
-    fn test_access_right_on_transfer_nep141() {
+    fn test_transfer_nep141_to_non_whitelisted_address() {
         let SiloTestContext {
             aurora,
             fallback_account,
@@ -794,8 +794,6 @@ pub mod sim_tests {
             nep_141,
             erc20,
         } = init_silo();
-
-        set_whitelist_status(&aurora, WhitelistKind::Address, true);
 
         let ft_transfer_amount = 300_000;
 
@@ -845,6 +843,68 @@ pub mod sim_tests {
         assert_eq!(erc20_balance(&erc20, fallback_address, &aurora), 0.into());
     }
 
+    #[test]
+    fn test_transfer_nep141_to_whitelisted_address() {
+        let SiloTestContext {
+            aurora,
+            fallback_account,
+            fallback_address,
+            ft_owner,
+            ft_owner_address,
+            nep_141,
+            erc20,
+        } = init_silo();
+
+        add_address_to_whitelist(&aurora, ft_owner_address);
+
+        let ft_transfer_amount = 300_000;
+
+        // Transfer tokens from `ft_owner` to whitelisted address `ft_owner_address`
+        transfer_nep_141_to_erc_20(
+            &nep_141,
+            &ft_owner,
+            ft_owner_address,
+            ft_transfer_amount,
+            &aurora,
+        );
+
+        // Verify the nep141 and erc20 tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY - ft_transfer_amount
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            0
+        );
+        assert_eq!(
+            erc20_balance(&erc20, ft_owner_address, &aurora),
+            ft_transfer_amount.into()
+        );
+        assert_eq!(erc20_balance(&erc20, fallback_address, &aurora), 0.into());
+
+        // Transfer tokens from ft_owner evm address to ft_owner near account
+        exit_to_near(
+            &ft_owner,
+            ft_owner.account_id.as_str(),
+            ft_transfer_amount,
+            &erc20,
+            &aurora,
+        );
+
+        // Verify the nep141 and erc20 tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            0
+        );
+        assert_eq!(erc20_balance(&erc20, ft_owner_address, &aurora), 0.into());
+        assert_eq!(erc20_balance(&erc20, fallback_address, &aurora), 0.into());
+    }
+
     struct SiloTestContext {
         pub aurora: AuroraAccount,
         pub fallback_account: UserAccount,
@@ -855,13 +915,16 @@ pub mod sim_tests {
         pub erc20: ERC20,
     }
 
-    fn set_whitelist_status(aurora: &AuroraAccount, kind: WhitelistKind, active: bool) {
-        let args = WhitelistStatusArgs { kind, active };
+    fn add_address_to_whitelist(aurora: &AuroraAccount, address: Address) {
+        let args = WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
+            kind: WhitelistKind::Address,
+            address,
+        });
         aurora
             .user
             .call(
                 aurora.contract.account_id(),
-                "set_whitelist_status",
+                "add_entry_to_whitelist",
                 &args.try_to_vec().unwrap(),
                 near_sdk_sim::DEFAULT_GAS,
                 0,
