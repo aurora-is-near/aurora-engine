@@ -19,6 +19,7 @@ use crate::prelude::{PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackA
 use crate::proof::Proof;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::borsh;
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call

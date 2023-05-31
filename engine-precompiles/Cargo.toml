@@ -16,7 +16,6 @@ autobenches = false
 aurora-engine-modexp = { path = "../engine-modexp", default-features = false }
 aurora-engine-types = { path = "../engine-types", default-features = false }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
-borsh = { version = "0.10", default-features = false }
 bn = { version = "0.5.11", package = "zeropool-bn", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false }
 libsecp256k1 = { version = "0.7.0", default-features = false, features = ["static-context", "hmac"] }
@@ -35,7 +34,8 @@ rand = "0.8.5"
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "borsh/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
+borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-sdk/borsh-compat"]
 contract = []
 log = []
 error_refund = []
