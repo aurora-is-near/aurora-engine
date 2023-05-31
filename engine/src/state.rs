@@ -1,9 +1,9 @@
 use crate::parameters::{LegacyNewCallArgs, NewCallArgs, NewCallArgsV2};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use aurora_engine_types::{Cow, Vec};
-use borsh::{BorshDeserialize, BorshSerialize};
 
 pub use error::EngineStateError;
 

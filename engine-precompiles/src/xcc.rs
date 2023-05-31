@@ -7,12 +7,12 @@ use crate::{utils, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{
     account_id::AccountId,
+    borsh::{BorshDeserialize, BorshSerialize},
     format,
     parameters::{CrossContractCallArgs, PromiseCreateArgs},
     types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
     vec, Cow, Vec, H160, H256, U256,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::Log;
 use evm::executor::stack::{PrecompileFailure, PrecompileHandle};
 use evm::ExitError;
@@ -238,9 +238,9 @@ pub mod state {
 
     use aurora_engine_sdk::error::ReadU32Error;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
+    use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
     use aurora_engine_types::storage::{self, KeyPrefix};
     use aurora_engine_types::types::{Address, Yocto};
-    use borsh::{BorshDeserialize, BorshSerialize};
 
     pub const ERR_CORRUPTED_STORAGE: &str = "ERR_CORRUPTED_XCC_STORAGE";
     pub const ERR_MISSING_WNEAR_ADDRESS: &str = "ERR_MISSING_WNEAR_ADDRESS";

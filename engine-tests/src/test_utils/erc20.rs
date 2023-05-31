@@ -60,7 +60,15 @@ impl ERC20Constructor {
             // if multiple tests running in parallel saw `contracts_dir` does not exist).
             DOWNLOAD_ONCE.call_once(|| {
                 let url = "https://github.com/OpenZeppelin/openzeppelin-contracts";
-                git2::Repository::clone(url, sources_dir).unwrap();
+                let repo = git2::Repository::clone(url, sources_dir).unwrap();
+                // We need to checkout a specific commit hash because the preset contract we use
+                // was removed from the repo later
+                // (https://github.com/OpenZeppelin/openzeppelin-contracts/pull/3637).
+                let commit_hash =
+                    git2::Oid::from_str("dfef6a68ee18dbd2e1f5a099061a3b8a0e404485").unwrap();
+                repo.set_head_detached(commit_hash).unwrap();
+                let mut opts = git2::build::CheckoutBuilder::new();
+                repo.checkout_head(Some(opts.force())).unwrap();
             });
         }
 
