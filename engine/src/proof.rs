@@ -1,4 +1,5 @@
 use crate::prelude::{sdk, BorshDeserialize, BorshSerialize, String, ToString, Vec};
+use aurora_engine_types::borsh;
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize, Clone)]
 #[cfg_attr(feature = "impl-serde", derive(serde::Deserialize, serde::Serialize))]

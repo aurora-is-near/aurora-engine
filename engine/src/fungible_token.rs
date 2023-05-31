@@ -9,6 +9,7 @@ use crate::prelude::{
     StorageBalanceBounds, StorageUsage, String, ToString, Vec,
 };
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::borsh;
 use aurora_engine_types::types::{NEP141Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO};
 use serde::{Deserialize, Serialize};
 

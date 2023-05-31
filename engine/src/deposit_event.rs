@@ -4,6 +4,7 @@ use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     vec, Address, BorshDeserialize, BorshSerialize, Fee, NEP141Wei, String, ToString, Vec, U256,
 };
+use aurora_engine_types::borsh;
 use aurora_engine_types::types::address::error::AddressError;
 use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
