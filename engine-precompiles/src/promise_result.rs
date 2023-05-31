@@ -2,8 +2,7 @@ use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::{Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
-use aurora_engine_types::{Cow, Vec};
-use borsh::BorshSerialize;
+use aurora_engine_types::{borsh::BorshSerialize, Cow, Vec};
 use evm::{Context, ExitError};
 
 /// `get_promise_results` precompile address

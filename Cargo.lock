@@ -270,7 +270,6 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "bitflags",
- "borsh 0.10.3",
  "byte-slice-cast",
  "digest 0.10.6",
  "ethabi",
@@ -300,7 +299,6 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-test-doubles",
  "aurora-engine-types",
- "borsh 0.10.3",
  "ethabi",
  "evm",
  "hex",
@@ -321,7 +319,6 @@ version = "1.0.0"
 dependencies = [
  "aurora-engine-types",
  "base64 0.21.0",
- "borsh 0.10.3",
  "sha2 0.10.6",
  "sha3",
 ]
@@ -1443,7 +1440,6 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-transactions",
  "aurora-engine-types",
- "borsh 0.10.3",
  "evm-core",
  "hex",
  "postgres",
