@@ -103,7 +103,7 @@ mod contract {
         sdk, u256_to_arr, Address, PromiseResult, ToString, Vec, Yocto, ERR_FAILED_PARSE, H256,
     };
     use crate::silo::parameters::{
-        SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+        FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
     };
     use crate::{errors, pausables, silo, state};
     use aurora_engine_sdk::env::Env;
@@ -1066,6 +1066,16 @@ mod contract {
     ///
     /// Silo
     ///
+    #[no_mangle]
+    pub extern "C" fn set_fixed_gas_cost() {
+        let mut io = Runtime;
+        silo::assert_admin(&io).sdk_unwrap();
+        let args: FixedGasCostArgs = io.read_input_borsh().sdk_unwrap();
+        args.cost.sdk_expect("FIXED_GAS_COST_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
+        silo::get_silo_params(&io).sdk_expect("SILO_MODE_IS_OFF"); // Use `set_silo_params` to enable the silo mode.
+        silo::set_fixed_gas_cost(&mut io, args.cost);
+    }
+
     #[no_mangle]
     pub extern "C" fn get_silo_params() {
         let mut io = Runtime;
