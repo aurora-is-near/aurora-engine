@@ -1,7 +1,7 @@
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use aurora_engine_types::AsBytes;
-use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::prelude::Vec;
 use crate::silo::parameters::{WhitelistKindArgs, WhitelistStatusArgs};
