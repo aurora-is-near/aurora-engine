@@ -3,6 +3,7 @@ use crate::fungible_token::FungibleTokenMetadata;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{Address, Balance, BorshDeserialize, BorshSerialize, RawU256, String, Vec};
 use crate::proof::Proof;
+use aurora_engine_types::borsh;
 pub use aurora_engine_types::parameters::engine::{
     CallArgs, DeployErc20TokenArgs, FunctionCallArgsV1, FunctionCallArgsV2,
     GetErc20FromNep141CallArgs, GetStorageAtArgs, ResultLog, SubmitResult, TransactionStatus,

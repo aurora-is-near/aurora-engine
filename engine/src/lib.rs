@@ -74,7 +74,6 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::{BorshDeserialize, BorshSerialize};
     use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
 
     use crate::connector::{self, EthConnectorContract};
@@ -110,6 +109,7 @@ mod contract {
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
+    use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
