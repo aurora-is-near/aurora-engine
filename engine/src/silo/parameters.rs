@@ -1,6 +1,6 @@
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::types::{Address, Wei};
-use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::silo::whitelist::WhitelistKind;
 
