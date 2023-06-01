@@ -107,7 +107,7 @@ where
             ..Default::default()
         };
         let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
-            engine::submit(
+            engine::submit::<_, _, _, aurora_engine_modexp::AuroraModExp>(
                 io,
                 &env,
                 &args,

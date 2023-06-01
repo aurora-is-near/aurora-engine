@@ -9,6 +9,22 @@ mod mpnat;
 
 use maybe_std::Vec;
 
+/// Trait providing the interface for the modexp function.
+/// The implementation provided by this crate is `AuroraModExp` below,
+/// but other users of Aurora Engine may wish to select a different implementation.
+pub trait ModExpAlgorithm {
+    /// Computes `(base ^ exp) % modulus`, where all values are given as big-endian encoded bytes.
+    fn modexp(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8>;
+}
+
+pub struct AuroraModExp;
+
+impl ModExpAlgorithm for AuroraModExp {
+    fn modexp(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
+        modexp(base, exp, modulus)
+    }
+}
+
 /// Computes `(base ^ exp) % modulus`, where all values are given as big-endian
 /// encoded bytes.
 pub fn modexp(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {

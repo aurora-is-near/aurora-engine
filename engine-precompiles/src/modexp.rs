@@ -3,22 +3,23 @@ use crate::prelude::{Cow, PhantomData, Vec, U256};
 use crate::{
     utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
 };
+use aurora_engine_modexp::ModExpAlgorithm;
 use evm::{Context, ExitError};
 use num::{Integer, Zero};
 
 #[derive(Default)]
-pub struct ModExp<HF: HardFork>(PhantomData<HF>);
+pub struct ModExp<HF: HardFork, M: ModExpAlgorithm>(PhantomData<HF>, PhantomData<M>);
 
-impl<HF: HardFork> ModExp<HF> {
+impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
     pub const ADDRESS: Address = super::make_address(0, 5);
 
     #[must_use]
     pub fn new() -> Self {
-        Self(PhantomData::default())
+        Self(PhantomData::default(), PhantomData::default())
     }
 }
 
-impl<HF: HardFork> ModExp<HF> {
+impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
     // Note: the output of this function is bounded by 2^67
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
         let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
@@ -61,7 +62,7 @@ impl<HF: HardFork> ModExp<HF> {
         } else {
             let base = parse_input_range_to_slice(input, base_start, base_len);
             let exponent = parse_input_range_to_slice(input, exp_start, exp_len);
-            aurora_engine_modexp::modexp(&base, &exponent, &modulus)
+            M::modexp(&base, &exponent, &modulus)
         };
 
         // The result must be the same length as the input modulus.
@@ -78,7 +79,7 @@ impl<HF: HardFork> ModExp<HF> {
     }
 }
 
-impl ModExp<Byzantium> {
+impl<M: ModExpAlgorithm> ModExp<Byzantium, M> {
     const MIN_GAS: EthGas = EthGas::new(0);
     // ouput of this function is bounded by 2^128
     fn mul_complexity(x: u64) -> U256 {
@@ -95,7 +96,7 @@ impl ModExp<Byzantium> {
     }
 }
 
-impl Precompile for ModExp<Byzantium> {
+impl<M: ModExpAlgorithm> Precompile for ModExp<Byzantium, M> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
         if base_len == 0 && mod_len == 0 {
@@ -131,7 +132,7 @@ impl Precompile for ModExp<Byzantium> {
     }
 }
 
-impl ModExp<Berlin> {
+impl<M: ModExpAlgorithm> ModExp<Berlin, M> {
     const MIN_GAS: EthGas = EthGas::new(200);
     // output bounded by 2^122
     fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
@@ -141,7 +142,7 @@ impl ModExp<Berlin> {
     }
 }
 
-impl Precompile for ModExp<Berlin> {
+impl<M: ModExpAlgorithm> Precompile for ModExp<Berlin, M> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
         if base_len == 0 && mod_len == 0 {
@@ -240,6 +241,7 @@ mod tests {
 
     use super::*;
     use crate::prelude::types::u256_to_arr;
+    use aurora_engine_modexp::AuroraModExp;
 
     // Byzantium tests: https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp.json
     // Berlin tests:https://github.com/holiman/go-ethereum/blob/master/core/vm/testdata/precompiles/modexp_eip2565.json
@@ -464,7 +466,7 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(test.input).unwrap();
 
-            let res = ModExp::<Byzantium>::new()
+            let res = ModExp::<Byzantium, AuroraModExp>::new()
                 .run(&input, Some(*test_gas), &new_context(), false)
                 .unwrap()
                 .output;
@@ -478,7 +480,7 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BYZANTIUM_GAS.iter()) {
             let input = hex::decode(test.input).unwrap();
 
-            let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+            let gas = ModExp::<Byzantium, AuroraModExp>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);
         }
     }
@@ -488,7 +490,7 @@ mod tests {
         for (test, test_gas) in TESTS.iter().zip(BERLIN_GAS.iter()) {
             let input = hex::decode(test.input).unwrap();
 
-            let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
+            let gas = ModExp::<Berlin, AuroraModExp>::required_gas(&input).unwrap();
             assert_eq!(gas, *test_gas, "{} gas", test.name);
         }
     }
@@ -504,7 +506,7 @@ mod tests {
             modulus: U256::MAX,
         });
         // completes without any overflow
-        ModExp::<Berlin>::required_gas(&input).unwrap();
+        ModExp::<Berlin, AuroraModExp>::required_gas(&input).unwrap();
     }
 
     #[test]
@@ -518,12 +520,12 @@ mod tests {
             modulus: U256::MAX,
         });
         // completes without any overflow
-        ModExp::<Berlin>::required_gas(&input).unwrap();
+        ModExp::<Berlin, AuroraModExp>::required_gas(&input).unwrap();
     }
 
     #[test]
     fn test_berlin_modexp_empty_input() {
-        let res = ModExp::<Berlin>::new()
+        let res = ModExp::<Berlin, AuroraModExp>::new()
             .run(&[], Some(EthGas::new(100_000)), &new_context(), false)
             .unwrap();
         let expected: Vec<u8> = Vec::new();
@@ -534,7 +536,7 @@ mod tests {
     fn test_modexp_gas_revert() {
         let input = "000000000000090000000000000000";
         // Gas cost comes out to 18446744073709551615
-        let res = ModExp::<Berlin>::new().run(
+        let res = ModExp::<Berlin, AuroraModExp>::new().run(
             &hex::decode(input).unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -554,23 +556,23 @@ mod tests {
             modulus: U256::MAX,
         });
 
-        let res = ModExp::<Byzantium>::new()
+        let res = ModExp::<Byzantium, AuroraModExp>::new()
             .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
             .unwrap();
         let expected = [0u8; 0];
         assert_eq!(res.output, expected);
 
-        let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+        let gas = ModExp::<Byzantium, AuroraModExp>::required_gas(&input).unwrap();
         let min_gas = EthGas::new(0);
         assert_eq!(gas, min_gas);
 
-        let res = ModExp::<Berlin>::new()
+        let res = ModExp::<Berlin, AuroraModExp>::new()
             .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
             .unwrap();
         let expected = [0u8; 0];
         assert_eq!(res.output, expected);
 
-        let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
+        let gas = ModExp::<Berlin, AuroraModExp>::required_gas(&input).unwrap();
         let min_gas = EthGas::new(200);
         assert_eq!(gas, min_gas);
     }
@@ -585,23 +587,23 @@ mod tests {
             exp: U256::from(1),
             modulus: U256::from(1),
         });
-        let res = ModExp::<Byzantium>::new()
+        let res = ModExp::<Byzantium, AuroraModExp>::new()
             .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
             .unwrap();
         let expected = [0u8; 0];
         assert_eq!(res.output, expected);
 
-        let gas = ModExp::<Byzantium>::required_gas(&input).unwrap();
+        let gas = ModExp::<Byzantium, AuroraModExp>::required_gas(&input).unwrap();
         let min_gas = EthGas::new(0);
         assert_eq!(gas, min_gas);
 
-        let res = ModExp::<Berlin>::new()
+        let res = ModExp::<Berlin, AuroraModExp>::new()
             .run(&input, Some(EthGas::new(100_000)), &new_context(), false)
             .unwrap();
         let expected = [0u8; 0];
         assert_eq!(res.output, expected);
 
-        let gas = ModExp::<Berlin>::required_gas(&input).unwrap();
+        let gas = ModExp::<Berlin, AuroraModExp>::required_gas(&input).unwrap();
         let min_gas = EthGas::new(200);
         assert_eq!(gas, min_gas);
     }
@@ -609,7 +611,7 @@ mod tests {
     #[test]
     fn test_max_exp_zero_base_zero_mod() {
         let input = hex::decode("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        let res = ModExp::<Byzantium>::new().run(
+        let res = ModExp::<Byzantium, AuroraModExp>::new().run(
             &input.unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -621,7 +623,7 @@ mod tests {
     #[test]
     fn test_max_exp_max_base_zero_mod() {
         let input = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        let res = ModExp::<Byzantium>::new().run(
+        let res = ModExp::<Byzantium, AuroraModExp>::new().run(
             &input.unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -633,7 +635,7 @@ mod tests {
     #[test]
     fn test_max_exp_max_base_non_zero_mod() {
         let input = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001");
-        let res = ModExp::<Byzantium>::new().run(
+        let res = ModExp::<Byzantium, AuroraModExp>::new().run(
             &input.unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -645,7 +647,7 @@ mod tests {
     #[test]
     fn test_max_exp_max_base_max_mod() {
         let input = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000ffffffffffffff9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        let res = ModExp::<Byzantium>::new().run(
+        let res = ModExp::<Byzantium, AuroraModExp>::new().run(
             &input.unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -657,7 +659,7 @@ mod tests {
     #[test]
     fn test_max_exp_non_zero_base_zero_mod() {
         let input = hex::decode("0000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        let res = ModExp::<Byzantium>::new().run(
+        let res = ModExp::<Byzantium, AuroraModExp>::new().run(
             &input.unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -669,7 +671,7 @@ mod tests {
     #[test]
     fn test_max_exp_zero_base_non_zero_mod() {
         let input = hex::decode("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff9f00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001");
-        let res = ModExp::<Byzantium>::new().run(
+        let res = ModExp::<Byzantium, AuroraModExp>::new().run(
             &input.unwrap(),
             Some(EthGas::new(100_000)),
             &new_context(),
@@ -689,8 +691,12 @@ mod tests {
             exp: U256::MAX,
             modulus: U256::MAX,
         });
-        let res =
-            ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
+        let res = ModExp::<Berlin, AuroraModExp>::new().run(
+            &input,
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
         assert!(res.is_ok());
     }
 
@@ -705,8 +711,12 @@ mod tests {
             exp: U256::MAX,
             modulus: U256::MAX,
         });
-        let res =
-            ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
+        let res = ModExp::<Berlin, AuroraModExp>::new().run(
+            &input,
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
         assert!(res.is_ok());
     }
 
@@ -721,8 +731,12 @@ mod tests {
             exp: U256::MAX,
             modulus: U256::MAX,
         });
-        let res =
-            ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
+        let res = ModExp::<Berlin, AuroraModExp>::new().run(
+            &input,
+            Some(EthGas::new(100_000)),
+            &new_context(),
+            false,
+        );
         assert!(res.is_ok());
     }
 }

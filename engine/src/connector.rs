@@ -576,9 +576,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// `ft_on_transfer` callback function.
-    pub fn ft_on_transfer<E: Env>(
+    pub fn ft_on_transfer<E: Env, M: aurora_engine_modexp::ModExpAlgorithm>(
         &mut self,
-        engine: &Engine<I, E>,
+        engine: &Engine<I, E, M>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");

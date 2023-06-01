@@ -264,6 +264,7 @@ dependencies = [
 name = "aurora-engine"
 version = "2.9.0"
 dependencies = [
+ "aurora-engine-modexp",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
  "aurora-engine-test-doubles",
@@ -339,6 +340,7 @@ name = "aurora-engine-tests"
 version = "1.0.0"
 dependencies = [
  "aurora-engine",
+ "aurora-engine-modexp",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
  "aurora-engine-test-doubles",
@@ -1382,6 +1384,7 @@ name = "engine-standalone-storage"
 version = "0.1.0"
 dependencies = [
  "aurora-engine",
+ "aurora-engine-modexp",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
  "aurora-engine-transactions",

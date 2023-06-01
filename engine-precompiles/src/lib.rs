@@ -35,6 +35,7 @@ use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
 use crate::xcc::CrossContractCall;
+use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
@@ -197,17 +198,20 @@ fn post_process(
     })
 }
 
-pub struct PrecompileConstructorContext<'a, I, E, H> {
+pub struct PrecompileConstructorContext<'a, I, E, H, M> {
     pub current_account_id: AccountId,
     pub random_seed: H256,
     pub io: I,
     pub env: &'a E,
     pub promise_handler: H,
+    pub mod_exp_algorithm: crate::prelude::PhantomData<M>,
 }
 
 impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, H> {
     #[allow(dead_code)]
-    pub fn new_homestead(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
+    pub fn new_homestead<M: ModExpAlgorithm + 'static>(
+        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
+    ) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
@@ -231,13 +235,15 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
     }
 
     #[allow(dead_code)]
-    pub fn new_byzantium(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
+    pub fn new_byzantium<M: ModExpAlgorithm + 'static>(
+        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
+    ) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
-            ModExp::<Byzantium>::ADDRESS,
+            ModExp::<Byzantium, M>::ADDRESS,
             Bn256Add::<Byzantium>::ADDRESS,
             Bn256Mul::<Byzantium>::ADDRESS,
             Bn256Pair::<Byzantium>::ADDRESS,
@@ -249,7 +255,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(SHA256),
             Box::new(RIPEMD160),
             Box::new(Identity),
-            Box::new(ModExp::<Byzantium>::new()),
+            Box::new(ModExp::<Byzantium, M>::new()),
             Box::new(Bn256Add::<Byzantium>::new()),
             Box::new(Bn256Mul::<Byzantium>::new()),
             Box::new(Bn256Pair::<Byzantium>::new()),
@@ -265,13 +271,15 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_istanbul(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
+    pub fn new_istanbul<M: ModExpAlgorithm + 'static>(
+        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
+    ) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
-            ModExp::<Byzantium>::ADDRESS,
+            ModExp::<Byzantium, M>::ADDRESS,
             Bn256Add::<Istanbul>::ADDRESS,
             Bn256Mul::<Istanbul>::ADDRESS,
             Bn256Pair::<Istanbul>::ADDRESS,
@@ -284,7 +292,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(SHA256),
             Box::new(RIPEMD160),
             Box::new(Identity),
-            Box::new(ModExp::<Byzantium>::new()),
+            Box::new(ModExp::<Byzantium, M>::new()),
             Box::new(Bn256Add::<Istanbul>::new()),
             Box::new(Bn256Mul::<Istanbul>::new()),
             Box::new(Bn256Pair::<Istanbul>::new()),
@@ -301,13 +309,15 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_berlin(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
+    pub fn new_berlin<M: ModExpAlgorithm + 'static>(
+        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
+    ) -> Self {
         let addresses = vec![
             ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
-            ModExp::<Berlin>::ADDRESS,
+            ModExp::<Berlin, M>::ADDRESS,
             Bn256Add::<Istanbul>::ADDRESS,
             Bn256Mul::<Istanbul>::ADDRESS,
             Bn256Pair::<Istanbul>::ADDRESS,
@@ -320,7 +330,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(SHA256),
             Box::new(RIPEMD160),
             Box::new(Identity),
-            Box::new(ModExp::<Berlin>::new()),
+            Box::new(ModExp::<Berlin, M>::new()),
             Box::new(Bn256Add::<Istanbul>::new()),
             Box::new(Bn256Mul::<Istanbul>::new()),
             Box::new(Bn256Pair::<Istanbul>::new()),
@@ -337,14 +347,16 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         Self::with_generic_precompiles(map, ctx)
     }
 
-    pub fn new_london(ctx: PrecompileConstructorContext<'a, I, E, H>) -> Self {
+    pub fn new_london<M: ModExpAlgorithm + 'static>(
+        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
+    ) -> Self {
         // no precompile changes in London HF
         Self::new_berlin(ctx)
     }
 
-    fn with_generic_precompiles(
+    fn with_generic_precompiles<M: ModExpAlgorithm + 'static>(
         mut generic_precompiles: BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
-        ctx: PrecompileConstructorContext<'a, I, E, H>,
+        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
         let ethereum_exit = ExitToEthereum::new(ctx.current_account_id.clone(), ctx.io);
@@ -466,6 +478,7 @@ const fn make_h256(x: u128, y: u128) -> prelude::H256 {
 mod tests {
     use crate::prelude::H160;
     use crate::{prelude, Byzantium, Istanbul};
+    use aurora_engine_modexp::AuroraModExp;
     use prelude::types::Address;
     use rand::Rng;
 
@@ -475,7 +488,10 @@ mod tests {
         assert_eq!(super::hash::SHA256::ADDRESS, u8_to_address(2));
         assert_eq!(super::hash::RIPEMD160::ADDRESS, u8_to_address(3));
         assert_eq!(super::identity::Identity::ADDRESS, u8_to_address(4));
-        assert_eq!(super::ModExp::<Byzantium>::ADDRESS, u8_to_address(5));
+        assert_eq!(
+            super::ModExp::<Byzantium, AuroraModExp>::ADDRESS,
+            u8_to_address(5)
+        );
         assert_eq!(super::Bn256Add::<Istanbul>::ADDRESS, u8_to_address(6));
         assert_eq!(super::Bn256Mul::<Istanbul>::ADDRESS, u8_to_address(7));
         assert_eq!(super::Bn256Pair::<Istanbul>::ADDRESS, u8_to_address(8));

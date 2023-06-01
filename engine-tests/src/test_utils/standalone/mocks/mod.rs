@@ -83,7 +83,8 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     use evm::backend::ApplyBackend;
 
     let aurora_account_id = env.current_account_id();
-    let mut engine = engine::Engine::new(address, aurora_account_id.clone(), io, env).unwrap();
+    let mut engine: engine::Engine<I, E, aurora_engine_modexp::AuroraModExp> =
+        engine::Engine::new(address, aurora_account_id.clone(), io, env).unwrap();
     let state_change = evm::backend::Apply::Modify {
         address: address.raw(),
         basic: evm::backend::Basic {
