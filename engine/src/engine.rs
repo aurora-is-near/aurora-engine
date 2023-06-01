@@ -1497,6 +1497,11 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
         U256::zero()
     }
 
+    /// Get environmental block randomness.
+    fn block_randomness(&self) -> Option<H256> {
+        Some(self.env.random_seed())
+    }
+
     /// Returns the current block gas limit.
     ///
     /// Currently, this returns 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
