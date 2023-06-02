@@ -15,6 +15,7 @@ use crate::prelude::{
 };
 use crate::prelude::{PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs};
 use crate::proof::Proof;
+use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::borsh;
@@ -576,9 +577,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// `ft_on_transfer` callback function.
-    pub fn ft_on_transfer<E: Env>(
+    pub fn ft_on_transfer<E: Env, M: ModExpAlgorithm>(
         &mut self,
-        engine: &Engine<I, E>,
+        engine: &Engine<I, E, M>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");

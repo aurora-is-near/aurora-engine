@@ -16,6 +16,7 @@ crate-type = ["lib"]
 [dependencies]
 aurora-engine = { path = "../engine", default-features = false, features = ["std"] }
 aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
+aurora-engine-modexp = { path = "../engine-modexp", default-features = false, features = ["std"] }
 aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
 aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
 aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false, features = ["std"] }

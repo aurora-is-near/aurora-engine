@@ -293,7 +293,7 @@ mod contract {
         let io = Runtime;
         let input = io.read_input().to_vec();
         let current_account_id = io.current_account_id();
-        let mut engine = Engine::new(
+        let mut engine: Engine<_, _> = Engine::new(
             predecessor_address(&io.predecessor_account_id()),
             current_account_id,
             io,
@@ -326,7 +326,7 @@ mod contract {
             check_promise.sdk_unwrap();
         }
 
-        let mut engine = Engine::new(
+        let mut engine: Engine<_, _> = Engine::new(
             predecessor_address(&predecessor_account_id),
             current_account_id,
             io,
@@ -398,7 +398,7 @@ mod contract {
 
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let mut engine = Engine::new(
+        let mut engine: Engine<_, _> = Engine::new(
             predecessor_address(&predecessor_account_id),
             current_account_id,
             io,
@@ -478,7 +478,7 @@ mod contract {
         let io = Runtime;
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let mut engine = Engine::new(
+        let mut engine: Engine<_, _> = Engine::new(
             predecessor_address(&predecessor_account_id),
             current_account_id.clone(),
             io,
@@ -561,7 +561,8 @@ mod contract {
         let env = ViewEnv;
         let args: ViewCallArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
-        let engine = Engine::new(args.sender, current_account_id, io, &env).sdk_unwrap();
+        let engine: Engine<_, _> =
+            Engine::new(args.sender, current_account_id, io, &env).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args).sdk_unwrap();
         io.return_output(&result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE));
     }
@@ -1026,7 +1027,8 @@ mod contract {
         let nonce = U256::from(args.1);
         let balance = NEP141Wei::new(u128::from(args.2));
         let current_account_id = io.current_account_id();
-        let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
+        let mut engine: Engine<_, _> =
+            Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {
             address: address.raw(),
             basic: evm::backend::Basic {
