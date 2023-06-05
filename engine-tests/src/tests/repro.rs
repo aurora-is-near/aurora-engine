@@ -1,9 +1,9 @@
 //! A module containing tests which reproduce transactions sent to live networks.
 
-use crate::test_utils::{standalone, ORIGIN};
-use crate::test_utils::{AuroraRunner, ExecutionProfile};
+use crate::utils::{standalone, ORIGIN};
+use crate::utils::{AuroraRunner, ExecutionProfile};
 use aurora_engine::parameters::SubmitResult;
-use borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use engine_standalone_storage::json_snapshot;
 
 /// This test reproduces a transaction from testnet:

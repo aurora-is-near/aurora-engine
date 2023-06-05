@@ -1,13 +1,14 @@
 use crate::prelude::H256;
-use crate::test_utils::{self, standalone};
+use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
+use crate::utils::{self, standalone, Signer};
 use aurora_engine_modexp::AuroraModExp;
+use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
     storage,
     types::{Address, NearGas, Wei, Yocto},
     U256,
 };
-use borsh::BorshSerialize;
 use engine_standalone_storage::sync;
 use engine_standalone_tracing::{
     sputnik,
@@ -17,11 +18,11 @@ use engine_standalone_tracing::{
 #[test]
 fn test_trace_contract_deploy() {
     let mut runner = standalone::StandaloneRunner::default();
-    let mut signer = test_utils::Signer::random();
+    let mut signer = Signer::random();
 
     runner.init_evm();
 
-    let constructor = test_utils::erc20::ERC20Constructor::load();
+    let constructor = ERC20Constructor::load();
     let deploy_tx = constructor.deploy("Test", "TST", signer.use_nonce().into());
     let mut listener = CallTracer::default();
     let deploy_result = sputnik::traced_call(&mut listener, || {
@@ -30,7 +31,7 @@ fn test_trace_contract_deploy() {
             .unwrap()
     });
     let contract_address = {
-        let bytes = test_utils::unwrap_success_slice(&deploy_result);
+        let bytes = utils::unwrap_success_slice(&deploy_result);
         Address::try_from_slice(bytes).unwrap()
     };
     let code = runner.get_code(&contract_address);
@@ -45,7 +46,7 @@ fn test_trace_contract_deploy() {
 #[test]
 fn test_trace_precompile_direct_call() {
     let mut runner = standalone::StandaloneRunner::default();
-    let mut signer = test_utils::Signer::random();
+    let mut signer = Signer::random();
 
     runner.init_evm();
 
@@ -69,7 +70,7 @@ fn test_trace_precompile_direct_call() {
 
     let expected_trace = call_tracer::CallFrame {
         call_type: call_tracer::CallType::Call,
-        from: test_utils::address_from_secret_key(&signer.secret_key),
+        from: utils::address_from_secret_key(&signer.secret_key),
         to: Some(aurora_engine_precompiles::random::RandomSeed::ADDRESS),
         value: U256::zero(),
         gas: u64::MAX,
@@ -88,21 +89,21 @@ fn test_trace_precompile_direct_call() {
 #[test]
 fn test_trace_contract_single_call() {
     let mut runner = standalone::StandaloneRunner::default();
-    let mut signer = test_utils::Signer::random();
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let mut signer = Signer::random();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
 
     runner.init_evm();
 
-    let constructor = test_utils::erc20::ERC20Constructor::load();
+    let constructor = ERC20Constructor::load();
     let deploy_tx = constructor.deploy("Test", "TST", signer.use_nonce().into());
     let deploy_result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
     let contract_address = {
-        let bytes = test_utils::unwrap_success_slice(&deploy_result);
+        let bytes = utils::unwrap_success_slice(&deploy_result);
         Address::try_from_slice(bytes).unwrap()
     };
-    let contract = test_utils::erc20::ERC20(constructor.0.deployed_at(contract_address));
+    let contract = ERC20(constructor.0.deployed_at(contract_address));
 
     let tx = contract.balance_of(signer_address, signer.use_nonce().into());
     let mut listener = CallTracer::default();
@@ -165,7 +166,7 @@ fn test_trace_contract_with_sub_call() {
 
     assert_eq!(listener.call_stack.len(), 1);
 
-    let user_address = test_utils::address_from_secret_key(&context.signer.secret_key);
+    let user_address = utils::address_from_secret_key(&context.signer.secret_key);
     let router_address = context.swap_router.0.address;
     let pool_address = pool.0.address;
     let b_address = token_b.0.address;
@@ -208,20 +209,20 @@ fn test_trace_contract_with_sub_call() {
 #[test]
 fn test_trace_contract_with_precompile_sub_call() {
     let mut runner = standalone::StandaloneRunner::default();
-    let mut signer = test_utils::Signer::random();
+    let mut signer = Signer::random();
 
     runner.init_evm();
 
-    let constructor = test_utils::standard_precompiles::PrecompilesConstructor::load();
+    let constructor = utils::solidity::standard_precompiles::PrecompilesConstructor::load();
     let deploy_tx = constructor.deploy(signer.use_nonce().into());
     let deploy_result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
     let contract_address = {
-        let bytes = test_utils::unwrap_success_slice(&deploy_result);
+        let bytes = utils::unwrap_success_slice(&deploy_result);
         Address::try_from_slice(bytes).unwrap()
     };
-    let contract = test_utils::standard_precompiles::PrecompilesContract(
+    let contract = utils::solidity::standard_precompiles::PrecompilesContract(
         constructor.0.deployed_at(contract_address),
     );
 
@@ -252,24 +253,24 @@ fn test_trace_precompiles_with_subcalls() {
     // The XCC precompile does internal sub-calls. We will trace an XCC call.
 
     let mut runner = standalone::StandaloneRunner::default();
-    let mut signer = test_utils::Signer::random();
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let mut signer = Signer::random();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let xcc_address = aurora_engine_precompiles::xcc::cross_contract_call::ADDRESS;
 
     runner.init_evm();
 
     // Deploy an ERC-20 contract to act as wNEAR. It doesn't actually need to be bridged for
     // this test because we are not executing any scheduled promises.
-    let constructor = test_utils::erc20::ERC20Constructor::load();
+    let constructor = ERC20Constructor::load();
     let deploy_tx = constructor.deploy("wNEAR", "WNEAR", signer.use_nonce().into());
     let deploy_result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
     let wnear_address = {
-        let bytes = test_utils::unwrap_success_slice(&deploy_result);
+        let bytes = utils::unwrap_success_slice(&deploy_result);
         Address::try_from_slice(bytes).unwrap()
     };
-    let wnear = test_utils::erc20::ERC20(constructor.0.deployed_at(wnear_address));
+    let wnear = ERC20(constructor.0.deployed_at(wnear_address));
     let mint_tx = wnear.mint(signer_address, u128::MAX.into(), signer.use_nonce().into());
     runner
         .submit_transaction(&signer.secret_key, mint_tx)
@@ -297,7 +298,7 @@ fn test_trace_precompiles_with_subcalls() {
         let key =
             storage::bytes_to_key(storage::KeyPrefix::Erc20Nep141Map, wnear_address.as_bytes());
         outcome.diff.modify(key, b"wrap.near".to_vec());
-        test_utils::standalone::storage::commit(storage, &outcome);
+        standalone::storage::commit(storage, &outcome);
     }
 
     // Setup xcc precompile in standalone runner

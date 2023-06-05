@@ -1,8 +1,8 @@
 use crate::prelude::Wei;
 use crate::prelude::{Address, U256};
-use crate::test_utils::{
+use crate::utils::{
     self,
-    erc20::{ERC20Constructor, ERC20},
+    solidity::erc20::{self, ERC20Constructor, ERC20},
     Signer,
 };
 use aurora_engine::engine::EngineErrorKind;
@@ -58,7 +58,7 @@ fn erc20_mint_out_of_gas() {
     let mut mint_tx = contract.mint(dest_address, mint_amount.into(), nonce.into());
 
     // not enough gas to cover intrinsic cost
-    let intrinsic_gas = test_utils::erc20::legacy_into_normalized_tx(mint_tx.clone())
+    let intrinsic_gas = erc20::legacy_into_normalized_tx(mint_tx.clone())
         .intrinsic_gas(&evm::Config::istanbul())
         .unwrap();
     mint_tx.gas_limit = (intrinsic_gas - 1).into();
@@ -76,13 +76,13 @@ fn erc20_mint_out_of_gas() {
 
     // Validate post-state
 
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
-        test_utils::address_from_secret_key(&source_account.secret_key),
+        utils::address_from_secret_key(&source_account.secret_key),
         Wei::new_u64(INITIAL_BALANCE - GAS_LIMIT * GAS_PRICE),
         (INITIAL_NONCE + 2).into(),
     );
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         sdk::types::near_account_to_evm_address(
             runner.context.predecessor_account_id.as_ref().as_bytes(),
@@ -95,7 +95,7 @@ fn erc20_mint_out_of_gas() {
 #[test]
 fn profile_erc20_get_balance() {
     let (mut runner, mut source_account, _, contract) = initialize_erc20();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
     let outcome = runner.submit_with_signer(&mut source_account, |nonce| {
         contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
@@ -104,12 +104,12 @@ fn profile_erc20_get_balance() {
 
     let balance_tx = contract.balance_of(source_address, U256::zero());
     let (status, profile) = runner
-        .profiled_view_call(&test_utils::as_view_call(balance_tx, source_address))
+        .profiled_view_call(&utils::as_view_call(balance_tx, source_address))
         .unwrap();
     assert!(status.is_ok());
 
     // call costs less than 2 Tgas
-    test_utils::assert_gas_bound(profile.all_gas(), 2);
+    utils::assert_gas_bound(profile.all_gas(), 2);
     // at least 70% of the cost is spent on wasm computation (as opposed to host functions)
     let wasm_fraction = (100 * profile.wasm_gas()) / profile.all_gas();
     assert!(
@@ -121,7 +121,7 @@ fn profile_erc20_get_balance() {
 #[test]
 fn erc20_transfer_success() {
     let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
     let outcome = runner.submit_with_signer(&mut source_account, |nonce| {
         contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
@@ -160,7 +160,7 @@ fn erc20_transfer_success() {
 #[test]
 fn erc20_transfer_insufficient_balance() {
     let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
     let outcome = runner.submit_with_signer(&mut source_account, |nonce| {
         contract.mint(source_address, INITIAL_BALANCE.into(), nonce)
@@ -183,8 +183,8 @@ fn erc20_transfer_insufficient_balance() {
             contract.transfer(dest_address, (2 * INITIAL_BALANCE).into(), nonce)
         })
         .unwrap();
-    let message = parse_erc20_error_message(&test_utils::unwrap_revert(outcome));
-    assert_eq!(&message, "&ERC20: transfer amount exceeds balance");
+    let message = parse_erc20_error_message(utils::unwrap_revert_slice(&outcome));
+    assert_eq!(message, "&ERC20: transfer amount exceeds balance");
 
     // Validate post-state
     assert_eq!(
@@ -199,10 +199,10 @@ fn erc20_transfer_insufficient_balance() {
 
 #[test]
 fn deploy_erc_20_out_of_gas() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
-    let source_address = test_utils::address_from_secret_key(&source_account);
+    let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(
         source_address,
         Wei::new_u64(INITIAL_BALANCE),
@@ -213,7 +213,7 @@ fn deploy_erc_20_out_of_gas() {
     let mut deploy_transaction = constructor.deploy("OutOfGas", "OOG", INITIAL_NONCE.into());
 
     // not enough gas to cover intrinsic cost
-    let intrinsic_gas = test_utils::erc20::legacy_into_normalized_tx(deploy_transaction.clone())
+    let intrinsic_gas = erc20::legacy_into_normalized_tx(deploy_transaction.clone())
         .intrinsic_gas(&evm::Config::istanbul())
         .unwrap();
     deploy_transaction.gas_limit = (intrinsic_gas - 1).into();
@@ -229,25 +229,25 @@ fn deploy_erc_20_out_of_gas() {
     assert_eq!(error.status, TransactionStatus::OutOfGas);
 
     // Validate post-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
-        test_utils::address_from_secret_key(&source_account),
+        utils::address_from_secret_key(&source_account),
         Wei::new_u64(INITIAL_BALANCE),
         (INITIAL_NONCE + 1).into(),
     );
 }
 
 fn get_address_erc20_balance(
-    runner: &mut test_utils::AuroraRunner,
+    runner: &mut utils::AuroraRunner,
     signer: &Signer,
     address: Address,
     contract: &ERC20,
 ) -> U256 {
     let balance_tx = contract.balance_of(address, signer.nonce.into());
     let result = runner
-        .view_call(&test_utils::as_view_call(
+        .view_call(&utils::as_view_call(
             balance_tx,
-            test_utils::address_from_secret_key(&signer.secret_key),
+            utils::address_from_secret_key(&signer.secret_key),
         ))
         .unwrap();
     let bytes = match result {
@@ -257,25 +257,25 @@ fn get_address_erc20_balance(
     U256::from_big_endian(&bytes)
 }
 
-fn parse_erc20_error_message(result: &[u8]) -> String {
+fn parse_erc20_error_message(result: &[u8]) -> &str {
     let start_index = result.find_char('&').unwrap();
     let end_index = result[start_index..].find_byte(0).unwrap() + start_index;
 
-    String::from_utf8(result[start_index..end_index].to_vec()).unwrap()
+    std::str::from_utf8(&result[start_index..end_index]).unwrap()
 }
 
-fn initialize_erc20() -> (test_utils::AuroraRunner, Signer, Address, ERC20) {
+fn initialize_erc20() -> (utils::AuroraRunner, Signer, Address, ERC20) {
     // set up Aurora runner and accounts
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
-    let source_address = test_utils::address_from_secret_key(&source_account);
+    let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(
         source_address,
         Wei::new_u64(INITIAL_BALANCE),
         INITIAL_NONCE.into(),
     );
-    let dest_address = test_utils::address_from_secret_key(&SecretKey::random(&mut rng));
+    let dest_address = utils::address_from_secret_key(&SecretKey::random(&mut rng));
 
     let mut signer = Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;

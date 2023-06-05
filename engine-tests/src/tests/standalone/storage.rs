@@ -6,16 +6,16 @@ use engine_standalone_storage::{
     BlockMetadata,
 };
 
-use crate::test_utils::standalone::{mocks, storage::create_db};
-use crate::test_utils::{self, Signer};
+use crate::utils::standalone::{mocks, storage::create_db};
+use crate::utils::{self, Signer};
 
 #[test]
 #[allow(clippy::too_many_lines)]
 fn test_replay_transaction() {
     let mut signer = Signer::random();
-    let address = test_utils::address_from_secret_key(&signer.secret_key);
+    let address = utils::address_from_secret_key(&signer.secret_key);
     let balance = Wei::new_u64(1000);
-    let dest_address = test_utils::address_from_secret_key(&Signer::random().secret_key);
+    let dest_address = utils::address_from_secret_key(&Signer::random().secret_key);
     let transfer_amounts: Vec<Wei> = vec![10, 13, 75, 88, 1, 9, 19, 256]
         .into_iter()
         .map(Wei::new_u64)
@@ -28,11 +28,11 @@ fn test_replay_transaction() {
             Some(new_total)
         })
         .collect();
-    let mut runner = test_utils::standalone::StandaloneRunner::default();
+    let mut runner = utils::standalone::StandaloneRunner::default();
     let chain_id = Some(runner.chain_id);
     let create_transfer = |from: &mut Signer, to: Address, amount: Wei| {
-        test_utils::sign_transaction(
-            test_utils::transfer(to, amount, from.use_nonce().into()),
+        utils::sign_transaction(
+            utils::transfer(to, amount, from.use_nonce().into()),
             chain_id,
             &from.secret_key,
         )
@@ -93,7 +93,7 @@ fn test_replay_transaction() {
                         )
                         .unwrap();
 
-                    test_utils::standalone::storage::commit(&mut runner.storage, &diff);
+                    utils::standalone::storage::commit(&mut runner.storage, &diff);
 
                     assert_eq!(
                         runner.get_balance(&address),
@@ -134,12 +134,12 @@ fn test_replay_transaction() {
 fn test_consume_transaction() {
     // Some util structures we will use in this test
     let signer = Signer::random();
-    let address = test_utils::address_from_secret_key(&signer.secret_key);
+    let address = utils::address_from_secret_key(&signer.secret_key);
     let balance = Wei::new_u64(1000);
     let transfer_amount = Wei::new_u64(37);
     let nonce = signer.nonce.into();
-    let dest_address = test_utils::address_from_secret_key(&Signer::random().secret_key);
-    let mut runner = test_utils::standalone::StandaloneRunner::default();
+    let dest_address = utils::address_from_secret_key(&Signer::random().secret_key);
+    let mut runner = utils::standalone::StandaloneRunner::default();
 
     runner.init_evm();
     runner.mint_account(address, balance, nonce, None);
@@ -149,7 +149,7 @@ fn test_consume_transaction() {
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // Try to execute a transfer transaction
-    let tx = test_utils::transfer(dest_address, transfer_amount, nonce);
+    let tx = utils::transfer(dest_address, transfer_amount, nonce);
     let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
     assert!(result.status.is_ok());
 
@@ -336,12 +336,12 @@ fn test_transaction_index() {
 fn test_track_key() {
     // Set up the test
     let mut signer = Signer::random();
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let initial_balance = Wei::new_u64(1000);
     let transfer_amount = Wei::new_u64(37);
     let dest1 = Address::from_array([0x11; 20]);
     let dest2 = Address::from_array([0x22; 20]);
-    let mut runner = test_utils::standalone::StandaloneRunner::default();
+    let mut runner = utils::standalone::StandaloneRunner::default();
 
     runner.init_evm();
     runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);

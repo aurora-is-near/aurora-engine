@@ -6,9 +6,9 @@ use aurora_engine::parameters::{
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
+use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
-use borsh::BorshDeserialize;
 use engine_standalone_storage::{
     sync::{
         self,
@@ -19,7 +19,7 @@ use engine_standalone_storage::{
 use libsecp256k1::SecretKey;
 use tempfile::TempDir;
 
-use crate::test_utils;
+use crate::utils;
 
 pub mod mocks;
 pub mod storage;
@@ -93,12 +93,12 @@ impl StandaloneRunner {
             maybe_result: Ok(None),
         };
         self.cumulative_diff.append(outcome.diff.clone());
-        test_utils::standalone::storage::commit(storage, &outcome);
+        storage::commit(storage, &outcome);
     }
 
     pub fn transfer_with_signer(
         &mut self,
-        signer: &mut test_utils::Signer,
+        signer: &mut utils::Signer,
         amount: Wei,
         dest: Address,
     ) -> Result<SubmitResult, engine::EngineError> {
@@ -121,7 +121,7 @@ impl StandaloneRunner {
         let storage = &mut self.storage;
         let env = &mut self.env;
         env.block_height += 1;
-        let signed_tx = test_utils::sign_transaction(transaction, Some(self.chain_id), account);
+        let signed_tx = utils::sign_transaction(transaction, Some(self.chain_id), account);
         let transaction_bytes = rlp::encode(&signed_tx).to_vec();
 
         Self::internal_submit_transaction(
@@ -202,7 +202,7 @@ impl StandaloneRunner {
         env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
 
         let storage = &mut self.storage;
-        if method_name == test_utils::SUBMIT {
+        if method_name == utils::SUBMIT {
             let transaction_bytes = &ctx.input;
             Self::internal_submit_transaction(
                 transaction_bytes,
@@ -212,7 +212,7 @@ impl StandaloneRunner {
                 &mut self.cumulative_diff,
                 promise_results,
             )
-        } else if method_name == test_utils::SUBMIT_WITH_ARGS {
+        } else if method_name == utils::SUBMIT_WITH_ARGS {
             let submit_args = SubmitArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&submit_args.tx_data);
             let mut tx_msg =
@@ -225,7 +225,7 @@ impl StandaloneRunner {
             storage::commit(storage, &outcome);
 
             unwrap_result(outcome)
-        } else if method_name == test_utils::CALL {
+        } else if method_name == utils::CALL {
             let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
             let mut tx_msg =
@@ -238,7 +238,7 @@ impl StandaloneRunner {
             storage::commit(storage, &outcome);
 
             unwrap_result(outcome)
-        } else if method_name == test_utils::DEPLOY_ERC20 {
+        } else if method_name == utils::DEPLOY_ERC20 {
             let deploy_args = DeployErc20TokenArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
             let mut tx_msg =
@@ -257,7 +257,7 @@ impl StandaloneRunner {
                 0,
                 Vec::new(),
             ))
-        } else if method_name == test_utils::RESUME_PRECOMPILES {
+        } else if method_name == utils::RESUME_PRECOMPILES {
             let input = &ctx.input[..];
             let call_args = PausePrecompilesCallArgs::try_from_slice(input)
                 .expect("Unable to parse input as PausePrecompilesCallArgs");
@@ -277,7 +277,7 @@ impl StandaloneRunner {
                 0,
                 Vec::new(),
             ))
-        } else if method_name == test_utils::PAUSE_PRECOMPILES {
+        } else if method_name == utils::PAUSE_PRECOMPILES {
             let input = &ctx.input[..];
             let call_args = PausePrecompilesCallArgs::try_from_slice(input)
                 .expect("Unable to parse input as PausePrecompilesCallArgs");
@@ -297,7 +297,7 @@ impl StandaloneRunner {
                 0,
                 Vec::new(),
             ))
-        } else if method_name == test_utils::SET_OWNER {
+        } else if method_name == utils::SET_OWNER {
             let input = &ctx.input[..];
             let call_args =
                 SetOwnerArgs::try_from_slice(input).expect("Unable to parse input as SetOwnerArgs");
@@ -317,7 +317,7 @@ impl StandaloneRunner {
                 0,
                 Vec::new(),
             ))
-        } else if method_name == test_utils::SET_UPGRADE_DELAY_BLOCKS {
+        } else if method_name == utils::SET_UPGRADE_DELAY_BLOCKS {
             let input = &ctx.input;
             let call_args = SetUpgradeDelayBlocksArgs::try_from_slice(input)
                 .expect("Unable to parse input as SetUpgradeDelayBlocksArgs");
@@ -450,7 +450,7 @@ impl Default for StandaloneRunner {
     fn default() -> Self {
         let (storage_dir, storage) = storage::create_db();
         let env = mocks::default_env(0);
-        let chain_id = test_utils::AuroraRunner::default().chain_id;
+        let chain_id = utils::AuroraRunner::default().chain_id;
         Self {
             storage_dir,
             storage,

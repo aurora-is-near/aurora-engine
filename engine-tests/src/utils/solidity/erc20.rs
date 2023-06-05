@@ -1,5 +1,5 @@
 use crate::prelude::{transactions::legacy::TransactionLegacy, Address, U256};
-use crate::test_utils::solidity;
+use crate::utils::solidity;
 use aurora_engine_transactions::NormalizedEthTransaction;
 use aurora_engine_types::types::Wei;
 use std::path::{Path, PathBuf};

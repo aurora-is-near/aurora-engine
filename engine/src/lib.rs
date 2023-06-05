@@ -986,8 +986,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_nep141_from_erc20() {
         let mut io = Runtime;
-        let erc20_address: crate::engine::ERC20Address =
-            io.read_input().to_vec().try_into().sdk_unwrap();
+        let erc20_address: engine::ERC20Address = io.read_input().to_vec().try_into().sdk_unwrap();
         io.return_output(
             engine::nep141_erc20_map(io)
                 .lookup_right(&erc20_address)

@@ -2,7 +2,7 @@ use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::U256;
 
-use crate::test_utils::solidity;
+use crate::utils::solidity;
 
 pub struct WethConstructor(solidity::ContractConstructor);
 

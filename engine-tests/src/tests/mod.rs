@@ -1,11 +1,9 @@
-mod access_lists;
 mod account_id_precompiles;
 mod contract_call;
 mod ecrecover;
-mod eip1559;
 mod erc20;
 mod erc20_connector;
-pub mod eth_connector;
+mod eth_connector;
 mod ghsa_3p69_m8gg_fwmf;
 #[cfg(feature = "meta-call")]
 mod meta_parsing;
@@ -22,6 +20,7 @@ mod self_destruct_state;
 mod serde;
 mod standalone;
 mod standard_precompiles;
-mod state_migration;
+mod transaction;
 pub mod uniswap;
+mod upgrade;
 pub mod xcc;
