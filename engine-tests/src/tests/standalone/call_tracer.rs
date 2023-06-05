@@ -1,5 +1,6 @@
 use crate::prelude::H256;
 use crate::test_utils::{self, standalone};
+use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
     storage,
@@ -245,6 +246,7 @@ fn test_trace_contract_with_precompile_sub_call() {
     runner.close();
 }
 
+#[allow(clippy::too_many_lines)]
 #[test]
 fn test_trace_precompiles_with_subcalls() {
     // The XCC precompile does internal sub-calls. We will trace an XCC call.
@@ -289,7 +291,7 @@ fn test_trace_precompiles_with_subcalls() {
                 nep141: "wrap.near".parse().unwrap(),
             },
         );
-        let mut outcome = sync::execute_transaction_message(storage, tx).unwrap();
+        let mut outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx).unwrap();
         let key = storage::bytes_to_key(storage::KeyPrefix::Nep141Erc20Map, b"wrap.near");
         outcome.diff.modify(key, wnear_address.as_bytes().to_vec());
         let key =
@@ -312,8 +314,9 @@ fn test_trace_precompiles_with_subcalls() {
         tx.transaction = sync::types::TransactionKind::FactoryUpdate(xcc_router_bytes);
         tx
     };
-    let outcome = sync::execute_transaction_message(&runner.storage, factory_update).unwrap();
-    test_utils::standalone::storage::commit(&mut runner.storage, &outcome);
+    let outcome =
+        sync::execute_transaction_message::<AuroraModExp>(&runner.storage, factory_update).unwrap();
+    standalone::storage::commit(&mut runner.storage, &outcome);
     let set_wnear_address = {
         runner.env.block_height += 1;
         let storage = &mut runner.storage;
@@ -324,8 +327,10 @@ fn test_trace_precompiles_with_subcalls() {
         tx.transaction = sync::types::TransactionKind::FactorySetWNearAddress(wnear_address);
         tx
     };
-    let outcome = sync::execute_transaction_message(&runner.storage, set_wnear_address).unwrap();
-    test_utils::standalone::storage::commit(&mut runner.storage, &outcome);
+    let outcome =
+        sync::execute_transaction_message::<AuroraModExp>(&runner.storage, set_wnear_address)
+            .unwrap();
+    standalone::storage::commit(&mut runner.storage, &outcome);
 
     // User calls XCC precompile
     let promise = PromiseCreateArgs {
