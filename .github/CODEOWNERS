@@ -4,6 +4,6 @@
 /engine-sdk/ @aleksuss
 /engine-standalone-storage/ @RomanHodulak
 /engine-standalone-tracing/ @RomanHodulak
-/engine-test-doubles/ @hskang9
-/engine-tests/ @hskang9
+/engine-test-doubles/ @joshuajbouw
+/engine-tests/ @joshuajbouw
 /engine-transactions/ @aleksuss
