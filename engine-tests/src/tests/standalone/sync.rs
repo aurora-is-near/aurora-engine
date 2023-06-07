@@ -426,7 +426,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         inputs: aurora_engine::deposit_event::DepositedEvent::event_params(),
         anonymous: false,
     };
-    let log_entry = aurora_engine::log_entry::LogEntry {
+    let log_entry = aurora_engine_types::parameters::connector::LogEntry {
         address: eth_custodian_address.raw(),
         topics: vec![
             event_schema.signature(),

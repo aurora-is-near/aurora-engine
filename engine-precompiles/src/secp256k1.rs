@@ -1,4 +1,4 @@
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{sdk, vec::Vec, Borrowed, H256};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 #[cfg(not(feature = "contract"))]
@@ -62,7 +62,7 @@ fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
 pub struct ECRecover;
 
 impl ECRecover {
-    pub const ADDRESS: Address = super::make_address(0, 1);
+    pub const ADDRESS: Address = make_address(0, 1);
 }
 
 impl Precompile for ECRecover {

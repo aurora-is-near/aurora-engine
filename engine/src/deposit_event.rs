@@ -1,10 +1,10 @@
 use crate::deposit_event::error::ParseEventMessageError;
-use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     vec, Address, BorshDeserialize, BorshSerialize, Fee, NEP141Wei, String, ToString, Vec, U256,
 };
 use aurora_engine_types::borsh;
+use aurora_engine_types::parameters::connector::LogEntry;
 use aurora_engine_types::types::address::error::AddressError;
 use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
@@ -386,7 +386,7 @@ pub mod error {
 mod tests {
     use super::*;
     use crate::errors;
-    use aurora_engine_precompiles::make_address;
+    use aurora_engine_types::types::address::make_address;
     use aurora_engine_types::H160;
 
     #[test]

@@ -1,5 +1,5 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{borsh::BorshSerialize, Cow, Vec};
@@ -9,7 +9,7 @@ use evm::{Context, ExitError};
 ///
 /// Address: `0x0a3540f79be10ef14890e87c1a0040a68cc6af71`
 /// This address is computed as: `&keccak("getPromiseResults")[12..]`
-pub const ADDRESS: Address = crate::make_address(0x0a3540f7, 0x9be10ef14890e87c1a0040a68cc6af71);
+pub const ADDRESS: Address = make_address(0x0a3540f7, 0x9be10ef14890e87c1a0040a68cc6af71);
 
 pub mod costs {
     use crate::prelude::types::EthGas;
