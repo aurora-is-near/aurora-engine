@@ -386,7 +386,7 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     modexp_algorithm: PhantomData<M>,
 }
 
-pub(crate) const CONFIG: &Config = &Config::london();
+pub(crate) const CONFIG: &Config = &Config::shanghai();
 
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
