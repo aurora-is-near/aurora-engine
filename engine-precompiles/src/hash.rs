@@ -1,6 +1,6 @@
 #[cfg(feature = "contract")]
 use crate::prelude::sdk;
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::vec;
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
@@ -27,7 +27,7 @@ mod consts {
 pub struct SHA256;
 
 impl SHA256 {
-    pub const ADDRESS: Address = super::make_address(0, 2);
+    pub const ADDRESS: Address = make_address(0, 2);
 }
 
 impl Precompile for SHA256 {
@@ -91,7 +91,7 @@ impl Precompile for SHA256 {
 pub struct RIPEMD160;
 
 impl RIPEMD160 {
-    pub const ADDRESS: Address = super::make_address(0, 3);
+    pub const ADDRESS: Address = make_address(0, 3);
 
     #[cfg(not(feature = "contract"))]
     fn internal_impl(input: &[u8]) -> [u8; 20] {

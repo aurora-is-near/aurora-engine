@@ -30,7 +30,7 @@ use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{exit_to_ethereum, exit_to_near, ExitToEthereum, ExitToNear};
 use crate::prelude::types::EthGas;
-use crate::prelude::{Vec, H160, H256};
+use crate::prelude::{Vec, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
@@ -404,37 +404,6 @@ pub enum AllPrecompiles<'a, I, E, H> {
     Generic(Box<dyn Precompile>),
 }
 
-/// fn for making an address by concatenating the bytes from two given numbers,
-/// Note that 32 + 128 = 160 = 20 bytes (the length of an address). This function is used
-/// as a convenience for specifying the addresses of the various precompiles.
-#[must_use]
-pub const fn make_address(x: u32, y: u128) -> Address {
-    let x_bytes = x.to_be_bytes();
-    let y_bytes = y.to_be_bytes();
-    Address::new(H160([
-        x_bytes[0],
-        x_bytes[1],
-        x_bytes[2],
-        x_bytes[3],
-        y_bytes[0],
-        y_bytes[1],
-        y_bytes[2],
-        y_bytes[3],
-        y_bytes[4],
-        y_bytes[5],
-        y_bytes[6],
-        y_bytes[7],
-        y_bytes[8],
-        y_bytes[9],
-        y_bytes[10],
-        y_bytes[11],
-        y_bytes[12],
-        y_bytes[13],
-        y_bytes[14],
-        y_bytes[15],
-    ]))
-}
-
 const fn make_h256(x: u128, y: u128) -> H256 {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
@@ -479,7 +448,6 @@ mod tests {
     use crate::prelude::H160;
     use crate::{prelude, Byzantium, Istanbul};
     use prelude::types::Address;
-    use rand::Rng;
 
     #[test]
     fn test_precompile_addresses() {
@@ -492,20 +460,6 @@ mod tests {
         assert_eq!(super::Bn256Mul::<Istanbul>::ADDRESS, u8_to_address(7));
         assert_eq!(super::Bn256Pair::<Istanbul>::ADDRESS, u8_to_address(8));
         assert_eq!(super::blake2::Blake2F::ADDRESS, u8_to_address(9));
-    }
-
-    #[test]
-    fn test_make_address() {
-        for i in 0..u8::MAX {
-            assert_eq!(super::make_address(0, i.into()), u8_to_address(i));
-        }
-
-        let mut rng = rand::thread_rng();
-        for _ in 0..u8::MAX {
-            let address = Address::new(H160(rng.gen()));
-            let (x, y) = split_address(address);
-            assert_eq!(address, super::make_address(x, y));
-        }
     }
 
     #[test]
@@ -637,16 +591,5 @@ mod tests {
         let mut bytes = [0u8; 20];
         bytes[19] = x;
         Address::new(H160(bytes))
-    }
-
-    // Inverse function of `super::make_address`.
-    fn split_address(a: Address) -> (u32, u128) {
-        let mut x_bytes = [0u8; 4];
-        let mut y_bytes = [0u8; 16];
-
-        x_bytes.copy_from_slice(&a.raw()[0..4]);
-        y_bytes.copy_from_slice(&a.raw()[4..20]);
-
-        (u32::from_be_bytes(x_bytes), u128::from_be_bytes(y_bytes))
     }
 }

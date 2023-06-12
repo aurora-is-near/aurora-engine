@@ -398,11 +398,13 @@ dependencies = [
 name = "aurora-engine-types"
 version = "1.0.0"
 dependencies = [
+ "base64 0.21.2",
  "borsh 0.10.3",
  "borsh 0.9.3",
  "hex",
  "primitive-types 0.12.1",
  "rand 0.8.5",
+ "rlp",
  "serde",
  "serde_json",
 ]

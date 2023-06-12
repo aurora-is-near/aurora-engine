@@ -20,9 +20,13 @@ extern crate alloc;
 extern crate core;
 
 mod map;
-pub mod parameters;
-pub mod proof;
-
+pub mod parameters {
+    pub use aurora_engine_types::parameters::connector::*;
+    pub use aurora_engine_types::parameters::engine::*;
+}
+pub mod proof {
+    pub use aurora_engine_types::parameters::connector::Proof;
+}
 pub mod accounting;
 pub mod admin_controlled;
 #[cfg_attr(feature = "contract", allow(dead_code))]
@@ -31,7 +35,6 @@ pub mod deposit_event;
 pub mod engine;
 pub mod errors;
 pub mod fungible_token;
-pub mod log_entry;
 pub mod pausables;
 mod prelude;
 pub mod state;
@@ -78,11 +81,9 @@ mod contract {
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
-    use crate::fungible_token::FungibleTokenMetadata;
-    use crate::parameters::error::ParseTypeFromJsonError;
     use crate::parameters::{
-        self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+        self, CallArgs, DeployErc20TokenArgs, FungibleTokenMetadata, GetErc20FromNep141CallArgs,
+        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
         SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitArgs,
         TransferCallCallArgs, ViewCallArgs,
@@ -106,6 +107,7 @@ mod contract {
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
     use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+    use aurora_engine_types::parameters::engine::errors::ParseTypeFromJsonError;
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;

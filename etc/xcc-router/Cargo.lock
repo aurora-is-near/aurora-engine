@@ -41,10 +41,12 @@ checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 name = "aurora-engine-types"
 version = "1.0.0"
 dependencies = [
+ "base64 0.21.2",
  "borsh 0.10.2",
  "borsh 0.9.3",
  "hex",
  "primitive-types 0.12.1",
+ "rlp",
  "serde",
  "serde_json",
 ]
@@ -66,6 +68,12 @@ name = "base64"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
+
+[[package]]
+name = "base64"
+version = "0.21.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "604178f6c5c21f02dc555784810edfb88d34ac2c73b2eae109655649ee73ce3d"
 
 [[package]]
 name = "bitvec"
