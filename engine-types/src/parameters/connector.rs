@@ -3,12 +3,11 @@ use base64::Engine;
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "borsh-compat")]
 use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
-use primitive_types::{H160, H256};
 use serde::{Deserialize, Serialize};
 
 use crate::account_id::AccountId;
 use crate::types::{Address, Balance, Fee, NEP141Wei, Yocto};
-use crate::{String, ToString, Vec};
+use crate::{String, ToString, Vec, H160, H256};
 
 /// Eth-connector initial args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
