@@ -1,4 +1,4 @@
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Cow, PhantomData, Vec, U256};
 use crate::{
     utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
@@ -11,7 +11,7 @@ use num::{Integer, Zero};
 pub struct ModExp<HF: HardFork, M = AuroraModExp>(PhantomData<HF>, PhantomData<M>);
 
 impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
-    pub const ADDRESS: Address = super::make_address(0, 5);
+    pub const ADDRESS: Address = make_address(0, 5);
 
     #[must_use]
     pub fn new() -> Self {

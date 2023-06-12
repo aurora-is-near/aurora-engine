@@ -4,10 +4,10 @@ use rand::{Rng, SeedableRng};
 
 use super::sanity::initialize_transfer;
 use crate::prelude::Wei;
-use crate::prelude::{Address, U256};
+use crate::prelude::{make_address, Address, U256};
 use crate::test_utils::{self, standalone::StandaloneRunner, AuroraRunner, Signer};
 
-const MODEXP_ADDRESS: Address = aurora_engine_precompiles::make_address(0, 5);
+const MODEXP_ADDRESS: Address = make_address(0, 5);
 
 #[test]
 fn bench_modexp() {

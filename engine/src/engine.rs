@@ -1755,12 +1755,11 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
 mod tests {
     use super::*;
     use crate::parameters::{FunctionCallArgsV1, FunctionCallArgsV2};
-    use aurora_engine_precompiles::make_address;
     use aurora_engine_sdk::env::Fixed;
     use aurora_engine_sdk::promise::Noop;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use aurora_engine_test_doubles::promise::PromiseTracker;
-    use aurora_engine_types::types::{Balance, NearGas, RawU256};
+    use aurora_engine_types::types::{make_address, Balance, NearGas, RawU256};
     use std::cell::RefCell;
 
     #[test]
