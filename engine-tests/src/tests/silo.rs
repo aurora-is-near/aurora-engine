@@ -627,7 +627,13 @@ fn test_switch_between_fix_gas_cost() {
 
     // Set fixed gas cost
     let fixed_gas_cost = Wei::new_u64(1_000_000);
-    set_fixed_gas_cost(&mut runner, Some(fixed_gas_cost));
+    set_silo_params(
+        &mut runner,
+        Some(SiloParamsArgs {
+            fixed_gas_cost,
+            erc20_fallback_address: ERC20_FALLBACK_ADDRESS,
+        }),
+    );
     // Check that fixed gas cost has been set successfully.
     assert_eq!(runner.get_fixed_gas_cost(), Some(fixed_gas_cost));
 
@@ -647,7 +653,7 @@ fn test_switch_between_fix_gas_cost() {
     validate_address_balance_and_nonce(&runner, receiver, receiver_balance, INITIAL_NONCE.into());
 
     // Unset fixed gas cost. Should be used usual gas charge mechanism.
-    set_fixed_gas_cost(&mut runner, None);
+    set_silo_params(&mut runner, None);
     assert_eq!(runner.get_fixed_gas_cost(), None);
     let balance_before_transfer = runner.get_balance(sender);
 
