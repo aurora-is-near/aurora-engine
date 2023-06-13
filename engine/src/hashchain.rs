@@ -1,10 +1,11 @@
 use self::blockchain_hashchain_error::BlockchainHashchainError;
 use crate::{
     bloom::Bloom,
-    prelude::{BorshDeserialize, BorshSerialize, Vec},
+    prelude::Vec,
 };
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::types::RawH256;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Blockchain Hashchain.
 /// Continually keeps track of the previous block hashchain through the blocks heights.

@@ -1,10 +1,10 @@
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
 /// Identity precompile costs.
 mod costs {
-    use crate::prelude::types::EthGas;
+    use aurora_engine_types::types::EthGas;
 
     /// The base cost of the operation.
     pub(super) const IDENTITY_BASE: EthGas = EthGas::new(15);
@@ -21,7 +21,7 @@ mod consts {
 pub struct Identity;
 
 impl Identity {
-    pub const ADDRESS: Address = super::make_address(0, 4);
+    pub const ADDRESS: Address = make_address(0, 4);
 }
 
 impl Precompile for Identity {
