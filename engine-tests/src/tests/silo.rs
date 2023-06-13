@@ -1,6 +1,6 @@
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::silo::parameters::{
-    FixedGasCostArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
+    FixedGasCostArgs, SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
     WhitelistStatusArgs,
 };
 use aurora_engine::silo::WhitelistKind;
@@ -22,6 +22,11 @@ const ZERO_BALANCE: Wei = Wei::zero();
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(10u64.pow(18) * 4);
 const FEE: Wei = Wei::new_u64(10u64.pow(18));
+const ERC20_FALLBACK_ADDRESS: Address = Address::zero();
+const SILO_PARAMS_ARGS: SiloParamsArgs = SiloParamsArgs {
+    fixed_gas_cost: FEE,
+    erc20_fallback_address: ERC20_FALLBACK_ADDRESS,
+};
 // https://github.com/aurora-is-near/aurora-engine/blob/master/engine-tests/src/test_utils/mod.rs#L393
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
@@ -32,7 +37,7 @@ fn test_address_transfer_success() {
     let sender = test_utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     // Allow to submit transactions
     add_account_to_whitelist(&mut runner, caller);
@@ -65,7 +70,7 @@ fn test_transfer_insufficient_balance() {
     let sender = test_utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -101,7 +106,7 @@ fn test_transfer_insufficient_balance_fee() {
     let sender = test_utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -154,7 +159,7 @@ fn test_eth_transfer_incorrect_nonce() {
     let sender = test_utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -182,7 +187,7 @@ fn test_transfer_with_low_gas_limit() {
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -217,7 +222,7 @@ fn test_relayer_balance_after_transfer() {
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
     let transaction = |nonce| test_utils::transfer(receiver, TRANSFER_AMOUNT, nonce);
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -251,7 +256,7 @@ fn test_admin_access_right() {
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     // Allow to submit transactions.
 
     let account = WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
@@ -291,7 +296,7 @@ fn test_submit_access_right() {
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
     let transaction = test_utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
@@ -335,7 +340,7 @@ fn test_submit_access_right_via_batch() {
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
     let transaction = test_utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
@@ -388,7 +393,7 @@ fn test_submit_with_disabled_whitelist() {
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
     let transaction = test_utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
@@ -441,7 +446,7 @@ fn test_submit_with_removing_entries() {
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
     let transaction = test_utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     // Allow to submit transactions.
     add_account_to_whitelist(&mut runner, caller.clone());
@@ -502,7 +507,7 @@ fn test_deploy_access_rights() {
     let balance = runner.get_balance(sender);
     assert_eq!(balance, INITIAL_BALANCE);
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     // Try to deploy code without adding to admins white list.
     let err = runner
@@ -552,7 +557,7 @@ fn test_deploy_with_disabled_whitelist() {
     let balance = runner.get_balance(sender);
     assert_eq!(balance, INITIAL_BALANCE);
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     // Try to deploy code without adding to admins white list.
     let err = runner
@@ -664,6 +669,27 @@ fn test_switch_between_fix_gas_cost() {
     validate_address_balance_and_nonce(&runner, receiver, receiver_balance, INITIAL_NONCE.into());
 }
 
+#[test]
+#[should_panic(expected = "SILO_MODE_IS_OFF")]
+fn test_set_fixed_gas_cost_in_disabled_silo_mode() {
+    let mut runner = test_utils::deploy_evm();
+    set_fixed_gas_cost(&mut runner, Some(FEE));
+}
+
+#[test]
+#[should_panic(expected = "FIXED_GAS_COST_IS_NONE")]
+fn test_set_none_fixed_gas_cost() {
+    let mut runner = test_utils::deploy_evm();
+    set_fixed_gas_cost(&mut runner, None);
+}
+
+#[test]
+fn test_set_fixed_gas_cost() {
+    let mut runner = test_utils::deploy_evm();
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
+    set_fixed_gas_cost(&mut runner, Some(FEE));
+}
+
 fn initialize_transfer() -> (AuroraRunner, test_utils::Signer, Address) {
     // set up Aurora runner and accounts
     let mut runner = test_utils::deploy_evm();
@@ -749,6 +775,10 @@ fn remove_address_from_whitelist(runner: &mut AuroraRunner, address: Address) {
 fn set_fixed_gas_cost(runner: &mut AuroraRunner, cost: Option<Wei>) {
     let args = FixedGasCostArgs { cost };
     call_function(runner, "set_fixed_gas_cost", args);
+}
+
+fn set_silo_params(runner: &mut AuroraRunner, silo_params: Option<SiloParamsArgs>) {
+    call_function(runner, "set_silo_params", silo_params);
 }
 
 fn call_function<T: BorshSerialize + Debug>(runner: &mut AuroraRunner, func: &str, args: T) {
