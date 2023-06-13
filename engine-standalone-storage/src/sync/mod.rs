@@ -454,6 +454,10 @@ fn non_submit_execute<'db>(
 
             None
         }
+        TransactionKind::SetFixedGasCost(args) => {
+            silo::set_fixed_gas_cost(&mut io, args.cost);
+            None
+        }
         TransactionKind::SetSiloParams(args) => {
             silo::set_silo_params(&mut io, args.clone());
             None

@@ -1067,6 +1067,16 @@ mod contract {
     /// Silo
     ///
     #[no_mangle]
+    pub extern "C" fn get_fixed_gas_cost() {
+        let mut io = Runtime;
+        let cost = FixedGasCostArgs {
+            cost: silo::get_fixed_gas_cost(&io),
+        };
+
+        io.return_output(&cost.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+    }
+
+    #[no_mangle]
     pub extern "C" fn set_fixed_gas_cost() {
         let mut io = Runtime;
         silo::assert_admin(&io).sdk_unwrap();

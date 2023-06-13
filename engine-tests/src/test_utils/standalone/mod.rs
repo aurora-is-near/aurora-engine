@@ -3,7 +3,9 @@ use aurora_engine::parameters::{
     CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs,
     SetUpgradeDelayBlocksArgs, SubmitArgs, SubmitResult, TransactionStatus,
 };
-use aurora_engine::silo::parameters::{SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs};
+use aurora_engine::silo::parameters::{
+    FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs,
+};
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
@@ -330,6 +332,23 @@ impl StandaloneRunner {
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::SET_FIXED_GAS_COST => {
+                let call_args = FixedGasCostArgs::try_from_slice(&ctx.input)
+                    .expect("Unable to parse input as FixedGasCostArgs");
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::SetFixedGasCost(call_args);
+
+                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
                 Ok(SubmitResult::new(
                     TransactionStatus::Succeed(Vec::new()),
                     0,

@@ -133,6 +133,7 @@ pub enum TransactionKind {
     FactorySetWNearAddress(Address),
     FundXccSubAccount(FundXccArgs),
     /// Silo operations
+    SetFixedGasCost(silo::parameters::FixedGasCostArgs),
     SetSiloParams(Option<silo::parameters::SiloParamsArgs>),
     AddEntryToWhitelist(silo::parameters::WhitelistArgs),
     AddEntryToWhitelistBatch(Vec<silo::parameters::WhitelistArgs>),
@@ -361,6 +362,7 @@ impl TransactionKind {
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
             Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
             Self::FundXccSubAccount(_) => Self::no_evm_execution("fund_xcc_sub_account"),
+            Self::SetFixedGasCost(_) => Self::no_evm_execution("set_fixed_gas_cost"),
             Self::SetSiloParams(_) => Self::no_evm_execution("set_silo_params"),
             Self::AddEntryToWhitelist(_) => Self::no_evm_execution("add_entry_to_whitelist"),
             Self::AddEntryToWhitelistBatch(_) => {
@@ -539,6 +541,7 @@ enum BorshableTransactionKind<'a> {
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccount(Cow<'a, FundXccArgs>),
     SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
+    SetFixedGasCost(Cow<'a, silo::parameters::FixedGasCostArgs>),
     SetSiloParams(Cow<'a, Option<silo::parameters::SiloParamsArgs>>),
     AddEntryToWhitelist(Cow<'a, silo::parameters::WhitelistArgs>),
     AddEntryToWhitelistBatch(Cow<'a, Vec<silo::parameters::WhitelistArgs>>),
@@ -590,6 +593,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetUpgradeDelayBlocks(x) => {
                 Self::SetUpgradeDelayBlocks(Cow::Borrowed(x))
             }
+            TransactionKind::SetFixedGasCost(x) => Self::SetFixedGasCost(Cow::Borrowed(x)),
             TransactionKind::SetSiloParams(x) => Self::SetSiloParams(Cow::Borrowed(x)),
             TransactionKind::AddEntryToWhitelist(x) => Self::AddEntryToWhitelist(Cow::Borrowed(x)),
             TransactionKind::AddEntryToWhitelistBatch(x) => {
@@ -663,6 +667,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
                 Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
+            }
+            BorshableTransactionKind::SetFixedGasCost(x) => {
+                Ok(Self::SetFixedGasCost(x.into_owned()))
             }
             BorshableTransactionKind::SetSiloParams(x) => Ok(Self::SetSiloParams(x.into_owned())),
             BorshableTransactionKind::AddEntryToWhitelist(x) => {
