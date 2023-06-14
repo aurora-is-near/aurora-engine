@@ -441,26 +441,13 @@ impl<I: IO> Precompile for ExitToNear<I> {
             amount: types::u256_to_arr(&exit_event.amount),
         };
 
-        let precompile_call_args = ExitToNearPrecompileCallbackCallArgs {
+        let callback_args = ExitToNearPrecompileCallbackCallArgs {
             #[cfg(feature = "error_refund")]
             refund: Some(refund_args),
             #[cfg(not(feature = "error_refund"))]
             refund: None,
             transfer_near: transfer_near_args,
         };
-
-        let callback_promise =
-            if precompile_call_args == ExitToNearPrecompileCallbackCallArgs::default() {
-                None
-            } else {
-                Some(PromiseCreateArgs {
-                    target_account_id: self.current_account_id.clone(),
-                    method: "exit_to_near_precompile_callback".to_string(),
-                    args: precompile_call_args.try_to_vec().unwrap(),
-                    attached_balance: Yocto::new(0),
-                    attached_gas: costs::EXIT_TO_NEAR_CALLBACK_GAS,
-                })
-            };
 
         let transfer_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
@@ -470,10 +457,16 @@ impl<I: IO> Precompile for ExitToNear<I> {
             attached_gas: costs::FT_TRANSFER_GAS,
         };
 
-        let promise = if let Some(callback) = callback_promise {
+        let promise = if callback_args != ExitToNearPrecompileCallbackCallArgs::default() {
             PromiseArgs::Callback(PromiseWithCallbackArgs {
                 base: transfer_promise,
-                callback,
+                callback: PromiseCreateArgs {
+                    target_account_id: self.current_account_id.clone(),
+                    method: "exit_to_near_precompile_callback".to_string(),
+                    args: callback_args.try_to_vec().unwrap(),
+                    attached_balance: Yocto::new(0),
+                    attached_gas: costs::EXIT_TO_NEAR_CALLBACK_GAS,
+                },
             })
         } else {
             PromiseArgs::Create(transfer_promise)
