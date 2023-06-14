@@ -538,9 +538,7 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
         TransactionKind::NewConnector(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::NewEngine(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::FactoryUpdate(bytecode) => Ok(bytecode.clone()),
-        TransactionKind::FactoryUpdateAddressVersion(args) => {
-            args.try_to_vec().map_err(Into::into)
-        }
+        TransactionKind::FactoryUpdateAddressVersion(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::FactorySetWNearAddress(address) => Ok(address.as_bytes().to_vec()),
         TransactionKind::FundXccSubAccound(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::Unknown => Ok(vec![]),

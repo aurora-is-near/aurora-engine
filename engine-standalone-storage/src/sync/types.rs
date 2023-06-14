@@ -492,17 +492,11 @@ impl From<&TransactionKind> for InnerTransactionKind {
             TransactionKind::NewConnector(_) => Self::NewConnector,
             TransactionKind::NewEngine(_) => Self::NewEngine,
             TransactionKind::FactoryUpdate(_) => Self::FactoryUpdate,
-            TransactionKind::FactoryUpdateAddressVersion(_) => {
-                Self::FactoryUpdateAddressVersion
-            }
-            TransactionKind::FactorySetWNearAddress(_) => {
-                Self::FactorySetWNearAddress
-            }
+            TransactionKind::FactoryUpdateAddressVersion(_) => Self::FactoryUpdateAddressVersion,
+            TransactionKind::FactorySetWNearAddress(_) => Self::FactorySetWNearAddress,
             TransactionKind::FundXccSubAccound(_) => Self::FundXccSubAccound,
             TransactionKind::Unknown => Self::Unknown,
-            TransactionKind::SetUpgradeDelayBlocks(_) => {
-                Self::SetUpgradeDelayBlocks
-            }
+            TransactionKind::SetUpgradeDelayBlocks(_) => Self::SetUpgradeDelayBlocks,
         }
     }
 }
