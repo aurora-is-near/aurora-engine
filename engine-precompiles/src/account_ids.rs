@@ -1,5 +1,5 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::account_id::AccountId;
@@ -20,14 +20,13 @@ pub struct PredecessorAccount<'a, E> {
 }
 
 pub mod predecessor_account {
-    use aurora_engine_types::types::Address;
+    use aurora_engine_types::types::{make_address, Address};
 
     /// `predecessor_account_id` precompile address
     ///
     /// Address: `0x723ffbaba940e75e7bf5f6d61dcbf8d9a4de0fd7`
     /// This address is computed as: `&keccak("predecessorAccountId")[12..]`
-    pub const ADDRESS: Address =
-        crate::make_address(0x723ffbab, 0xa940e75e7bf5f6d61dcbf8d9a4de0fd7);
+    pub const ADDRESS: Address = make_address(0x723ffbab, 0xa940e75e7bf5f6d61dcbf8d9a4de0fd7);
 }
 
 impl<'a, E> PredecessorAccount<'a, E> {
@@ -73,8 +72,7 @@ impl CurrentAccount {
     ///
     /// Address: `0xfefae79e4180eb0284f261205e3f8cea737aff56`
     /// This address is computed as: `&keccak("currentAccountId")[12..]`
-    pub const ADDRESS: Address =
-        super::make_address(0xfefae79e, 0x4180eb0284f261205e3f8cea737aff56);
+    pub const ADDRESS: Address = make_address(0xfefae79e, 0x4180eb0284f261205e3f8cea737aff56);
 
     #[must_use]
     pub const fn new(current_account_id: AccountId) -> Self {

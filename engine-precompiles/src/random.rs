@@ -1,5 +1,5 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::H256;
 use crate::{utils, PrecompileOutput};
 use evm::{Context, ExitError};
@@ -22,8 +22,7 @@ impl RandomSeed {
     ///
     /// Address: `0xc104f4840573bed437190daf5d2898c2bdf928ac`
     /// This address is computed as: `&keccak("randomSeed")[12..]`
-    pub const ADDRESS: Address =
-        super::make_address(0xc104f484, 0x0573bed437190daf5d2898c2bdf928ac);
+    pub const ADDRESS: Address = make_address(0xc104f484, 0x0573bed437190daf5d2898c2bdf928ac);
 
     #[must_use]
     pub const fn new(random_seed: H256) -> Self {

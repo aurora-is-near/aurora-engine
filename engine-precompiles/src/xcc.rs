@@ -74,14 +74,16 @@ impl<I> CrossContractCall<I> {
 }
 
 pub mod cross_contract_call {
-    use aurora_engine_types::{types::Address, H256};
+    use aurora_engine_types::{
+        types::{make_address, Address},
+        H256,
+    };
 
     /// Exit to Ethereum precompile address
     ///
     /// Address: `0x516cded1d16af10cad47d6d49128e2eb7d27b372`
     /// This address is computed as: `&keccak("nearCrossContractCall")[12..]`
-    pub const ADDRESS: Address =
-        crate::make_address(0x516cded1, 0xd16af10cad47d6d49128e2eb7d27b372);
+    pub const ADDRESS: Address = make_address(0x516cded1, 0xd16af10cad47d6d49128e2eb7d27b372);
 
     /// Sentinel value used to indicate the following topic field is how much NEAR the
     /// cross-contract call will require.

@@ -4,10 +4,10 @@ use rand::{Rng, SeedableRng};
 
 use super::sanity::initialize_transfer;
 use crate::prelude::Wei;
-use crate::prelude::{Address, U256};
+use crate::prelude::{make_address, Address, U256};
 use crate::test_utils::{self, standalone::StandaloneRunner, AuroraRunner, Signer};
 
-const MODEXP_ADDRESS: Address = aurora_engine_precompiles::make_address(0, 5);
+const MODEXP_ADDRESS: Address = make_address(0, 5);
 
 #[test]
 fn bench_modexp() {
@@ -153,9 +153,11 @@ fn test_modexp_oom() {
         "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffff0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         // exp_len: u64::MAX
         "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000c000000000000000000000000000000000000000000000000000000000000000071000000000000ff600000000000000000000000000000000000000000000000",
+        // exponent equal to zero
+        "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001060002",
     ];
 
-    let outputs = [Vec::new(), Vec::new(), Vec::new()];
+    let outputs = [Vec::new(), Vec::new(), Vec::new(), vec![0x01]];
 
     for (input, output) in inputs.iter().zip(outputs.iter()) {
         check_wasm_modexp(

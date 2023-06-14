@@ -1,5 +1,6 @@
 use crate::prelude::{
-    parameters::SubmitResult, transactions::legacy::TransactionLegacy, Address, Wei, U256,
+    make_address, parameters::SubmitResult, transactions::legacy::TransactionLegacy, Address, Wei,
+    U256,
 };
 use crate::test_utils::{self, solidity, AuroraRunner, Signer};
 use aurora_engine::engine::EngineError;
@@ -8,8 +9,7 @@ pub struct TesterConstructor(pub solidity::ContractConstructor);
 
 const DEPLOY_CONTRACT_GAS: u64 = 1_000_000_000;
 pub const DEST_ACCOUNT: &str = "target.aurora";
-pub const DEST_ADDRESS: Address =
-    aurora_engine_precompiles::make_address(0xe0f5206b, 0xbd039e7b0592d8918820024e2a7437b9);
+pub const DEST_ADDRESS: Address = make_address(0xe0f5206b, 0xbd039e7b0592d8918820024e2a7437b9);
 
 impl TesterConstructor {
     #[cfg(feature = "error_refund")]

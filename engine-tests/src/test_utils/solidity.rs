@@ -195,9 +195,10 @@ where
         ])
         .output()
         .unwrap();
+    let cwd = std::env::current_dir();
     assert!(
         output.status.success(),
-        "Could not compile solidity contracts in docker: {}",
+        "Could not compile solidity contracts in docker [source={source_mount_arg}, output={output_mount_arg}, contract={contract_arg}, workdir={cwd:?}]: {}",
         String::from_utf8(output.stderr).unwrap()
     );
 }
