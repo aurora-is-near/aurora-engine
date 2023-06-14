@@ -456,52 +456,52 @@ pub enum InnerTransactionKind {
     Unknown,
 }
 
-/// Used to make sure InnerTransactionKind is kept in sync with TransactionKind
+/// Used to make sure `InnerTransactionKind` is kept in sync with TransactionKind
 impl From<TransactionKind> for InnerTransactionKind {
     fn from(tx: TransactionKind) -> Self {
-        InnerTransactionKind::from(&tx)
+        Self::from(&tx)
     }
 }
 
-/// Used to make sure InnerTransactionKind is kept in sync with TransactionKind
+/// Used to make sure `InnerTransactionKind` is kept in sync with TransactionKind
 impl From<&TransactionKind> for InnerTransactionKind {
     fn from(tx: &TransactionKind) -> Self {
         match tx {
-            TransactionKind::Submit(_) => InnerTransactionKind::Submit,
-            TransactionKind::SubmitWithArgs(_) => InnerTransactionKind::SubmitWithArgs,
-            TransactionKind::Call(_) => InnerTransactionKind::Call,
-            TransactionKind::PausePrecompiles(_) => InnerTransactionKind::PausePrecompiles,
-            TransactionKind::ResumePrecompiles(_) => InnerTransactionKind::ResumePrecompiles,
-            TransactionKind::Deploy(_) => InnerTransactionKind::Deploy,
-            TransactionKind::DeployErc20(_) => InnerTransactionKind::DeployErc20,
-            TransactionKind::FtOnTransfer(_) => InnerTransactionKind::FtOnTransfer,
-            TransactionKind::Deposit(_) => InnerTransactionKind::Deposit,
-            TransactionKind::FtTransferCall(_) => InnerTransactionKind::FtTransferCall,
-            TransactionKind::FinishDeposit(_) => InnerTransactionKind::FinishDeposit,
-            TransactionKind::ResolveTransfer(_, _) => InnerTransactionKind::ResolveTransfer,
-            TransactionKind::FtTransfer(_) => InnerTransactionKind::FtTransfer,
-            TransactionKind::Withdraw(_) => InnerTransactionKind::Withdraw,
-            TransactionKind::StorageDeposit(_) => InnerTransactionKind::StorageDeposit,
-            TransactionKind::StorageUnregister(_) => InnerTransactionKind::StorageUnregister,
-            TransactionKind::StorageWithdraw(_) => InnerTransactionKind::StorageWithdraw,
-            TransactionKind::SetOwner(_) => InnerTransactionKind::SetOwner,
-            TransactionKind::SetPausedFlags(_) => InnerTransactionKind::SetPausedFlags,
-            TransactionKind::RegisterRelayer(_) => InnerTransactionKind::RegisterRelayer,
-            TransactionKind::RefundOnError(_) => InnerTransactionKind::RefundOnError,
-            TransactionKind::SetConnectorData(_) => InnerTransactionKind::SetConnectorData,
-            TransactionKind::NewConnector(_) => InnerTransactionKind::NewConnector,
-            TransactionKind::NewEngine(_) => InnerTransactionKind::NewEngine,
-            TransactionKind::FactoryUpdate(_) => InnerTransactionKind::FactoryUpdate,
+            TransactionKind::Submit(_) => Self::Submit,
+            TransactionKind::SubmitWithArgs(_) => Self::SubmitWithArgs,
+            TransactionKind::Call(_) => Self::Call,
+            TransactionKind::PausePrecompiles(_) => Self::PausePrecompiles,
+            TransactionKind::ResumePrecompiles(_) => Self::ResumePrecompiles,
+            TransactionKind::Deploy(_) => Self::Deploy,
+            TransactionKind::DeployErc20(_) => Self::DeployErc20,
+            TransactionKind::FtOnTransfer(_) => Self::FtOnTransfer,
+            TransactionKind::Deposit(_) => Self::Deposit,
+            TransactionKind::FtTransferCall(_) => Self::FtTransferCall,
+            TransactionKind::FinishDeposit(_) => Self::FinishDeposit,
+            TransactionKind::ResolveTransfer(_, _) => Self::ResolveTransfer,
+            TransactionKind::FtTransfer(_) => Self::FtTransfer,
+            TransactionKind::Withdraw(_) => Self::Withdraw,
+            TransactionKind::StorageDeposit(_) => Self::StorageDeposit,
+            TransactionKind::StorageUnregister(_) => Self::StorageUnregister,
+            TransactionKind::StorageWithdraw(_) => Self::StorageWithdraw,
+            TransactionKind::SetOwner(_) => Self::SetOwner,
+            TransactionKind::SetPausedFlags(_) => Self::SetPausedFlags,
+            TransactionKind::RegisterRelayer(_) => Self::RegisterRelayer,
+            TransactionKind::RefundOnError(_) => Self::RefundOnError,
+            TransactionKind::SetConnectorData(_) => Self::SetConnectorData,
+            TransactionKind::NewConnector(_) => Self::NewConnector,
+            TransactionKind::NewEngine(_) => Self::NewEngine,
+            TransactionKind::FactoryUpdate(_) => Self::FactoryUpdate,
             TransactionKind::FactoryUpdateAddressVersion(_) => {
-                InnerTransactionKind::FactoryUpdateAddressVersion
+                Self::FactoryUpdateAddressVersion
             }
             TransactionKind::FactorySetWNearAddress(_) => {
-                InnerTransactionKind::FactorySetWNearAddress
+                Self::FactorySetWNearAddress
             }
-            TransactionKind::FundXccSubAccound(_) => InnerTransactionKind::FundXccSubAccound,
-            TransactionKind::Unknown => InnerTransactionKind::Unknown,
+            TransactionKind::FundXccSubAccound(_) => Self::FundXccSubAccound,
+            TransactionKind::Unknown => Self::Unknown,
             TransactionKind::SetUpgradeDelayBlocks(_) => {
-                InnerTransactionKind::SetUpgradeDelayBlocks
+                Self::SetUpgradeDelayBlocks
             }
         }
     }

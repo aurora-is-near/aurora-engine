@@ -56,7 +56,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                         transaction_message.as_ref(),
                         block_height,
                         &block_metadata,
-                        engine_account_id,
+                        &engine_account_id,
                         io,
                     )
                 })
@@ -92,7 +92,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
             &transaction_message,
             block_height,
             &block_metadata,
-            engine_account_id,
+            &engine_account_id,
             io,
         )
     });
@@ -110,7 +110,7 @@ fn execute_transaction<'db, M: ModExpAlgorithm + 'static>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
-    engine_account_id: AccountId,
+    engine_account_id: &AccountId,
     mut io: EngineStateAccess<'db, 'db, 'db>,
 ) -> (
     H256,
@@ -514,40 +514,41 @@ fn update_hashchain<'db>(
 fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
     match transaction {
         TransactionKind::Submit(tx) => Ok(tx.into()),
-        TransactionKind::SubmitWithArgs(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::Call(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::PausePrecompiles(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::ResumePrecompiles(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::SubmitWithArgs(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::Call(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::PausePrecompiles(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::ResumePrecompiles(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::Deploy(input) => Ok(input.to_vec()),
-        TransactionKind::DeployErc20(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::FtOnTransfer(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::Deposit(raw_proof) => Ok(raw_proof.to_vec()),
-        TransactionKind::FtTransferCall(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::FinishDeposit(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::ResolveTransfer(args, _) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::FtTransfer(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::Withdraw(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::StorageDeposit(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::StorageUnregister(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::StorageWithdraw(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::SetOwner(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::SetPausedFlags(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::DeployErc20(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::FtOnTransfer(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::Deposit(raw_proof) => Ok(raw_proof.clone()),
+        TransactionKind::FtTransferCall(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::FinishDeposit(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::ResolveTransfer(args, _) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::FtTransfer(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::Withdraw(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::StorageDeposit(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::StorageUnregister(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::StorageWithdraw(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::SetOwner(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::SetPausedFlags(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::RegisterRelayer(evm_address) => Ok(evm_address.as_bytes().to_vec()),
-        TransactionKind::RefundOnError(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::SetConnectorData(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::NewConnector(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::NewEngine(args) => args.try_to_vec().map_err(|e| e.into()),
-        TransactionKind::FactoryUpdate(bytecode) => Ok(bytecode.to_vec()),
+        TransactionKind::RefundOnError(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::SetConnectorData(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::NewConnector(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::NewEngine(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::FactoryUpdate(bytecode) => Ok(bytecode.clone()),
         TransactionKind::FactoryUpdateAddressVersion(args) => {
-            args.try_to_vec().map_err(|e| e.into())
+            args.try_to_vec().map_err(Into::into)
         }
         TransactionKind::FactorySetWNearAddress(address) => Ok(address.as_bytes().to_vec()),
-        TransactionKind::FundXccSubAccound(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::FundXccSubAccound(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::Unknown => Ok(vec![]),
-        TransactionKind::SetUpgradeDelayBlocks(args) => args.try_to_vec().map_err(|e| e.into()),
+        TransactionKind::SetUpgradeDelayBlocks(args) => args.try_to_vec().map_err(Into::into),
     }
 }
 
+#[deny(clippy::option_if_let_else)]
 fn get_output_and_log_bloom(
     result: &Option<TransactionExecutionResult>,
 ) -> Result<(Vec<u8>, Bloom), error::Error> {
