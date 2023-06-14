@@ -89,11 +89,11 @@ mod contract {
     use crate::engine::{self, Engine};
     use crate::hashchain::BlockchainHashchain;
     use crate::parameters::{
-        self, CallArgs, DeployErc20TokenArgs, FinishDepositCallArgs, FungibleTokenMetadata, GetErc20FromNep141CallArgs,
-        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
-        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitArgs,
-        TransferCallCallArgs, ViewCallArgs,
+        self, CallArgs, DeployErc20TokenArgs, FinishDepositCallArgs, FungibleTokenMetadata,
+        GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
+        NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs, PausePrecompilesCallArgs,
+        ResolveTransferCallArgs, SetContractDataCallArgs, StorageDepositCallArgs,
+        StorageWithdrawCallArgs, SubmitArgs, TransferCallCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
