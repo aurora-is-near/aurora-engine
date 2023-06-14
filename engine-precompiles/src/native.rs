@@ -456,7 +456,9 @@ impl<I: IO> Precompile for ExitToNear<I> {
             attached_gas: costs::FT_TRANSFER_GAS,
         };
 
-        let promise = if callback_args != ExitToNearPrecompileCallbackCallArgs::default() {
+        let promise = if callback_args == ExitToNearPrecompileCallbackCallArgs::default() {
+            PromiseArgs::Create(transfer_promise)
+        } else {
             PromiseArgs::Callback(PromiseWithCallbackArgs {
                 base: transfer_promise,
                 callback: PromiseCreateArgs {
@@ -467,8 +469,6 @@ impl<I: IO> Precompile for ExitToNear<I> {
                     attached_gas: costs::EXIT_TO_NEAR_CALLBACK_GAS,
                 },
             })
-        } else {
-            PromiseArgs::Create(transfer_promise)
         };
         let promise_log = Log {
             address: exit_to_near::ADDRESS.raw(),
