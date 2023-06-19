@@ -147,9 +147,9 @@ fn test_state_format() {
     };
     let state: aurora_engine::state::EngineState = args.into();
     let expected_hex: String = [
-        "01000000000000000000000000000000000000000000000000000000000000029a",
+        "02000000000000000000000000000000000000000000000000000000000000029a",
         "04000000626f7373",
-        "0300000000000000",
+        "030000000000000000",
     ]
     .concat();
     assert_eq!(hex::encode(state.borsh_serialize().unwrap()), expected_hex);

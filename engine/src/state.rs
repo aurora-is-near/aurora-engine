@@ -22,7 +22,7 @@ pub struct EngineState {
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
     /// Flag to pause and unpause the engine.
-    pub is_paused: Option<bool>,
+    pub is_paused: bool,
 }
 
 impl EngineState {
@@ -56,6 +56,7 @@ impl EngineState {
 pub enum BorshableEngineState<'a> {
     V1(BorshableEngineStateV1<'a>),
     V2(BorshableEngineStateV2<'a>),
+    V3(BorshableEngineStateV3<'a>),
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
@@ -64,7 +65,6 @@ pub struct BorshableEngineStateV1<'a> {
     pub owner_id: Cow<'a, AccountId>,
     pub bridge_prover_id: Cow<'a, AccountId>,
     pub upgrade_delay_blocks: u64,
-    pub is_paused: Option<bool>,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
@@ -72,12 +72,19 @@ pub struct BorshableEngineStateV2<'a> {
     pub chain_id: [u8; 32],
     pub owner_id: Cow<'a, AccountId>,
     pub upgrade_delay_blocks: u64,
-    pub is_paused: Option<bool>,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
+pub struct BorshableEngineStateV3<'a> {
+    pub chain_id: [u8; 32],
+    pub owner_id: Cow<'a, AccountId>,
+    pub upgrade_delay_blocks: u64,
+    pub is_paused: bool,
 }
 
 impl<'a> From<&'a EngineState> for BorshableEngineState<'a> {
     fn from(state: &'a EngineState) -> Self {
-        Self::V2(BorshableEngineStateV2 {
+        Self::V3(BorshableEngineStateV3 {
             chain_id: state.chain_id,
             owner_id: Cow::Borrowed(&state.owner_id),
             upgrade_delay_blocks: state.upgrade_delay_blocks,
@@ -91,6 +98,7 @@ impl<'a> From<BorshableEngineState<'a>> for EngineState {
         match state {
             BorshableEngineState::V1(state) => state.into(),
             BorshableEngineState::V2(state) => state.into(),
+            BorshableEngineState::V3(state) => state.into(),
         }
     }
 }
@@ -101,13 +109,24 @@ impl<'a> From<BorshableEngineStateV1<'a>> for EngineState {
             chain_id: state.chain_id,
             owner_id: state.owner_id.into_owned(),
             upgrade_delay_blocks: state.upgrade_delay_blocks,
-            is_paused: state.is_paused,
+            is_paused: false,
         }
     }
 }
 
 impl<'a> From<BorshableEngineStateV2<'a>> for EngineState {
     fn from(state: BorshableEngineStateV2<'a>) -> Self {
+        Self {
+            chain_id: state.chain_id,
+            owner_id: state.owner_id.into_owned(),
+            upgrade_delay_blocks: state.upgrade_delay_blocks,
+            is_paused: false,
+        }
+    }
+}
+
+impl<'a> From<BorshableEngineStateV3<'a>> for EngineState {
+    fn from(state: BorshableEngineStateV3<'a>) -> Self {
         Self {
             chain_id: state.chain_id,
             owner_id: state.owner_id.into_owned(),
@@ -123,7 +142,7 @@ impl From<LegacyNewCallArgs> for EngineState {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-            is_paused: None,
+            is_paused: false,
         }
     }
 }
@@ -134,7 +153,7 @@ impl From<NewCallArgsV2> for EngineState {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-            is_paused: None,
+            is_paused: false,
         }
     }
 }
