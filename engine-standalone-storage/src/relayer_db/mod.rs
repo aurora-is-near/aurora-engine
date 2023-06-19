@@ -219,6 +219,7 @@ mod test {
             chain_id: aurora_engine_types::types::u256_to_arr(&1_313_161_555.into()),
             owner_id: "aurora".parse().unwrap(),
             upgrade_delay_blocks: 0,
+            is_paused: None,
         };
 
         // Initialize engine and connector states in storage.

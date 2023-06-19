@@ -21,8 +21,8 @@ pub struct EngineState {
     pub owner_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
-    /// Flag to pause and unpause the contract.
-    pub is_paused: bool,
+    /// Flag to pause and unpause the engine.
+    pub is_paused: Option<bool>,
 }
 
 impl EngineState {
@@ -64,7 +64,7 @@ pub struct BorshableEngineStateV1<'a> {
     pub owner_id: Cow<'a, AccountId>,
     pub bridge_prover_id: Cow<'a, AccountId>,
     pub upgrade_delay_blocks: u64,
-    pub is_paused: bool,
+    pub is_paused: Option<bool>,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
@@ -72,7 +72,7 @@ pub struct BorshableEngineStateV2<'a> {
     pub chain_id: [u8; 32],
     pub owner_id: Cow<'a, AccountId>,
     pub upgrade_delay_blocks: u64,
-    pub is_paused: bool,
+    pub is_paused: Option<bool>,
 }
 
 impl<'a> From<&'a EngineState> for BorshableEngineState<'a> {
@@ -123,7 +123,7 @@ impl From<LegacyNewCallArgs> for EngineState {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-            is_paused: false,
+            is_paused: None,
         }
     }
 }
@@ -134,7 +134,7 @@ impl From<NewCallArgsV2> for EngineState {
             chain_id: args.chain_id,
             owner_id: args.owner_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
-            is_paused: false,
+            is_paused: None,
         }
     }
 }
