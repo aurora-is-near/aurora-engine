@@ -138,7 +138,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_version() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let version = option_env!("NEAR_EVM_VERSION")
             .map_or(&include_bytes!("../../VERSION")[..], str::as_bytes);
         io.return_output(version);
@@ -149,7 +149,7 @@ mod contract {
     pub extern "C" fn get_owner() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         io.return_output(state.owner_id.as_bytes());
     }
 
@@ -158,7 +158,7 @@ mod contract {
     pub extern "C" fn set_owner() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
         let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
         if state.owner_id == args.new_owner {
@@ -173,7 +173,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let connector = EthConnectorContract::init_instance(io).sdk_unwrap();
         io.return_output(connector.get_bridge_prover().as_bytes());
     }
@@ -182,7 +182,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
     }
 
@@ -190,7 +190,7 @@ mod contract {
     pub extern "C" fn get_upgrade_delay_blocks() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         io.return_output(&state.upgrade_delay_blocks.to_le_bytes());
     }
 
@@ -198,7 +198,7 @@ mod contract {
     pub extern "C" fn set_upgrade_delay_blocks() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
         let args: SetUpgradeDelayBlocksArgs = io.read_input_borsh().sdk_unwrap();
         state.upgrade_delay_blocks = args.upgrade_delay_blocks;
@@ -208,7 +208,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let index = internal_get_upgrade_index();
         io.return_output(&index.to_le_bytes());
     }
@@ -218,7 +218,7 @@ mod contract {
     pub extern "C" fn stage_upgrade() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         let delay_block_height = io.block_height() + state.upgrade_delay_blocks;
         require_owner_only(&state, &io.predecessor_account_id());
         io.read_input_and_store(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
@@ -233,7 +233,7 @@ mod contract {
     pub extern "C" fn deploy_upgrade() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
         let index = internal_get_upgrade_index();
         if io.block_height() <= index {
@@ -259,7 +259,7 @@ mod contract {
     pub extern "C" fn resume_precompiles() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         let predecessor_account_id = io.predecessor_account_id();
 
         require_owner_only(&state, &predecessor_account_id);
@@ -274,7 +274,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn pause_precompiles() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let authorizer: pausables::EngineAuthorizer = engine::get_authorizer(&io);
 
         if !authorizer.is_authorized(&io.predecessor_account_id()) {
@@ -292,10 +292,30 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn paused_precompiles() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let pauser = EnginePrecompilesPauser::from_io(io);
         let data = pauser.paused().bits().to_le_bytes();
         io.return_output(&data[..]);
+    }
+
+    /// Sets the flag to pause the contract.
+    #[no_mangle]
+    pub extern "C" fn pause_contract() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        state.is_paused = true;
+        state::set_state(&mut io, &state).sdk_unwrap();
+    }
+
+    /// Sets the flag to resume the contract.
+    #[no_mangle]
+    pub extern "C" fn resume_contract() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+        require_owner_only(&state, &io.predecessor_account_id());
+        state.is_paused = false;
+        state::set_state(&mut io, &state).sdk_unwrap();
     }
 
     ///
@@ -306,7 +326,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let input = io.read_input().to_vec();
         let current_account_id = io.current_account_id();
         let mut engine: Engine<_, _> = Engine::new(
@@ -326,7 +346,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn call() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let bytes = io.read_input().to_vec();
         let args = CallArgs::deserialize(&bytes).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
         let current_account_id = io.current_account_id();
@@ -362,7 +382,7 @@ mod contract {
     pub extern "C" fn submit() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         let tx_data = io.read_input().to_vec();
         let current_account_id = io.current_account_id();
         let relayer_address = predecessor_address(&io.predecessor_account_id());
@@ -391,7 +411,7 @@ mod contract {
     pub extern "C" fn submit_with_args() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         let args: SubmitArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
         let relayer_address = predecessor_address(&io.predecessor_account_id());
@@ -413,7 +433,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn register_relayer() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let relayer_address = io.read_input_arr20().sdk_unwrap();
 
         let current_account_id = io.current_account_id();
@@ -438,7 +458,7 @@ mod contract {
     pub extern "C" fn factory_update() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
         let bytes = io.read_input().to_vec();
         let router_bytecode = crate::xcc::RouterCode::new(bytes);
@@ -450,7 +470,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn factory_update_address_version() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         // The function is only set to be private, otherwise callback error will happen.
         io.assert_private_call().sdk_unwrap();
         let check_deploy: Result<(), &[u8]> = match io.promise_result_check() {
@@ -469,7 +489,7 @@ mod contract {
     pub extern "C" fn factory_set_wnear_address() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
         let address = io.read_input_arr20().sdk_unwrap();
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
@@ -482,7 +502,7 @@ mod contract {
     pub extern "C" fn fund_xcc_sub_account() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         // This method can only be called by the owner because it allows specifying the
         // account ID of the wNEAR account. This information must be accurate for the
         // sub-account to work properly, therefore this method can only be called by
@@ -500,7 +520,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
         let mut engine: Engine<_, _> = Engine::new(
@@ -534,7 +554,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_erc20_token() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         // Id of the NEP141 token in Near
         let args: DeployErc20TokenArgs = io.read_input_borsh().sdk_unwrap();
 
@@ -556,7 +576,7 @@ mod contract {
     pub extern "C" fn refund_on_error() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         io.assert_private_call().sdk_unwrap();
 
         // This function should only be called as the callback of
@@ -585,7 +605,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn view() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let env = ViewEnv;
         let args: ViewCallArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
@@ -599,7 +619,7 @@ mod contract {
     pub extern "C" fn get_block_hash() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         let block_height = io.read_input_borsh().sdk_unwrap();
         let account_id = io.current_account_id();
         let chain_id = state.chain_id;
@@ -611,7 +631,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_code() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let address = io.read_input_arr20().sdk_unwrap();
         let code = engine::get_code(&io, &Address::from_array(address));
         io.return_output(&code);
@@ -620,7 +640,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_balance() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let address = io.read_input_arr20().sdk_unwrap();
         let balance = engine::get_balance(&io, &Address::from_array(address));
         io.return_output(&balance.to_bytes());
@@ -629,7 +649,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_nonce() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let address = io.read_input_arr20().sdk_unwrap();
         let nonce = engine::get_nonce(&io, &Address::from_array(address));
         io.return_output(&u256_to_arr(&nonce));
@@ -638,7 +658,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let args: GetStorageAtArgs = io.read_input_borsh().sdk_unwrap();
         let address = args.address;
         let generation = engine::get_generation(&io, &address);
@@ -655,6 +675,7 @@ mod contract {
         use crate::prelude::U256;
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
+        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
         let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
@@ -676,6 +697,7 @@ mod contract {
     pub extern "C" fn begin_block() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
+        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
         let _args: BeginBlockArgs = io.read_input_borsh().sdk_unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
@@ -685,7 +707,7 @@ mod contract {
     pub extern "C" fn new_eth_connector() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         // Only the owner can initialize the EthConnector
         let is_private = io.assert_private_call();
         if is_private.is_err() {
@@ -702,7 +724,7 @@ mod contract {
     pub extern "C" fn set_eth_connector_contract_data() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         // Only the owner can set the EthConnector contract data
         let is_private = io.assert_private_call();
         if is_private.is_err() {
@@ -716,7 +738,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn withdraw() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         io.assert_one_yocto().sdk_unwrap();
         let args = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
@@ -740,7 +762,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deposit() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let raw_proof = io.read_input().to_vec();
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
@@ -758,7 +780,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn finish_deposit() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         io.assert_private_call().sdk_unwrap();
 
         // Check result from proof verification call
@@ -800,7 +822,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn is_used_proof() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let args: IsUsedProofCallArgs = io.read_input_borsh().sdk_unwrap();
 
         let is_used_proof = EthConnectorContract::init_instance(io)
@@ -813,7 +835,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_total_supply() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_near();
@@ -822,7 +844,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_near() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_near();
@@ -831,7 +853,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_aurora() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_aurora();
@@ -840,7 +862,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let args: parameters::BalanceOfCallArgs = serde_json::from_slice(&io.read_input().to_vec())
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
@@ -852,7 +874,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
@@ -863,7 +885,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_transfer() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
         let args: parameters::TransferCallArgs = serde_json::from_slice(&io.read_input().to_vec())
@@ -878,7 +900,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_resolve_transfer() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
 
         io.assert_private_call().sdk_unwrap();
         if io.promise_results_count() != 1 {
@@ -896,7 +918,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         // Check is payable
         io.assert_one_yocto().sdk_unwrap();
 
@@ -923,7 +945,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let args: StorageDepositCallArgs = serde_json::from_slice(&io.read_input().to_vec())
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
@@ -943,7 +965,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_unregister() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         io.assert_one_yocto().sdk_unwrap();
         let predecessor_account_id = io.predecessor_account_id();
         let force = serde_json::from_slice::<serde_json::Value>(&io.read_input().to_vec())
@@ -962,7 +984,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_withdraw() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         io.assert_one_yocto().sdk_unwrap();
         let args: StorageWithdrawCallArgs = serde_json::from_slice(&io.read_input().to_vec())
             .map_err(Into::<ParseTypeFromJsonError>::into)
@@ -977,7 +999,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_balance_of() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let args: parameters::StorageBalanceOfCallArgs =
             serde_json::from_slice(&io.read_input().to_vec())
                 .map_err(Into::<ParseTypeFromJsonError>::into)
@@ -990,7 +1012,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_paused_flags() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let paused_flags = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_paused_flags();
@@ -1002,7 +1024,7 @@ mod contract {
     pub extern "C" fn set_paused_flags() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        assert!(!state.is_paused);
+        require_running(&state);
         let is_private = io.assert_private_call();
         if is_private.is_err() {
             require_owner_only(&state, &io.predecessor_account_id());
@@ -1016,7 +1038,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_accounts_counter() {
         let io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_accounts_counter();
@@ -1025,7 +1047,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_erc20_from_nep141() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let args: GetErc20FromNep141CallArgs = io.read_input_borsh().sdk_unwrap();
 
         io.return_output(
@@ -1038,7 +1060,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_nep141_from_erc20() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let erc20_address: crate::engine::ERC20Address =
             io.read_input().to_vec().try_into().sdk_unwrap();
         io.return_output(
@@ -1052,7 +1074,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_metadata() {
         let mut io = Runtime;
-        assert!(!state::get_state(&io).sdk_unwrap().is_paused);
+        require_running(&state::get_state(&io).sdk_unwrap());
         let metadata: FungibleTokenMetadata = connector::get_metadata(&io).unwrap_or_default();
         let bytes = serde_json::to_vec(&metadata).unwrap_or_default();
         io.return_output(&bytes);
@@ -1151,6 +1173,12 @@ mod contract {
     fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
         if &state.owner_id != predecessor_account_id {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
+        }
+    }
+
+    fn require_running(state: &state::EngineState) {
+        if state.is_paused {
+            sdk::panic_utf8(errors::ERR_PAUSED);
         }
     }
 

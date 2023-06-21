@@ -12,6 +12,7 @@ mod meta_parsing;
 pub mod modexp;
 mod multisender;
 mod one_inch;
+mod pause_contract;
 mod pausable_precompiles;
 mod prepaid_gas_precompile;
 mod promise_results_precompile;
