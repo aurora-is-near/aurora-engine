@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "2.9.1"
+version = "2.9.2"
 authors = ["Aurora Labs <hello@aurora.dev>"]
 edition = "2021"
 description = ""
