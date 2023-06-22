@@ -297,6 +297,9 @@ mod contract {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
+        if state.is_paused {
+            sdk::panic_utf8(errors::ERR_PAUSED);
+        }
         state.is_paused = true;
         state::set_state(&mut io, &state).sdk_unwrap();
     }
@@ -307,6 +310,9 @@ mod contract {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
+        if !state.is_paused {
+            sdk::panic_utf8(errors::ERR_RUNNING);
+        }
         state.is_paused = false;
         state::set_state(&mut io, &state).sdk_unwrap();
     }
