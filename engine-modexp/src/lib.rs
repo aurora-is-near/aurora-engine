@@ -21,7 +21,7 @@ pub struct AuroraModExp;
 
 impl ModExpAlgorithm for AuroraModExp {
     fn modexp(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
-        modexp(base, exp, modulus)
+        modexp_ibig(base, exp, modulus)
     }
 }
 
@@ -37,7 +37,6 @@ pub fn modexp(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
     result.to_big_endian()
 }
 
-#[cfg(feature = "bench")]
 pub fn modexp_ibig(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
     use num::Zero;
 
