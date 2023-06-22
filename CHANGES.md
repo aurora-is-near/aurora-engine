@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.2] 2023-06-22
+
+### Fixes
+
+- Use ibig implemenation of modexp by [@birchmd]. ([#778])
+
+[#778]: https://github.com/aurora-is-near/aurora-engine/pull/778
+
 ## [2.9.1] 2023-05-11
 
 ### Changes
