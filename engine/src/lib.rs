@@ -138,7 +138,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_version() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let version = option_env!("NEAR_EVM_VERSION")
             .map_or(&include_bytes!("../../VERSION")[..], str::as_bytes);
         io.return_output(version);
@@ -149,7 +148,6 @@ mod contract {
     pub extern "C" fn get_owner() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
         io.return_output(state.owner_id.as_bytes());
     }
 
@@ -173,7 +171,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let connector = EthConnectorContract::init_instance(io).sdk_unwrap();
         io.return_output(connector.get_bridge_prover().as_bytes());
     }
@@ -182,7 +179,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
     }
 
@@ -190,7 +186,6 @@ mod contract {
     pub extern "C" fn get_upgrade_delay_blocks() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
         io.return_output(&state.upgrade_delay_blocks.to_le_bytes());
     }
 
@@ -208,7 +203,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let index = internal_get_upgrade_index();
         io.return_output(&index.to_le_bytes());
     }
@@ -292,7 +286,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn paused_precompiles() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let pauser = EnginePrecompilesPauser::from_io(io);
         let data = pauser.paused().bits().to_le_bytes();
         io.return_output(&data[..]);
@@ -605,7 +598,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn view() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let env = ViewEnv;
         let args: ViewCallArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
@@ -618,11 +610,11 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_block_hash() {
         let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
         let block_height = io.read_input_borsh().sdk_unwrap();
         let account_id = io.current_account_id();
-        let chain_id = state.chain_id;
+        let chain_id = state::get_state(&io)
+            .map(|state| state.chain_id)
+            .sdk_unwrap();
         let block_hash =
             crate::engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
         io.return_output(block_hash.as_bytes());
@@ -631,7 +623,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_code() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let address = io.read_input_arr20().sdk_unwrap();
         let code = engine::get_code(&io, &Address::from_array(address));
         io.return_output(&code);
@@ -640,7 +631,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_balance() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let address = io.read_input_arr20().sdk_unwrap();
         let balance = engine::get_balance(&io, &Address::from_array(address));
         io.return_output(&balance.to_bytes());
@@ -649,7 +639,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_nonce() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let address = io.read_input_arr20().sdk_unwrap();
         let nonce = engine::get_nonce(&io, &Address::from_array(address));
         io.return_output(&u256_to_arr(&nonce));
@@ -658,7 +647,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_storage_at() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let args: GetStorageAtArgs = io.read_input_borsh().sdk_unwrap();
         let address = args.address;
         let generation = engine::get_generation(&io, &address);
@@ -822,7 +810,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn is_used_proof() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let args: IsUsedProofCallArgs = io.read_input_borsh().sdk_unwrap();
 
         let is_used_proof = EthConnectorContract::init_instance(io)
@@ -835,7 +822,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_total_supply() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_near();
@@ -844,7 +830,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_near() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_near();
@@ -853,7 +838,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_aurora() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_total_eth_supply_on_aurora();
@@ -862,7 +846,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let args: parameters::BalanceOfCallArgs = serde_json::from_slice(&io.read_input().to_vec())
             .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
@@ -874,7 +857,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
@@ -999,7 +981,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_balance_of() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let args: parameters::StorageBalanceOfCallArgs =
             serde_json::from_slice(&io.read_input().to_vec())
                 .map_err(Into::<ParseTypeFromJsonError>::into)
@@ -1012,7 +993,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_paused_flags() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let paused_flags = EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_paused_flags();
@@ -1038,7 +1018,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_accounts_counter() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .get_accounts_counter();
@@ -1047,7 +1026,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_erc20_from_nep141() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let args: GetErc20FromNep141CallArgs = io.read_input_borsh().sdk_unwrap();
 
         io.return_output(
@@ -1060,7 +1038,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_nep141_from_erc20() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let erc20_address: crate::engine::ERC20Address =
             io.read_input().to_vec().try_into().sdk_unwrap();
         io.return_output(
@@ -1074,7 +1051,6 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_metadata() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
         let metadata: FungibleTokenMetadata = connector::get_metadata(&io).unwrap_or_default();
         let bytes = serde_json::to_vec(&metadata).unwrap_or_default();
         io.return_output(&bytes);
