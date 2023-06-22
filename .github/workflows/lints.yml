@@ -31,8 +31,6 @@ jobs:
       - run: cargo make build-contracts
       - name: Run Contract cargo clippy
         run: cargo make clippy
-      - name: Run cargo clippy
-        run: cargo clippy
   udeps:
     name: Udeps
     runs-on: [self-hosted, heavy]

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.2] 2023-06-22
+
+### Fixes
+
+- Use ibig implemenation of modexp by [@birchmd]. ([#778])
+
+[#778]: https://github.com/aurora-is-near/aurora-engine/pull/778
+
+## [2.9.1] 2023-05-11
+
+### Changes
+
+- Removed unused state variable `bridge_prover_id` by [@birchmd]. ([#749])
+- `modexp` has been improved to be greatly faster than before by [@birchmd]. ([#757])
+
+### Fixes
+
+- Fixed an issue where the owner could call `new` multiple times by [@lempire123]. ([#733])
+- Fixed an issue with `deploy_upgrade` where the upgrade index isn't cleared by [@lempire123]. ([#741])
+
+[#749]: https://github.com/aurora-is-near/aurora-engine/pull/749
+[#757]: https://github.com/aurora-is-near/aurora-engine/pull/757
+[#733]: https://github.com/aurora-is-near/aurora-engine/pull/733
+[#741]: https://github.com/aurora-is-near/aurora-engine/pull/741
+
 ## [2.9.0] 2023-04-05
 
 ### Added
@@ -396,7 +421,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.1...develop
+[2.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.0...2.9.1
 [2.9.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.8.0...2.9.0 
 [2.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.7.0...2.8.0
 [2.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.1...2.7.0
