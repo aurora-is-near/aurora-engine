@@ -421,7 +421,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.1...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.2...develop
+[2.9.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.1...2.9.2
 [2.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.0...2.9.1
 [2.9.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.8.0...2.9.0 
 [2.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.7.0...2.8.0
