@@ -17,7 +17,7 @@ use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Proof};
 use aurora_engine_types::parameters::engine::{
-    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2,
+    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, PausedMask,
 };
 use aurora_engine_types::parameters::xcc::FundXccArgs;
 use aurora_engine_types::types::{Address, RawU256, WeiU256};
@@ -101,7 +101,7 @@ impl EngineContract {
     ) -> CallFtTransferCall {
         CallFtTransferCall::call(&self.contract).args_json(json!({
            "receiver_id": receiver_id,
-           "amount": amount.0.to_string(),
+           "amount": amount,
            "memo": memo,
            "msg": msg,
         }))
@@ -254,7 +254,7 @@ impl EngineContract {
         CallMintAccount::call(&self.contract).args_borsh((address, init_nonce, init_balance))
     }
 
-    pub fn set_paused_flags(&self, flags: u8) -> CallSetPausedFlags {
+    pub fn set_paused_flags(&self, flags: PausedMask) -> CallSetPausedFlags {
         CallSetPausedFlags::call(&self.contract).args_borsh(flags)
     }
 }
