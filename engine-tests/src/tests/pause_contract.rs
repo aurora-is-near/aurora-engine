@@ -48,10 +48,18 @@ fn test_pause_contract_get_method() {
 fn test_pause_contract_set_method() {
     let mut runner = test_utils::deploy_evm();
     let aurora_account_id = runner.aurora_account_id.clone();
-    let set_input = (SetUpgradeDelayBlocksArgs {upgrade_delay_blocks: 2}).try_to_vec().unwrap();
+    let set_input = (SetUpgradeDelayBlocksArgs {
+        upgrade_delay_blocks: 2,
+    })
+    .try_to_vec()
+    .unwrap();
 
     // contract is running by default, sets should work
-    let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set_input.clone());
+    let result = runner.call(
+        "set_upgrade_delay_blocks",
+        &aurora_account_id,
+        set_input.clone(),
+    );
     assert!(result.is_ok());
 
     // pause contract
@@ -93,10 +101,18 @@ fn test_resume_contract_get_method() {
 fn test_resume_contract_set_method() {
     let mut runner = test_utils::deploy_evm();
     let aurora_account_id = runner.aurora_account_id.clone();
-    let set_input = (SetUpgradeDelayBlocksArgs {upgrade_delay_blocks: 2}).try_to_vec().unwrap();
+    let set_input = (SetUpgradeDelayBlocksArgs {
+        upgrade_delay_blocks: 2,
+    })
+    .try_to_vec()
+    .unwrap();
 
     // contract is running by default, sets should work
-    let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set_input.clone());
+    let result = runner.call(
+        "set_upgrade_delay_blocks",
+        &aurora_account_id,
+        set_input.clone(),
+    );
     assert!(result.is_ok());
 
     // pause contract
@@ -104,7 +120,11 @@ fn test_resume_contract_set_method() {
     assert!(result.is_ok());
 
     // contract is paused, sets should NOT work
-    let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set_input.clone());
+    let result = runner.call(
+        "set_upgrade_delay_blocks",
+        &aurora_account_id,
+        set_input.clone(),
+    );
     assert!(result.is_err());
 
     // resume contract
