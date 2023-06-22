@@ -669,7 +669,6 @@ mod contract {
         use crate::prelude::U256;
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
         let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
@@ -691,7 +690,6 @@ mod contract {
     pub extern "C" fn begin_block() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
         let _args: BeginBlockArgs = io.read_input_borsh().sdk_unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
