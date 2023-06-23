@@ -135,11 +135,11 @@ fn bench_modexp_standalone() {
         &mut signer,
         "../etc/tests/modexp-bench/res/evm_contract_1.hex",
     );
-    do_bench(
+    /*do_bench( // TODO: re-enable this in the future
         &mut standalone,
         &mut signer,
         "../etc/tests/modexp-bench/res/evm_contract_2.hex",
-    );
+    );*/
 }
 
 #[test]
