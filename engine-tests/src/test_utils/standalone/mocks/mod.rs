@@ -6,7 +6,7 @@ use aurora_engine::parameters::{
 use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::{Address, Balance, NEP141Wei, NearGas, Wei};
+use aurora_engine_types::types::{make_address, Address, Balance, NEP141Wei, NearGas, Wei};
 use aurora_engine_types::{account_id::AccountId, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
 use near_sdk_sim::DEFAULT_GAS;
@@ -14,10 +14,10 @@ use near_sdk_sim::DEFAULT_GAS;
 pub mod block;
 
 pub const ETH_CUSTODIAN_ADDRESS: Address =
-    aurora_engine_precompiles::make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
+    make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
 
 pub fn compute_block_hash(block_height: u64) -> H256 {
-    aurora_engine::engine::compute_block_hash([0u8; 32], block_height, b"aurora")
+    engine::compute_block_hash([0u8; 32], block_height, b"aurora")
 }
 
 pub fn insert_block(storage: &mut Storage, block_height: u64) {
@@ -83,7 +83,8 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     use evm::backend::ApplyBackend;
 
     let aurora_account_id = env.current_account_id();
-    let mut engine = engine::Engine::new(address, aurora_account_id.clone(), io, env).unwrap();
+    let mut engine: engine::Engine<_, _> =
+        engine::Engine::new(address, aurora_account_id.clone(), io, env).unwrap();
     let state_change = evm::backend::Apply::Modify {
         address: address.raw(),
         basic: evm::backend::Basic {

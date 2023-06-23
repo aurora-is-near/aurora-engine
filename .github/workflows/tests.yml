@@ -41,6 +41,29 @@ jobs:
         run: |
           cache-util save cargo_git cargo_registry yarn_cache
           cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+
+  test_modexp:
+    name: Test modexp suite (mainnet, testnet)
+    runs-on: [ self-hosted, heavy ]
+    steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v3
+      - name: Restore cache
+        run: |
+          cache-util restore cargo_git cargo_registry yarn_cache
+          cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+      - name: Test mainnet bench-modexp
+        run: cargo make --profile mainnet bench-modexp
+      - name: Test testnet bench-modexp
+        run: cargo make --profile testnet bench-modexp
+      - name: Save cache
+        run: |
+          cache-util save cargo_git cargo_registry yarn_cache
+          cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0

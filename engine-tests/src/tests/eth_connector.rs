@@ -651,7 +651,7 @@ fn test_deposit_with_0x_prefix() {
         inputs: aurora_engine::deposit_event::DepositedEvent::event_params(),
         anonymous: false,
     };
-    let log_entry = aurora_engine::log_entry::LogEntry {
+    let log_entry = aurora_engine_types::parameters::connector::LogEntry {
         address: eth_custodian_address.raw(),
         topics: vec![
             event_schema.signature(),
@@ -712,7 +712,7 @@ fn generate_dummy_proof(message: String, deposit_amount: u128, log_index: u64) -
         inputs: aurora_engine::deposit_event::DepositedEvent::event_params(),
         anonymous: false,
     };
-    let log_entry = aurora_engine::log_entry::LogEntry {
+    let log_entry = aurora_engine_types::parameters::connector::LogEntry {
         address: eth_custodian_address.raw(),
         topics: vec![
             event_schema.signature(),

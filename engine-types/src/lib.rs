@@ -33,6 +33,11 @@ mod v0 {
         ops::Mul, ops::Sub, ops::SubAssign,
     };
     pub use primitive_types::{H160, H256, U256};
+
+    #[cfg(not(feature = "borsh-compat"))]
+    pub use borsh;
+    #[cfg(feature = "borsh-compat")]
+    pub use borsh_compat::{self as borsh};
 }
 
 pub use v0::*;

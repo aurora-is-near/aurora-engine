@@ -20,9 +20,13 @@ extern crate alloc;
 extern crate core;
 
 mod map;
-pub mod parameters;
-pub mod proof;
-
+pub mod parameters {
+    pub use aurora_engine_types::parameters::connector::*;
+    pub use aurora_engine_types::parameters::engine::*;
+}
+pub mod proof {
+    pub use aurora_engine_types::parameters::connector::Proof;
+}
 pub mod accounting;
 pub mod admin_controlled;
 #[cfg_attr(feature = "contract", allow(dead_code))]
@@ -31,7 +35,6 @@ pub mod deposit_event;
 pub mod engine;
 pub mod errors;
 pub mod fungible_token;
-pub mod log_entry;
 pub mod pausables;
 mod prelude;
 pub mod state;
@@ -74,16 +77,13 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use borsh::{BorshDeserialize, BorshSerialize};
     use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
 
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
-    use crate::fungible_token::FungibleTokenMetadata;
-    use crate::parameters::error::ParseTypeFromJsonError;
     use crate::parameters::{
-        self, CallArgs, DeployErc20TokenArgs, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
+        self, CallArgs, DeployErc20TokenArgs, FungibleTokenMetadata, GetErc20FromNep141CallArgs,
+        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
         PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
         SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitArgs,
         TransferCallCallArgs, ViewCallArgs,
@@ -106,6 +106,8 @@ mod contract {
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
+    use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+    use aurora_engine_types::parameters::engine::errors::ParseTypeFromJsonError;
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
@@ -293,7 +295,7 @@ mod contract {
         let io = Runtime;
         let input = io.read_input().to_vec();
         let current_account_id = io.current_account_id();
-        let mut engine = Engine::new(
+        let mut engine: Engine<_, _> = Engine::new(
             predecessor_address(&io.predecessor_account_id()),
             current_account_id,
             io,
@@ -326,7 +328,7 @@ mod contract {
             check_promise.sdk_unwrap();
         }
 
-        let mut engine = Engine::new(
+        let mut engine: Engine<_, _> = Engine::new(
             predecessor_address(&predecessor_account_id),
             current_account_id,
             io,
@@ -398,7 +400,7 @@ mod contract {
 
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let mut engine = Engine::new(
+        let mut engine: Engine<_, _> = Engine::new(
             predecessor_address(&predecessor_account_id),
             current_account_id,
             io,
@@ -478,7 +480,7 @@ mod contract {
         let io = Runtime;
         let current_account_id = io.current_account_id();
         let predecessor_account_id = io.predecessor_account_id();
-        let mut engine = Engine::new(
+        let mut engine: Engine<_, _> = Engine::new(
             predecessor_address(&predecessor_account_id),
             current_account_id.clone(),
             io,
@@ -561,7 +563,8 @@ mod contract {
         let env = ViewEnv;
         let args: ViewCallArgs = io.read_input_borsh().sdk_unwrap();
         let current_account_id = io.current_account_id();
-        let engine = Engine::new(args.sender, current_account_id, io, &env).sdk_unwrap();
+        let engine: Engine<_, _> =
+            Engine::new(args.sender, current_account_id, io, &env).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args).sdk_unwrap();
         io.return_output(&result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE));
     }
@@ -1026,7 +1029,8 @@ mod contract {
         let nonce = U256::from(args.1);
         let balance = NEP141Wei::new(u128::from(args.2));
         let current_account_id = io.current_account_id();
-        let mut engine = Engine::new(address, current_account_id, io, &io).sdk_unwrap();
+        let mut engine: Engine<_, _> =
+            Engine::new(address, current_account_id, io, &io).sdk_unwrap();
         let state_change = evm::backend::Apply::Modify {
             address: address.raw(),
             basic: evm::backend::Basic {

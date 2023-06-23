@@ -333,7 +333,7 @@ args = [
     "${CARGO_FEATURES_TEST}",
 ]
 
-[tasks.bench-modexp]
+[tasks.bench-modexp-test]
 condition = { profiles = ["mainnet", "testnet", "custom"] }
 category = "Test"
 command = "${CARGO}"
@@ -353,12 +353,21 @@ dependencies = [
     "build-test",
     "test-contracts",
     "test-workspace",
-    "bench-modexp",
+]
+
+[tasks.bench-modexp]
+category = "Test"
+dependencies = [
+    "build-test",
+    "bench-modexp-test",
 ]
 
 [tasks.test]
 category = "Test"
-run_task = "test-flow"
+dependencies = [
+    "test-flow",
+    "bench-modexp-test",
+]
 
 [tasks.default]
 condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }

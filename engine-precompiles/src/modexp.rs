@@ -1,24 +1,25 @@
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Cow, PhantomData, Vec, U256};
 use crate::{
     utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
 };
+use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use evm::{Context, ExitError};
 use num::{Integer, Zero};
 
 #[derive(Default)]
-pub struct ModExp<HF: HardFork>(PhantomData<HF>);
+pub struct ModExp<HF: HardFork, M = AuroraModExp>(PhantomData<HF>, PhantomData<M>);
 
-impl<HF: HardFork> ModExp<HF> {
-    pub const ADDRESS: Address = super::make_address(0, 5);
+impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
+    pub const ADDRESS: Address = make_address(0, 5);
 
     #[must_use]
     pub fn new() -> Self {
-        Self(PhantomData::default())
+        Self(PhantomData::default(), PhantomData::default())
     }
 }
 
-impl<HF: HardFork> ModExp<HF> {
+impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
     // Note: the output of this function is bounded by 2^67
     fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
         let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
@@ -61,7 +62,7 @@ impl<HF: HardFork> ModExp<HF> {
         } else {
             let base = parse_input_range_to_slice(input, base_start, base_len);
             let exponent = parse_input_range_to_slice(input, exp_start, exp_len);
-            aurora_engine_modexp::modexp(&base, &exponent, &modulus)
+            M::modexp(&base, &exponent, &modulus)
         };
 
         // The result must be the same length as the input modulus.
@@ -78,9 +79,9 @@ impl<HF: HardFork> ModExp<HF> {
     }
 }
 
-impl ModExp<Byzantium> {
+impl<M: ModExpAlgorithm> ModExp<Byzantium, M> {
     const MIN_GAS: EthGas = EthGas::new(0);
-    // ouput of this function is bounded by 2^128
+    // output of this function is bounded by 2^128
     fn mul_complexity(x: u64) -> U256 {
         if x <= 64 {
             U256::from(x * x)
@@ -95,7 +96,7 @@ impl ModExp<Byzantium> {
     }
 }
 
-impl Precompile for ModExp<Byzantium> {
+impl<M: ModExpAlgorithm> Precompile for ModExp<Byzantium, M> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
         if base_len == 0 && mod_len == 0 {
@@ -131,7 +132,7 @@ impl Precompile for ModExp<Byzantium> {
     }
 }
 
-impl ModExp<Berlin> {
+impl<M: ModExpAlgorithm> ModExp<Berlin, M> {
     const MIN_GAS: EthGas = EthGas::new(200);
     // output bounded by 2^122
     fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
@@ -141,7 +142,7 @@ impl ModExp<Berlin> {
     }
 }
 
-impl Precompile for ModExp<Berlin> {
+impl<M: ModExpAlgorithm> Precompile for ModExp<Berlin, M> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
         if base_len == 0 && mod_len == 0 {
