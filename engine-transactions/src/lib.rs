@@ -137,7 +137,7 @@ impl NormalizedEthTransaction {
         let is_contract_creation = self.to.is_none();
 
         let base_gas = if is_contract_creation {
-            config.gas_transaction_create
+            config.gas_transaction_create + init_code_cost(config, &self.data)?
         } else {
             config.gas_transaction_call
         };
@@ -183,6 +183,19 @@ impl NormalizedEthTransaction {
             .and_then(|gas| gas.checked_add(gas_access_list_storage))
             .ok_or(Error::GasOverflow)
     }
+}
+
+fn init_code_cost(config: &evm::Config, data: &[u8]) -> Result<u64, Error> {
+    // As per EIP-3860:
+    // > We define initcode_cost(initcode) to equal INITCODE_WORD_COST * ceil(len(initcode) / 32).
+    // where INITCODE_WORD_COST is 2.
+    let init_code_cost = if config.max_initcode_size.is_some() {
+        2 * ((u64::try_from(data.len()).map_err(|_| Error::IntegerConversion)? + 31) / 32)
+    } else {
+        0
+    };
+
+    Ok(init_code_cost)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
