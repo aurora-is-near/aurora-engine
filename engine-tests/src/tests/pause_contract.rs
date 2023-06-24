@@ -63,34 +63,19 @@ fn test_resume_contract_require_paused() {
 }
 
 #[test]
-fn test_pause_contract_get_method() {
+fn test_pause_contract() {
     let mut runner = test_utils::deploy_evm();
     let aurora_account_id = runner.aurora_account_id.clone();
-
-    // contract is running by default, gets should work
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
-    assert!(result.is_ok());
-
-    // pause contract
-    let result = runner.call("pause_contract", &aurora_account_id, vec![]);
-    assert!(result.is_ok());
-
-    // contract is paused, gets should still work
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
-    assert!(result.is_ok());
-}
-
-#[test]
-fn test_pause_contract_set_method() {
-    let mut runner = test_utils::deploy_evm();
-    let aurora_account_id = runner.aurora_account_id.clone();
-    let set = (SetUpgradeDelayBlocksArgs {
+    let set = SetUpgradeDelayBlocksArgs {
         upgrade_delay_blocks: 2,
-    })
+    }
     .try_to_vec()
     .unwrap();
 
-    // contract is running by default, sets should work
+    // contract is running by default, gets and sets should work
+    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+    assert!(result.is_ok());
+
     let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set.clone());
     assert!(result.is_ok());
 
@@ -98,64 +83,36 @@ fn test_pause_contract_set_method() {
     let result = runner.call("pause_contract", &aurora_account_id, vec![]);
     assert!(result.is_ok());
 
-    // contract is paused, sets should NOT work
+    // contract is paused, gets should still work but sets should fail
+    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+    assert!(result.is_ok());
+
     let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set);
     assert!(result.is_err());
 }
 
 #[test]
-fn test_resume_contract_get_method() {
+fn test_resume_contract() {
     let mut runner = test_utils::deploy_evm();
     let aurora_account_id = runner.aurora_account_id.clone();
-
-    // contract is running by default, gets should work
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
-    assert!(result.is_ok());
-
-    // pause contract
-    let result = runner.call("pause_contract", &aurora_account_id, vec![]);
-    assert!(result.is_ok());
-
-    // contract is paused, gets should still work
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
-    assert!(result.is_ok());
-
-    // resume contract
-    let result = runner.call("resume_contract", &aurora_account_id, vec![]);
-    assert!(result.is_ok());
-
-    // contract is running again, gets should work
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
-    assert!(result.is_ok());
-}
-
-#[test]
-fn test_resume_contract_set_method() {
-    let mut runner = test_utils::deploy_evm();
-    let aurora_account_id = runner.aurora_account_id.clone();
-    let set = (SetUpgradeDelayBlocksArgs {
+    let set = SetUpgradeDelayBlocksArgs {
         upgrade_delay_blocks: 2,
-    })
+    }
     .try_to_vec()
     .unwrap();
 
-    // contract is running by default, sets should work
-    let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set.clone());
-    assert!(result.is_ok());
-
     // pause contract
     let result = runner.call("pause_contract", &aurora_account_id, vec![]);
     assert!(result.is_ok());
-
-    // contract is paused, sets should NOT work
-    let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set.clone());
-    assert!(result.is_err());
 
     // resume contract
     let result = runner.call("resume_contract", &aurora_account_id, vec![]);
     assert!(result.is_ok());
 
-    // contract is running again, sets should work
+    // contract is running again, gets and sets should work
+    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+    assert!(result.is_ok());
+
     let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set);
     assert!(result.is_ok());
 }
