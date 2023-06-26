@@ -13,18 +13,10 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
-      - name: Restore cache
-        run: |
-          cache-util restore cargo_git cargo_registry yarn_cache
-          cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
       - name: Test mainnet
         run: cargo make --profile mainnet test
       - name: Test testnet
         run: cargo make --profile testnet test
-      - name: Save cache
-        run: |
-          cache-util save cargo_git cargo_registry yarn_cache
-          cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
   checks:
     name: Run checks
     runs-on: [self-hosted, heavy]
