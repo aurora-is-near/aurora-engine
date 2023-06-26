@@ -13,7 +13,7 @@ publish = false
 autobenches = false
 
 [dependencies]
-ibig = { version = "0.3.6", default-features = false, features = ["num-traits"], optional = true }
+ibig = { version = "0.3.6", default-features = false, features = ["num-traits"] }
 num = { version = "0.4.0", default-features = false, features = ["alloc"] }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 
@@ -21,5 +21,5 @@ hex = { version = "0.4", default-features = false, features = ["alloc"] }
 
 [features]
 default = ["std"]
-std = ["num/std", "hex/std"]
-bench = ["ibig"]
+std = ["num/std", "ibig/std", "hex/std"]
+bench = []

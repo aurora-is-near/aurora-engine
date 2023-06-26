@@ -1,8 +1,6 @@
-use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
-use aurora_engine_types::types::{Address, Wei};
-
-use crate::silo::whitelist::WhitelistKind;
+use crate::account_id::AccountId;
+use crate::borsh::{self, BorshDeserialize, BorshSerialize};
+use crate::types::{Address, Wei};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct FixedGasCostArgs {
@@ -43,6 +41,36 @@ pub struct WhitelistStatusArgs {
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct WhitelistKindArgs {
     pub kind: WhitelistKind,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum WhitelistKind {
+    /// The whitelist of this type is for storing NEAR accounts. Accounts stored in this whitelist
+    /// have an admin role. The admin role allows to add new admins and add new entities
+    /// (`AccountId` and `Address`) to whitelists. Also, this role allows to deploy of EVM code
+    /// and submit transactions.
+    Admin = 0x0,
+    /// The whitelist of this type is for storing EVM addresses. Addresses included in this
+    /// whitelist can deploy EVM code.
+    EvmAdmin = 0x1,
+    /// The whitelist of this type is for storing NEAR accounts. Accounts included in this
+    /// whitelist can submit transactions.
+    Account = 0x2,
+    /// The whitelist of this type is for storing EVM addresses. Addresses included in this
+    /// whitelist can submit transactions.
+    Address = 0x3,
+}
+
+impl From<WhitelistKind> for u8 {
+    fn from(list: WhitelistKind) -> Self {
+        match list {
+            WhitelistKind::Admin => 0x0,
+            WhitelistKind::EvmAdmin => 0x1,
+            WhitelistKind::Account => 0x2,
+            WhitelistKind::Address => 0x3,
+        }
+    }
 }
 
 #[test]

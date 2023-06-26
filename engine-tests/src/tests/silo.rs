@@ -1,12 +1,11 @@
 use aurora_engine::engine::EngineErrorKind;
-use aurora_engine::silo::parameters::{
-    FixedGasCostArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
-    WhitelistStatusArgs,
-};
-use aurora_engine::silo::WhitelistKind;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::engine::TransactionStatus;
+use aurora_engine_types::parameters::silo::{
+    FixedGasCostArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind,
+    WhitelistStatusArgs,
+};
 use borsh::BorshSerialize;
 use libsecp256k1::SecretKey;
 use rand::{rngs::ThreadRng, Rng, RngCore};

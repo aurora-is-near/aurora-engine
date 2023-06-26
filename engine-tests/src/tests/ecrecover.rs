@@ -1,10 +1,10 @@
 use super::sanity::initialize_transfer;
-use crate::prelude::{Address, U256};
+use crate::prelude::{make_address, Address, U256};
 use crate::prelude::{Wei, H160};
 use crate::test_utils::{self, AuroraRunner, Signer};
 use aurora_engine_precompiles::Precompile;
 
-const ECRECOVER_ADDRESS: Address = aurora_engine_precompiles::make_address(0, 1);
+const ECRECOVER_ADDRESS: Address = make_address(0, 1);
 
 /// ecrecover tests taken from geth
 #[test]

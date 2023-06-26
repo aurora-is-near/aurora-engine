@@ -1,42 +1,13 @@
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::parameters::silo::{
+    WhitelistKind, WhitelistKindArgs, WhitelistStatusArgs,
+};
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use aurora_engine_types::AsBytes;
 
 use crate::prelude::Vec;
-use crate::silo::parameters::{WhitelistKindArgs, WhitelistStatusArgs};
 
 const STATUS: &[u8] = b"LIST_STATUS";
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum WhitelistKind {
-    /// The whitelist of this type is for storing NEAR accounts. Accounts stored in this whitelist
-    /// have an admin role. The admin role allows to add new admins and add new entities
-    /// (`AccountId` and `Address`) to whitelists. Also, this role allows to deploy of EVM code
-    /// and submit transactions.
-    Admin = 0x0,
-    /// The whitelist of this type is for storing EVM addresses. Addresses included in this
-    /// whitelist can deploy EVM code.
-    EvmAdmin = 0x1,
-    /// The whitelist of this type is for storing NEAR accounts. Accounts included in this
-    /// whitelist can submit transactions.
-    Account = 0x2,
-    /// The whitelist of this type is for storing EVM addresses. Addresses included in this
-    /// whitelist can submit transactions.
-    Address = 0x3,
-}
-
-impl From<WhitelistKind> for u8 {
-    fn from(list: WhitelistKind) -> Self {
-        match list {
-            WhitelistKind::Admin => 0x0,
-            WhitelistKind::EvmAdmin => 0x1,
-            WhitelistKind::Account => 0x2,
-            WhitelistKind::Address => 0x3,
-        }
-    }
-}
 
 /// `Whitelist` for checking access before interacting with the Aurora EVM.
 /// * io - I/O trait handler

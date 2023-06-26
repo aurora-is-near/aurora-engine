@@ -1,9 +1,9 @@
 use crate::Storage;
 use aurora_engine::parameters;
-use aurora_engine::silo;
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::silo;
 use aurora_engine_types::types::Address;
 use aurora_engine_types::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -133,11 +133,11 @@ pub enum TransactionKind {
     FactorySetWNearAddress(Address),
     FundXccSubAccount(FundXccArgs),
     /// Silo operations
-    SetFixedGasCost(silo::parameters::FixedGasCostArgs),
-    AddEntryToWhitelist(silo::parameters::WhitelistArgs),
-    AddEntryToWhitelistBatch(Vec<silo::parameters::WhitelistArgs>),
-    RemoveEntryFromWhitelist(silo::parameters::WhitelistArgs),
-    SetWhitelistStatus(silo::parameters::WhitelistStatusArgs),
+    SetFixedGasCost(silo::FixedGasCostArgs),
+    AddEntryToWhitelist(silo::WhitelistArgs),
+    AddEntryToWhitelistBatch(Vec<silo::WhitelistArgs>),
+    RemoveEntryFromWhitelist(silo::WhitelistArgs),
+    SetWhitelistStatus(silo::WhitelistStatusArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -539,11 +539,11 @@ enum BorshableTransactionKind<'a> {
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccount(Cow<'a, FundXccArgs>),
     SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
-    SetFixedGasCost(Cow<'a, silo::parameters::FixedGasCostArgs>),
-    AddEntryToWhitelist(Cow<'a, silo::parameters::WhitelistArgs>),
-    AddEntryToWhitelistBatch(Cow<'a, Vec<silo::parameters::WhitelistArgs>>),
-    RemoveEntryFromWhitelist(Cow<'a, silo::parameters::WhitelistArgs>),
-    SetWhitelistStatus(Cow<'a, silo::parameters::WhitelistStatusArgs>),
+    SetFixedGasCost(Cow<'a, silo::FixedGasCostArgs>),
+    AddEntryToWhitelist(Cow<'a, silo::WhitelistArgs>),
+    AddEntryToWhitelistBatch(Cow<'a, Vec<silo::WhitelistArgs>>),
+    RemoveEntryFromWhitelist(Cow<'a, silo::WhitelistArgs>),
+    SetWhitelistStatus(Cow<'a, silo::WhitelistStatusArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {

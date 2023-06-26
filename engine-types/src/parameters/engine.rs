@@ -1,12 +1,146 @@
 use crate::{
     account_id::AccountId,
-    types::{Address, RawH256, RawU256, WeiU256},
+    types::{Address, RawH256, RawU256, WeiU256, Yocto},
     Vec,
 };
 #[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "borsh-compat")]
 use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
+
+/// Parameters for the `new` function.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub enum NewCallArgs {
+    V1(LegacyNewCallArgs),
+    V2(NewCallArgsV2),
+}
+
+impl NewCallArgs {
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, borsh::maybestd::io::Error> {
+        Self::try_from_slice(bytes).map_or_else(
+            |_| LegacyNewCallArgs::try_from_slice(bytes).map(Self::V1),
+            Ok,
+        )
+    }
+}
+
+/// Old Borsh-encoded parameters for the `new` function.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct LegacyNewCallArgs {
+    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    pub chain_id: RawU256,
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
+    /// Account of the bridge prover.
+    /// Use empty to not use base token as bridged asset.
+    pub bridge_prover_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct NewCallArgsV2 {
+    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    pub chain_id: RawU256,
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
+}
+
+/// Borsh-encoded parameters for the `set_owner` function.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SetOwnerArgs {
+    pub new_owner: AccountId,
+}
+
+/// Borsh-encoded parameters for the `set_upgrade_delay_blocks` function.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SetUpgradeDelayBlocksArgs {
+    pub upgrade_delay_blocks: u64,
+}
+
+/// Borsh-encoded (genesis) account balance used by the `begin_chain` function.
+#[cfg(feature = "evm_bully")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct AccountBalance {
+    pub address: Address,
+    pub balance: RawU256,
+}
+
+/// Borsh-encoded submit arguments used by the `submit_with_args` function.
+#[derive(Default, Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct SubmitArgs {
+    /// Bytes of the transaction.
+    pub tx_data: Vec<u8>,
+    /// Max gas price the user is ready to pay for the transaction.
+    pub max_gas_price: Option<u128>,
+    /// Address of the `ERC20` token the user prefers to pay in.
+    pub gas_token_address: Option<Address>,
+}
+
+/// Borsh-encoded parameters for the `begin_chain` function.
+#[cfg(feature = "evm_bully")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct BeginChainArgs {
+    pub chain_id: RawU256,
+    pub genesis_alloc: Vec<AccountBalance>,
+}
+
+/// Borsh-encoded parameters for the `begin_block` function.
+#[cfg(feature = "evm_bully")]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct BeginBlockArgs {
+    /// The current block's hash (for replayer use).
+    pub hash: RawU256,
+    /// The current block's beneficiary address.
+    pub coinbase: Address,
+    /// The current block's timestamp (in seconds since the Unix epoch).
+    pub timestamp: RawU256,
+    /// The current block's number (the genesis block is number zero).
+    pub number: RawU256,
+    /// The current block's difficulty.
+    pub difficulty: RawU256,
+    /// The current block's gas limit.
+    pub gaslimit: RawU256,
+}
+
+/// Fungible token storage balance
+#[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
+pub struct StorageBalance {
+    pub total: Yocto,
+    pub available: Yocto,
+}
+
+impl StorageBalance {
+    #[must_use]
+    pub fn to_json_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap_or_default()
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct RegisterRelayerCallArgs {
+    pub address: Address,
+}
+
+pub type PausedMask = u8;
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct PauseEthConnectorCallArgs {
+    pub paused_mask: PausedMask,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct PausePrecompilesCallArgs {
+    pub paused_mask: u32,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
@@ -153,13 +287,53 @@ pub struct GetStorageAtArgs {
     pub key: RawH256,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct StorageUnregisterArgs {
+    pub force: bool,
+}
+
+pub fn parse_json_args<'de, T: Deserialize<'de>>(
+    bytes: &'de [u8],
+) -> Result<T, errors::ParseArgsError> {
+    serde_json::from_slice(bytes).map_err(Into::into)
+}
+
 pub mod errors {
+    use crate::{account_id::ParseAccountError, String, ToString};
+
     pub const ERR_REVERT: &[u8; 10] = b"ERR_REVERT";
     pub const ERR_NOT_ALLOWED: &[u8; 15] = b"ERR_NOT_ALLOWED";
     pub const ERR_OUT_OF_FUNDS: &[u8; 16] = b"ERR_OUT_OF_FUNDS";
     pub const ERR_CALL_TOO_DEEP: &[u8; 17] = b"ERR_CALL_TOO_DEEP";
     pub const ERR_OUT_OF_OFFSET: &[u8; 17] = b"ERR_OUT_OF_OFFSET";
     pub const ERR_OUT_OF_GAS: &[u8; 14] = b"ERR_OUT_OF_GAS";
+
+    #[derive(Debug)]
+    pub enum ParseArgsError {
+        Json(String),
+        InvalidAccount(ParseAccountError),
+    }
+
+    impl From<serde_json::Error> for ParseArgsError {
+        fn from(e: serde_json::Error) -> Self {
+            Self::Json(e.to_string())
+        }
+    }
+
+    impl From<ParseAccountError> for ParseArgsError {
+        fn from(e: ParseAccountError) -> Self {
+            Self::InvalidAccount(e)
+        }
+    }
+
+    impl AsRef<[u8]> for ParseArgsError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::Json(e) => e.as_bytes(),
+                Self::InvalidAccount(e) => e.as_ref(),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
