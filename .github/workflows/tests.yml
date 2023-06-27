@@ -19,8 +19,10 @@ jobs:
         uses: actions/checkout@v3
       - name: Restore cache
         run: |
-          cache-util restore cargo_git cargo_registry yarn_cache
+          cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
           cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+      - name: Preparing rocksdb library
+        run: scripts/ci/build_rocksdb.sh
       - name: Build contracts
         run: cargo make build-contracts
       - name: Test contracts
@@ -53,8 +55,10 @@ jobs:
         uses: actions/checkout@v3
       - name: Restore cache
         run: |
-          cache-util restore cargo_git cargo_registry yarn_cache
+          cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
           cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+      - name: Preparing rocksdb library
+        run: scripts/ci/build_rocksdb.sh
       - name: Test mainnet bench-modexp
         run: cargo make --profile mainnet bench-modexp
       - name: Test testnet bench-modexp
@@ -67,3 +71,6 @@ jobs:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  ROCKSDB_INCLUDE_DIR: /root/rocksdb/include
+  ROCKSDB_LIB_DIR: /root/rocksdb/lib
+  ROCKSDB_STATIC: 1
