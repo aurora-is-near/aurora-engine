@@ -2,6 +2,9 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 #[cfg(feature = "contract")]
 use aurora_engine_sdk::{env::Env, types::SdkUnwrap};
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::silo::{
+    SiloParamsArgs, WhitelistArgs, WhitelistKind, WhitelistKindArgs, WhitelistStatusArgs,
+};
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::AsBytes;
@@ -10,11 +13,8 @@ use aurora_engine_types::AsBytes;
 use crate::engine::EngineErrorKind;
 use crate::prelude::Vec;
 
-use parameters::{SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs};
 use whitelist::Whitelist;
-pub use whitelist::WhitelistKind;
 
-pub mod parameters;
 mod whitelist;
 
 const GAS_COST_KEY: &[u8] = b"GAS_COST_KEY";

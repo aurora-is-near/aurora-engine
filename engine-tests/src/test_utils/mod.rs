@@ -1,7 +1,7 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
-use aurora_engine::silo::parameters::FixedGasCostArgs;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::silo::FixedGasCostArgs;
 use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
 use evm::ExitFatal;

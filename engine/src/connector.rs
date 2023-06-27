@@ -9,7 +9,7 @@ use crate::parameters::{
     StorageWithdrawCallArgs, TransferCallArgs, TransferCallCallArgs, WithdrawResult,
 };
 use crate::prelude::{
-    address::error::AddressError, NEP141Wei, Wei, U256, ZERO_NEP141_WEI, ZERO_WEI,
+    address::error::AddressError, NEP141Wei, String, Wei, ZERO_NEP141_WEI, ZERO_WEI,
 };
 use crate::prelude::{
     format, sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
@@ -17,6 +17,7 @@ use crate::prelude::{
 };
 use crate::prelude::{PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs};
 use crate::proof::Proof;
+use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::borsh;
@@ -50,12 +51,14 @@ pub struct EthConnectorContract<I: IO> {
     io: I,
 }
 
-/// Connector specific data. It always should contain `prover account` -
+/// Eth connector specific data. It always must contain `prover_account` - account id of the smart
+/// contract which is used for verifying a proof used in the deposit flow.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnector {
-    /// It used in the Deposit flow, to verify log entry form incoming proof.
+    /// The account id of the Prover NEAR smart contract. It used in the Deposit flow for verifying
+    /// a log entry from incoming proof.
     pub prover_account: AccountId,
-    /// It is Eth address, used in the Deposit and Withdraw logic.
+    /// It is Ethereum address used in the Deposit and Withdraw logic.  
     pub eth_custodian_address: Address,
 }
 
@@ -121,23 +124,23 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
-    /// Deposit all types of tokens
+    /// Deposit all types of tokens.
     pub fn deposit(
         &self,
         raw_proof: Vec<u8>,
         current_account_id: AccountId,
         predecessor_account_id: AccountId,
     ) -> Result<PromiseWithCallbackArgs, error::DepositError> {
-        // Check is current account owner
+        // Check if the current account is owner.
         let is_owner = current_account_id == predecessor_account_id;
-        // Check is current flow paused. If it's owner account just skip it.
+        // Check if the deposit flow isn't paused. If it's owner just skip it.
         self.assert_not_paused(PAUSE_DEPOSIT, is_owner)
             .map_err(|_| error::DepositError::Paused)?;
 
         sdk::log!("[Deposit tokens]");
 
         // Get incoming deposit arguments
-        let proof: Proof =
+        let proof =
             Proof::try_from_slice(&raw_proof).map_err(|_| error::DepositError::ProofParseFailed)?;
         // Fetch event data from Proof
         let event = DepositedEvent::from_log_entry_data(&proof.log_entry_data)
@@ -165,7 +168,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             return Err(error::DepositError::InsufficientAmountForFee);
         }
 
-        // Verify proof data with cross-contract call to prover account
+        // Verify the proof data by sending cross-contract call to the prover smart contract.
         sdk::log!(
             "Deposit verify_log_entry for prover: {}",
             self.contract.prover_account,
@@ -173,8 +176,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         // Do not skip bridge call. This is only used for development and diagnostics.
         let skip_bridge_call = false.try_to_vec().unwrap();
-        let mut proof_to_verify = raw_proof;
-        proof_to_verify.extend(skip_bridge_call);
+        let proof_to_verify = [raw_proof, skip_bridge_call].concat();
 
         let verify_call = PromiseCreateArgs {
             target_account_id: self.contract.prover_account.clone(),
@@ -190,7 +192,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             TokenMessageData::Near(account_id) => FinishDepositCallArgs {
                 new_owner_id: account_id,
                 amount: event.amount,
-                proof_key: proof.key(),
+                proof_key: proof_key(&proof),
                 relayer_id: predecessor_account_id,
                 fee: event.fee,
                 msg: None,
@@ -218,7 +220,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 FinishDepositCallArgs {
                     new_owner_id: current_account_id.clone(),
                     amount: event.amount,
-                    proof_key: proof.key(),
+                    proof_key: proof_key(&proof),
                     relayer_id: predecessor_account_id,
                     fee: event.fee,
                     msg: Some(transfer_data),
@@ -241,11 +243,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         })
     }
 
-    /// Finish deposit (private method)
-    /// NOTE: we should `record_proof` only after `mint` operation. The reason
-    /// is that in this case we only calculate the amount to be credited but
-    /// do not save it, however, if an error occurs during the calculation,
-    /// this will happen before `record_proof`. After that contract will save.
+    /// Finish deposit flow (private method).
+    /// NOTE: In the mint methods could occur an error while calculating the amount to be
+    /// credited and therefore we invoke `record_proof` after mint methods to avoid saving
+    /// proof before minting which could be potentially finished with error.
     pub fn finish_deposit(
         &mut self,
         predecessor_account_id: AccountId,
@@ -274,7 +275,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         } else {
             // Mint - calculate new balances
             self.mint_eth_on_near(
-                &data.new_owner_id.clone(),
+                &data.new_owner_id,
+                // it's safe subtracting because we check that the amount is greater than fee in
+                // the deposit method.
                 data.amount - NEP141Wei::new(data.fee.as_u128()),
             )?;
             self.mint_eth_on_near(&data.relayer_id, NEP141Wei::new(data.fee.as_u128()))?;
@@ -286,7 +289,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Internal ETH withdraw ETH logic
+    /// Internal `ETH` withdraw (ETH on Aurora).
     pub(crate) fn internal_remove_eth(
         &mut self,
         amount: Wei,
@@ -296,7 +299,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
-    /// Record used proof as hash key
+    /// Record hash of the used proof in the storage.
     fn record_proof(&mut self, key: &str) -> Result<(), error::ProofUsed> {
         sdk::log!("Record proof: {}", key);
 
@@ -308,7 +311,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
-    ///  Mint `nETH` tokens
+    ///  Mint `nETH` tokens (ETH on NEAR).
     fn mint_eth_on_near(
         &mut self,
         owner_id: &AccountId,
@@ -322,17 +325,17 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         self.ft.internal_deposit_eth_to_near(owner_id, amount)
     }
 
-    ///  Mint ETH tokens
+    ///  Mint `ETH` tokens (ETH on Aurora).
     fn mint_eth_on_aurora(
         &mut self,
-        owner_id: Address,
+        address: Address,
         amount: Wei,
     ) -> Result<(), fungible_token::error::DepositError> {
-        sdk::log!("Mint {} ETH tokens for: {}", amount, owner_id.encode());
-        self.ft.internal_deposit_eth_to_aurora(owner_id, amount)
+        sdk::log!("Mint {} ETH tokens for: {}", amount, address.encode());
+        self.ft.internal_deposit_eth_to_aurora(address, amount)
     }
 
-    /// Burn ETH tokens
+    /// Burn `ETH` tokens (ETH on Aurora).
     fn burn_eth_on_aurora(
         &mut self,
         amount: Wei,
@@ -348,9 +351,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: &AccountId,
         args: &WithdrawCallArgs,
     ) -> Result<WithdrawResult, error::WithdrawError> {
-        // Check is current account id is owner
+        // Check if the current account id is owner.
         let is_owner = current_account_id == predecessor_account_id;
-        // Check is current flow paused. If it's owner just skip asserrion.
+        // Check if the withdraw flow is paused. If it's owner just skip the assertion.
         self.assert_not_paused(PAUSE_WITHDRAW, is_owner)
             .map_err(|_| error::WithdrawError::Paused)?;
 
@@ -367,7 +370,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         })
     }
 
-    /// Returns total ETH supply on NEAR (`nETH` as NEP-141 token)
+    /// Returns total `nETH` supply (ETH on NEAR).
     pub fn ft_total_eth_supply_on_near(&mut self) {
         let total_supply = self.ft.ft_total_eth_supply_on_near();
         sdk::log!("Total ETH supply on NEAR: {}", total_supply);
@@ -375,7 +378,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .return_output(format!("\"{total_supply}\"").as_bytes());
     }
 
-    /// Returns total ETH supply on Aurora (ETH in Aurora EVM)
+    /// Returns total `ETH` supply (ETH on Aurora).
     pub fn ft_total_eth_supply_on_aurora(&mut self) {
         let total_supply = self.ft.ft_total_eth_supply_on_aurora();
         sdk::log!("Total ETH supply on Aurora: {}", total_supply);
@@ -383,7 +386,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .return_output(format!("\"{total_supply}\"").as_bytes());
     }
 
-    /// Return balance of `nETH` (ETH on Near)
+    /// Return `nETH` balance (ETH on NEAR).
     pub fn ft_balance_of(&mut self, args: &BalanceOfCallArgs) {
         let balance = self.ft.ft_balance_of(&args.account_id);
         sdk::log!("Balance of nETH [{}]: {}", args.account_id, balance);
@@ -391,7 +394,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         self.io.return_output(format!("\"{balance}\"").as_bytes());
     }
 
-    /// Return balance of ETH (ETH in Aurora EVM)
+    /// Return `ETH` balance (ETH on Aurora).
     pub fn ft_balance_of_eth_on_aurora(
         &mut self,
         args: &BalanceOfEthCallArgs,
@@ -404,7 +407,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
-    /// Transfer between NEAR accounts
+    /// Transfer `nETH` between NEAR accounts.
     pub fn ft_transfer(
         &mut self,
         predecessor_account_id: &AccountId,
@@ -448,10 +451,11 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         self.io.return_output(format!("\"{amount}\"").as_bytes());
     }
 
-    /// FT transfer call from sender account (invoker account) to receiver
-    /// We starting early checking for message data to avoid `ft_on_transfer` call panics
-    /// But we don't check relayer exists. If relayer doesn't exist we simply not mint/burn the amount of the fee
-    /// We allow empty messages for cases when `receiver_id =! current_account_id`
+    /// FT transfer call from sender account (invoker account) to receiver.
+    /// We start early checking for message data to avoid `ft_on_transfer` call panics.
+    /// But we don't check if the relayer exists. If the relayer doesn't exist we simply
+    /// do not mint/burn the fee amount.
+    /// We allow empty messages for cases when `receiver_id =! current_account_id`.
     pub fn ft_transfer_call(
         &mut self,
         predecessor_account_id: AccountId,
@@ -475,9 +479,10 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 return Err(error::FtTransferCallError::InsufficientAmountForFee);
             }
 
-            // Additional check overflow before process `ft_on_transfer`
-            // But don't check overflow for relayer
-            // Note: It can't overflow because the total supply doesn't change during transfer.
+            // Additional check for overflowing before `ft_on_transfer` calling.
+            // But skip checking for overflowing for the relayer.
+            // Note: It couldn't be overflowed because the total supply isn't changed during
+            // the transfer.
             let amount_for_check = self
                 .ft
                 .internal_unwrap_balance_of_eth_on_aurora(&message_data.recipient);
@@ -514,7 +519,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             .map_err(Into::into)
     }
 
-    /// FT storage deposit logic
+    /// FT storage deposit logic.
     pub fn storage_deposit(
         &mut self,
         predecessor_account_id: AccountId,
@@ -535,7 +540,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(maybe_promise)
     }
 
-    /// FT storage unregister
+    /// FT storage unregister.
     pub fn storage_unregister(
         &mut self,
         account_id: AccountId,
@@ -555,7 +560,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(promise)
     }
 
-    /// FT storage withdraw
+    /// FT storage withdraw.
     pub fn storage_withdraw(
         &mut self,
         account_id: &AccountId,
@@ -567,57 +572,60 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         Ok(())
     }
 
-    /// Get balance of storage
+    /// Get the balance used by usage of the storage.
     pub fn storage_balance_of(&mut self, args: &StorageBalanceOfCallArgs) {
         self.io
             .return_output(&self.ft.storage_balance_of(&args.account_id).to_json_bytes());
     }
 
-    /// `ft_on_transfer` callback function
-    pub fn ft_on_transfer<E: Env>(
+    /// `ft_on_transfer` callback function.
+    pub fn ft_on_transfer<E: Env, M: ModExpAlgorithm>(
         &mut self,
-        engine: &Engine<I, E>,
+        engine: &Engine<I, E, M>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
         // Parse message with specific rules
         let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
             .map_err(error::FtTransferCallError::MessageParseFailed)?;
-
+        let amount = Wei::new_u128(args.amount.as_u128());
         // Special case when predecessor_account_id is current_account_id
-        let wei_fee = Wei::from(message_data.fee);
+        let fee = Wei::from(message_data.fee);
         // Mint fee to relayer
         let relayer = engine.get_relayer(message_data.relayer.as_bytes());
-        match (wei_fee, relayer) {
-            (fee, Some(evm_relayer_address)) if fee > ZERO_WEI => {
-                let eth_amount = Wei::new_u128(args.amount.as_u128())
-                    .checked_sub(fee)
-                    .ok_or(error::FtTransferCallError::InsufficientAmountForFee)?;
-                self.mint_eth_on_aurora(message_data.recipient, eth_amount)?;
-                self.mint_eth_on_aurora(evm_relayer_address, fee)?;
-            }
-            _ => self.mint_eth_on_aurora(
-                message_data.recipient,
-                Wei::new(U256::from(args.amount.as_u128())),
-            )?,
+        let (amount, relayer_fee) =
+            relayer
+                .filter(|_| fee > ZERO_WEI)
+                .map_or(Ok((amount, None)), |address| {
+                    amount.checked_sub(fee).map_or(
+                        Err(error::FtTransferCallError::InsufficientAmountForFee),
+                        |amount| Ok((amount, Some((address, fee)))),
+                    )
+                })?;
+
+        if let Some((address, fee)) = relayer_fee {
+            self.mint_eth_on_aurora(address, fee)?;
         }
+
+        self.mint_eth_on_aurora(message_data.recipient, amount)?;
         self.save_ft_contract();
         self.io.return_output(b"\"0\"");
         Ok(())
     }
 
-    /// Get accounts counter for statistics.
+    /// Return account counter.
     /// It represents total unique accounts (all-time, including accounts which now have zero balance).
     pub fn get_accounts_counter(&mut self) {
         self.io
             .return_output(&self.ft.get_accounts_counter().to_le_bytes());
     }
 
+    /// Return account id of the prover smart contract.
     pub const fn get_bridge_prover(&self) -> &AccountId {
         &self.contract.prover_account
     }
 
-    /// Save eth-connector fungible token contract data
+    /// Save eth-connector fungible token contract data in the storage.
     fn save_ft_contract(&mut self) {
         self.io.write_borsh(
             &construct_contract_key(EthConnectorStorageId::FungibleToken),
@@ -625,11 +633,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         );
     }
 
-    /// Generate key for used events from Proof
+    /// Generate key for used events from Proof.
     fn used_event_key(key: &str) -> Vec<u8> {
-        let mut v = construct_contract_key(EthConnectorStorageId::UsedEvent);
-        v.extend_from_slice(key.as_bytes());
-        v
+        [
+            &construct_contract_key(EthConnectorStorageId::UsedEvent),
+            key.as_bytes(),
+        ]
+        .concat()
     }
 
     /// Save already used event proof as hash key
@@ -637,14 +647,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         self.io.write_borsh(&Self::used_event_key(key), &0u8);
     }
 
-    /// Check is event of proof already used
+    /// Check if the event of the proof has already been used.
     fn is_used_event(&self, key: &str) -> bool {
         self.io.storage_has_key(&Self::used_event_key(key))
     }
 
-    /// Checks whether the provided proof was already used
+    /// Check whether the provided proof has already been used.
     pub fn is_used_proof(&self, proof: &Proof) -> bool {
-        self.is_used_event(&proof.key())
+        self.is_used_event(&proof_key(proof))
     }
 
     /// Get Eth connector paused flags
@@ -659,12 +669,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 }
 
 impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
-    /// Get current admin paused status
+    /// Get current admin paused status.
     fn get_paused(&self) -> PausedMask {
         self.paused_mask
     }
 
-    /// Set admin paused status
+    /// Set admin paused status.
     fn set_paused(&mut self, paused_mask: PausedMask) {
         self.paused_mask = paused_mask;
         self.io.write_borsh(
@@ -714,7 +724,7 @@ pub fn set_contract_data<I: IO>(
     Ok(contract_data)
 }
 
-/// Return metadata
+/// Return FT metadata.
 pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
     io.read_storage(&construct_contract_key(
         EthConnectorStorageId::FungibleTokenMetadata,
@@ -881,6 +891,90 @@ pub mod error {
     impl AsRef<[u8]> for ProofUsed {
         fn as_ref(&self) -> &[u8] {
             PROOF_EXIST
+        }
+    }
+}
+
+#[must_use]
+pub fn proof_key(proof: &Proof) -> String {
+    let mut data = proof.log_index.try_to_vec().unwrap();
+    data.extend(proof.receipt_index.try_to_vec().unwrap());
+    data.extend(proof.header_data.clone());
+    sdk::sha256(&data)
+        .0
+        .iter()
+        .map(ToString::to_string)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::deposit_event::{DepositedEvent, TokenMessageData, DEPOSITED_EVENT};
+    use aurora_engine_types::parameters::connector::LogEntry;
+    use aurora_engine_types::types::{make_address, Address, Fee, NEP141Wei, Wei};
+    use aurora_engine_types::{H160, U256};
+
+    const ETH_CUSTODIAN_ADDRESS: Address =
+        make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
+
+    #[test]
+    fn test_proof_key_generates_successfully() {
+        let recipient_address = Address::new(H160([22u8; 20]));
+        let deposit_amount = Wei::new_u64(123_456_789);
+        let proof = create_proof(recipient_address, deposit_amount);
+
+        let expected_key =
+            "1297721518512077871939115641114233180253108247225100248224214775219368216419218177247";
+        let actual_key = proof_key(&proof);
+
+        assert_eq!(expected_key, actual_key);
+    }
+
+    fn create_proof(recipient_address: Address, deposit_amount: Wei) -> Proof {
+        let eth_custodian_address = ETH_CUSTODIAN_ADDRESS;
+
+        let fee = Fee::new(NEP141Wei::new(0));
+        let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
+        let token_message_data: TokenMessageData =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+                .unwrap();
+
+        let deposit_event = DepositedEvent {
+            eth_custodian_address,
+            sender: Address::new(H160([0u8; 20])),
+            token_message_data,
+            amount: NEP141Wei::new(deposit_amount.raw().as_u128()),
+            fee,
+        };
+
+        let event_schema = ethabi::Event {
+            name: DEPOSITED_EVENT.into(),
+            inputs: DepositedEvent::event_params(),
+            anonymous: false,
+        };
+        let log_entry = LogEntry {
+            address: eth_custodian_address.raw(),
+            topics: vec![
+                event_schema.signature(),
+                // the sender is not important
+                crate::prelude::H256::zero(),
+            ],
+            data: ethabi::encode(&[
+                ethabi::Token::String(message),
+                ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+                ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
+            ]),
+        };
+
+        Proof {
+            log_index: 1,
+            // Only this field matters for the purpose of this test
+            log_entry_data: rlp::encode(&log_entry).to_vec(),
+            receipt_index: 1,
+            receipt_data: Vec::new(),
+            header_data: Vec::new(),
+            proof: Vec::new(),
         }
     }
 }

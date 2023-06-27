@@ -3,11 +3,12 @@ use aurora_engine::parameters::{
     CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs,
     SetUpgradeDelayBlocksArgs, SubmitArgs, SubmitResult, TransactionStatus,
 };
-use aurora_engine::silo::parameters::{
-    FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs,
-};
+use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
+use aurora_engine_types::parameters::silo::{
+    FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs,
+};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
 use borsh::BorshDeserialize;
@@ -173,7 +174,7 @@ impl StandaloneRunner {
         tx_msg.position = transaction_position;
         tx_msg.transaction =
             TransactionKind::Submit(transaction_bytes.as_slice().try_into().unwrap());
-        let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+        let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
 
         match outcome.maybe_result.as_ref().unwrap().as_ref().unwrap() {
             sync::TransactionExecutionResult::Submit(result) => {
@@ -224,7 +225,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::SubmitWithArgs(submit_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -237,7 +239,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::Call(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -250,7 +253,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::DeployErc20(deploy_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -271,7 +275,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::ResumePrecompiles(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -290,7 +295,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::PausePrecompiles(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -308,7 +314,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::SetOwner(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -328,7 +335,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::SetUpgradeDelayBlocks(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -346,7 +354,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::SetFixedGasCost(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
                 Ok(SubmitResult::new(
@@ -364,7 +373,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::SetSiloParams(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -382,7 +392,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::AddEntryToWhitelist(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -400,7 +411,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::AddEntryToWhitelistBatch(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -418,7 +430,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::RemoveEntryFromWhitelist(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -436,7 +449,8 @@ impl StandaloneRunner {
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::SetWhitelistStatus(call_args);
 
-                let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
@@ -536,7 +550,7 @@ impl StandaloneRunner {
         );
         tx_msg.transaction = TransactionKind::Submit(transaction_bytes.try_into().unwrap());
 
-        let outcome = sync::execute_transaction_message(storage, tx_msg).unwrap();
+        let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
         cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 

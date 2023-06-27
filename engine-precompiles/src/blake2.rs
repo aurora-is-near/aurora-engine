@@ -1,7 +1,11 @@
 use evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
-use crate::prelude::{mem, types::Address, Borrowed};
+use crate::prelude::{
+    mem,
+    types::{make_address, Address},
+    Borrowed,
+};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::Vec;
 
@@ -133,7 +137,7 @@ fn f(mut h: [u64; 8], m: [u64; 16], t: [u64; 2], f: bool, rounds: u32) -> Vec<u8
 pub struct Blake2F;
 
 impl Blake2F {
-    pub const ADDRESS: Address = crate::make_address(0, 9);
+    pub const ADDRESS: Address = make_address(0, 9);
 }
 
 impl Precompile for Blake2F {

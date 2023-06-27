@@ -88,6 +88,10 @@ impl MPNat {
 
     /// Computes `self ^ exp mod modulus`. `exp` must be given as big-endian bytes.
     pub fn modpow(&mut self, exp: &[u8], modulus: &Self) -> Self {
+        if exp.iter().all(|x| x == &0) {
+            return Self { digits: vec![1] };
+        }
+
         if exp.len() <= core::mem::size_of::<usize>() {
             let exp_as_number = {
                 let mut tmp: usize = 0;

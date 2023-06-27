@@ -2,6 +2,7 @@ use crate::prelude::{transactions::legacy::TransactionLegacy, Address, U256};
 use aurora_engine_types::types::Wei;
 use serde::Deserialize;
 use std::fs;
+use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;
 
@@ -69,7 +70,8 @@ impl ContractConstructor {
         );
         let code = hex::decode(hex_rep).unwrap();
         let abi_path = artifacts_base_path.as_ref().join(abi_file);
-        let reader = fs::File::open(abi_path).unwrap();
+        let file = fs::File::open(abi_path).unwrap();
+        let reader = BufReader::new(file);
         let abi = ethabi::Contract::load(reader).unwrap();
 
         Self { abi, code }
@@ -79,7 +81,8 @@ impl ContractConstructor {
     where
         P: AsRef<Path>,
     {
-        let reader = std::fs::File::open(contract_path).unwrap();
+        let file = fs::File::open(contract_path).unwrap();
+        let reader = BufReader::new(file);
         let contract: ExtendedJsonSolidityArtifact = serde_json::from_reader(reader).unwrap();
 
         Self {
@@ -192,9 +195,10 @@ where
         ])
         .output()
         .unwrap();
+    let cwd = std::env::current_dir();
     assert!(
         output.status.success(),
-        "Could not compile solidity contracts in docker: {}",
+        "Could not compile solidity contracts in docker [source={source_mount_arg}, output={output_mount_arg}, contract={contract_arg}, workdir={cwd:?}]: {}",
         String::from_utf8(output.stderr).unwrap()
     );
 }

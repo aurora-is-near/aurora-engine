@@ -1,10 +1,10 @@
 use crate::deposit_event::error::ParseEventMessageError;
-use crate::log_entry::LogEntry;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     vec, Address, BorshDeserialize, BorshSerialize, Fee, NEP141Wei, String, ToString, Vec, U256,
 };
 use aurora_engine_types::borsh;
+use aurora_engine_types::parameters::connector::LogEntry;
 use aurora_engine_types::types::address::error::AddressError;
 use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
@@ -132,14 +132,14 @@ impl TokenMessageData {
     pub fn parse_event_message_and_prepare_token_message_data(
         message: &str,
         fee: Fee,
-    ) -> Result<Self, error::ParseEventMessageError> {
+    ) -> Result<Self, ParseEventMessageError> {
         let data: Vec<_> = message.split(':').collect();
         // Data array can contain 1 or 2 elements
         if data.len() >= 3 {
-            return Err(error::ParseEventMessageError::TooManyParts);
+            return Err(ParseEventMessageError::TooManyParts);
         }
         let account_id = AccountId::try_from(data[0].as_bytes())
-            .map_err(|_| error::ParseEventMessageError::InvalidAccount)?;
+            .map_err(|_| ParseEventMessageError::InvalidAccount)?;
 
         // If data array contain only one element it should return NEAR account id
         if data.len() == 1 {
@@ -386,7 +386,7 @@ pub mod error {
 mod tests {
     use super::*;
     use crate::errors;
-    use aurora_engine_precompiles::make_address;
+    use aurora_engine_types::types::address::make_address;
     use aurora_engine_types::H160;
 
     #[test]

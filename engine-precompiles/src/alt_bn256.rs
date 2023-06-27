@@ -1,4 +1,4 @@
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, PhantomData, Vec};
 use crate::utils;
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
@@ -186,7 +186,7 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
 pub struct Bn256Add<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> Bn256Add<HF> {
-    pub const ADDRESS: Address = super::make_address(0, 6);
+    pub const ADDRESS: Address = make_address(0, 6);
 
     #[must_use]
     pub fn new() -> Self {
@@ -291,7 +291,7 @@ impl Precompile for Bn256Add<Istanbul> {
 pub struct Bn256Mul<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> Bn256Mul<HF> {
-    pub const ADDRESS: Address = super::make_address(0, 7);
+    pub const ADDRESS: Address = make_address(0, 7);
 
     #[must_use]
     pub fn new() -> Self {
@@ -399,7 +399,7 @@ impl Precompile for Bn256Mul<Istanbul> {
 pub struct Bn256Pair<HF: HardFork>(PhantomData<HF>);
 
 impl<HF: HardFork> Bn256Pair<HF> {
-    pub const ADDRESS: Address = super::make_address(0, 8);
+    pub const ADDRESS: Address = make_address(0, 8);
 
     #[must_use]
     pub fn new() -> Self {

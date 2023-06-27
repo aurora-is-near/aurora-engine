@@ -1,12 +1,11 @@
 use aurora_engine::engine::EngineErrorKind;
-use aurora_engine::silo::parameters::{
-    FixedGasCostArgs, SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
-    WhitelistStatusArgs,
-};
-use aurora_engine::silo::WhitelistKind;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::engine::TransactionStatus;
+use aurora_engine_types::parameters::silo::{
+    FixedGasCostArgs, SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
+    WhitelistKind, WhitelistStatusArgs,
+};
 use borsh::BorshSerialize;
 use libsecp256k1::SecretKey;
 use rand::{rngs::ThreadRng, Rng, RngCore};
@@ -806,10 +805,11 @@ pub mod sim_tests {
         self, deploy_nep_141, erc20_balance, exit_to_near, nep_141_balance_of,
     };
     use crate::tests::state_migration::{deploy_evm, AuroraAccount};
-    use aurora_engine::silo::parameters::{SiloParamsArgs, WhitelistAddressArgs, WhitelistArgs};
-    use aurora_engine::silo::WhitelistKind;
+    use aurora_engine_types::borsh::BorshSerialize;
+    use aurora_engine_types::parameters::silo::{
+        SiloParamsArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind,
+    };
     use aurora_engine_types::types::Address;
-    use borsh::BorshSerialize;
     use near_sdk_sim::UserAccount;
     use serde_json::json;
 

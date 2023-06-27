@@ -1,4 +1,5 @@
 use aurora_engine::deposit_event::TokenMessageData;
+use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
 use aurora_engine_types::types::{Address, Balance, Fee, NEP141Wei, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
@@ -56,7 +57,7 @@ fn test_consume_deposit_message() {
         promise_data: Vec::new(),
     };
 
-    let outcome = sync::consume_message(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -88,7 +89,7 @@ fn test_consume_deposit_message() {
         promise_data: Vec::new(),
     };
 
-    let outcome = sync::consume_message(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -118,7 +119,7 @@ fn test_consume_deposit_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message(
+    sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -148,7 +149,7 @@ fn test_consume_deploy_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message(
+    sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -201,7 +202,7 @@ fn test_consume_deploy_erc20_message() {
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
-    sync::consume_message(
+    sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -239,7 +240,7 @@ fn test_consume_deploy_erc20_message() {
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
-    sync::consume_message(
+    sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -295,7 +296,7 @@ fn test_consume_ft_on_transfer_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message(
+    sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -339,7 +340,7 @@ fn test_consume_call_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message(
+    sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -389,7 +390,7 @@ fn test_consume_submit_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message(
+    sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -425,7 +426,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         inputs: aurora_engine::deposit_event::DepositedEvent::event_params(),
         anonymous: false,
     };
-    let log_entry = aurora_engine::log_entry::LogEntry {
+    let log_entry = aurora_engine_types::parameters::connector::LogEntry {
         address: eth_custodian_address.raw(),
         topics: vec![
             event_schema.signature(),
@@ -479,7 +480,7 @@ fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
     runner.init_evm();
 
     let block_message = sample_block();
-    sync::consume_message(
+    sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Block(block_message.clone()),
     )
