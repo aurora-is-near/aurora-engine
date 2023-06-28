@@ -20,7 +20,7 @@ jobs:
       - name: Restore cache
         run: |
           cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
-          cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+          cache-util restore aurora-engine-target@tests@${{ hashFiles('**/Cargo.lock') }}:target
       - name: Preparing rocksdb library
         run: scripts/ci/build_rocksdb.sh
       - name: Build contracts
@@ -42,7 +42,7 @@ jobs:
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry yarn_cache
-          cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+          cache-util msave aurora-engine-target@tests@${{ hashFiles('**/Cargo.lock') }}:target
 
   test_modexp:
     name: Test modexp suite (mainnet, testnet)
@@ -56,7 +56,7 @@ jobs:
       - name: Restore cache
         run: |
           cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
-          cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+          cache-util restore aurora-engine-target@modexp@${{ hashFiles('**/Cargo.lock') }}:target
       - name: Preparing rocksdb library
         run: scripts/ci/build_rocksdb.sh
       - name: Test mainnet bench-modexp
@@ -66,7 +66,7 @@ jobs:
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry yarn_cache
-          cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+          cache-util msave aurora-engine-target@modexp@${{ hashFiles('**/Cargo.lock') }}:target
 
 env:
   CARGO_TERM_COLOR: always
