@@ -497,8 +497,7 @@ fn update_hashchain<'db>(
             state::get_state(io).unwrap().chain_id,
             engine_account_id.as_bytes().to_vec(),
             block_height,
-            [0; 32],
-            [0; 32],
+            [0; 32]
         )
     });
 

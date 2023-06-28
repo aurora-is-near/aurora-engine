@@ -87,9 +87,9 @@ mod contract {
     use crate::bloom::{self, Bloom};
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
-    use crate::hashchain::BlockchainHashchain;
+    use crate::hashchain::{self, BlockchainHashchain};
     use crate::parameters::{
-        self, CallArgs, DeployErc20TokenArgs, FinishDepositCallArgs, FungibleTokenMetadata,
+        self, CallArgs, BlockchainHashchainStartArgs, DeployErc20TokenArgs, FinishDepositCallArgs, FungibleTokenMetadata,
         GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
         NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs, PausePrecompilesCallArgs,
         ResolveTransferCallArgs, SetContractDataCallArgs, StorageDepositCallArgs,
@@ -108,7 +108,7 @@ mod contract {
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
-    use crate::{errors, hashchain, pausables, state};
+    use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
@@ -310,6 +310,40 @@ mod contract {
         let pauser = EnginePrecompilesPauser::from_io(io);
         let data = pauser.paused().bits().to_le_bytes();
         io.return_output(&data[..]);
+    }
+
+    /// Starts the hashchain from indicated block height and block hashchain values.
+    /// Requires that the indicated block height is before the current block height.
+    /// Assumes that no tx has been accepted after the last tx included on the indicated block hashchain.
+    #[no_mangle]
+    pub extern "C" fn start_hashchain() {
+        let mut io = Runtime;
+
+        // *** requires some admin account
+
+        let args: BlockchainHashchainStartArgs = io.read_input_borsh().sdk_unwrap();
+        let block_height = io.block_height();
+
+        if args.block_height >= block_height {
+            sdk::panic_utf8(errors::ERR_INVALID_BLOCK)
+        }
+
+        let mut blockchain_hashchain = 
+            BlockchainHashchain::new(
+                state::get_state(&io).sdk_unwrap().chain_id,
+                io.current_account_id().as_bytes().to_vec(),
+                args.block_height + 1,
+                args.block_hashchain,
+            );
+
+        // move hashchain from the args state to the current state
+        if block_height > blockchain_hashchain.get_current_block_height() {
+            blockchain_hashchain
+                .move_to_block(block_height)
+                .sdk_unwrap();
+        }
+
+        hashchain::storage::set_state(&mut io, &blockchain_hashchain).sdk_unwrap(); 
     }
 
     ///
@@ -681,16 +715,9 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn get_previous_block_hashchain() {
+    pub extern "C" fn get_last_computed_block_hashchain() {
         let mut io = Runtime;
-        let block_height = io.block_height();
-        let mut blockchain_hashchain = hashchain::storage::get_state(&io).sdk_unwrap();
-
-        if block_height > blockchain_hashchain.get_current_block_height() {
-            blockchain_hashchain
-                .move_to_block(block_height)
-                .sdk_unwrap();
-        }
+        let blockchain_hashchain = hashchain::storage::get_state(&io).sdk_unwrap();
 
         let height_and_hashchain = serde_json::to_vec(&(
             blockchain_hashchain.get_current_block_height() - 1,
@@ -699,14 +726,6 @@ mod contract {
         .unwrap();
 
         io.return_output(&height_and_hashchain);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn get_genesis_block_hashchain() {
-        let mut io = Runtime;
-        let blockchain_hashchain = hashchain::storage::get_state(&io).sdk_unwrap();
-        let genesis_block_hashchain = blockchain_hashchain.get_genesis_block_hashchain();
-        io.return_output(&genesis_block_hashchain);
     }
 
     #[no_mangle]
@@ -1310,16 +1329,17 @@ mod contract {
             return;
         }
 
+        let hashchain_state = hashchain::storage::get_state(io);
+
+        if let Err(hashchain_error) = hashchain_state {
+            match hashchain_error {
+                hashchain::blockchain_hashchain_error::BlockchainHashchainError::NotFound => return,
+                _ => sdk::panic_utf8(hashchain_error.as_ref())
+            }
+        }
+
+        let mut blockchain_hashchain = hashchain_state.unwrap();
         let block_height = io.block_height();
-        let mut blockchain_hashchain = hashchain::storage::get_state(io).unwrap_or_else(|_| {
-            BlockchainHashchain::new(
-                state::get_state(io).sdk_unwrap().chain_id,
-                io.current_account_id().as_bytes().to_vec(),
-                block_height,
-                [0; 32],
-                [0; 32],
-            )
-        });
 
         if block_height > blockchain_hashchain.get_current_block_height() {
             blockchain_hashchain
