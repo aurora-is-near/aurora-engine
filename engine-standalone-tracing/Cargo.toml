@@ -20,7 +20,7 @@ evm = { workspace = true, features = ["std", "tracing"] }
 evm-runtime.workspace = true
 evm-gasometer.workspace = true
 hex = { workspace = true, features = ["std"] }
-serde = { workspace = true, default-features = true, features = ["derive"], optional = true }
+serde = { workspace = true, features = ["std"], optional = true }
 
 [features]
 default = []

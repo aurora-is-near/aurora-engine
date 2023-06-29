@@ -21,11 +21,11 @@ aurora-engine-precompiles = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }
 aurora-engine-transactions = { workspace = true, features = ["std"] }
 evm-core.workspace = true
-hex = { workspace = true, default-features = true }
+hex = { workspace = true, features = ["std"] }
 rocksdb.workspace = true
 postgres.workspace = true
-serde = { workspace = true, default-features = true }
-serde_json = { workspace = true, default-features = true }
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true, features = ["std"] }
 
 [features]
 default = ["snappy", "lz4", "zstd", "zlib"]

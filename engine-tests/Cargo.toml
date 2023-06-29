@@ -24,7 +24,7 @@ byte-slice-cast.workspace = true
 criterion.workspace = true
 engine-standalone-storage.workspace = true
 engine-standalone-tracing.workspace = true
-ethabi = { workspace = true, default-features = true }
+ethabi = { workspace = true, features = ["full-serde"] }
 evm = { workspace = true, features = ["std", "tracing"] }
 evm-gasometer.workspace = true
 evm-runtime.workspace = true
@@ -40,8 +40,8 @@ near-vm-logic.workspace = true
 near-vm-runner.workspace = true
 rand.workspace = true
 rlp.workspace = true
-serde = { workspace = true, default-features = true , features = ["derive"] }
-serde_json = { workspace = true, default-features = true }
+serde.workspace = true
+serde_json.workspace = true
 sha3.workspace = true
 tempfile.workspace = true
 walrus.workspace = true
