@@ -473,14 +473,11 @@ impl StandaloneRunner {
         }
     }
 
-    pub fn set_hashchain_activation(
-        &mut self,
-        active: bool,
-    ) -> Result<(), BlockchainHashchainError> {
+    pub fn cancel_hashchain(&mut self) -> Result<(), BlockchainHashchainError> {
         let result = self
             .storage
             .with_engine_access(self.env.block_height, 0, &[], |io| {
-                Self::set_hashchain_activation_internal(io, active)
+                Self::cancel_hashchain_internal(io)
             });
 
         result.result?;
@@ -501,11 +498,10 @@ impl StandaloneRunner {
         Ok(())
     }
 
-    fn set_hashchain_activation_internal<'db>(
+    fn cancel_hashchain_internal<'db>(
         mut io: engine_standalone_storage::engine_state::EngineStateAccess<'db, 'db, 'db>,
-        active: bool,
     ) -> Result<(), BlockchainHashchainError> {
-        hashchain::storage::set_activation(&mut io, active)
+        hashchain::storage::remove_state(&mut io)
     }
 
     fn internal_submit_transaction(

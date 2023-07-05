@@ -529,17 +529,13 @@ impl AuroraRunner {
         H256(result)
     }
 
-    pub fn set_hashchain_activation(&mut self, active: bool) {
-        let wasm_result = self.call(
-            "set_hashchain_activation",
-            "hashchain",
-            active.try_to_vec().unwrap(),
-        );
+    pub fn cancel_hashchain(&mut self) {
+        let wasm_result = self.call("cancel_hashchain", "hashchain", vec![]);
         assert!(wasm_result.is_ok(), "{:?}", wasm_result.unwrap());
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.env.block_height = self.context.block_height;
-            let standalone_result = standalone_runner.set_hashchain_activation(active);
+            let standalone_result = standalone_runner.cancel_hashchain();
             assert!(standalone_result.is_ok(), "{:?}", standalone_result);
             self.validate_standalone();
         }

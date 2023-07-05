@@ -353,6 +353,16 @@ mod contract {
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
+    /// Cancels the hashchain mechanism.
+    /// This call will remove the hashchain storage.
+    /// To resume the hashchain use `start_hashchain` method.
+    #[cfg(feature = "integration-test")]
+    #[no_mangle]
+    pub extern "C" fn cancel_hashchain() {
+        let mut io = Runtime;
+        hashchain::storage::remove_state(&mut io).sdk_unwrap();
+    }
+
     ///
     /// MUTATIVE METHODS
     ///
@@ -1289,16 +1299,6 @@ mod contract {
         };
     }
 
-    /// Function to set hashchain activation
-    #[cfg(feature = "integration-test")]
-    #[no_mangle]
-    pub extern "C" fn set_hashchain_activation() {
-        let mut io = Runtime;
-        let input = io.read_input().to_vec();
-        let active = bool::try_from_slice(&input).sdk_expect(errors::ERR_SERIALIZE);
-        hashchain::storage::set_activation(&mut io, active).sdk_unwrap();
-    }
-
     ///
     /// Utility methods.
     ///
@@ -1331,11 +1331,6 @@ mod contract {
         output: &[u8],
         bloom: &Bloom,
     ) {
-        #[cfg(feature = "integration-test")]
-        if !hashchain::storage::get_activation(io).sdk_unwrap() {
-            return;
-        }
-
         let hashchain_state = hashchain::storage::get_state(io);
 
         if matches!(hashchain_state, Err(BlockchainHashchainError::NotFound)) {

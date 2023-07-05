@@ -290,7 +290,7 @@ pub mod storage {
             })
     }
 
-    /// Saves state into the storage.
+    /// Saves the state into the storage.
     pub fn set_state<I: IO>(
         io: &mut I,
         state: &BlockchainHashchain,
@@ -305,43 +305,11 @@ pub mod storage {
         Ok(())
     }
 
-    #[cfg(feature = "integration-test")]
-    /// Key for storing the hashchain activation flag.
-    const HASHCHAIN_ACTIVATION_KEY: &[u8; 20] = b"HASHCHAIN_ACTIVATION";
-
-    /// Gets the hashchain activation flag from storage if it exists, otherwise it returns true.
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn get_activation<I: IO>(_io: &I) -> Result<bool, BlockchainHashchainError> {
+    /// Removes the state from the storage.
+    pub fn remove_state<I: IO>(_io: &mut I) -> Result<(), BlockchainHashchainError> {
         #[cfg(feature = "integration-test")]
         {
-            return match _io.read_storage(&bytes_to_key(
-                KeyPrefix::Hashchain,
-                HASHCHAIN_ACTIVATION_KEY,
-            )) {
-                None => Ok(true),
-                Some(bytes) => bool::try_from_slice(&bytes.to_vec())
-                    .map_err(|_| BlockchainHashchainError::DeserializationFailed),
-            };
-        }
-
-        #[cfg(not(feature = "integration-test"))]
-        Ok(true)
-    }
-
-    /// Saves the hashchain activation flag into the storage.
-    pub fn set_activation<I: IO>(
-        _io: &mut I,
-        _active: bool,
-    ) -> Result<(), BlockchainHashchainError> {
-        #[cfg(feature = "integration-test")]
-        {
-            _io.write_storage(
-                &bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_ACTIVATION_KEY),
-                &_active
-                    .try_to_vec()
-                    .map_err(|_| BlockchainHashchainError::SerializationFailed)?,
-            );
-
+            _io.remove_storage(&bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_KEY));
             Ok(())
         }
 

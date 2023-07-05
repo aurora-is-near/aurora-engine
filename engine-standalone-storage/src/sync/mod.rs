@@ -503,10 +503,6 @@ fn update_hashchain<'db>(
     transaction: &TransactionKind,
     result: &Option<TransactionExecutionResult>,
 ) -> Result<(), error::Error> {
-    if !hashchain::storage::get_activation(io)? {
-        return Ok(());
-    }
-
     let hashchain_state = hashchain::storage::get_state(io);
 
     if matches!(hashchain_state, Err(BlockchainHashchainError::NotFound)) {

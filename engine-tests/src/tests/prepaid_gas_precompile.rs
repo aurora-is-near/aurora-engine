@@ -8,7 +8,7 @@ fn test_prepaid_gas_precompile() {
     const EXPECTED_VALUE: u64 = 157_277_246_352_223;
     let mut signer = test_utils::Signer::random();
     let mut runner = test_utils::deploy_evm();
-    runner.set_hashchain_activation(false);
+    runner.cancel_hashchain();
 
     let transaction = TransactionLegacy {
         nonce: signer.use_nonce().into(),
