@@ -1,6 +1,7 @@
 use aurora_engine::engine;
 use aurora_engine::hashchain;
 use aurora_engine::hashchain::blockchain_hashchain_error::BlockchainHashchainError;
+use aurora_engine::parameters::StartHashchainArgs;
 use aurora_engine::parameters::{
     CallArgs, DeployErc20TokenArgs, InitCallArgs, NewCallArgs, PausePrecompilesCallArgs,
     SetOwnerArgs, SetUpgradeDelayBlocksArgs, SubmitArgs, SubmitResult, TransactionStatus,
@@ -371,6 +372,23 @@ impl StandaloneRunner {
             let mut tx_msg =
                 Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::NewConnector(call_args);
+
+            let outcome =
+                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
+        } else if method_name == test_utils::START_HASHCHAIN {
+            let call_args = StartHashchainArgs::try_from_slice(&ctx.input).unwrap();
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::StartHashchain(call_args);
 
             let outcome =
                 sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();

@@ -67,7 +67,7 @@ pub struct SetUpgradeDelayBlocksArgs {
 /// Borsh-encoded parameters for the `start_hashchain` function.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BlockchainHashchainStartArgs {
+pub struct StartHashchainArgs {
     pub block_height: u64,
     pub block_hashchain: RawH256,
 }

@@ -1,5 +1,5 @@
 use crate::Storage;
-use aurora_engine::parameters;
+use aurora_engine::parameters::{self, StartHashchainArgs};
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -132,6 +132,8 @@ pub enum TransactionKind {
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
     FactorySetWNearAddress(Address),
     FundXccSubAccound(FundXccArgs),
+    /// Starts the hashchain
+    StartHashchain(StartHashchainArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -355,6 +357,7 @@ impl TransactionKind {
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
             Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
             Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
+            Self::StartHashchain(_) => Self::no_evm_execution("start_hashchain"),
         }
     }
 
@@ -453,17 +456,19 @@ pub enum InnerTransactionKind {
     FactorySetWNearAddress,
     #[strum(serialize = "fund_xcc_sub_account")]
     FundXccSubAccound,
+    #[strum(serialize = "start_hashchain")]
+    StartHashchain,
     Unknown,
 }
 
-/// Used to make sure `InnerTransactionKind` is kept in sync with TransactionKind
+/// Used to make sure `InnerTransactionKind` is kept in sync with `TransactionKind`
 impl From<TransactionKind> for InnerTransactionKind {
     fn from(tx: TransactionKind) -> Self {
         Self::from(&tx)
     }
 }
 
-/// Used to make sure `InnerTransactionKind` is kept in sync with TransactionKind
+/// Used to make sure `InnerTransactionKind` is kept in sync with `TransactionKind`
 impl From<&TransactionKind> for InnerTransactionKind {
     fn from(tx: &TransactionKind) -> Self {
         match tx {
@@ -497,6 +502,7 @@ impl From<&TransactionKind> for InnerTransactionKind {
             TransactionKind::FundXccSubAccound(_) => Self::FundXccSubAccound,
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::SetUpgradeDelayBlocks(_) => Self::SetUpgradeDelayBlocks,
+            TransactionKind::StartHashchain(_) => Self::StartHashchain,
         }
     }
 }
@@ -632,6 +638,7 @@ enum BorshableTransactionKind<'a> {
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccound(Cow<'a, FundXccArgs>),
     SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
+    StartHashchain(Cow<'a, parameters::StartHashchainArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -678,6 +685,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetUpgradeDelayBlocks(x) => {
                 Self::SetUpgradeDelayBlocks(Cow::Borrowed(x))
             }
+            TransactionKind::StartHashchain(x) => Self::StartHashchain(Cow::Borrowed(x)),
         }
     }
 }
@@ -743,6 +751,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
                 Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
             }
+            BorshableTransactionKind::StartHashchain(x) => Ok(Self::StartHashchain(x.into_owned())),
         }
     }
 }

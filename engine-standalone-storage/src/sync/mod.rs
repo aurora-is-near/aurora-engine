@@ -1,5 +1,7 @@
 use aurora_engine::bloom::{self, Bloom};
-use aurora_engine::hashchain;
+use aurora_engine::hashchain::{
+    self, blockchain_hashchain_error::BlockchainHashchainError, BlockchainHashchain,
+};
 use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
@@ -202,7 +204,6 @@ fn execute_transaction<'db, M: ModExpAlgorithm + 'static>(
         if let Err(e) = update_hashchain(
             &mut io,
             block_height,
-            &engine_account_id,
             &transaction_message.transaction,
             option_result,
         ) {
@@ -472,6 +473,25 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
 
             None
         }
+        TransactionKind::StartHashchain(args) => {
+            let block_height = env.block_height;
+
+            let mut blockchain_hashchain = BlockchainHashchain::new(
+                state::get_state(&io)?.chain_id,
+                env.current_account_id.as_bytes().to_vec(),
+                args.block_height + 1,
+                args.block_hashchain,
+            );
+
+            // move hashchain from the args state to the current state
+            if block_height > blockchain_hashchain.get_current_block_height() {
+                blockchain_hashchain.move_to_block(block_height)?;
+            }
+
+            hashchain::storage::set_state(&mut io, &blockchain_hashchain)?;
+
+            None
+        }
     };
 
     Ok(result)
@@ -480,7 +500,6 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
 fn update_hashchain<'db>(
     io: &mut EngineStateAccess<'db, 'db, 'db>,
     block_height: u64,
-    engine_account_id: &AccountId,
     transaction: &TransactionKind,
     result: &Option<TransactionExecutionResult>,
 ) -> Result<(), error::Error> {
@@ -488,18 +507,17 @@ fn update_hashchain<'db>(
         return Ok(());
     }
 
+    let hashchain_state = hashchain::storage::get_state(io);
+
+    if matches!(hashchain_state, Err(BlockchainHashchainError::NotFound)) {
+        return Ok(());
+    }
+
+    let mut blockchain_hashchain = hashchain_state?;
+
     let method_name = InnerTransactionKind::from(transaction).to_string();
     let input = get_input(transaction)?;
     let (output, log_bloom) = get_output_and_log_bloom(result)?;
-
-    let mut blockchain_hashchain = hashchain::storage::get_state(io).unwrap_or_else(|_| {
-        hashchain::BlockchainHashchain::new(
-            state::get_state(io).unwrap().chain_id,
-            engine_account_id.as_bytes().to_vec(),
-            block_height,
-            [0; 32]
-        )
-    });
 
     if block_height > blockchain_hashchain.get_current_block_height() {
         blockchain_hashchain.move_to_block(block_height)?;
@@ -515,9 +533,10 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
         TransactionKind::Submit(tx) => Ok(tx.into()),
         TransactionKind::SubmitWithArgs(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::Call(args) => args.try_to_vec().map_err(Into::into),
-        TransactionKind::PausePrecompiles(args) => args.try_to_vec().map_err(Into::into),
-        TransactionKind::ResumePrecompiles(args) => args.try_to_vec().map_err(Into::into),
-        TransactionKind::Deploy(input) => Ok(input.to_vec()),
+        TransactionKind::PausePrecompiles(args) | TransactionKind::ResumePrecompiles(args) => {
+            args.try_to_vec().map_err(Into::into)
+        }
+        TransactionKind::Deploy(input) => Ok(input.clone()),
         TransactionKind::DeployErc20(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::FtOnTransfer(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::Deposit(raw_proof) => Ok(raw_proof.clone()),
@@ -533,8 +552,9 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
         TransactionKind::SetPausedFlags(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::RegisterRelayer(evm_address) => Ok(evm_address.as_bytes().to_vec()),
         TransactionKind::RefundOnError(args) => args.try_to_vec().map_err(Into::into),
-        TransactionKind::SetConnectorData(args) => args.try_to_vec().map_err(Into::into),
-        TransactionKind::NewConnector(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::SetConnectorData(args) | TransactionKind::NewConnector(args) => {
+            args.try_to_vec().map_err(Into::into)
+        }
         TransactionKind::NewEngine(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::FactoryUpdate(bytecode) => Ok(bytecode.clone()),
         TransactionKind::FactoryUpdateAddressVersion(args) => args.try_to_vec().map_err(Into::into),
@@ -542,10 +562,11 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
         TransactionKind::FundXccSubAccound(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::Unknown => Ok(vec![]),
         TransactionKind::SetUpgradeDelayBlocks(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::StartHashchain(args) => args.try_to_vec().map_err(Into::into),
     }
 }
 
-#[deny(clippy::option_if_let_else)]
+#[allow(clippy::option_if_let_else)]
 fn get_output_and_log_bloom(
     result: &Option<TransactionExecutionResult>,
 ) -> Result<(Vec<u8>, Bloom), error::Error> {

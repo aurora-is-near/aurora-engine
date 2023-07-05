@@ -1,5 +1,5 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
-use aurora_engine::parameters::{NewCallArgs, SubmitArgs, ViewCallArgs};
+use aurora_engine::parameters::{NewCallArgs, StartHashchainArgs, SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::{NEP141Wei, PromiseResult};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -44,6 +44,7 @@ pub const SET_OWNER: &str = "set_owner";
 pub const SET_UPGRADE_DELAY_BLOCKS: &str = "set_upgrade_delay_blocks";
 pub const NEW: &str = "new";
 pub const NEW_ETH_CONNECTOR: &str = "new_eth_connector";
+pub const START_HASHCHAIN: &str = "start_hashchain";
 
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
@@ -249,6 +250,7 @@ impl AuroraRunner {
                 || method_name == SET_UPGRADE_DELAY_BLOCKS
                 || method_name == NEW
                 || method_name == NEW_ETH_CONNECTOR
+                || method_name == START_HASHCHAIN
             {
                 standalone_runner.submit_raw(method_name, &self.context, &self.promise_results)?;
                 self.validate_standalone();
@@ -662,6 +664,7 @@ pub fn deploy_evm() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     runner.standalone_runner = Some(standalone_runner);
 
+    // new
     let args = NewCallArgs::V1(LegacyNewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: str_to_account_id(runner.aurora_account_id.as_str()),
@@ -671,16 +674,25 @@ pub fn deploy_evm() -> AuroraRunner {
 
     let account_id = runner.aurora_account_id.clone();
     let result = runner.call("new", &account_id, args.try_to_vec().unwrap());
-
     assert!(result.is_ok());
 
+    // start_hashchain
+    let args = StartHashchainArgs {
+        block_height: 0,
+        block_hashchain: [0; 32],
+    };
+
+    let result = runner.call("start_hashchain", &account_id, args.try_to_vec().unwrap());
+    assert!(result.is_ok());
+
+    // new_eth_connector
     let args = InitCallArgs {
         prover_account: str_to_account_id("prover.near"),
         eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
         metadata: FungibleTokenMetadata::default(),
     };
-    let result = runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
 
+    let result = runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
     assert!(result.is_ok());
 
     runner.validate_standalone();

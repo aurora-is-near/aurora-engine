@@ -87,13 +87,16 @@ mod contract {
     use crate::bloom::{self, Bloom};
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
-    use crate::hashchain::{self, BlockchainHashchain};
+    use crate::hashchain::{
+        self, blockchain_hashchain_error::BlockchainHashchainError, BlockchainHashchain,
+    };
     use crate::parameters::{
-        self, CallArgs, BlockchainHashchainStartArgs, DeployErc20TokenArgs, FinishDepositCallArgs, FungibleTokenMetadata,
+        self, CallArgs, DeployErc20TokenArgs, FinishDepositCallArgs, FungibleTokenMetadata,
         GetErc20FromNep141CallArgs, GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs,
         NEP141FtOnTransferArgs, NewCallArgs, PauseEthConnectorCallArgs, PausePrecompilesCallArgs,
-        ResolveTransferCallArgs, SetContractDataCallArgs, StorageDepositCallArgs,
-        StorageWithdrawCallArgs, SubmitArgs, TransferCallCallArgs, ViewCallArgs,
+        ResolveTransferCallArgs, SetContractDataCallArgs, StartHashchainArgs,
+        StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitArgs, TransferCallCallArgs,
+        ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
@@ -315,26 +318,28 @@ mod contract {
     /// Starts the hashchain from indicated block height and block hashchain values.
     /// Requires that the indicated block height is before the current block height.
     /// Assumes that no tx has been accepted after the last tx included on the indicated block hashchain.
+    /// This tx is added to the started hashchain as it changes the state of the contract.
     #[no_mangle]
+    #[named]
     pub extern "C" fn start_hashchain() {
         let mut io = Runtime;
 
         // *** requires some admin account
 
-        let args: BlockchainHashchainStartArgs = io.read_input_borsh().sdk_unwrap();
+        let input = io.read_input().to_vec();
+        let args = StartHashchainArgs::try_from_slice(&input).sdk_expect(errors::ERR_SERIALIZE);
         let block_height = io.block_height();
 
         if args.block_height >= block_height {
             sdk::panic_utf8(errors::ERR_INVALID_BLOCK)
         }
 
-        let mut blockchain_hashchain = 
-            BlockchainHashchain::new(
-                state::get_state(&io).sdk_unwrap().chain_id,
-                io.current_account_id().as_bytes().to_vec(),
-                args.block_height + 1,
-                args.block_hashchain,
-            );
+        let mut blockchain_hashchain = BlockchainHashchain::new(
+            state::get_state(&io).sdk_unwrap().chain_id,
+            io.current_account_id().as_bytes().to_vec(),
+            args.block_height + 1,
+            args.block_hashchain,
+        );
 
         // move hashchain from the args state to the current state
         if block_height > blockchain_hashchain.get_current_block_height() {
@@ -343,7 +348,9 @@ mod contract {
                 .sdk_unwrap();
         }
 
-        hashchain::storage::set_state(&mut io, &blockchain_hashchain).sdk_unwrap(); 
+        hashchain::storage::set_state(&mut io, &blockchain_hashchain).sdk_unwrap();
+
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     ///
@@ -1331,14 +1338,11 @@ mod contract {
 
         let hashchain_state = hashchain::storage::get_state(io);
 
-        if let Err(hashchain_error) = hashchain_state {
-            match hashchain_error {
-                hashchain::blockchain_hashchain_error::BlockchainHashchainError::NotFound => return,
-                _ => sdk::panic_utf8(hashchain_error.as_ref())
-            }
+        if matches!(hashchain_state, Err(BlockchainHashchainError::NotFound)) {
+            return;
         }
 
-        let mut blockchain_hashchain = hashchain_state.unwrap();
+        let mut blockchain_hashchain = hashchain_state.sdk_unwrap();
         let block_height = io.block_height();
 
         if block_height > blockchain_hashchain.get_current_block_height() {

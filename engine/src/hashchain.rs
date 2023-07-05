@@ -400,8 +400,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn add_tx_lower_height_test() {
-        let mut blockchain_hashchain =
-            BlockchainHashchain::new([0u8; 32], vec![], 2, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new([0u8; 32], vec![], 2, [0u8; 32]);
 
         let add_tx_result =
             blockchain_hashchain.add_block_tx(1, "foo", &[], &[], &Bloom::default());
@@ -426,8 +425,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn add_tx_higger_height_test() {
-        let mut blockchain_hashchain =
-            BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32]);
 
         let add_tx_result =
             blockchain_hashchain.add_block_tx(2, "foo", &[], &[], &Bloom::default());
@@ -452,8 +450,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn add_tx_same_height_test() {
-        let mut blockchain_hashchain =
-            BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32]);
 
         let add_tx_result =
             blockchain_hashchain.add_block_tx(1, "foo", &[], &[], &Bloom::default());
@@ -478,8 +475,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn move_to_block_lower_height_test() {
-        let mut blockchain_hashchain =
-            BlockchainHashchain::new([0u8; 32], vec![], 2, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new([0u8; 32], vec![], 2, [0u8; 32]);
 
         let move_to_block_result = blockchain_hashchain.move_to_block(1);
         assert!(move_to_block_result.is_err());
@@ -487,8 +483,7 @@ mod blockchain_hashchain_tests {
 
     #[test]
     fn move_to_block_same_height_test() {
-        let mut blockchain_hashchain =
-            BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32]);
+        let mut blockchain_hashchain = BlockchainHashchain::new([0u8; 32], vec![], 1, [0u8; 32]);
 
         let move_to_block_result = blockchain_hashchain.move_to_block(1);
         assert!(move_to_block_result.is_err());
@@ -532,7 +527,12 @@ mod blockchain_hashchain_tests {
         )
         .0;
 
-        let mut blockchain_hashchain = BlockchainHashchain::new(chain_id, contract_account_id, block_height_2, block_hashchain_1);
+        let mut blockchain_hashchain = BlockchainHashchain::new(
+            chain_id,
+            contract_account_id,
+            block_height_2,
+            block_hashchain_1,
+        );
 
         let move_add_block_tx_result =
             blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output, &bloom);
@@ -602,7 +602,12 @@ mod blockchain_hashchain_tests {
         )
         .0;
 
-        let mut blockchain_hashchain = BlockchainHashchain::new(chain_id, contract_account_id, block_height_2, block_hashchain_1);
+        let mut blockchain_hashchain = BlockchainHashchain::new(
+            chain_id,
+            contract_account_id,
+            block_height_2,
+            block_hashchain_1,
+        );
 
         let move_add_block_tx_result =
             blockchain_hashchain.add_block_tx(block_height_2, method_name, input, output, &bloom);
