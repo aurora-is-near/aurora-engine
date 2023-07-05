@@ -205,7 +205,7 @@ impl AuroraRunner {
             &mut self.context,
             caller_account_id,
             signer_account_id,
-            input.clone(),
+            input,
         );
 
         let vm_promise_results: Vec<_> = self
@@ -536,7 +536,7 @@ impl AuroraRunner {
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.env.block_height = self.context.block_height;
             let standalone_result = standalone_runner.cancel_hashchain();
-            assert!(standalone_result.is_ok(), "{:?}", standalone_result);
+            assert!(standalone_result.is_ok(), "{standalone_result:?}");
             self.validate_standalone();
         }
     }
@@ -657,8 +657,7 @@ pub fn deploy_evm() -> AuroraRunner {
     let mut standalone_runner = standalone::StandaloneRunner::default();
     standalone_runner.init_evm_no_state();
 
-    let mut runner = AuroraRunner::default();
-    runner.standalone_runner = Some(standalone_runner);
+    let mut runner = AuroraRunner { standalone_runner: Some(standalone_runner), ..Default::default() };
 
     // new
     let args = NewCallArgs::V1(LegacyNewCallArgs {
