@@ -19,8 +19,10 @@ jobs:
         uses: actions/checkout@v3
       - name: Restore cache
         run: |
-          cache-util restore cargo_git cargo_registry yarn_cache
-          cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+          cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
+          cache-util restore aurora-engine-target@tests@${{ hashFiles('**/Cargo.lock') }}:target
+      - name: Preparing rocksdb library
+        run: scripts/ci/build_rocksdb.sh
       - name: Build contracts
         run: cargo make build-contracts
       - name: Test contracts
@@ -40,7 +42,35 @@ jobs:
       - name: Save cache
         run: |
           cache-util save cargo_git cargo_registry yarn_cache
-          cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+          cache-util msave aurora-engine-target@tests@${{ hashFiles('**/Cargo.lock') }}:target
+
+  test_modexp:
+    name: Test modexp suite (mainnet, testnet)
+    runs-on: [ self-hosted, heavy ]
+    steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v3
+      - name: Restore cache
+        run: |
+          cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
+          cache-util restore aurora-engine-target@modexp@${{ hashFiles('**/Cargo.lock') }}:target
+      - name: Preparing rocksdb library
+        run: scripts/ci/build_rocksdb.sh
+      - name: Test mainnet bench-modexp
+        run: cargo make --profile mainnet bench-modexp
+      - name: Test testnet bench-modexp
+        run: cargo make --profile testnet bench-modexp
+      - name: Save cache
+        run: |
+          cache-util save cargo_git cargo_registry yarn_cache
+          cache-util msave aurora-engine-target@modexp@${{ hashFiles('**/Cargo.lock') }}:target
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  ROCKSDB_INCLUDE_DIR: /root/rocksdb/include
+  ROCKSDB_LIB_DIR: /root/rocksdb/lib
+  ROCKSDB_STATIC: 1
