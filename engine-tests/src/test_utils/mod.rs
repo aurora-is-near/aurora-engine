@@ -657,7 +657,10 @@ pub fn deploy_evm() -> AuroraRunner {
     let mut standalone_runner = standalone::StandaloneRunner::default();
     standalone_runner.init_evm_no_state();
 
-    let mut runner = AuroraRunner { standalone_runner: Some(standalone_runner), ..Default::default() };
+    let mut runner = AuroraRunner {
+        standalone_runner: Some(standalone_runner),
+        ..Default::default()
+    };
 
     // new
     let args = NewCallArgs::V1(LegacyNewCallArgs {
