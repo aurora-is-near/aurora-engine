@@ -1,46 +1,43 @@
 [package]
 name = "aurora-engine"
 version = "2.9.2"
-authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2021"
-description = ""
-documentation = ""
-readme = true
-homepage = "https://github.com/aurora-is-near/aurora-engine"
-repository = "https://github.com/aurora-is-near/aurora-engine"
-license = "CC0-1.0"
-publish = false
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+readme.workspace = true
+publish.workspace = true
 autobenches = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-aurora-engine-types = { path = "../engine-types", default-features = false }
-aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
-aurora-engine-modexp = { path = "../engine-modexp", default-features = false }
-aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
-aurora-engine-transactions = { path = "../engine-transactions", default-features = false }
-bitflags = { version = "1.3", default-features = false }
-byte-slice-cast = { version = "1.0", default-features = false }
-ethabi = { version = "18.0", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-aurora", default-features = false }
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
-rlp = { version = "0.5.0", default-features = false }
-serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
-serde_json = { version = "1", default-features = false, features = ["alloc"] }
+aurora-engine-modexp.workspace = true
+aurora-engine-precompiles.workspace = true
+aurora-engine-transactions.workspace = true
+aurora-engine-types.workspace = true
+aurora-engine-sdk.workspace = true
+bitflags.workspace = true
+ethabi.workspace = true
+evm.workspace = true
+hex.workspace = true
+rlp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wee_alloc = { version = "0.4.5", default-features = false }
+wee_alloc.workspace = true
 
 [dev-dependencies]
-aurora-engine-test-doubles = { path = "../engine-test-doubles" }
-test-case = "3.1"
-digest = "0.10"
+aurora-engine-test-doubles.workspace = true
+digest.workspace = true
+test-case.workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "byte-slice-cast/std", "ethabi/std", "evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "ethabi/std", "evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
 borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-sdk/borsh-compat", "aurora-engine-precompiles/borsh-compat"]
 evm_bully = []

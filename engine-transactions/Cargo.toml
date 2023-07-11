@@ -1,27 +1,25 @@
 [package]
 name = "aurora-engine-transactions"
 version = "1.0.0"
-authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2021"
-description = ""
-documentation = ""
-readme = true
-homepage = "https://github.com/aurora-is-near/aurora-engine"
-repository = "https://github.com/aurora-is-near/aurora-engine"
-license = "CC0-1.0"
-publish = false
+authors.workspace = true
+edition.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
 autobenches = false
 
 [dependencies]
-aurora-engine-types = { path = "../engine-types", default-features = false }
-aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
-aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-aurora", default-features = false }
-rlp = { version = "0.5.0", default-features = false }
-serde = { version = "1", default-features = false, features = ["alloc", "derive"], optional = true }
+aurora-engine-precompiles.workspace = true
+aurora-engine-sdk.workspace = true
+aurora-engine-types.workspace = true
+evm.workspace = true
+rlp.workspace = true
+serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
+hex.workspace = true
 
 [features]
 std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "evm/std", "rlp/std"]

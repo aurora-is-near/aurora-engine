@@ -1,22 +1,26 @@
 [package]
 name = "aurora-engine-workspace"
 version = "0.1.0"
-authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2021"
-readme = "README.md"
 description = "Environment for testing Aurora EVM contract"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
+autobenches = false
 
 [dependencies]
-aurora-engine-types = { path = "../engine-types", default-features = false, features = [ "std", "impl-serde", "borsh-compat" ] }
-
-anyhow = "1"
-near-sdk = "4.1"
-near-units = "0.2"
-serde = { version = "1", features = [ "derive" ] }
-serde_json = "1"
-workspaces = "0.7"
-tokio = { version = "1", features = [ "time" ] }
+aurora-engine-types = { workspace = true, features = ["borsh-compat", "impl-serde", "std"] }
+anyhow.workspace = true
+near-sdk.workspace = true
+near-units.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+workspaces.workspace = true
+tokio = { workspace = true, features = [ "time" ] }
 
 [dev-dependencies]
-hex = "0.4"
-lazy_static = "1.4"
+hex.workspace = true
+lazy_static.workspace = true
