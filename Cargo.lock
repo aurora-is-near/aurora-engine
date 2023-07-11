@@ -277,7 +277,6 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "bitflags",
- "byte-slice-cast",
  "digest 0.10.7",
  "ethabi",
  "evm",
