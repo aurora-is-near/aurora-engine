@@ -455,6 +455,22 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
 
             None
         }
+        TransactionKind::PauseContract => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.is_paused = true;
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
+        TransactionKind::ResumeContract => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.is_paused = false;
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
     };
 
     Ok(result)

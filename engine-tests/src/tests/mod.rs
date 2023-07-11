@@ -13,6 +13,7 @@ pub mod modexp;
 mod multisender;
 mod one_inch;
 mod pausable_precompiles;
+mod pause_contract;
 mod prepaid_gas_precompile;
 mod promise_results_precompile;
 mod random;
