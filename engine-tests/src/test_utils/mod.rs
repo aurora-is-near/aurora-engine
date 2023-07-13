@@ -678,7 +678,11 @@ pub fn deploy_evm() -> AuroraRunner {
     let result = runner.call("new", &account_id, args.try_to_vec().unwrap());
     assert!(result.is_ok());
 
-    // start_hashchain
+    // pause
+    let result = runner.call("pause_contract", &account_id, vec![0]);
+    assert!(result.is_ok());
+
+    // start_hashchain (and resume)
     let args = StartHashchainArgs {
         block_height: 0,
         block_hashchain: [0; 32],

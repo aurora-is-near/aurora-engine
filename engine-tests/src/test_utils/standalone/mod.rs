@@ -366,7 +366,6 @@ impl StandaloneRunner {
                 0,
                 Vec::new(),
             ))
-
         } else if method_name == test_utils::NEW_ETH_CONNECTOR {
             let call_args = InitCallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);

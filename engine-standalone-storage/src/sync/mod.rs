@@ -490,10 +490,11 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             None
         }
         TransactionKind::StartHashchain(args) => {
+            let mut prev = state::get_state(&io)?;
             let block_height = env.block_height;
 
             let mut blockchain_hashchain = BlockchainHashchain::new(
-                state::get_state(&io)?.chain_id,
+                prev.chain_id,
                 env.current_account_id.as_bytes().to_vec(),
                 args.block_height + 1,
                 args.block_hashchain,
@@ -505,6 +506,8 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             }
 
             hashchain::storage::set_state(&mut io, &blockchain_hashchain)?;
+            prev.is_paused = false;
+            state::set_state(&mut io, &prev)?;
 
             None
         }
@@ -572,10 +575,11 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
         TransactionKind::FactoryUpdateAddressVersion(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::FactorySetWNearAddress(address) => Ok(address.as_bytes().to_vec()),
         TransactionKind::FundXccSubAccound(args) => args.try_to_vec().map_err(Into::into),
-        TransactionKind::Unknown => Ok(vec![]),
         TransactionKind::SetUpgradeDelayBlocks(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::PauseContract
+        | TransactionKind::ResumeContract
+        | TransactionKind::Unknown => Ok(vec![]),
         TransactionKind::StartHashchain(args) => args.try_to_vec().map_err(Into::into),
-        TransactionKind::PauseContract | TransactionKind::ResumeContract => Ok(vec![]),
     }
 }
 

@@ -322,15 +322,21 @@ mod contract {
     }
 
     /// Starts the hashchain from indicated block height and block hashchain values.
+    /// Resumes the contract.
+    /// Requires Aurora Labs account.
+    /// Requires contract to be in pause state.
     /// Requires that the indicated block height is before the current block height.
     /// Assumes that no tx has been accepted after the last tx included on the indicated block hashchain.
-    /// This tx is added to the started hashchain as it changes the state of the contract.
+    /// This self tx is added to the started hashchain as it changes the state of the contract.
     #[no_mangle]
     #[named]
     pub extern "C" fn start_hashchain() {
         let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
 
-        // *** requires some admin account
+        // *** TODO requires some Aurora Labs account
+        // require_account(some_AuroraLabs_account);
+        require_paused(&state);
 
         let input = io.read_input().to_vec();
         let args = StartHashchainArgs::try_from_slice(&input).sdk_expect(errors::ERR_SERIALIZE);
@@ -341,13 +347,13 @@ mod contract {
         }
 
         let mut blockchain_hashchain = BlockchainHashchain::new(
-            state::get_state(&io).sdk_unwrap().chain_id,
+            state.chain_id,
             io.current_account_id().as_bytes().to_vec(),
             args.block_height + 1,
             args.block_hashchain,
         );
 
-        // move hashchain from the args state to the current state
+        // moves hashchain from the args state to the current state
         if block_height > blockchain_hashchain.get_current_block_height() {
             blockchain_hashchain
                 .move_to_block(block_height)
@@ -355,8 +361,9 @@ mod contract {
         }
 
         hashchain::storage::set_state(&mut io, &blockchain_hashchain).sdk_unwrap();
-
         update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
+        state.is_paused = false;
+        state::set_state(&mut io, &state).sdk_unwrap()
     }
 
     /// Cancels the hashchain mechanism.
@@ -376,9 +383,7 @@ mod contract {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
-        if state.is_paused {
-            sdk::panic_utf8(errors::ERR_PAUSED);
-        }
+        require_running(&state);
         state.is_paused = true;
         state::set_state(&mut io, &state).sdk_unwrap();
         update_hashchain(&mut io, function_name!(), &[], &[], &Bloom::default());
@@ -391,9 +396,7 @@ mod contract {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
         require_owner_only(&state, &io.predecessor_account_id());
-        if !state.is_paused {
-            sdk::panic_utf8(errors::ERR_RUNNING);
-        }
+        require_paused(&state);
         state.is_paused = false;
         state::set_state(&mut io, &state).sdk_unwrap();
         update_hashchain(&mut io, function_name!(), &[], &[], &Bloom::default());
@@ -1376,6 +1379,12 @@ mod contract {
     fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
         if &state.owner_id != predecessor_account_id {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
+        }
+    }
+
+    fn require_paused(state: &state::EngineState) {
+        if !state.is_paused {
+            sdk::panic_utf8(errors::ERR_RUNNING);
         }
     }
 
