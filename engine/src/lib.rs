@@ -371,6 +371,7 @@ mod contract {
 
     /// Sets the flag to pause the contract.
     #[no_mangle]
+    #[named]
     pub extern "C" fn pause_contract() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
@@ -380,10 +381,12 @@ mod contract {
         }
         state.is_paused = true;
         state::set_state(&mut io, &state).sdk_unwrap();
+        update_hashchain(&mut io, function_name!(), &[], &[], &Bloom::default());
     }
 
     /// Sets the flag to resume the contract.
     #[no_mangle]
+    #[named]
     pub extern "C" fn resume_contract() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
@@ -393,6 +396,7 @@ mod contract {
         }
         state.is_paused = false;
         state::set_state(&mut io, &state).sdk_unwrap();
+        update_hashchain(&mut io, function_name!(), &[], &[], &Bloom::default());
     }
 
     ///
