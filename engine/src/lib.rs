@@ -323,7 +323,7 @@ mod contract {
 
     /// Starts the hashchain from indicated block height and block hashchain values.
     /// Resumes the contract.
-    /// Requires Aurora Labs account.
+    /// Requires a specific Aurora Labs account.
     /// Requires contract to be in pause state.
     /// Requires that the indicated block height is before the current block height.
     /// Assumes that no tx has been accepted after the last tx included on the indicated block hashchain.
