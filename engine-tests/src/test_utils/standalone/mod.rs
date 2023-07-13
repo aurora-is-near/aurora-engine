@@ -366,12 +366,45 @@ impl StandaloneRunner {
                 0,
                 Vec::new(),
             ))
+
         } else if method_name == test_utils::NEW_ETH_CONNECTOR {
             let call_args = InitCallArgs::try_from_slice(&ctx.input).unwrap();
             let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
             let mut tx_msg =
                 Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::NewConnector(call_args);
+
+            let outcome =
+                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
+        } else if method_name == test_utils::PAUSE_CONTRACT {
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::PauseContract;
+
+            let outcome =
+                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
+        } else if method_name == test_utils::RESUME_CONTRACT {
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::ResumeContract;
 
             let outcome =
                 sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();

@@ -2,7 +2,11 @@ use self::blockchain_hashchain_error::BlockchainHashchainError;
 use crate::{bloom::Bloom, prelude::Vec};
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::types::RawH256;
+
+#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 
 /// Blockchain Hashchain.
 /// Continually keeps track of the previous block hashchain through the blocks heights.

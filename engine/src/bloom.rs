@@ -5,11 +5,15 @@
 #![allow(clippy::expl_impl_clone_on_copy)]
 
 use aurora_engine_types::parameters::engine::ResultLog;
-use borsh::{BorshDeserialize, BorshSerialize};
 use fixed_hash::construct_fixed_hash;
 use impl_serde::impl_fixed_hash_serde;
 
 use aurora_engine_sdk::keccak;
+
+#[cfg(not(feature = "borsh-compat"))]
+use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh-compat")]
+use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 
 const BLOOM_SIZE: usize = 256;
 const BLOOM_BITS: u32 = 3;

@@ -22,6 +22,8 @@ pub const ERR_VERIFY_PROOF: &[u8; 16] = b"ERR_VERIFY_PROOF";
 pub const ERR_INVALID_UPGRADE: &[u8; 19] = b"ERR_INVALID_UPGRADE";
 pub const ERR_NO_UPGRADE: &[u8; 14] = b"ERR_NO_UPGRADE";
 pub const ERR_NOT_ALLOWED: &[u8; 15] = b"ERR_NOT_ALLOWED";
+pub const ERR_PAUSED: &[u8; 10] = b"ERR_PAUSED";
+pub const ERR_RUNNING: &[u8; 11] = b"ERR_RUNNING";
 pub const ERR_INVALID_BLOCK: &[u8; 17] = b"ERR_INVALID_BLOCK";
 
 pub const ERR_SERIALIZE: &str = "ERR_SERIALIZE";

@@ -473,6 +473,22 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
 
             None
         }
+        TransactionKind::PauseContract => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.is_paused = true;
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
+        TransactionKind::ResumeContract => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.is_paused = false;
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
         TransactionKind::StartHashchain(args) => {
             let block_height = env.block_height;
 
@@ -559,6 +575,7 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
         TransactionKind::Unknown => Ok(vec![]),
         TransactionKind::SetUpgradeDelayBlocks(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::StartHashchain(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::PauseContract | TransactionKind::ResumeContract => Ok(vec![]),
     }
 }
 

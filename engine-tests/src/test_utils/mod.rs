@@ -44,6 +44,8 @@ pub const SET_OWNER: &str = "set_owner";
 pub const SET_UPGRADE_DELAY_BLOCKS: &str = "set_upgrade_delay_blocks";
 pub const NEW: &str = "new";
 pub const NEW_ETH_CONNECTOR: &str = "new_eth_connector";
+pub const PAUSE_CONTRACT: &str = "pause_contract";
+pub const RESUME_CONTRACT: &str = "resume_contract";
 pub const START_HASHCHAIN: &str = "start_hashchain";
 
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
@@ -250,6 +252,8 @@ impl AuroraRunner {
                 || method_name == SET_UPGRADE_DELAY_BLOCKS
                 || method_name == NEW
                 || method_name == NEW_ETH_CONNECTOR
+                || method_name == PAUSE_CONTRACT
+                || method_name == RESUME_CONTRACT
                 || method_name == START_HASHCHAIN
             {
                 standalone_runner.submit_raw(method_name, &self.context, &self.promise_results)?;
