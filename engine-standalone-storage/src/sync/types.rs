@@ -131,6 +131,10 @@ pub enum TransactionKind {
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
     FactorySetWNearAddress(Address),
     FundXccSubAccound(FundXccArgs),
+    /// Pause the contract
+    PauseContract,
+    /// Resume the contract
+    ResumeContract,
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -354,6 +358,8 @@ impl TransactionKind {
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
             Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
             Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
+            Self::PauseContract => Self::no_evm_execution("pause_contract"),
+            Self::ResumeContract => Self::no_evm_execution("resume_contract"),
         }
     }
 
@@ -523,6 +529,8 @@ enum BorshableTransactionKind<'a> {
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccound(Cow<'a, FundXccArgs>),
     SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
+    PauseContract,
+    ResumeContract,
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -569,6 +577,8 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetUpgradeDelayBlocks(x) => {
                 Self::SetUpgradeDelayBlocks(Cow::Borrowed(x))
             }
+            TransactionKind::PauseContract => Self::PauseContract,
+            TransactionKind::ResumeContract => Self::ResumeContract,
         }
     }
 }
@@ -634,6 +644,8 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
                 Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
             }
+            BorshableTransactionKind::PauseContract => Ok(Self::PauseContract),
+            BorshableTransactionKind::ResumeContract => Ok(Self::ResumeContract),
         }
     }
 }
