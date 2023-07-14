@@ -346,6 +346,11 @@ impl StandaloneRunner {
                 Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::FactorySetWNearAddress(call_args);
 
+            let outcome =
+                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
             Ok(SubmitResult::new(
                 TransactionStatus::Succeed(Vec::new()),
                 0,
