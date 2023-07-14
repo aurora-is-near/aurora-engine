@@ -89,6 +89,10 @@ fn test_pause_contract() {
 
     let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set);
     assert!(result.is_err());
+
+    // resume contract
+    let result = runner.call("resume_contract", &aurora_account_id, vec![]);
+    assert!(result.is_ok());
 }
 
 #[test]
