@@ -1,4 +1,5 @@
 use crate::account_id::AccountId;
+use crate::public_key::PublicKey;
 use crate::types::{Address, NEP141Wei, NearGas, RawU256, Yocto};
 use crate::{Box, String, Vec};
 
@@ -260,33 +261,25 @@ pub enum PromiseAction {
     },
     Stake {
         amount: Yocto,
-        public_key: NearPublicKey,
+        public_key: PublicKey,
     },
     AddFullAccessKey {
-        public_key: NearPublicKey,
+        public_key: PublicKey,
         nonce: u64,
     },
     AddFunctionCallKey {
-        public_key: NearPublicKey,
+        public_key: PublicKey,
         nonce: u64,
         allowance: Yocto,
         receiver_id: AccountId,
         function_names: String,
     },
     DeleteKey {
-        public_key: NearPublicKey,
+        public_key: PublicKey,
     },
     DeleteAccount {
         beneficiary_id: AccountId,
     },
-}
-
-#[derive(Debug, BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq)]
-pub enum NearPublicKey {
-    /// ed25519 public keys are 32 bytes
-    Ed25519([u8; 32]),
-    /// secp256k1 keys are in the uncompressed 64 byte format
-    Secp256k1([u8; 64]),
 }
 
 #[must_use]

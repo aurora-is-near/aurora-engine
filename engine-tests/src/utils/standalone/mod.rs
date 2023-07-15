@@ -7,6 +7,7 @@ use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_types::borsh::BorshDeserialize;
+use aurora_engine_types::parameters::engine::RelayerKeyManagerArgs;
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
 use engine_standalone_storage::{
@@ -358,6 +359,25 @@ impl StandaloneRunner {
             let mut tx_msg =
                 Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
             tx_msg.transaction = TransactionKind::ResumeContract;
+
+            let outcome =
+                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+            self.cumulative_diff.append(outcome.diff.clone());
+            storage::commit(storage, &outcome);
+
+            Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+            ))
+        } else if method_name == utils::SET_KEY_MANAGER {
+            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+            let call_args: RelayerKeyManagerArgs = serde_json::from_slice(&ctx.input)
+                .expect("Unable to parse input as RelayerKeyManagerArgs");
+
+            let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+            tx_msg.transaction = TransactionKind::SetKeyManager(call_args);
 
             let outcome =
                 sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();

@@ -70,6 +70,7 @@ dependencies = [
  "base64 0.21.2",
  "borsh 0.10.3",
  "borsh 0.9.3",
+ "bs58 0.5.0",
  "hex",
  "primitive-types 0.12.1",
  "rlp",
@@ -237,6 +238,16 @@ name = "bs58"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
+
+[[package]]
+name = "bs58"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5353f36341f7451062466f0b755b96ac3a9547e4d7f6b70d603fc721a7d7896"
+dependencies = [
+ "sha2 0.10.6",
+ "tinyvec",
+]
 
 [[package]]
 name = "bumpalo"
@@ -702,7 +713,7 @@ dependencies = [
  "arrayref",
  "blake2",
  "borsh 0.9.3",
- "bs58",
+ "bs58 0.4.0",
  "c2-chacha",
  "curve25519-dalek",
  "derive_more",
@@ -756,7 +767,7 @@ checksum = "91d508f0fc340f6461e4e256417685720d3c4c00bb5a939b105160e49137caba"
 dependencies = [
  "base64 0.11.0",
  "borsh 0.9.3",
- "bs58",
+ "bs58 0.4.0",
  "derive_more",
  "near-account-id",
  "num-rational",
@@ -795,7 +806,7 @@ checksum = "15eb3de2defe3626260cc209a6cdb985c6b27b0bd4619fad97dcfae002c3c5bd"
 dependencies = [
  "base64 0.13.1",
  "borsh 0.9.3",
- "bs58",
+ "bs58 0.4.0",
  "near-abi",
  "near-crypto",
  "near-primitives",
@@ -848,7 +859,7 @@ checksum = "81b534828419bacbf1f7b11ef7b00420f248c548c485d3f0cfda8bb6931152f2"
 dependencies = [
  "base64 0.13.1",
  "borsh 0.9.3",
- "bs58",
+ "bs58 0.4.0",
  "byteorder",
  "near-account-id",
  "near-crypto",
@@ -1380,6 +1391,21 @@ dependencies = [
  "wasi 0.10.0+wasi-snapshot-preview1",
  "winapi",
 ]
+
+[[package]]
+name = "tinyvec"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87cc5ceb3875bb20c2890005a4e226a4651264a5c75edb2421b52861a0a0cb50"
+dependencies = [
+ "tinyvec_macros",
+]
+
+[[package]]
+name = "tinyvec_macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "toml"

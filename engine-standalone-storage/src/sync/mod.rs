@@ -471,6 +471,24 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
 
             None
         }
+        TransactionKind::SetKeyManager(args) => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.key_manager = args.key_manager.clone();
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
+        TransactionKind::AddRelayerKey(args) => {
+            engine::add_function_call_key(&mut io, &args.public_key);
+
+            None
+        }
+        TransactionKind::RemoveRelayerKey(args) => {
+            engine::remove_function_call_key(&mut io, &args.public_key)?;
+
+            None
+        }
     };
 
     Ok(result)
