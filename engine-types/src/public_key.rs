@@ -41,8 +41,8 @@ impl BorshSerialize for PublicKey {
 #[cfg(not(feature = "borsh-compat"))]
 impl BorshDeserialize for PublicKey {
     fn deserialize_reader<R: io::Read>(rd: &mut R) -> io::Result<Self> {
-        let key_type = KeyType::try_from(u8::deserialize_reader(rd)?)
-            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err.to_string()))?;
+        let key_type = u8::deserialize_reader(rd).and_then(KeyType::try_from)?;
+
         match key_type {
             KeyType::Ed25519 => Ok(Self::Ed25519(BorshDeserialize::deserialize_reader(rd)?)),
             KeyType::Secp256k1 => Ok(Self::Secp256k1(BorshDeserialize::deserialize_reader(rd)?)),
