@@ -44,6 +44,7 @@ pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const SET_OWNER: &str = "set_owner";
 pub const SET_UPGRADE_DELAY_BLOCKS: &str = "set_upgrade_delay_blocks";
 pub const SET_FIXED_GAS_COST: &str = "set_fixed_gas_cost";
+pub const SET_SILO_PARAMS: &str = "set_silo_params";
 pub const ADD_ENTRY_TO_WHITELIST: &str = "add_entry_to_whitelist";
 pub const ADD_ENTRY_TO_WHITELIST_BATCH: &str = "add_entry_to_whitelist_batch";
 pub const REMOVE_ENTRY_FROM_WHITELIST: &str = "remove_entry_from_whitelist";
@@ -252,6 +253,7 @@ impl AuroraRunner {
                 || method_name == SET_OWNER
                 || method_name == SET_UPGRADE_DELAY_BLOCKS
                 || method_name == SET_FIXED_GAS_COST
+                || method_name == SET_SILO_PARAMS
                 || method_name == ADD_ENTRY_TO_WHITELIST
                 || method_name == ADD_ENTRY_TO_WHITELIST_BATCH
                 || method_name == REMOVE_ENTRY_FROM_WHITELIST

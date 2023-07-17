@@ -1,9 +1,9 @@
-use aurora_engine_sdk::io::IO;
+use aurora_engine_sdk::io::{StorageIntermediate, IO};
 #[cfg(feature = "contract")]
 use aurora_engine_sdk::{env::Env, types::SdkUnwrap};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::silo::{
-    WhitelistArgs, WhitelistKind, WhitelistKindArgs, WhitelistStatusArgs,
+    SiloParamsArgs, WhitelistArgs, WhitelistKind, WhitelistKindArgs, WhitelistStatusArgs,
 };
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use aurora_engine_types::types::{Address, Wei};
@@ -18,6 +18,31 @@ use whitelist::Whitelist;
 mod whitelist;
 
 const GAS_COST_KEY: &[u8] = b"GAS_COST_KEY";
+const ERC20_FALLBACK_KEY: &[u8] = b"ERC20_FALLBACK_KEY";
+
+/// Return SILO parameters.
+pub fn get_silo_params<I: IO>(io: &I) -> Option<SiloParamsArgs> {
+    let params = get_fixed_gas_cost(io)
+        .and_then(|cost| get_erc20_fallback_address(io).map(|address| (cost, address)));
+
+    params.map(|(cost, address)| SiloParamsArgs {
+        fixed_gas_cost: cost,
+        erc20_fallback_address: address,
+    })
+}
+
+/// Set SILO parameters.
+pub fn set_silo_params<I: IO>(io: &mut I, args: Option<SiloParamsArgs>) {
+    let (cost, address) = args.map_or((None, None), |params| {
+        (
+            Some(params.fixed_gas_cost),
+            Some(params.erc20_fallback_address),
+        )
+    });
+
+    set_fixed_gas_cost(io, cost);
+    set_erc20_fallback_address(io, address);
+}
 
 /// Return fixed gas cost.
 pub fn get_fixed_gas_cost<I: IO>(io: &I) -> Option<Wei> {
@@ -31,6 +56,23 @@ pub fn set_fixed_gas_cost<I: IO>(io: &mut I, cost: Option<Wei>) {
 
     if let Some(cost) = cost {
         io.write_storage(&key, &cost.to_bytes());
+    } else {
+        io.remove_storage(&key);
+    }
+}
+
+/// Return ERC-20 fallback address.
+pub fn get_erc20_fallback_address<I: IO>(io: &I) -> Option<Address> {
+    let key = erc20_fallback_address_key();
+    io.read_storage(&key)?.to_value().ok()
+}
+
+/// Set ERC-20 fallback address.
+pub fn set_erc20_fallback_address<I: IO>(io: &mut I, address: Option<Address>) {
+    let key = erc20_fallback_address_key();
+
+    if let Some(address) = address {
+        io.write_storage(&key, address.as_bytes());
     } else {
         io.remove_storage(&key);
     }
@@ -90,6 +132,11 @@ pub fn is_allow_submit<I: IO + Copy>(io: &I, account: &AccountId, address: &Addr
     is_address_allowed(io, address) && is_account_allowed(io, account)
 }
 
+/// Check if a user has the right to receive erc20 tokens.
+pub fn is_allow_receive_erc20_tokens<I: IO + Copy>(io: &I, address: &Address) -> bool {
+    is_address_allowed(io, address)
+}
+
 fn is_admin<I: IO + Copy>(io: &I, account_id: &AccountId) -> bool {
     let list = Whitelist::init(io, WhitelistKind::Admin);
     !list.is_enabled() || list.is_exist(account_id)
@@ -117,7 +164,11 @@ fn is_account_allowed<I: IO + Copy>(io: &I, account: &AccountId) -> bool {
 }
 
 fn fixed_gas_cost_key() -> Vec<u8> {
-    bytes_to_key(KeyPrefix::FixedGasCost, GAS_COST_KEY)
+    bytes_to_key(KeyPrefix::Silo, GAS_COST_KEY)
+}
+
+fn erc20_fallback_address_key() -> Vec<u8> {
+    bytes_to_key(KeyPrefix::Silo, ERC20_FALLBACK_KEY)
 }
 
 fn get_kind_and_entry(args: &WhitelistArgs) -> (WhitelistKind, &dyn AsBytes) {

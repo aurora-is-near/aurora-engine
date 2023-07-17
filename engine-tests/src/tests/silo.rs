@@ -3,8 +3,8 @@ use aurora_engine_sdk as sdk;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::parameters::silo::{
-    FixedGasCostArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind,
-    WhitelistStatusArgs,
+    FixedGasCostArgs, SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
+    WhitelistKind, WhitelistStatusArgs,
 };
 use borsh::BorshSerialize;
 use libsecp256k1::SecretKey;
@@ -21,6 +21,11 @@ const ZERO_BALANCE: Wei = Wei::zero();
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(10u64.pow(18) * 4);
 const FEE: Wei = Wei::new_u64(10u64.pow(18));
+const ERC20_FALLBACK_ADDRESS: Address = Address::zero();
+const SILO_PARAMS_ARGS: SiloParamsArgs = SiloParamsArgs {
+    fixed_gas_cost: FEE,
+    erc20_fallback_address: ERC20_FALLBACK_ADDRESS,
+};
 // https://github.com/aurora-is-near/aurora-engine/blob/master/engine-tests/src/test_utils/mod.rs#L393
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
@@ -31,7 +36,7 @@ fn test_address_transfer_success() {
     let sender = test_utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     // Allow to submit transactions
     add_account_to_whitelist(&mut runner, caller);
@@ -64,7 +69,7 @@ fn test_transfer_insufficient_balance() {
     let sender = test_utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -100,7 +105,7 @@ fn test_transfer_insufficient_balance_fee() {
     let sender = test_utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -153,7 +158,7 @@ fn test_eth_transfer_incorrect_nonce() {
     let sender = test_utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -181,7 +186,7 @@ fn test_transfer_with_low_gas_limit() {
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -216,7 +221,7 @@ fn test_relayer_balance_after_transfer() {
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
     let transaction = |nonce| test_utils::transfer(receiver, TRANSFER_AMOUNT, nonce);
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
@@ -250,7 +255,7 @@ fn test_admin_access_right() {
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     // Allow to submit transactions.
 
     let account = WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
@@ -290,7 +295,7 @@ fn test_submit_access_right() {
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
     let transaction = test_utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
@@ -334,7 +339,7 @@ fn test_submit_access_right_via_batch() {
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
     let transaction = test_utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
@@ -387,7 +392,7 @@ fn test_submit_with_disabled_whitelist() {
     let sender = test_utils::address_from_secret_key(&signer.secret_key);
     let transaction = test_utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
@@ -440,7 +445,7 @@ fn test_submit_with_removing_entries() {
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
     let transaction = test_utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     // Allow to submit transactions.
     add_account_to_whitelist(&mut runner, caller.clone());
@@ -501,7 +506,7 @@ fn test_deploy_access_rights() {
     let balance = runner.get_balance(sender);
     assert_eq!(balance, INITIAL_BALANCE);
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     // Try to deploy code without adding to admins white list.
     let err = runner
@@ -551,7 +556,7 @@ fn test_deploy_with_disabled_whitelist() {
     let balance = runner.get_balance(sender);
     assert_eq!(balance, INITIAL_BALANCE);
 
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
     // Try to deploy code without adding to admins white list.
     let err = runner
@@ -621,7 +626,13 @@ fn test_switch_between_fix_gas_cost() {
 
     // Set fixed gas cost
     let fixed_gas_cost = Wei::new_u64(1_000_000);
-    set_fixed_gas_cost(&mut runner, Some(fixed_gas_cost));
+    set_silo_params(
+        &mut runner,
+        Some(SiloParamsArgs {
+            fixed_gas_cost,
+            erc20_fallback_address: ERC20_FALLBACK_ADDRESS,
+        }),
+    );
     // Check that fixed gas cost has been set successfully.
     assert_eq!(runner.get_fixed_gas_cost(), Some(fixed_gas_cost));
 
@@ -641,7 +652,7 @@ fn test_switch_between_fix_gas_cost() {
     validate_address_balance_and_nonce(&runner, receiver, receiver_balance, INITIAL_NONCE.into());
 
     // Unset fixed gas cost. Should be used usual gas charge mechanism.
-    set_fixed_gas_cost(&mut runner, None);
+    set_silo_params(&mut runner, None);
     assert_eq!(runner.get_fixed_gas_cost(), None);
     let balance_before_transfer = runner.get_balance(sender);
 
@@ -661,6 +672,27 @@ fn test_switch_between_fix_gas_cost() {
     // validate post-state
     validate_address_balance_and_nonce(&runner, sender, sender_balance, (INITIAL_NONCE + 3).into());
     validate_address_balance_and_nonce(&runner, receiver, receiver_balance, INITIAL_NONCE.into());
+}
+
+#[test]
+#[should_panic(expected = "SILO_MODE_IS_OFF")]
+fn test_set_fixed_gas_cost_in_disabled_silo_mode() {
+    let mut runner = test_utils::deploy_evm();
+    set_fixed_gas_cost(&mut runner, Some(FEE));
+}
+
+#[test]
+#[should_panic(expected = "FIXED_GAS_COST_IS_NONE")]
+fn test_set_none_fixed_gas_cost() {
+    let mut runner = test_utils::deploy_evm();
+    set_fixed_gas_cost(&mut runner, None);
+}
+
+#[test]
+fn test_set_fixed_gas_cost() {
+    let mut runner = test_utils::deploy_evm();
+    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
+    set_fixed_gas_cost(&mut runner, Some(FEE));
 }
 
 fn initialize_transfer() -> (AuroraRunner, test_utils::Signer, Address) {
@@ -750,6 +782,10 @@ fn set_fixed_gas_cost(runner: &mut AuroraRunner, cost: Option<Wei>) {
     call_function(runner, "set_fixed_gas_cost", args);
 }
 
+fn set_silo_params(runner: &mut AuroraRunner, silo_params: Option<SiloParamsArgs>) {
+    call_function(runner, "set_silo_params", silo_params);
+}
+
 fn call_function<T: BorshSerialize + Debug>(runner: &mut AuroraRunner, func: &str, args: T) {
     let input = args.try_to_vec().unwrap();
     let result = runner.call(func, &runner.aurora_account_id.clone(), input);
@@ -760,4 +796,284 @@ fn call_function<T: BorshSerialize + Debug>(runner: &mut AuroraRunner, func: &st
         result.unwrap_err(),
         args
     );
+}
+
+pub mod sim_tests {
+    use super::FEE;
+    use crate::test_utils::erc20::ERC20;
+    use crate::tests::erc20_connector::sim_tests::{
+        self, deploy_nep_141, erc20_balance, exit_to_near, nep_141_balance_of,
+    };
+    use crate::tests::state_migration::{deploy_evm, AuroraAccount};
+    use aurora_engine_types::borsh::BorshSerialize;
+    use aurora_engine_types::parameters::silo::{
+        SiloParamsArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind,
+    };
+    use aurora_engine_types::types::Address;
+    use near_sdk_sim::UserAccount;
+    use serde_json::json;
+
+    const FT_ACCOUNT: &str = "test_token.root";
+    const FT_TOTAL_SUPPLY: u128 = 1_000_000;
+
+    #[test]
+    fn test_transfer_nep141_to_non_whitelisted_address() {
+        let SiloTestContext {
+            aurora,
+            fallback_account,
+            fallback_address,
+            ft_owner,
+            ft_owner_address,
+            nep_141,
+            erc20,
+        } = init_silo();
+
+        let ft_transfer_amount = 300_000;
+
+        // Transfer tokens from `ft_owner` to non-whitelisted address `ft_owner_address`
+        transfer_nep_141_to_erc_20(
+            &nep_141,
+            &ft_owner,
+            ft_owner_address,
+            ft_transfer_amount,
+            &aurora,
+        );
+
+        // Verify the nep141 and erc20 tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY - ft_transfer_amount
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            0
+        );
+        assert_eq!(erc20_balance(&erc20, ft_owner_address, &aurora), 0.into());
+        assert_eq!(
+            erc20_balance(&erc20, fallback_address, &aurora),
+            ft_transfer_amount.into()
+        );
+
+        // Transfer tokens from fallback address to fallback near account
+        exit_to_near(
+            &fallback_account,
+            fallback_account.account_id.as_str(),
+            ft_transfer_amount,
+            &erc20,
+            &aurora,
+        );
+
+        // Verify the nep141 and erc20 tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY - ft_transfer_amount
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            ft_transfer_amount
+        );
+        assert_eq!(erc20_balance(&erc20, ft_owner_address, &aurora), 0.into());
+        assert_eq!(erc20_balance(&erc20, fallback_address, &aurora), 0.into());
+    }
+
+    #[test]
+    fn test_transfer_nep141_to_whitelisted_address() {
+        let SiloTestContext {
+            aurora,
+            fallback_account,
+            fallback_address,
+            ft_owner,
+            ft_owner_address,
+            nep_141,
+            erc20,
+        } = init_silo();
+
+        add_address_to_whitelist(&aurora, ft_owner_address);
+
+        let ft_transfer_amount = 300_000;
+
+        // Transfer tokens from `ft_owner` to whitelisted address `ft_owner_address`
+        transfer_nep_141_to_erc_20(
+            &nep_141,
+            &ft_owner,
+            ft_owner_address,
+            ft_transfer_amount,
+            &aurora,
+        );
+
+        // Verify the nep141 and erc20 tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY - ft_transfer_amount
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            0
+        );
+        assert_eq!(
+            erc20_balance(&erc20, ft_owner_address, &aurora),
+            ft_transfer_amount.into()
+        );
+        assert_eq!(erc20_balance(&erc20, fallback_address, &aurora), 0.into());
+
+        // Transfer tokens from ft_owner evm address to ft_owner near account
+        exit_to_near(
+            &ft_owner,
+            ft_owner.account_id.as_str(),
+            ft_transfer_amount,
+            &erc20,
+            &aurora,
+        );
+
+        // Verify the nep141 and erc20 tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            0
+        );
+        assert_eq!(erc20_balance(&erc20, ft_owner_address, &aurora), 0.into());
+        assert_eq!(erc20_balance(&erc20, fallback_address, &aurora), 0.into());
+    }
+
+    struct SiloTestContext {
+        pub aurora: AuroraAccount,
+        pub fallback_account: UserAccount,
+        pub fallback_address: Address,
+        pub ft_owner: UserAccount,
+        pub ft_owner_address: Address,
+        pub nep_141: UserAccount,
+        pub erc20: ERC20,
+    }
+
+    fn add_address_to_whitelist(aurora: &AuroraAccount, address: Address) {
+        let args = WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
+            kind: WhitelistKind::Address,
+            address,
+        });
+        aurora
+            .user
+            .call(
+                aurora.contract.account_id(),
+                "add_entry_to_whitelist",
+                &args.try_to_vec().unwrap(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .assert_success();
+    }
+
+    pub fn transfer_nep_141_to_erc_20(
+        nep_141: &UserAccount,
+        source: &UserAccount,
+        dest: Address,
+        amount: u128,
+        aurora: &AuroraAccount,
+    ) {
+        let transfer_args = json!({
+            "receiver_id": aurora.contract.account_id.as_str(),
+            "amount": format!("{amount}"),
+            "msg": dest.encode(),
+        });
+        source
+            .call(
+                nep_141.account_id(),
+                "ft_transfer_call",
+                transfer_args.to_string().as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                1,
+            )
+            .assert_success();
+    }
+
+    /// Deploys the EVM, deploys nep141 contract, and calls `set_silo_params`
+    fn init_silo() -> SiloTestContext {
+        // Deploy Aurora
+        let aurora: AuroraAccount = deploy_evm();
+
+        // Create fallback account and evm address
+        let fallback_account = aurora.user.create_user(
+            "fallback.root".parse().unwrap(),
+            near_sdk_sim::STORAGE_AMOUNT,
+        );
+        let fallback_address = aurora_engine_sdk::types::near_account_to_evm_address(
+            fallback_account.account_id.as_bytes(),
+        );
+
+        // Set silo mode
+        let args = Some(SiloParamsArgs {
+            fixed_gas_cost: FEE,
+            erc20_fallback_address: fallback_address,
+        });
+
+        aurora
+            .user
+            .call(
+                aurora.contract.account_id(),
+                "set_silo_params",
+                &args.try_to_vec().unwrap(),
+                near_sdk_sim::DEFAULT_GAS,
+                0,
+            )
+            .assert_success();
+
+        // Create `ft_owner` account and evm address
+        let ft_owner = aurora.user.create_user(
+            "ft_owner.root".parse().unwrap(),
+            near_sdk_sim::STORAGE_AMOUNT,
+        );
+        let ft_owner_address =
+            aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.account_id.as_bytes());
+
+        // Deploy nep141 token
+        let nep_141 = deploy_nep_141(
+            FT_ACCOUNT,
+            ft_owner.account_id.as_ref(),
+            FT_TOTAL_SUPPLY,
+            &aurora,
+        );
+
+        // Call storage deposit for fallback account
+        aurora
+            .user
+            .call(
+                nep_141.account_id(),
+                "storage_deposit",
+                json!({
+                    "account_id": fallback_account.account_id.as_str(),
+                })
+                .to_string()
+                .as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                near_sdk_sim::STORAGE_AMOUNT,
+            )
+            .assert_success();
+
+        // Deploy erc20 token
+        let erc20 = sim_tests::deploy_erc20_from_nep_141(&nep_141, &aurora);
+
+        // Verify tokens balances
+        assert_eq!(
+            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            FT_TOTAL_SUPPLY
+        );
+        assert_eq!(
+            nep_141_balance_of(fallback_account.account_id.as_str(), &nep_141, &aurora),
+            0
+        );
+        assert_eq!(erc20_balance(&erc20, ft_owner_address, &aurora), 0.into());
+        assert_eq!(erc20_balance(&erc20, fallback_address, &aurora), 0.into());
+
+        SiloTestContext {
+            aurora,
+            fallback_account,
+            fallback_address,
+            ft_owner,
+            ft_owner_address,
+            nep_141,
+            erc20,
+        }
+    }
 }

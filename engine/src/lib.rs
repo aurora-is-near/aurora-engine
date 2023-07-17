@@ -113,7 +113,7 @@ mod contract {
     use aurora_engine_types::parameters::engine::errors::ParseArgsError;
     use aurora_engine_types::parameters::engine::StorageUnregisterArgs;
     use aurora_engine_types::parameters::silo::{
-        FixedGasCostArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+        FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
     };
 
     #[cfg(feature = "integration-test")]
@@ -1087,7 +1087,25 @@ mod contract {
         let mut io = Runtime;
         silo::assert_admin(&io).sdk_unwrap();
         let args: FixedGasCostArgs = io.read_input_borsh().sdk_unwrap();
+        args.cost.sdk_expect("FIXED_GAS_COST_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
+        silo::get_silo_params(&io).sdk_expect("SILO_MODE_IS_OFF"); // Use `set_silo_params` to enable the silo mode.
         silo::set_fixed_gas_cost(&mut io, args.cost);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_silo_params() {
+        let mut io = Runtime;
+        let params = silo::get_silo_params(&io);
+
+        io.return_output(&params.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_silo_params() {
+        let mut io = Runtime;
+        silo::assert_admin(&io).sdk_unwrap();
+        let args: Option<SiloParamsArgs> = io.read_input_borsh().sdk_unwrap();
+        silo::set_silo_params(&mut io, args);
     }
 
     #[no_mangle]

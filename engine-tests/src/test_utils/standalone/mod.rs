@@ -6,7 +6,9 @@ use aurora_engine::parameters::{
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
-use aurora_engine_types::parameters::silo::{FixedGasCostArgs, WhitelistArgs, WhitelistStatusArgs};
+use aurora_engine_types::parameters::silo::{
+    FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs,
+};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
 use borsh::BorshDeserialize;
@@ -351,6 +353,25 @@ impl StandaloneRunner {
                 let mut tx_msg =
                     Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::SetFixedGasCost(call_args);
+
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            test_utils::SET_SILO_PARAMS => {
+                let call_args: Option<SiloParamsArgs> =
+                    BorshDeserialize::try_from_slice(&ctx.input)
+                        .expect("Unable to parse input as SiloParamsArgs");
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::SetSiloParams(call_args);
 
                 let outcome =
                     sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();

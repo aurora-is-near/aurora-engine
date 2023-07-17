@@ -8,6 +8,12 @@ pub struct FixedGasCostArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct SiloParamsArgs {
+    pub fixed_gas_cost: Wei,
+    pub erc20_fallback_address: Address,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(
     feature = "impl-serde",
     derive(serde::Serialize, serde::Deserialize),

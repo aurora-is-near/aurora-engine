@@ -747,7 +747,7 @@ pub mod sim_tests {
         }
     }
 
-    fn exit_to_near(
+    pub fn exit_to_near(
         source: &UserAccount,
         dest: &str,
         amount: u128,
@@ -830,7 +830,7 @@ pub mod sim_tests {
         }
     }
 
-    fn erc20_balance(erc20: &ERC20, address: Address, aurora: &AuroraAccount) -> U256 {
+    pub fn erc20_balance(erc20: &ERC20, address: Address, aurora: &AuroraAccount) -> U256 {
         let balance_tx = erc20.balance_of(address, 0.into());
         let call_args = CallArgs::V2(FunctionCallArgsV2 {
             contract: erc20.0.address,

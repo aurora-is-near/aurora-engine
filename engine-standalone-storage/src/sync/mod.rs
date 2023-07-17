@@ -459,6 +459,10 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             silo::set_fixed_gas_cost(&mut io, args.cost);
             None
         }
+        TransactionKind::SetSiloParams(args) => {
+            silo::set_silo_params(&mut io, args.clone());
+            None
+        }
         TransactionKind::AddEntryToWhitelist(args) => {
             silo::add_entry_to_whitelist(&io, args);
             None
