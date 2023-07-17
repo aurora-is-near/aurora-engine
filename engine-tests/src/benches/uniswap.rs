@@ -1,8 +1,8 @@
 use criterion::{BatchSize, BenchmarkId, Criterion};
 
 use crate::prelude::U256;
-use crate::test_utils::{self, SUBMIT};
 use crate::tests::uniswap::UniswapTestContext;
+use crate::utils::{self, SUBMIT};
 
 const MINT_AMOUNT: u64 = 1_000_000_000;
 const LIQUIDITY_AMOUNT: u64 = MINT_AMOUNT / 2;
@@ -24,7 +24,7 @@ pub fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestContext) {
     let nonce = context.signer.use_nonce();
     let liquidity_params = context.mint_params(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
     let tx = context.manager.mint(&liquidity_params, nonce.into());
-    let signed_tx = test_utils::sign_transaction(tx, chain_id, &context.signer.secret_key);
+    let signed_tx = utils::sign_transaction(tx, chain_id, &context.signer.secret_key);
     let liquidity_tx_bytes = rlp::encode(&signed_tx).to_vec();
 
     // create transaction for swapping
@@ -34,7 +34,7 @@ pub fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestContext) {
     let tx = context
         .swap_router
         .exact_output_single(&swap_params, nonce.into());
-    let signed_tx = test_utils::sign_transaction(tx, chain_id, &context.signer.secret_key);
+    let signed_tx = utils::sign_transaction(tx, chain_id, &context.signer.secret_key);
     let swap_tx_bytes = rlp::encode(&signed_tx).to_vec();
 
     let mut group = c.benchmark_group(&context.name);
@@ -63,7 +63,7 @@ pub fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestContext) {
         .call(SUBMIT, calling_account_id, liquidity_tx_bytes.clone());
     let output = result.unwrap();
     let gas = output.burnt_gas;
-    let eth_gas = test_utils::parse_eth_gas(&output);
+    let eth_gas = utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("UNISWAP_ADD_LIQUIDITY NEAR GAS: {gas:?}");
     println!("UNISWAP_ADD_LIQUIDITY ETH GAS: {eth_gas:?}");
@@ -75,7 +75,7 @@ pub fn uniswap_benchmark(c: &mut Criterion, context: &mut UniswapTestContext) {
         .call(SUBMIT, calling_account_id, swap_tx_bytes.clone())
         .unwrap();
     let gas = output.burnt_gas;
-    let eth_gas = test_utils::parse_eth_gas(&output);
+    let eth_gas = utils::parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("UNISWAP_SWAP NEAR GAS: {gas:?}");
     println!("UNISWAP_SWAP ETH GAS: {eth_gas:?}");
