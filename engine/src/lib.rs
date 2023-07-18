@@ -233,7 +233,6 @@ mod contract {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         require_running(&state);
-        require_owner_only(&state, &io.predecessor_account_id());
         let index = internal_get_upgrade_index();
         if io.block_height() <= index {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED_TOO_EARLY);
