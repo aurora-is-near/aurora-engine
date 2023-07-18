@@ -144,7 +144,7 @@ impl EngineErrorKind {
             Self::MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
             Self::GasPayment(e) => e.as_ref(),
             Self::GasOverflow => errors::ERR_GAS_OVERFLOW,
-            Self::NonExistedKey => errors::ERR_FUNCTIONAL_KEY_NOT_FOUND,
+            Self::NonExistedKey => errors::ERR_FUNCTION_CALL_KEY_NOT_FOUND,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
@@ -2293,7 +2293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_remove_functional_call_key() {
+    fn test_add_remove_function_call_key() {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         let public_key = serde_json::from_str::<RelayerKeyArgs>(
