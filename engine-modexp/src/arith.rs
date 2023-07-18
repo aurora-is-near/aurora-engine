@@ -294,14 +294,22 @@ pub fn big_sq(x: &MPNat, out: &mut [Word]) {
         out[i + i] = product;
         let mut c = carry as DoubleWord;
         for j in (i + 1)..s {
-            let product = (x.digits[i] as DoubleWord) * (x.digits[j] as DoubleWord);
-            let (product, overflow) = product.overflowing_add(product);
-            let sum = (out[i + j] as DoubleWord) + product + c;
-            out[i + j] = sum as Word;
-            c = (sum >> WORD_BITS) as DoubleWord;
+            let mut new_c : DoubleWord = 0;
+            let res = (x.digits[i] as DoubleWord) * (x.digits[j] as DoubleWord);
+            let (res, overflow) = res.overflowing_add(res);
             if overflow {
-                c += BASE;
+                new_c += BASE;
             }
+            let (res, overflow) = (out[i + j] as DoubleWord).overflowing_add(res);
+            if overflow {
+                new_c += BASE;
+            }
+            let (res, overflow) = res.overflowing_add(c);
+            if overflow {
+                new_c += BASE;
+            }
+            out[i + j] = res as Word;
+            c = new_c + ((res >> WORD_BITS) as DoubleWord);
         }
         let (sum, carry) = carrying_add(out[i + s], c as Word, false);
         out[i + s] = sum;
@@ -654,6 +662,25 @@ fn test_big_sq() {
             num::BigUint::from_bytes_be(&result)
         };
         assert_eq!(result, expected, "{a}^2 != {expected}");
+    }
+
+    /* Test for addition overflows in the big_sq inner loop */
+    {
+        let x = MPNat::from_big_endian(&[
+            0xff, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00,
+            0x80, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,
+            0xff, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00]);
+        let mut out = vec![0; 2 * x.digits.len() + 1];
+        big_sq(&x, &mut out);
+        let result = MPNat { digits: out }.to_big_endian();
+        let expected = vec![
+            0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01,
+            0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+            0xff, 0xff, 0xff, 0xfe, 0x40, 0x00, 0x00, 0x01,
+            0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xbf, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
+            0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        assert_eq!(result, expected);
     }
 }
 
