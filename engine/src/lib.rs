@@ -81,7 +81,6 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 mod contract {
     use ::function_name::named;
     use aurora_engine_types::parameters::WithdrawCallArgs;
-    use borsh::{BorshDeserialize, BorshSerialize};
     use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
 
     use crate::bloom::{self, Bloom};
@@ -116,6 +115,7 @@ mod contract {
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
+    use aurora_engine_types::borsh::{BorshSerialize, BorshDeserialize};
     use aurora_engine_types::parameters::engine::errors::ParseTypeFromJsonError;
 
     #[cfg(feature = "integration-test")]

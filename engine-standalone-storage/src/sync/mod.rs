@@ -11,6 +11,7 @@ use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::{
     account_id::AccountId,
+    borsh::BorshSerialize,
     parameters::PromiseWithCallbackArgs,
     types::{Address, Yocto},
     H256,
@@ -20,7 +21,6 @@ pub mod types;
 
 use crate::engine_state::EngineStateAccess;
 use crate::{BlockMetadata, Diff, Storage};
-use borsh::BorshSerialize;
 use types::{Message, TransactionKind, TransactionMessage};
 
 use self::types::InnerTransactionKind;
