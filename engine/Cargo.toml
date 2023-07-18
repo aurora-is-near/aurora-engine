@@ -23,7 +23,6 @@ bitflags.workspace = true
 ethabi.workspace = true
 evm.workspace = true
 fixed-hash.workspace = true
-function_name = "0.3.0"
 hex.workspace = true
 impl-serde.workspace = true
 rlp.workspace = true
