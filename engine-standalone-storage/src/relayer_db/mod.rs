@@ -220,6 +220,7 @@ mod test {
             owner_id: "aurora".parse().unwrap(),
             upgrade_delay_blocks: 0,
             is_paused: false,
+            key_manager: None,
         };
 
         // Initialize engine and connector states in storage.

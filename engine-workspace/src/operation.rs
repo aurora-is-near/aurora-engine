@@ -36,6 +36,9 @@ impl_call_return![
     (CallStateMigration, Call::StateMigration),
     (CallMintAccount, Call::MintAccount),
     (CallSetPausedFlags, Call::SetPausedFlags),
+    (CallSetKeyManager, Call::SetKeyManager),
+    (CallAddRelayerKey, Call::AddRelayerKey),
+    (CallRemoveRelayerKey, Call::RemoveRelayerKey),
 ];
 
 impl_call_return![
@@ -109,6 +112,9 @@ pub(crate) enum Call {
     RefundOnError,
     MintAccount,
     SetPausedFlags,
+    SetKeyManager,
+    AddRelayerKey,
+    RemoveRelayerKey,
 }
 
 impl AsRef<str> for Call {
@@ -142,6 +148,9 @@ impl AsRef<str> for Call {
             Call::RefundOnError => "refund_on_error",
             Call::MintAccount => "mint_account",
             Call::SetPausedFlags => "set_paused_flags",
+            Call::SetKeyManager => "set_key_manager",
+            Call::AddRelayerKey => "add_relayer_key",
+            Call::RemoveRelayerKey => "remove_relayer_key",
         }
     }
 }

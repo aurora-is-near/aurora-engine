@@ -25,6 +25,7 @@ bitflags = { version = "1", default-features = false }
 bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "0.10", default-features = false }
 borsh-compat = { version = "0.9", package = "borsh", default-features = false }
+bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
 bstr = "1"
 byte-slice-cast = { version = "1", default-features = false }
 criterion = "0.5"

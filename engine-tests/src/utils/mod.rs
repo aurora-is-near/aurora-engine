@@ -44,6 +44,7 @@ pub const SET_OWNER: &str = "set_owner";
 pub const SET_UPGRADE_DELAY_BLOCKS: &str = "set_upgrade_delay_blocks";
 pub const PAUSE_CONTRACT: &str = "pause_contract";
 pub const RESUME_CONTRACT: &str = "resume_contract";
+pub const SET_KEY_MANAGER: &str = "set_key_manager";
 
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
@@ -243,6 +244,7 @@ impl AuroraRunner {
                 || method_name == SET_UPGRADE_DELAY_BLOCKS
                 || method_name == PAUSE_CONTRACT
                 || method_name == RESUME_CONTRACT
+                || method_name == SET_KEY_MANAGER
             {
                 standalone_runner.submit_raw(method_name, &self.context, &self.promise_results)?;
                 self.validate_standalone();

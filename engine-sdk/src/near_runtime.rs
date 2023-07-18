@@ -2,9 +2,8 @@ use crate::io::StorageIntermediate;
 use crate::prelude::NearGas;
 use crate::promise::PromiseId;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::{
-    NearPublicKey, PromiseAction, PromiseBatchAction, PromiseCreateArgs,
-};
+use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
+use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::types::PromiseResult;
 use aurora_engine_types::H256;
 
@@ -418,36 +417,32 @@ impl crate::promise::PromiseHandler for Runtime {
                     receiver_id,
                     function_names,
                 } => {
-                    feature_gated!("all-promise-actions", {
-                        let pk: RawPublicKey = public_key.into();
-                        let pk_bytes = pk.as_bytes();
-                        let allowance = allowance.as_u128();
-                        let allowance_addr = core::ptr::addr_of!(allowance);
-                        let receiver_id = receiver_id.as_bytes();
-                        let function_names = function_names.as_bytes();
-                        exports::promise_batch_action_add_key_with_function_call(
-                            id,
-                            pk_bytes.len() as _,
-                            pk_bytes.as_ptr() as _,
-                            *nonce,
-                            allowance_addr as _,
-                            receiver_id.len() as _,
-                            receiver_id.as_ptr() as _,
-                            function_names.len() as _,
-                            function_names.as_ptr() as _,
-                        );
-                    });
+                    let pk: RawPublicKey = public_key.into();
+                    let pk_bytes = pk.as_bytes();
+                    let allowance = allowance.as_u128();
+                    let allowance_addr = core::ptr::addr_of!(allowance);
+                    let receiver_id = receiver_id.as_bytes();
+                    let function_names = function_names.as_bytes();
+                    exports::promise_batch_action_add_key_with_function_call(
+                        id,
+                        pk_bytes.len() as _,
+                        pk_bytes.as_ptr() as _,
+                        *nonce,
+                        allowance_addr as _,
+                        receiver_id.len() as _,
+                        receiver_id.as_ptr() as _,
+                        function_names.len() as _,
+                        function_names.as_ptr() as _,
+                    );
                 }
                 PromiseAction::DeleteKey { public_key } => {
-                    feature_gated!("all-promise-actions", {
-                        let pk: RawPublicKey = public_key.into();
-                        let pk_bytes = pk.as_bytes();
-                        exports::promise_batch_action_delete_key(
-                            id,
-                            pk_bytes.len() as _,
-                            pk_bytes.as_ptr() as _,
-                        );
-                    });
+                    let pk: RawPublicKey = public_key.into();
+                    let pk_bytes = pk.as_bytes();
+                    exports::promise_batch_action_delete_key(
+                        id,
+                        pk_bytes.len() as _,
+                        pk_bytes.as_ptr() as _,
+                    );
                 }
                 PromiseAction::DeleteAccount { beneficiary_id } => {
                     feature_gated!("all-promise-actions", {
@@ -508,18 +503,18 @@ impl RawPublicKey {
     }
 }
 
-impl<'a> From<&'a NearPublicKey> for RawPublicKey {
-    fn from(key: &'a NearPublicKey) -> Self {
+impl<'a> From<&'a PublicKey> for RawPublicKey {
+    fn from(key: &'a PublicKey) -> Self {
         match key {
-            NearPublicKey::Ed25519(bytes) => {
+            PublicKey::Ed25519(_) => {
                 let mut buf = [0u8; 33];
-                buf[1..33].copy_from_slice(bytes);
+                buf[1..33].copy_from_slice(key.key_data());
                 Self::Ed25519(buf)
             }
-            NearPublicKey::Secp256k1(bytes) => {
+            PublicKey::Secp256k1(_) => {
                 let mut buf = [0u8; 65];
                 buf[0] = 0x01;
-                buf[1..65].copy_from_slice(bytes);
+                buf[1..65].copy_from_slice(key.key_data());
                 Self::Secp256k1(buf)
             }
         }

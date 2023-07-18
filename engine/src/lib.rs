@@ -100,14 +100,19 @@ mod contract {
         near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
     };
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, PromiseResult, Yocto, ERR_FAILED_PARSE, H256};
+    use crate::prelude::{
+        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
+    };
     use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_sdk::promise::PromiseHandler;
+    use aurora_engine_sdk::types::ExpectUtf8;
     use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
     use aurora_engine_types::parameters::engine::errors::ParseTypeFromJsonError;
+    use aurora_engine_types::parameters::engine::{RelayerKeyArgs, RelayerKeyManagerArgs};
+    use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction};
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
@@ -596,6 +601,87 @@ mod contract {
                 sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
             }
         }
+    }
+
+    /// Sets relayer key manager.
+    #[no_mangle]
+    pub extern "C" fn set_key_manager() {
+        let mut io = Runtime;
+        let mut state = state::get_state(&io).sdk_unwrap();
+
+        require_owner_only(&state, &io.predecessor_account_id());
+
+        let key_manager =
+            serde_json::from_slice::<RelayerKeyManagerArgs>(&io.read_input().to_vec())
+                .map(|args| args.key_manager)
+                .sdk_expect(errors::ERR_JSON_DESERIALIZE);
+
+        if state.key_manager == key_manager {
+            sdk::panic_utf8(errors::ERR_SAME_KEY_MANAGER)
+        } else {
+            state.key_manager = key_manager;
+            state::set_state(&mut io, &state).sdk_unwrap();
+        }
+    }
+
+    /// Adds a relayer function call key.
+    #[no_mangle]
+    pub extern "C" fn add_relayer_key() {
+        let mut io = Runtime;
+        let state = state::get_state(&io).sdk_unwrap();
+        require_key_manager_only(&state, &io.predecessor_account_id());
+
+        let public_key = serde_json::from_slice::<RelayerKeyArgs>(&io.read_input().to_vec())
+            .map(|args| args.public_key)
+            .sdk_expect(errors::ERR_JSON_DESERIALIZE);
+        let allowance = Yocto::new(io.attached_deposit());
+        sdk::log!("attached key allowance: {allowance}");
+
+        if allowance.as_u128() < 100 {
+            // TODO: Clarify the minimum amount if check is needed then change error type
+            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
+        }
+
+        engine::add_function_call_key(&mut io, &public_key);
+
+        let action = PromiseAction::AddFunctionCallKey {
+            public_key,
+            allowance,
+            nonce: 0, // not actually used - depends on block height
+            receiver_id: io.current_account_id(),
+            function_names: "call,submit,submit_with_args".to_string(),
+        };
+        let promise = PromiseBatchAction {
+            target_account_id: io.current_account_id(),
+            actions: vec![action],
+        };
+
+        let promise_id = unsafe { io.promise_create_batch(&promise) };
+        io.promise_return(promise_id);
+    }
+
+    /// Removes a relayer function call key.
+    #[no_mangle]
+    pub extern "C" fn remove_relayer_key() {
+        let mut io = Runtime;
+        let state = state::get_state(&io).sdk_unwrap();
+        require_key_manager_only(&state, &io.predecessor_account_id());
+
+        let args: RelayerKeyArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .sdk_expect(errors::ERR_JSON_DESERIALIZE);
+
+        engine::remove_function_call_key(&mut io, &args.public_key).sdk_unwrap();
+
+        let action = PromiseAction::DeleteKey {
+            public_key: args.public_key,
+        };
+        let promise = PromiseBatchAction {
+            target_account_id: io.current_account_id(),
+            actions: vec![action],
+        };
+
+        let promise_id = unsafe { io.promise_create_batch(&promise) };
+        io.promise_return(promise_id);
     }
 
     ///
@@ -1158,6 +1244,16 @@ mod contract {
     fn require_running(state: &state::EngineState) {
         if state.is_paused {
             sdk::panic_utf8(errors::ERR_PAUSED);
+        }
+    }
+
+    fn require_key_manager_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
+        let key_manager = state
+            .key_manager
+            .as_ref()
+            .expect_utf8(errors::ERR_KEY_MANAGER_IS_NOT_SET);
+        if key_manager != predecessor_account_id {
+            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
         }
     }
 
