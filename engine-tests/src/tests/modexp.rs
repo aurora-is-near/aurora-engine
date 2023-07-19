@@ -5,7 +5,7 @@ use rand::{Rng, SeedableRng};
 use super::sanity::initialize_transfer;
 use crate::prelude::Wei;
 use crate::prelude::{make_address, Address, U256};
-use crate::test_utils::{self, standalone::StandaloneRunner, AuroraRunner, Signer};
+use crate::utils::{self, standalone::StandaloneRunner, AuroraRunner, Signer};
 
 const MODEXP_ADDRESS: Address = make_address(0, 5);
 
@@ -95,14 +95,14 @@ fn bench_modexp_standalone() {
 
     let deploy_contract = |standalone: &mut StandaloneRunner, signer: &mut Signer, path| {
         let contract_code = std::fs::read_to_string(path).unwrap();
-        let deploy_tx = test_utils::create_deploy_transaction(
+        let deploy_tx = utils::create_deploy_transaction(
             hex::decode(contract_code.trim()).unwrap(),
             signer.use_nonce().into(),
         );
         let deploy_result = standalone
             .submit_transaction(&signer.secret_key, deploy_tx)
             .unwrap();
-        Address::try_from_slice(&test_utils::unwrap_success(deploy_result)).unwrap()
+        Address::try_from_slice(&utils::unwrap_success(deploy_result)).unwrap()
     };
 
     let do_bench = |standalone: &mut StandaloneRunner, signer: &mut Signer, path| {
@@ -187,10 +187,7 @@ fn check_wasm_modexp(
             }
         })
         .unwrap();
-    assert_eq!(
-        expected_output,
-        test_utils::unwrap_success_slice(&wasm_result),
-    );
+    assert_eq!(expected_output, utils::unwrap_success_slice(&wasm_result));
 }
 
 /// Input to the modexp call (base, exp, modulus in big-endian bytes).
@@ -269,7 +266,7 @@ impl BenchResult {
 }
 
 struct ModExpBenchContext {
-    inner: test_utils::AuroraRunner,
+    inner: AuroraRunner,
 }
 
 impl ModExpBenchContext {
@@ -310,20 +307,18 @@ impl ModExpBenchContext {
 
 impl Default for ModExpBenchContext {
     fn default() -> Self {
-        let mut inner = test_utils::AuroraRunner::default();
-
+        let mut inner = AuroraRunner::default();
         let bench_contract_bytes = {
             let base_path = std::path::Path::new("../etc")
                 .join("tests")
                 .join("modexp-bench");
             let output_path =
                 base_path.join("target/wasm32-unknown-unknown/release/modexp_bench.wasm");
-            test_utils::rust::compile(base_path);
+            utils::rust::compile(base_path);
             std::fs::read(output_path).unwrap()
         };
 
         inner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
-
         inner.code = ContractCode::new(bench_contract_bytes, None);
 
         Self { inner }

@@ -1,4 +1,4 @@
-use crate::test_utils::{self, standalone};
+use crate::utils::{self, standalone};
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H160, U256};
@@ -58,8 +58,8 @@ fn test_produce_snapshot() {
     // add a couple more transactions that write some extra keys
     runner.env.block_height = snapshot.result.block_height + 1;
     let sk = libsecp256k1::SecretKey::parse(&[0x77; 32]).unwrap();
-    let mut signer = test_utils::Signer::new(sk);
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let mut signer = utils::Signer::new(sk);
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let dest1 = Address::from_array([0x11; 20]);
     let dest2 = Address::from_array([0x22; 20]);
     let initial_balance = Wei::from_eth(U256::one()).unwrap();
@@ -102,7 +102,7 @@ fn test_produce_snapshot() {
         if (key[0..3] == [7, 6, 1]) || (key == state_key) {
             continue;
         }
-        println!("{}", hex::encode(&key));
+
         let value = aurora_engine_sdk::base64::decode(entry.value).unwrap();
         assert_eq!(computed_snapshot.get(&key).unwrap(), &value);
     }

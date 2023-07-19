@@ -131,6 +131,17 @@ pub enum TransactionKind {
     /// Update the version of a deployed xcc-router contract
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
     FactorySetWNearAddress(Address),
+    FundXccSubAccound(FundXccArgs),
+    /// Pause the contract
+    PauseContract,
+    /// Resume the contract
+    ResumeContract,
+    /// Set the relayer key manager
+    SetKeyManager(parameters::RelayerKeyManagerArgs),
+    /// Add a new relayer public function call access key
+    AddRelayerKey(parameters::RelayerKeyArgs),
+    /// Remove the relayer public function call access key
+    RemoveRelayerKey(parameters::RelayerKeyArgs),
     FundXccSubAccount(FundXccArgs),
     /// Silo operations
     SetFixedGasCost(silo::FixedGasCostArgs),
@@ -361,6 +372,12 @@ impl TransactionKind {
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
             Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
+            Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
+            Self::PauseContract => Self::no_evm_execution("pause_contract"),
+            Self::ResumeContract => Self::no_evm_execution("resume_contract"),
+            Self::SetKeyManager(_) => Self::no_evm_execution("set_key_manager"),
+            Self::AddRelayerKey(_) => Self::no_evm_execution("add_relayer_key"),
+            Self::RemoveRelayerKey(_) => Self::no_evm_execution("remove_relayer_key"),
             Self::FundXccSubAccount(_) => Self::no_evm_execution("fund_xcc_sub_account"),
             Self::SetFixedGasCost(_) => Self::no_evm_execution("set_fixed_gas_cost"),
             Self::SetSiloParams(_) => Self::no_evm_execution("set_silo_params"),
@@ -541,6 +558,11 @@ enum BorshableTransactionKind<'a> {
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccount(Cow<'a, FundXccArgs>),
     SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
+    PauseContract,
+    ResumeContract,
+    SetKeyManager(Cow<'a, parameters::RelayerKeyManagerArgs>),
+    AddRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
+    RemoveRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
     SetFixedGasCost(Cow<'a, silo::FixedGasCostArgs>),
     SetSiloParams(Cow<'a, Option<silo::SiloParamsArgs>>),
     AddEntryToWhitelist(Cow<'a, silo::WhitelistArgs>),
@@ -593,6 +615,11 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetUpgradeDelayBlocks(x) => {
                 Self::SetUpgradeDelayBlocks(Cow::Borrowed(x))
             }
+            TransactionKind::PauseContract => Self::PauseContract,
+            TransactionKind::ResumeContract => Self::ResumeContract,
+            TransactionKind::SetKeyManager(x) => Self::SetKeyManager(Cow::Borrowed(x)),
+            TransactionKind::AddRelayerKey(x) => Self::AddRelayerKey(Cow::Borrowed(x)),
+            TransactionKind::RemoveRelayerKey(x) => Self::RemoveRelayerKey(Cow::Borrowed(x)),
             TransactionKind::SetFixedGasCost(x) => Self::SetFixedGasCost(Cow::Borrowed(x)),
             TransactionKind::SetSiloParams(x) => Self::SetSiloParams(Cow::Borrowed(x)),
             TransactionKind::AddEntryToWhitelist(x) => Self::AddEntryToWhitelist(Cow::Borrowed(x)),
@@ -667,6 +694,13 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
                 Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
+            }
+            BorshableTransactionKind::PauseContract => Ok(Self::PauseContract),
+            BorshableTransactionKind::ResumeContract => Ok(Self::ResumeContract),
+            BorshableTransactionKind::SetKeyManager(x) => Ok(Self::SetKeyManager(x.into_owned())),
+            BorshableTransactionKind::AddRelayerKey(x) => Ok(Self::AddRelayerKey(x.into_owned())),
+            BorshableTransactionKind::RemoveRelayerKey(x) => {
+                Ok(Self::RemoveRelayerKey(x.into_owned()))
             }
             BorshableTransactionKind::SetFixedGasCost(x) => {
                 Ok(Self::SetFixedGasCost(x.into_owned()))

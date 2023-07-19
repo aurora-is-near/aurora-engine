@@ -6,12 +6,13 @@ use aurora_engine::parameters::{
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
+use aurora_engine_types::borsh::BorshDeserialize;
+use aurora_engine_types::parameters::engine::RelayerKeyManagerArgs;
 use aurora_engine_types::parameters::silo::{
     FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs,
 };
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
-use borsh::BorshDeserialize;
 use engine_standalone_storage::{
     sync::{
         self,
@@ -22,7 +23,7 @@ use engine_standalone_storage::{
 use libsecp256k1::SecretKey;
 use tempfile::TempDir;
 
-use crate::test_utils;
+use crate::utils;
 
 pub mod mocks;
 pub mod storage;
@@ -96,12 +97,12 @@ impl StandaloneRunner {
             maybe_result: Ok(None),
         };
         self.cumulative_diff.append(outcome.diff.clone());
-        test_utils::standalone::storage::commit(storage, &outcome);
+        storage::commit(storage, &outcome);
     }
 
     pub fn transfer_with_signer(
         &mut self,
-        signer: &mut test_utils::Signer,
+        signer: &mut utils::Signer,
         amount: Wei,
         dest: Address,
     ) -> Result<SubmitResult, engine::EngineError> {
@@ -124,7 +125,7 @@ impl StandaloneRunner {
         let storage = &mut self.storage;
         let env = &mut self.env;
         env.block_height += 1;
-        let signed_tx = test_utils::sign_transaction(transaction, Some(self.chain_id), account);
+        let signed_tx = utils::sign_transaction(transaction, Some(self.chain_id), account);
         let transaction_bytes = rlp::encode(&signed_tx).to_vec();
 
         Self::internal_submit_transaction(
@@ -207,7 +208,7 @@ impl StandaloneRunner {
         let storage = &mut self.storage;
 
         match method_name {
-            test_utils::SUBMIT => {
+            utils::SUBMIT => {
                 let transaction_bytes = &ctx.input;
                 Self::internal_submit_transaction(
                     transaction_bytes,
@@ -218,7 +219,7 @@ impl StandaloneRunner {
                     promise_results,
                 )
             }
-            test_utils::SUBMIT_WITH_ARGS => {
+            utils::SUBMIT_WITH_ARGS => {
                 let submit_args = SubmitArgs::try_from_slice(&ctx.input).unwrap();
                 let transaction_hash = aurora_engine_sdk::keccak(&submit_args.tx_data);
                 let mut tx_msg =
@@ -232,7 +233,7 @@ impl StandaloneRunner {
 
                 unwrap_result(outcome)
             }
-            test_utils::CALL => {
+            utils::CALL => {
                 let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
                 let mut tx_msg =
@@ -246,7 +247,7 @@ impl StandaloneRunner {
 
                 unwrap_result(outcome)
             }
-            test_utils::DEPLOY_ERC20 => {
+            utils::DEPLOY_ERC20 => {
                 let deploy_args = DeployErc20TokenArgs::try_from_slice(&ctx.input).unwrap();
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
                 let mut tx_msg =
@@ -266,7 +267,7 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::RESUME_PRECOMPILES => {
+            utils::RESUME_PRECOMPILES => {
                 let call_args = PausePrecompilesCallArgs::try_from_slice(&ctx.input)
                     .expect("Unable to parse input as PausePrecompilesCallArgs");
 
@@ -286,7 +287,7 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::PAUSE_PRECOMPILES => {
+            utils::PAUSE_PRECOMPILES => {
                 let call_args = PausePrecompilesCallArgs::try_from_slice(&ctx.input)
                     .expect("Unable to parse input as PausePrecompilesCallArgs");
 
@@ -306,7 +307,7 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::SET_OWNER => {
+            utils::SET_OWNER => {
                 let call_args = SetOwnerArgs::try_from_slice(&ctx.input)
                     .expect("Unable to parse input as SetOwnerArgs");
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
@@ -325,7 +326,7 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::SET_UPGRADE_DELAY_BLOCKS => {
+            utils::SET_UPGRADE_DELAY_BLOCKS => {
                 let input = &ctx.input;
                 let call_args = SetUpgradeDelayBlocksArgs::try_from_slice(input)
                     .expect("Unable to parse input as SetUpgradeDelayBlocksArgs");
@@ -346,7 +347,59 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::SET_FIXED_GAS_COST => {
+            utils::PAUSE_CONTRACT => {
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::PauseContract;
+
+                let outcome =
+                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
+
+                Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+                ))
+            }
+            utils::RESUME_CONTRACT => {
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let mut tx_msg =
+                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::ResumeContract;
+
+                let outcome =
+                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
+
+                Ok(SubmitResult::new(
+                TransactionStatus::Succeed(Vec::new()),
+                0,
+                Vec::new(),
+                ))
+            }
+            utils::SET_KEY_MANAGER => {
+                let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
+                let call_args: RelayerKeyManagerArgs = serde_json::from_slice(&ctx.input)
+                    .expect("Unable to parse input as RelayerKeyManagerArgs");
+
+                let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                tx_msg.transaction = TransactionKind::SetKeyManager(call_args);
+
+                let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+                self.cumulative_diff.append(outcome.diff.clone());
+                storage::commit(storage, &outcome);
+
+                Ok(SubmitResult::new(
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
+                ))
+            }
+            utils::SET_FIXED_GAS_COST => {
                 let call_args = FixedGasCostArgs::try_from_slice(&ctx.input)
                     .expect("Unable to parse input as FixedGasCostArgs");
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
@@ -364,7 +417,7 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::SET_SILO_PARAMS => {
+            utils::SET_SILO_PARAMS => {
                 let call_args: Option<SiloParamsArgs> =
                     BorshDeserialize::try_from_slice(&ctx.input)
                         .expect("Unable to parse input as SiloParamsArgs");
@@ -384,7 +437,7 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::ADD_ENTRY_TO_WHITELIST => {
+            utils::ADD_ENTRY_TO_WHITELIST => {
                 let call_args = WhitelistArgs::try_from_slice(&ctx.input)
                     .expect("Unable to parse input as WhitelistArgs");
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
@@ -403,7 +456,7 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::ADD_ENTRY_TO_WHITELIST_BATCH => {
+            utils::ADD_ENTRY_TO_WHITELIST_BATCH => {
                 let call_args: Vec<WhitelistArgs> = BorshDeserialize::try_from_slice(&ctx.input)
                     .expect("Unable to parse input as vector of WhitelistArgs");
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
@@ -422,7 +475,7 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::REMOVE_ENTRY_FROM_WHITELIST => {
+            utils::REMOVE_ENTRY_FROM_WHITELIST => {
                 let call_args = WhitelistArgs::try_from_slice(&ctx.input)
                     .expect("Unable to parse WhitelistArgs");
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
@@ -441,7 +494,7 @@ impl StandaloneRunner {
                     Vec::new(),
                 ))
             }
-            test_utils::SET_WHITELIST_STATUS => {
+            utils::SET_WHITELIST_STATUS => {
                 let call_args = WhitelistStatusArgs::try_from_slice(&ctx.input)
                     .expect("Unable to parse WhitelistStatusArgs");
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
@@ -572,7 +625,7 @@ impl Default for StandaloneRunner {
     fn default() -> Self {
         let (storage_dir, storage) = storage::create_db();
         let env = mocks::default_env(0);
-        let chain_id = test_utils::AuroraRunner::default().chain_id;
+        let chain_id = utils::AuroraRunner::default().chain_id;
         Self {
             storage_dir,
             storage,

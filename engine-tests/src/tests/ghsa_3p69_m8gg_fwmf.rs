@@ -1,11 +1,11 @@
-use crate::test_utils;
-use borsh::BorshSerialize;
+use crate::utils;
+use aurora_engine_types::borsh::BorshSerialize;
 
 #[test]
 fn test_exploit_fix() {
     let (mut runner, mut signer, _) = crate::tests::sanity::initialize_transfer();
 
-    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+    let constructor = utils::solidity::ContractConstructor::compile_from_source(
         "src/tests/res",
         "target/solidity_build",
         "echo.sol",
@@ -38,8 +38,8 @@ fn test_exploit_fix() {
     .unwrap();
 
     let tx = contract.call_method_with_args("echo", &[ethabi::Token::Bytes(payload)], nonce.into());
-    let sender = test_utils::address_from_secret_key(&signer.secret_key);
-    let view_call_args = test_utils::as_view_call(tx, sender);
+    let sender = utils::address_from_secret_key(&signer.secret_key);
+    let view_call_args = utils::as_view_call(tx, sender);
     let input = view_call_args.try_to_vec().unwrap();
     let error = runner.one_shot().call("view", "viewer", input).unwrap_err();
 

@@ -5,6 +5,6 @@ mod benches;
 #[cfg(test)]
 mod prelude;
 #[cfg(test)]
-mod test_utils;
-#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod utils;

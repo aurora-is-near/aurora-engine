@@ -1,5 +1,6 @@
 use crate::{
     account_id::AccountId,
+    public_key::PublicKey,
     types::{Address, RawH256, RawU256, WeiU256, Yocto},
     Vec,
 };
@@ -14,6 +15,7 @@ use serde::{Deserialize, Serialize};
 pub enum NewCallArgs {
     V1(LegacyNewCallArgs),
     V2(NewCallArgsV2),
+    V3(NewCallArgsV3),
 }
 
 impl NewCallArgs {
@@ -49,6 +51,19 @@ pub struct NewCallArgsV2 {
     pub owner_id: AccountId,
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct NewCallArgsV3 {
+    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    pub chain_id: RawU256,
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
+    /// Relayer keys manager.
+    pub key_manager: AccountId,
 }
 
 /// Borsh-encoded parameters for the `set_owner` function.
@@ -298,6 +313,18 @@ pub fn parse_json_args<'de, T: Deserialize<'de>>(
     serde_json::from_slice(bytes).map_err(Into::into)
 }
 
+/// Parameters for setting relayer keys manager.
+#[derive(Debug, Clone, Eq, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct RelayerKeyManagerArgs {
+    pub key_manager: Option<AccountId>,
+}
+
+/// Parameters for adding or removing relayer function all keys.
+#[derive(Debug, Clone, Eq, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct RelayerKeyArgs {
+    pub public_key: PublicKey,
+}
+
 pub mod errors {
     use crate::{account_id::ParseAccountError, String, ToString};
 
@@ -400,5 +427,16 @@ mod tests {
         let input_bytes = new_input.try_to_vec().unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
         assert_eq!(parsed_data, None);
+    }
+
+    #[test]
+    fn test_deserialize_relayer_key_args() {
+        let json = r#"{"public_key": "ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847"}"#;
+        let public_key: PublicKey = "ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847"
+            .parse()
+            .unwrap();
+        let args = serde_json::from_str::<RelayerKeyArgs>(json).unwrap();
+
+        assert_eq!(args.public_key, public_key);
     }
 }

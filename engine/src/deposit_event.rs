@@ -1,12 +1,12 @@
 use crate::deposit_event::error::ParseEventMessageError;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
-    vec, Address, BorshDeserialize, BorshSerialize, Fee, NEP141Wei, String, ToString, Vec, U256,
+    format, vec, Address, BorshDeserialize, BorshSerialize, Fee, NEP141Wei, String, ToString, Vec,
+    U256,
 };
 use aurora_engine_types::borsh;
 use aurora_engine_types::parameters::connector::LogEntry;
 use aurora_engine_types::types::address::error::AddressError;
-use byte_slice_cast::AsByteSlice;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
 
 pub const DEPOSITED_EVENT: &str = "Deposited";
@@ -30,34 +30,37 @@ impl FtTransferMessageData {
         message: &str,
     ) -> Result<Self, error::ParseOnTransferMessageError> {
         // Split message by separator
-        let data: Vec<_> = message.split(':').collect();
-        // Message data array should contain 2 elements
-        if data.len() != 2 {
-            return Err(error::ParseOnTransferMessageError::TooManyParts);
-        }
+        let (account, msg) = message
+            .split_once(':')
+            .ok_or(error::ParseOnTransferMessageError::TooManyParts)?;
 
         // Check relayer account id from 1-th data element
-        let account_id = AccountId::try_from(data[0].as_bytes())
+        let account_id = account
+            .parse()
             .map_err(|_| error::ParseOnTransferMessageError::InvalidAccount)?;
 
         // Decode message array from 2-th element of data array
-        let msg =
-            hex::decode(data[1]).map_err(|_| error::ParseOnTransferMessageError::InvalidHexData)?;
         // Length = fee[32] + eth_address[20] bytes
-        if msg.len() != 52 {
-            return Err(error::ParseOnTransferMessageError::WrongMessageFormat);
-        }
+        let mut data = [0; 52];
+        hex::decode_to_slice(msg, &mut data).map_err(|e| match e {
+            hex::FromHexError::InvalidHexCharacter { .. } | hex::FromHexError::OddLength => {
+                error::ParseOnTransferMessageError::InvalidHexData
+            }
+            hex::FromHexError::InvalidStringLength => {
+                error::ParseOnTransferMessageError::WrongMessageFormat
+            }
+        })?;
 
         // Parse the fee from the message slice. It should contain 32 bytes,
         // but after that, it will be parsed to u128.
         // This logic is for compatibility.
-        let fee_u128: u128 = U256::from_little_endian(&msg[..32])
+        let fee_u128: u128 = U256::from_little_endian(&data[..32])
             .try_into()
             .map_err(|_| error::ParseOnTransferMessageError::OverflowNumber)?;
         let fee: Fee = fee_u128.into();
 
         // Get recipient Eth address from message slice
-        let recipient = Address::try_from_slice(&msg[32..52]).unwrap();
+        let recipient = Address::try_from_slice(&data[32..]).unwrap();
 
         Ok(Self {
             relayer: account_id,
@@ -70,13 +73,14 @@ impl FtTransferMessageData {
     #[must_use]
     pub fn encode(&self) -> String {
         // The first data section should contain fee data.
-        // Pay attention, that for compatibility reasons we used U256 type
-        // it means 32 bytes for fee data
-        let mut data = U256::from(self.fee.as_u128()).as_byte_slice().to_vec();
-        // Second data section should contain Eth address
-        data.extend(self.recipient.as_bytes());
-        // Add `:` separator between relayer_id and data message
-        [self.relayer.as_ref(), &hex::encode(data)].join(":")
+        // Pay attention, that for compatibility reasons we used U256 type.
+        // It means 32 bytes for fee data and 20 bytes for address.
+        let mut data = [0; 52];
+        U256::from(self.fee.as_u128()).to_little_endian(&mut data[..32]);
+        // Second data section should contain Eth address.
+        data[32..].copy_from_slice(self.recipient.as_bytes());
+        // Add `:` separator between relayer_id and the data encoded in hex.
+        format!("{}:{}", self.relayer, hex::encode(data))
     }
 
     /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`

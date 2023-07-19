@@ -1,10 +1,10 @@
 use crate::prelude::{Address, Balance, Wei, WeiU256, U256};
-use crate::test_utils::{self, create_eth_transaction, AuroraRunner, ORIGIN};
+use crate::utils::{self, create_eth_transaction, AuroraRunner, ORIGIN};
 use aurora_engine::engine::EngineError;
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
 use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
+use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
-use borsh::{BorshDeserialize, BorshSerialize};
 use ethabi::Token;
 use libsecp256k1::SecretKey;
 use near_vm_logic::VMOutcome;
@@ -31,7 +31,7 @@ fn build_input(str_selector: &str, inputs: &[Token]) -> Vec<u8> {
 fn create_ethereum_address() -> Address {
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
-    test_utils::address_from_secret_key(&source_account)
+    utils::address_from_secret_key(&source_account)
 }
 
 pub struct EthereumAddress {
@@ -41,7 +41,7 @@ pub struct EthereumAddress {
 
 impl AuroraRunner {
     pub fn new() -> Self {
-        test_utils::deploy_evm()
+        utils::deploy_runner()
     }
 
     pub fn make_call(
@@ -105,7 +105,7 @@ impl AuroraRunner {
     pub fn create_account(&mut self) -> EthereumAddress {
         let mut rng = rand::thread_rng();
         let source_account = SecretKey::random(&mut rng);
-        let source_address = test_utils::address_from_secret_key(&source_account);
+        let source_address = utils::address_from_secret_key(&source_account);
         self.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
         EthereumAddress {
             secret_key: source_account,
@@ -360,42 +360,39 @@ fn test_transfer_erc20_token() {
     );
 }
 
-// Simulation tests for exit to NEAR precompile.
-// Note: `AuroraRunner` is not suitable for these tests because
-// it does not execute promises; but `near-sdk-sim` does.
-pub mod sim_tests {
-    use crate::prelude::{Wei, WeiU256, U256};
-    use crate::test_utils;
-    use crate::test_utils::erc20::{ERC20Constructor, ERC20};
-    use crate::test_utils::exit_precompile::TesterConstructor;
-    use crate::tests::state_migration::{deploy_evm, AuroraAccount};
-    use aurora_engine::parameters::{
-        CallArgs, DeployErc20TokenArgs, FunctionCallArgsV2, SubmitResult,
+mod workspace {
+    use super::build_input;
+    use crate::prelude::{Address, Wei, WeiU256, U256};
+    use crate::utils;
+    use crate::utils::solidity::erc20::ERC20;
+    use crate::utils::solidity::exit_precompile::TesterConstructor;
+    use crate::utils::workspace::{
+        create_sub_account, deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141,
+        nep_141_balance_of, transfer_nep_141_to_erc_20,
     };
-    use aurora_engine_types::types::Address;
-    use borsh::{BorshDeserialize, BorshSerialize};
-    use near_sdk_sim::UserAccount;
-    use serde_json::json;
+    use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
+    use aurora_engine_types::parameters::engine::TransactionStatus;
+    use aurora_engine_workspace::account::Account;
+    use aurora_engine_workspace::{parse_near, EngineContract, RawContract};
 
-    const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;
     const FT_TRANSFER_AMOUNT: u128 = 300_000;
     const FT_EXIT_AMOUNT: u128 = 100_000;
-    const FT_ACCOUNT: &str = "test_token.root";
+    const FT_ACCOUNT: &str = "test_token";
     const INITIAL_ETH_BALANCE: u64 = 777_777_777;
     const ETH_EXIT_AMOUNT: u64 = 111_111_111;
 
-    #[test]
-    fn test_ghsa_5c82_x4m4_hcj6_exploit() {
+    #[tokio::test]
+    async fn test_ghsa_5c82_x4m4_hcj6_exploit() {
         let TestExitToNearEthContext {
             mut signer,
             signer_address,
             chain_id,
             tester_address: _,
             aurora,
-        } = test_exit_to_near_eth_common();
+        } = test_exit_to_near_eth_common().await.unwrap();
 
-        let constructor = test_utils::solidity::ContractConstructor::force_compile(
+        let constructor = utils::solidity::ContractConstructor::force_compile(
             "src/tests/res",
             "target/solidity_build",
             "exploit.sol",
@@ -403,53 +400,54 @@ pub mod sim_tests {
         );
         let nonce = signer.use_nonce().into();
         let deploy_tx = constructor.deploy_without_constructor(nonce);
-        let signed_tx = test_utils::sign_transaction(deploy_tx, Some(chain_id), &signer.secret_key);
-        let deploy_result = aurora.call("submit", &rlp::encode(&signed_tx));
-        let contract_address = match &deploy_result.status() {
-            near_sdk_sim::transaction::ExecutionStatus::SuccessValue(bytes) => {
-                let submit_result = SubmitResult::try_from_slice(bytes).unwrap();
-                Address::try_from_slice(test_utils::unwrap_success_slice(&submit_result)).unwrap()
-            }
-            _ => panic!("Unknown result: {deploy_result:?}"),
-        };
+        let signed_tx = utils::sign_transaction(deploy_tx, Some(chain_id), &signer.secret_key);
+        let deploy_result = aurora
+            .submit(rlp::encode(&signed_tx).to_vec())
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+        let contract_address =
+            if let TransactionStatus::Succeed(bytes) = &deploy_result.value().status {
+                Address::try_from_slice(bytes).unwrap()
+            } else {
+                panic!("Unknown result: {deploy_result:?}");
+            };
         let contract = constructor.deployed_at(contract_address);
-
         let nonce = signer.use_nonce().into();
         let hacker_account = "hacker.near";
-        let hacker_account_bytes = hacker_account.as_bytes().to_vec();
         let mut exploit_tx = contract.call_method_with_args(
             "exploit",
-            &[ethabi::Token::Bytes(hacker_account_bytes)],
+            &[ethabi::Token::Bytes(hacker_account.as_bytes().to_vec())],
             nonce,
         );
         exploit_tx.value = Wei::new_u64(ETH_EXIT_AMOUNT);
-        let signed_tx =
-            test_utils::sign_transaction(exploit_tx, Some(chain_id), &signer.secret_key);
-        aurora
-            .call("submit", &rlp::encode(&signed_tx))
-            .assert_success();
+        let signed_tx = utils::sign_transaction(exploit_tx, Some(chain_id), &signer.secret_key);
+        let result = aurora
+            .submit(rlp::encode(&signed_tx).to_vec())
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+        assert!(result.is_success());
 
         // check balances -- Hacker does not steal any funds!
         assert_eq!(
-            nep_141_balance_of(
-                aurora.contract.account_id.as_str(),
-                &aurora.contract,
-                &aurora,
-            ),
+            nep_141_balance_of(aurora.as_raw_contract(), &aurora.id()).await,
             u128::from(INITIAL_ETH_BALANCE)
         );
         assert_eq!(
-            nep_141_balance_of(hacker_account, &aurora.contract, &aurora),
+            nep_141_balance_of(aurora.as_raw_contract(), &hacker_account.parse().unwrap()).await,
             0
         );
         assert_eq!(
-            eth_balance_of(signer_address, &aurora),
+            eth_balance_of(signer_address, &aurora).await,
             Wei::new_u64(INITIAL_ETH_BALANCE)
         );
     }
 
-    #[test]
-    fn test_exit_to_near() {
+    #[tokio::test]
+    async fn test_exit_to_near() {
         // Deploy Aurora; deploy NEP-141; bridge NEP-141 to ERC-20 on Aurora
         let TestExitToNearContext {
             ft_owner,
@@ -457,33 +455,34 @@ pub mod sim_tests {
             nep_141,
             erc20,
             aurora,
-        } = test_exit_to_near_common();
+        } = test_exit_to_near_common().await.unwrap();
 
         // Call exit function on ERC-20; observe ERC-20 burned + NEP-141 transferred
         exit_to_near(
             &ft_owner,
-            ft_owner.account_id.as_str(),
+            ft_owner.id().as_ref(),
             FT_EXIT_AMOUNT,
             &erc20,
             &aurora,
-        );
+        )
+        .await;
 
         assert_eq!(
-            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            nep_141_balance_of(&nep_141, &ft_owner.id()).await,
             FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT + FT_EXIT_AMOUNT
         );
         assert_eq!(
-            nep_141_balance_of(aurora.contract.account_id.as_str(), &nep_141, &aurora),
+            nep_141_balance_of(&nep_141, &aurora.id()).await,
             FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT
         );
         assert_eq!(
-            erc20_balance(&erc20, ft_owner_address, &aurora),
+            erc20_balance(&erc20, ft_owner_address, &aurora).await,
             (FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT).into()
         );
     }
 
-    #[test]
-    fn test_exit_to_near_refund() {
+    #[tokio::test]
+    async fn test_exit_to_near_refund() {
         // Deploy Aurora; deploy NEP-141; bridge NEP-141 to ERC-20 on Aurora
         let TestExitToNearContext {
             ft_owner,
@@ -491,7 +490,7 @@ pub mod sim_tests {
             nep_141,
             erc20,
             aurora,
-        } = test_exit_to_near_common();
+        } = test_exit_to_near_common().await.unwrap();
 
         // Call exit on ERC-20; ft_transfer promise fails; expect refund on Aurora;
         exit_to_near(
@@ -501,77 +500,79 @@ pub mod sim_tests {
             FT_EXIT_AMOUNT,
             &erc20,
             &aurora,
-        );
+        )
+        .await;
 
         assert_eq!(
-            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            nep_141_balance_of(&nep_141, &ft_owner.id()).await,
             FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT
         );
         assert_eq!(
-            nep_141_balance_of(aurora.contract.account_id.as_str(), &nep_141, &aurora),
+            nep_141_balance_of(&nep_141, &aurora.id()).await,
             FT_TRANSFER_AMOUNT
         );
+
         #[cfg(feature = "error_refund")]
-        assert_eq!(
-            erc20_balance(&erc20, ft_owner_address, &aurora),
-            FT_TRANSFER_AMOUNT.into()
-        );
+        let balance = FT_TRANSFER_AMOUNT.into();
         // If the refund feature is not enabled then there is no refund in the EVM
         #[cfg(not(feature = "error_refund"))]
+        let balance = (FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT).into();
+
         assert_eq!(
-            erc20_balance(&erc20, ft_owner_address, &aurora),
-            (FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT).into()
+            erc20_balance(&erc20, ft_owner_address, &aurora).await,
+            balance
         );
     }
 
-    #[test]
-    fn test_exit_to_near_eth() {
+    #[tokio::test]
+    async fn test_exit_to_near_eth() {
         // Same test as above, but exit ETH instead of a bridged NEP-141
-
         let TestExitToNearEthContext {
             signer,
             signer_address,
             chain_id,
             tester_address,
             aurora,
-        } = test_exit_to_near_eth_common();
+        } = test_exit_to_near_eth_common().await.unwrap();
         let exit_account_id = "any.near";
 
         // call exit to near
-        let input = super::build_input(
+        let input = build_input(
             "withdrawEthToNear(bytes)",
             &[ethabi::Token::Bytes(exit_account_id.as_bytes().to_vec())],
         );
-        let tx = test_utils::create_eth_transaction(
+        let tx = utils::create_eth_transaction(
             Some(tester_address),
             Wei::new_u64(ETH_EXIT_AMOUNT),
             input,
             Some(chain_id),
             &signer.secret_key,
         );
-        aurora.call("submit", &rlp::encode(&tx)).assert_success();
+        let result = aurora
+            .submit(rlp::encode(&tx).to_vec())
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+        assert!(result.is_success());
 
         // check balances
         assert_eq!(
-            nep_141_balance_of(
-                aurora.contract.account_id.as_str(),
-                &aurora.contract,
-                &aurora,
-            ),
+            nep_141_balance_of(aurora.as_raw_contract(), &aurora.id()).await,
             u128::from(INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT)
         );
         assert_eq!(
-            nep_141_balance_of(exit_account_id, &aurora.contract, &aurora),
+            nep_141_balance_of(aurora.as_raw_contract(), &exit_account_id.parse().unwrap()).await,
             u128::from(ETH_EXIT_AMOUNT)
         );
         assert_eq!(
-            eth_balance_of(signer_address, &aurora),
+            eth_balance_of(signer_address, &aurora).await,
             Wei::new_u64(INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT)
         );
     }
 
-    #[test]
-    fn test_exit_to_near_eth_refund() {
+    #[tokio::test]
+    async fn test_exit_to_near_eth_refund() {
         // Test the case where the ft_transfer promise from the exit call fails;
         // ensure ETH is refunded.
 
@@ -581,180 +582,177 @@ pub mod sim_tests {
             chain_id,
             tester_address,
             aurora,
-        } = test_exit_to_near_eth_common();
-        let exit_account_id = "any.near".to_owned();
+        } = test_exit_to_near_eth_common().await.unwrap();
+        let exit_account_id = "any.near";
 
         // Make the ft_transfer call fail by draining the Aurora account
-        let transfer_args = json!({
-            "receiver_id": "tmp.near",
-            "amount": format!("{INITIAL_ETH_BALANCE}"),
-            "memo": "null",
-        });
-        aurora
-            .contract
-            .call(
-                aurora.contract.account_id(),
-                "ft_transfer",
-                transfer_args.to_string().as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                1,
+        let result = aurora
+            .ft_transfer(
+                &"tmp.near".parse().unwrap(),
+                u128::from(INITIAL_ETH_BALANCE).into(),
+                None,
             )
-            .assert_success();
+            .max_gas()
+            .deposit(1)
+            .transact()
+            .await
+            .unwrap();
+        assert!(result.is_success());
 
         // call exit to near
-        let input = super::build_input(
+        let input = build_input(
             "withdrawEthToNear(bytes)",
             &[ethabi::Token::Bytes(exit_account_id.as_bytes().to_vec())],
         );
-        let tx = test_utils::create_eth_transaction(
+        let tx = utils::create_eth_transaction(
             Some(tester_address),
             Wei::new_u64(ETH_EXIT_AMOUNT),
             input,
             Some(chain_id),
             &signer.secret_key,
         );
-        aurora.call("submit", &rlp::encode(&tx)).assert_success();
+        let result = aurora
+            .submit(rlp::encode(&tx).to_vec())
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+        assert!(result.is_success());
 
         // check balances
         assert_eq!(
-            nep_141_balance_of(exit_account_id.as_str(), &aurora.contract, &aurora),
+            nep_141_balance_of(aurora.as_raw_contract(), &exit_account_id.parse().unwrap()).await,
             0
         );
+
         #[cfg(feature = "error_refund")]
-        assert_eq!(
-            eth_balance_of(signer_address, &aurora),
-            Wei::new_u64(INITIAL_ETH_BALANCE)
-        );
+        let expected_balance = Wei::new_u64(INITIAL_ETH_BALANCE);
         // If the refund feature is not enabled then there is no refund in the EVM
         #[cfg(not(feature = "error_refund"))]
+        let expected_balance = Wei::new_u64(INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT);
+
         assert_eq!(
-            eth_balance_of(signer_address, &aurora),
-            Wei::new_u64(INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT)
+            eth_balance_of(signer_address, &aurora).await,
+            expected_balance
         );
     }
 
-    fn test_exit_to_near_eth_common() -> TestExitToNearEthContext {
-        let aurora = deploy_evm();
-        let chain_id = test_utils::AuroraRunner::default().chain_id;
-        let signer = test_utils::Signer::random();
-        let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
-        aurora
-            .call(
-                "mint_account",
-                &(signer_address, signer.nonce, INITIAL_ETH_BALANCE)
-                    .try_to_vec()
-                    .unwrap(),
-            )
-            .assert_success();
+    async fn test_exit_to_near_eth_common() -> anyhow::Result<TestExitToNearEthContext> {
+        let aurora = deploy_engine().await;
+        let chain_id = aurora.get_chain_id().await?.result.as_u64();
+        let signer = utils::Signer::random();
+        let signer_address = utils::address_from_secret_key(&signer.secret_key);
 
-        assert_eq!(
-            nep_141_balance_of(
-                aurora.contract.account_id.as_str(),
-                &aurora.contract,
-                &aurora,
-            ),
-            u128::from(INITIAL_ETH_BALANCE)
-        );
-        assert_eq!(
-            eth_balance_of(signer_address, &aurora),
-            Wei::new_u64(INITIAL_ETH_BALANCE)
-        );
+        let result = aurora
+            .mint_account(signer_address, signer.nonce, INITIAL_ETH_BALANCE)
+            .max_gas()
+            .transact()
+            .await?;
+        assert!(result.is_success());
+
+        let balance = aurora.ft_balance_of(&aurora.id()).await?.result;
+        assert_eq!(balance.0, u128::from(INITIAL_ETH_BALANCE));
+
+        let balance = eth_balance_of(signer_address, &aurora).await;
+        assert_eq!(balance, Wei::new_u64(INITIAL_ETH_BALANCE));
 
         // deploy contract with simple exit to near method
         let constructor = TesterConstructor::load();
         let deploy_data = constructor.deploy(0, Address::zero()).data;
-        let submit_result = match aurora.call("deploy_code", &deploy_data).status() {
-            near_sdk_sim::transaction::ExecutionStatus::SuccessValue(bytes) => {
-                SubmitResult::try_from_slice(&bytes).unwrap()
-            }
-            other => panic!("Unexpected status {other:?}"),
+        let result = aurora
+            .deploy_code(deploy_data)
+            .max_gas()
+            .transact()
+            .await?
+            .into_value();
+        let tester_address = if let TransactionStatus::Succeed(bytes) = result.status {
+            Address::try_from_slice(&bytes).unwrap()
+        } else {
+            anyhow::bail!("Wrong submit result: {result:?}");
         };
-        let tester_address =
-            Address::try_from_slice(&test_utils::unwrap_success(submit_result)).unwrap();
 
-        TestExitToNearEthContext {
+        Ok(TestExitToNearEthContext {
             signer,
             signer_address,
             chain_id,
             tester_address,
             aurora,
-        }
+        })
     }
 
-    fn test_exit_to_near_common() -> TestExitToNearContext {
+    async fn test_exit_to_near_common() -> anyhow::Result<TestExitToNearContext> {
         // 1. deploy Aurora
-        let aurora = deploy_evm();
+        let aurora = deploy_engine().await;
 
         // 2. Create account
-        let ft_owner = aurora.user.create_user(
-            "ft_owner.root".parse().unwrap(),
-            near_sdk_sim::STORAGE_AMOUNT,
-        );
+        let ft_owner = create_sub_account(&aurora.root(), "ft_owner", parse_near!("50 N")).await?;
         let ft_owner_address =
-            aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.account_id.as_bytes());
-        aurora
-            .call(
-                "mint_account",
-                &(ft_owner_address, 0u64, INITIAL_ETH_BALANCE)
-                    .try_to_vec()
-                    .unwrap(),
-            )
-            .assert_success();
+            aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.id().as_bytes());
+        let result = aurora
+            .mint_account(ft_owner_address, 0u64, INITIAL_ETH_BALANCE)
+            .max_gas()
+            .transact()
+            .await?;
+        assert!(result.is_success());
 
+        let nep_141_account =
+            create_sub_account(&aurora.root(), FT_ACCOUNT, parse_near!("50 N")).await?;
         // 3. Deploy NEP-141
-        let nep_141 = deploy_nep_141(
-            FT_ACCOUNT,
-            ft_owner.account_id.as_ref(),
-            FT_TOTAL_SUPPLY,
-            &aurora,
-        );
+        let nep_141 = deploy_nep_141(&nep_141_account, &ft_owner, FT_TOTAL_SUPPLY, &aurora)
+            .await
+            .map_err(|e| anyhow::anyhow!("Couldn't deploy NEP-141: {e}"))?;
 
         assert_eq!(
-            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            nep_141_balance_of(&nep_141, &ft_owner.id()).await,
             FT_TOTAL_SUPPLY
         );
 
         // 4. Deploy ERC-20 from NEP-141 and bridge value to Aurora
-        let erc20 = deploy_erc20_from_nep_141(&nep_141, &aurora);
+        let erc20 = deploy_erc20_from_nep_141(nep_141.id().as_ref(), &aurora)
+            .await
+            .map_err(|e| anyhow::anyhow!("Couldn't deploy ERC-20 from NEP-141: {e}"))?;
+
         transfer_nep_141_to_erc_20(
             &nep_141,
             &erc20,
             &ft_owner,
-            ft_owner_address,
+            Address::from_array(ft_owner_address.raw().0),
             FT_TRANSFER_AMOUNT,
             &aurora,
-        );
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
-            nep_141_balance_of(ft_owner.account_id.as_str(), &nep_141, &aurora),
+            nep_141_balance_of(&nep_141, &ft_owner.id()).await,
             FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT
         );
         assert_eq!(
-            nep_141_balance_of(aurora.contract.account_id.as_str(), &nep_141, &aurora),
+            nep_141_balance_of(&nep_141, &aurora.id()).await,
             FT_TRANSFER_AMOUNT
         );
         assert_eq!(
-            erc20_balance(&erc20, ft_owner_address, &aurora),
+            erc20_balance(&erc20, ft_owner_address, &aurora).await,
             FT_TRANSFER_AMOUNT.into()
         );
 
-        TestExitToNearContext {
+        Ok(TestExitToNearContext {
             ft_owner,
             ft_owner_address,
             nep_141,
             erc20,
             aurora,
-        }
+        })
     }
 
-    pub fn exit_to_near(
-        source: &UserAccount,
+    pub async fn exit_to_near(
+        source: &Account,
         dest: &str,
         amount: u128,
         erc20: &ERC20,
-        aurora: &AuroraAccount,
+        aurora: &EngineContract,
     ) {
-        let input = super::build_input(
+        let input = build_input(
             "withdrawToNear(bytes,uint256)",
             &[
                 ethabi::Token::Bytes(dest.as_bytes().to_vec()),
@@ -766,184 +764,49 @@ pub mod sim_tests {
             value: WeiU256::default(),
             input,
         });
-        source
-            .call(
-                aurora.contract.account_id(),
-                "call",
-                &call_args.try_to_vec().unwrap(),
-                near_sdk_sim::DEFAULT_GAS,
-                0,
-            )
-            .assert_success();
+        let result = source
+            .call(&aurora.id(), "call")
+            .args_borsh(call_args)
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+        assert!(result.is_success());
     }
 
-    pub fn transfer_nep_141_to_erc_20(
-        nep_141: &UserAccount,
-        erc20: &ERC20,
-        source: &UserAccount,
-        dest: Address,
-        amount: u128,
-        aurora: &AuroraAccount,
-    ) {
-        let transfer_args = json!({
-            "receiver_id": aurora.contract.account_id.as_str(),
-            "amount": format!("{amount}"),
-            "memo": "null",
-        });
-        source
-            .call(
-                nep_141.account_id(),
-                "ft_transfer",
-                transfer_args.to_string().as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                1,
-            )
-            .assert_success();
-
-        let mint_tx = erc20.mint(dest, amount.into(), 0.into());
-        let call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: erc20.0.address,
-            value: WeiU256::default(),
-            input: mint_tx.data,
-        });
-        aurora
-            .contract
-            .call(
-                aurora.contract.account_id(),
-                "call",
-                &call_args.try_to_vec().unwrap(),
-                near_sdk_sim::DEFAULT_GAS,
-                0,
-            )
-            .assert_success();
+    async fn eth_balance_of(address: Address, aurora: &EngineContract) -> Wei {
+        let result = aurora.get_balance(address).await.unwrap().result;
+        Wei::new(result)
     }
 
-    fn eth_balance_of(address: Address, aurora: &AuroraAccount) -> Wei {
-        let result = aurora.call("get_balance", address.as_bytes());
+    pub async fn erc20_balance(erc20: &ERC20, address: Address, aurora: &EngineContract) -> U256 {
+        let balance_tx = erc20.balance_of(address, 0.into());
+        let result = aurora
+            .call(erc20.0.address, U256::zero(), balance_tx.data)
+            .transact()
+            .await
+            .unwrap();
+        assert!(result.is_success());
 
-        result.assert_success();
-        match result.status() {
-            near_sdk_sim::transaction::ExecutionStatus::SuccessValue(bytes) => {
-                Wei::new(U256::from_big_endian(&bytes))
-            }
-            _ => unreachable!(),
+        match &result.value().status {
+            TransactionStatus::Succeed(bytes) => U256::from_big_endian(bytes),
+            _ => panic!("Unexpected status {result:?}"),
         }
     }
 
-    pub fn erc20_balance(erc20: &ERC20, address: Address, aurora: &AuroraAccount) -> U256 {
-        let balance_tx = erc20.balance_of(address, 0.into());
-        let call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: erc20.0.address,
-            value: WeiU256::default(),
-            input: balance_tx.data,
-        });
-        let result = aurora.call("call", &call_args.try_to_vec().unwrap());
-        let submit_result = match result.status() {
-            near_sdk_sim::transaction::ExecutionStatus::SuccessValue(bytes) => {
-                SubmitResult::try_from_slice(&bytes).unwrap()
-            }
-            other => panic!("Unexpected status {other:?}"),
-        };
-        U256::from_big_endian(&test_utils::unwrap_success(submit_result))
-    }
-
-    pub fn deploy_erc20_from_nep_141(nep_141: &UserAccount, aurora: &AuroraAccount) -> ERC20 {
-        let args = DeployErc20TokenArgs {
-            nep141: nep_141.account_id().as_str().parse().unwrap(),
-        };
-        let result = aurora.call("deploy_erc20_token", &args.try_to_vec().unwrap());
-        let addr_bytes: Vec<u8> = result.unwrap_borsh();
-        let address = Address::try_from_slice(&addr_bytes).unwrap();
-        let abi = ERC20Constructor::load().0.abi;
-        ERC20(test_utils::solidity::DeployedContract { abi, address })
-    }
-
-    pub fn nep_141_balance_of(
-        account_id: &str,
-        nep_141: &UserAccount,
-        aurora: &AuroraAccount,
-    ) -> u128 {
-        aurora
-            .user
-            .call(
-                nep_141.account_id(),
-                "ft_balance_of",
-                json!({ "account_id": account_id }).to_string().as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                0,
-            )
-            .unwrap_json_value()
-            .as_str()
-            .unwrap()
-            .parse()
-            .unwrap()
-    }
-
-    /// Deploys the standard FT implementation:
-    /// `https://github.com/near/near-sdk-rs/blob/master/examples/fungible-token/ft/src/lib.rs`
-    pub fn deploy_nep_141(
-        nep_141_account_id: &str,
-        token_owner: &str,
-        amount: u128,
-        aurora: &AuroraAccount,
-    ) -> UserAccount {
-        let contract_bytes = std::fs::read(FT_PATH).unwrap();
-
-        let contract_account = aurora.user.deploy(
-            &contract_bytes,
-            nep_141_account_id.parse().unwrap(),
-            5 * near_sdk_sim::STORAGE_AMOUNT,
-        );
-
-        let init_args = json!({
-            "owner_id": token_owner,
-            "total_supply": format!("{amount}"),
-        })
-        .to_string();
-
-        aurora
-            .user
-            .call(
-                contract_account.account_id(),
-                "new_default_meta",
-                init_args.as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                0,
-            )
-            .assert_success();
-
-        // Need to register Aurora contract so that it can receive tokens
-        let args = json!({
-            "account_id": &aurora.contract.account_id,
-        })
-        .to_string();
-        aurora
-            .user
-            .call(
-                contract_account.account_id(),
-                "storage_deposit",
-                args.as_bytes(),
-                near_sdk_sim::DEFAULT_GAS,
-                near_sdk_sim::STORAGE_AMOUNT,
-            )
-            .assert_success();
-
-        contract_account
-    }
-
     struct TestExitToNearContext {
-        ft_owner: UserAccount,
+        ft_owner: Account,
         ft_owner_address: Address,
-        nep_141: UserAccount,
+        nep_141: RawContract,
         erc20: ERC20,
-        aurora: AuroraAccount,
+        aurora: EngineContract,
     }
 
     struct TestExitToNearEthContext {
-        signer: test_utils::Signer,
+        signer: utils::Signer,
         signer_address: Address,
         chain_id: u64,
         tester_address: Address,
-        aurora: AuroraAccount,
+        aurora: EngineContract,
     }
 }

@@ -34,6 +34,7 @@ pub enum KeyPrefix {
     CrossContractCall = 0xa,
     Silo = 0xb,
     Whitelist = 0xc,
+    RelayerFunctionCallKey = 0xd,
 }
 
 impl From<KeyPrefix> for u8 {
@@ -52,6 +53,7 @@ impl From<KeyPrefix> for u8 {
             KeyPrefix::CrossContractCall => 0xa,
             KeyPrefix::Silo => 0xb,
             KeyPrefix::Whitelist => 0xc,
+            KeyPrefix::RelayerFunctionCallKey => 0xd,
         }
     }
 }
@@ -100,6 +102,7 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0xa => Self::CrossContractCall,
             0xb => Self::Silo,
             0xc => Self::Whitelist,
+            0xd => Self::RelayerFunctionCallKey,
             _ => unreachable!("Unknown key prefix"),
         }
     }

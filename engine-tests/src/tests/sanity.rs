@@ -1,18 +1,14 @@
 use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
-use crate::test_utils::{self, str_to_account_id};
-use crate::tests::state_migration;
+use crate::utils::{self, str_to_account_id};
 use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_HEIGHT};
 use aurora_engine::fungible_token::FungibleTokenMetadata;
-use aurora_engine::parameters::{
-    SetOwnerArgs, SetUpgradeDelayBlocksArgs, SubmitResult, TransactionStatus,
-};
+use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
+use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::H160;
-use borsh::{BorshDeserialize, BorshSerialize};
+use evm::ExitFatal;
 use libsecp256k1::SecretKey;
-use near_sdk_sim::errors::TxExecutionError;
-use near_sdk_sim::transaction::ExecutionStatus;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
 
@@ -25,16 +21,16 @@ const GAS_PRICE: u64 = 10;
 fn test_total_supply_accounting() {
     let (mut runner, mut signer, benefactor) = initialize_transfer();
 
-    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+    let constructor = utils::solidity::ContractConstructor::compile_from_source(
         "src/tests/res",
         "target/solidity_build",
         "self_destructor.sol",
         "SelfDestruct",
     );
 
-    let deploy_contract = |runner: &mut test_utils::AuroraRunner,
-                           signer: &mut test_utils::Signer|
-     -> test_utils::solidity::DeployedContract {
+    let deploy_contract = |runner: &mut utils::AuroraRunner,
+                           signer: &mut utils::Signer|
+     -> utils::solidity::DeployedContract {
         let submit_result = runner
             .submit_with_signer(signer, |nonce| {
                 let mut deploy_tx = constructor.deploy_without_constructor(nonce);
@@ -44,11 +40,11 @@ fn test_total_supply_accounting() {
             .unwrap();
 
         let contract_address =
-            Address::try_from_slice(test_utils::unwrap_success_slice(&submit_result)).unwrap();
+            Address::try_from_slice(utils::unwrap_success_slice(&submit_result)).unwrap();
         constructor.deployed_at(contract_address)
     };
 
-    let get_total_supply = |runner: &mut test_utils::AuroraRunner| -> Wei {
+    let get_total_supply = |runner: &mut utils::AuroraRunner| -> Wei {
         let result = runner.call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
         let amount: u128 = String::from_utf8(result.unwrap().return_data.as_value().unwrap())
             .unwrap()
@@ -109,25 +105,21 @@ fn test_transaction_to_zero_address() {
 
     // We want the standalone engine to still reproduce the old behaviour for blocks before the bug fix, and
     // to use the correct parsing for blocks after the fix.
-    let mut runner = test_utils::standalone::StandaloneRunner::default();
+    let mut runner = utils::standalone::StandaloneRunner::default();
     runner.init_evm_with_chain_id(normalized_tx.chain_id.unwrap());
-    let mut context = test_utils::AuroraRunner::default().context;
+    let mut context = utils::AuroraRunner::default().context;
     context.input = tx_bytes;
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
-    let result = runner
-        .submit_raw(test_utils::SUBMIT, &context, &[])
-        .unwrap();
+    let result = runner.submit_raw(utils::SUBMIT, &context, &[]).unwrap();
     assert_eq!(result.gas_used, 53_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT;
-    let result = runner
-        .submit_raw(test_utils::SUBMIT, &context, &[])
-        .unwrap();
+    let result = runner.submit_raw(utils::SUBMIT, &context, &[]).unwrap();
     assert_eq!(result.gas_used, 21_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT + 1;
     assert_eq!(runner.get_nonce(&address), U256::one());
@@ -139,16 +131,20 @@ fn test_state_format() {
     // change the binary format of the `EngineState` then we will know
     // about it. This is important because changing the state format will
     // break the contract unless we do a state migration.
-    let args = aurora_engine::parameters::NewCallArgsV2 {
+    let args = aurora_engine::parameters::NewCallArgsV3 {
         chain_id: aurora_engine_types::types::u256_to_arr(&666.into()),
         owner_id: "boss".parse().unwrap(),
         upgrade_delay_blocks: 3,
+        key_manager: "key_manager".parse().unwrap(),
     };
     let state: aurora_engine::state::EngineState = args.into();
     let expected_hex: String = [
-        "01000000000000000000000000000000000000000000000000000000000000029a",
-        "04000000626f7373",
-        "0300000000000000",
+        "02",                                                               // state version
+        "000000000000000000000000000000000000000000000000000000000000029a", // chain id
+        "04000000626f7373",                                                 // owner id
+        "0300000000000000",                                                 // upgrade delay blocks
+        "00",                                                               // contract mode
+        "010b0000006b65795f6d616e61676572",                                 // key manager
     ]
     .concat();
     assert_eq!(hex::encode(state.borsh_serialize().unwrap()), expected_hex);
@@ -170,10 +166,10 @@ fn test_deploy_contract() {
     // Deploy that code
     let result = runner
         .submit_with_signer(&mut signer, |nonce| {
-            test_utils::create_deploy_transaction(code.clone(), nonce)
+            utils::create_deploy_transaction(code.clone(), nonce)
         })
         .unwrap();
-    let address = Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
+    let address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
 
     // Confirm the code stored at that address is equal to the input code.
     let stored_code = runner.get_code(address);
@@ -192,7 +188,7 @@ fn test_deploy_largest_contract() {
     // Deploy that code
     let (result, profile) = runner
         .submit_with_signer_profiled(&mut signer, |nonce| {
-            test_utils::create_deploy_transaction(code.clone(), nonce)
+            utils::create_deploy_transaction(code.clone(), nonce)
         })
         .unwrap();
 
@@ -204,15 +200,15 @@ fn test_deploy_largest_contract() {
     );
 
     // Less than 12 NEAR Tgas
-    test_utils::assert_gas_bound(profile.all_gas(), 10);
+    utils::assert_gas_bound(profile.all_gas(), 10);
 }
 
 #[test]
 fn test_log_address() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
-    let mut deploy_contract = |name: &str, signer: &mut test_utils::Signer| {
-        let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+    let mut deploy_contract = |name: &str, signer: &mut utils::Signer| {
+        let constructor = utils::solidity::ContractConstructor::compile_from_source(
             "src/tests/res",
             "target/solidity_build",
             "caller.sol",
@@ -249,9 +245,9 @@ fn test_log_address() {
 #[test]
 fn test_is_contract() {
     let (mut runner, mut signer, _) = initialize_transfer();
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
 
-    let constructor = test_utils::solidity::ContractConstructor::force_compile(
+    let constructor = utils::solidity::ContractConstructor::force_compile(
         "src/tests/res",
         "target/solidity_build",
         "is_contract.sol",
@@ -265,27 +261,25 @@ fn test_is_contract() {
         constructor,
     );
 
-    let call_contract = |account: Address,
-                         runner: &mut test_utils::AuroraRunner,
-                         signer: &mut test_utils::Signer|
-     -> bool {
-        let result = runner
-            .submit_with_signer(signer, |nonce| {
-                contract.call_method_with_args(
-                    "isContract",
-                    &[ethabi::Token::Address(account.raw())],
-                    nonce,
-                )
-            })
-            .unwrap();
-        let bytes = test_utils::unwrap_success_slice(&result);
-        ethabi::decode(&[ethabi::ParamType::Bool], bytes)
-            .unwrap()
-            .pop()
-            .unwrap()
-            .into_bool()
-            .unwrap()
-    };
+    let call_contract =
+        |account: Address, runner: &mut utils::AuroraRunner, signer: &mut utils::Signer| -> bool {
+            let result = runner
+                .submit_with_signer(signer, |nonce| {
+                    contract.call_method_with_args(
+                        "isContract",
+                        &[ethabi::Token::Address(account.raw())],
+                        nonce,
+                    )
+                })
+                .unwrap();
+            let bytes = utils::unwrap_success_slice(&result);
+            ethabi::decode(&[ethabi::ParamType::Bool], bytes)
+                .unwrap()
+                .pop()
+                .unwrap()
+                .into_bool()
+                .unwrap()
+        };
 
     // Should return false for accounts that don't exist
     assert!(!call_contract(
@@ -298,7 +292,7 @@ fn test_is_contract() {
     assert!(!call_contract(signer_address, &mut runner, &mut signer),);
 
     // Should return true for contracts
-    let erc20_constructor = test_utils::erc20::ERC20Constructor::load();
+    let erc20_constructor = utils::solidity::erc20::ERC20Constructor::load();
     let nonce = signer.use_nonce();
     let token_a = runner.deploy_contract(
         &signer.secret_key,
@@ -313,7 +307,7 @@ fn test_solidity_pure_bench() {
     let (mut runner, mut signer, _) = initialize_transfer();
     runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
 
-    let constructor = test_utils::solidity::ContractConstructor::force_compile(
+    let constructor = utils::solidity::ContractConstructor::force_compile(
         "src/tests/res",
         "target/solidity_build",
         "bench.sol",
@@ -354,7 +348,7 @@ fn test_solidity_pure_bench() {
     let base_path = Path::new("../etc").join("tests").join("benchmark-contract");
     let output_path =
         base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
-    test_utils::rust::compile(base_path);
+    utils::rust::compile(base_path);
     let contract_bytes = std::fs::read(output_path).unwrap();
     let code = near_primitives_core::contract::ContractCode::new(contract_bytes, None);
     let mut context = runner.context.clone();
@@ -371,7 +365,7 @@ fn test_solidity_pure_bench() {
         Some(&runner.cache),
     )
     .unwrap();
-    let profile = test_utils::ExecutionProfile::new(&outcome);
+    let profile = utils::ExecutionProfile::new(&outcome);
 
     // Check the contract actually did the work.
     assert_eq!(&outcome.logs, &[format!("Done {loop_limit} iterations!")]);
@@ -382,7 +376,7 @@ fn test_solidity_pure_bench() {
 fn test_revert_during_contract_deploy() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
-    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+    let constructor = utils::solidity::ContractConstructor::compile_from_source(
         "src/tests/res",
         "target/solidity_build",
         "reverter.sol",
@@ -396,7 +390,7 @@ fn test_revert_during_contract_deploy() {
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
 
-    let revert_bytes = test_utils::unwrap_revert(submit_result);
+    let revert_bytes = utils::unwrap_revert_slice(&submit_result);
     // First 4 bytes is a function selector with signature `Error(string)`
     assert_eq!(&revert_bytes[0..4], &[8, 195, 121, 160]);
     // Remaining data is an ABI-encoded string
@@ -414,7 +408,7 @@ fn test_revert_during_contract_deploy() {
 fn test_call_too_deep_error() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
-    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+    let constructor = utils::solidity::ContractConstructor::compile_from_source(
         "src/tests/res",
         "target/solidity_build",
         "CallTooDeep.sol",
@@ -477,7 +471,7 @@ fn test_create_out_of_gas() {
 fn test_timestamp() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
-    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+    let constructor = utils::solidity::ContractConstructor::compile_from_source(
         "src/tests/res",
         "target/solidity_build",
         "timestamp.sol",
@@ -506,7 +500,7 @@ fn test_timestamp() {
             contract.call_method_without_args("getCurrentBlockTimestamp", nonce)
         })
         .unwrap();
-    let timestamp = U256::from_big_endian(&test_utils::unwrap_success(result));
+    let timestamp = U256::from_big_endian(&utils::unwrap_success(result));
 
     // Check time is correct.
     // The `+1`  is needed here because the runner increments the context
@@ -517,12 +511,12 @@ fn test_timestamp() {
 #[test]
 fn test_override_state() {
     let (mut runner, mut account1, viewer_address) = initialize_transfer();
-    let account1_address = test_utils::address_from_secret_key(&account1.secret_key);
-    let mut account2 = test_utils::Signer::random();
-    let account2_address = test_utils::address_from_secret_key(&account2.secret_key);
+    let account1_address = utils::address_from_secret_key(&account1.secret_key);
+    let mut account2 = utils::Signer::random();
+    let account2_address = utils::address_from_secret_key(&account2.secret_key);
     runner.create_address(account2_address, INITIAL_BALANCE, INITIAL_NONCE.into());
 
-    let contract = test_utils::solidity::ContractConstructor::compile_from_source(
+    let contract = utils::solidity::ContractConstructor::compile_from_source(
         "src/tests/res",
         "target/solidity_build",
         "poster.sol",
@@ -542,13 +536,13 @@ fn test_override_state() {
             }
         })
         .unwrap();
-    let address = Address::try_from_slice(&test_utils::unwrap_success(result)).unwrap();
+    let address = Address::try_from_slice(&utils::unwrap_success(result)).unwrap();
     let contract = contract.deployed_at(address);
 
     // define functions to interact with the contract
-    let get_address = |runner: &test_utils::AuroraRunner| {
+    let get_address = |runner: &utils::AuroraRunner| {
         let result = runner
-            .view_call(&test_utils::as_view_call(
+            .view_call(&utils::as_view_call(
                 contract.call_method_without_args("get", U256::zero()),
                 viewer_address,
             ))
@@ -559,7 +553,7 @@ fn test_override_state() {
         }
     };
 
-    let post_address = |runner: &mut test_utils::AuroraRunner, signer: &mut test_utils::Signer| {
+    let post_address = |runner: &mut utils::AuroraRunner, signer: &mut utils::Signer| {
         let result = runner
             .submit_with_signer(signer, |nonce| {
                 contract.call_method_with_args(
@@ -586,7 +580,7 @@ fn test_override_state() {
 fn test_num_wasm_functions() {
     // Counts the number of functions in our wasm output.
     // See https://github.com/near/nearcore/issues/4814 for context
-    let runner = test_utils::deploy_evm();
+    let runner = utils::deploy_runner();
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
@@ -603,126 +597,121 @@ fn test_num_wasm_functions() {
 fn test_eth_transfer_success() {
     // set up Aurora runner and accounts
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
     // validate pre-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // perform transfer
     runner
         .submit_with_signer(&mut source_account, |nonce| {
-            test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce)
+            utils::transfer(dest_address, TRANSFER_AMOUNT, nonce)
         })
         .unwrap();
 
     // validate post-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE - TRANSFER_AMOUNT,
         (INITIAL_NONCE + 1).into(),
     );
-    test_utils::validate_address_balance_and_nonce(
-        &runner,
-        dest_address,
-        TRANSFER_AMOUNT,
-        0.into(),
-    );
+    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into());
 }
 
 /// Tests the case where the transfer amount is larger than the address balance
 #[test]
 fn test_eth_transfer_insufficient_balance() {
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
     // validate pre-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
     let result = runner
         .submit_with_signer(&mut source_account, |nonce| {
             // try to transfer more than we have
-            test_utils::transfer(dest_address, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
+            utils::transfer(dest_address, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
         })
         .unwrap();
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         // the nonce is still incremented even though the transfer failed
         (INITIAL_NONCE + 1).into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 }
 
 /// Tests the case where the nonce on the transaction does not match the address
 #[test]
 fn test_eth_transfer_incorrect_nonce() {
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
     // validate pre-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
     let error = runner
         .submit_with_signer(&mut source_account, |nonce| {
             // creating transaction with incorrect nonce
-            test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce + 1)
+            utils::transfer(dest_address, TRANSFER_AMOUNT, nonce + 1)
         })
         .unwrap_err();
     assert_eq!(error.kind, EngineErrorKind::IncorrectNonce);
 
     // validate post-state (which is the same as pre-state in this case)
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 }
 
 #[test]
 fn test_eth_transfer_not_enough_gas() {
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
-        let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
+        let mut tx = utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
         tx.gas_limit = 10_000.into(); // this is not enough gas
         tx
     };
 
     // validate pre-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
     let error = runner
@@ -731,34 +720,34 @@ fn test_eth_transfer_not_enough_gas() {
     assert_eq!(error.kind, EngineErrorKind::IntrinsicGasNotMet);
 
     // validate post-state (which is the same as pre-state in this case)
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 }
 
 #[test]
 fn test_transfer_charging_gas_success() {
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
-        let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
+        let mut tx = utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
         tx.gas_limit = 30_000.into();
         tx.gas_price = GAS_PRICE.into();
         tx
     };
 
     // validate pre-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // do transfer
     let result = runner
@@ -773,19 +762,19 @@ fn test_transfer_charging_gas_success() {
     );
 
     // validate post-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         expected_source_balance,
         (INITIAL_NONCE + 1).into(),
     );
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         dest_address,
         expected_dest_balance,
         0.into(),
     );
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         relayer_address,
         expected_relayer_balance,
@@ -796,9 +785,9 @@ fn test_transfer_charging_gas_success() {
 #[test]
 fn test_eth_transfer_charging_gas_not_enough_balance() {
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
-        let mut tx = test_utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
+        let mut tx = utils::transfer(dest_address, TRANSFER_AMOUNT, nonce);
         // With this gas limit and price the account does not
         // have enough balance to cover the gas cost
         tx.gas_limit = 3_000_000.into();
@@ -807,13 +796,13 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     };
 
     // validate pre-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // attempt transfer
     let error = runner
@@ -829,26 +818,26 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
         runner.context.predecessor_account_id.as_ref().as_bytes(),
     );
 
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         // nonce is still not incremented since the transaction was invalid
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
-    test_utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
 }
 
-pub fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
+pub fn initialize_transfer() -> (utils::AuroraRunner, utils::Signer, Address) {
     // set up Aurora runner and accounts
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
-    let source_address = test_utils::address_from_secret_key(&source_account);
+    let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
-    let dest_address = test_utils::address_from_secret_key(&SecretKey::random(&mut rng));
-    let mut signer = test_utils::Signer::new(source_account);
+    let dest_address = utils::address_from_secret_key(&SecretKey::random(&mut rng));
+    let mut signer = utils::Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;
 
     (runner, signer, dest_address)
@@ -856,7 +845,7 @@ pub fn initialize_transfer() -> (test_utils::AuroraRunner, test_utils::Signer, A
 
 #[test]
 fn check_selector() {
-    // Selector to call mint function in ERC 20 contract
+    // Selector to call mint function in ERC-20 contract
     //
     // keccak("mint(address,uint256)".as_bytes())[..4];
     use sha3::Digest;
@@ -867,7 +856,7 @@ fn check_selector() {
 
 #[test]
 fn test_block_hash() {
-    let runner = test_utils::AuroraRunner::default();
+    let runner = utils::AuroraRunner::default();
     let chain_id = {
         let number = crate::prelude::U256::from(runner.chain_id);
         crate::prelude::u256_to_arr(&number)
@@ -883,7 +872,7 @@ fn test_block_hash() {
 
 #[test]
 fn test_block_hash_api() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let block_height: u64 = 10;
     let outcome = runner
         .call(
@@ -903,7 +892,7 @@ fn test_block_hash_api() {
 #[test]
 fn test_block_hash_contract() {
     let (mut runner, mut source_account, _) = initialize_transfer();
-    let test_constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+    let test_constructor = utils::solidity::ContractConstructor::compile_from_source(
         ["src", "tests", "res"].iter().collect::<PathBuf>(),
         Path::new("target").join("solidity_build"),
         "blockhash.sol",
@@ -922,12 +911,12 @@ fn test_block_hash_contract() {
         })
         .unwrap();
 
-    test_utils::panic_on_fail(result.status);
+    utils::panic_on_fail(result.status);
 }
 
 #[test]
 fn test_ft_metadata() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let account_id: String = runner.context.signer_account_id.clone().into();
     let outcome = runner.call("ft_metadata", &account_id, Vec::new()).unwrap();
     let metadata =
@@ -937,100 +926,25 @@ fn test_ft_metadata() {
     assert_eq!(metadata, FungibleTokenMetadata::default());
 }
 
-// Same as `test_eth_transfer_insufficient_balance` above, except runs through
-// `near-sdk-sim` instead of `near-vm-runner`. This is important because `near-sdk-sim`
-// has more production logic, in particular, state revert on contract panic.
-// TODO: should be able to generalize the `call` backend of `AuroraRunner` so that this
-//       test does not need to be written twice.
-#[test]
-fn test_eth_transfer_insufficient_balance_sim() {
-    let (aurora, mut signer, address) = initialize_evm_sim();
-
-    // Run transaction which will fail (transfer more than current balance)
-    let nonce = signer.use_nonce();
-    let tx = test_utils::transfer(
-        Address::new(H160([1; 20])),
-        INITIAL_BALANCE + INITIAL_BALANCE,
-        nonce.into(),
-    );
-    let signed_tx = test_utils::sign_transaction(
-        tx,
-        Some(test_utils::AuroraRunner::default().chain_id),
-        &signer.secret_key,
-    );
-    let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
-    let result = match call_result.status() {
-        ExecutionStatus::SuccessValue(bytes) => {
-            use borsh::BorshDeserialize;
-            SubmitResult::try_from_slice(&bytes).unwrap()
-        }
-        other => panic!("Unexpected status {other:?}"),
-    };
-    assert_eq!(result.status, TransactionStatus::OutOfFund);
-
-    // validate post-state
-    assert_eq!(
-        query_address_sim(&address, "get_nonce", &aurora),
-        U256::from(INITIAL_NONCE + 1),
-    );
-    assert_eq!(
-        query_address_sim(&address, "get_balance", &aurora),
-        INITIAL_BALANCE.raw(),
-    );
-}
-
-// Same as `test_eth_transfer_charging_gas_not_enough_balance` but run through `near-sdk-sim`.
-#[test]
-fn test_eth_transfer_charging_gas_not_enough_balance_sim() {
-    let (aurora, mut signer, address) = initialize_evm_sim();
-
-    // Run transaction which will fail (not enough balance to cover gas)
-    let nonce = signer.use_nonce();
-    let mut tx = test_utils::transfer(Address::new(H160([1; 20])), TRANSFER_AMOUNT, nonce.into());
-    tx.gas_limit = 3_000_000.into();
-    tx.gas_price = GAS_PRICE.into();
-    let signed_tx = test_utils::sign_transaction(
-        tx,
-        Some(test_utils::AuroraRunner::default().chain_id),
-        &signer.secret_key,
-    );
-    let call_result = aurora.call("submit", rlp::encode(&signed_tx).as_ref());
-    let outcome = call_result.outcome();
-
-    assert!(matches!(&outcome.status, ExecutionStatus::Failure(
-        TxExecutionError::ActionError(e)) if e.to_string().contains("ERR_OUT_OF_FUND")
-    ));
-
-    // validate post-state
-    assert_eq!(
-        query_address_sim(&address, "get_nonce", &aurora),
-        INITIAL_NONCE.into(), // nonce hasn't been changed because an error occurs
-    );
-    assert_eq!(
-        query_address_sim(&address, "get_balance", &aurora),
-        INITIAL_BALANCE.raw(),
-    );
-}
-
 /// Tests transfer Eth from one account to another with custom argument `max_gas_price`.
 #[test]
 fn test_eth_transfer_with_max_gas_price() {
     // set up Aurora runner and accounts
     let (mut runner, source_account, dest_address) = initialize_transfer();
-    let source_address = test_utils::address_from_secret_key(&source_account.secret_key);
+    let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
     // validate pre-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );
-    test_utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
 
     // perform transfer
     let max_gas_price = 5;
-    let mut transaction = test_utils::transfer(dest_address, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    let mut transaction = utils::transfer(dest_address, TRANSFER_AMOUNT, INITIAL_NONCE.into());
     transaction.gas_price = 10.into();
     transaction.gas_limit = 30_000.into();
 
@@ -1040,23 +954,18 @@ fn test_eth_transfer_with_max_gas_price() {
 
     let fee = u128::from(result.gas_used) * max_gas_price;
     // validate post-state
-    test_utils::validate_address_balance_and_nonce(
+    utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE - TRANSFER_AMOUNT - Wei::new_u128(fee),
         (INITIAL_NONCE + 1).into(),
     );
-    test_utils::validate_address_balance_and_nonce(
-        &runner,
-        dest_address,
-        TRANSFER_AMOUNT,
-        0.into(),
-    );
+    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into());
 }
 
 #[test]
 fn test_set_owner() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
     // set owner args
@@ -1087,7 +996,7 @@ fn test_set_owner() {
 
 #[test]
 fn test_set_owner_fail_on_same_owner() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
     // set owner args
@@ -1109,7 +1018,7 @@ fn test_set_owner_fail_on_same_owner() {
 
 #[test]
 fn test_set_upgrade_delay_blocks() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
     // set upgrade_delay_blocks args
@@ -1140,37 +1049,107 @@ fn test_set_upgrade_delay_blocks() {
     assert_eq!(result.upgrade_delay_blocks, 2);
 }
 
-fn initialize_evm_sim() -> (state_migration::AuroraAccount, test_utils::Signer, Address) {
-    let aurora = state_migration::deploy_evm();
-    let signer = test_utils::Signer::random();
-    let address = test_utils::address_from_secret_key(&signer.secret_key);
+mod workspace {
+    use crate::prelude::{Address, U256};
+    use crate::tests::sanity::{GAS_PRICE, INITIAL_BALANCE, INITIAL_NONCE, TRANSFER_AMOUNT};
+    use crate::utils;
+    use aurora_engine_types::parameters::engine::TransactionStatus;
+    use aurora_engine_workspace::EngineContract;
 
-    let args = (address, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64());
-    aurora
-        .call("mint_account", &args.try_to_vec().unwrap())
-        .assert_success();
+    // Same as `test_eth_transfer_insufficient_balance` above, except runs through
+    // `aurora-engine-workspace` instead of `near-vm-runner`. This is important because
+    // `aurora-engine-workspace` has more production logic, in particular, state revert on
+    // contract panic.
+    // TODO: should be able to generalize the `call` backend of `AuroraRunner` so that this
+    //       test does not need to be written twice.
+    #[tokio::test]
+    async fn test_eth_transfer_insufficient_balance() {
+        let (aurora, mut signer, address) = initialize_engine().await;
 
-    // validate pre-state
-    assert_eq!(
-        query_address_sim(&address, "get_nonce", &aurora),
-        U256::from(INITIAL_NONCE),
-    );
-    assert_eq!(
-        query_address_sim(&address, "get_balance", &aurora),
-        INITIAL_BALANCE.raw(),
-    );
+        // Run transaction which will fail (transfer more than current balance)
+        let nonce = signer.use_nonce();
+        let tx = utils::transfer(
+            Address::from_array([1; 20]),
+            INITIAL_BALANCE + INITIAL_BALANCE,
+            nonce.into(),
+        );
+        let signed_tx = utils::sign_transaction(
+            tx,
+            Some(utils::AuroraRunner::default().chain_id),
+            &signer.secret_key,
+        );
+        let result = aurora
+            .submit(rlp::encode(&signed_tx).to_vec())
+            .transact()
+            .await
+            .unwrap()
+            .into_value();
+        assert_eq!(result.status, TransactionStatus::OutOfFund);
 
-    (aurora, signer, address)
-}
+        // validate post-state
+        assert_eq!(
+            aurora.get_nonce(address).await.unwrap().result,
+            (INITIAL_NONCE + 1).into(),
+        );
+        assert_eq!(
+            aurora.get_balance(address).await.unwrap().result,
+            INITIAL_BALANCE.raw(),
+        );
+    }
 
-fn query_address_sim(
-    address: &Address,
-    method: &str,
-    aurora: &state_migration::AuroraAccount,
-) -> U256 {
-    let x = aurora.call(method, address.as_bytes());
-    match &x.outcome().status {
-        ExecutionStatus::SuccessValue(b) => U256::from_big_endian(b),
-        other => panic!("Unexpected outcome: {other:?}"),
+    // Same as `test_eth_transfer_charging_gas_not_enough_balance` but run through
+    // `aurora-engine-workspace`.
+    #[tokio::test]
+    async fn test_eth_transfer_charging_gas_not_enough_balance() {
+        let (aurora, mut signer, address) = initialize_engine().await;
+
+        // Run transaction which will fail (not enough balance to cover gas)
+        let nonce = signer.use_nonce();
+        let mut tx = utils::transfer(Address::from_array([1; 20]), TRANSFER_AMOUNT, nonce.into());
+        tx.gas_limit = 3_000_000.into();
+        tx.gas_price = GAS_PRICE.into();
+        let signed_tx = utils::sign_transaction(
+            tx,
+            Some(utils::AuroraRunner::default().chain_id),
+            &signer.secret_key,
+        );
+        let error = aurora
+            .submit(rlp::encode(&signed_tx).to_vec())
+            .transact()
+            .await
+            .err()
+            .unwrap();
+        assert!(error.to_string().contains("ERR_OUT_OF_FUND"));
+
+        // validate post-state
+        assert_eq!(
+            aurora.get_nonce(address).await.unwrap().result,
+            INITIAL_NONCE.into(), // nonce hasn't been changed because an error occurs
+        );
+        assert_eq!(
+            aurora.get_balance(address).await.unwrap().result,
+            INITIAL_BALANCE.raw(),
+        );
+    }
+    async fn initialize_engine() -> (EngineContract, utils::Signer, Address) {
+        let engine = utils::workspace::deploy_engine().await;
+        let signer = utils::Signer::random();
+        let address = utils::address_from_secret_key(&signer.secret_key);
+        let result = engine
+            .mint_account(address, INITIAL_NONCE, INITIAL_BALANCE.raw().low_u64())
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+        assert!(result.is_success());
+
+        // validate pre-state
+        let nonce = engine.get_nonce(address).await.unwrap();
+        assert_eq!(nonce.result, U256::from(INITIAL_NONCE),);
+
+        let balance = engine.get_balance(address).await.unwrap();
+        assert_eq!(balance.result, INITIAL_BALANCE.raw(),);
+
+        (engine, signer, address)
     }
 }

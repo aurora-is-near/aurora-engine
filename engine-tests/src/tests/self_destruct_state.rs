@@ -1,13 +1,13 @@
-use crate::test_utils;
-use crate::test_utils::self_destruct::{
+use crate::utils;
+use crate::utils::solidity::self_destruct::{
     SelfDestruct, SelfDestructConstructor, SelfDestructFactory, SelfDestructFactoryConstructor,
 };
 
 /// Check that account state should be properly removed after calling selfdestruct
 #[test]
 fn test_self_destruct_reset_state() {
-    let mut signer = test_utils::Signer::random();
-    let mut runner = test_utils::deploy_evm();
+    let mut signer = utils::Signer::random();
+    let mut runner = utils::deploy_runner();
 
     let sd_factory_ctr = SelfDestructFactoryConstructor::load();
     let nonce = signer.use_nonce();
@@ -40,8 +40,8 @@ fn test_self_destruct_reset_state() {
 
 #[test]
 fn test_self_destruct_with_submit() {
-    let mut signer = test_utils::Signer::random();
-    let mut runner = test_utils::deploy_evm();
+    let mut signer = utils::Signer::random();
+    let mut runner = utils::deploy_runner();
 
     let sd_factory_ctr = SelfDestructFactoryConstructor::load();
     let nonce = signer.use_nonce();
