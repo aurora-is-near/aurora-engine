@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.3] 2023-07-19
+
+### Changes
+
+- It is now possible for anyone to call the contract method `deploy_upgrade` by [@joshuajbouw]. ([#794])
+
+[#794]: https://github.com/aurora-is-near/aurora-engine/pull/794
+
 ## [2.9.2] 2023-06-22
 
 ### Fixes
@@ -421,7 +429,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.2...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.3...develop
+[2.9.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.2...2.9.3 
 [2.9.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.1...2.9.2
 [2.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.0...2.9.1
 [2.9.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.8.0...2.9.0 
