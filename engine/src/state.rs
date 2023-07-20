@@ -2,6 +2,7 @@ use crate::parameters::{LegacyNewCallArgs, NewCallArgs, NewCallArgsV2};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::parameters::engine::NewCallArgsV3;
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use aurora_engine_types::{Cow, Vec};
 
@@ -23,10 +24,12 @@ pub struct EngineState {
     pub upgrade_delay_blocks: u64,
     /// Flag to pause and unpause the engine.
     pub is_paused: bool,
+    /// Relayer key manager.
+    pub key_manager: Option<AccountId>,
 }
 
 impl EngineState {
-    pub fn borsh_serialize(&self) -> Result<Vec<u8>, error::EngineStateError> {
+    pub fn borsh_serialize(&self) -> Result<Vec<u8>, EngineStateError> {
         let borshable: BorshableEngineState = self.into();
         borshable
             .try_to_vec()
@@ -34,10 +37,7 @@ impl EngineState {
     }
 
     /// Deserialization with lazy state migration.
-    pub fn try_from_slice<I: IO + Copy>(
-        bytes: &[u8],
-        io: &I,
-    ) -> Result<Self, error::EngineStateError> {
+    pub fn try_from_slice<I: IO + Copy>(bytes: &[u8], io: &I) -> Result<Self, EngineStateError> {
         let Ok(borshable) = BorshableEngineState::try_from_slice(bytes) else {
             let legacy = BorshableEngineStateV1::try_from_slice(bytes)
                 .map_err(|_| EngineStateError::DeserializationFailed)?;
@@ -80,6 +80,7 @@ pub struct BorshableEngineStateV3<'a> {
     pub owner_id: Cow<'a, AccountId>,
     pub upgrade_delay_blocks: u64,
     pub is_paused: bool,
+    pub key_manager: Option<Cow<'a, AccountId>>,
 }
 
 impl<'a> From<&'a EngineState> for BorshableEngineState<'a> {
@@ -89,6 +90,7 @@ impl<'a> From<&'a EngineState> for BorshableEngineState<'a> {
             owner_id: Cow::Borrowed(&state.owner_id),
             upgrade_delay_blocks: state.upgrade_delay_blocks,
             is_paused: state.is_paused,
+            key_manager: state.key_manager.as_ref().map(Cow::Borrowed),
         })
     }
 }
@@ -110,6 +112,7 @@ impl<'a> From<BorshableEngineStateV1<'a>> for EngineState {
             owner_id: state.owner_id.into_owned(),
             upgrade_delay_blocks: state.upgrade_delay_blocks,
             is_paused: false,
+            key_manager: None,
         }
     }
 }
@@ -121,6 +124,7 @@ impl<'a> From<BorshableEngineStateV2<'a>> for EngineState {
             owner_id: state.owner_id.into_owned(),
             upgrade_delay_blocks: state.upgrade_delay_blocks,
             is_paused: false,
+            key_manager: None,
         }
     }
 }
@@ -132,6 +136,7 @@ impl<'a> From<BorshableEngineStateV3<'a>> for EngineState {
             owner_id: state.owner_id.into_owned(),
             upgrade_delay_blocks: state.upgrade_delay_blocks,
             is_paused: state.is_paused,
+            key_manager: state.key_manager.map(Cow::into_owned),
         }
     }
 }
@@ -143,6 +148,7 @@ impl From<LegacyNewCallArgs> for EngineState {
             owner_id: args.owner_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
             is_paused: false,
+            key_manager: None,
         }
     }
 }
@@ -154,6 +160,19 @@ impl From<NewCallArgsV2> for EngineState {
             owner_id: args.owner_id,
             upgrade_delay_blocks: args.upgrade_delay_blocks,
             is_paused: false,
+            key_manager: None,
+        }
+    }
+}
+
+impl From<NewCallArgsV3> for EngineState {
+    fn from(args: NewCallArgsV3) -> Self {
+        Self {
+            chain_id: args.chain_id,
+            owner_id: args.owner_id,
+            upgrade_delay_blocks: args.upgrade_delay_blocks,
+            is_paused: false,
+            key_manager: Some(args.key_manager),
         }
     }
 }
@@ -163,6 +182,7 @@ impl From<NewCallArgs> for EngineState {
         match args {
             NewCallArgs::V1(args) => args.into(),
             NewCallArgs::V2(args) => args.into(),
+            NewCallArgs::V3(args) => args.into(),
         }
     }
 }

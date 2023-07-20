@@ -1,12 +1,13 @@
 use aurora_engine::deposit_event::TokenMessageData;
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
+use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::types::{Address, Balance, Fee, NEP141Wei, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
-use borsh::{BorshDeserialize, BorshSerialize};
 use engine_standalone_storage::sync;
 
-use crate::test_utils::{self, standalone::StandaloneRunner};
+use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
+use crate::utils::{self, standalone::StandaloneRunner};
 
 #[test]
 fn test_consume_block_message() {
@@ -135,7 +136,7 @@ fn test_consume_deploy_message() {
     let (mut runner, block_message) = initialize();
 
     let code = b"hello_world!".to_vec();
-    let input = test_utils::create_deploy_transaction(code.clone(), U256::zero()).data;
+    let input = utils::create_deploy_transaction(code.clone(), U256::zero()).data;
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
@@ -219,8 +220,8 @@ fn test_consume_deploy_erc20_message() {
     runner.env.block_height += 1;
     runner.env.signer_account_id = "some_account.near".parse().unwrap();
     runner.env.predecessor_account_id = token;
-    test_utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
-    let block_hash = test_utils::standalone::mocks::compute_block_hash(runner.env.block_height);
+    utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
+    let block_hash = utils::standalone::mocks::compute_block_hash(runner.env.block_height);
 
     let args = aurora_engine::parameters::NEP141FtOnTransferArgs {
         sender_id: "mr_money_bags.near".parse().unwrap(),
@@ -247,16 +248,16 @@ fn test_consume_deploy_erc20_message() {
     .unwrap();
 
     // Check balance is correct
-    let deployed_token = test_utils::erc20::ERC20(
-        test_utils::erc20::ERC20Constructor::load()
+    let deployed_token = ERC20(
+        ERC20Constructor::load()
             .0
             .deployed_at(Address::try_from_slice(&erc20_address).unwrap()),
     );
-    let signer = test_utils::Signer::random();
+    let signer = utils::Signer::random();
     let tx = deployed_token.balance_of(dest_address, signer.nonce.into());
     let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
     assert_eq!(
-        U256::from_big_endian(&test_utils::unwrap_success(result)).low_u128(),
+        U256::from_big_endian(&utils::unwrap_success(result)).low_u128(),
         mint_amount
     );
 }
@@ -322,8 +323,8 @@ fn test_consume_call_message() {
     runner.env.block_height += 1;
     runner.env.signer_account_id = caller.parse().unwrap();
     runner.env.predecessor_account_id = caller.parse().unwrap();
-    test_utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
-    let block_hash = test_utils::standalone::mocks::compute_block_hash(runner.env.block_height);
+    utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
+    let block_hash = utils::standalone::mocks::compute_block_hash(runner.env.block_height);
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
@@ -358,23 +359,23 @@ fn test_consume_call_message() {
 fn test_consume_submit_message() {
     let (mut runner, _) = initialize();
 
-    let mut signer = test_utils::Signer::random();
+    let mut signer = utils::Signer::random();
     let initial_balance = Wei::new_u64(800_000);
     let transfer_amount = Wei::new_u64(115_321);
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let recipient_address = Address::new(H160([1u8; 20]));
     runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);
 
     runner.env.block_height += 1;
-    test_utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
-    let block_hash = test_utils::standalone::mocks::compute_block_hash(runner.env.block_height);
-    let transaction = test_utils::transfer(
+    utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
+    let block_hash = utils::standalone::mocks::compute_block_hash(runner.env.block_height);
+    let transaction = utils::transfer(
         recipient_address,
         transfer_amount,
         signer.use_nonce().into(),
     );
     let signed_transaction =
-        test_utils::sign_transaction(transaction, Some(runner.chain_id), &signer.secret_key);
+        utils::sign_transaction(transaction, Some(runner.chain_id), &signer.secret_key);
     let eth_transaction =
         crate::prelude::transactions::EthTransactionKind::Legacy(signed_transaction);
 
@@ -405,7 +406,7 @@ fn test_consume_submit_message() {
 }
 
 fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine::proof::Proof {
-    let eth_custodian_address = test_utils::standalone::mocks::ETH_CUSTODIAN_ADDRESS;
+    let eth_custodian_address = utils::standalone::mocks::ETH_CUSTODIAN_ADDRESS;
 
     let fee = Fee::new(NEP141Wei::new(0));
     let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
@@ -463,7 +464,7 @@ fn simple_transfer_args(
 
 fn sample_block() -> sync::types::BlockMessage {
     let block_height = 101;
-    let block_hash = test_utils::standalone::mocks::compute_block_hash(block_height);
+    let block_hash = utils::standalone::mocks::compute_block_hash(block_height);
 
     sync::types::BlockMessage {
         height: block_height,
@@ -486,7 +487,7 @@ fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
     )
     .unwrap();
 
-    let env = test_utils::standalone::mocks::default_env(block_message.height);
+    let env = utils::standalone::mocks::default_env(block_message.height);
     runner.env = env;
 
     (runner, block_message)

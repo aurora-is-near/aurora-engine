@@ -1,4 +1,5 @@
-use crate::test_utils;
+use crate::utils;
+use crate::utils::solidity::erc20::ERC20;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::U256;
@@ -12,8 +13,7 @@ fn test_multisender_eth() {
     let mut multi_send_eth = |num_addr: usize| -> (u64, u64) {
         let destinations: Vec<(Address, U256)> = (0..num_addr)
             .map(|_| {
-                let address =
-                    test_utils::address_from_secret_key(&test_utils::Signer::random().secret_key);
+                let address = utils::address_from_secret_key(&utils::Signer::random().secret_key);
                 let amount = Wei::from_eth(U256::one()).unwrap().raw();
                 (address, amount)
             })
@@ -24,7 +24,7 @@ fn test_multisender_eth() {
                 call_contract(contract_address, nonce, send_eth_data(&destinations))
             })
             .unwrap();
-        test_utils::unwrap_success_slice(&result);
+        utils::unwrap_success_slice(&result);
 
         (result.gas_used, profile.all_gas())
     };
@@ -37,37 +37,36 @@ fn test_multisender_eth() {
 #[test]
 fn test_multisender_erc20() {
     let (mut runner, mut signer, contract_address) = initialize();
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
 
     let erc20 = {
-        let constructor = test_utils::erc20::ERC20Constructor::load();
+        let constructor = utils::solidity::erc20::ERC20Constructor::load();
         let nonce = signer.use_nonce();
         let contract = runner.deploy_contract(
             &signer.secret_key,
             |c| c.deploy("TEST_A", "AAA", nonce.into()),
             constructor,
         );
-        test_utils::erc20::ERC20(contract)
+        ERC20(contract)
     };
     let result = runner
         .submit_with_signer(&mut signer, |nonce| {
             erc20.mint(signer_address, U256::from(u128::MAX), nonce)
         })
         .unwrap();
-    test_utils::unwrap_success_slice(&result);
+    utils::unwrap_success_slice(&result);
 
     let result = runner
         .submit_with_signer(&mut signer, |nonce| {
             erc20.approve(contract_address, U256::from(u128::MAX), nonce)
         })
         .unwrap();
-    test_utils::unwrap_success_slice(&result);
+    utils::unwrap_success_slice(&result);
 
     let mut multi_send_erc20 = |num_addr: usize| -> (u64, u64) {
         let destinations: Vec<(Address, U256)> = (0..num_addr)
             .map(|_| {
-                let address =
-                    test_utils::address_from_secret_key(&test_utils::Signer::random().secret_key);
+                let address = utils::address_from_secret_key(&utils::Signer::random().secret_key);
                 let amount = U256::from(1);
                 (address, amount)
             })
@@ -82,7 +81,7 @@ fn test_multisender_erc20() {
                 )
             })
             .unwrap();
-        test_utils::unwrap_success_slice(&result);
+        utils::unwrap_success_slice(&result);
 
         (result.gas_used, profile.all_gas())
     };
@@ -121,16 +120,16 @@ fn send_eth_data(amounts: &[(Address, U256)]) -> Vec<u8> {
     result
 }
 
-fn initialize() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
-    let mut runner = test_utils::deploy_evm();
+fn initialize() -> (utils::AuroraRunner, utils::Signer, Address) {
+    let mut runner = utils::deploy_runner();
     runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
 
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
-    let source_address = test_utils::address_from_secret_key(&source_account);
+    let source_address = utils::address_from_secret_key(&source_account);
     let initial_balance = Wei::new(U256::from(u128::MAX));
     runner.create_address(source_address, initial_balance, INITIAL_NONCE.into());
-    let mut signer = test_utils::Signer::new(source_account);
+    let mut signer = utils::Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;
 
     let deploy_code = hex::decode(
@@ -141,23 +140,22 @@ fn initialize() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
     .unwrap();
     let result = runner
         .submit_with_signer(&mut signer, |nonce| {
-            let mut tx = test_utils::create_deploy_transaction(Vec::new(), nonce);
+            let mut tx = utils::create_deploy_transaction(Vec::new(), nonce);
             tx.data = deploy_code;
             tx
         })
         .unwrap();
-    let contract_address =
-        Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
+    let contract_address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
 
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let result = runner
         .submit_with_signer(&mut signer, |nonce| {
-            let mut tx = test_utils::transfer(contract_address, Wei::zero(), nonce);
+            let mut tx = utils::transfer(contract_address, Wei::zero(), nonce);
             tx.data = initialize_data(signer_address);
             tx
         })
         .unwrap();
-    test_utils::unwrap_success(result);
+    utils::unwrap_success(result);
 
     (runner, signer, contract_address)
 }
@@ -175,7 +173,7 @@ fn initialize_data(owner_address: Address) -> Vec<u8> {
 }
 
 fn call_contract(contract_address: Address, nonce: U256, data: Vec<u8>) -> TransactionLegacy {
-    let mut tx = test_utils::transfer(contract_address, Wei::zero(), nonce);
+    let mut tx = utils::transfer(contract_address, Wei::zero(), nonce);
     tx.data = data;
     tx
 }

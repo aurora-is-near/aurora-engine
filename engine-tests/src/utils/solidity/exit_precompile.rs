@@ -2,7 +2,7 @@ use crate::prelude::{
     make_address, parameters::SubmitResult, transactions::legacy::TransactionLegacy, Address, Wei,
     U256,
 };
-use crate::test_utils::{self, solidity, AuroraRunner, Signer};
+use crate::utils::{self, solidity, AuroraRunner, Signer};
 use aurora_engine::engine::EngineError;
 
 pub struct TesterConstructor(pub solidity::ContractConstructor);
@@ -36,10 +36,10 @@ impl TesterConstructor {
 
         TransactionLegacy {
             nonce: nonce.into(),
-            gas_price: U256::default(),
+            gas_price: U256::zero(),
             gas_limit: U256::from(DEPLOY_CONTRACT_GAS),
             to: None,
-            value: Wei::default(),
+            value: Wei::zero(),
             data,
         }
     }
@@ -114,7 +114,7 @@ impl Tester {
                 &[ethabi::Token::String(name)],
             )
             .unwrap();
-        let output_bytes = test_utils::unwrap_success(result);
+        let output_bytes = utils::unwrap_success(result);
         let output = ethabi::decode(output_type, &output_bytes).unwrap();
 
         match &output[..] {

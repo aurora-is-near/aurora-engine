@@ -1,5 +1,5 @@
 use crate::prelude::U256;
-use crate::test_utils::{self, solidity, AuroraRunner, Signer};
+use crate::utils::{self, solidity, AuroraRunner, Signer};
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::H256;
@@ -66,7 +66,7 @@ impl Random {
         };
 
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
-        let result = test_utils::unwrap_success(result);
+        let result = utils::unwrap_success(result);
 
         let mut random_seed = [0; 32];
         random_seed.copy_from_slice(result.as_slice());

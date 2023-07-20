@@ -135,6 +135,12 @@ pub enum TransactionKind {
     PauseContract,
     /// Resume the contract
     ResumeContract,
+    /// Set the relayer key manager
+    SetKeyManager(parameters::RelayerKeyManagerArgs),
+    /// Add a new relayer public function call access key
+    AddRelayerKey(parameters::RelayerKeyArgs),
+    /// Remove the relayer public function call access key
+    RemoveRelayerKey(parameters::RelayerKeyArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -360,6 +366,9 @@ impl TransactionKind {
             Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
             Self::PauseContract => Self::no_evm_execution("pause_contract"),
             Self::ResumeContract => Self::no_evm_execution("resume_contract"),
+            Self::SetKeyManager(_) => Self::no_evm_execution("set_key_manager"),
+            Self::AddRelayerKey(_) => Self::no_evm_execution("add_relayer_key"),
+            Self::RemoveRelayerKey(_) => Self::no_evm_execution("remove_relayer_key"),
         }
     }
 
@@ -531,6 +540,9 @@ enum BorshableTransactionKind<'a> {
     SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
     PauseContract,
     ResumeContract,
+    SetKeyManager(Cow<'a, parameters::RelayerKeyManagerArgs>),
+    AddRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
+    RemoveRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -579,6 +591,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             }
             TransactionKind::PauseContract => Self::PauseContract,
             TransactionKind::ResumeContract => Self::ResumeContract,
+            TransactionKind::SetKeyManager(x) => Self::SetKeyManager(Cow::Borrowed(x)),
+            TransactionKind::AddRelayerKey(x) => Self::AddRelayerKey(Cow::Borrowed(x)),
+            TransactionKind::RemoveRelayerKey(x) => Self::RemoveRelayerKey(Cow::Borrowed(x)),
         }
     }
 }
@@ -646,6 +661,11 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::PauseContract => Ok(Self::PauseContract),
             BorshableTransactionKind::ResumeContract => Ok(Self::ResumeContract),
+            BorshableTransactionKind::SetKeyManager(x) => Ok(Self::SetKeyManager(x.into_owned())),
+            BorshableTransactionKind::AddRelayerKey(x) => Ok(Self::AddRelayerKey(x.into_owned())),
+            BorshableTransactionKind::RemoveRelayerKey(x) => {
+                Ok(Self::RemoveRelayerKey(x.into_owned()))
+            }
         }
     }
 }
