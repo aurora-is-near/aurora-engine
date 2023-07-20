@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Enabled Shanghai Ethereum hard fork support by [@mandreyel]. ([#773])
 - Added ability to pause and resume the core functionality of the contract by [@Casuso]. ([#779])
-- Added function call keys to be used with relayers by [@alexsuss]. ([#792])
+- Added function call keys to be used with relayers by [@aleksuss]. ([#792])
 
 [#773]: https://github.com/aurora-is-near/aurora-engine/pull/773
 [#779]: https://github.com/aurora-is-near/aurora-engine/pull/779
