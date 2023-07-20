@@ -268,7 +268,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "2.9.2"
+version = "2.9.3"
 dependencies = [
  "aurora-engine-modexp",
  "aurora-engine-precompiles",
