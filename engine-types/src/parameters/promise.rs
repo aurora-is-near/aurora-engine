@@ -10,6 +10,13 @@ use borsh_compat::{self as borsh, maybestd::io, BorshDeserialize, BorshSerialize
 
 #[must_use]
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct PromiseArgsWithSender {
+    pub sender: [u8; 20],
+    pub args: PromiseArgs,
+}
+
+#[must_use]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub enum PromiseArgs {
     Create(PromiseCreateArgs),
     Callback(PromiseWithCallbackArgs),
@@ -310,11 +317,11 @@ pub struct RefundCallArgs {
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub enum CrossContractCallArgs {
     /// The promise is to be executed immediately (as part of the same NEAR transaction as the EVM call).
-    Eager(PromiseArgs),
+    Eager(PromiseArgsWithSender),
     /// The promise is to be stored in the router contract, and can be executed in a future transaction.
     /// The purpose of this is to expand how much NEAR gas can be made available to a cross contract call.
     /// For example, if an expensive EVM call ends with a NEAR cross contract call, then there may not be
     /// much gas left to perform it. In this case, the promise could be `Delayed` (stored in the router)
     /// and executed in a separate transaction with a fresh 300 Tgas available for it.
-    Delayed(PromiseArgs),
+    Delayed(PromiseArgsWithSender),
 }
