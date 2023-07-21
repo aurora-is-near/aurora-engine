@@ -113,10 +113,10 @@ mod contract {
     use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
     use aurora_engine_types::parameters::engine::errors::ParseArgsError;
     use aurora_engine_types::parameters::engine::StorageUnregisterArgs;
+    use aurora_engine_types::parameters::engine::{RelayerKeyArgs, RelayerKeyManagerArgs};
     use aurora_engine_types::parameters::silo::{
         FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
     };
-    use aurora_engine_types::parameters::engine::{RelayerKeyArgs, RelayerKeyManagerArgs};
     use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction};
 
     #[cfg(feature = "integration-test")]

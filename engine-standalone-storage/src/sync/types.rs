@@ -131,7 +131,7 @@ pub enum TransactionKind {
     /// Update the version of a deployed xcc-router contract
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
     FactorySetWNearAddress(Address),
-    FundXccSubAccound(FundXccArgs),
+    FundXccSubAccount(FundXccArgs),
     /// Pause the contract
     PauseContract,
     /// Resume the contract
@@ -142,7 +142,6 @@ pub enum TransactionKind {
     AddRelayerKey(parameters::RelayerKeyArgs),
     /// Remove the relayer public function call access key
     RemoveRelayerKey(parameters::RelayerKeyArgs),
-    FundXccSubAccount(FundXccArgs),
     /// Silo operations
     SetFixedGasCost(silo::FixedGasCostArgs),
     SetSiloParams(Option<silo::SiloParamsArgs>),
@@ -372,13 +371,12 @@ impl TransactionKind {
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
             Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
-            Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
+            Self::FundXccSubAccount(_) => Self::no_evm_execution("fund_xcc_sub_account"),
             Self::PauseContract => Self::no_evm_execution("pause_contract"),
             Self::ResumeContract => Self::no_evm_execution("resume_contract"),
             Self::SetKeyManager(_) => Self::no_evm_execution("set_key_manager"),
             Self::AddRelayerKey(_) => Self::no_evm_execution("add_relayer_key"),
             Self::RemoveRelayerKey(_) => Self::no_evm_execution("remove_relayer_key"),
-            Self::FundXccSubAccount(_) => Self::no_evm_execution("fund_xcc_sub_account"),
             Self::SetFixedGasCost(_) => Self::no_evm_execution("set_fixed_gas_cost"),
             Self::SetSiloParams(_) => Self::no_evm_execution("set_silo_params"),
             Self::AddEntryToWhitelist(_) => Self::no_evm_execution("add_entry_to_whitelist"),

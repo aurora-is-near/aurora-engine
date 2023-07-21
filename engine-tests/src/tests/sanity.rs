@@ -7,7 +7,6 @@ use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, Transac
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::H160;
-use evm::ExitFatal;
 use libsecp256k1::SecretKey;
 use rand::RngCore;
 use std::path::{Path, PathBuf};

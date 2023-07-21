@@ -360,7 +360,7 @@ fn test_transfer_erc20_token() {
     );
 }
 
-mod workspace {
+pub mod workspace {
     use super::build_input;
     use crate::prelude::{Address, Wei, WeiU256, U256};
     use crate::utils;

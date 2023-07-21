@@ -350,35 +350,35 @@ impl StandaloneRunner {
             utils::PAUSE_CONTRACT => {
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
                 let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::PauseContract;
 
                 let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
                 Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
                 ))
             }
             utils::RESUME_CONTRACT => {
                 let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
                 let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::ResumeContract;
 
                 let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 
                 Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
+                    TransactionStatus::Succeed(Vec::new()),
+                    0,
+                    Vec::new(),
                 ))
             }
             utils::SET_KEY_MANAGER => {
@@ -386,10 +386,12 @@ impl StandaloneRunner {
                 let call_args: RelayerKeyManagerArgs = serde_json::from_slice(&ctx.input)
                     .expect("Unable to parse input as RelayerKeyManagerArgs");
 
-                let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+                let mut tx_msg =
+                    Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
                 tx_msg.transaction = TransactionKind::SetKeyManager(call_args);
 
-                let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+                let outcome =
+                    sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
                 self.cumulative_diff.append(outcome.diff.clone());
                 storage::commit(storage, &outcome);
 

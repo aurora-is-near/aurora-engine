@@ -1,6 +1,9 @@
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawResult};
 use aurora_engine_types::parameters::engine::{StorageBalance, SubmitResult, TransactionStatus};
+use aurora_engine_types::parameters::silo::{
+    FixedGasCostArgs, SiloParamsArgs, WhitelistStatusArgs,
+};
 use aurora_engine_types::types::Address;
 use aurora_engine_types::{H256, U256};
 use near_sdk::json_types::U128;
@@ -39,6 +42,14 @@ impl_call_return![
     (CallSetKeyManager, Call::SetKeyManager),
     (CallAddRelayerKey, Call::AddRelayerKey),
     (CallRemoveRelayerKey, Call::RemoveRelayerKey),
+    (CallPauseContract, Call::PauseContract),
+    (CallResumeContract, Call::ResumeContract),
+    (CallSetFixedGasCost, Call::SetFixedGasCost),
+    (CallSetSiloParams, Call::SetSiloParams),
+    (CallSetWhitelistStatus, Call::SetWhitelistStatus),
+    (CallAddEntryToWhitelist, Call::AddEntryToWhitelist),
+    (CallAddEntryToWhitelistBatch, Call::AddEntryToWhitelistBatch),
+    (CallRemoveEntryFromWhitelist, Call::RemoveEntryFromWhitelist)
 ];
 
 impl_call_return![
@@ -78,7 +89,10 @@ impl_view_return![
     (ViewErc20FromNep141 => Address, View::Erc20FromNep141, borsh),
     (ViewNep141FromErc20 => AccountId, View::Nep141FromErc20, borsh),
     (ViewPausedFlags => u8, View::PausedFlags, borsh),
-    (ViewAccountsCounter => u64, View::AccountsCounter, borsh)
+    (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
+    (ViewGetFixedGasCost => FixedGasCostArgs, View::GetFixedGasCost, borsh),
+    (ViewGetSiloParams => SiloParamsArgs, View::GetSiloParams, borsh),
+    (ViewGetWhitelistStatus => WhitelistStatusArgs, View::GetWhitelistStatus, borsh)
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -115,6 +129,14 @@ pub(crate) enum Call {
     SetKeyManager,
     AddRelayerKey,
     RemoveRelayerKey,
+    PauseContract,
+    ResumeContract,
+    SetFixedGasCost,
+    SetSiloParams,
+    SetWhitelistStatus,
+    AddEntryToWhitelist,
+    AddEntryToWhitelistBatch,
+    RemoveEntryFromWhitelist,
 }
 
 impl AsRef<str> for Call {
@@ -151,6 +173,14 @@ impl AsRef<str> for Call {
             Call::SetKeyManager => "set_key_manager",
             Call::AddRelayerKey => "add_relayer_key",
             Call::RemoveRelayerKey => "remove_relayer_key",
+            Call::PauseContract => "pause_contract",
+            Call::ResumeContract => "resume_contract",
+            Call::SetFixedGasCost => "set_fixed_gas_cost",
+            Call::SetSiloParams => "set_silo_params",
+            Call::SetWhitelistStatus => "set_whitelist_status",
+            Call::AddEntryToWhitelist => "add_entry_to_whitelist",
+            Call::AddEntryToWhitelistBatch => "add_entry_to_whitelist_batch",
+            Call::RemoveEntryFromWhitelist => "remove_entry_from_whitelist",
         }
     }
 }
@@ -181,6 +211,9 @@ pub enum View {
     Erc20FromNep141,
     Nep141FromErc20,
     AccountsCounter,
+    GetFixedGasCost,
+    GetSiloParams,
+    GetWhitelistStatus,
 }
 
 impl AsRef<str> for View {
@@ -210,6 +243,9 @@ impl AsRef<str> for View {
             View::Erc20FromNep141 => "get_erc20_from_nep141",
             View::Nep141FromErc20 => "get_nep141_from_erc20",
             View::AccountsCounter => "get_accounts_counter",
+            View::GetFixedGasCost => "get_fixed_gas_cost",
+            View::GetSiloParams => "get_silo_params",
+            View::GetWhitelistStatus => "get_whitelist_status",
         }
     }
 }

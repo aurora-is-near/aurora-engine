@@ -1,16 +1,19 @@
 use crate::account::Account;
 use crate::node::Node;
 use crate::operation::{
-    CallAddRelayerKey, CallCall, CallDeployCode, CallDeployErc20Token, CallDeployUpgrade,
-    CallDeposit, CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
+    CallAddEntryToWhitelist, CallAddEntryToWhitelistBatch, CallAddRelayerKey, CallCall,
+    CallDeployCode, CallDeployErc20Token, CallDeployUpgrade, CallDeposit,
+    CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
     CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
-    CallNew, CallNewEthConnector, CallPausePrecompiles, CallRefundOnError, CallRegisterRelayer,
-    CallRemoveRelayerKey, CallResumePrecompiles, CallSetEthConnectorContractData,
-    CallSetKeyManager, CallSetPausedFlags, CallStageUpgrade, CallStateMigration,
-    CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit, CallWithdraw,
-    ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode,
-    ViewErc20FromNep141, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
-    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply, ViewIsUsedProof,
+    CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles, CallRefundOnError,
+    CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey, CallResumeContract,
+    CallResumePrecompiles, CallSetEthConnectorContractData, CallSetFixedGasCost, CallSetKeyManager,
+    CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus, CallStageUpgrade,
+    CallStateMigration, CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit,
+    CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId,
+    ViewCode, ViewErc20FromNep141, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
+    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
+    ViewGetFixedGasCost, ViewGetSiloParams, ViewGetWhitelistStatus, ViewIsUsedProof,
     ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags, ViewPausedPrecompiles,
     ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion, ViewView,
 };
@@ -20,6 +23,9 @@ use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Proof};
 use aurora_engine_types::parameters::engine::{
     CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, PausedMask, RelayerKeyArgs,
     RelayerKeyManagerArgs,
+};
+use aurora_engine_types::parameters::silo::{
+    FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
 };
 use aurora_engine_types::parameters::xcc::FundXccArgs;
 use aurora_engine_types::types::{Address, RawU256, WeiU256};
@@ -282,6 +288,44 @@ impl EngineContract {
     pub fn remove_relayer_key(&self, key: RelayerKeyArgs) -> CallRemoveRelayerKey {
         CallRemoveRelayerKey::call(&self.contract).args_json(key)
     }
+
+    pub fn pause_contract(&self) -> CallPauseContract {
+        CallPauseContract::call(&self.contract)
+    }
+
+    pub fn resume_contract(&self) -> CallResumeContract {
+        CallResumeContract::call(&self.contract)
+    }
+
+    pub fn set_fixed_gas_cost(&self, cost: FixedGasCostArgs) -> CallSetFixedGasCost {
+        CallSetFixedGasCost::call(&self.contract).args_borsh(cost)
+    }
+
+    pub fn set_silo_params(&self, params: Option<SiloParamsArgs>) -> CallSetSiloParams {
+        CallSetSiloParams::call(&self.contract).args_borsh(params)
+    }
+
+    pub fn set_whitelist_status(&self, status: WhitelistStatusArgs) -> CallSetWhitelistStatus {
+        CallSetWhitelistStatus::call(&self.contract).args_borsh(status)
+    }
+
+    pub fn add_entry_to_whitelist(&self, entry: WhitelistArgs) -> CallAddEntryToWhitelist {
+        CallAddEntryToWhitelist::call(&self.contract).args_borsh(entry)
+    }
+
+    pub fn add_entry_to_whitelist_batch(
+        &self,
+        batch: Vec<WhitelistArgs>,
+    ) -> CallAddEntryToWhitelistBatch {
+        CallAddEntryToWhitelistBatch::call(&self.contract).args_borsh(batch)
+    }
+
+    pub fn remove_entry_from_whitelist(
+        &self,
+        entry: WhitelistArgs,
+    ) -> CallRemoveEntryFromWhitelist {
+        CallRemoveEntryFromWhitelist::call(&self.contract).args_borsh(entry)
+    }
 }
 
 /// View functions
@@ -389,6 +433,18 @@ impl EngineContract {
 
     pub fn get_accounts_counter(&self) -> ViewAccountsCounter {
         ViewAccountsCounter::view(&self.contract)
+    }
+
+    pub fn get_fixed_gas_cost(&self) -> ViewGetFixedGasCost {
+        ViewGetFixedGasCost::view(&self.contract)
+    }
+
+    pub fn get_silo_params(&self) -> ViewGetSiloParams {
+        ViewGetSiloParams::view(&self.contract)
+    }
+
+    pub fn get_whitelist_status(&self, args: WhitelistKindArgs) -> ViewGetWhitelistStatus {
+        ViewGetWhitelistStatus::view(&self.contract).args_borsh(args)
     }
 }
 

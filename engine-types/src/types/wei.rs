@@ -232,7 +232,7 @@ impl BorshDeserialize for Wei {
         }
 
         let mut buffer = [0; 32];
-        buffer.copy_from_slice(buf);
+        buffer.copy_from_slice(&buf[..32]);
         *buf = &buf[32..];
 
         Ok(Self::from(buffer))
