@@ -348,7 +348,7 @@ impl MPNat {
             return;
         }
 
-        let other_most_sig = *other.digits.last().unwrap();
+        let other_most_sig = *other.digits.last().unwrap() as DoubleWord;
 
         if self.digits.len() == 2 {
             // This is the smallest case since `n >= 1` and `m > 0`
@@ -357,7 +357,7 @@ impl MPNat {
             // to get the answer directly.
             let self_most_sig = self.digits.pop().unwrap();
             let a = join_as_double(self_most_sig, self.digits[0]);
-            let b = other_most_sig as DoubleWord;
+            let b = other_most_sig;
             self.digits[0] = (a % b) as Word;
             return;
         }
@@ -370,7 +370,7 @@ impl MPNat {
                 let self_most_sig = self.digits.pop().unwrap();
                 let self_second_sig = self.digits[j];
                 let r =
-                    join_as_double(self_most_sig, self_second_sig) % (other_most_sig as DoubleWord);
+                    join_as_double(self_most_sig, self_second_sig) % other_most_sig;
                 self.digits[j] = r as Word;
             }
             return;
@@ -385,7 +385,7 @@ impl MPNat {
         // both numerator and denominator by a common factor
         // and run the algorithm on those numbers.
         // See Knuth The Art of Computer Programming vol. 2 section 4.3 for details.
-        let shift = other_most_sig.leading_zeros();
+        let shift = (other_most_sig as Word).leading_zeros();
         if shift > 0 {
             // Normalize self
             let overflow = in_place_shl(&mut self.digits, shift);
@@ -410,34 +410,31 @@ impl MPNat {
             return;
         }
 
-        let other_second_sig = other.digits[n - 2];
+        let other_second_sig = other.digits[n - 2] as DoubleWord;
         let mut self_most_sig: Word = 0;
         for j in (0..=m).rev() {
             let self_second_sig = *self.digits.last().unwrap();
             let self_third_sig = self.digits[self.digits.len() - 2];
 
-            let (mut q_hat, mut r_hat) = {
-                let a = join_as_double(self_most_sig, self_second_sig);
-                let mut q_hat = a / (other_most_sig as DoubleWord);
-                let mut r_hat = a % (other_most_sig as DoubleWord);
+            let a = join_as_double(self_most_sig, self_second_sig);
+            let mut q_hat = a / other_most_sig;
+            let mut r_hat = a % other_most_sig;
 
-                if q_hat == BASE {
+            loop {
+                let a = q_hat * other_second_sig;
+                let b = join_as_double(r_hat as Word, self_third_sig);
+                if q_hat >= BASE || a > b {
                     q_hat -= 1;
-                    r_hat += other_most_sig as DoubleWord;
+                    r_hat += other_most_sig;
+                    if BASE < r_hat {
+                        break;
+                    }
+                } else {
+                    break;
                 }
-
-                (q_hat as Word, r_hat)
-            };
-
-            while r_hat < BASE
-                && join_as_double(r_hat as Word, self_third_sig)
-                    < (q_hat as DoubleWord) * (other_second_sig as DoubleWord)
-            {
-                q_hat -= 1;
-                r_hat += other_most_sig as DoubleWord;
             }
 
-            let mut borrow = in_place_mul_sub(&mut self.digits[j..], &other.digits, q_hat);
+            let mut borrow = in_place_mul_sub(&mut self.digits[j..], &other.digits, q_hat as Word);
             if borrow > self_most_sig {
                 // q_hat was too large, add back one multiple of the modulus
                 let carry = in_place_add(&mut self.digits[j..], &other.digits);
