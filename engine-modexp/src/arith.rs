@@ -359,6 +359,11 @@ pub fn in_place_add(a: &mut [Word], b: &[Word]) -> bool {
 pub fn in_place_mul_sub(a: &mut [Word], x: &[Word], y: Word) -> Word {
     debug_assert!(a.len() == x.len());
 
+    // a -= x*0 leaves a unchanged, so return early
+    if y == 0 {
+        return 0
+    }
+
     // carry is between -big_digit::MAX and 0, so to avoid overflow we store
     // offset_carry = carry + big_digit::MAX
     let mut offset_carry = Word::MAX;
