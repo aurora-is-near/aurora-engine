@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] 2023-07-20
+
+### Changes
+
+- Enabled Shanghai Ethereum hard fork support by [@mandreyel]. ([#773])
+- Added ability to pause and resume the core functionality of the contract by [@Casuso]. ([#779])
+- Added function call keys to be used with relayers by [@aleksuss]. ([#792])
+
+[#773]: https://github.com/aurora-is-near/aurora-engine/pull/773
+[#779]: https://github.com/aurora-is-near/aurora-engine/pull/779
+[#792]: https://github.com/aurora-is-near/aurora-engine/pull/792
+
 ## [2.9.3] 2023-07-19
 
 ### Changes
@@ -429,7 +441,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.3...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.0...develop
+[2.10.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.3...2.10.0
 [2.9.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.2...2.9.3 
 [2.9.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.1...2.9.2
 [2.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.0...2.9.1
@@ -469,8 +482,10 @@ struct SubmitResult {
 [@aleksuss]: https://github.com/aleksuss
 [@andrcmdr]: https://github.com/andrcmdr
 [@birchmd]: https://github.com/birchmd
+[@Casuso]: https://github.com/Casuso
 [@hskang9]: https://github.com/hskang9
 [@joshuajbouw]: https://github.com/joshuajbouw
+[@mandreyel]: https://github.com/mandreyel
 [@mfornet]: https://github.com/mfornet
 [@mrLSD]: https://github.com/mrLSD
 [@RomanHodulak]: https://github.com/RomanHodulak
