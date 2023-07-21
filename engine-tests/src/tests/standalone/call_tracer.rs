@@ -3,6 +3,7 @@ use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, standalone, Signer};
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_types::borsh::BorshSerialize;
+use aurora_engine_types::parameters::PromiseArgsWithSender;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
     storage,
@@ -341,7 +342,10 @@ fn test_trace_precompiles_with_subcalls() {
         attached_balance: Yocto::new(1),
         attached_gas: NearGas::new(100_000_000_000_000),
     };
-    let xcc_args = CrossContractCallArgs::Delayed(PromiseArgs::Create(promise));
+    let xcc_args = CrossContractCallArgs::Delayed(PromiseArgsWithSender {
+        sender: signer_address,
+        args: PromiseArgs::Create(promise),
+    });
     let tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: U256::zero(),

@@ -1,6 +1,10 @@
 use super::Router;
-use aurora_engine_types::parameters::{PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs};
-use aurora_engine_types::types::{NearGas, Yocto};
+use aurora_engine_sdk as sdk;
+use aurora_engine_types::parameters::{
+    PromiseArgs, PromiseArgsWithSender, PromiseCreateArgs, PromiseWithCallbackArgs,
+};
+use aurora_engine_types::types::{Address, NearGas, Yocto};
+use near_sdk::borsh::BorshSerialize;
 use near_sdk::mock::VmAction;
 use near_sdk::test_utils::test_env::{alice, bob, carol};
 use near_sdk::test_utils::{self, VMContextBuilder};
@@ -10,7 +14,7 @@ const WNEAR_ACCOUNT: &str = "wrap.near";
 
 #[test]
 fn test_initialize() {
-    let (parent, contract) = create_contract();
+    let (parent, _signer, contract) = create_contract();
 
     assert_eq!(contract.parent.get().unwrap(), parent);
 }
@@ -18,7 +22,7 @@ fn test_initialize() {
 /// `initialize` should be able to be called multiple times without resetting the state.
 #[test]
 fn test_reinitialize() {
-    let (_parent, mut contract) = create_contract();
+    let (_parent, _signer, mut contract) = create_contract();
 
     let nonce = 8;
     contract.nonce.set(&nonce);
@@ -32,7 +36,7 @@ fn test_reinitialize() {
 #[test]
 #[should_panic]
 fn test_reinitialize_wrong_caller() {
-    let (parent, contract) = create_contract();
+    let (parent, _signer, contract) = create_contract();
 
     assert_eq!(contract.parent.get().unwrap(), parent);
     drop(contract);
@@ -46,7 +50,7 @@ fn test_reinitialize_wrong_caller() {
 #[test]
 #[should_panic]
 fn test_execute_wrong_caller() {
-    let (_parent, contract) = create_contract();
+    let (_parent, signer, contract) = create_contract();
 
     let promise = PromiseCreateArgs {
         target_account_id: bob().as_str().parse().unwrap(),
@@ -59,12 +63,15 @@ fn test_execute_wrong_caller() {
     testing_env!(VMContextBuilder::new()
         .predecessor_account_id(bob())
         .build());
-    contract.execute(PromiseArgs::Create(promise));
+    contract.execute(PromiseArgsWithSender {
+        sender: signer.raw().into(),
+        args: PromiseArgs::Create(promise),
+    });
 }
 
 #[test]
 fn test_execute() {
-    let (_parent, contract) = create_contract();
+    let (_parent, signer, contract) = create_contract();
 
     let promise = PromiseCreateArgs {
         target_account_id: bob().as_str().parse().unwrap(),
@@ -74,7 +81,10 @@ fn test_execute() {
         attached_gas: NearGas::new(100_000_000_000_000),
     };
 
-    contract.execute(PromiseArgs::Create(promise.clone()));
+    contract.execute(PromiseArgsWithSender {
+        sender: signer.raw().into(),
+        args: PromiseArgs::Create(promise.clone()),
+    });
 
     let mut receipts = test_utils::get_created_receipts();
     assert_eq!(receipts.len(), 1);
@@ -89,7 +99,7 @@ fn test_execute() {
 
 #[test]
 fn test_execute_callback() {
-    let (_parent, contract) = create_contract();
+    let (_parent, signer, contract) = create_contract();
 
     let promise = PromiseWithCallbackArgs {
         base: PromiseCreateArgs {
@@ -108,7 +118,10 @@ fn test_execute_callback() {
         },
     };
 
-    contract.execute(PromiseArgs::Callback(promise.clone()));
+    contract.execute(PromiseArgsWithSender {
+        sender: signer.raw().into(),
+        args: PromiseArgs::Callback(promise.clone()),
+    });
 
     let receipts = test_utils::get_created_receipts();
     assert_eq!(receipts.len(), 2);
@@ -122,7 +135,7 @@ fn test_execute_callback() {
 #[test]
 #[should_panic]
 fn test_schedule_wrong_caller() {
-    let (_parent, mut contract) = create_contract();
+    let (_parent, signer, mut contract) = create_contract();
 
     let promise = PromiseCreateArgs {
         target_account_id: bob().as_str().parse().unwrap(),
@@ -135,12 +148,16 @@ fn test_schedule_wrong_caller() {
     testing_env!(VMContextBuilder::new()
         .predecessor_account_id(bob())
         .build());
-    contract.schedule(PromiseArgs::Create(promise));
+
+    contract.schedule(PromiseArgsWithSender {
+        sender: signer.raw().into(),
+        args: PromiseArgs::Create(promise),
+    });
 }
 
 #[test]
 fn test_schedule_and_execute() {
-    let (_parent, mut contract) = create_contract();
+    let (_parent, signer, mut contract) = create_contract();
 
     let promise = PromiseCreateArgs {
         target_account_id: bob().as_str().parse().unwrap(),
@@ -150,7 +167,10 @@ fn test_schedule_and_execute() {
         attached_gas: NearGas::new(100_000_000_000_000),
     };
 
-    contract.schedule(PromiseArgs::Create(promise.clone()));
+    contract.schedule(PromiseArgsWithSender {
+        sender: signer.raw().into(),
+        args: PromiseArgs::Create(promise.clone()),
+    });
 
     // no promise actually create yet
     let receipts = test_utils::get_created_receipts();
@@ -159,7 +179,10 @@ fn test_schedule_and_execute() {
     // promise stored and nonce incremented instead
     assert_eq!(contract.nonce.get().unwrap(), 1);
     let stored_promise = match contract.scheduled_promises.get(&0) {
-        Some(PromiseArgs::Create(promise)) => promise,
+        Some(PromiseArgsWithSender {
+            args: PromiseArgs::Create(promise),
+            ..
+        }) => promise,
         _ => unreachable!(),
     };
     assert_eq!(stored_promise, promise);
@@ -199,13 +222,18 @@ fn validate_function_call_action(actions: &[VmAction], promise: PromiseCreateArg
     );
 }
 
-fn create_contract() -> (near_sdk::AccountId, Router) {
+fn create_contract() -> (near_sdk::AccountId, Address, Router) {
+    // let mut signer = Signer::random();
+    // let signer_address = utils::address_from_secret_key(&signer.secret_key);
+
     let parent = alice();
     testing_env!(VMContextBuilder::new()
         .current_account_id(format!("some_address.{}", parent).try_into().unwrap())
         .predecessor_account_id(parent.clone())
         .build());
+    let hash = sdk::keccak(&parent.try_to_vec().unwrap());
+    let signer = Address::try_from_slice(&hash[12..]).unwrap();
     let contract = Router::initialize(WNEAR_ACCOUNT.parse().unwrap(), false);
 
-    (parent, contract)
+    (parent, signer, contract)
 }
