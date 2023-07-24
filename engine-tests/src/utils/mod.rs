@@ -1,8 +1,8 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::types::{NEP141Wei, PromiseResult};
-use borsh::{BorshDeserialize, BorshSerialize};
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
@@ -29,7 +29,7 @@ use crate::prelude::transactions::{
     legacy::{LegacyEthSignedTransaction, TransactionLegacy},
 };
 use crate::prelude::{sdk, Address, Wei, H256, U256};
-use crate::test_utils::solidity::{ContractConstructor, DeployedContract};
+use crate::utils::solidity::{ContractConstructor, DeployedContract};
 
 // TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
 pub const ORIGIN: &str = "aurora";
@@ -47,18 +47,12 @@ pub const RESUME_CONTRACT: &str = "resume_contract";
 
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
-pub mod erc20;
-pub mod exit_precompile;
 pub mod mocked_external;
 pub mod one_inch;
-pub mod random;
 pub mod rust;
-pub mod self_destruct;
 pub mod solidity;
 pub mod standalone;
-pub mod standard_precompiles;
-pub mod uniswap;
-pub mod weth;
+pub mod workspace;
 
 pub struct Signer {
     pub nonce: u64,
@@ -180,8 +174,8 @@ impl AuroraRunner {
         context.block_height += 1;
         context.block_timestamp += 1_000_000_000;
         context.input = input;
-        context.signer_account_id = as_account_id(signer_account_id);
-        context.predecessor_account_id = as_account_id(caller_account_id);
+        context.signer_account_id = signer_account_id.parse().unwrap();
+        context.predecessor_account_id = caller_account_id.parse().unwrap();
     }
 
     pub fn call(
@@ -579,6 +573,7 @@ impl Default for AuroraRunner {
         let runtime_config_store = RuntimeConfigStore::new(None);
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
         let wasm_config = runtime_config.wasm_config.clone();
+        let origin_account_id: near_primitives::types::AccountId = ORIGIN.parse().unwrap();
 
         Self {
             aurora_account_id: ORIGIN.to_string(),
@@ -587,10 +582,10 @@ impl Default for AuroraRunner {
             cache: MockCompiledContractCache::default(),
             ext: mocked_external::MockedExternalWithTrie::new(MockedExternal::default()),
             context: VMContext {
-                current_account_id: as_account_id(ORIGIN),
-                signer_account_id: as_account_id(ORIGIN),
+                current_account_id: origin_account_id.clone(),
+                signer_account_id: origin_account_id.clone(),
                 signer_account_pk: vec![],
-                predecessor_account_id: as_account_id(ORIGIN),
+                predecessor_account_id: origin_account_id,
                 input: vec![],
                 block_height: 0,
                 block_timestamp: 0,
@@ -639,7 +634,7 @@ impl ExecutionProfile {
     }
 }
 
-pub fn deploy_evm() -> AuroraRunner {
+pub fn deploy_runner() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     let args = LegacyNewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
@@ -840,13 +835,8 @@ pub fn address_from_hex(address: &str) -> Address {
     Address::try_from_slice(&bytes).unwrap()
 }
 
-pub fn as_account_id(account_id: &str) -> near_primitives_core::types::AccountId {
-    account_id.parse().unwrap()
-}
-
 pub fn str_to_account_id(account_id: &str) -> AccountId {
-    use aurora_engine_types::str::FromStr;
-    AccountId::from_str(account_id).unwrap()
+    account_id.parse().unwrap()
 }
 
 pub fn unwrap_success(result: SubmitResult) -> Vec<u8> {
@@ -863,8 +853,8 @@ pub fn unwrap_success_slice(result: &SubmitResult) -> &[u8] {
     }
 }
 
-pub fn unwrap_revert(result: SubmitResult) -> Vec<u8> {
-    match result.status {
+pub fn unwrap_revert_slice(result: &SubmitResult) -> &[u8] {
+    match &result.status {
         TransactionStatus::Revert(ret) => ret,
         other => panic!("Unexpected status: {other:?}"),
     }

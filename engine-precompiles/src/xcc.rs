@@ -240,7 +240,7 @@ pub mod state {
 
     use aurora_engine_sdk::error::ReadU32Error;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
-    use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+    use aurora_engine_types::parameters::xcc::CodeVersion;
     use aurora_engine_types::storage::{self, KeyPrefix};
     use aurora_engine_types::types::{Address, Yocto};
 
@@ -250,28 +250,6 @@ pub mod state {
     pub const WNEAR_KEY: &[u8] = b"wnear";
     /// Amount of NEAR needed to cover storage for a router contract.
     pub const STORAGE_AMOUNT: Yocto = Yocto::new(2_000_000_000_000_000_000_000_000);
-
-    /// Type wrapper for version of router contracts.
-    #[derive(
-        Debug,
-        Clone,
-        Copy,
-        Default,
-        PartialEq,
-        Eq,
-        PartialOrd,
-        Ord,
-        BorshDeserialize,
-        BorshSerialize,
-    )]
-    pub struct CodeVersion(pub u32);
-
-    impl CodeVersion {
-        #[must_use]
-        pub const fn increment(self) -> Self {
-            Self(self.0 + 1)
-        }
-    }
 
     /// Get the address of the `wNEAR` ERC-20 contract
     ///

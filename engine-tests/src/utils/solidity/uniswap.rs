@@ -1,5 +1,5 @@
 use crate::prelude::{Address, U256};
-use crate::test_utils::solidity;
+use crate::utils::solidity;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::types::Wei;
 use std::ops::Not;
@@ -152,10 +152,10 @@ impl Factory {
 
         TransactionLegacy {
             nonce,
-            gas_price: U256::default(),
+            gas_price: U256::zero(),
             gas_limit: u64::MAX.into(),
             to: Some(self.0.address),
-            value: Wei::default(),
+            value: Wei::zero(),
             data,
         }
     }

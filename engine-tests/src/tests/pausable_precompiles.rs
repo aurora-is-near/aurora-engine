@@ -1,19 +1,19 @@
 use crate::prelude::{Address, U256};
-use crate::test_utils::exit_precompile::{Tester, TesterConstructor};
-use crate::test_utils::{
+use crate::utils::solidity::exit_precompile::{Tester, TesterConstructor};
+use crate::utils::{
     self, AuroraRunner, Signer, ORIGIN, PAUSED_PRECOMPILES, PAUSE_PRECOMPILES, RESUME_PRECOMPILES,
 };
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::parameters::{PausePrecompilesCallArgs, TransactionStatus};
+use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::types::Wei;
-use borsh::BorshSerialize;
 
 const EXIT_TO_ETHEREUM_FLAG: u32 = 0b10;
 const CALLED_ACCOUNT_ID: &str = "aurora";
 
 #[test]
 fn test_paused_precompile_is_shown_when_viewing() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
 
     let call_args = PausePrecompilesCallArgs {
         paused_mask: EXIT_TO_ETHEREUM_FLAG,
@@ -84,7 +84,7 @@ fn test_executing_paused_and_then_resumed_precompile_succeeds() {
 
 #[test]
 fn test_resuming_precompile_does_not_throw_error() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
 
     let call_args = PausePrecompilesCallArgs { paused_mask: 0b1 };
 
@@ -98,7 +98,7 @@ fn test_resuming_precompile_does_not_throw_error() {
 
 #[test]
 fn test_pausing_precompile_does_not_throw_error() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let call_args = PausePrecompilesCallArgs { paused_mask: 0b1 };
     let input = call_args.try_to_vec().unwrap();
     let result = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input);
@@ -109,11 +109,11 @@ fn test_pausing_precompile_does_not_throw_error() {
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     const INITIAL_NONCE: u64 = 0;
 
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let token = runner.deploy_erc20_token("tt.testnet");
     let mut signer = Signer::random();
     runner.create_address(
-        test_utils::address_from_secret_key(&signer.secret_key),
+        utils::address_from_secret_key(&signer.secret_key),
         Wei::from_eth(1.into()).unwrap(),
         INITIAL_NONCE.into(),
     );

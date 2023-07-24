@@ -2,9 +2,9 @@ use crate::prelude::{
     parameters::CallArgs, parameters::FunctionCallArgsV2, transactions::legacy::TransactionLegacy,
     Address, WeiU256, U256,
 };
-use crate::test_utils::{self, solidity, AuroraRunner, Signer};
+use crate::utils::{self, solidity, AuroraRunner, Signer};
+use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::types::Wei;
-use borsh::BorshSerialize;
 
 pub struct SelfDestructFactoryConstructor(pub solidity::ContractConstructor);
 
@@ -73,7 +73,7 @@ impl SelfDestructFactory {
         };
 
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
-        let result = test_utils::unwrap_success(result);
+        let result = utils::unwrap_success(result);
 
         Address::try_from_slice(&result[12..]).unwrap()
     }
@@ -113,7 +113,7 @@ impl SelfDestruct {
         };
 
         let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
-        let result = test_utils::unwrap_success(result);
+        let result = utils::unwrap_success(result);
 
         if result.len() == 32 {
             Some(u128::from_be_bytes(result[16..32].try_into().unwrap()))

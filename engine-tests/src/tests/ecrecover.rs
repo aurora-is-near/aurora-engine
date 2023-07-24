@@ -1,7 +1,7 @@
 use super::sanity::initialize_transfer;
 use crate::prelude::{make_address, Address, U256};
 use crate::prelude::{Wei, H160};
-use crate::test_utils::{self, AuroraRunner, Signer};
+use crate::utils::{self, AuroraRunner, Signer};
 use aurora_engine_precompiles::Precompile;
 
 const ECRECOVER_ADDRESS: Address = make_address(0, 1);
@@ -79,10 +79,7 @@ fn check_wasm_ecrecover(
             }
         })
         .unwrap();
-    assert_eq!(
-        expected_output,
-        test_utils::unwrap_success_slice(&wasm_result),
-    );
+    assert_eq!(expected_output, utils::unwrap_success_slice(&wasm_result),);
 }
 
 fn construct_input(hash: &[u8], sig: &[u8]) -> Vec<u8> {

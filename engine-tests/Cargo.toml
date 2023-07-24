@@ -18,6 +18,9 @@ aurora-engine-sdk = { workspace = true, features = ["std"] }
 aurora-engine-test-doubles.workspace = true
 aurora-engine-transactions = { workspace = true, features = ["std", "impl-serde"] }
 aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
+aurora-engine-workspace.workspace = true
+
+anyhow.workspace = true
 borsh.workspace = true
 bstr.workspace = true
 byte-slice-cast.workspace = true
@@ -34,7 +37,6 @@ libsecp256k1.workspace = true
 near-crypto.workspace = true
 near-primitives-core.workspace = true
 near-primitives.workspace = true
-near-sdk-sim.workspace = true
 near-vm-errors.workspace = true
 near-vm-logic.workspace = true
 near-vm-runner.workspace = true
@@ -44,6 +46,7 @@ serde.workspace = true
 serde_json.workspace = true
 sha3.workspace = true
 tempfile.workspace = true
+tokio.workspace = true
 walrus.workspace = true
 
 [features]
