@@ -15,6 +15,7 @@ mod pause_contract;
 mod prepaid_gas_precompile;
 mod promise_results_precompile;
 mod random;
+mod relayer_keys;
 mod repro;
 pub mod sanity;
 mod self_destruct_state;

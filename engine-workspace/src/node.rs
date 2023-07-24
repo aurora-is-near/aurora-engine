@@ -26,6 +26,10 @@ impl Node {
         Account::from_inner(self.root.clone())
     }
 
+    pub fn worker(&self) -> &Worker<Sandbox> {
+        &self.worker
+    }
+
     pub async fn get_balance(&self, account_id: &AccountId) -> anyhow::Result<u128> {
         let account_id = workspaces::AccountId::from_str(account_id.as_ref())?;
 

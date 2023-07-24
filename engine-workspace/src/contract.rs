@@ -1,14 +1,15 @@
 use crate::account::Account;
 use crate::node::Node;
 use crate::operation::{
-    CallCall, CallDeployCode, CallDeployErc20Token, CallDeployUpgrade, CallDeposit,
-    CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
+    CallAddRelayerKey, CallCall, CallDeployCode, CallDeployErc20Token, CallDeployUpgrade,
+    CallDeposit, CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
     CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
     CallNew, CallNewEthConnector, CallPausePrecompiles, CallRefundOnError, CallRegisterRelayer,
-    CallResumePrecompiles, CallSetEthConnectorContractData, CallSetPausedFlags, CallStageUpgrade,
-    CallStateMigration, CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit,
-    CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId,
-    ViewCode, ViewErc20FromNep141, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
+    CallRemoveRelayerKey, CallResumePrecompiles, CallSetEthConnectorContractData,
+    CallSetKeyManager, CallSetPausedFlags, CallStageUpgrade, CallStateMigration,
+    CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit, CallWithdraw,
+    ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode,
+    ViewErc20FromNep141, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
     ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply, ViewIsUsedProof,
     ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags, ViewPausedPrecompiles,
     ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion, ViewView,
@@ -17,13 +18,15 @@ use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Proof};
 use aurora_engine_types::parameters::engine::{
-    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, PausedMask,
+    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, PausedMask, RelayerKeyArgs,
+    RelayerKeyManagerArgs,
 };
 use aurora_engine_types::parameters::xcc::FundXccArgs;
 use aurora_engine_types::types::{Address, RawU256, WeiU256};
 use aurora_engine_types::{H256, U256};
 use near_sdk::json_types::U128;
 use serde_json::json;
+use workspaces::types::SecretKey;
 
 #[derive(Debug, Clone)]
 pub struct EngineContract {
@@ -42,6 +45,16 @@ impl EngineContract {
 
     pub fn root(&self) -> Account {
         self.node.root()
+    }
+
+    pub fn create_account(&self, account_id: &AccountId, secret_key: SecretKey) -> Account {
+        let inner = workspaces::Account::from_secret_key(
+            account_id.as_ref().parse().unwrap(),
+            secret_key,
+            self.node.worker(),
+        );
+
+        Account::from_inner(inner)
     }
 }
 
@@ -256,6 +269,18 @@ impl EngineContract {
 
     pub fn set_paused_flags(&self, flags: PausedMask) -> CallSetPausedFlags {
         CallSetPausedFlags::call(&self.contract).args_borsh(flags)
+    }
+
+    pub fn set_key_manager(&self, args: RelayerKeyManagerArgs) -> CallSetKeyManager {
+        CallSetKeyManager::call(&self.contract).args_json(args)
+    }
+
+    pub fn add_relayer_key(&self, key: RelayerKeyArgs) -> CallAddRelayerKey {
+        CallAddRelayerKey::call(&self.contract).args_json(key)
+    }
+
+    pub fn remove_relayer_key(&self, key: RelayerKeyArgs) -> CallRemoveRelayerKey {
+        CallRemoveRelayerKey::call(&self.contract).args_json(key)
     }
 }
 

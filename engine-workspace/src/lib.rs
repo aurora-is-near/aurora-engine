@@ -18,6 +18,7 @@ pub mod transaction;
 
 pub mod types {
     pub use workspaces::result::ExecutionOutcome;
+    pub use workspaces::types::{KeyType, SecretKey};
 }
 
 const AURORA_LOCAL_CHAIN_ID: u64 = 1313161556;

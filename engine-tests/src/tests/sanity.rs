@@ -131,16 +131,20 @@ fn test_state_format() {
     // change the binary format of the `EngineState` then we will know
     // about it. This is important because changing the state format will
     // break the contract unless we do a state migration.
-    let args = aurora_engine::parameters::NewCallArgsV2 {
+    let args = aurora_engine::parameters::NewCallArgsV3 {
         chain_id: aurora_engine_types::types::u256_to_arr(&666.into()),
         owner_id: "boss".parse().unwrap(),
         upgrade_delay_blocks: 3,
+        key_manager: "key_manager".parse().unwrap(),
     };
     let state: aurora_engine::state::EngineState = args.into();
     let expected_hex: String = [
-        "02000000000000000000000000000000000000000000000000000000000000029a",
-        "04000000626f7373",
-        "030000000000000000",
+        "02",                                                               // state version
+        "000000000000000000000000000000000000000000000000000000000000029a", // chain id
+        "04000000626f7373",                                                 // owner id
+        "0300000000000000",                                                 // upgrade delay blocks
+        "00",                                                               // contract mode
+        "010b0000006b65795f6d616e61676572",                                 // key manager
     ]
     .concat();
     assert_eq!(hex::encode(state.borsh_serialize().unwrap()), expected_hex);

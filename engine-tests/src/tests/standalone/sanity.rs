@@ -20,6 +20,7 @@ fn test_deploy_code() {
         owner_id: owner_id.clone(),
         upgrade_delay_blocks: 0,
         is_paused: false,
+        key_manager: None,
     };
     let origin = Address::new(H160([0u8; 20]));
     let storage = RefCell::new(Storage::default());

@@ -3,6 +3,7 @@ use aurora_engine_types::account_id::AccountId;
 use std::str::FromStr;
 
 use crate::contract::RawContract;
+use aurora_engine_types::public_key::PublicKey;
 pub use near_units::parse_near;
 
 #[derive(Debug, Clone)]
@@ -47,5 +48,10 @@ impl Account {
             .into_result()
             .map(|inner| Account { inner })
             .map_err(Into::into)
+    }
+
+    pub fn public_key(&self) -> anyhow::Result<PublicKey> {
+        let pk = self.inner.secret_key().public_key();
+        PublicKey::from_str(&serde_json::to_string(&pk)?).map_err(|e| anyhow::anyhow!("{e:?}"))
     }
 }
