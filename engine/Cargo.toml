@@ -20,7 +20,6 @@ aurora-engine-transactions.workspace = true
 aurora-engine-types.workspace = true
 aurora-engine-sdk.workspace = true
 bitflags.workspace = true
-byte-slice-cast.workspace = true
 ethabi.workspace = true
 evm.workspace = true
 hex.workspace = true
@@ -38,7 +37,7 @@ test-case.workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "byte-slice-cast/std", "ethabi/std", "evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "ethabi/std", "evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
 borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-sdk/borsh-compat", "aurora-engine-precompiles/borsh-compat"]
 evm_bully = []
