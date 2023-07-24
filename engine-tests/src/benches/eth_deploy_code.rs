@@ -2,15 +2,16 @@ use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
 use libsecp256k1::SecretKey;
 
 use crate::prelude::Wei;
-use crate::test_utils::{
-    address_from_secret_key, create_deploy_transaction, deploy_evm, sign_transaction, SUBMIT,
+use crate::utils::{
+    address_from_secret_key, create_deploy_transaction, deploy_runner, parse_eth_gas,
+    sign_transaction, SUBMIT,
 };
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 
 pub fn eth_deploy_code_benchmark(c: &mut Criterion) {
-    let mut runner = deploy_evm();
+    let mut runner = deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
     runner.create_address(
@@ -40,7 +41,7 @@ pub fn eth_deploy_code_benchmark(c: &mut Criterion) {
             .call(SUBMIT, calling_account_id, input.clone())
             .unwrap();
         let gas = output.burnt_gas;
-        let eth_gas = crate::test_utils::parse_eth_gas(&output);
+        let eth_gas = parse_eth_gas(&output);
         // TODO(#45): capture this in a file
         println!("ETH_DEPLOY_CODE_{input_size:?} NEAR GAS: {gas:?}");
         println!("ETH_DEPLOY_CODE_{input_size:?} ETH GAS: {eth_gas:?}");

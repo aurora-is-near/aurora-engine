@@ -1,4 +1,7 @@
+use near_vm_errors::VMLogicError;
 use near_vm_logic::mocks::mock_external::MockedExternal;
+use near_vm_logic::StorageGetMode;
+use std::cell::Cell;
 
 /// Derived from mainnet data reported here: `https://hackmd.io/@birchmd/r1HRjr0P9`
 /// Uses the formulas:
@@ -20,16 +23,16 @@ pub const MAINNET_AVERAGE_TRIE_DEPTH: u64 = 13;
 #[derive(Clone)]
 pub struct MockedExternalWithTrie {
     pub underlying: MockedExternal,
-    new_trie_node_count: std::cell::Cell<u64>,
-    cached_trie_node_count: std::cell::Cell<u64>,
+    new_trie_node_count: Cell<u64>,
+    cached_trie_node_count: Cell<u64>,
 }
 
 impl MockedExternalWithTrie {
     pub const fn new(ext: MockedExternal) -> Self {
         Self {
             underlying: ext,
-            new_trie_node_count: std::cell::Cell::new(0),
-            cached_trie_node_count: std::cell::Cell::new(0),
+            new_trie_node_count: Cell::new(0),
+            cached_trie_node_count: Cell::new(0),
         }
     }
 
@@ -45,7 +48,7 @@ impl MockedExternalWithTrie {
 }
 
 impl near_vm_logic::External for MockedExternalWithTrie {
-    fn storage_set(&mut self, key: &[u8], value: &[u8]) -> Result<(), near_vm_logic::VMLogicError> {
+    fn storage_set(&mut self, key: &[u8], value: &[u8]) -> Result<(), VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TRIE_DEPTH);
         self.underlying.storage_set(key, value)
     }
@@ -54,36 +57,23 @@ impl near_vm_logic::External for MockedExternalWithTrie {
         &'a self,
         key: &[u8],
         mode: near_vm_logic::StorageGetMode,
-    ) -> Result<Option<Box<dyn near_vm_logic::ValuePtr + 'a>>, near_vm_logic::VMLogicError> {
+    ) -> Result<Option<Box<dyn near_vm_logic::ValuePtr + 'a>>, VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TOUCHED_TRIE_PER_READ);
         self.increment_cached_trie_node_count(MAINNET_AVERAGE_READ_CACHED_TRIE_PER_READ);
         self.underlying.storage_get(key, mode)
     }
 
-    fn storage_remove(&mut self, key: &[u8]) -> Result<(), near_vm_logic::VMLogicError> {
+    fn storage_remove(&mut self, key: &[u8]) -> Result<(), VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TRIE_DEPTH);
         self.underlying.storage_remove(key)
     }
 
-    fn storage_remove_subtree(&mut self, prefix: &[u8]) -> Result<(), near_vm_logic::VMLogicError> {
+    fn storage_remove_subtree(&mut self, prefix: &[u8]) -> Result<(), VMLogicError> {
         self.underlying.storage_remove_subtree(prefix)
     }
 
-    fn storage_has_key(&mut self, key: &[u8]) -> Result<bool, near_vm_logic::VMLogicError> {
-        self.underlying.storage_has_key(key)
-    }
-
-    fn validator_stake(
-        &self,
-        account_id: &near_primitives::types::AccountId,
-    ) -> Result<Option<near_primitives::types::Balance>, near_vm_logic::VMLogicError> {
-        self.underlying.validator_stake(account_id)
-    }
-
-    fn validator_total_stake(
-        &self,
-    ) -> Result<near_primitives::types::Balance, near_vm_logic::VMLogicError> {
-        self.underlying.validator_total_stake()
+    fn storage_has_key(&mut self, key: &[u8], mode: StorageGetMode) -> Result<bool, VMLogicError> {
+        self.underlying.storage_has_key(key, mode)
     }
 
     fn generate_data_id(&mut self) -> near_primitives::hash::CryptoHash {
@@ -97,5 +87,16 @@ impl near_vm_logic::External for MockedExternalWithTrie {
             db_reads,
             mem_reads,
         }
+    }
+
+    fn validator_stake(
+        &self,
+        account_id: &near_primitives::types::AccountId,
+    ) -> Result<Option<near_primitives::types::Balance>, VMLogicError> {
+        self.underlying.validator_stake(account_id)
+    }
+
+    fn validator_total_stake(&self) -> Result<near_primitives::types::Balance, VMLogicError> {
+        self.underlying.validator_total_stake()
     }
 }

@@ -1,6 +1,7 @@
 use crate::parameters::{
     CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs,
 };
+use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
@@ -112,6 +113,7 @@ pub enum EngineErrorKind {
     MaxPriorityGasFeeTooLarge,
     GasPayment(GasPaymentError),
     GasOverflow,
+    NonExistedKey,
 }
 
 impl EngineErrorKind {
@@ -142,6 +144,7 @@ impl EngineErrorKind {
             Self::MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
             Self::GasPayment(e) => e.as_ref(),
             Self::GasOverflow => errors::ERR_GAS_OVERFLOW,
+            Self::NonExistedKey => errors::ERR_FUNCTION_CALL_KEY_NOT_FOUND,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
@@ -386,7 +389,7 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     modexp_algorithm: PhantomData<M>,
 }
 
-pub(crate) const CONFIG: &Config = &Config::london();
+pub(crate) const CONFIG: &Config = &Config::shanghai();
 
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
@@ -1329,6 +1332,21 @@ pub fn get_generation<I: IO>(io: &I, address: &Address) -> u32 {
         })
 }
 
+/// Adds a public function call key for a relayer.
+pub fn add_function_call_key<I: IO>(io: &mut I, key: &PublicKey) {
+    let prefixed_key = bytes_to_key(KeyPrefix::RelayerFunctionCallKey, key.key_data());
+    io.write_storage(&prefixed_key, &[1]);
+}
+
+/// Removes a public function call key for a relayer.
+pub fn remove_function_call_key<I: IO>(io: &mut I, key: &PublicKey) -> Result<(), EngineError> {
+    let prefixed_key = bytes_to_key(KeyPrefix::RelayerFunctionCallKey, key.key_data());
+    io.remove_storage(&prefixed_key)
+        .ok_or_else(|| EngineError::from(EngineErrorKind::NonExistedKey))?;
+
+    Ok(())
+}
+
 /// Removes all storage for the given address.
 fn remove_all_storage<I: IO>(io: &mut I, address: &Address, generation: u32) {
     // FIXME: there is presently no way to prefix delete trie state.
@@ -1759,6 +1777,7 @@ mod tests {
     use aurora_engine_sdk::promise::Noop;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use aurora_engine_test_doubles::promise::PromiseTracker;
+    use aurora_engine_types::parameters::engine::RelayerKeyArgs;
     use aurora_engine_types::types::{make_address, Balance, NearGas, RawU256};
     use std::cell::RefCell;
 
@@ -2271,5 +2290,26 @@ mod tests {
         }];
 
         assert_eq!(expected_logs, actual_logs);
+    }
+
+    #[test]
+    fn test_add_remove_function_call_key() {
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        let public_key = serde_json::from_str::<RelayerKeyArgs>(
+            r#"{"public_key":"ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847"}"#,
+        )
+        .map(|args| args.public_key)
+        .unwrap();
+
+        let result = remove_function_call_key(&mut io, &public_key);
+        assert!(result.is_err()); // should fail because the key doesn't exist yet.
+
+        add_function_call_key(&mut io, &public_key);
+
+        let result = remove_function_call_key(&mut io, &public_key);
+        assert!(result.is_ok());
+        let result = remove_function_call_key(&mut io, &public_key);
+        assert!(result.is_err()); // should fail because the key doesn't exist anymore.
     }
 }

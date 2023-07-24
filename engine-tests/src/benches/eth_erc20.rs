@@ -2,15 +2,17 @@ use crate::prelude::U256;
 use criterion::{BatchSize, BenchmarkId, Criterion};
 use libsecp256k1::SecretKey;
 
-use crate::test_utils::erc20::{ERC20Constructor, ERC20};
-use crate::test_utils::{address_from_secret_key, deploy_evm, sign_transaction, SUBMIT};
+use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
+use crate::utils::{
+    address_from_secret_key, deploy_runner, parse_eth_gas, sign_transaction, SUBMIT,
+};
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: u64 = 67;
 
 pub fn eth_erc20_benchmark(c: &mut Criterion) {
-    let mut runner = deploy_evm();
+    let mut runner = deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
     runner.create_address(
@@ -66,7 +68,7 @@ pub fn eth_erc20_benchmark(c: &mut Criterion) {
         .call(SUBMIT, calling_account_id, mint_tx_bytes.clone())
         .unwrap();
     let gas = output.burnt_gas;
-    let eth_gas = crate::test_utils::parse_eth_gas(&output);
+    let eth_gas = parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("ETH_ERC20_MINT NEAR GAS: {gas:?}");
     println!("ETH_ERC20_MINT ETH GAS: {eth_gas:?}");
@@ -77,7 +79,7 @@ pub fn eth_erc20_benchmark(c: &mut Criterion) {
         .call(SUBMIT, calling_account_id, transfer_tx_bytes.clone())
         .unwrap();
     let gas = output.burnt_gas;
-    let eth_gas = crate::test_utils::parse_eth_gas(&output);
+    let eth_gas = parse_eth_gas(&output);
     // TODO(#45): capture this in a file
     println!("ETH_ERC20_TRANSFER NEAR GAS: {gas:?}");
     println!("ETH_ERC20_TRANSFER ETH GAS: {eth_gas:?}");

@@ -5,7 +5,7 @@ use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{Vec, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Clone)]
 pub struct TransactionLegacy {
     /// A monotonically increasing transaction counter for this sender
     pub nonce: U256,
