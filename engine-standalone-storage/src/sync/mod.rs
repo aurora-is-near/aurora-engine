@@ -23,6 +23,8 @@ use crate::engine_state::EngineStateAccess;
 use crate::{BlockMetadata, Diff, Storage};
 use types::{Message, TransactionKind, TransactionMessage};
 
+use self::types::InnerTransactionKind;
+
 pub fn consume_message<M: ModExpAlgorithm + 'static>(
     storage: &mut Storage,
     message: Message,
@@ -493,6 +495,7 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
 
             let mut blockchain_hashchain = BlockchainHashchain::new(
                 prev.chain_id,
+                env.current_account_id.as_bytes().to_vec(),
                 args.block_height + 1,
                 args.block_hashchain,
             );
@@ -527,6 +530,7 @@ fn update_hashchain<'db>(
 
     let mut blockchain_hashchain = hashchain_state?;
 
+    let method_name = InnerTransactionKind::from(transaction).to_string();
     let input = get_input(transaction)?;
     let (output, log_bloom) = get_output_and_log_bloom(result)?;
 
@@ -534,7 +538,7 @@ fn update_hashchain<'db>(
         blockchain_hashchain.move_to_block(block_height)?;
     }
 
-    blockchain_hashchain.add_block_tx(block_height, &input, &output, &log_bloom)?;
+    blockchain_hashchain.add_block_tx(block_height, &method_name, &input, &output, &log_bloom)?;
 
     Ok(hashchain::storage::set_state(io, &blockchain_hashchain)?)
 }

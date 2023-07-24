@@ -79,6 +79,7 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
+    use ::function_name::named;
     use aurora_engine_types::parameters::WithdrawCallArgs;
     use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
 
@@ -130,6 +131,7 @@ mod contract {
     /// Sets the configuration for the Engine.
     /// Should be called on deployment.
     #[no_mangle]
+    #[named]
     pub extern "C" fn new() {
         let mut io = Runtime;
 
@@ -140,7 +142,7 @@ mod contract {
         let input = io.read_input().to_vec();
         let args = NewCallArgs::deserialize(&input).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
         state::set_state(&mut io, &args.into()).sdk_unwrap();
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     /// Get version of the contract.
@@ -162,6 +164,7 @@ mod contract {
 
     /// Set owner account id for this contract.
     #[no_mangle]
+    #[named]
     pub extern "C" fn set_owner() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
@@ -176,7 +179,7 @@ mod contract {
         } else {
             state.owner_id = args.new_owner;
             state::set_state(&mut io, &state).sdk_unwrap();
-            update_hashchain(&mut io, &input, &[], &Bloom::default());
+            update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
         }
     }
 
@@ -203,6 +206,7 @@ mod contract {
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn set_upgrade_delay_blocks() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
@@ -213,7 +217,7 @@ mod contract {
             SetUpgradeDelayBlocksArgs::try_from_slice(&input).sdk_expect(errors::ERR_SERIALIZE);
         state.upgrade_delay_blocks = args.upgrade_delay_blocks;
         state::set_state(&mut io, &state).sdk_unwrap();
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
@@ -266,6 +270,7 @@ mod contract {
     ///
     /// [`paused`]: crate::contract::pause_precompiles
     #[no_mangle]
+    #[named]
     pub extern "C" fn resume_precompiles() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -281,11 +286,12 @@ mod contract {
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         pauser.resume_precompiles(flags);
 
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     /// Pauses a precompile.
     #[no_mangle]
+    #[named]
     pub extern "C" fn pause_precompiles() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -302,7 +308,7 @@ mod contract {
         let mut pauser = EnginePrecompilesPauser::from_io(io);
         pauser.pause_precompiles(flags);
 
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
@@ -323,6 +329,7 @@ mod contract {
     /// Assumes that no tx has been accepted after the last tx included on the indicated block hashchain.
     /// This self tx is added to the started hashchain as it changes the state of the contract.
     #[no_mangle]
+    #[named]
     pub extern "C" fn start_hashchain() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
@@ -341,6 +348,7 @@ mod contract {
 
         let mut blockchain_hashchain = BlockchainHashchain::new(
             state.chain_id,
+            io.current_account_id().as_bytes().to_vec(),
             args.block_height + 1,
             args.block_hashchain,
         );
@@ -353,7 +361,7 @@ mod contract {
         }
 
         hashchain::storage::set_state(&mut io, &blockchain_hashchain).sdk_unwrap();
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
         state.is_paused = false;
         state::set_state(&mut io, &state).sdk_unwrap()
     }
@@ -370,6 +378,7 @@ mod contract {
 
     /// Sets the flag to pause the contract.
     #[no_mangle]
+    #[named]
     pub extern "C" fn pause_contract() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
@@ -377,11 +386,12 @@ mod contract {
         require_running(&state);
         state.is_paused = true;
         state::set_state(&mut io, &state).sdk_unwrap();
-        update_hashchain(&mut io, &[], &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &[], &[], &Bloom::default());
     }
 
     /// Sets the flag to resume the contract.
     #[no_mangle]
+    #[named]
     pub extern "C" fn resume_contract() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
@@ -389,7 +399,7 @@ mod contract {
         require_paused(&state);
         state.is_paused = false;
         state::set_state(&mut io, &state).sdk_unwrap();
-        update_hashchain(&mut io, &[], &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &[], &[], &Bloom::default());
     }
 
     ///
@@ -398,6 +408,7 @@ mod contract {
 
     /// Deploy code into the EVM.
     #[no_mangle]
+    #[named]
     pub extern "C" fn deploy_code() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -415,7 +426,7 @@ mod contract {
             .map(|res| {
                 let output = res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
                 let log_bloom = bloom::get_logs_bloom(&res.logs);
-                update_hashchain(&mut io, &input, &output, &log_bloom);
+                update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
                 output
             })
             .sdk_process();
@@ -424,6 +435,7 @@ mod contract {
 
     /// Call method on the EVM contract.
     #[no_mangle]
+    #[named]
     pub extern "C" fn call() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -455,7 +467,7 @@ mod contract {
             .map(|res| {
                 let output = res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
                 let log_bloom = bloom::get_logs_bloom(&res.logs);
-                update_hashchain(&mut io, &input, &output, &log_bloom);
+                update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
                 output
             })
             .sdk_process();
@@ -465,6 +477,7 @@ mod contract {
     /// Process signed Ethereum transaction.
     /// Must match `CHAIN_ID` to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
+    #[named]
     pub extern "C" fn submit() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -491,7 +504,7 @@ mod contract {
             .map(|res| {
                 let output = res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
                 let log_bloom = bloom::get_logs_bloom(&res.logs);
-                update_hashchain(&mut io, &input, &output, &log_bloom);
+                update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
                 output
             })
             .sdk_process();
@@ -500,6 +513,7 @@ mod contract {
     /// Analog of the `submit` function, but waits for the `SubmitArgs` structure rather than
     /// the array of bytes representing the transaction.
     #[no_mangle]
+    #[named]
     pub extern "C" fn submit_with_args() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -523,13 +537,14 @@ mod contract {
             .map(|res| {
                 let output = res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
                 let log_bloom = bloom::get_logs_bloom(&res.logs);
-                update_hashchain(&mut io, &input, &output, &log_bloom);
+                update_hashchain(&mut io, function_name!(), &input, &output, &log_bloom);
                 output
             })
             .sdk_process();
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn register_relayer() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -549,7 +564,7 @@ mod contract {
         );
         update_hashchain(
             &mut io,
-           
+            function_name!(),
             &input_relayer_address,
             &[],
             &Bloom::default(),
@@ -560,6 +575,7 @@ mod contract {
     /// These contracts are where cross-contract calls initiated by the EVM precompile
     /// will be sent from.
     #[no_mangle]
+    #[named]
     pub extern "C" fn factory_update() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -568,12 +584,13 @@ mod contract {
         let input = io.read_input().to_vec();
         let router_bytecode = crate::xcc::RouterCode::new(input.clone());
         crate::xcc::update_router_code(&mut io, &router_bytecode);
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     /// Updates the bytecode version for the given account. This is only called as a callback
     /// when a new version of the router contract is deployed to an account.
     #[no_mangle]
+    #[named]
     pub extern "C" fn factory_update_address_version() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -589,12 +606,13 @@ mod contract {
         let args = crate::xcc::AddressVersionUpdateArgs::try_from_slice(&input)
             .sdk_expect(errors::ERR_SERIALIZE);
         crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     /// Sets the address for the `wNEAR` ERC-20 contract. This contract will be used by the
     /// cross-contract calls feature to have users pay for their NEAR transactions.
     #[no_mangle]
+    #[named]
     pub extern "C" fn factory_set_wnear_address() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -604,7 +622,7 @@ mod contract {
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(input_address));
         update_hashchain(
             &mut io,
-           
+            function_name!(),
             &input_address,
             &[],
             &Bloom::default(),
@@ -615,6 +633,7 @@ mod contract {
     /// created via the XCC precompile in the EVM). The purpose of this method is to enable
     /// XCC on engine instances where wrapped NEAR (WNEAR) is not bridged.
     #[no_mangle]
+    #[named]
     pub extern "C" fn fund_xcc_sub_account() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -628,7 +647,7 @@ mod contract {
         let args =
             crate::xcc::FundXccArgs::try_from_slice(&input).sdk_expect(errors::ERR_SERIALIZE);
         crate::xcc::fund_xcc_sub_account(&io, &mut Runtime, &io, args).sdk_unwrap();
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.
@@ -637,6 +656,7 @@ mod contract {
     /// Either all tokens are transferred and tokens are returned
     /// in case of an error, or no token is returned if the transaction was successful.
     #[no_mangle]
+    #[named]
     pub extern "C" fn ft_on_transfer() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -669,11 +689,12 @@ mod contract {
             );
         }
 
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     /// Deploy ERC20 token mapped to a NEP141
     #[no_mangle]
+    #[named]
     pub extern "C" fn deploy_erc20_token() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -690,7 +711,7 @@ mod contract {
         io.return_output(address_vec);
         update_hashchain(
             &mut io,
-           
+            function_name!(),
             &input,
             address_vec,
             &Bloom::default(),
@@ -701,6 +722,7 @@ mod contract {
     /// Callback invoked by exit to NEAR precompile to handle potential
     /// errors in the exit call.
     #[no_mangle]
+    #[named]
     pub extern "C" fn refund_on_error() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -715,7 +737,7 @@ mod contract {
 
         if let Some(PromiseResult::Successful(_)) = io.promise_result(0) {
             // Promise succeeded -- nothing to do
-            update_hashchain(&mut io, &[], &[], &Bloom::default());
+            update_hashchain(&mut io, function_name!(), &[], &[], &Bloom::default());
         } else {
             // Exit call failed; need to refund tokens
             let input = io.read_input().to_vec();
@@ -727,7 +749,7 @@ mod contract {
                 sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
             }
 
-            update_hashchain(&mut io, &input, &[], &Bloom::default());
+            update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
         }
     }
 
@@ -843,6 +865,7 @@ mod contract {
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn new_eth_connector() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -858,10 +881,11 @@ mod contract {
         let owner_id = io.current_account_id();
 
         EthConnectorContract::create_contract(io, &owner_id, args).sdk_unwrap();
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn set_eth_connector_contract_data() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -877,10 +901,11 @@ mod contract {
             SetContractDataCallArgs::try_from_slice(&input).sdk_expect(errors::ERR_SERIALIZE);
 
         connector::set_contract_data(&mut io, args).sdk_unwrap();
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn withdraw() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -905,7 +930,7 @@ mod contract {
         }
         update_hashchain(
             &mut io,
-           
+            function_name!(),
             &input,
             &output,
             &Bloom::default(),
@@ -913,6 +938,7 @@ mod contract {
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn deposit() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -934,7 +960,7 @@ mod contract {
         io.promise_return(promise_id);
         update_hashchain(
             &mut io,
-           
+            function_name!(),
             &input_raw_proof,
             &[],
             &Bloom::default(),
@@ -942,6 +968,7 @@ mod contract {
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn finish_deposit() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -983,7 +1010,7 @@ mod contract {
             io.promise_return(promise_id);
         }
 
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
@@ -1044,6 +1071,7 @@ mod contract {
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn ft_transfer() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -1058,10 +1086,11 @@ mod contract {
             .sdk_unwrap()
             .ft_transfer(&predecessor_account_id, &args)
             .sdk_unwrap();
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn ft_resolve_transfer() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -1079,10 +1108,11 @@ mod contract {
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .ft_resolve_transfer(&args, promise_result);
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn ft_transfer_call() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -1108,10 +1138,11 @@ mod contract {
         // creates a call to another contract's `ft_on_transfer` method.
         let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
         io.promise_return(promise_id);
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn storage_deposit() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -1130,10 +1161,11 @@ mod contract {
             // that they over paid for their deposit.
             unsafe { io.promise_create_batch(&promise) };
         }
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn storage_unregister() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -1151,10 +1183,11 @@ mod contract {
             // Safety: This call is safe. It is only a transfer back to the user for their deposit.
             unsafe { io.promise_create_batch(&promise) };
         }
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn storage_withdraw() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
@@ -1168,7 +1201,7 @@ mod contract {
             .sdk_unwrap()
             .storage_withdraw(&predecessor_account_id, &args)
             .sdk_unwrap();
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
@@ -1194,6 +1227,7 @@ mod contract {
     }
 
     #[no_mangle]
+    #[named]
     pub extern "C" fn set_paused_flags() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -1208,7 +1242,7 @@ mod contract {
         EthConnectorContract::init_instance(io)
             .sdk_unwrap()
             .set_paused_flags(&args);
-        update_hashchain(&mut io, &input, &[], &Bloom::default());
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     #[no_mangle]
@@ -1366,6 +1400,7 @@ mod contract {
 
     fn update_hashchain(
         io: &mut Runtime,
+        method_name: &str,
         input: &[u8],
         output: &[u8],
         bloom: &Bloom,
@@ -1385,7 +1420,9 @@ mod contract {
                 .sdk_unwrap();
         }
 
-        blockchain_hashchain.add_block_tx(block_height, input, output, bloom).sdk_unwrap();
+        blockchain_hashchain
+            .add_block_tx(block_height, method_name, input, output, bloom)
+            .sdk_unwrap();
 
         hashchain::storage::set_state(io, &blockchain_hashchain).sdk_unwrap();
     }
