@@ -714,7 +714,7 @@ fn test_tx_support_shanghai() {
                 data: hex::decode(data).unwrap(),
             }
         })
-        .unwrap();
+        .expect("Should be able to execute EVM bytecode including PUSH0");
 
     assert!(result.status.is_ok());
 }
