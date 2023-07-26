@@ -759,33 +759,36 @@ mod contract {
 
     /// Sets relayer key manager.
     #[no_mangle]
+    #[named]
     pub extern "C" fn set_key_manager() {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
-
         require_owner_only(&state, &io.predecessor_account_id());
+        let input = io.read_input().to_vec();
 
-        let key_manager =
-            serde_json::from_slice::<RelayerKeyManagerArgs>(&io.read_input().to_vec())
-                .map(|args| args.key_manager)
-                .sdk_expect(errors::ERR_JSON_DESERIALIZE);
+        let key_manager = serde_json::from_slice::<RelayerKeyManagerArgs>(&input)
+            .map(|args| args.key_manager)
+            .sdk_expect(errors::ERR_JSON_DESERIALIZE);
 
         if state.key_manager == key_manager {
             sdk::panic_utf8(errors::ERR_SAME_KEY_MANAGER)
         } else {
             state.key_manager = key_manager;
             state::set_state(&mut io, &state).sdk_unwrap();
+            update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
         }
     }
 
     /// Adds a relayer function call key.
     #[no_mangle]
+    #[named]
     pub extern "C" fn add_relayer_key() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         require_key_manager_only(&state, &io.predecessor_account_id());
+        let input = io.read_input().to_vec();
 
-        let public_key = serde_json::from_slice::<RelayerKeyArgs>(&io.read_input().to_vec())
+        let public_key = serde_json::from_slice::<RelayerKeyArgs>(&input)
             .map(|args| args.public_key)
             .sdk_expect(errors::ERR_JSON_DESERIALIZE);
         let allowance = Yocto::new(io.attached_deposit());
@@ -812,17 +815,20 @@ mod contract {
 
         let promise_id = unsafe { io.promise_create_batch(&promise) };
         io.promise_return(promise_id);
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     /// Removes a relayer function call key.
     #[no_mangle]
+    #[named]
     pub extern "C" fn remove_relayer_key() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         require_key_manager_only(&state, &io.predecessor_account_id());
+        let input = io.read_input().to_vec();
 
-        let args: RelayerKeyArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .sdk_expect(errors::ERR_JSON_DESERIALIZE);
+        let args: RelayerKeyArgs =
+            serde_json::from_slice(&input).sdk_expect(errors::ERR_JSON_DESERIALIZE);
 
         engine::remove_function_call_key(&mut io, &args.public_key).sdk_unwrap();
 
@@ -836,6 +842,7 @@ mod contract {
 
         let promise_id = unsafe { io.promise_create_batch(&promise) };
         io.promise_return(promise_id);
+        update_hashchain(&mut io, function_name!(), &input, &[], &Bloom::default());
     }
 
     ///
