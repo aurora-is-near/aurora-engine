@@ -1,4 +1,4 @@
-use crate::test_utils;
+use crate::utils;
 use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{
     FinishDepositCallArgs, InitCallArgs, NEP141FtOnTransferArgs, NewCallArgsV2,
@@ -9,10 +9,10 @@ use aurora_engine_sdk::io::IO;
 use aurora_engine_types::types::{make_address, Address, Balance, NEP141Wei, NearGas, Wei};
 use aurora_engine_types::{account_id::AccountId, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
-use near_sdk_sim::DEFAULT_GAS;
 
 pub mod block;
 
+const DEFAULT_GAS: u64 = 300_000_000_000_000;
 pub const ETH_CUSTODIAN_ADDRESS: Address =
     make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
 
@@ -32,7 +32,7 @@ pub fn insert_block(storage: &mut Storage, block_height: u64) {
 }
 
 pub fn default_env(block_height: u64) -> aurora_engine_sdk::env::Fixed {
-    let aurora_id: AccountId = test_utils::AuroraRunner::default()
+    let aurora_id: AccountId = utils::AuroraRunner::default()
         .aurora_account_id
         .parse()
         .unwrap();
@@ -58,7 +58,7 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
     state::set_state(&mut io, &new_args.into()).unwrap();
 
     let connector_args = InitCallArgs {
-        prover_account: test_utils::str_to_account_id("prover.near"),
+        prover_account: utils::str_to_account_id("prover.near"),
         eth_custodian_address: ETH_CUSTODIAN_ADDRESS.encode(),
         metadata: FungibleTokenMetadata::default(),
     };

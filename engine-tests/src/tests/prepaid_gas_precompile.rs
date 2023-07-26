@@ -1,4 +1,4 @@
-use crate::test_utils;
+use crate::utils::{self, standalone};
 use aurora_engine_precompiles::prepaid_gas;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::{types::Wei, U256};
@@ -6,8 +6,8 @@ use aurora_engine_types::{types::Wei, U256};
 #[test]
 fn test_prepaid_gas_precompile() {
     const EXPECTED_VALUE: u64 = 157_277_246_352_223;
-    let mut signer = test_utils::Signer::random();
-    let mut runner = test_utils::deploy_evm();
+    let mut signer = utils::Signer::random();
+    let mut runner = utils::deploy_runner();
     runner.cancel_hashchain();
 
     let transaction = TransactionLegacy {
@@ -26,13 +26,13 @@ fn test_prepaid_gas_precompile() {
 
     assert_eq!(
         U256::from(EXPECTED_VALUE),
-        U256::from_big_endian(test_utils::unwrap_success_slice(&result)),
+        U256::from_big_endian(utils::unwrap_success_slice(&result)),
     );
 
     // confirm the precompile works in view calls too
-    let sender = test_utils::address_from_secret_key(&signer.secret_key);
+    let sender = utils::address_from_secret_key(&signer.secret_key);
     let result = runner
-        .view_call(&test_utils::as_view_call(transaction, sender))
+        .view_call(&utils::as_view_call(transaction, sender))
         .unwrap();
     assert!(result.is_ok());
 }

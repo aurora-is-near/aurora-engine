@@ -36,7 +36,10 @@ pub fn download_and_compile_solidity_sources(
             .args(["yarn", "install"])
             .status()
             .unwrap();
-        assert!(status.success());
+        assert!(
+            status.success(),
+            "Unsuccessful exit status while install hardhat dependencies: {status}"
+        );
 
         let hardhat = |command: &str| {
             let status = Command::new("/usr/bin/env")
@@ -44,7 +47,10 @@ pub fn download_and_compile_solidity_sources(
                 .args(["node_modules/hardhat/internal/cli/cli.js", command])
                 .status()
                 .unwrap();
-            assert!(status.success());
+            assert!(
+                status.success(),
+                "Unsuccessful exit status while install while executing `{command}`: {status}",
+            );
         };
 
         // clean and compile

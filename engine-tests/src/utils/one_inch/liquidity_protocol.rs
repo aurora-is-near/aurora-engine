@@ -1,6 +1,7 @@
 use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
-use crate::test_utils::{self, solidity, ExecutionProfile};
+use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
+use crate::utils::{self, solidity, ExecutionProfile};
 use aurora_engine_types::types::Wei;
 use std::path::PathBuf;
 use std::sync::Once;
@@ -9,8 +10,8 @@ static DOWNLOAD_ONCE: Once = Once::new();
 static COMPILE_ONCE: Once = Once::new();
 
 pub struct Helper<'a> {
-    pub runner: &'a mut test_utils::AuroraRunner,
-    pub signer: &'a mut test_utils::Signer,
+    pub runner: &'a mut utils::AuroraRunner,
+    pub signer: &'a mut utils::Signer,
 }
 
 impl<'a> Helper<'a> {
@@ -18,10 +19,9 @@ impl<'a> Helper<'a> {
         &mut self,
     ) -> (SubmitResult, ExecutionProfile, PoolDeployer) {
         let artifacts_path = download_and_compile_solidity_sources();
-        let deployer_constructor =
-            test_utils::solidity::ContractConstructor::compile_from_extended_json(
-                artifacts_path.join("MooniswapDeployer.sol/MooniswapDeployer.json"),
-            );
+        let deployer_constructor = utils::solidity::ContractConstructor::compile_from_extended_json(
+            artifacts_path.join("MooniswapDeployer.sol/MooniswapDeployer.json"),
+        );
         let data = deployer_constructor.code;
         let abi = deployer_constructor.abi;
 
@@ -40,7 +40,7 @@ impl<'a> Helper<'a> {
             .unwrap();
 
         let deployer_address =
-            Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
+            Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
         let deployer = PoolDeployer(solidity::DeployedContract {
             abi,
             address: deployer_address,
@@ -54,11 +54,11 @@ impl<'a> Helper<'a> {
         pool_deployer: &PoolDeployer,
     ) -> (SubmitResult, ExecutionProfile, PoolFactory) {
         let artifacts_path = download_and_compile_solidity_sources();
-        let constructor = test_utils::solidity::ContractConstructor::compile_from_extended_json(
+        let constructor = utils::solidity::ContractConstructor::compile_from_extended_json(
             artifacts_path.join("MooniswapFactory.sol/MooniswapFactory.json"),
         );
 
-        let signer_address = test_utils::address_from_secret_key(&self.signer.secret_key);
+        let signer_address = utils::address_from_secret_key(&self.signer.secret_key);
         let (result, profile) = self
             .runner
             .submit_with_signer_profiled(self.signer, |nonce| {
@@ -73,7 +73,7 @@ impl<'a> Helper<'a> {
             })
             .unwrap();
 
-        let address = Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
+        let address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
         let pool_factory = PoolFactory(constructor.deployed_at(address));
 
         (result, profile, pool_factory)
@@ -86,7 +86,7 @@ impl<'a> Helper<'a> {
         token_b: Address,
     ) -> (SubmitResult, ExecutionProfile, Pool) {
         let artifacts_path = download_and_compile_solidity_sources();
-        let constructor = test_utils::solidity::ContractConstructor::compile_from_extended_json(
+        let constructor = solidity::ContractConstructor::compile_from_extended_json(
             artifacts_path.join("Mooniswap.sol/Mooniswap.json"),
         );
 
@@ -105,27 +105,23 @@ impl<'a> Helper<'a> {
             .unwrap();
 
         let address =
-            Address::try_from_slice(&test_utils::unwrap_success_slice(&result)[12..32]).unwrap();
+            Address::try_from_slice(&utils::unwrap_success_slice(&result)[12..32]).unwrap();
         let pool = Pool(constructor.deployed_at(address));
 
         (result, profile, pool)
     }
 
-    pub(crate) fn create_erc20(&mut self, name: &str, symbol: &str) -> test_utils::erc20::ERC20 {
-        let constructor = test_utils::erc20::ERC20Constructor::load();
+    pub(crate) fn create_erc20(&mut self, name: &str, symbol: &str) -> ERC20 {
+        let constructor = ERC20Constructor::load();
         let nonce = self.signer.use_nonce();
-        test_utils::erc20::ERC20(self.runner.deploy_contract(
+        ERC20(self.runner.deploy_contract(
             &self.signer.secret_key,
             |c| c.deploy(name, symbol, nonce.into()),
             constructor,
         ))
     }
 
-    pub(crate) fn mint_erc20_tokens(
-        &mut self,
-        token: &test_utils::erc20::ERC20,
-        dest: Address,
-    ) -> SubmitResult {
+    pub(crate) fn mint_erc20_tokens(&mut self, token: &ERC20, dest: Address) -> SubmitResult {
         let result = self
             .runner
             .submit_with_signer(self.signer, |nonce| {
@@ -136,11 +132,7 @@ impl<'a> Helper<'a> {
         result
     }
 
-    pub(crate) fn approve_erc20_tokens(
-        &mut self,
-        token: &test_utils::erc20::ERC20,
-        dest: Address,
-    ) -> SubmitResult {
+    pub(crate) fn approve_erc20_tokens(&mut self, token: &ERC20, dest: Address) -> SubmitResult {
         let result = self
             .runner
             .submit_with_signer(self.signer, |nonce| {

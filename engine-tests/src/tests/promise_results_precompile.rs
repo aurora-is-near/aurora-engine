@@ -1,18 +1,18 @@
-use crate::test_utils;
+use crate::utils::{self, standalone};
 use aurora_engine_precompiles::promise_result::{self, costs};
 use aurora_engine_transactions::legacy::TransactionLegacy;
+use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::{
     types::{Address, EthGas, NearGas, PromiseResult, Wei},
     U256,
 };
-use borsh::BorshSerialize;
 
 const NEAR_GAS_PER_EVM: u64 = 175_000_000;
 
 #[test]
 fn test_promise_results_precompile() {
-    let mut signer = test_utils::Signer::random();
-    let mut runner = test_utils::deploy_evm();
+    let mut signer = utils::Signer::random();
+    let mut runner = utils::deploy_runner();
 
     let mut standalone = runner.standalone_runner.unwrap();
     runner.standalone_runner = None;
@@ -43,18 +43,18 @@ fn test_promise_results_precompile() {
     assert_eq!(result, standalone_result);
 
     assert_eq!(
-        test_utils::unwrap_success(result),
+        utils::unwrap_success(result),
         promise_results.try_to_vec().unwrap(),
     );
 }
 
 #[test]
 fn test_promise_result_gas_cost() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     runner.cancel_hashchain();
     runner.context.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
 
-    let mut signer = test_utils::Signer::random();
+    let mut signer = utils::Signer::random();
 
     // Baseline transaction that does essentially nothing.
     let (_, baseline) = runner
@@ -106,7 +106,7 @@ fn test_promise_result_gas_cost() {
     let cost_per_byte = cost_per_byte / NEAR_GAS_PER_EVM;
 
     assert!(
-        test_utils::within_x_percent(
+        utils::within_x_percent(
             5,
             base_cost.as_u64(),
             costs::PROMISE_RESULT_BASE_COST.as_u64()
@@ -117,7 +117,7 @@ fn test_promise_result_gas_cost() {
     );
 
     assert!(
-        test_utils::within_x_percent(5, cost_per_byte, costs::PROMISE_RESULT_BYTE_COST.as_u64()),
+        utils::within_x_percent(5, cost_per_byte, costs::PROMISE_RESULT_BYTE_COST.as_u64()),
         "Incorrect promise_result per byte cost. Expected: {} Actual: {}",
         cost_per_byte,
         costs::PROMISE_RESULT_BYTE_COST
@@ -126,13 +126,13 @@ fn test_promise_result_gas_cost() {
     let total_gas1 = y1 + baseline.all_gas();
     let total_gas2 = y2 + baseline.all_gas();
     assert!(
-        test_utils::within_x_percent(8, evm1, total_gas1 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(8, evm1, total_gas1 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm1,
         total_gas1 / NEAR_GAS_PER_EVM
     );
     assert!(
-        test_utils::within_x_percent(8, evm2, total_gas2 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(8, evm2, total_gas2 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / NEAR_GAS_PER_EVM

@@ -5,11 +5,13 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, Yocto, ZERO_YOCTO};
 use aurora_engine_types::{format, Cow, Vec, U256};
+
+pub use aurora_engine_types::parameters::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 
 pub const ERR_NO_ROUTER_CODE: &str = "ERR_MISSING_XCC_BYTECODE";
 pub const ERR_INVALID_ACCOUNT: &str = "ERR_INVALID_XCC_ACCOUNT";
@@ -25,9 +27,10 @@ pub const WITHDRAW_GAS: NearGas = NearGas::new(30_000_000_000_000);
 pub const WITHDRAW_TO_NEAR_SELECTOR: [u8; 4] = [0x6b, 0x35, 0x18, 0x48];
 
 pub use aurora_engine_precompiles::xcc::state::{
-    get_code_version_of_address, get_latest_code_version, get_wnear_address, CodeVersion,
-    ERR_CORRUPTED_STORAGE, STORAGE_AMOUNT, VERSION_KEY, WNEAR_KEY,
+    get_code_version_of_address, get_latest_code_version, get_wnear_address, ERR_CORRUPTED_STORAGE,
+    STORAGE_AMOUNT, VERSION_KEY, WNEAR_KEY,
 };
+pub use aurora_engine_types::parameters::xcc::CodeVersion;
 
 /// Type wrapper for router bytecode.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,18 +46,6 @@ impl<'a> RouterCode<'a> {
     pub const fn borrowed(bytes: &'a [u8]) -> Self {
         Self(Cow::Borrowed(bytes))
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
-pub struct AddressVersionUpdateArgs {
-    pub address: Address,
-    pub version: CodeVersion,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
-pub struct FundXccArgs {
-    pub target: Address,
-    pub wnear_account_id: Option<AccountId>,
 }
 
 pub fn fund_xcc_sub_account<I, P, E>(

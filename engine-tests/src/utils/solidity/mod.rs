@@ -6,6 +6,14 @@ use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;
 
+pub mod erc20;
+pub mod exit_precompile;
+pub mod random;
+pub mod self_destruct;
+pub mod standard_precompiles;
+pub mod uniswap;
+pub mod weth;
+
 pub struct ContractConstructor {
     pub abi: ethabi::Contract,
     pub code: Vec<u8>,

@@ -1,10 +1,10 @@
-use crate::test_utils;
+use crate::utils;
 use aurora_engine::parameters::SetUpgradeDelayBlocksArgs;
-use borsh::BorshSerialize;
+use aurora_engine_types::borsh::BorshSerialize;
 
 #[test]
 fn test_pause_contract_require_owner() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
     let result = runner.call("pause_contract", &aurora_account_id, vec![]);
@@ -19,7 +19,7 @@ fn test_pause_contract_require_owner() {
 
 #[test]
 fn test_resume_contract_require_owner() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
     let result = runner.call("pause_contract", &aurora_account_id, vec![]);
@@ -37,7 +37,7 @@ fn test_resume_contract_require_owner() {
 
 #[test]
 fn test_pause_contract_require_running() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
     let result = runner.call("pause_contract", &aurora_account_id, vec![]);
@@ -49,7 +49,7 @@ fn test_pause_contract_require_running() {
 
 #[test]
 fn test_resume_contract_require_paused() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
     let result = runner.call("resume_contract", &aurora_account_id, vec![]);
@@ -64,7 +64,7 @@ fn test_resume_contract_require_paused() {
 
 #[test]
 fn test_pause_contract() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
     let set = SetUpgradeDelayBlocksArgs {
         upgrade_delay_blocks: 2,
@@ -97,7 +97,7 @@ fn test_pause_contract() {
 
 #[test]
 fn test_resume_contract() {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
     let set = SetUpgradeDelayBlocksArgs {
         upgrade_delay_blocks: 2,

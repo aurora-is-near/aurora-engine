@@ -1,12 +1,12 @@
-use crate::test_utils;
+use crate::utils::{self, standalone};
 use aurora_engine::parameters::SubmitResult;
 
 #[test]
 fn test_account_id_precompiles() {
-    let mut signer = test_utils::Signer::random();
-    let mut runner = test_utils::deploy_evm();
+    let mut signer = utils::Signer::random();
+    let mut runner = utils::deploy_runner();
 
-    let constructor = test_utils::solidity::ContractConstructor::compile_from_source(
+    let constructor = utils::solidity::ContractConstructor::compile_from_source(
         "src/tests/res",
         "target/solidity_build",
         "AccountIds.sol",
@@ -39,10 +39,8 @@ fn test_account_id_precompiles() {
 
     // confirm the precompile works in view calls too
     let tx = contract.call_method_without_args("predecessorAccountId", 0.into());
-    let sender = test_utils::address_from_secret_key(&signer.secret_key);
-    let result = runner
-        .view_call(&test_utils::as_view_call(tx, sender))
-        .unwrap();
+    let sender = utils::address_from_secret_key(&signer.secret_key);
+    let result = runner.view_call(&utils::as_view_call(tx, sender)).unwrap();
     assert!(result.is_ok());
 
     // double check the case where account_id is the full 64 bytes
@@ -67,7 +65,7 @@ fn test_account_id_precompiles() {
 }
 
 fn unwrap_ethabi_string(result: &SubmitResult) -> String {
-    let bytes = test_utils::unwrap_success_slice(result);
+    let bytes = utils::unwrap_success_slice(result);
     let mut tokens = ethabi::decode(&[ethabi::ParamType::String], bytes).unwrap();
     tokens.pop().unwrap().into_string().unwrap()
 }

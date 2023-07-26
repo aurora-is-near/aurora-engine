@@ -1,8 +1,8 @@
 use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Wei, U256};
-use crate::test_utils::one_inch::liquidity_protocol;
-use crate::test_utils::{self, assert_gas_bound};
-use borsh::BorshDeserialize;
+use crate::utils::one_inch::liquidity_protocol;
+use crate::utils::{self, assert_gas_bound};
+use aurora_engine_types::borsh::BorshDeserialize;
 use libsecp256k1::SecretKey;
 use near_vm_logic::VMOutcome;
 use std::sync::Once;
@@ -30,7 +30,7 @@ fn test_1inch_liquidity_protocol() {
     assert_gas_bound(profile.all_gas(), 10); // less than 11 NEAR Tgas used
 
     // create some ERC-20 tokens to have a liquidity pool for
-    let signer_address = test_utils::address_from_secret_key(&helper.signer.secret_key);
+    let signer_address = utils::address_from_secret_key(&helper.signer.secret_key);
     let token_a = helper.create_erc20("TokenA", "AAA");
     let token_b = helper.create_erc20("TokenB", "BBB");
     helper.mint_erc20_tokens(&token_a, signer_address);
@@ -93,7 +93,7 @@ fn test_1_inch_limit_order_deploy() {
     let (mut runner, mut source_account) = initialize();
 
     let outcome = deploy_1_inch_limit_order_contract(&mut runner, &mut source_account);
-    let profile = test_utils::ExecutionProfile::new(&outcome);
+    let profile = utils::ExecutionProfile::new(&outcome);
     let result: SubmitResult =
         SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
@@ -111,17 +111,17 @@ fn test_1_inch_limit_order_deploy() {
 }
 
 fn deploy_1_inch_limit_order_contract(
-    runner: &mut test_utils::AuroraRunner,
-    signer: &mut test_utils::Signer,
+    runner: &mut utils::AuroraRunner,
+    signer: &mut utils::Signer,
 ) -> VMOutcome {
-    let artifacts_path = test_utils::one_inch::download_and_compile_solidity_sources(
+    let artifacts_path = utils::one_inch::download_and_compile_solidity_sources(
         "limit-order-protocol",
         &DOWNLOAD_ONCE,
         &COMPILE_ONCE,
     );
     let contract_path = artifacts_path.join("LimitOrderProtocol.sol/LimitOrderProtocol.json");
     let constructor =
-        test_utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
+        utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
 
     let nonce = signer.use_nonce();
     let deploy_tx = crate::prelude::transactions::legacy::TransactionLegacy {
@@ -132,25 +132,21 @@ fn deploy_1_inch_limit_order_contract(
         value: Wei::default(),
         data: constructor.code,
     };
-    let tx = test_utils::sign_transaction(deploy_tx, Some(runner.chain_id), &signer.secret_key);
-    let outcome = runner.call(
-        test_utils::SUBMIT,
-        "any_account.near",
-        rlp::encode(&tx).to_vec(),
-    );
+    let tx = utils::sign_transaction(deploy_tx, Some(runner.chain_id), &signer.secret_key);
+    let outcome = runner.call(utils::SUBMIT, "any_account.near", rlp::encode(&tx).to_vec());
 
     assert!(outcome.is_ok());
     outcome.unwrap()
 }
 
-fn initialize() -> (test_utils::AuroraRunner, test_utils::Signer) {
+fn initialize() -> (utils::AuroraRunner, utils::Signer) {
     // set up Aurora runner and accounts
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
-    let source_address = test_utils::address_from_secret_key(&source_account);
+    let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
-    let mut signer = test_utils::Signer::new(source_account);
+    let mut signer = utils::Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;
 
     (runner, signer)

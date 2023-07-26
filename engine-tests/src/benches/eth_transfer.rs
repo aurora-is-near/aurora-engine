@@ -2,14 +2,14 @@ use criterion::{BatchSize, Criterion};
 use libsecp256k1::SecretKey;
 
 use crate::prelude::Wei;
-use crate::test_utils::{address_from_secret_key, create_eth_transaction, deploy_evm, SUBMIT};
+use crate::utils::{address_from_secret_key, create_eth_transaction, deploy_runner, SUBMIT};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 
 pub fn eth_transfer_benchmark(c: &mut Criterion) {
-    let mut runner = deploy_evm();
+    let mut runner = deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
     runner.create_address(

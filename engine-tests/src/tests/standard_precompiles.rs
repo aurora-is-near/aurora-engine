@@ -1,7 +1,7 @@
 use crate::prelude::Wei;
-use crate::test_utils::{
+use crate::utils::{
     self,
-    standard_precompiles::{PrecompilesConstructor, PrecompilesContract},
+    solidity::standard_precompiles::{PrecompilesConstructor, PrecompilesContract},
     AuroraRunner, ExecutionProfile, Signer,
 };
 
@@ -24,69 +24,69 @@ fn test_standard_precompiles() {
         .submit_with_signer(&mut signer, |nonce| contract.call_method("test_all", nonce))
         .unwrap();
 
-    test_utils::panic_on_fail(outcome.status);
+    utils::panic_on_fail(outcome.status);
 }
 
 #[test]
 fn profile_ecrecover() {
     let profile = precompile_execution_profile("test_ecrecover");
-    test_utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
 #[test]
 fn profile_sha256() {
     let profile = precompile_execution_profile("test_sha256");
-    test_utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
 #[test]
 fn profile_ripemd160() {
     let profile = precompile_execution_profile("test_ripemd160");
-    test_utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
 #[test]
 fn profile_identity() {
     let profile = precompile_execution_profile("test_identity");
-    test_utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
 #[test]
 fn profile_modexp() {
     let profile = precompile_execution_profile("test_modexp");
-    test_utils::assert_gas_bound(profile.all_gas(), 7);
+    utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
 #[test]
 fn profile_ecadd() {
     let profile = precompile_execution_profile("test_ecadd");
-    test_utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
 #[test]
 fn profile_ecmul() {
     let profile = precompile_execution_profile("test_ecmul");
-    test_utils::assert_gas_bound(profile.all_gas(), 7);
+    utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
 #[test]
 fn profile_ecpair() {
     let profile = precompile_execution_profile("test_ecpair");
-    test_utils::assert_gas_bound(profile.all_gas(), 103);
+    utils::assert_gas_bound(profile.all_gas(), 103);
 }
 
 #[test]
 fn profile_blake2f() {
     let profile = precompile_execution_profile("test_blake2f");
-    test_utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
 fn initialize() -> (AuroraRunner, Signer, PrecompilesContract) {
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let mut signer = Signer::random();
     signer.nonce = INITIAL_NONCE;
     runner.create_address(
-        test_utils::address_from_secret_key(&signer.secret_key),
+        utils::address_from_secret_key(&signer.secret_key),
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
     );

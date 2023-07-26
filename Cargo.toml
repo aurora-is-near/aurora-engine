@@ -15,14 +15,17 @@ aurora-engine-transactions = { path = "engine-transactions", default-features = 
 aurora-engine-types = { path = "engine-types", default-features = false }
 aurora-engine-modexp = { path = "engine-modexp", default-features = false }
 aurora-engine-test-doubles = { path = "engine-test-doubles" }
+aurora-engine-workspace = { path = "engine-workspace" }
 engine-standalone-storage = { path = "engine-standalone-storage" }
 engine-standalone-tracing = { path = "engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 
+anyhow = "1"
 base64 = { version = "0.21", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }
 bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "0.10", default-features = false }
 borsh-compat = { version = "0.9", package = "borsh", default-features = false }
+bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
 bstr = "1"
 byte-slice-cast = { version = "1", default-features = false }
 criterion = "0.5"
@@ -37,14 +40,16 @@ git2 = "0.17"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.4.0", default-features = false}
+lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
-near-crypto = "0.16"
-near-primitives = "0.16"
-near-primitives-core = "0.16"
-near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "cc4d4aaf2e1f7297aa060b342ca3ef3ff8e67003" }
-near-vm-errors = "0.16"
-near-vm-logic = "0.16"
-near-vm-runner = { version = "0.16", default-features = false, features = [ "wasmer2_vm", "wasmtime_vm" ] }
+near-crypto = "0.17"
+near-primitives = "0.17"
+near-primitives-core = "0.17"
+near-sdk = "4"
+near-vm-errors = "0.17"
+near-vm-logic = "0.17"
+near-vm-runner = { version = "0.17", default-features = false, features = [ "wasmer2_vm", "wasmtime_vm" ] }
+near-units = "0.2"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
@@ -58,10 +63,11 @@ sha2 = { version = "0.10", default-features = false }
 sha3 = { version = "0.10", default-features = false }
 strum = { version = "0.24.1", features = [ "derive" ] }
 tempfile = "3"
+tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
 walrus = "0.20"
 wee_alloc = { version = "0.4", default-features = false }
-
+workspaces = "0.7"
 
 [workspace]
 resolver = "2"
@@ -76,6 +82,7 @@ members = [
     "engine-tests",
     "engine-transactions",
     "engine-types",
+    "engine-workspace",
 ]
 
 exclude = [

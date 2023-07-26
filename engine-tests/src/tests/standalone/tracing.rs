@@ -5,7 +5,7 @@ use engine_standalone_tracing::{sputnik, types::TransactionTrace};
 use serde::Deserialize;
 use std::path::Path;
 
-use crate::test_utils::{self, standalone};
+use crate::utils::{self, standalone};
 
 /// This test replays two transactions from Ethereum mainnet (listed below) and checks we obtain
 /// the same gas usage and transaction trace as reported by etherscan.
@@ -18,8 +18,8 @@ use crate::test_utils::{self, standalone};
 #[test]
 fn test_evm_tracing_with_storage() {
     let mut runner = standalone::StandaloneRunner::default();
-    let mut signer = test_utils::Signer::random();
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let mut signer = utils::Signer::random();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let sender_address = Address::decode("304ee8ae14eceb3a544dff53a27eb1bb1aaa471f").unwrap();
     let weth_address = Address::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap();
 
@@ -28,13 +28,12 @@ fn test_evm_tracing_with_storage() {
     runner.mint_account(signer_address, Wei::zero(), signer.nonce.into(), None);
 
     // Deploy WETH contract
-    let weth_constructor = test_utils::weth::WethConstructor::load();
+    let weth_constructor = utils::solidity::weth::WethConstructor::load();
     let deploy_tx = weth_constructor.deploy(signer.use_nonce().into());
     let result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
-    let contract_address =
-        Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
+    let contract_address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
 
     // Move it over to the same address as it exists on mainnet
     let mut diff = engine_standalone_storage::Diff::default();
@@ -52,7 +51,7 @@ fn test_evm_tracing_with_storage() {
     }
     runner.env.block_height += 1;
     let block_height = runner.env.block_height;
-    let block_hash = test_utils::standalone::mocks::compute_block_hash(block_height);
+    let block_hash = standalone::mocks::compute_block_hash(block_height);
     let block_metadata = engine_standalone_storage::BlockMetadata {
         timestamp: runner.env.block_timestamp(),
         random_seed: runner.env.random_seed(),
@@ -77,7 +76,7 @@ fn test_evm_tracing_with_storage() {
         diff,
         maybe_result: Ok(None),
     };
-    test_utils::standalone::storage::commit(&mut runner.storage, &tx);
+    standalone::storage::commit(&mut runner.storage, &tx);
 
     // Replay transaction depositing some ETH to get WETH (for the first time)
     // tx: https://etherscan.io/tx/0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4
@@ -132,7 +131,7 @@ fn test_evm_tracing_with_storage() {
 #[test]
 fn test_evm_tracing() {
     let mut runner = standalone::StandaloneRunner::default();
-    let mut signer = test_utils::Signer::random();
+    let mut signer = utils::Signer::random();
 
     // Initialize EVM
     runner.init_evm();
@@ -149,8 +148,7 @@ fn test_evm_tracing() {
     let result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
-    let contract_address =
-        Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
+    let contract_address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
 
     // Interact with contract (and trace execution)
     let tx = aurora_engine_transactions::legacy::TransactionLegacy {
