@@ -5,7 +5,7 @@
 #![allow(clippy::expl_impl_clone_on_copy)]
 
 use aurora_engine_sdk::keccak;
-use aurora_engine_types::borsh::{self, BorshSerialize, BorshDeserialize};
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::engine::ResultLog;
 use fixed_hash::construct_fixed_hash;
 use impl_serde::impl_fixed_hash_serde;

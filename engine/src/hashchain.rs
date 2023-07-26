@@ -1,8 +1,8 @@
 use self::blockchain_hashchain_error::BlockchainHashchainError;
 use crate::{bloom::Bloom, prelude::Vec};
 use aurora_engine_sdk::keccak;
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::types::RawH256;
-use aurora_engine_types::borsh::{self, BorshSerialize, BorshDeserialize};
 
 /// Blockchain Hashchain.
 /// Continually keeps track of the previous block hashchain through the blocks heights.
@@ -275,7 +275,7 @@ struct CompactMerkleSubtree {
 pub mod storage {
     use super::{blockchain_hashchain_error::BlockchainHashchainError, BlockchainHashchain};
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
-    use aurora_engine_types::borsh::{BorshSerialize, BorshDeserialize};
+    use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
     use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 
     /// Key for storing the state of the blockchain hashchain.
