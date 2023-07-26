@@ -475,6 +475,12 @@ pub enum InnerTransactionKind {
     PauseContract,
     #[strum(serialize = "resume_contract")]
     ResumeContract,
+    #[strum(serialize = "set_key_manager")]
+    SetKeyManager,
+    #[strum(serialize = "add_relayer_key")]
+    AddRelayerKey,
+    #[strum(serialize = "remove_relayer_key")]
+    RemoveRelayerKey,
     #[strum(serialize = "start_hashchain")]
     StartHashchain,
     Unknown,
@@ -523,6 +529,9 @@ impl From<&TransactionKind> for InnerTransactionKind {
             TransactionKind::SetUpgradeDelayBlocks(_) => Self::SetUpgradeDelayBlocks,
             TransactionKind::PauseContract => Self::PauseContract,
             TransactionKind::ResumeContract => Self::ResumeContract,
+            TransactionKind::SetKeyManager(_) => Self::SetKeyManager,
+            TransactionKind::AddRelayerKey(_) => Self::AddRelayerKey,
+            TransactionKind::RemoveRelayerKey(_) => Self::RemoveRelayerKey,
             TransactionKind::StartHashchain(_) => Self::StartHashchain,
         }
     }

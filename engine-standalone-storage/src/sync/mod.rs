@@ -597,6 +597,8 @@ fn get_input(transaction: &TransactionKind) -> Result<Vec<u8>, error::Error> {
         TransactionKind::PauseContract
         | TransactionKind::ResumeContract
         | TransactionKind::Unknown => Ok(vec![]),
+        TransactionKind::SetKeyManager(args) => args.try_to_vec().map_err(Into::into),
+        TransactionKind::AddRelayerKey(args) | TransactionKind::RemoveRelayerKey(args) => args.try_to_vec().map_err(Into::into),
         TransactionKind::StartHashchain(args) => args.try_to_vec().map_err(Into::into),
     }
 }
