@@ -1720,7 +1720,7 @@ checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 [[package]]
 name = "evm"
 version = "0.39.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#fcc538cc1f7f91156ef66564a8ac032a82bd4b9e"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#c5cdf0c9bf8da9f6baeb1e5b4a52a2a3405e123f"
 dependencies = [
  "auto_impl",
  "environmental",
@@ -1740,7 +1740,7 @@ dependencies = [
 [[package]]
 name = "evm-core"
 version = "0.39.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#fcc538cc1f7f91156ef66564a8ac032a82bd4b9e"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#c5cdf0c9bf8da9f6baeb1e5b4a52a2a3405e123f"
 dependencies = [
  "parity-scale-codec 3.6.4",
  "primitive-types 0.12.1",
@@ -1751,7 +1751,7 @@ dependencies = [
 [[package]]
 name = "evm-gasometer"
 version = "0.39.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#fcc538cc1f7f91156ef66564a8ac032a82bd4b9e"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#c5cdf0c9bf8da9f6baeb1e5b4a52a2a3405e123f"
 dependencies = [
  "environmental",
  "evm-core",
@@ -1762,7 +1762,7 @@ dependencies = [
 [[package]]
 name = "evm-runtime"
 version = "0.39.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#fcc538cc1f7f91156ef66564a8ac032a82bd4b9e"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#c5cdf0c9bf8da9f6baeb1e5b4a52a2a3405e123f"
 dependencies = [
  "auto_impl",
  "environmental",
