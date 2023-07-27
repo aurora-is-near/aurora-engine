@@ -218,9 +218,11 @@ impl StreamCompactMerkleTree {
             }
             // all remaining subtrees have different heights so we can't compact anything else
             else {
-                debug_assert!(
-                    self.subtrees.iter().zip(self.subtrees.iter().skip(1)).all(|(left, right)| left.height > right.height)
-                );
+                debug_assert!(self
+                    .subtrees
+                    .iter()
+                    .zip(self.subtrees.iter().skip(1))
+                    .all(|(left, right)| left.height > right.height));
                 break;
             }
         }
