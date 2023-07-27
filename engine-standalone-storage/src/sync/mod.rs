@@ -58,7 +58,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                         transaction_message.as_ref(),
                         block_height,
                         &block_metadata,
-                        &engine_account_id,
+                        engine_account_id,
                         io,
                     )
                 })
@@ -94,7 +94,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
             &transaction_message,
             block_height,
             &block_metadata,
-            &engine_account_id,
+            engine_account_id,
             io,
         )
     });
@@ -112,7 +112,7 @@ fn execute_transaction<'db, M: ModExpAlgorithm + 'static>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
-    engine_account_id: &AccountId,
+    engine_account_id: AccountId,
     mut io: EngineStateAccess<'db, 'db, 'db>,
 ) -> (
     H256,
@@ -124,7 +124,7 @@ fn execute_transaction<'db, M: ModExpAlgorithm + 'static>(
     let relayer_address =
         aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes());
     let near_receipt_id = transaction_message.near_receipt_id;
-    let current_account_id = engine_account_id.clone();
+    let current_account_id = engine_account_id;
     let env = env::Fixed {
         signer_account_id,
         current_account_id,

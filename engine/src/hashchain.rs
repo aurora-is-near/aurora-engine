@@ -186,7 +186,7 @@ impl StreamCompactMerkleTree {
 
     /// Adds a leaf hash to the right of the tree.
     /// For n leaves hashes added, a single call to this function is O(log n),
-    /// but the amortized time for the n calls is O(1).
+    /// but the amortized time per each of the n calls is O(1).
     pub fn add(&mut self, leaf_hash: RawH256) {
         let leaf_subtree = CompactMerkleSubtree {
             height: 1,
@@ -195,9 +195,11 @@ impl StreamCompactMerkleTree {
         self.subtrees.push(leaf_subtree);
 
         // compact subtrees from right to left
-        let mut index = &self.subtrees.len() - 1;
+        let mut index = self.subtrees.len() - 1;
 
         while index >= 1 {
+            debug_assert_eq!(index, self.subtrees.len() - 1);
+
             let right_subtree = &self.subtrees[index];
             let left_subtree = &self.subtrees[index - 1];
 
@@ -216,6 +218,9 @@ impl StreamCompactMerkleTree {
             }
             // all remaining subtrees have different heights so we can't compact anything else
             else {
+                debug_assert!(
+                    self.subtrees.iter().zip(self.subtrees.iter().skip(1)).all(|(left, right)| left.height > right.height)
+                );
                 break;
             }
         }

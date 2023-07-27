@@ -1,4 +1,4 @@
-use crate::utils::{self, standalone};
+use crate::utils::{self};
 use aurora_engine_precompiles::prepaid_gas;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::{types::Wei, U256};
