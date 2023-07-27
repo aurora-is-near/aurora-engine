@@ -5,8 +5,8 @@ on:
       - '[0-9]+.[0-9]+.[0-9]+'
 name: Build
 jobs:
-  release:
-    name: Release
+  build:
+    name: Build contracts
     runs-on: [self-hosted, heavy]
     strategy:
       matrix:
@@ -17,25 +17,33 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
-      - run: cargo make --profile ${{ matrix.profile }} build-docker
-      - run: cargo make --profile ${{ matrix.profile }} build-xcc-docker
-      - run: ls -lH bin/aurora-${{ matrix.profile }}.wasm
-      - run: ls -lH bin/aurora-factory-${{ matrix.profile }}.wasm
-      - name: Upload the aurora-${{ matrix.profile }}.wasm artifact
+      - run: |
+          cargo make --profile ${{ matrix.profile }} build-docker
+          cargo make --profile ${{ matrix.profile }} build-xcc-docker
+      - run: ls -lH bin/aurora-*${{ matrix.profile }}.wasm
+      - name: Upload aurora-${{ matrix.profile }}.wasm artifact
         uses: actions/upload-artifact@v2
         with:
           name: aurora-${{ matrix.profile }}.wasm
           path: bin/aurora-${{ matrix.profile }}.wasm
-      - name: Upload the aurora-factory-${{ matrix.profile }}.wasm artifact
+      - name: Upload aurora-factory-${{ matrix.profile }}.wasm artifact
         uses: actions/upload-artifact@v2
         with:
           name: aurora-factory-${{ matrix.profile }}.wasm
           path: bin/aurora-factory-${{ matrix.profile }}.wasm
-      - name: Update the latest releases
+
+  publish:
+    name: Publish contracts
+    runs-on: [self-hosted, heavy]
+    needs: build
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+      - name: Publish contracts for ${{ github.ref }} release
         uses: svenstaro/upload-release-action@v2
         with:
           tag: ${{ github.ref }}
-          file: bin/aurora*-${{ matrix.profile }}.wasm
+          file: aurora*.wasm
           overwrite: true
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
