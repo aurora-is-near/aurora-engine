@@ -18,6 +18,9 @@ panic = "abort"
 aurora-engine-types = { path = "../../engine-types", default-features = false, features = ["borsh-compat"] }
 near-sdk = "4.1"
 
+[dev-dependencies]
+aurora-engine-sdk = { workspace = true, features = ["std"] }
+
 [features]
 default = []
 all-promise-actions = []

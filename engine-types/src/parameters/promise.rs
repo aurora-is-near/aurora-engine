@@ -10,10 +10,25 @@ use borsh_compat::{self as borsh, maybestd::io, BorshDeserialize, BorshSerialize
 
 #[must_use]
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
+pub struct PromiseArgsWithSender {
+    pub sender: [u8; 20],
+    pub args: PromiseArgs,
+}
+
+#[must_use]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub enum PromiseArgs {
     Create(PromiseCreateArgs),
     Callback(PromiseWithCallbackArgs),
     Recursive(NearPromise),
+}
+
+fn refund_costs(method: &str) -> u64 {
+    match method {
+        "ft_transfer" => 14_000_000_000_000,
+        "ft_transfer_call" => 39_000_000_000_000,
+        _ => 0,
+    }
 }
 
 impl PromiseArgs {
@@ -24,6 +39,18 @@ impl PromiseArgs {
             Self::Create(_) => 1,
             Self::Callback(_) => 2,
             Self::Recursive(p) => p.promise_count(),
+        }
+    }
+
+    /// Counts the total gas cost of potentail refunds this call creates.
+    #[must_use]
+    pub fn refund_costs(&self) -> u64 {
+        match self {
+            Self::Create(call) => refund_costs(call.method.as_str()),
+            Self::Callback(cb) => {
+                refund_costs(cb.base.method.as_str()) + refund_costs(cb.callback.method.as_str())
+            }
+            Self::Recursive(p) => p.refund_count(),
         }
     }
 
@@ -53,6 +80,26 @@ pub enum SimpleNearPromise {
 }
 
 impl SimpleNearPromise {
+    #[must_use]
+    pub fn refund_count(&self) -> u64 {
+        match self {
+            Self::Create(call) => refund_costs(call.method.as_str()),
+            Self::Batch(batch) => {
+                let total: u64 = batch
+                    .actions
+                    .iter()
+                    .filter_map(|a| {
+                        if let PromiseAction::FunctionCall { name, .. } = a {
+                            Some(refund_costs(name.as_str()))
+                        } else {
+                            None
+                        }
+                    })
+                    .sum();
+                total
+            }
+        }
+    }
     #[must_use]
     pub fn total_gas(&self) -> NearGas {
         match self {
@@ -115,6 +162,14 @@ impl NearPromise {
             Self::Simple(_) => 1,
             Self::Then { base, .. } => base.promise_count() + 1,
             Self::And(ps) => ps.iter().map(Self::promise_count).sum(),
+        }
+    }
+    #[must_use]
+    pub fn refund_count(&self) -> u64 {
+        match self {
+            Self::Simple(x) => x.refund_count(),
+            Self::Then { base, callback } => base.refund_count() + callback.refund_count(),
+            Self::And(ps) => ps.iter().map(Self::refund_count).sum(),
         }
     }
 

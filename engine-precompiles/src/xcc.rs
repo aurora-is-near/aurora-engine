@@ -9,7 +9,7 @@ use aurora_engine_types::{
     account_id::AccountId,
     borsh::{BorshDeserialize, BorshSerialize},
     format,
-    parameters::{CrossContractCallArgs, PromiseCreateArgs},
+    parameters::{CrossContractCallArgs, PromiseArgsWithSender, PromiseCreateArgs},
     types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
     vec, Cow, Vec, H160, H256, U256,
 };
@@ -138,12 +138,18 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                 let call_gas = call.total_gas();
                 let attached_near = call.total_near();
                 let callback_count = call.promise_count() - 1;
+                let refund_costs = call.refund_costs();
                 let router_exec_cost = costs::ROUTER_EXEC_BASE
-                    + NearGas::new(callback_count * costs::ROUTER_EXEC_PER_CALLBACK.as_u64());
+                    + NearGas::new(callback_count * costs::ROUTER_EXEC_PER_CALLBACK.as_u64())
+                    + NearGas::new(refund_costs);
+                let args = PromiseArgsWithSender {
+                    sender: *context.address.as_fixed_bytes(),
+                    args: call,
+                };
                 let promise = PromiseCreateArgs {
                     target_account_id,
                     method: consts::ROUTER_EXEC_NAME.into(),
-                    args: call
+                    args: args
                         .try_to_vec()
                         .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,
@@ -153,10 +159,14 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
             }
             CrossContractCallArgs::Delayed(call) => {
                 let attached_near = call.total_near();
+                let args = PromiseArgsWithSender {
+                    sender: *context.address.as_fixed_bytes(),
+                    args: call,
+                };
                 let promise = PromiseCreateArgs {
                     target_account_id,
                     method: consts::ROUTER_SCHEDULE_NAME.into(),
-                    args: call
+                    args: args
                         .try_to_vec()
                         .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,

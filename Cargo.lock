@@ -6642,6 +6642,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "xcc_router"
+version = "1.0.0"
+dependencies = [
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "near-sdk",
+]
+
+[[package]]
 name = "zeroize"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

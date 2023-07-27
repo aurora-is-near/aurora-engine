@@ -1,10 +1,11 @@
 use aurora_engine_types::parameters::{
-    NearPromise, PromiseAction, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
-    SimpleNearPromise,
+    NearPromise, PromiseAction, PromiseArgs, PromiseArgsWithSender, PromiseCreateArgs,
+    PromiseWithCallbackArgs, SimpleNearPromise,
 };
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LazyOption, LookupMap};
 use near_sdk::json_types::{U128, U64};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::BorshStorageKey;
 use near_sdk::{
     env, near_bindgen, AccountId, Gas, PanicOnDefault, Promise, PromiseIndex, PromiseResult,
@@ -22,6 +23,29 @@ enum StorageKey {
     Map,
 }
 
+#[derive(Deserialize, Serialize)]
+#[serde(crate = "near_sdk::serde")]
+struct FtTransferCallArgs {
+    pub receiver_id: AccountId,
+    pub amount: U128,
+    pub memo: Option<String>,
+    pub msg: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(crate = "near_sdk::serde")]
+struct FtResolveTransferCallArgs {
+    pub sender: [u8; 20],
+    pub token_id: AccountId,
+    pub amount: U128,
+}
+
+// #[derive(Serialize)]
+// #[serde(crate = "near_sdk::serde")]
+// struct FtResolveTransferCallArgs {
+//     pub amount: U128,
+// }
+
 const CURRENT_VERSION: u32 = 1;
 
 const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
@@ -34,6 +58,8 @@ const WNEAR_WITHDRAW_GAS: Gas = Gas(5_000_000_000_000);
 const WNEAR_REGISTER_GAS: Gas = Gas(5_000_000_000_000);
 /// Gas cost estimated from simulation tests.
 const REFUND_GAS: Gas = Gas(5_000_000_000_000);
+const FT_RESOLVE_TRANSFER_CALL_GAS: Gas = Gas(39_000_000_000_000);
+const FT_TRANSFER_CALL_GAS: Gas = Gas(31_000_000_000_000);
 /// Registration amount computed from FT token source code, see
 /// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/core_impl.rs#L50
 /// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/storage_impl.rs#L101
@@ -52,7 +78,7 @@ pub struct Router {
     /// This allows multiple promises to be scheduled before any of them are executed.
     nonce: LazyOption<u64>,
     /// The storage for the scheduled promises.
-    scheduled_promises: LookupMap<u64, PromiseArgs>,
+    scheduled_promises: LookupMap<u64, PromiseArgsWithSender>,
     /// Account ID for the wNEAR contract.
     wnear_account: AccountId,
 }
@@ -114,7 +140,7 @@ impl Router {
     /// The engine only calls this function when the special precompile in the EVM for NEAR cross
     /// contract calls is used by the address associated with the sub-account this router contract
     /// is deployed at.
-    pub fn execute(&self, #[serializer(borsh)] promise: PromiseArgs) {
+    pub fn execute(&self, #[serializer(borsh)] promise: PromiseArgsWithSender) {
         self.require_parent_caller();
 
         let promise_id = Router::promise_create(promise);
@@ -122,7 +148,7 @@ impl Router {
     }
 
     /// Similar security considerations here as for `execute`.
-    pub fn schedule(&mut self, #[serializer(borsh)] promise: PromiseArgs) {
+    pub fn schedule(&mut self, #[serializer(borsh)] promise: PromiseArgsWithSender) {
         self.require_parent_caller();
 
         let nonce = self.nonce.get().unwrap_or_default();
@@ -186,6 +212,40 @@ impl Router {
 
         Promise::new(parent).transfer(REFUND_AMOUNT)
     }
+
+    #[private]
+    pub fn ft_resolve_transfer_call(&self, sender: [u8; 20], token_id: AccountId, amount: U128) {
+        let used_amount = match env::promise_result(0) {
+            PromiseResult::Successful(value) => {
+                near_sdk::serde_json::from_slice::<U128>(&value).unwrap()
+            }
+            PromiseResult::Failed => 0.into(),
+            PromiseResult::NotReady => panic!(),
+        };
+        let unused_amount = U128(amount.0 - used_amount.0);
+        let address = sender.map(|c| format!("{:02x?}", c)).concat();
+        near_sdk::log!("amount {}", amount.0);
+        near_sdk::log!("used_amount {}", used_amount.0);
+        near_sdk::log!("unused_amount {}", unused_amount.0);
+        near_sdk::log!("address {}", &address);
+        near_sdk::log!("self.parent {}", self.parent.get().unwrap());
+        if unused_amount.0 > 0 {
+            let promise_idx = env::promise_create(
+                token_id,
+                "ft_transfer_call",
+                &near_sdk::serde_json::to_vec(&FtTransferCallArgs {
+                    receiver_id: self.parent.get().unwrap(),
+                    amount: unused_amount,
+                    msg: address,
+                    memo: Some("refund".to_string()),
+                })
+                .unwrap(),
+                1u128,
+                FT_TRANSFER_CALL_GAS,
+            );
+            env::promise_return(promise_idx)
+        }
+    }
 }
 
 impl Router {
@@ -208,16 +268,18 @@ impl Router {
         }
     }
 
-    fn promise_create(promise: PromiseArgs) -> PromiseIndex {
-        match promise {
-            PromiseArgs::Create(call) => Self::base_promise_create(&call),
-            PromiseArgs::Callback(cb) => Self::cb_promise_create(&cb),
-            PromiseArgs::Recursive(p) => Self::recursive_promise_create(&p),
+    fn promise_create(promise: PromiseArgsWithSender) -> PromiseIndex {
+        near_sdk::log!("PROMISE {:?}", &promise);
+        near_sdk::log!("prepaid_gas {}", near_sdk::env::prepaid_gas().0);
+        match promise.args {
+            PromiseArgs::Create(call) => Self::base_promise_create(promise.sender, &call),
+            PromiseArgs::Callback(cb) => Self::cb_promise_create(promise.sender, &cb),
+            PromiseArgs::Recursive(p) => Self::recursive_promise_create(promise.sender, &p),
         }
     }
 
-    fn cb_promise_create(promise: &PromiseWithCallbackArgs) -> PromiseIndex {
-        let base = Self::base_promise_create(&promise.base);
+    fn cb_promise_create(sender: [u8; 20], promise: &PromiseWithCallbackArgs) -> PromiseIndex {
+        let base = Self::base_promise_create(sender, &promise.base);
         let promise = &promise.callback;
 
         env::promise_then(
@@ -230,20 +292,49 @@ impl Router {
         )
     }
 
-    fn base_promise_create(promise: &PromiseCreateArgs) -> PromiseIndex {
-        env::promise_create(
-            near_sdk::AccountId::new_unchecked(promise.target_account_id.to_string()),
+    fn base_promise_create(sender: [u8; 20], promise: &PromiseCreateArgs) -> PromiseIndex {
+        // let gas = if promise.method == "ft_transfer_call" {
+        //     (promise.attached_gas.as_u64() - FT_RESOLVE_TRANSFER_CALL_GAS.0).into()
+        // } else {
+        //     promise.attached_gas.as_u64().into()
+        // };
+
+        let account_id = near_sdk::AccountId::new_unchecked(promise.target_account_id.to_string());
+        let mut res = env::promise_create(
+            account_id.clone(),
             promise.method.as_str(),
             &promise.args,
             promise.attached_balance.as_u128(),
+            // gas,
             promise.attached_gas.as_u64().into(),
-        )
+        );
+
+        if promise.method == "ft_transfer_call" {
+            let FtTransferCallArgs { amount, .. } =
+                near_sdk::serde_json::from_slice::<FtTransferCallArgs>(&promise.args).unwrap();
+
+            res = env::promise_then(
+                res,
+                env::current_account_id(),
+                "ft_resolve_transfer_call",
+                &near_sdk::serde_json::to_vec(&FtResolveTransferCallArgs {
+                    sender,
+                    token_id: account_id,
+                    amount,
+                })
+                .unwrap(),
+                0,
+                FT_RESOLVE_TRANSFER_CALL_GAS,
+            );
+        }
+
+        res
     }
 
-    fn recursive_promise_create(promise: &NearPromise) -> PromiseIndex {
+    fn recursive_promise_create(sender: [u8; 20], promise: &NearPromise) -> PromiseIndex {
         match promise {
             NearPromise::Simple(x) => match x {
-                SimpleNearPromise::Create(call) => Self::base_promise_create(call),
+                SimpleNearPromise::Create(call) => Self::base_promise_create(sender, call),
                 SimpleNearPromise::Batch(batch) => {
                     let target =
                         near_sdk::AccountId::new_unchecked(batch.target_account_id.to_string());
@@ -253,7 +344,7 @@ impl Router {
                 }
             },
             NearPromise::Then { base, callback } => {
-                let base_index = Self::recursive_promise_create(base);
+                let base_index = Self::recursive_promise_create(sender, base);
                 match callback {
                     SimpleNearPromise::Create(call) => env::promise_then(
                         base_index,
@@ -275,7 +366,7 @@ impl Router {
             NearPromise::And(promises) => {
                 let indices: Vec<PromiseIndex> = promises
                     .iter()
-                    .map(Self::recursive_promise_create)
+                    .map(|p| Self::recursive_promise_create(sender, p))
                     .collect();
                 env::promise_and(&indices)
             }

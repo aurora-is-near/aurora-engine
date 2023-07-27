@@ -80,6 +80,7 @@ members = [
     "engine-transactions",
     "engine-types",
     "engine-workspace",
+    "etc/xcc-router",
 ]
 
 exclude = [
@@ -89,7 +90,6 @@ exclude = [
     "etc/tests/self-contained-5bEgfRQ",
     "etc/tests/fibonacci",
     "etc/tests/modexp-bench",
-    "etc/xcc-router",
 ]
 
 [profile.release]
