@@ -158,32 +158,6 @@ pub fn mod_inv(x: Word) -> Word {
     y
 }
 
-// Given x odd, computes `x^(-1) mod 2^(WORD_BYTES*out.digits.len())`.
-// See `MODULAR-INVERSE` in https://link.springer.com/content/pdf/10.1007/3-540-46877-3_21.pdf
-pub fn big_mod_inv(x: &MPNat, out: &mut MPNat, scratch: &mut [Word]) {
-    let s = out.digits.len();
-    out.digits[0] = mod_inv(x.digits[0]);
-
-    for digit_index in 1..s {
-        for i in 1..WORD_BITS {
-            let mask = (1 << i) - 1;
-            big_wrapping_mul(x, out, scratch);
-            scratch[digit_index] &= mask;
-            let q = 1 << (i - 1);
-            if scratch[digit_index] >= q {
-                out.digits[digit_index] += q;
-            }
-            scratch.fill(0);
-        }
-        big_wrapping_mul(x, out, scratch);
-        let q = 1 << (WORD_BITS - 1);
-        if scratch[digit_index] >= q {
-            out.digits[digit_index] += q;
-        }
-        scratch.fill(0);
-    }
-}
-
 /// Computes R mod n, where R = 2^(WORD_BITS*k) and k = n.digits.len()
 /// Note that if R = qn + r, q must be smaller than 2^WORD_BITS since `2^(WORD_BITS) * n > R`
 /// (adding a whole additional word to n is too much).
@@ -514,31 +488,6 @@ fn test_r_mod_n() {
         let expected = num::BigUint::from(2_u32).pow((WORD_BITS * x.digits.len()) as u32)
             % num::BigUint::from(n);
         assert_eq!(num::BigUint::from(result), expected);
-    }
-}
-
-#[test]
-fn test_big_mod_inv() {
-    check_big_mod_inv(0x02_FF_FF_FF);
-    check_big_mod_inv(0x1234_0000_DDDD_FFFF);
-    check_big_mod_inv(0x52DA_9A91_F82D_6E17_FDF8_6743_2B58_7917);
-
-    fn check_big_mod_inv(n: u128) {
-        let x = MPNat::from_big_endian(&n.to_be_bytes());
-        let s = x.digits.len();
-        let mut result = MPNat { digits: vec![0; s] };
-        let mut scratch = vec![0; s];
-        big_mod_inv(&x, &mut result, &mut scratch);
-        let n_inv = mp_nat_to_u128(&result);
-        if WORD_BITS * s < u128::BITS as usize {
-            assert_eq!(
-                n.wrapping_mul(n_inv) % (1 << (WORD_BITS * s)),
-                1,
-                "{n} failed big_mod_inv check"
-            );
-        } else {
-            assert_eq!(n.wrapping_mul(n_inv), 1, "{n} failed big_mod_inv check");
-        }
     }
 }
 

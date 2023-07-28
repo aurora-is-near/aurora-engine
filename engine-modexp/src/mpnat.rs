@@ -1,6 +1,6 @@
 use crate::{
     arith::{
-        big_mod_inv, big_wrapping_mul, big_wrapping_pow, borrowing_sub, carrying_add,
+        big_wrapping_mul, big_wrapping_pow, borrowing_sub, carrying_add,
         compute_r_mod_n, in_place_add, in_place_mul_sub, in_place_shl, in_place_shr,
         join_as_double, mod_inv, monpro, monsq,
     },
@@ -22,6 +22,61 @@ pub struct MPNat {
 }
 
 impl MPNat {
+    // Koç's algorithm for inversion mod 2^k
+    // https://eprint.iacr.org/2017/411.pdf
+    fn koc_2017_inverse(aa: &Self, k: usize) -> Self {
+        debug_assert!(aa.is_odd());
+
+        let length = k / WORD_BITS;
+        let mut b = MPNat {
+            digits: vec![0; length + 1]
+        };
+        b.digits[0] = 1;
+
+        let mut a = MPNat {
+            digits: aa.digits.clone()
+        };
+        a.digits.resize(length + 1, 0);
+
+        let mut neg: bool = false;
+
+        let mut res = MPNat {
+            digits: vec![0; length + 1]
+        };
+
+        let (mut wordpos, mut bitpos) = (0, 0);
+
+        for _ in 0..k {
+            let x = b.digits[0] & 1;
+            if x != 0 {
+                if neg == false {
+                    // b = a - b
+                    let mut tmp = MPNat {
+                        digits: a.digits.clone()
+                    };
+                    in_place_mul_sub(&mut tmp.digits, &b.digits, 1);
+                    b = tmp;
+                    neg = true;
+                } else {
+                    // b = b - a
+                    in_place_add(&mut b.digits, &a.digits);
+                }
+            }
+
+            in_place_shr(&mut b.digits, 1);
+
+            res.digits[wordpos] |= x << bitpos;
+
+            bitpos += 1;
+            if bitpos == WORD_BITS {
+                bitpos = 0;
+                wordpos += 1;
+            }
+        }
+
+        res
+    }
+
     pub fn from_big_endian(bytes: &[u8]) -> Self {
         if bytes.is_empty() {
             return Self { digits: vec![0] };
@@ -174,14 +229,10 @@ impl MPNat {
         let x1 = base_copy.modpow_montgomery(exp, &odd);
         let x2 = self.modpow_with_power_of_two(exp, &power_of_two);
 
+        let odd_inv = Self::koc_2017_inverse(&odd, trailing_zeros * WORD_BITS + additional_zero_bits);
+
         let s = power_of_two.digits.len();
         let mut scratch = vec![0; s];
-        let odd_inv = {
-            let mut tmp = MPNat { digits: vec![0; s] };
-            big_mod_inv(&odd, &mut tmp, &mut scratch);
-            *tmp.digits.last_mut().unwrap() &= power_of_two_mask;
-            tmp
-        };
         let diff = {
             scratch.fill(0);
             let mut b = false;
