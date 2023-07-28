@@ -392,7 +392,7 @@ impl EngineContract {
         ViewAccountsCounter::view(&self.contract)
     }
 
-    pub fn factory_wnear_address(&self) -> ViewFactoryWnearAddress {
+    pub fn factory_get_wnear_address(&self) -> ViewFactoryWnearAddress {
         ViewFactoryWnearAddress::view(&self.contract)
     }
 }

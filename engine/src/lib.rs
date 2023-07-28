@@ -500,7 +500,7 @@ mod contract {
 
     /// Returns the address for the `wNEAR` ERC-20 contract in borsh format.
     #[no_mangle]
-    pub extern "C" fn factory_wnear_address() {
+    pub extern "C" fn factory_get_wnear_address() {
         let mut io = Runtime;
         let address = aurora_engine_precompiles::xcc::state::get_wnear_address(&io);
         let bytes = address.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);

@@ -212,7 +212,7 @@ impl AsRef<str> for View {
             View::Erc20FromNep141 => "get_erc20_from_nep141",
             View::Nep141FromErc20 => "get_nep141_from_erc20",
             View::AccountsCounter => "get_accounts_counter",
-            View::FactoryWnearAddress => "factory_wnear_address",
+            View::FactoryWnearAddress => "factory_get_wnear_address",
         }
     }
 }
