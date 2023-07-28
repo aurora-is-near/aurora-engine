@@ -763,6 +763,9 @@ mod workspace {
             .await?;
         assert!(result.is_success());
 
+        let wnear_address = aurora.factory_wnear_address().await.unwrap().result;
+        assert_eq!(wnear_address, wnear_erc20.0.address);
+
         let approve_tx = wnear_erc20.approve(
             cross_contract_call::ADDRESS,
             WNEAR_AMOUNT.into(),

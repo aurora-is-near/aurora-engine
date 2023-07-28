@@ -9,10 +9,11 @@ use crate::operation::{
     CallSetKeyManager, CallSetPausedFlags, CallStageUpgrade, CallStateMigration,
     CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit, CallWithdraw,
     ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode,
-    ViewErc20FromNep141, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
-    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply, ViewIsUsedProof,
-    ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags, ViewPausedPrecompiles,
-    ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion, ViewView,
+    ViewErc20FromNep141, ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth,
+    ViewFtMetadata, ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
+    ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags,
+    ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion,
+    ViewView,
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -389,6 +390,10 @@ impl EngineContract {
 
     pub fn get_accounts_counter(&self) -> ViewAccountsCounter {
         ViewAccountsCounter::view(&self.contract)
+    }
+
+    pub fn factory_wnear_address(&self) -> ViewFactoryWnearAddress {
+        ViewFactoryWnearAddress::view(&self.contract)
     }
 }
 
