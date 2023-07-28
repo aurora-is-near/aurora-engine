@@ -498,7 +498,7 @@ mod contract {
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
     }
 
-    /// Returns the address for the `wNEAR` ERC-20 contract in hex format.
+    /// Returns the address for the `wNEAR` ERC-20 contract in borsh format.
     #[no_mangle]
     pub extern "C" fn factory_wnear_address() {
         let mut io = Runtime;
