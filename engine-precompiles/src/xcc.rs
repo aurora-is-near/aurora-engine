@@ -7,12 +7,12 @@ use crate::{utils, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{
     account_id::AccountId,
+    borsh::{BorshDeserialize, BorshSerialize},
     format,
     parameters::{CrossContractCallArgs, PromiseCreateArgs},
     types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
     vec, Cow, Vec, H160, H256, U256,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
 use evm::backend::Log;
 use evm::executor::stack::{PrecompileFailure, PrecompileHandle};
 use evm::ExitError;
@@ -31,7 +31,7 @@ pub mod costs {
     ///
     /// This process is done in the `test_xcc_eth_gas_cost` test in
     /// `engine-tests/src/tests/xcc.rs`.
-    pub const CROSS_CONTRACT_CALL_BASE: EthGas = EthGas::new(323_000);
+    pub const CROSS_CONTRACT_CALL_BASE: EthGas = EthGas::new(343_650);
     /// Additional EVM gas cost per bytes of input given.
     /// See `CROSS_CONTRACT_CALL_BASE` for estimation methodology.
     pub const CROSS_CONTRACT_CALL_BYTE: EthGas = EthGas::new(3);
@@ -74,14 +74,16 @@ impl<I> CrossContractCall<I> {
 }
 
 pub mod cross_contract_call {
-    use aurora_engine_types::{types::Address, H256};
+    use aurora_engine_types::{
+        types::{make_address, Address},
+        H256,
+    };
 
     /// Exit to Ethereum precompile address
     ///
     /// Address: `0x516cded1d16af10cad47d6d49128e2eb7d27b372`
     /// This address is computed as: `&keccak("nearCrossContractCall")[12..]`
-    pub const ADDRESS: Address =
-        crate::make_address(0x516cded1, 0xd16af10cad47d6d49128e2eb7d27b372);
+    pub const ADDRESS: Address = make_address(0x516cded1, 0xd16af10cad47d6d49128e2eb7d27b372);
 
     /// Sentinel value used to indicate the following topic field is how much NEAR the
     /// cross-contract call will require.
@@ -238,9 +240,9 @@ pub mod state {
 
     use aurora_engine_sdk::error::ReadU32Error;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
+    use aurora_engine_types::parameters::xcc::CodeVersion;
     use aurora_engine_types::storage::{self, KeyPrefix};
     use aurora_engine_types::types::{Address, Yocto};
-    use borsh::{BorshDeserialize, BorshSerialize};
 
     pub const ERR_CORRUPTED_STORAGE: &str = "ERR_CORRUPTED_XCC_STORAGE";
     pub const ERR_MISSING_WNEAR_ADDRESS: &str = "ERR_MISSING_WNEAR_ADDRESS";
@@ -248,28 +250,6 @@ pub mod state {
     pub const WNEAR_KEY: &[u8] = b"wnear";
     /// Amount of NEAR needed to cover storage for a router contract.
     pub const STORAGE_AMOUNT: Yocto = Yocto::new(2_000_000_000_000_000_000_000_000);
-
-    /// Type wrapper for version of router contracts.
-    #[derive(
-        Debug,
-        Clone,
-        Copy,
-        Default,
-        PartialEq,
-        Eq,
-        PartialOrd,
-        Ord,
-        BorshDeserialize,
-        BorshSerialize,
-    )]
-    pub struct CodeVersion(pub u32);
-
-    impl CodeVersion {
-        #[must_use]
-        pub const fn increment(self) -> Self {
-            Self(self.0 + 1)
-        }
-    }
 
     /// Get the address of the `wNEAR` ERC-20 contract
     ///

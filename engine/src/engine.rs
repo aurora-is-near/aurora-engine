@@ -1,6 +1,8 @@
 use crate::parameters::{
     CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs,
 };
+use aurora_engine_types::public_key::PublicKey;
+use aurora_engine_types::PhantomData;
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
@@ -29,6 +31,7 @@ use crate::prelude::{
     Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
+use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use aurora_engine_precompiles::PrecompileConstructorContext;
 use core::cell::RefCell;
 use core::iter::once;
@@ -109,6 +112,7 @@ pub enum EngineErrorKind {
     MaxPriorityGasFeeTooLarge,
     GasPayment(GasPaymentError),
     GasOverflow,
+    NonExistedKey,
 }
 
 impl EngineErrorKind {
@@ -139,6 +143,7 @@ impl EngineErrorKind {
             Self::MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
             Self::GasPayment(e) => e.as_ref(),
             Self::GasOverflow => errors::ERR_GAS_OVERFLOW,
+            Self::NonExistedKey => errors::ERR_FUNCTION_CALL_KEY_NOT_FOUND,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
@@ -346,13 +351,14 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
         }
     }
 
-    fn make_executor<'a>(
+    #[allow(clippy::type_complexity)]
+    fn make_executor<'a, M: ModExpAlgorithm>(
         &'a self,
-        engine: &'a Engine<'env, I, E>,
+        engine: &'a Engine<'env, I, E, M>,
     ) -> executor::stack::StackExecutor<
         'static,
         'a,
-        executor::stack::MemoryStackState<Engine<'env, I, E>>,
+        executor::stack::MemoryStackState<Engine<'env, I, E, M>>,
         Precompiles<'env, I, E, H>,
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
@@ -368,7 +374,7 @@ pub struct GasPaymentResult {
     pub priority_fee_per_gas: U256,
 }
 
-pub struct Engine<'env, I: IO, E: Env> {
+pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     state: EngineState,
     origin: Address,
     gas_price: U256,
@@ -379,11 +385,12 @@ pub struct Engine<'env, I: IO, E: Env> {
     account_info_cache: RefCell<FullCache<Address, Basic>>,
     contract_code_cache: RefCell<FullCache<Address, Vec<u8>>>,
     contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
+    modexp_algorithm: PhantomData<M>,
 }
 
-pub(crate) const CONFIG: &Config = &Config::london();
+pub(crate) const CONFIG: &Config = &Config::shanghai();
 
-impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
+impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
         origin: Address,
         current_account_id: AccountId,
@@ -412,6 +419,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             account_info_cache: RefCell::new(FullCache::default()),
             contract_code_cache: RefCell::new(FullCache::default()),
             contract_storage_cache: RefCell::new(FullCache::default()),
+            modexp_algorithm: PhantomData::default(),
         }
     }
 
@@ -789,6 +797,7 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
             io,
             env,
             promise_handler: ro_promise_handler,
+            mod_exp_algorithm: self.modexp_algorithm,
         });
 
         Self::apply_pause_flags_to_precompiles(precompiles, pause_flags)
@@ -811,6 +820,31 @@ impl<'env, I: IO + Copy, E: Env> Engine<'env, I, E> {
 }
 
 pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
+    io: I,
+    env: &E,
+    args: &SubmitArgs,
+    state: EngineState,
+    current_account_id: AccountId,
+    relayer_address: Address,
+    handler: &mut P,
+) -> EngineResult<SubmitResult> {
+    submit_with_alt_modexp::<_, _, _, AuroraModExp>(
+        io,
+        env,
+        args,
+        state,
+        current_account_id,
+        relayer_address,
+        handler,
+    )
+}
+
+pub fn submit_with_alt_modexp<
+    I: IO + Copy,
+    E: Env,
+    P: PromiseHandler,
+    M: ModExpAlgorithm + 'static,
+>(
     mut io: I,
     env: &E,
     args: &SubmitArgs,
@@ -858,7 +892,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     check_nonce(&io, &sender, &transaction.nonce)?;
 
     // Check intrinsic gas is covered by transaction gas limit
-    match transaction.intrinsic_gas(crate::engine::CONFIG) {
+    match transaction.intrinsic_gas(CONFIG) {
         Err(_e) => {
             return Err(EngineErrorKind::GasOverflow.into());
         }
@@ -873,7 +907,8 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
         return Err(EngineErrorKind::MaxPriorityGasFeeTooLarge.into());
     }
 
-    let mut engine = Engine::new_with_state(state, sender, current_account_id, io, env);
+    let mut engine: Engine<_, _, M> =
+        Engine::new_with_state(state, sender, current_account_id, io, env);
     let prepaid_amount =
         match engine.charge_gas(&sender, &transaction, args.max_gas_price.map(Into::into)) {
             Ok(gas_result) => gas_result,
@@ -957,7 +992,7 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
     if let Some(erc20_address) = args.erc20_address {
         // ERC-20 exit; re-mint burned tokens
         let erc20_admin_address = current_address(&current_account_id);
-        let mut engine =
+        let mut engine: Engine<_, _> =
             Engine::new_with_state(state, erc20_admin_address, current_account_id, io, env);
         let erc20_address = erc20_address;
         let refund_address = args.recipient_address;
@@ -975,8 +1010,9 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
         )
     } else {
         // ETH exit; transfer ETH back from precompile address
-        let exit_address = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
-        let mut engine = Engine::new_with_state(state, exit_address, current_account_id, io, env);
+        let exit_address = exit_to_near::ADDRESS;
+        let mut engine: Engine<_, _> =
+            Engine::new_with_state(state, exit_address, current_account_id, io, env);
         let refund_address = args.recipient_address;
         let amount = Wei::new(U256::from_big_endian(&args.amount));
         engine.call(
@@ -1022,7 +1058,7 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
 }
 
 #[must_use]
-pub fn get_authorizer<I: IO>(io: &I) -> EngineAuthorizer {
+pub fn get_authorizer<I: IO + Copy>(io: &I) -> EngineAuthorizer {
     // TODO: a temporary use the owner account only until the engine adapts std with near-plugins
     state::get_state(io)
         .map(|state| EngineAuthorizer::from_accounts(once(state.owner_id)))
@@ -1103,7 +1139,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
 ) -> Result<Address, DeployErc20Error> {
     let current_account_id = env.current_account_id();
     let input = setup_deploy_erc20_input(&current_account_id);
-    let mut engine = Engine::new(
+    let mut engine: Engine<_, _> = Engine::new(
         aurora_engine_sdk::types::near_account_to_evm_address(
             env.predecessor_account_id().as_bytes(),
         ),
@@ -1295,6 +1331,21 @@ pub fn get_generation<I: IO>(io: &I, address: &Address) -> u32 {
         })
 }
 
+/// Adds a public function call key for a relayer.
+pub fn add_function_call_key<I: IO>(io: &mut I, key: &PublicKey) {
+    let prefixed_key = bytes_to_key(KeyPrefix::RelayerFunctionCallKey, key.key_data());
+    io.write_storage(&prefixed_key, &[1]);
+}
+
+/// Removes a public function call key for a relayer.
+pub fn remove_function_call_key<I: IO>(io: &mut I, key: &PublicKey) -> Result<(), EngineError> {
+    let prefixed_key = bytes_to_key(KeyPrefix::RelayerFunctionCallKey, key.key_data());
+    io.remove_storage(&prefixed_key)
+        .ok_or_else(|| EngineError::from(EngineErrorKind::NonExistedKey))?;
+
+    Ok(())
+}
+
 /// Removes all storage for the given address.
 fn remove_all_storage<I: IO>(io: &mut I, address: &Address, generation: u32) {
     // FIXME: there is presently no way to prefix delete trie state.
@@ -1426,7 +1477,7 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
     handler.promise_attach_callback(base_id, promise)
 }
 
-impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
+impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I, E, M> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
         self.gas_price
@@ -1494,6 +1545,11 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     /// See: `https://doc.aurora.dev/develop/compat/evm#difficulty`
     fn block_difficulty(&self) -> U256 {
         U256::zero()
+    }
+
+    /// Get environmental block randomness.
+    fn block_randomness(&self) -> Option<H256> {
+        Some(self.env.random_seed())
     }
 
     /// Returns the current block gas limit.
@@ -1588,7 +1644,7 @@ impl<'env, I: IO + Copy, E: Env> evm::backend::Backend for Engine<'env, I, E> {
     }
 }
 
-impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
+impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'env, J, E, M> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,
@@ -1707,12 +1763,12 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for Engine<'env, J, E> {
 mod tests {
     use super::*;
     use crate::parameters::{FunctionCallArgsV1, FunctionCallArgsV2};
-    use aurora_engine_precompiles::make_address;
     use aurora_engine_sdk::env::Fixed;
     use aurora_engine_sdk::promise::Noop;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use aurora_engine_test_doubles::promise::PromiseTracker;
-    use aurora_engine_types::types::{Balance, NearGas, RawU256};
+    use aurora_engine_types::parameters::engine::RelayerKeyArgs;
+    use aurora_engine_types::types::{make_address, Balance, NearGas, RawU256};
     use std::cell::RefCell;
 
     #[test]
@@ -1723,7 +1779,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let engine =
+        let engine: Engine<_, _> =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let contract = make_address(1, 1);
@@ -1748,7 +1804,7 @@ mod tests {
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
-        let mut engine =
+        let mut engine: Engine<_, _> =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let input = vec![];
@@ -1774,7 +1830,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine =
+        let mut engine: Engine<_, _> =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let input = Vec::<u8>::new();
@@ -1804,7 +1860,7 @@ mod tests {
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
         let io = StoragePointer(&storage);
-        let mut engine =
+        let mut engine: Engine<_, _> =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let input = Vec::<u8>::new();
@@ -1834,7 +1890,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine =
+        let mut engine: Engine<_, _> =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let gas_limit = u64::MAX;
@@ -1862,7 +1918,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine =
+        let mut engine: Engine<_, _> =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let input = Vec::<u8>::new();
@@ -1888,7 +1944,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine =
+        let mut engine: Engine<_, _> =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let account_id = AccountId::new("relayer").unwrap();
@@ -1907,7 +1963,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         set_balance(&mut io, &origin, &Wei::new_u64(22000));
-        let mut engine = Engine::new_with_state(
+        let mut engine: Engine<_, _> = Engine::new_with_state(
             EngineState::default(),
             origin,
             current_account_id.clone(),
@@ -1967,7 +2023,7 @@ mod tests {
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
-        let mut engine =
+        let mut engine: Engine<_, _> =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let transaction = NormalizedEthTransaction {
@@ -2057,7 +2113,7 @@ mod tests {
         let env = Fixed::default();
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
-        let engine =
+        let engine: Engine<_, _> =
             Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
 
         let expected_value = H256::from_low_u64_le(64);
@@ -2078,7 +2134,7 @@ mod tests {
         let mut io = StoragePointer(&storage);
         let expected_state = EngineState::default();
         state::set_state(&mut io, &expected_state).unwrap();
-        let engine = Engine::new(origin, current_account_id, io, &env).unwrap();
+        let engine: Engine<_, _> = Engine::new(origin, current_account_id, io, &env).unwrap();
         let actual_state = engine.state;
 
         assert_eq!(expected_state, actual_state);
@@ -2224,5 +2280,26 @@ mod tests {
         }];
 
         assert_eq!(expected_logs, actual_logs);
+    }
+
+    #[test]
+    fn test_add_remove_function_call_key() {
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        let public_key = serde_json::from_str::<RelayerKeyArgs>(
+            r#"{"public_key":"ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847"}"#,
+        )
+        .map(|args| args.public_key)
+        .unwrap();
+
+        let result = remove_function_call_key(&mut io, &public_key);
+        assert!(result.is_err()); // should fail because the key doesn't exist yet.
+
+        add_function_call_key(&mut io, &public_key);
+
+        let result = remove_function_call_key(&mut io, &public_key);
+        assert!(result.is_ok());
+        let result = remove_function_call_key(&mut io, &public_key);
+        assert!(result.is_err()); // should fail because the key doesn't exist anymore.
     }
 }

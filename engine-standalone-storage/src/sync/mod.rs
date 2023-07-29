@@ -3,6 +3,7 @@ use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
 use aurora_engine::{engine, parameters::SubmitResult, state, xcc};
+use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_standalone_nep141_legacy::legacy_connector;
 use aurora_engine_types::{
@@ -18,7 +19,7 @@ use crate::engine_state::EngineStateAccess;
 use crate::{BlockMetadata, Diff, Storage};
 use types::{Message, TransactionKind, TransactionMessage};
 
-pub fn consume_message(
+pub fn consume_message<M: ModExpAlgorithm + 'static>(
     storage: &mut Storage,
     message: Message,
 ) -> Result<ConsumeMessageOutcome, crate::Error> {
@@ -47,7 +48,7 @@ pub fn consume_message(
 
             let (tx_hash, diff, result) = storage
                 .with_engine_access(block_height, transaction_position, &[], |io| {
-                    execute_transaction(
+                    execute_transaction::<M>(
                         transaction_message.as_ref(),
                         block_height,
                         &block_metadata,
@@ -73,7 +74,7 @@ pub fn consume_message(
     }
 }
 
-pub fn execute_transaction_message(
+pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     storage: &Storage,
     transaction_message: TransactionMessage,
 ) -> Result<TransactionIncludedOutcome, crate::Error> {
@@ -83,7 +84,7 @@ pub fn execute_transaction_message(
     let block_metadata = storage.get_block_metadata(block_hash)?;
     let engine_account_id = storage.get_engine_account_id()?;
     let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
-        execute_transaction(
+        execute_transaction::<M>(
             &transaction_message,
             block_height,
             &block_metadata,
@@ -101,7 +102,7 @@ pub fn execute_transaction_message(
     Ok(outcome)
 }
 
-fn execute_transaction<'db>(
+fn execute_transaction<'db, M: ModExpAlgorithm + 'static>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
@@ -144,7 +145,7 @@ fn execute_transaction<'db>(
             };
             let result = state::get_state(&io)
                 .map(|engine_state| {
-                    let submit_result = engine::submit(
+                    let submit_result = engine::submit_with_alt_modexp::<_, _, _, M>(
                         io,
                         &env,
                         &args,
@@ -166,7 +167,7 @@ fn execute_transaction<'db>(
             let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
             let result = state::get_state(&io)
                 .map(|engine_state| {
-                    let submit_result = engine::submit(
+                    let submit_result = engine::submit_with_alt_modexp::<_, _, _, M>(
                         io,
                         &env,
                         args,
@@ -182,7 +183,7 @@ fn execute_transaction<'db>(
             (tx_hash, result)
         }
         other => {
-            let result = non_submit_execute(
+            let result = non_submit_execute::<M>(
                 other,
                 io,
                 env,
@@ -202,7 +203,7 @@ fn execute_transaction<'db>(
 /// The `submit` transaction kind is special because it is the only one where the transaction hash
 /// differs from the NEAR receipt hash.
 #[allow(clippy::too_many_lines)]
-fn non_submit_execute<'db>(
+fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
     transaction: &TransactionKind,
     mut io: EngineStateAccess<'db, 'db, 'db>,
     env: env::Fixed,
@@ -216,7 +217,7 @@ fn non_submit_execute<'db>(
         TransactionKind::Call(args) => {
             // We can ignore promises in the standalone engine (see above)
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine =
+            let mut engine: engine::Engine<_, _, M> =
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
             let result = engine.call_with_args(args.clone(), &mut handler);
@@ -227,7 +228,7 @@ fn non_submit_execute<'db>(
         TransactionKind::Deploy(input) => {
             // We can ignore promises in the standalone engine (see above)
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine =
+            let mut engine: engine::Engine<_, _, M> =
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
             let result = engine.deploy_code_with_input(input.clone(), &mut handler);
@@ -246,7 +247,7 @@ fn non_submit_execute<'db>(
         TransactionKind::FtOnTransfer(args) => {
             // No promises can be created by `ft_on_transfer`
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine =
+            let mut engine: engine::Engine<_, _, M> =
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
             if env.predecessor_account_id == env.current_account_id {
@@ -367,7 +368,7 @@ fn non_submit_execute<'db>(
         }
 
         TransactionKind::RegisterRelayer(evm_address) => {
-            let mut engine =
+            let mut engine: engine::Engine<_, _, M> =
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
             engine.register_relayer(env.predecessor_account_id.as_bytes(), *evm_address);
 
@@ -484,6 +485,40 @@ fn non_submit_execute<'db>(
 
             prev.upgrade_delay_blocks = args.upgrade_delay_blocks;
             state::set_state(&mut io, &prev)?;
+
+            None
+        }
+        TransactionKind::PauseContract => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.is_paused = true;
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
+        TransactionKind::ResumeContract => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.is_paused = false;
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
+        TransactionKind::SetKeyManager(args) => {
+            let mut prev = state::get_state(&io)?;
+
+            prev.key_manager = args.key_manager.clone();
+            state::set_state(&mut io, &prev)?;
+
+            None
+        }
+        TransactionKind::AddRelayerKey(args) => {
+            engine::add_function_call_key(&mut io, &args.public_key);
+
+            None
+        }
+        TransactionKind::RemoveRelayerKey(args) => {
+            engine::remove_function_call_key(&mut io, &args.public_key)?;
 
             None
         }

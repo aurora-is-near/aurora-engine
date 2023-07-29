@@ -1,5 +1,6 @@
 use crate::admin_controlled::{AdminControlled, PauseEthConnectorCallArgs, PausedMask};
-use crate::fungible_token::{self, FungibleToken, FungibleTokenMetadata, FungibleTokenOps};
+use crate::fungible_token::{self, FungibleToken, FungibleTokenOps};
+use aurora_engine::connector::proof_key;
 use aurora_engine::{
     deposit_event::{DepositedEvent, FtTransferMessageData, TokenMessageData},
     engine::Engine,
@@ -11,11 +12,14 @@ use aurora_engine::{
     },
     proof::Proof,
 };
+use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk as sdk;
 use aurora_engine_sdk::{
     env::Env,
     io::{StorageIntermediate, IO},
 };
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::{
     account_id::AccountId,
     format,
@@ -30,7 +34,6 @@ use aurora_engine_types::{
     },
     ToString, Vec, U256,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
@@ -202,7 +205,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             TokenMessageData::Near(account_id) => FinishDepositCallArgs {
                 new_owner_id: account_id,
                 amount: event.amount,
-                proof_key: proof.key(),
+                proof_key: proof_key(&proof),
                 relayer_id: predecessor_account_id,
                 fee: event.fee,
                 msg: None,
@@ -230,7 +233,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
                 FinishDepositCallArgs {
                     new_owner_id: current_account_id.clone(),
                     amount: event.amount,
-                    proof_key: proof.key(),
+                    proof_key: proof_key(&proof),
                     relayer_id: predecessor_account_id,
                     fee: event.fee,
                     msg: Some(transfer_data),
@@ -587,9 +590,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// ft_on_transfer callback function
-    pub fn ft_on_transfer<E: Env>(
+    pub fn ft_on_transfer<E: Env, M: ModExpAlgorithm>(
         &mut self,
-        engine: &Engine<'_, I, E>,
+        engine: &Engine<'_, I, E, M>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
@@ -654,7 +657,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
     /// Checks whether the provided proof was already used
     pub fn is_used_proof(&self, proof: Proof) -> bool {
-        self.is_used_event(&proof.key())
+        self.is_used_event(&proof_key(&proof))
     }
 
     /// Get Eth connector paused flags
@@ -724,7 +727,7 @@ pub fn set_contract_data<I: IO>(
     Ok(contract_data)
 }
 
-/// Return metdata
+/// Return metadata
 pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
     io.read_storage(&construct_contract_key(
         &EthConnectorStorageId::FungibleTokenMetadata,

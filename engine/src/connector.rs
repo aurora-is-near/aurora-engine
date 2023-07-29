@@ -1,18 +1,22 @@
 use crate::admin_controlled::AdminControlled;
-use crate::parameters::{BalanceOfEthCallArgs, NEP141FtOnTransferArgs, SetContractDataCallArgs};
+use crate::parameters::{
+    BalanceOfEthCallArgs, FungibleTokenMetadata, NEP141FtOnTransferArgs, SetContractDataCallArgs,
+};
+use crate::prelude::PromiseCreateArgs;
 use crate::prelude::{address::error::AddressError, Wei};
-use crate::prelude::{PromiseCreateArgs, U256};
 
 use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
-use crate::metadata::FungibleTokenMetadata;
-use crate::parameters::error::ParseTypeFromJsonError;
+use crate::parameters::errors::ParseTypeFromJsonError;
 use crate::prelude::{
-    sdk, str, AccountId, Address, BorshDeserialize, BorshSerialize, EthConnectorStorageId,
-    KeyPrefix, NearGas, ToString, Vec, Yocto,
+    sdk, str, AccountId, Address, EthConnectorStorageId, KeyPrefix, NearGas, String, ToString, Vec,
+    Yocto,
 };
+use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::parameters::connector::Proof;
 use aurora_engine_types::types::ZERO_WEI;
 use error::DepositError;
 
@@ -39,12 +43,14 @@ pub struct EthConnectorContract<I: IO> {
     io: I,
 }
 
-/// Connector specific data. It always should contain `prover account` -
+/// Eth connector specific data. It always must contain `prover_account` - account id of the smart
+/// contract which is used for verifying a proof used in the deposit flow.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct EthConnector {
-    /// It used in the Deposit flow, to verify log entry form incoming proof.
+    /// The account id of the Prover NEAR smart contract. It used in the Deposit flow for verifying
+    /// a log entry from incoming proof.
     pub prover_account: AccountId,
-    /// It is Eth address, used in the Deposit and Withdraw logic.
+    /// It is Ethereum address used in the Deposit and Withdraw logic.
     pub eth_custodian_address: Address,
 }
 
@@ -99,7 +105,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Return balance of `nETH` (ETH on Near)
+    /// Return `nETH` balance (ETH on NEAR).
     pub fn ft_balance_of(&self, input: Vec<u8>) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
@@ -110,7 +116,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Return balance of ETH (ETH in Aurora EVM)
+    /// Return `ETH` balance (ETH on Aurora).
     pub fn ft_balance_of_eth_on_aurora(
         &mut self,
         args: &BalanceOfEthCallArgs,
@@ -126,17 +132,17 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         crate::engine::get_balance(&self.io, address)
     }
 
-    /// `ft_on_transfer` callback function
-    pub fn ft_on_transfer<E: Env>(
+    /// `ft_on_transfer` callback function.
+    pub fn ft_on_transfer<E: Env, M: ModExpAlgorithm>(
         &mut self,
-        engine: &Engine<I, E>,
+        engine: &Engine<I, E, M>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), error::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
         // Parse message with specific rules
         let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
             .map_err(error::FtTransferCallError::MessageParseFailed)?;
-
+        let amount = Wei::new_u128(args.amount.as_u128());
         // Special case when predecessor_account_id is current_account_id
         let fee = Wei::from(message_data.fee);
         // Mint fee to relayer
@@ -144,12 +150,12 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         let mint_amount = if relayer.is_some() && fee > ZERO_WEI {
             self.mint_eth_on_aurora(relayer.unwrap(), fee)?;
-            args.amount.as_u128() - message_data.fee.as_u128()
+            amount - fee
         } else {
-            args.amount.as_u128()
+            amount
         };
 
-        self.mint_eth_on_aurora(message_data.recipient, Wei::new(U256::from(mint_amount)))?;
+        self.mint_eth_on_aurora(message_data.recipient, mint_amount)?;
         self.io.return_output(b"\"0\"");
 
         Ok(())
@@ -367,7 +373,7 @@ pub fn set_contract_data<I: IO>(
     Ok(contract_data)
 }
 
-/// Return metadata
+/// Return FT metadata.
 pub fn get_metadata<I: IO>(io: &I) -> Option<FungibleTokenMetadata> {
     io.read_storage(&construct_contract_key(
         EthConnectorStorageId::FungibleTokenMetadata,
@@ -612,6 +618,90 @@ pub mod error {
                     errors::ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE
                 }
             }
+        }
+    }
+}
+
+#[must_use]
+pub fn proof_key(proof: &Proof) -> String {
+    let mut data = proof.log_index.try_to_vec().unwrap();
+    data.extend(proof.receipt_index.try_to_vec().unwrap());
+    data.extend(proof.header_data.clone());
+    sdk::sha256(&data)
+        .0
+        .iter()
+        .map(ToString::to_string)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::deposit_event::{DepositedEvent, TokenMessageData, DEPOSITED_EVENT};
+    use aurora_engine_types::parameters::connector::LogEntry;
+    use aurora_engine_types::types::{make_address, Address, Fee, NEP141Wei, Wei};
+    use aurora_engine_types::{H160, U256};
+
+    const ETH_CUSTODIAN_ADDRESS: Address =
+        make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
+
+    #[test]
+    fn test_proof_key_generates_successfully() {
+        let recipient_address = Address::new(H160([22u8; 20]));
+        let deposit_amount = Wei::new_u64(123_456_789);
+        let proof = create_proof(recipient_address, deposit_amount);
+
+        let expected_key =
+            "1297721518512077871939115641114233180253108247225100248224214775219368216419218177247";
+        let actual_key = proof_key(&proof);
+
+        assert_eq!(expected_key, actual_key);
+    }
+
+    fn create_proof(recipient_address: Address, deposit_amount: Wei) -> Proof {
+        let eth_custodian_address = ETH_CUSTODIAN_ADDRESS;
+
+        let fee = Fee::new(NEP141Wei::new(0));
+        let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
+        let token_message_data: TokenMessageData =
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+                .unwrap();
+
+        let deposit_event = DepositedEvent {
+            eth_custodian_address,
+            sender: Address::new(H160([0u8; 20])),
+            token_message_data,
+            amount: NEP141Wei::new(deposit_amount.raw().as_u128()),
+            fee,
+        };
+
+        let event_schema = ethabi::Event {
+            name: DEPOSITED_EVENT.into(),
+            inputs: DepositedEvent::event_params(),
+            anonymous: false,
+        };
+        let log_entry = LogEntry {
+            address: eth_custodian_address.raw(),
+            topics: vec![
+                event_schema.signature(),
+                // the sender is not important
+                crate::prelude::H256::zero(),
+            ],
+            data: ethabi::encode(&[
+                ethabi::Token::String(message),
+                ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+                ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
+            ]),
+        };
+
+        Proof {
+            log_index: 1,
+            // Only this field matters for the purpose of this test
+            log_entry_data: rlp::encode(&log_entry).to_vec(),
+            receipt_index: 1,
+            receipt_data: Vec::new(),
+            header_data: Vec::new(),
+            proof: Vec::new(),
         }
     }
 }

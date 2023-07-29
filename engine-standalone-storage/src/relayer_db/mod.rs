@@ -201,9 +201,9 @@ mod test {
     use super::FallibleIterator;
     use crate::relayer_db::types::ConnectionParams;
     use crate::sync::types::{TransactionKind, TransactionMessage};
-    use aurora_engine::metadata::FungibleTokenMetadata;
     use aurora_engine::{parameters, state};
     use aurora_engine_standalone_nep141_legacy::legacy_connector;
+    use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
     use aurora_engine_types::H256;
 
     #[allow(clippy::doc_markdown)]
@@ -219,8 +219,9 @@ mod test {
         let engine_state = state::EngineState {
             chain_id: aurora_engine_types::types::u256_to_arr(&1_313_161_555.into()),
             owner_id: "aurora".parse().unwrap(),
-            bridge_prover_id: "prover.bridge.near".parse().unwrap(),
             upgrade_delay_blocks: 0,
+            is_paused: false,
+            key_manager: None,
         };
 
         // Initialize engine and connector states in storage.
@@ -242,7 +243,7 @@ mod test {
                     io,
                     engine_state.owner_id.clone(),
                     parameters::InitCallArgs {
-                        prover_account: engine_state.bridge_prover_id.clone(),
+                        prover_account: "prover.bridge.near".parse().unwrap(),
                         eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"
                             .to_string(),
                         metadata: FungibleTokenMetadata::default(),

@@ -1,22 +1,19 @@
 [package]
 name = "aurora-engine-test-doubles"
 version = "1.0.0"
-authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2021"
+authors.workspace = true
+edition.workspace = true
 description = "Contains implementations of engine traits suitable for using in tests"
-documentation = ""
-readme = true
-homepage = "https://github.com/aurora-is-near/aurora-engine"
-repository = "https://github.com/aurora-is-near/aurora-engine"
-license = "GPL-3.0"
-publish = false
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
 autobenches = false
 
 [dependencies]
-aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
-aurora-engine-sdk = { path = "../engine-sdk" }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false, features = ["std", "tracing"] }
-
-[dev-dependencies]
+aurora-engine-types = { workspace = true, features = ["std"] }
+aurora-engine-sdk.workspace = true
+evm = { workspace = true, features = ["std", "tracing"] }
+evm-gasometer.workspace = true
+evm-runtime.workspace = true

@@ -7,7 +7,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- New variant of submit function `submit_with_args` which accepts additional arguments along with the transaction.
+## [2.10.1] 2023-07-27
+
+### Fixes
+
+- Updated sputnikvm dependency with bugfix in the `shanghai` implementation [@mandreyel]. ([#803]) 
+
+[#803]: https://github.com/aurora-is-near/aurora-engine/pull/803
+
+## [2.10.0] 2023-07-20
+
+### Changes
+
+- Enabled Shanghai Ethereum hard fork support by [@mandreyel]. ([#773])
+- Added ability to pause and resume the core functionality of the contract by [@Casuso]. ([#779])
+- Added function call keys to be used with relayers by [@aleksuss]. ([#792])
+
+[#773]: https://github.com/aurora-is-near/aurora-engine/pull/773
+[#779]: https://github.com/aurora-is-near/aurora-engine/pull/779
+[#792]: https://github.com/aurora-is-near/aurora-engine/pull/792
+
+## [2.9.3] 2023-07-19
+
+### Changes
+
+- It is now possible for anyone to call the contract method `deploy_upgrade` by [@joshuajbouw]. ([#794])
+
+[#794]: https://github.com/aurora-is-near/aurora-engine/pull/794
+
+## [2.9.2] 2023-06-22
+
+### Fixes
+
+- Use ibig implemenation of modexp by [@birchmd]. ([#778])
+
+[#778]: https://github.com/aurora-is-near/aurora-engine/pull/778
+
+## [2.9.1] 2023-05-11
+
+### Changes
+
+- Removed unused state variable `bridge_prover_id` by [@birchmd]. ([#749])
+- `modexp` has been improved to be greatly faster than before by [@birchmd]. ([#757])
+
+### Fixes
+
+- Fixed an issue where the owner could call `new` multiple times by [@lempire123]. ([#733])
+- Fixed an issue with `deploy_upgrade` where the upgrade index isn't cleared by [@lempire123]. ([#741])
+
+[#749]: https://github.com/aurora-is-near/aurora-engine/pull/749
+[#757]: https://github.com/aurora-is-near/aurora-engine/pull/757
+[#733]: https://github.com/aurora-is-near/aurora-engine/pull/733
+[#741]: https://github.com/aurora-is-near/aurora-engine/pull/741
+
+## [2.9.0] 2023-04-05
+
+### Added
+
+- Enabled XCC for mainnet release by [@birchmd]. ([#694])
+- Added `set_owner` contract method which sets the owner of the contract by [@hskang9]. ([#690])
+- New variant of submit function `submit_with_args` which accepts additional arguments along with the transaction such as the max gas price a user is ready to pay by [@aleksuss]. ([#696])
+- Added the ability to create and fund XCC sub-accounts from external NEAR accounts by [@birchmd]. ([#735])
+
+### Changes
+
+- Replaced `rjson` with `serde_json` by [@aleksuss]. ([#677])
+- Changed owner intended contract methods to now require owner or the contract itself by [@hskang9]. ([#676])
+
+### Fixes
+
+- Fixed nonce incorrectly being incremented on an out of fund failure by [@joshuajbouw]. ([#671])
+- Fixed a check in promise results before executing cross contract calls (XCC) callbacks by [@birchmd]. ([#693])
+- Fixed a reachable panic in `receive_erc20_tokens` by [@0x3bfc]. ([#709])
+- Fixed a lack of minimum size checks when instantiating a new `EthGas` object by [@lempire123]. ([#722])
+- Fixed a lack of division by 0 checks in `EthGas::Div()` by [@lempire123]. ([#718])
+- Fixed the validation of the return of `exports:storage_remove` by [@0x3bfc]. ([#712])
+- Fixed missing account validations of NEAR account IDs by [@0x3bfc]. ([#703])
+- Fixed a reachable panic in the `exitToNear` and `exitToEthereum` precompiles if the input amount is greater than 1^128 when cast from a `U256` to `u128` by [@0x3bfc]. ([#681])
+- Fixed a reachable panic in `modExp` due to arithmetic overflow by [@0x3bfc]. ([#688])
+- Fixed the ability attaching values to Aurora specific precompiles, this no longer is possible, by [@0x3bfc]. ([#714])
+- Fixed a return error if an ecrecover signature length is not exactly 65 by [@0x3bfc]. ([#717])
+- Fixed size checks on input array passed to `exitToNear` and `exitToEthereum` precompiles by [@0x3bfc]. ([#684])
+- Fixed missing gas costs in `exitToNear` and `exitToEthereum` precompiles by [@lempire123]. ([#687])
+- Fixed a reachable panic due to out of memory in the `modExp` precompile by [@0x3bfc]. ([#689])
+- Fixed an assurance that the `sender_id` has a balance greater than the amount in `ft_transfer_call` by [@0x3bfc]. ([#708])
+- Fixed returning `0x` when a length cannot be cast as `usize` instead of returning an error in the `modExp` precompile by [@birchmd]. ([#737])
+- Miscellaneous minor fixes by [@0x3bfc]. ([#738])
+
+[#671]: https://github.com/aurora-is-near/aurora-engine/pull/671
+[#677]: https://github.com/aurora-is-near/aurora-engine/pull/677
+[#693]: https://github.com/aurora-is-near/aurora-engine/pull/693
+[#694]: https://github.com/aurora-is-near/aurora-engine/pull/694
+[#690]: https://github.com/aurora-is-near/aurora-engine/pull/690
+[#676]: https://github.com/aurora-is-near/aurora-engine/pull/676
+[#709]: https://github.com/aurora-is-near/aurora-engine/pull/709
+[#722]: https://github.com/aurora-is-near/aurora-engine/pull/722
+[#718]: https://github.com/aurora-is-near/aurora-engine/pull/718
+[#696]: https://github.com/aurora-is-near/aurora-engine/pull/696
+[#712]: https://github.com/aurora-is-near/aurora-engine/pull/712
+[#703]: https://github.com/aurora-is-near/aurora-engine/pull/703
+[#681]: https://github.com/aurora-is-near/aurora-engine/pull/681
+[#688]: https://github.com/aurora-is-near/aurora-engine/pull/688
+[#714]: https://github.com/aurora-is-near/aurora-engine/pull/714
+[#717]: https://github.com/aurora-is-near/aurora-engine/pull/717
+[#684]: https://github.com/aurora-is-near/aurora-engine/pull/684
+[#687]: https://github.com/aurora-is-near/aurora-engine/pull/687
+[#689]: https://github.com/aurora-is-near/aurora-engine/pull/689
+[#708]: https://github.com/aurora-is-near/aurora-engine/pull/708
+[#737]: https://github.com/aurora-is-near/aurora-engine/pull/737
+[#735]: https://github.com/aurora-is-near/aurora-engine/pull/735
+[#738]: https://github.com/aurora-is-near/aurora-engine/pull/738
+
+## [2.8.1] 2022-12-07
+
+- Updated SputnikVM to v0.37.2 by [@birchmd]. ([#645])
+
+## [2.8.1] 2022-12-07
+
+### Changes
+
+- Performance improvement (approximately 5% reduction in NEAR gas usage) by [@birchmd]. ([#645])
+
+### Fixes
+
+- Tracing bug fix by [@birchmd]. ([#646])
+
+[#645]: https://github.com/aurora-is-near/aurora-engine/pull/645
+[#646]: https://github.com/aurora-is-near/aurora-engine/pull/646
 
 ## [2.8.0] 2022-11-15
 
@@ -323,17 +449,23 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.8.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.1...develop
+[2.10.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.0...2.10.1
+[2.10.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.3...2.10.0
+[2.9.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.2...2.9.3 
+[2.9.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.1...2.9.2
+[2.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.0...2.9.1
+[2.9.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.8.0...2.9.0 
 [2.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.7.0...2.8.0
 [2.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.1...2.7.0
-[2.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.0...2.6.1 
+[2.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.6.0...2.6.1
 [2.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.3...2.6.0
 [2.5.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.2...2.5.3
 [2.5.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.1...2.5.2
 [2.5.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.5.0...2.5.1
 [2.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.4.0...2.5.0
 [2.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.3.0...2.4.0
-[2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0 
+[2.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.2.0...2.3.0
 [2.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.1.0...2.2.0
 [2.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.2...2.1.0
 [2.0.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.0.1...2.0.2
@@ -355,9 +487,14 @@ struct SubmitResult {
 [1.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/aurora-is-near/aurora-engine/tree/1.0.0
 
+[@0x3bfc]: https://github.com/0x3bfc
+[@aleksuss]: https://github.com/aleksuss
 [@andrcmdr]: https://github.com/andrcmdr
 [@birchmd]: https://github.com/birchmd
+[@Casuso]: https://github.com/Casuso
+[@hskang9]: https://github.com/hskang9
 [@joshuajbouw]: https://github.com/joshuajbouw
+[@mandreyel]: https://github.com/mandreyel
 [@mfornet]: https://github.com/mfornet
 [@mrLSD]: https://github.com/mrLSD
 [@RomanHodulak]: https://github.com/RomanHodulak

@@ -1,6 +1,7 @@
 use crate::prelude::{Address, Wei, U256};
-use crate::test_utils::{self, solidity};
+use crate::utils::{self, solidity};
 use aurora_engine_transactions::legacy::TransactionLegacy;
+use aurora_engine_types::parameters::engine::TransactionStatus;
 use libsecp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -42,10 +43,11 @@ pub fn measure_gas_usage(total_tokens: usize, data_size: usize, tokens_per_page:
     // show them
     let nonce = source_account.nonce;
     let tx = marketplace.get_page(tokens_per_page, 0, nonce.into());
-    let (result, profile) = runner.profiled_view_call(&test_utils::as_view_call(tx, dest_address));
+    let (status, profile) = runner
+        .profiled_view_call(&utils::as_view_call(tx, dest_address))
+        .unwrap();
 
-    let status = result.unwrap();
-    assert!(status.is_ok());
+    assert!(matches!(status, TransactionStatus::Succeed(_)));
     profile.all_gas()
 }
 
@@ -155,15 +157,15 @@ impl MarketPlace {
     }
 }
 
-fn initialize_evm() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
+fn initialize_evm() -> (utils::AuroraRunner, utils::Signer, Address) {
     // set up Aurora runner and accounts
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
-    let source_address = test_utils::address_from_secret_key(&source_account);
+    let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
-    let dest_address = test_utils::address_from_secret_key(&SecretKey::random(&mut rng));
-    let mut signer = test_utils::Signer::new(source_account);
+    let dest_address = utils::address_from_secret_key(&SecretKey::random(&mut rng));
+    let mut signer = utils::Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;
 
     runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;

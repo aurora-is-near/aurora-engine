@@ -1,15 +1,15 @@
 use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
-use crate::test_utils::{AuroraRunner, Signer, ORIGIN};
-
-use crate::test_utils;
-use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS};
+use crate::utils::solidity::exit_precompile::{
+    Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS,
+};
+use crate::utils::{self, deploy_runner, AuroraRunner, Signer, ORIGIN};
 
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token("tt.testnet");
-    let mut signer = test_utils::Signer::random();
+    let mut signer = Signer::random();
     runner.create_address(
-        test_utils::address_from_secret_key(&signer.secret_key),
+        utils::address_from_secret_key(&signer.secret_key),
         Wei::from_eth(1.into()).unwrap(),
         U256::zero(),
     );
@@ -25,7 +25,9 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
         )
         .into();
 
-    runner.mint(token, tester.contract.address, 1_000_000_000, ORIGIN);
+    runner
+        .mint(token, tester.contract.address, 1_000_000_000, ORIGIN)
+        .unwrap();
 
     (runner, signer, token, tester)
 }
@@ -33,7 +35,7 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
 #[test]
 #[should_panic]
 fn test_deploy_erc20_token_with_invalid_account_id() {
-    let mut runner = AuroraRunner::new();
+    let mut runner = deploy_runner();
     let invalid_nep141 = "_";
     runner.deploy_erc20_token(invalid_nep141);
 }
@@ -209,7 +211,7 @@ fn withdraw_eth() {
     ];
     let exit_events = parse_exit_events(result, &schema);
 
-    assert!(exit_events.len() == 1);
+    assert_eq!(exit_events.len(), 1);
     assert_eq!(&expected_event, &exit_events[0].params);
 
     // exit to ethereum
@@ -228,7 +230,7 @@ fn withdraw_eth() {
     let schema = aurora_engine_precompiles::native::events::exit_to_eth_schema();
     let exit_events = parse_exit_events(result, &schema);
 
-    assert!(exit_events.len() == 1);
+    assert_eq!(exit_events.len(), 1);
     assert_eq!(&expected_event, &exit_events[0].params);
 }
 

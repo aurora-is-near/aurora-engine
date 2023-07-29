@@ -32,6 +32,7 @@ pub enum KeyPrefix {
     Nep141Erc20Map = 0x8,
     Erc20Nep141Map = 0x9,
     CrossContractCall = 0xa,
+    RelayerFunctionCallKey = 0xb,
 }
 
 impl From<KeyPrefix> for u8 {
@@ -48,6 +49,7 @@ impl From<KeyPrefix> for u8 {
             KeyPrefix::Nep141Erc20Map => 0x8,
             KeyPrefix::Erc20Nep141Map => 0x9,
             KeyPrefix::CrossContractCall => 0xa,
+            KeyPrefix::RelayerFunctionCallKey => 0xb,
         }
     }
 }
@@ -98,7 +100,8 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x8 => Self::Nep141Erc20Map,
             0x9 => Self::Erc20Nep141Map,
             0xa => Self::CrossContractCall,
-            _ => unreachable!(),
+            0xb => Self::RelayerFunctionCallKey,
+            _ => unreachable!("Unknown key prefix"),
         }
     }
 }

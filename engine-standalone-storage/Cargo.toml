@@ -1,35 +1,36 @@
 [package]
 name = "engine-standalone-storage"
 version = "0.1.0"
-edition = "2021"
-authors = ["Aurora Labs <hello@aurora.dev>"]
+authors.workspace = true
+edition.workspace = true
 description = "Aurora engine standalone storage library. Provides the storage backend used by the standalone engine."
-homepage = "https://github.com/aurora-is-near/aurora-engine"
-repository = "https://github.com/aurora-is-near/aurora-engine"
-license = "CC0-1.0"
-publish = false
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
 autobenches = false
 
 [lib]
 crate-type = ["lib"]
 
 [dependencies]
-aurora-engine = { path = "../engine", default-features = false, features = ["std"] }
-aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
-aurora-engine-sdk = { path = "../engine-sdk", default-features = false, features = ["std"] }
-aurora-engine-standalone-nep141-legacy = { path = "../engine-standalone-nep141-legacy", default-features = false }
-aurora-engine-transactions = { path = "../engine-transactions", default-features = false, features = ["std"] }
-aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false, features = ["std"] }
-borsh = "0.10"
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.37.4-aurora", default-features = false }
-hex = "0.4.3"
-rocksdb = { version = "0.19.0", default-features = false }
-postgres = "0.19.2"
-serde = "1.0.130"
-serde_json = "1.0.72"
+aurora-engine = { workspace = true, features = ["std"] }
+aurora-engine-modexp = { workspace = true, features = ["std"] }
+aurora-engine-precompiles = { workspace = true, features = ["std"] }
+aurora-engine-sdk = { workspace = true, features = ["std"] }
+aurora-engine-standalone-nep141-legacy.workspace = true
+aurora-engine-transactions = { workspace = true, features = ["std"] }
+aurora-engine-types = { workspace = true, features = ["std"] }
+evm-core.workspace = true
+hex = { workspace = true, features = ["std"] }
+rocksdb.workspace = true
+postgres.workspace = true
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true, features = ["std"] }
 
 [features]
 default = ["snappy", "lz4", "zstd", "zlib"]
+borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-sdk/borsh-compat", "aurora-engine-precompiles/borsh-compat", "aurora-engine/borsh-compat"]
 mainnet = []
 testnet = []
 snappy = ["rocksdb/snappy"]

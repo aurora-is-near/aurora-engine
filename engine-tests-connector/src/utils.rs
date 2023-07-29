@@ -1,8 +1,7 @@
-use aurora_engine::metadata::FungibleTokenMetadata;
-use aurora_engine::parameters::SetEthConnectorContractAccountArgs;
+use aurora_engine::parameters::{FungibleTokenMetadata, SetEthConnectorContractAccountArgs};
 use aurora_engine::proof::Proof;
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::types::{Address, Wei};
-use borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::serde_json::json;
 use near_sdk::{json_types::U128, serde_json};
 use std::path::Path;

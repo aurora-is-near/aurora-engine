@@ -1,34 +1,36 @@
 [package]
 name = "aurora-engine-types"
 version = "1.0.0"
-authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2021"
-description = ""
-documentation = ""
-readme = true
-homepage = "https://github.com/aurora-is-near/aurora-engine"
-repository = "https://github.com/aurora-is-near/aurora-engine"
-license = "CC0-1.0"
-publish = false
 autobenches = false
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish.workspace = true
 
 [dependencies]
-borsh = { version = "0.10", default-features = false }
-borsh-compat = { version = "0.9", package = "borsh", default-features = false, optional = true }
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
-primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
-serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
-serde_json = { version = "1", default-features = false, features = ["alloc"] }
+base64.workspace = true
+borsh-compat = { workspace = true, optional = true }
+borsh.workspace = true
+bs58.workspace = true
+hex.workspace = true
+primitive-types.workspace = true
+rlp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
-rand = "0.8.5"
+rand.workspace = true
 
 [features]
 default = ["std"]
-std = ["borsh/std", "hex/std", "primitive-types/std", "primitive-types/serde", "serde/std", "serde_json/std"]
+std = ["borsh/std", "hex/std", "primitive-types/std", "primitive-types/serde", "serde/std", "serde_json/std", "rlp/std"]
 # `primitive-types/std` is excluded because its `std` implementation includes a transitive
 # dependency on `getrandom` which uses OS call to obtain entropy. Such calls are not
 # available in Wasm, therefore we cannot use the `std` implementation of `primitive-types`
 # in other Rust contracts.
 contracts-std = ["borsh/std", "hex/std"]
 impl-serde = ["primitive-types/impl-serde"]
+evm_bully = []

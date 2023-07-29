@@ -18,8 +18,9 @@ fn test_deploy_code() {
     let state = state::EngineState {
         chain_id,
         owner_id: owner_id.clone(),
-        bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
+        is_paused: false,
+        key_manager: None,
     };
     let origin = Address::new(H160([0u8; 20]));
     let storage = RefCell::new(Storage::default());
@@ -35,7 +36,8 @@ fn test_deploy_code() {
         prepaid_gas: DEFAULT_PREPAID_GAS,
     };
     let mut handler = PromiseTracker::default();
-    let mut engine = engine::Engine::new_with_state(state, origin, owner_id, io, &env);
+    let mut engine: engine::Engine<_, _> =
+        engine::Engine::new_with_state(state, origin, owner_id, io, &env);
     let code_to_deploy = vec![1, 2, 3, 4, 5, 6];
     let result = engine.deploy_code(
         origin,

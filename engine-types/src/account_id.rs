@@ -16,17 +16,7 @@ pub const MAX_ACCOUNT_ID_LEN: usize = 64;
 ///
 /// This guarantees all properly constructed `AccountId`'s are valid for the NEAR network.
 #[derive(
-    Default,
-    BorshSerialize,
-    Serialize,
-    Deserialize,
-    Eq,
-    Ord,
-    Hash,
-    Clone,
-    Debug,
-    PartialEq,
-    PartialOrd,
+    Default, BorshSerialize, Serialize, Eq, Ord, Hash, Clone, Debug, PartialEq, PartialOrd,
 )]
 pub struct AccountId(Box<str>);
 
@@ -123,6 +113,17 @@ impl BorshDeserialize for AccountId {
         }
 
         Self::new(&account).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
+    }
+}
+
+impl<'de> Deserialize<'de> for AccountId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+        D::Error: serde::de::Error,
+    {
+        let account = <String as Deserialize>::deserialize(deserializer)?;
+        Self::new(&account).map_err(serde::de::Error::custom)
     }
 }
 
@@ -498,5 +499,11 @@ mod tests {
                 "Account ID {invalid_account_id} should be invalid 64-len hex",
             );
         }
+    }
+
+    #[test]
+    fn test_json_deserialize_account_id() {
+        assert!(serde_json::from_str::<AccountId>(r#""test.near""#).is_ok());
+        assert!(serde_json::from_str::<AccountId>(r#""test@.near""#).is_err());
     }
 }

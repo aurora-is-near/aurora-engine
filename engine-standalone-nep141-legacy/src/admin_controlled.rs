@@ -1,4 +1,4 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 
 pub type PausedMask = u8;
 

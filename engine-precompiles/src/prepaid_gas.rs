@@ -1,5 +1,5 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::{vec, U256};
@@ -9,7 +9,7 @@ use evm::{Context, ExitError};
 ///
 /// Address: `0x536822d27de53629ef1f84c60555689e9488609f`
 /// This address is computed as: `&keccak("prepaidGas")[12..]`
-pub const ADDRESS: Address = crate::make_address(0x536822d2, 0x7de53629ef1f84c60555689e9488609f);
+pub const ADDRESS: Address = make_address(0x536822d2, 0x7de53629ef1f84c60555689e9488609f);
 
 mod costs {
     use crate::prelude::types::EthGas;

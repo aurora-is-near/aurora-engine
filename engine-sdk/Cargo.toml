@@ -1,27 +1,24 @@
 [package]
 name = "aurora-engine-sdk"
 version = "1.0.0"
-authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2021"
-description = ""
-documentation = ""
-readme = true
-homepage = "https://github.com/aurora-is-near/aurora-engine"
-repository = "https://github.com/aurora-is-near/aurora-engine"
-license = "CC0-1.0"
-publish = false
+authors.workspace = true
+edition.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
 autobenches = false
 
 [dependencies]
-aurora-engine-types = { path = "../engine-types", default-features = false }
-
-base64 = { version = "0.21", default-features = false, features = [ "alloc" ] }
-borsh = { version = "0.10", default-features = false }
-sha2 = { version = "0.10", default-features = false }
-sha3 = { version = "0.10", default-features = false }
+aurora-engine-types.workspace = true
+base64.workspace = true
+sha2.workspace = true
+sha3.workspace = true
 
 [features]
-std = ["aurora-engine-types/std", "borsh/std", "sha3/std", "sha2/std", "base64/std" ]
+std = ["aurora-engine-types/std", "sha3/std", "sha2/std", "base64/std" ]
+borsh-compat = ["aurora-engine-types/borsh-compat"]
 contract = []
 log = []
 all-promise-actions = []

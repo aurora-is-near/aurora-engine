@@ -1,4 +1,5 @@
-use crate::test_utils::{self, standalone};
+use crate::utils::{self, standalone};
+use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H160, U256};
 use engine_standalone_storage::json_snapshot;
@@ -57,8 +58,8 @@ fn test_produce_snapshot() {
     // add a couple more transactions that write some extra keys
     runner.env.block_height = snapshot.result.block_height + 1;
     let sk = libsecp256k1::SecretKey::parse(&[0x77; 32]).unwrap();
-    let mut signer = test_utils::Signer::new(sk);
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let mut signer = utils::Signer::new(sk);
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let dest1 = Address::from_array([0x11; 20]);
     let dest2 = Address::from_array([0x22; 20]);
     let initial_balance = Wei::from_eth(U256::one()).unwrap();
@@ -92,13 +93,16 @@ fn test_produce_snapshot() {
         .get_snapshot(runner.env.block_height)
         .unwrap();
 
+    let state_key = storage::bytes_to_key(KeyPrefix::Config, aurora_engine::state::STATE_KEY);
     // New snapshot should still contain all keys from initial snapshot
     for entry in snapshot.result.values {
         let key = aurora_engine_sdk::base64::decode(entry.key).unwrap();
         // skip the eth-connector keys; they were changed by minting the new account
-        if key[0..3] == [7, 6, 1] {
+        // also skip the state since it was automatically migrated from the old format
+        if (key[0..3] == [7, 6, 1]) || (key == state_key) {
             continue;
         }
+
         let value = aurora_engine_sdk::base64::decode(entry.value).unwrap();
         assert_eq!(computed_snapshot.get(&key).unwrap(), &value);
     }

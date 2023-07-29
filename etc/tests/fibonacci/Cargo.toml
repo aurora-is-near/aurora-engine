@@ -15,5 +15,5 @@ debug = false
 panic = "abort"
 
 [dependencies]
-near-sdk = "4.0.0"
+near-sdk = "4.1"
 serde = "1"
