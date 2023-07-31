@@ -250,25 +250,13 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         }
     }
 
-    /// Get accounts counter for statistics.
-    /// It represents total unique accounts (all-time, including accounts which now have zero balance).
-    pub fn get_accounts_counter(&self) -> PromiseCreateArgs {
-        PromiseCreateArgs {
-            target_account_id: self.get_eth_connector_contract_account(),
-            method: "get_accounts_counter".to_string(),
-            args: Vec::new(),
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_FINISH_DEPOSIT,
-        }
-    }
-
     pub fn get_bridge_prover(&self) -> PromiseCreateArgs {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "get_bridge_prover".to_string(),
             args: Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+            attached_gas: VIEW_CALL_GAS,
         }
     }
 
@@ -301,7 +289,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             method: "ft_metadata".to_string(),
             args: Vec::new(),
             attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_FINISH_DEPOSIT,
+            attached_gas: VIEW_CALL_GAS,
         }
     }
 
