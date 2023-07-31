@@ -1,8 +1,8 @@
 use crate::{
     arith::{
-        big_wrapping_mul, big_wrapping_pow, borrowing_sub, carrying_add,
-        compute_r_mod_n, in_place_add, in_place_mul_sub, in_place_shl, in_place_shr,
-        join_as_double, mod_inv, monpro, monsq,
+        big_wrapping_mul, big_wrapping_pow, borrowing_sub, carrying_add, compute_r_mod_n,
+        in_place_add, in_place_mul_sub, in_place_shl, in_place_shr, join_as_double, mod_inv,
+        monpro, monsq,
     },
     maybe_std::{vec, Vec},
 };
@@ -29,19 +29,19 @@ impl MPNat {
 
         let length = k / WORD_BITS;
         let mut b = MPNat {
-            digits: vec![0; length + 1]
+            digits: vec![0; length + 1],
         };
         b.digits[0] = 1;
 
         let mut a = MPNat {
-            digits: aa.digits.clone()
+            digits: aa.digits.clone(),
         };
         a.digits.resize(length + 1, 0);
 
         let mut neg: bool = false;
 
         let mut res = MPNat {
-            digits: vec![0; length + 1]
+            digits: vec![0; length + 1],
         };
 
         let (mut wordpos, mut bitpos) = (0, 0);
@@ -49,10 +49,10 @@ impl MPNat {
         for _ in 0..k {
             let x = b.digits[0] & 1;
             if x != 0 {
-                if neg == false {
+                if !neg {
                     // b = a - b
                     let mut tmp = MPNat {
-                        digits: a.digits.clone()
+                        digits: a.digits.clone(),
                     };
                     in_place_mul_sub(&mut tmp.digits, &b.digits, 1);
                     b = tmp;
@@ -229,7 +229,8 @@ impl MPNat {
         let x1 = base_copy.modpow_montgomery(exp, &odd);
         let x2 = self.modpow_with_power_of_two(exp, &power_of_two);
 
-        let odd_inv = Self::koc_2017_inverse(&odd, trailing_zeros * WORD_BITS + additional_zero_bits);
+        let odd_inv =
+            Self::koc_2017_inverse(&odd, trailing_zeros * WORD_BITS + additional_zero_bits);
 
         let s = power_of_two.digits.len();
         let mut scratch = vec![0; s];
@@ -420,8 +421,7 @@ impl MPNat {
             for j in (0..k).rev() {
                 let self_most_sig = self.digits.pop().unwrap();
                 let self_second_sig = self.digits[j];
-                let r =
-                    join_as_double(self_most_sig, self_second_sig) % other_most_sig;
+                let r = join_as_double(self_most_sig, self_second_sig) % other_most_sig;
                 self.digits[j] = r as Word;
             }
             return;
@@ -712,27 +712,27 @@ fn test_sub_to_same_size() {
     /* Test that borrow equals self_most_sig at end of sub_to_same_size */
     {
         let mut x = MPNat::from_big_endian(&[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0xae, 0x5f, 0xf0, 0x8b, 0xfc, 0x02, 0x71, 0xa4,
-            0xfe, 0xe0, 0x49, 0x02, 0xc9, 0xd9, 0x12, 0x61,
-            0x8e, 0xf5, 0x02, 0x2c, 0xa0, 0x00, 0x00, 0x00]);
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xae, 0x5f, 0xf0, 0x8b, 0xfc, 0x02,
+            0x71, 0xa4, 0xfe, 0xe0, 0x49, 0x02, 0xc9, 0xd9, 0x12, 0x61, 0x8e, 0xf5, 0x02, 0x2c,
+            0xa0, 0x00, 0x00, 0x00,
+        ]);
         let y = MPNat::from_big_endian(&[
-            0xae, 0x5f, 0xf0, 0x8b, 0xfc, 0x02, 0x71, 0xa4,
-            0xfe, 0xe0, 0x49, 0x0f, 0x70, 0x00, 0x00, 0x00]);
+            0xae, 0x5f, 0xf0, 0x8b, 0xfc, 0x02, 0x71, 0xa4, 0xfe, 0xe0, 0x49, 0x0f, 0x70, 0x00,
+            0x00, 0x00,
+        ]);
         x.sub_to_same_size(&y);
     }
 
     /* Additional test for sub_to_same_size q_hat/r_hat adjustment logic */
     {
         let mut x = MPNat::from_big_endian(&[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00,
-            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff,
+            0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
         ]);
         let y = MPNat::from_big_endian(&[
-            0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00,
+            0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00,
+            0x00, 0x00,
         ]);
         x.sub_to_same_size(&y);
     }
