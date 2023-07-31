@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.1] 2023-07-27
+
+### Fixes
+
+- Updated sputnikvm dependency with bugfix in the `shanghai` implementation [@mandreyel]. ([#803]) 
+
+[#803]: https://github.com/aurora-is-near/aurora-engine/pull/803
+
 ## [2.10.0] 2023-07-20
 
 ### Changes
@@ -441,7 +449,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.1...develop
+[2.10.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.0...2.10.1
 [2.10.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.3...2.10.0
 [2.9.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.2...2.9.3 
 [2.9.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.1...2.9.2
