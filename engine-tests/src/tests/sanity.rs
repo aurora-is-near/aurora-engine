@@ -695,6 +695,31 @@ fn test_eth_transfer_incorrect_nonce() {
 }
 
 #[test]
+fn test_tx_support_shanghai() {
+    let (mut runner, mut source_account, _) = initialize_transfer();
+    // Encoded EVM transaction with parameter: `evmVersion: 'shanghai'`.
+    let data = "6080604052348015600e575f80fd5b50607480601a5f395ff3fe6080604052348015600e575\
+    f80fd5b50600436106026575f3560e01c8063919840ad14602a575b5f80fd5b600560405190815260200160\
+    405180910390f3fea2646970667358221220cb01b9b9c75e5cd079a1980af2fe4397d2029888d12737d74cb\
+    bc10e0de65bd364736f6c63430008150033";
+
+    let result = runner
+        .submit_with_signer(&mut source_account, |nonce| {
+            aurora_engine_transactions::legacy::TransactionLegacy {
+                nonce,
+                gas_price: 0.into(),
+                gas_limit: u64::MAX.into(),
+                to: None,
+                value: Wei::zero(),
+                data: hex::decode(data).unwrap(),
+            }
+        })
+        .expect("Should be able to execute EVM bytecode including PUSH0");
+
+    assert!(result.status.is_ok());
+}
+
+#[test]
 fn test_eth_transfer_not_enough_gas() {
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
