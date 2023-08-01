@@ -2,21 +2,194 @@ use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
-use aurora_engine::{connector, engine, parameters::SubmitResult, state, xcc};
+use aurora_engine::{
+    connector, engine,
+    parameters::{self, SubmitResult},
+    state, xcc,
+};
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
+use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::{
     account_id::AccountId,
+    borsh::BorshDeserialize,
     parameters::PromiseWithCallbackArgs,
     types::{Address, Yocto},
     H256,
 };
+use std::str::FromStr;
 
 pub mod types;
 
 use crate::engine_state::EngineStateAccess;
 use crate::{BlockMetadata, Diff, Storage};
-use types::{Message, TransactionKind, TransactionMessage};
+use types::{Message, TransactionKind, TransactionKindTag, TransactionMessage};
+
+/// Try to parse an Aurora transaction from raw information available in a Near action
+/// (method name, input bytes, data returned from promises).
+pub fn parse_transaction_kind(
+    method_name: &str,
+    bytes: Vec<u8>,
+    promise_data: &[Option<Vec<u8>>],
+) -> Option<TransactionKind> {
+    let tx_kind_tag = TransactionKindTag::from_str(method_name).ok()?;
+
+    let tx_kind = match tx_kind_tag {
+        TransactionKindTag::Submit => {
+            let eth_tx = EthTransactionKind::try_from(bytes.as_slice()).ok()?;
+            TransactionKind::Submit(eth_tx)
+        }
+        TransactionKindTag::SubmitWithArgs => {
+            let args = parameters::SubmitArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::SubmitWithArgs(args)
+        }
+        TransactionKindTag::Call => {
+            let call_args = parameters::CallArgs::deserialize(&bytes)?;
+            TransactionKind::Call(call_args)
+        }
+        TransactionKindTag::PausePrecompiles => {
+            let args = parameters::PausePrecompilesCallArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::PausePrecompiles(args)
+        }
+        TransactionKindTag::ResumePrecompiles => {
+            let args = parameters::PausePrecompilesCallArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::ResumePrecompiles(args)
+        }
+        TransactionKindTag::SetOwner => {
+            let args = parameters::SetOwnerArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::SetOwner(args)
+        }
+        TransactionKindTag::Deploy => TransactionKind::Deploy(bytes),
+        TransactionKindTag::DeployErc20 => {
+            let deploy_args = parameters::DeployErc20TokenArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::DeployErc20(deploy_args)
+        }
+        TransactionKindTag::FtOnTransfer => {
+            let transfer_args: parameters::NEP141FtOnTransferArgs =
+                serde_json::from_slice(bytes.as_slice()).ok()?;
+
+            TransactionKind::FtOnTransfer(transfer_args)
+        }
+        TransactionKindTag::Deposit => TransactionKind::Deposit(bytes),
+        TransactionKindTag::FtTransferCall => {
+            let transfer_args: parameters::TransferCallCallArgs =
+                serde_json::from_slice(bytes.as_slice()).ok()?;
+
+            TransactionKind::FtTransferCall(transfer_args)
+        }
+        TransactionKindTag::FinishDeposit => {
+            let args = parameters::FinishDepositCallArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::FinishDeposit(args)
+        }
+        TransactionKindTag::ResolveTransfer => {
+            let args = parameters::ResolveTransferCallArgs::try_from_slice(&bytes).ok()?;
+            let promise_result = match promise_data.first().and_then(|x| x.as_ref()) {
+                Some(bytes) => aurora_engine_types::types::PromiseResult::Successful(bytes.clone()),
+                None => aurora_engine_types::types::PromiseResult::Failed,
+            };
+            TransactionKind::ResolveTransfer(args, promise_result)
+        }
+        TransactionKindTag::FtTransfer => {
+            let args: parameters::TransferCallArgs =
+                serde_json::from_slice(bytes.as_slice()).ok()?;
+
+            TransactionKind::FtTransfer(args)
+        }
+        TransactionKindTag::Withdraw => {
+            let args =
+                aurora_engine_types::parameters::WithdrawCallArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::Withdraw(args)
+        }
+        TransactionKindTag::StorageDeposit => {
+            let args: parameters::StorageDepositCallArgs =
+                serde_json::from_slice(bytes.as_slice()).ok()?;
+
+            TransactionKind::StorageDeposit(args)
+        }
+        TransactionKindTag::StorageUnregister => {
+            let json_args: serde_json::Value = serde_json::from_slice(bytes.as_slice()).ok()?;
+            let force = json_args
+                .as_object()
+                .and_then(|x| x.get("force"))
+                .and_then(|x| x.as_bool());
+
+            TransactionKind::StorageUnregister(force)
+        }
+        TransactionKindTag::StorageWithdraw => {
+            let args: parameters::StorageWithdrawCallArgs =
+                serde_json::from_slice(bytes.as_slice()).ok()?;
+
+            TransactionKind::StorageWithdraw(args)
+        }
+        TransactionKindTag::SetPausedFlags => {
+            let args = parameters::PauseEthConnectorCallArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::SetPausedFlags(args)
+        }
+        TransactionKindTag::RegisterRelayer => {
+            let address = Address::try_from_slice(&bytes).ok()?;
+            TransactionKind::RegisterRelayer(address)
+        }
+        TransactionKindTag::RefundOnError => match promise_data.first().and_then(|x| x.as_ref()) {
+            None => TransactionKind::RefundOnError(None),
+            Some(_) => {
+                let args =
+                    aurora_engine_types::parameters::RefundCallArgs::try_from_slice(&bytes).ok()?;
+                TransactionKind::RefundOnError(Some(args))
+            }
+        },
+        TransactionKindTag::SetConnectorData => {
+            let args = parameters::SetContractDataCallArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::SetConnectorData(args)
+        }
+        TransactionKindTag::NewConnector => {
+            let args = parameters::InitCallArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::NewConnector(args)
+        }
+        TransactionKindTag::NewEngine => {
+            let args = parameters::NewCallArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::NewEngine(args)
+        }
+        TransactionKindTag::FactoryUpdate => TransactionKind::FactoryUpdate(bytes),
+        TransactionKindTag::FactoryUpdateAddressVersion => {
+            let args = aurora_engine::xcc::AddressVersionUpdateArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::FactoryUpdateAddressVersion(args)
+        }
+        TransactionKindTag::FactorySetWNearAddress => {
+            let address = Address::try_from_slice(&bytes).ok()?;
+            TransactionKind::FactorySetWNearAddress(address)
+        }
+        TransactionKindTag::SetUpgradeDelayBlocks => {
+            let args = aurora_engine::parameters::SetUpgradeDelayBlocksArgs::try_from_slice(&bytes)
+                .ok()?;
+            TransactionKind::SetUpgradeDelayBlocks(args)
+        }
+        TransactionKindTag::FundXccSubAccound => {
+            let args = aurora_engine::xcc::FundXccArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::FundXccSubAccound(args)
+        }
+
+        TransactionKindTag::PauseContract => TransactionKind::PauseContract,
+        TransactionKindTag::ResumeContract => TransactionKind::ResumeContract,
+        TransactionKindTag::SetKeyManager => {
+            let args =
+                aurora_engine::parameters::RelayerKeyManagerArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::SetKeyManager(args)
+        }
+        TransactionKindTag::AddRelayerKey => {
+            let args = aurora_engine::parameters::RelayerKeyArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::AddRelayerKey(args)
+        }
+        TransactionKindTag::RemoveRelayerKey => {
+            let args = aurora_engine::parameters::RelayerKeyArgs::try_from_slice(&bytes).ok()?;
+            TransactionKind::RemoveRelayerKey(args)
+        }
+
+        TransactionKindTag::Unknown => {
+            return None;
+        }
+    };
+    Some(tx_kind)
+}
 
 pub fn consume_message<M: ModExpAlgorithm + 'static>(
     storage: &mut Storage,
