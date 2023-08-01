@@ -158,32 +158,6 @@ pub fn mod_inv(x: Word) -> Word {
     y
 }
 
-// Given x odd, computes `x^(-1) mod 2^(WORD_BYTES*out.digits.len())`.
-// See `MODULAR-INVERSE` in https://link.springer.com/content/pdf/10.1007/3-540-46877-3_21.pdf
-pub fn big_mod_inv(x: &MPNat, out: &mut MPNat, scratch: &mut [Word]) {
-    let s = out.digits.len();
-    out.digits[0] = mod_inv(x.digits[0]);
-
-    for digit_index in 1..s {
-        for i in 1..WORD_BITS {
-            let mask = (1 << i) - 1;
-            big_wrapping_mul(x, out, scratch);
-            scratch[digit_index] &= mask;
-            let q = 1 << (i - 1);
-            if scratch[digit_index] >= q {
-                out.digits[digit_index] += q;
-            }
-            scratch.fill(0);
-        }
-        big_wrapping_mul(x, out, scratch);
-        let q = 1 << (WORD_BITS - 1);
-        if scratch[digit_index] >= q {
-            out.digits[digit_index] += q;
-        }
-        scratch.fill(0);
-    }
-}
-
 /// Computes R mod n, where R = 2^(WORD_BITS*k) and k = n.digits.len()
 /// Note that if R = qn + r, q must be smaller than 2^WORD_BITS since `2^(WORD_BITS) * n > R`
 /// (adding a whole additional word to n is too much).
@@ -294,14 +268,22 @@ pub fn big_sq(x: &MPNat, out: &mut [Word]) {
         out[i + i] = product;
         let mut c = carry as DoubleWord;
         for j in (i + 1)..s {
-            let product = (x.digits[i] as DoubleWord) * (x.digits[j] as DoubleWord);
-            let (product, overflow) = product.overflowing_add(product);
-            let sum = (out[i + j] as DoubleWord) + product + c;
-            out[i + j] = sum as Word;
-            c = (sum >> WORD_BITS) as DoubleWord;
+            let mut new_c: DoubleWord = 0;
+            let res = (x.digits[i] as DoubleWord) * (x.digits[j] as DoubleWord);
+            let (res, overflow) = res.overflowing_add(res);
             if overflow {
-                c += BASE;
+                new_c += BASE;
             }
+            let (res, overflow) = (out[i + j] as DoubleWord).overflowing_add(res);
+            if overflow {
+                new_c += BASE;
+            }
+            let (res, overflow) = res.overflowing_add(c);
+            if overflow {
+                new_c += BASE;
+            }
+            out[i + j] = res as Word;
+            c = new_c + ((res >> WORD_BITS) as DoubleWord);
         }
         let (sum, carry) = carrying_add(out[i + s], c as Word, false);
         out[i + s] = sum;
@@ -350,6 +332,11 @@ pub fn in_place_add(a: &mut [Word], b: &[Word]) -> bool {
 // Performs `a -= xy`, returning the "borrow".
 pub fn in_place_mul_sub(a: &mut [Word], x: &[Word], y: Word) -> Word {
     debug_assert!(a.len() == x.len());
+
+    // a -= x*0 leaves a unchanged, so return early
+    if y == 0 {
+        return 0;
+    }
 
     // carry is between -big_digit::MAX and 0, so to avoid overflow we store
     // offset_carry = carry + big_digit::MAX
@@ -505,31 +492,6 @@ fn test_r_mod_n() {
 }
 
 #[test]
-fn test_big_mod_inv() {
-    check_big_mod_inv(0x02_FF_FF_FF);
-    check_big_mod_inv(0x1234_0000_DDDD_FFFF);
-    check_big_mod_inv(0x52DA_9A91_F82D_6E17_FDF8_6743_2B58_7917);
-
-    fn check_big_mod_inv(n: u128) {
-        let x = MPNat::from_big_endian(&n.to_be_bytes());
-        let s = x.digits.len();
-        let mut result = MPNat { digits: vec![0; s] };
-        let mut scratch = vec![0; s];
-        big_mod_inv(&x, &mut result, &mut scratch);
-        let n_inv = mp_nat_to_u128(&result);
-        if WORD_BITS * s < u128::BITS as usize {
-            assert_eq!(
-                n.wrapping_mul(n_inv) % (1 << (WORD_BITS * s)),
-                1,
-                "{n} failed big_mod_inv check"
-            );
-        } else {
-            assert_eq!(n.wrapping_mul(n_inv), 1, "{n} failed big_mod_inv check");
-        }
-    }
-}
-
-#[test]
 fn test_in_place_shl() {
     check_in_place_shl(0, 0);
     check_in_place_shl(1, 10);
@@ -654,6 +616,24 @@ fn test_big_sq() {
             num::BigUint::from_bytes_be(&result)
         };
         assert_eq!(result, expected, "{a}^2 != {expected}");
+    }
+
+    /* Test for addition overflows in the big_sq inner loop */
+    {
+        let x = MPNat::from_big_endian(&[
+            0xff, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x40, 0x00,
+            0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00,
+        ]);
+        let mut out = vec![0; 2 * x.digits.len() + 1];
+        big_sq(&x, &mut out);
+        let result = MPNat { digits: out }.to_big_endian();
+        let expected = vec![
+            0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x01, 0xff, 0xff, 0xff, 0xfe, 0x40, 0x00, 0x00, 0x01, 0x90, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0xbf, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        assert_eq!(result, expected);
     }
 }
 
