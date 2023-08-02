@@ -1,6 +1,7 @@
 use crate::Storage;
 use aurora_engine::parameters;
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
+use aurora_engine_standalone_nep141_legacy::admin_controlled::PauseEthConnectorCallArgs;
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::Address;
@@ -114,7 +115,7 @@ pub enum TransactionKind {
     /// Admin only method; used to change upgrade delay blocks
     SetUpgradeDelayBlocks(parameters::SetUpgradeDelayBlocksArgs),
     /// Admin only method
-    SetPausedFlags(parameters::PauseEthConnectorCallArgs),
+    SetPausedFlags(PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
     RegisterRelayer(Address),
     /// Called if exist precompiles fail
@@ -123,6 +124,8 @@ pub enum TransactionKind {
     SetConnectorData(parameters::SetContractDataCallArgs),
     /// Initialize eth-connector
     NewConnector(parameters::InitCallArgs),
+    SetEthConnectorContractAccount(parameters::SetEthConnectorContractAccountArgs),
+    DisableLegacyNEP141,
     /// Initialize Engine
     NewEngine(parameters::NewCallArgs),
     /// Update xcc-router bytecode
@@ -352,6 +355,10 @@ impl TransactionKind {
             Self::RegisterRelayer(_) => Self::no_evm_execution("register_relayer"),
             Self::SetConnectorData(_) => Self::no_evm_execution("set_connector_data"),
             Self::NewConnector(_) => Self::no_evm_execution("new_connector"),
+            Self::SetEthConnectorContractAccount(_) => {
+                Self::no_evm_execution("set_eth_connector_contract_account")
+            }
+            Self::DisableLegacyNEP141 => Self::no_evm_execution("disable_legacy_nep141"),
             Self::NewEngine(_) => Self::no_evm_execution("new_engine"),
             Self::FactoryUpdate(_) => Self::no_evm_execution("factory_update"),
             Self::FactoryUpdateAddressVersion(_) => {
@@ -522,7 +529,7 @@ enum BorshableTransactionKind<'a> {
     StorageDeposit(Cow<'a, parameters::StorageDepositCallArgs>),
     StorageUnregister(Option<bool>),
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
-    SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
+    SetPausedFlags(Cow<'a, PauseEthConnectorCallArgs>),
     RegisterRelayer(Cow<'a, Address>),
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
@@ -534,6 +541,8 @@ enum BorshableTransactionKind<'a> {
     PausePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
+    SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
+    DisableLegacyNEP141,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccound(Cow<'a, FundXccArgs>),
@@ -584,6 +593,10 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
+            TransactionKind::SetEthConnectorContractAccount(x) => {
+                Self::SetEthConnectorContractAccount(Cow::Borrowed(x))
+            }
+            TransactionKind::DisableLegacyNEP141 => Self::DisableLegacyNEP141,
             TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
             TransactionKind::FundXccSubAccound(x) => Self::FundXccSubAccound(Cow::Borrowed(x)),
             TransactionKind::SetUpgradeDelayBlocks(x) => {
@@ -652,6 +665,10 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::ResumePrecompiles(x) => {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
             }
+            BorshableTransactionKind::SetEthConnectorContractAccount(x) => {
+                Ok(Self::SetEthConnectorContractAccount(x.into_owned()))
+            }
+            BorshableTransactionKind::DisableLegacyNEP141 => Ok(Self::DisableLegacyNEP141),
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
             BorshableTransactionKind::FundXccSubAccound(x) => {
                 Ok(Self::FundXccSubAccound(x.into_owned()))

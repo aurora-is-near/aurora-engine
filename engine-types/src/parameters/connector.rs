@@ -149,6 +149,24 @@ pub struct NEP141FtOnTransferArgs {
     pub msg: String,
 }
 
+#[derive(BorshSerialize)]
+pub struct EngineWithdrawCallArgs {
+    pub sender_id: AccountId,
+    pub recipient_address: Address,
+    pub amount: NEP141Wei,
+}
+
+/// `storage_unregister` eth-connector call args
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StorageUnregisterCallArgs {
+    pub force: Option<bool>,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct SetEthConnectorContractAccountArgs {
+    pub account: AccountId,
+}
+
 /// Fungible token Reference hash type.
 /// Used for `FungibleTokenMetadata`
 #[derive(Debug, BorshDeserialize, BorshSerialize, Deserialize, Serialize, Clone, PartialEq, Eq)]

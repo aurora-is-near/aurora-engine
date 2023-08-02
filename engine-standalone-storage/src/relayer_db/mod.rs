@@ -124,7 +124,7 @@ where
                 if tx_succeeded {
                     println!(
                         "WARN: Transaction with NEAR hash {near_tx_hash:?} expected to succeed, but failed with error message {e:?}",
-                    );
+					);
                 }
                 continue;
             }
@@ -133,7 +133,7 @@ where
                     println!(
                         "WARN: Transaction with NEAR hash {near_tx_hash:?} expected to succeed, but failed with error message {:?}",
                         result.status
-                    );
+					);
                     continue;
                 }
                 // if result.status.is_fail() && !tx_succeeded then this is consistent; we
@@ -201,8 +201,9 @@ mod test {
     use super::FallibleIterator;
     use crate::relayer_db::types::ConnectionParams;
     use crate::sync::types::{TransactionKind, TransactionMessage};
-    use aurora_engine::fungible_token::FungibleTokenMetadata;
-    use aurora_engine::{connector, parameters, state};
+    use aurora_engine::{parameters, state};
+    use aurora_engine_standalone_nep141_legacy::legacy_connector;
+    use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
     use aurora_engine_types::H256;
 
     #[allow(clippy::doc_markdown)]
@@ -238,9 +239,9 @@ mod test {
             let result = storage.with_engine_access(block_height, 0, &[], |io| {
                 let mut local_io = io;
                 state::set_state(&mut local_io, &engine_state).unwrap();
-                connector::EthConnectorContract::create_contract(
+                legacy_connector::EthConnectorContract::create_contract(
                     io,
-                    &engine_state.owner_id,
+                    engine_state.owner_id.clone(),
                     parameters::InitCallArgs {
                         prover_account: "prover.bridge.near".parse().unwrap(),
                         eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"

@@ -5,6 +5,7 @@ use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 /// it does not execute promises; but `aurora-workspaces` does.
 use crate::utils::AuroraRunner;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
@@ -13,6 +14,7 @@ use serde_json::json;
 
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
 const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
+const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector";
 
 pub async fn deploy_engine() -> EngineContract {
     let aurora_runner = AuroraRunner::default();
@@ -27,6 +29,41 @@ pub async fn deploy_engine() -> EngineContract {
         .deploy_and_init()
         .await
         .unwrap()
+}
+
+/// Deploy and init external eth connector
+pub async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
+    let contract_bytes = get_aurora_eth_connector_contract();
+    let contract_account = aurora
+        .root()
+        .create_subaccount(AURORA_ETH_CONNECTOR, 15 * STORAGE_AMOUNT)
+        .await
+        .unwrap();
+    let contract = contract_account.deploy(&contract_bytes).await.unwrap();
+    let metadata = FungibleTokenMetadata::default();
+    let init_args = json!({
+        "prover_account": contract_account.id(),
+        "eth_custodian_address": "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E",
+        "metadata": metadata,
+        "account_with_access_right": aurora.id(),
+        "owner_id": aurora.id()
+    });
+
+    let result = contract
+        .call("new")
+        .args_json(init_args)
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(result.is_success());
+
+    let result = aurora
+        .set_eth_connector_contract_account(contract_account.id())
+        .transact()
+        .await?;
+    assert!(result.is_success());
+
+    Ok(())
 }
 
 pub async fn create_sub_account(
@@ -85,12 +122,14 @@ pub async fn transfer_nep_141_to_erc_20(
 
 pub async fn nep_141_balance_of(nep_141: &RawContract, account_id: &AccountId) -> u128 {
     nep_141
-        .view("ft_balance_of")
+        .call("ft_balance_of") // XCC requires gas
         .args_json(json!({ "account_id": account_id }))
+        .max_gas()
+        .transact()
         .await
         .unwrap()
-        .json::<String>()
-        .map(|s| s.parse().unwrap())
+        .json::<near_sdk::json_types::U128>()
+        .map(|s| s.0)
         .unwrap()
 }
 
@@ -128,4 +167,10 @@ pub async fn deploy_nep_141(
     assert!(result.is_success());
 
     Ok(nep141)
+}
+
+fn get_aurora_eth_connector_contract() -> Vec<u8> {
+    use std::path::Path;
+    let contract_path = Path::new("../engine-tests-connector/etc/aurora-eth-connector");
+    std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
 }

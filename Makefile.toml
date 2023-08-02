@@ -347,9 +347,31 @@ args = [
     "--ignored",
 ]
 
+[tasks.build-aurora-eth-connector]
+category = "Build"
+script = '''
+AURORA_ETH_CONNECTOR_DIR="engine-tests-connector/etc/aurora-eth-connector/"
+AURORA_ETH_CONNECTOR_ETC="engine-tests-connector/etc/"
+AURORA_ETH_CONNECTOR_REPO_NAME="aurora-eth-connector"
+AURORA_ETH_CONNECTOR_REPO="https://github.com/aurora-is-near/"$AURORA_ETH_CONNECTOR_REPO_NAME
+if [ -d $AURORA_ETH_CONNECTOR_DIR ]; then
+  cd $AURORA_ETH_CONNECTOR_DIR
+  echo "Pull Aurora Eth-Connector repo"
+  git pull origin master
+else
+  mkdir $AURORA_ETH_CONNECTOR_ETC || true
+  cd $AURORA_ETH_CONNECTOR_ETC
+  echo "Clone Aurora Eth-Connector repo: "$AURORA_ETH_CONNECTOR_REPO
+  git clone --depth 1 $AURORA_ETH_CONNECTOR_REPO
+  cd $AURORA_ETH_CONNECTOR_REPO_NAME
+fi
+cargo make --profile mainnet build-test
+'''
+
 [tasks.test-flow]
 category = "Test"
 dependencies = [
+    "build-aurora-eth-connector",
     "build-test",
     "test-contracts",
     "test-workspace",

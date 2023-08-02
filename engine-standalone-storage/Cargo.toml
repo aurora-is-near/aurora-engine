@@ -15,11 +15,12 @@ crate-type = ["lib"]
 
 [dependencies]
 aurora-engine = { workspace = true, features = ["std"] }
-aurora-engine-types = { workspace = true, features = ["std"] }
 aurora-engine-modexp = { workspace = true, features = ["std"] }
 aurora-engine-precompiles = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }
+aurora-engine-standalone-nep141-legacy.workspace = true
 aurora-engine-transactions = { workspace = true, features = ["std"] }
+aurora-engine-types = { workspace = true, features = ["std"] }
 evm-core.workspace = true
 hex = { workspace = true, features = ["std"] }
 rocksdb.workspace = true

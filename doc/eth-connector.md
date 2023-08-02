@@ -29,7 +29,6 @@ For more details see: [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToke
 
 * ft_total_supply (view)
 * ft_total_eth_supply_on_near (view)
-* ft_total_eth_supply_on_aurora (view)
 * ft_balance_of (view)
 * ft_balance_of_eth (view)
 * ft_transfer (mutable, payable)

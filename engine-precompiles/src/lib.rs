@@ -358,7 +358,10 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         mut generic_precompiles: BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
+        #[cfg(feature = "error_refund")]
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
+        #[cfg(not(feature = "error_refund"))]
+        let near_exit = ExitToNear::new(ctx.io);
         let ethereum_exit = ExitToEthereum::new(ctx.current_account_id.clone(), ctx.io);
         let cross_contract_call = CrossContractCall::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);

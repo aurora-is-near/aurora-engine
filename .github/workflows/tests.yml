@@ -25,6 +25,10 @@ jobs:
         run: cargo make build-contracts
       - name: Test contracts
         run: cargo make test-contracts
+      - name: Build Aurora Eth Connector contract
+        run: cargo make build-aurora-eth-connector
+      - name: List Aurora Eth Connector contract
+        run: ls -la engine-tests-connector/etc/aurora-eth-connector/bin/aurora-eth-connector-test.wasm
       - name: Build mainnet test WASM
         run: cargo make --profile mainnet build-test
       - name: List mainnet WASM directory and root directory

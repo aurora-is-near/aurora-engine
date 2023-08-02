@@ -67,18 +67,7 @@ impl<'de> Deserialize<'de> for Balance {
 }
 
 #[derive(
-    Default,
-    BorshSerialize,
-    BorshDeserialize,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-    Copy,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
+    Default, BorshSerialize, BorshDeserialize, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd,
 )]
 /// Near Yocto type which wraps an underlying u128.
 /// 1 NEAR = 10^24 `yoctoNEAR`
@@ -101,6 +90,34 @@ impl Yocto {
     #[must_use]
     pub const fn as_u128(self) -> u128 {
         self.0
+    }
+}
+
+impl Serialize for Yocto {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let value = self.0.to_string();
+        serializer.serialize_str(&value)
+    }
+}
+
+impl<'de> Deserialize<'de> for Yocto {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+        D::Error: serde::de::Error,
+    {
+        use serde::de::Error;
+
+        let value = serde_json::Value::deserialize(deserializer)?;
+        Ok(Self(
+            value
+                .as_str()
+                .ok_or_else(|| Error::custom(format!("Wait for a string but got: {value}")))
+                .and_then(|value| value.parse().map_err(Error::custom))?,
+        ))
     }
 }
 

@@ -1,0 +1,30 @@
+[package]
+name = "aurora-engine-tests-connector"
+version = "1.0.0"
+authors.workspace = true
+edition.workspace = true
+description = "ETH connector tests"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+autobenches = false
+
+[dev-dependencies]
+aurora-engine = { workspace = true, features = ["std", "tracing", "impl-serde", "borsh-compat"] }
+aurora-engine-types = { workspace = true, features = ["std", "impl-serde", "borsh-compat"] }
+
+anyhow.workspace = true
+byte-slice-cast.workspace = true
+near-sdk.workspace = true
+near-units.workspace = true
+tokio = { workspace = true, features = ["macros"] }
+hex.workspace = true
+ethabi.workspace = true
+rlp.workspace = true
+serde = { workspace = true, features = ["derive"] }
+workspaces = "0.7.0"
+
+[features]
+mainnet-test = []
+testnet-test = []
