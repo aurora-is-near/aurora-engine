@@ -2,6 +2,7 @@ use crate::prelude::{Address, Balance, Wei, WeiU256, U256};
 use crate::utils::{self, create_eth_transaction, AuroraRunner, ORIGIN};
 use aurora_engine::engine::EngineError;
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
+use aurora_engine::proof::Proof;
 use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
@@ -368,9 +369,10 @@ pub mod workspace {
     use crate::utils::solidity::exit_precompile::TesterConstructor;
     use crate::utils::workspace::{
         create_sub_account, deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141,
-        nep_141_balance_of, transfer_nep_141_to_erc_20,
+        init_eth_connector, nep_141_balance_of, transfer_nep_141_to_erc_20,
     };
     use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
+    use aurora_engine_types::parameters::connector::Proof;
     use aurora_engine_types::parameters::engine::TransactionStatus;
     use aurora_engine_workspace::account::Account;
     use aurora_engine_workspace::{parse_near, EngineContract, RawContract};
@@ -561,10 +563,12 @@ pub mod workspace {
             nep_141_balance_of(aurora.as_raw_contract(), &aurora.id()).await,
             u128::from(INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT)
         );
+
         assert_eq!(
             nep_141_balance_of(aurora.as_raw_contract(), &exit_account_id.parse().unwrap()).await,
-            u128::from(ETH_EXIT_AMOUNT)
+            ETH_EXIT_AMOUNT.into()
         );
+
         assert_eq!(
             eth_balance_of(signer_address, &aurora).await,
             Wei::new_u64(INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT)
@@ -649,9 +653,10 @@ pub mod workspace {
             .transact()
             .await?;
         assert!(result.is_success());
+        let _nep141_contract = deploy_aurora_eth_connector(&aurora).await;
 
-        let balance = aurora.ft_balance_of(&aurora.id()).await?.result;
-        assert_eq!(balance.0, u128::from(INITIAL_ETH_BALANCE));
+        let balance = nep_141_balance_of(aurora.as_raw_contract(), &aurora.id()).await;
+        assert_eq!(balance, u128::from(INITIAL_ETH_BALANCE));
 
         let balance = eth_balance_of(signer_address, &aurora).await;
         assert_eq!(balance, Wei::new_u64(INITIAL_ETH_BALANCE));
@@ -794,6 +799,21 @@ pub mod workspace {
         }
     }
 
+    async fn deploy_aurora_eth_connector(aurora: &EngineContract) {
+        init_eth_connector(aurora).await.unwrap();
+
+        let proof: Proof = super::create_test_proof(
+            INITIAL_ETH_BALANCE,
+            aurora.id().as_ref(),
+            "096de9c2b8a5b8c22cee3289b101f6960d68e51e",
+        );
+        let result = aurora.deposit(proof).max_gas().transact().await.unwrap();
+        assert!(result.is_success());
+
+        let balance = nep_141_balance_of(aurora.as_raw_contract(), &aurora.id()).await;
+        assert_eq!(balance, u128::from(INITIAL_ETH_BALANCE));
+    }
+
     struct TestExitToNearContext {
         ft_owner: Account,
         ft_owner_address: Address,
@@ -808,5 +828,53 @@ pub mod workspace {
         chain_id: u64,
         tester_address: Address,
         aurora: EngineContract,
+    }
+}
+
+fn create_test_proof(deposit_amount: u64, recipient_id: &str, custodian_address: &str) -> Proof {
+    use aurora_engine::deposit_event::TokenMessageData;
+    use aurora_engine_types::types::{Fee, NEP141Wei};
+
+    let eth_custodian_address: Address = Address::decode(custodian_address).unwrap();
+
+    let message = recipient_id.to_string();
+    let fee: Fee = Fee::new(NEP141Wei::new(0));
+    let token_message_data =
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+            .unwrap();
+
+    let deposit_event = aurora_engine::deposit_event::DepositedEvent {
+        eth_custodian_address,
+        sender: Address::zero(),
+        token_message_data,
+        amount: NEP141Wei::new(deposit_amount.into()),
+        fee,
+    };
+
+    let event_schema = ethabi::Event {
+        name: aurora_engine::deposit_event::DEPOSITED_EVENT.into(),
+        inputs: aurora_engine::deposit_event::DepositedEvent::event_params(),
+        anonymous: false,
+    };
+    let log_entry = aurora_engine_types::parameters::connector::LogEntry {
+        address: eth_custodian_address.raw(),
+        topics: vec![
+            event_schema.signature(),
+            // the sender is not important
+            crate::prelude::H256::zero(),
+        ],
+        data: ethabi::encode(&[
+            Token::String(message),
+            Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            Token::Uint(U256::from(deposit_event.fee.as_u128())),
+        ]),
+    };
+    Proof {
+        log_index: 1,
+        log_entry_data: rlp::encode(&log_entry).to_vec(),
+        receipt_index: 1,
+        receipt_data: Vec::new(),
+        header_data: Vec::new(),
+        proof: Vec::new(),
     }
 }

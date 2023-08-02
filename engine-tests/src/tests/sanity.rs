@@ -2,7 +2,6 @@ use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::utils::{self, str_to_account_id};
 use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_HEIGHT};
-use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
@@ -43,16 +42,6 @@ fn test_total_supply_accounting() {
         constructor.deployed_at(contract_address)
     };
 
-    let get_total_supply = |runner: &mut utils::AuroraRunner| -> Wei {
-        let result = runner.call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
-        let amount: u128 = String::from_utf8(result.unwrap().return_data.as_value().unwrap())
-            .unwrap()
-            .replace('"', "")
-            .parse()
-            .unwrap();
-        Wei::new(U256::from(amount))
-    };
-
     // Self-destruct with some benefactor does not reduce the total supply
     let contract = deploy_contract(&mut runner, &mut signer);
     let _submit_result = runner
@@ -65,7 +54,6 @@ fn test_total_supply_accounting() {
         })
         .unwrap();
     assert_eq!(runner.get_balance(benefactor), TRANSFER_AMOUNT);
-    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 
     // Self-destruct with self benefactor burns any ETH in the destroyed contract
     let contract = deploy_contract(&mut runner, &mut signer);
@@ -78,10 +66,6 @@ fn test_total_supply_accounting() {
             )
         })
         .unwrap();
-    assert_eq!(
-        get_total_supply(&mut runner),
-        INITIAL_BALANCE - TRANSFER_AMOUNT
-    );
 }
 
 #[test]
@@ -936,18 +920,6 @@ fn test_block_hash_contract() {
         .unwrap();
 
     utils::panic_on_fail(result.status);
-}
-
-#[test]
-fn test_ft_metadata() {
-    let mut runner = utils::deploy_runner();
-    let account_id: String = runner.context.signer_account_id.clone().into();
-    let outcome = runner.call("ft_metadata", &account_id, Vec::new()).unwrap();
-    let metadata =
-        serde_json::from_slice::<FungibleTokenMetadata>(&outcome.return_data.as_value().unwrap())
-            .unwrap();
-
-    assert_eq!(metadata, FungibleTokenMetadata::default());
 }
 
 /// Tests transfer Eth from one account to another with custom argument `max_gas_price`.

@@ -42,6 +42,10 @@ impl_call_return![
     (CallSetKeyManager, Call::SetKeyManager),
     (CallAddRelayerKey, Call::AddRelayerKey),
     (CallRemoveRelayerKey, Call::RemoveRelayerKey),
+    (
+        CallSetEthConnectorContractAccount,
+        Call::SetEthConnectorContractAccount
+    ),
     (CallPauseContract, Call::PauseContract),
     (CallResumeContract, Call::ResumeContract),
     (CallSetFixedGasCost, Call::SetFixedGasCost),
@@ -90,6 +94,8 @@ impl_view_return![
     (ViewNep141FromErc20 => AccountId, View::Nep141FromErc20, borsh),
     (ViewPausedFlags => u8, View::PausedFlags, borsh),
     (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
+    (ViewGetEthConnectorContractAccount => AccountId, View::GetEthConnectorContractAccount, borsh)
+    (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
     (ViewGetFixedGasCost => FixedGasCostArgs, View::GetFixedGasCost, borsh),
     (ViewGetSiloParams => SiloParamsArgs, View::GetSiloParams, borsh),
     (ViewGetWhitelistStatus => WhitelistStatusArgs, View::GetWhitelistStatus, borsh)
@@ -122,6 +128,7 @@ pub(crate) enum Call {
     FundXccSubAccount,
     FactorySetWNearAddress,
     SetEthConnectorContractData,
+    SetEthConnectorContractAccount,
     FactoryUpdateAddressVersion,
     RefundOnError,
     MintAccount,
@@ -166,6 +173,7 @@ impl AsRef<str> for Call {
             Call::FundXccSubAccount => "fund_xcc_sub_account",
             Call::FactorySetWNearAddress => "factory_set_wnear_address",
             Call::SetEthConnectorContractData => "set_eth_connector_contract_data",
+            Call::SetEthConnectorContractAccount => "set_eth_connector_contract_account",
             Call::FactoryUpdateAddressVersion => "factory_update_address_version",
             Call::RefundOnError => "refund_on_error",
             Call::MintAccount => "mint_account",
@@ -211,6 +219,7 @@ pub enum View {
     Erc20FromNep141,
     Nep141FromErc20,
     AccountsCounter,
+    GetEthConnectorContractAccount,
     GetFixedGasCost,
     GetSiloParams,
     GetWhitelistStatus,
@@ -243,6 +252,7 @@ impl AsRef<str> for View {
             View::Erc20FromNep141 => "get_erc20_from_nep141",
             View::Nep141FromErc20 => "get_nep141_from_erc20",
             View::AccountsCounter => "get_accounts_counter",
+            View::GetEthConnectorContractAccount => "get_eth_connector_contract_account",
             View::GetFixedGasCost => "get_fixed_gas_cost",
             View::GetSiloParams => "get_silo_params",
             View::GetWhitelistStatus => "get_whitelist_status",

@@ -14,6 +14,7 @@ aurora-engine-sdk = { path = "engine-sdk", default-features = false }
 aurora-engine-transactions = { path = "engine-transactions", default-features = false }
 aurora-engine-types = { path = "engine-types", default-features = false }
 aurora-engine-modexp = { path = "engine-modexp", default-features = false }
+aurora-engine-standalone-nep141-legacy = { path = "engine-standalone-nep141-legacy", default-features = false }
 aurora-engine-test-doubles = { path = "engine-test-doubles" }
 aurora-engine-workspace = { path = "engine-workspace" }
 engine-standalone-storage = { path = "engine-standalone-storage" }
@@ -74,9 +75,11 @@ members = [
     "engine-modexp",
     "engine-precompiles",
     "engine-sdk",
+    "engine-standalone-nep141-legacy",
     "engine-standalone-storage",
     "engine-standalone-tracing",
     "engine-tests",
+    "engine-tests-connector",
     "engine-transactions",
     "engine-types",
     "engine-workspace",

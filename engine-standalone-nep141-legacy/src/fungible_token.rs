@@ -1,17 +1,22 @@
-use crate::connector::ZERO_ATTACHED_BALANCE;
-use crate::engine;
-use crate::parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance};
-use crate::prelude::account_id::AccountId;
-use crate::prelude::Wei;
-use crate::prelude::{
-    sdk, storage, vec, Address, Balance, BorshDeserialize, BorshSerialize, NearGas, PromiseAction,
-    PromiseBatchAction, PromiseCreateArgs, PromiseResult, PromiseWithCallbackArgs,
-    StorageBalanceBounds, StorageUsage, String, ToString, Vec,
+use crate::legacy_connector::ZERO_ATTACHED_BALANCE;
+use aurora_engine::{
+    engine,
+    parameters::{NEP141FtOnTransferArgs, ResolveTransferCallArgs, StorageBalance},
 };
+use aurora_engine_sdk as sdk;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::borsh;
-pub use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
-use aurora_engine_types::types::{NEP141Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO};
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::{
+    account_id::AccountId,
+    parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs},
+    storage,
+    types::{
+        Address, Balance, NEP141Wei, NearGas, PromiseResult, StorageBalanceBounds, StorageUsage,
+        Wei, Yocto, ZERO_NEP141_WEI, ZERO_YOCTO,
+    },
+    vec, String, ToString, Vec,
+};
+use serde::{Deserialize, Serialize};
 
 /// Gas for `resolve_transfer`: 5 `TGas`
 const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
@@ -54,6 +59,25 @@ pub struct FungibleTokenOps<I: IO> {
     pub account_storage_usage: StorageUsage,
 
     io: I,
+}
+
+/// Fungible token Reference hash type.
+/// Used for `FungibleTokenMetadata`
+#[derive(Debug, BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct FungibleReferenceHash([u8; 32]);
+
+impl FungibleReferenceHash {
+    /// Encode to base64-encoded string
+    #[must_use]
+    pub fn encode(&self) -> String {
+        aurora_engine_sdk::base64::encode(self)
+    }
+}
+
+impl AsRef<[u8]> for FungibleReferenceHash {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl<I: IO + Copy> FungibleTokenOps<I> {
@@ -488,7 +512,7 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         storage::bytes_to_key(
             storage::KeyPrefix::EthConnector,
             &[u8::from(
-                crate::prelude::EthConnectorStorageId::StatisticsAuroraAccountsCounter,
+                aurora_engine_types::storage:: EthConnectorStorageId::StatisticsAuroraAccountsCounter,
             )],
         )
     }
@@ -500,14 +524,14 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
             .read_u64(&key)
             .unwrap_or(0)
             .checked_add(1)
-            .expect(crate::errors::ERR_ACCOUNTS_COUNTER_OVERFLOW);
+            .expect(aurora_engine::errors::ERR_ACCOUNTS_COUNTER_OVERFLOW);
         self.io.write_storage(&key, &accounts_counter.to_le_bytes());
     }
 }
 
 pub mod error {
-    use crate::errors;
-    use crate::prelude::types::balance::error::BalanceOverflowError;
+    use aurora_engine::errors;
+    use aurora_engine_types::types::balance::error::BalanceOverflowError;
 
     const TOTAL_SUPPLY_OVERFLOW: &[u8; 25] = errors::ERR_TOTAL_SUPPLY_OVERFLOW;
     const BALANCE_OVERFLOW: &[u8; 20] = errors::ERR_BALANCE_OVERFLOW;

@@ -35,6 +35,7 @@ pub struct StandaloneRunner {
     pub chain_id: u64,
     // Cumulative diff from all transactions (ie full state representation)
     pub cumulative_diff: Diff,
+    pub init_legacy_connector: bool,
 }
 
 impl StandaloneRunner {
@@ -52,8 +53,12 @@ impl StandaloneRunner {
         env.block_height += 1;
         let transaction_hash = H256::zero();
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
+        let init_legacy_connector = self.init_legacy_connector;
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::init_evm(io, env, chain_id);
+            if init_legacy_connector {
+                mocks::init_legacy_connector(io, env);
+            }
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
@@ -634,6 +639,7 @@ impl Default for StandaloneRunner {
             env,
             chain_id,
             cumulative_diff: Diff::default(),
+            init_legacy_connector: false,
         }
     }
 }

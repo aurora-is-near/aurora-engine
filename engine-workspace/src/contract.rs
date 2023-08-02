@@ -5,6 +5,16 @@ use crate::operation::{
     CallDeployCode, CallDeployErc20Token, CallDeployUpgrade, CallDeposit,
     CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
     CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
+    CallNew, CallNewEthConnector, CallPausePrecompiles, CallRefundOnError, CallRegisterRelayer,
+    CallRemoveRelayerKey, CallResumePrecompiles, CallSetEthConnectorContractAccount,
+    CallSetEthConnectorContractData, CallSetKeyManager, CallSetPausedFlags, CallStageUpgrade,
+    CallStateMigration, CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit,
+    CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId,
+    ViewCode, ViewErc20FromNep141, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
+    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
+    ViewGetEthConnectorContractAccount, ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner,
+    ViewPausedFlags, ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex,
+    ViewVersion, ViewView,
     CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles, CallRefundOnError,
     CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey, CallResumeContract,
     CallResumePrecompiles, CallSetEthConnectorContractData, CallSetFixedGasCost, CallSetKeyManager,
@@ -162,6 +172,13 @@ impl EngineContract {
             eth_custodian_address,
             metadata,
         ))
+    }
+
+    pub fn set_eth_connector_contract_account(
+        &self,
+        account_id: AccountId,
+    ) -> CallSetEthConnectorContractAccount {
+        CallSetEthConnectorContractAccount::call(&self.contract).args_borsh(account_id)
     }
 
     pub fn factory_update_address_version(
@@ -433,6 +450,10 @@ impl EngineContract {
 
     pub fn get_accounts_counter(&self) -> ViewAccountsCounter {
         ViewAccountsCounter::view(&self.contract)
+    }
+
+    pub fn get_eth_connector_contract_account(&self) -> ViewGetEthConnectorContractAccount {
+        ViewGetEthConnectorContractAccount::view(&self.contract)
     }
 
     pub fn get_fixed_gas_cost(&self) -> ViewGetFixedGasCost {
