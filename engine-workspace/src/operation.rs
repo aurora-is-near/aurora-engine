@@ -94,8 +94,7 @@ impl_view_return![
     (ViewNep141FromErc20 => AccountId, View::Nep141FromErc20, borsh),
     (ViewPausedFlags => u8, View::PausedFlags, borsh),
     (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
-    (ViewGetEthConnectorContractAccount => AccountId, View::GetEthConnectorContractAccount, borsh)
-    (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
+    (ViewGetEthConnectorContractAccount => AccountId, View::GetEthConnectorContractAccount, borsh),
     (ViewGetFixedGasCost => FixedGasCostArgs, View::GetFixedGasCost, borsh),
     (ViewGetSiloParams => SiloParamsArgs, View::GetSiloParams, borsh),
     (ViewGetWhitelistStatus => WhitelistStatusArgs, View::GetWhitelistStatus, borsh),

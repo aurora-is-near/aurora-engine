@@ -4,7 +4,7 @@ use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::engine::LegacyNewCallArgs;
 use aurora_engine_types::parameters::silo::FixedGasCostArgs;
-use aurora_engine_types::types::{NEP141Wei, PromiseResult};
+use aurora_engine_types::types::PromiseResult;
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;

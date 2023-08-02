@@ -7,7 +7,6 @@ use crate::prelude::{address::error::AddressError, Wei};
 
 use crate::deposit_event::FtTransferMessageData;
 use crate::engine::Engine;
-use crate::parameters::errors::ParseTypeFromJsonError;
 use crate::prelude::{
     sdk, str, AccountId, Address, EthConnectorStorageId, KeyPrefix, NearGas, String, ToString, Vec,
     Yocto,
@@ -17,6 +16,7 @@ use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::connector::Proof;
+use aurora_engine_types::parameters::engine::errors::ParseArgsError;
 use aurora_engine_types::types::ZERO_WEI;
 use error::DepositError;
 
@@ -120,7 +120,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     pub fn ft_balance_of_eth_on_aurora(
         &mut self,
         args: &BalanceOfEthCallArgs,
-    ) -> Result<(), ParseTypeFromJsonError> {
+    ) -> Result<(), ParseArgsError> {
         let balance = self.internal_unwrap_balance_of_eth_on_aurora(&args.address);
         sdk::log!("Balance of ETH [{}]: {}", args.address.encode(), balance);
         self.io.return_output(&serde_json::to_vec(&balance)?);

@@ -803,7 +803,8 @@ pub mod workspace {
     use crate::tests::erc20_connector::workspace::{erc20_balance, exit_to_near};
     use crate::utils::solidity::erc20::ERC20;
     use crate::utils::workspace::{
-        deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141, nep_141_balance_of,
+        deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141, init_eth_connector,
+        nep_141_balance_of,
     };
     use aurora_engine_types::parameters::silo::{
         SiloParamsArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind,
@@ -1005,7 +1006,8 @@ pub mod workspace {
     async fn init_silo() -> SiloTestContext {
         // Deploy Aurora Engine
         let aurora = deploy_engine().await;
-
+        // Init external eth-connector
+        init_eth_connector(&aurora).await.unwrap();
         // Create fallback account and evm address
         let fallback_account = aurora
             .root()

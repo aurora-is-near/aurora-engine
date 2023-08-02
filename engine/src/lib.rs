@@ -113,7 +113,6 @@ mod contract {
         EngineWithdrawCallArgs, SetEthConnectorContractAccountArgs, StorageUnregisterCallArgs,
     };
     use aurora_engine_types::parameters::engine::errors::ParseArgsError;
-    use aurora_engine_types::parameters::engine::StorageUnregisterArgs;
     use aurora_engine_types::parameters::engine::{RelayerKeyArgs, RelayerKeyManagerArgs};
     use aurora_engine_types::parameters::silo::{
         FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
@@ -587,10 +586,9 @@ mod contract {
 
         require_owner_only(&state, &io.predecessor_account_id());
 
-        let key_manager =
-            serde_json::from_slice::<RelayerKeyManagerArgs>(&io.read_input().to_vec())
-                .map(|args| args.key_manager)
-                .sdk_expect(errors::ERR_JSON_DESERIALIZE);
+        let key_manager = read_json_args(&io)
+            .map(|args: RelayerKeyManagerArgs| args.key_manager)
+            .sdk_expect(errors::ERR_JSON_DESERIALIZE);
 
         if state.key_manager == key_manager {
             sdk::panic_utf8(errors::ERR_SAME_KEY_MANAGER)
@@ -607,8 +605,8 @@ mod contract {
         let state = state::get_state(&io).sdk_unwrap();
         require_key_manager_only(&state, &io.predecessor_account_id());
 
-        let public_key = serde_json::from_slice::<RelayerKeyArgs>(&io.read_input().to_vec())
-            .map(|args| args.public_key)
+        let public_key = read_json_args(&io)
+            .map(|args: RelayerKeyArgs| args.public_key)
             .sdk_expect(errors::ERR_JSON_DESERIALIZE);
         let allowance = Yocto::new(io.attached_deposit());
         sdk::log!("attached key allowance: {allowance}");
@@ -643,8 +641,7 @@ mod contract {
         let state = state::get_state(&io).sdk_unwrap();
         require_key_manager_only(&state, &io.predecessor_account_id());
 
-        let args: RelayerKeyArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .sdk_expect(errors::ERR_JSON_DESERIALIZE);
+        let args: RelayerKeyArgs = read_json_args(&io).sdk_expect(errors::ERR_JSON_DESERIALIZE);
 
         engine::remove_function_call_key(&mut io, &args.public_key).sdk_unwrap();
 
@@ -886,8 +883,8 @@ mod contract {
                     args.amount,
                     args.memo,
                 ))
+                .map_err(Into::<ParseArgsError>::into)
             })
-            .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
 
         let promise_arg = EthConnectorContract::init_instance(io)
@@ -912,8 +909,8 @@ mod contract {
                     args.memo,
                     args.msg,
                 ))
+                .map_err(Into::<ParseArgsError>::into)
             })
-            .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
 
         let promise_args = EthConnectorContract::init_instance(io)
@@ -941,8 +938,8 @@ mod contract {
         )
         .sdk_unwrap();
 
-        let args: NEP141FtOnTransferArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
+        let args: NEP141FtOnTransferArgs = read_json_args(&io)
+            .map_err(Into::<ParseArgsError>::into)
             .sdk_unwrap();
         let mut eth_connector = EthConnectorContract::init_instance(io).sdk_unwrap();
 
@@ -969,8 +966,8 @@ mod contract {
                     args.account_id,
                     args.registration_only,
                 ))
+                .map_err(Into::<ParseArgsError>::into)
             })
-            .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
 
         let promise_args = EthConnectorContract::init_instance(io)
@@ -990,8 +987,8 @@ mod contract {
         let input = read_json_args(&io)
             .and_then(|args: StorageUnregisterCallArgs| {
                 serde_json::to_vec(&(io.predecessor_account_id(), args.force))
+                    .map_err(Into::<ParseArgsError>::into)
             })
-            .map_err(Into::<ParseTypeFromJsonError>::into)
             .sdk_unwrap();
 
         let promise_args = EthConnectorContract::init_instance(io)
@@ -1009,8 +1006,10 @@ mod contract {
         io.assert_one_yocto().sdk_unwrap();
 
         let input = read_json_args(&io)
-            .and_then(|args: StorageWithdrawCallArgs| serde_json::to_vec(&(io.predecessor_account_id(), args.amount)))
-            .map_err(Into::<ParseTypeFromJsonError>::into)
+            .and_then(|args: StorageWithdrawCallArgs| {
+                serde_json::to_vec(&(io.predecessor_account_id(), args.amount))
+                    .map_err(Into::<ParseArgsError>::into)
+            })
             .sdk_unwrap();
 
         let promise_args = EthConnectorContract::init_instance(io)
@@ -1292,12 +1291,6 @@ mod contract {
     {
         let bytes = io.read_input().to_vec();
         aurora_engine_types::parameters::engine::parse_json_args(&bytes)
-    }
-
-    mod exports {
-        extern "C" {
-            pub(crate) fn value_return(value_len: u64, value_ptr: u64);
-        }
     }
 }
 
