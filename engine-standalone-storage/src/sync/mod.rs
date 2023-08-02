@@ -27,6 +27,8 @@ use types::{Message, TransactionKind, TransactionKindTag, TransactionMessage};
 
 /// Try to parse an Aurora transaction from raw information available in a Near action
 /// (method name, input bytes, data returned from promises).
+#[allow(clippy::too_many_lines)]
+#[must_use]
 pub fn parse_transaction_kind(
     method_name: &str,
     bytes: Vec<u8>,
@@ -83,10 +85,12 @@ pub fn parse_transaction_kind(
         }
         TransactionKindTag::ResolveTransfer => {
             let args = parameters::ResolveTransferCallArgs::try_from_slice(&bytes).ok()?;
-            let promise_result = match promise_data.first().and_then(|x| x.as_ref()) {
-                Some(bytes) => aurora_engine_types::types::PromiseResult::Successful(bytes.clone()),
-                None => aurora_engine_types::types::PromiseResult::Failed,
-            };
+            let promise_result = promise_data
+                .first()
+                .and_then(Option::as_ref)
+                .map_or(aurora_engine_types::types::PromiseResult::Failed, |bytes| {
+                    aurora_engine_types::types::PromiseResult::Successful(bytes.clone())
+                });
             TransactionKind::ResolveTransfer(args, promise_result)
         }
         TransactionKindTag::FtTransfer => {
@@ -111,7 +115,7 @@ pub fn parse_transaction_kind(
             let force = json_args
                 .as_object()
                 .and_then(|x| x.get("force"))
-                .and_then(|x| x.as_bool());
+                .and_then(serde_json::Value::as_bool);
 
             TransactionKind::StorageUnregister(force)
         }
@@ -129,7 +133,7 @@ pub fn parse_transaction_kind(
             let address = Address::try_from_slice(&bytes).ok()?;
             TransactionKind::RegisterRelayer(address)
         }
-        TransactionKindTag::RefundOnError => match promise_data.first().and_then(|x| x.as_ref()) {
+        TransactionKindTag::RefundOnError => match promise_data.first().and_then(Option::as_ref) {
             None => TransactionKind::RefundOnError(None),
             Some(_) => {
                 let args =

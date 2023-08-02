@@ -141,8 +141,10 @@ fn repro_common(context: &ReproContext) {
 
     let snapshot = json_snapshot::types::JsonSnapshot::load_from_file(snapshot_path).unwrap();
 
-    let mut runner = AuroraRunner::default();
-    runner.standalone_runner = None; // Turn off standalone here, validated separately below
+    let mut runner = AuroraRunner {
+        standalone_runner: None, // Turn off standalone here, validated separately below
+        ..Default::default()
+    };
     runner.wasm_config.limit_config.max_gas_burnt = 3_000_000_000_000_000;
     runner.context.storage_usage = 1_000_000_000;
     runner.consume_json_snapshot(snapshot.clone());
