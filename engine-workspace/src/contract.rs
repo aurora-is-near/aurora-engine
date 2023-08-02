@@ -11,8 +11,8 @@ use crate::operation::{
     CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus, CallStageUpgrade,
     CallStateMigration, CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit,
     CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId,
-    ViewCode, ViewErc20FromNep141, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
-    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
+    ViewCode, ViewErc20FromNep141, ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth,
+    ViewFtMetadata, ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
     ViewGetFixedGasCost, ViewGetSiloParams, ViewGetWhitelistStatus, ViewIsUsedProof,
     ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags, ViewPausedPrecompiles,
     ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion, ViewView,
@@ -445,6 +445,10 @@ impl EngineContract {
 
     pub fn get_whitelist_status(&self, args: WhitelistKindArgs) -> ViewGetWhitelistStatus {
         ViewGetWhitelistStatus::view(&self.contract).args_borsh(args)
+    }
+
+    pub fn factory_get_wnear_address(&self) -> ViewFactoryWnearAddress {
+        ViewFactoryWnearAddress::view(&self.contract)
     }
 }
 
