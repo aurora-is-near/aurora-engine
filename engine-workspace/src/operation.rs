@@ -78,7 +78,8 @@ impl_view_return![
     (ViewErc20FromNep141 => Address, View::Erc20FromNep141, borsh),
     (ViewNep141FromErc20 => AccountId, View::Nep141FromErc20, borsh),
     (ViewPausedFlags => u8, View::PausedFlags, borsh),
-    (ViewAccountsCounter => u64, View::AccountsCounter, borsh)
+    (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
+    (ViewFactoryWnearAddress => Address, View::FactoryWnearAddress, borsh)
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -181,6 +182,7 @@ pub enum View {
     Erc20FromNep141,
     Nep141FromErc20,
     AccountsCounter,
+    FactoryWnearAddress,
 }
 
 impl AsRef<str> for View {
@@ -210,6 +212,7 @@ impl AsRef<str> for View {
             View::Erc20FromNep141 => "get_erc20_from_nep141",
             View::Nep141FromErc20 => "get_nep141_from_erc20",
             View::AccountsCounter => "get_accounts_counter",
+            View::FactoryWnearAddress => "factory_get_wnear_address",
         }
     }
 }
