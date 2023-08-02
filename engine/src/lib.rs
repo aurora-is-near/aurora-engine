@@ -1232,7 +1232,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_fixed_gas_cost() {
         let mut io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
         silo::assert_admin(&io).sdk_unwrap();
+
         let args: FixedGasCostArgs = io.read_input_borsh().sdk_unwrap();
         args.cost.sdk_expect("FIXED_GAS_COST_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
         silo::get_silo_params(&io).sdk_expect("SILO_MODE_IS_OFF"); // Use `set_silo_params` to enable the silo mode.
@@ -1250,7 +1252,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_silo_params() {
         let mut io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
         silo::assert_admin(&io).sdk_unwrap();
+
         let args: Option<SiloParamsArgs> = io.read_input_borsh().sdk_unwrap();
         silo::set_silo_params(&mut io, args);
     }
@@ -1258,7 +1262,9 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_whitelist_status() {
         let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
         silo::assert_admin(&io).sdk_unwrap();
+
         let args: WhitelistStatusArgs = io.read_input_borsh().sdk_unwrap();
         silo::set_whitelist_status(&io, &args);
     }
@@ -1278,6 +1284,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn add_entry_to_whitelist() {
         let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
         silo::assert_admin(&io).sdk_unwrap();
 
         let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
@@ -1287,6 +1294,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn add_entry_to_whitelist_batch() {
         let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
         silo::assert_admin(&io).sdk_unwrap();
 
         let args: Vec<WhitelistArgs> = io.read_input_borsh().sdk_unwrap();
@@ -1296,6 +1304,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn remove_entry_from_whitelist() {
         let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
         silo::assert_admin(&io).sdk_unwrap();
 
         let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
