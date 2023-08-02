@@ -98,7 +98,8 @@ impl_view_return![
     (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
     (ViewGetFixedGasCost => FixedGasCostArgs, View::GetFixedGasCost, borsh),
     (ViewGetSiloParams => SiloParamsArgs, View::GetSiloParams, borsh),
-    (ViewGetWhitelistStatus => WhitelistStatusArgs, View::GetWhitelistStatus, borsh)
+    (ViewGetWhitelistStatus => WhitelistStatusArgs, View::GetWhitelistStatus, borsh),
+    (ViewFactoryWnearAddress => Address, View::FactoryWnearAddress, borsh)
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -223,6 +224,7 @@ pub enum View {
     GetFixedGasCost,
     GetSiloParams,
     GetWhitelistStatus,
+    FactoryWnearAddress,
 }
 
 impl AsRef<str> for View {
@@ -256,6 +258,7 @@ impl AsRef<str> for View {
             View::GetFixedGasCost => "get_fixed_gas_cost",
             View::GetSiloParams => "get_silo_params",
             View::GetWhitelistStatus => "get_whitelist_status",
+            View::FactoryWnearAddress => "factory_get_wnear_address",
         }
     }
 }
