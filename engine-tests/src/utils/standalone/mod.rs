@@ -346,14 +346,16 @@ fn unwrap_result(
 
 impl Default for StandaloneRunner {
     fn default() -> Self {
-        let (storage_dir, storage) = storage::create_db();
+        let (storage_dir, mut storage) = storage::create_db();
         let env = mocks::default_env(0);
-        let chain_id = utils::AuroraRunner::default().chain_id;
+        storage
+            .set_engine_account_id(&env.current_account_id)
+            .unwrap();
         Self {
             storage_dir,
             storage,
             env,
-            chain_id,
+            chain_id: utils::DEFAULT_CHAIN_ID,
             cumulative_diff: Diff::default(),
         }
     }

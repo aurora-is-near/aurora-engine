@@ -1,7 +1,8 @@
 use crate::prelude::{Address, U256};
 use crate::utils::solidity::exit_precompile::{Tester, TesterConstructor};
 use crate::utils::{
-    self, AuroraRunner, Signer, ORIGIN, PAUSED_PRECOMPILES, PAUSE_PRECOMPILES, RESUME_PRECOMPILES,
+    self, AuroraRunner, Signer, DEFAULT_AURORA_ACCOUNT_ID, PAUSED_PRECOMPILES, PAUSE_PRECOMPILES,
+    RESUME_PRECOMPILES,
 };
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::parameters::{PausePrecompilesCallArgs, TransactionStatus};
@@ -24,6 +25,7 @@ fn test_paused_precompile_is_shown_when_viewing() {
 
     let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
     let result = runner
+        .one_shot()
         .call(PAUSED_PRECOMPILES, CALLED_ACCOUNT_ID, Vec::new())
         .unwrap();
     let output = result.return_data.as_value().unwrap();
@@ -130,7 +132,12 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
         .into();
 
     runner
-        .mint(token, tester.contract.address, 1_000_000_000, ORIGIN)
+        .mint(
+            token,
+            tester.contract.address,
+            1_000_000_000,
+            DEFAULT_AURORA_ACCOUNT_ID,
+        )
         .unwrap();
 
     (runner, signer, token, tester)

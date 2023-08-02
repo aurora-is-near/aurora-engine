@@ -1,5 +1,5 @@
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
-use crate::utils::{self, AuroraRunner, ORIGIN};
+use crate::utils::{self, AuroraRunner, DEFAULT_AURORA_ACCOUNT_ID};
 use aurora_engine_precompiles::xcc::{costs, cross_contract_call};
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::account_id::AccountId;
@@ -24,7 +24,7 @@ fn test_xcc_eth_gas_cost() {
     let mut runner = utils::deploy_runner();
     runner.standalone_runner = None;
     let xcc_wasm_bytes = contract_bytes();
-    let _res = runner.call("factory_update", ORIGIN, xcc_wasm_bytes);
+    let _res = runner.call("factory_update", DEFAULT_AURORA_ACCOUNT_ID, xcc_wasm_bytes);
     let mut signer = utils::Signer::random();
     let mut baseline_signer = utils::Signer::random();
     runner.context.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
@@ -44,7 +44,7 @@ fn test_xcc_eth_gas_cost() {
     );
     let _res = runner.call(
         "factory_set_wnear_address",
-        ORIGIN,
+        DEFAULT_AURORA_ACCOUNT_ID,
         wnear_erc20.0.address.as_bytes().to_vec(),
     );
 
@@ -189,7 +189,7 @@ fn test_xcc_schedule_gas() {
     let outcome = router
         .call(
             "schedule",
-            ORIGIN,
+            DEFAULT_AURORA_ACCOUNT_ID,
             PromiseArgs::Create(promise).try_to_vec().unwrap(),
         )
         .unwrap();
@@ -231,7 +231,11 @@ fn test_xcc_exec_gas() {
         let args = PromiseArgs::Recursive(x);
 
         let outcome = router
-            .call("execute", ORIGIN, args.try_to_vec().unwrap())
+            .call(
+                "execute",
+                DEFAULT_AURORA_ACCOUNT_ID,
+                args.try_to_vec().unwrap(),
+            )
             .unwrap();
         let callback_count = args.promise_count() - 1;
         let router_exec_cost = costs::ROUTER_EXEC_BASE
@@ -273,12 +277,18 @@ fn deploy_router() -> AuroraRunner {
         ..Default::default()
     };
 
+    // Standalone not relevant here because this is not an Aurora Engine instance
+    router.standalone_runner = None;
     router.context.current_account_id = "some_address.aurora".parse().unwrap();
-    router.context.predecessor_account_id = ORIGIN.parse().unwrap();
+    router.context.predecessor_account_id = DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
 
     let init_args = r#"{"wnear_account": "wrap.near", "must_register": true}"#;
     let outcome = router
-        .call("initialize", ORIGIN, init_args.as_bytes().to_vec())
+        .call(
+            "initialize",
+            DEFAULT_AURORA_ACCOUNT_ID,
+            init_args.as_bytes().to_vec(),
+        )
         .unwrap();
     assert!(outcome.used_gas < aurora_engine::xcc::INITIALIZE_GAS.as_u64());
 

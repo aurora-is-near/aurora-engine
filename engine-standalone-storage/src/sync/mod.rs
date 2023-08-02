@@ -146,7 +146,7 @@ pub fn parse_transaction_kind(
             TransactionKind::NewConnector(args)
         }
         TransactionKindTag::NewEngine => {
-            let args = parameters::NewCallArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::NewCallArgs::deserialize(&bytes).ok()?;
             TransactionKind::NewEngine(args)
         }
         TransactionKindTag::FactoryUpdate => TransactionKind::FactoryUpdate(bytes),
