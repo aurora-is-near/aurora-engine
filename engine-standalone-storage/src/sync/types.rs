@@ -408,7 +408,7 @@ impl TransactionKind {
     }
 }
 
-#[derive(EnumString)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString)]
 pub enum TransactionKindTag {
     #[strum(serialize = "submit")]
     Submit,

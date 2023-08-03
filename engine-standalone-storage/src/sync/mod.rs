@@ -17,74 +17,87 @@ use aurora_engine_types::{
     types::{Address, Yocto},
     H256,
 };
-use std::str::FromStr;
+use std::{io, str::FromStr};
 
 pub mod types;
 
 use crate::engine_state::EngineStateAccess;
-use crate::{BlockMetadata, Diff, Storage};
+use crate::{error::ParseTransactionKindError, BlockMetadata, Diff, Storage};
 use types::{Message, TransactionKind, TransactionKindTag, TransactionMessage};
 
 /// Try to parse an Aurora transaction from raw information available in a Near action
 /// (method name, input bytes, data returned from promises).
 #[allow(clippy::too_many_lines)]
-#[must_use]
 pub fn parse_transaction_kind(
     method_name: &str,
     bytes: Vec<u8>,
     promise_data: &[Option<Vec<u8>>],
-) -> Option<TransactionKind> {
-    let tx_kind_tag = TransactionKindTag::from_str(method_name).ok()?;
+) -> Result<TransactionKind, ParseTransactionKindError> {
+    let tx_kind_tag = TransactionKindTag::from_str(method_name).map_err(|_| {
+        ParseTransactionKindError::UnknownMethodName {
+            name: method_name.into(),
+        }
+    })?;
+    let f = |e: io::Error| ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e));
 
     let tx_kind = match tx_kind_tag {
         TransactionKindTag::Submit => {
-            let eth_tx = EthTransactionKind::try_from(bytes.as_slice()).ok()?;
+            let eth_tx = EthTransactionKind::try_from(bytes.as_slice()).map_err(|e| {
+                ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+            })?;
             TransactionKind::Submit(eth_tx)
         }
         TransactionKindTag::SubmitWithArgs => {
-            let args = parameters::SubmitArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::SubmitArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SubmitWithArgs(args)
         }
         TransactionKindTag::Call => {
-            let call_args = parameters::CallArgs::deserialize(&bytes)?;
+            let call_args = parameters::CallArgs::deserialize(&bytes).ok_or_else(|| {
+                ParseTransactionKindError::failed_deserialization::<io::Error>(tx_kind_tag, None)
+            })?;
             TransactionKind::Call(call_args)
         }
         TransactionKindTag::PausePrecompiles => {
-            let args = parameters::PausePrecompilesCallArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::PausePrecompilesCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::PausePrecompiles(args)
         }
         TransactionKindTag::ResumePrecompiles => {
-            let args = parameters::PausePrecompilesCallArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::PausePrecompilesCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::ResumePrecompiles(args)
         }
         TransactionKindTag::SetOwner => {
-            let args = parameters::SetOwnerArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::SetOwnerArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetOwner(args)
         }
         TransactionKindTag::Deploy => TransactionKind::Deploy(bytes),
         TransactionKindTag::DeployErc20 => {
-            let deploy_args = parameters::DeployErc20TokenArgs::try_from_slice(&bytes).ok()?;
+            let deploy_args =
+                parameters::DeployErc20TokenArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::DeployErc20(deploy_args)
         }
         TransactionKindTag::FtOnTransfer => {
             let transfer_args: parameters::NEP141FtOnTransferArgs =
-                serde_json::from_slice(bytes.as_slice()).ok()?;
+                serde_json::from_slice(bytes.as_slice()).map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
 
             TransactionKind::FtOnTransfer(transfer_args)
         }
         TransactionKindTag::Deposit => TransactionKind::Deposit(bytes),
         TransactionKindTag::FtTransferCall => {
             let transfer_args: parameters::TransferCallCallArgs =
-                serde_json::from_slice(bytes.as_slice()).ok()?;
+                serde_json::from_slice(bytes.as_slice()).map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
 
             TransactionKind::FtTransferCall(transfer_args)
         }
         TransactionKindTag::FinishDeposit => {
-            let args = parameters::FinishDepositCallArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::FinishDepositCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::FinishDeposit(args)
         }
         TransactionKindTag::ResolveTransfer => {
-            let args = parameters::ResolveTransferCallArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::ResolveTransferCallArgs::try_from_slice(&bytes).map_err(f)?;
             let promise_result = promise_data
                 .first()
                 .and_then(Option::as_ref)
@@ -94,24 +107,31 @@ pub fn parse_transaction_kind(
             TransactionKind::ResolveTransfer(args, promise_result)
         }
         TransactionKindTag::FtTransfer => {
-            let args: parameters::TransferCallArgs =
-                serde_json::from_slice(bytes.as_slice()).ok()?;
+            let args: parameters::TransferCallArgs = serde_json::from_slice(bytes.as_slice())
+                .map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
 
             TransactionKind::FtTransfer(args)
         }
         TransactionKindTag::Withdraw => {
-            let args =
-                aurora_engine_types::parameters::WithdrawCallArgs::try_from_slice(&bytes).ok()?;
+            let args = aurora_engine_types::parameters::WithdrawCallArgs::try_from_slice(&bytes)
+                .map_err(f)?;
             TransactionKind::Withdraw(args)
         }
         TransactionKindTag::StorageDeposit => {
-            let args: parameters::StorageDepositCallArgs =
-                serde_json::from_slice(bytes.as_slice()).ok()?;
+            let args: parameters::StorageDepositCallArgs = serde_json::from_slice(bytes.as_slice())
+                .map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
 
             TransactionKind::StorageDeposit(args)
         }
         TransactionKindTag::StorageUnregister => {
-            let json_args: serde_json::Value = serde_json::from_slice(bytes.as_slice()).ok()?;
+            let json_args: serde_json::Value =
+                serde_json::from_slice(bytes.as_slice()).map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
             let force = json_args
                 .as_object()
                 .and_then(|x| x.get("force"))
@@ -121,78 +141,89 @@ pub fn parse_transaction_kind(
         }
         TransactionKindTag::StorageWithdraw => {
             let args: parameters::StorageWithdrawCallArgs =
-                serde_json::from_slice(bytes.as_slice()).ok()?;
+                serde_json::from_slice(bytes.as_slice()).map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
 
             TransactionKind::StorageWithdraw(args)
         }
         TransactionKindTag::SetPausedFlags => {
-            let args = parameters::PauseEthConnectorCallArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::PauseEthConnectorCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetPausedFlags(args)
         }
         TransactionKindTag::RegisterRelayer => {
-            let address = Address::try_from_slice(&bytes).ok()?;
+            let address = Address::try_from_slice(&bytes).map_err(|e| {
+                ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+            })?;
             TransactionKind::RegisterRelayer(address)
         }
         TransactionKindTag::RefundOnError => match promise_data.first().and_then(Option::as_ref) {
             None => TransactionKind::RefundOnError(None),
             Some(_) => {
-                let args =
-                    aurora_engine_types::parameters::RefundCallArgs::try_from_slice(&bytes).ok()?;
+                let args = aurora_engine_types::parameters::RefundCallArgs::try_from_slice(&bytes)
+                    .map_err(f)?;
                 TransactionKind::RefundOnError(Some(args))
             }
         },
         TransactionKindTag::SetConnectorData => {
-            let args = parameters::SetContractDataCallArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::SetContractDataCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetConnectorData(args)
         }
         TransactionKindTag::NewConnector => {
-            let args = parameters::InitCallArgs::try_from_slice(&bytes).ok()?;
+            let args = parameters::InitCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::NewConnector(args)
         }
         TransactionKindTag::NewEngine => {
-            let args = parameters::NewCallArgs::deserialize(&bytes).ok()?;
+            let args = parameters::NewCallArgs::deserialize(&bytes).map_err(|e| {
+                ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+            })?;
             TransactionKind::NewEngine(args)
         }
         TransactionKindTag::FactoryUpdate => TransactionKind::FactoryUpdate(bytes),
         TransactionKindTag::FactoryUpdateAddressVersion => {
-            let args = aurora_engine::xcc::AddressVersionUpdateArgs::try_from_slice(&bytes).ok()?;
+            let args =
+                aurora_engine::xcc::AddressVersionUpdateArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::FactoryUpdateAddressVersion(args)
         }
         TransactionKindTag::FactorySetWNearAddress => {
-            let address = Address::try_from_slice(&bytes).ok()?;
+            let address = Address::try_from_slice(&bytes).map_err(|e| {
+                ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+            })?;
             TransactionKind::FactorySetWNearAddress(address)
         }
         TransactionKindTag::SetUpgradeDelayBlocks => {
             let args = aurora_engine::parameters::SetUpgradeDelayBlocksArgs::try_from_slice(&bytes)
-                .ok()?;
+                .map_err(f)?;
             TransactionKind::SetUpgradeDelayBlocks(args)
         }
         TransactionKindTag::FundXccSubAccound => {
-            let args = aurora_engine::xcc::FundXccArgs::try_from_slice(&bytes).ok()?;
+            let args = aurora_engine::xcc::FundXccArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::FundXccSubAccound(args)
         }
-
         TransactionKindTag::PauseContract => TransactionKind::PauseContract,
         TransactionKindTag::ResumeContract => TransactionKind::ResumeContract,
         TransactionKindTag::SetKeyManager => {
-            let args =
-                aurora_engine::parameters::RelayerKeyManagerArgs::try_from_slice(&bytes).ok()?;
+            let args = aurora_engine::parameters::RelayerKeyManagerArgs::try_from_slice(&bytes)
+                .map_err(f)?;
             TransactionKind::SetKeyManager(args)
         }
         TransactionKindTag::AddRelayerKey => {
-            let args = aurora_engine::parameters::RelayerKeyArgs::try_from_slice(&bytes).ok()?;
+            let args =
+                aurora_engine::parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::AddRelayerKey(args)
         }
         TransactionKindTag::RemoveRelayerKey => {
-            let args = aurora_engine::parameters::RelayerKeyArgs::try_from_slice(&bytes).ok()?;
+            let args =
+                aurora_engine::parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::RemoveRelayerKey(args)
         }
-
         TransactionKindTag::Unknown => {
-            return None;
+            return Err(ParseTransactionKindError::UnknownMethodName {
+                name: method_name.into(),
+            });
         }
     };
-    Some(tx_kind)
+    Ok(tx_kind)
 }
 
 pub fn consume_message<M: ModExpAlgorithm + 'static>(
