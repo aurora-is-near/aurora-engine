@@ -13,9 +13,9 @@ autobenches = false
 [dependencies]
 hex.workspace = true
 num.workspace = true
-ibig.workspace = true
+ibig = { workspace = true, optional = true }
 
 [features]
 default = ["std"]
-std = ["num/std", "ibig/std", "hex/std"]
-bench = []
+std = ["num/std", "hex/std"]
+bench = ["ibig"]
