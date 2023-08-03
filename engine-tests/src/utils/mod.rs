@@ -31,20 +31,13 @@ use crate::prelude::transactions::{
 use crate::prelude::{sdk, Address, Wei, H256, U256};
 use crate::utils::solidity::{ContractConstructor, DeployedContract};
 
-// TODO(Copied from #84): Make sure that there is only one Signer after both PR are merged.
-pub const ORIGIN: &str = "aurora";
+pub const DEFAULT_AURORA_ACCOUNT_ID: &str = "aurora";
 pub const SUBMIT: &str = "submit";
 pub const SUBMIT_WITH_ARGS: &str = "submit_with_args";
-pub const CALL: &str = "call";
-pub const DEPLOY_ERC20: &str = "deploy_erc20_token";
 pub const PAUSE_PRECOMPILES: &str = "pause_precompiles";
 pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
-pub const SET_OWNER: &str = "set_owner";
-pub const SET_UPGRADE_DELAY_BLOCKS: &str = "set_upgrade_delay_blocks";
-pub const PAUSE_CONTRACT: &str = "pause_contract";
-pub const RESUME_CONTRACT: &str = "resume_contract";
-pub const SET_KEY_MANAGER: &str = "set_key_manager";
+pub const DEFAULT_CHAIN_ID: u64 = 1_313_161_556; // NEAR localnet
 
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
@@ -234,21 +227,8 @@ impl AuroraRunner {
         self.previous_logs = outcome.logs.clone();
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
-            if method_name == SUBMIT
-                || method_name == SUBMIT_WITH_ARGS
-                || method_name == CALL
-                || method_name == DEPLOY_ERC20
-                || method_name == PAUSE_PRECOMPILES
-                || method_name == RESUME_PRECOMPILES
-                || method_name == SET_OWNER
-                || method_name == SET_UPGRADE_DELAY_BLOCKS
-                || method_name == PAUSE_CONTRACT
-                || method_name == RESUME_CONTRACT
-                || method_name == SET_KEY_MANAGER
-            {
-                standalone_runner.submit_raw(method_name, &self.context, &self.promise_results)?;
-                self.validate_standalone();
-            }
+            standalone_runner.submit_raw(method_name, &self.context, &self.promise_results)?;
+            self.validate_standalone();
         }
 
         Ok(outcome)
@@ -575,11 +555,12 @@ impl Default for AuroraRunner {
         let runtime_config_store = RuntimeConfigStore::new(None);
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
         let wasm_config = runtime_config.wasm_config.clone();
-        let origin_account_id: near_primitives::types::AccountId = ORIGIN.parse().unwrap();
+        let origin_account_id: near_primitives::types::AccountId =
+            DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
 
         Self {
-            aurora_account_id: ORIGIN.to_string(),
-            chain_id: 1_313_161_556, // NEAR localnet,
+            aurora_account_id: DEFAULT_AURORA_ACCOUNT_ID.to_string(),
+            chain_id: DEFAULT_CHAIN_ID,
             code: ContractCode::new(evm_wasm_bytes, None),
             cache: MockCompiledContractCache::default(),
             ext: mocked_external::MockedExternalWithTrie::new(MockedExternal::default()),
@@ -605,7 +586,7 @@ impl Default for AuroraRunner {
             fees_config: RuntimeFeesConfig::test(),
             current_protocol_version: u32::MAX,
             previous_logs: Vec::new(),
-            standalone_runner: None,
+            standalone_runner: Some(standalone::StandaloneRunner::default()),
             promise_results: Vec::new(),
         }
     }
@@ -658,12 +639,6 @@ pub fn deploy_runner() -> AuroraRunner {
     let result = runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
 
     assert!(result.is_ok());
-
-    let mut standalone_runner = standalone::StandaloneRunner::default();
-    standalone_runner.init_evm();
-
-    runner.standalone_runner = Some(standalone_runner);
-    runner.validate_standalone();
 
     runner
 }

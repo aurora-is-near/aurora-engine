@@ -10,6 +10,7 @@ use aurora_engine_types::{
     H256, U256,
 };
 use std::borrow::Cow;
+use strum::EnumString;
 
 /// Type describing the format of messages sent to the storage layer for keeping
 /// it in sync with the blockchain.
@@ -404,6 +405,122 @@ impl TransactionKind {
                 aurora_engine::engine::get_nonce(&io, from)
             })
             .result
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString)]
+pub enum TransactionKindTag {
+    #[strum(serialize = "submit")]
+    Submit,
+    #[strum(serialize = "call")]
+    Call,
+    #[strum(serialize = "pause_precompiles")]
+    PausePrecompiles,
+    #[strum(serialize = "resume_precompiles")]
+    ResumePrecompiles,
+    #[strum(serialize = "deploy_code")]
+    Deploy,
+    #[strum(serialize = "deploy_erc20_token")]
+    DeployErc20,
+    #[strum(serialize = "ft_on_transfer")]
+    FtOnTransfer,
+    #[strum(serialize = "deposit")]
+    Deposit,
+    #[strum(serialize = "ft_transfer_call")]
+    FtTransferCall,
+    #[strum(serialize = "finish_deposit")]
+    FinishDeposit,
+    #[strum(serialize = "ft_resolve_transfer")]
+    ResolveTransfer,
+    #[strum(serialize = "ft_transfer")]
+    FtTransfer,
+    #[strum(serialize = "withdraw")]
+    Withdraw,
+    #[strum(serialize = "storage_deposit")]
+    StorageDeposit,
+    #[strum(serialize = "storage_unregister")]
+    StorageUnregister,
+    #[strum(serialize = "storage_withdraw")]
+    StorageWithdraw,
+    #[strum(serialize = "set_paused_flags")]
+    SetPausedFlags,
+    #[strum(serialize = "register_relayer")]
+    RegisterRelayer,
+    #[strum(serialize = "refund_on_error")]
+    RefundOnError,
+    #[strum(serialize = "set_eth_connector_contract_data")]
+    SetConnectorData,
+    #[strum(serialize = "new_eth_connector")]
+    NewConnector,
+    #[strum(serialize = "new")]
+    NewEngine,
+    #[strum(serialize = "factory_update")]
+    FactoryUpdate,
+    #[strum(serialize = "factory_update_address_version")]
+    FactoryUpdateAddressVersion,
+    #[strum(serialize = "factory_set_wnear_address")]
+    FactorySetWNearAddress,
+    #[strum(serialize = "set_owner")]
+    SetOwner,
+    #[strum(serialize = "submit_with_args")]
+    SubmitWithArgs,
+    #[strum(serialize = "set_upgrade_delay_blocks")]
+    SetUpgradeDelayBlocks,
+    #[strum(serialize = "fund_xcc_sub_account")]
+    FundXccSubAccound,
+    #[strum(serialize = "pause_contract")]
+    PauseContract,
+    #[strum(serialize = "resume_contract")]
+    ResumeContract,
+    #[strum(serialize = "set_key_manager")]
+    SetKeyManager,
+    #[strum(serialize = "add_relayer_key")]
+    AddRelayerKey,
+    #[strum(serialize = "remove_relayer_key")]
+    RemoveRelayerKey,
+    Unknown,
+}
+
+/// Used to make sure `TransactionKindTag` is kept in sync with `TransactionKind`
+impl From<&TransactionKind> for TransactionKindTag {
+    fn from(tx: &TransactionKind) -> Self {
+        match tx {
+            TransactionKind::Submit(_) => Self::Submit,
+            TransactionKind::Call(_) => Self::Call,
+            TransactionKind::PausePrecompiles(_) => Self::PausePrecompiles,
+            TransactionKind::ResumePrecompiles(_) => Self::ResumePrecompiles,
+            TransactionKind::Deploy(_) => Self::Deploy,
+            TransactionKind::DeployErc20(_) => Self::DeployErc20,
+            TransactionKind::FtOnTransfer(_) => Self::FtOnTransfer,
+            TransactionKind::Deposit(_) => Self::Deposit,
+            TransactionKind::FtTransferCall(_) => Self::FtTransferCall,
+            TransactionKind::FinishDeposit(_) => Self::FinishDeposit,
+            TransactionKind::ResolveTransfer(_, _) => Self::ResolveTransfer,
+            TransactionKind::FtTransfer(_) => Self::FtTransfer,
+            TransactionKind::Withdraw(_) => Self::Withdraw,
+            TransactionKind::StorageDeposit(_) => Self::StorageDeposit,
+            TransactionKind::StorageUnregister(_) => Self::StorageUnregister,
+            TransactionKind::StorageWithdraw(_) => Self::StorageWithdraw,
+            TransactionKind::SetPausedFlags(_) => Self::SetPausedFlags,
+            TransactionKind::RegisterRelayer(_) => Self::RegisterRelayer,
+            TransactionKind::RefundOnError(_) => Self::RefundOnError,
+            TransactionKind::SetConnectorData(_) => Self::SetConnectorData,
+            TransactionKind::NewConnector(_) => Self::NewConnector,
+            TransactionKind::NewEngine(_) => Self::NewEngine,
+            TransactionKind::FactoryUpdate(_) => Self::FactoryUpdate,
+            TransactionKind::FactoryUpdateAddressVersion(_) => Self::FactoryUpdateAddressVersion,
+            TransactionKind::FactorySetWNearAddress(_) => Self::FactorySetWNearAddress,
+            TransactionKind::SetOwner(_) => Self::SetOwner,
+            TransactionKind::SubmitWithArgs(_) => Self::SubmitWithArgs,
+            TransactionKind::SetUpgradeDelayBlocks(_) => Self::SetUpgradeDelayBlocks,
+            TransactionKind::FundXccSubAccound(_) => Self::FundXccSubAccound,
+            TransactionKind::PauseContract => Self::PauseContract,
+            TransactionKind::ResumeContract => Self::ResumeContract,
+            TransactionKind::SetKeyManager(_) => Self::SetKeyManager,
+            TransactionKind::AddRelayerKey(_) => Self::AddRelayerKey,
+            TransactionKind::RemoveRelayerKey(_) => Self::RemoveRelayerKey,
+            TransactionKind::Unknown => Self::Unknown,
+        }
     }
 }
 
