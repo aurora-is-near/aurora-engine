@@ -144,14 +144,6 @@ pub struct RegisterRelayerCallArgs {
     pub address: Address,
 }
 
-pub type PausedMask = u8;
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PauseEthConnectorCallArgs {
-    pub paused_mask: PausedMask,
-}
-
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct PausePrecompilesCallArgs {
     pub paused_mask: u32,

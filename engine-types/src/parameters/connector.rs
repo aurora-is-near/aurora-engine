@@ -167,6 +167,13 @@ pub struct SetEthConnectorContractAccountArgs {
     pub account: AccountId,
 }
 
+pub type PausedMask = u8;
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct PauseEthConnectorCallArgs {
+    pub paused_mask: PausedMask,
+}
+
 /// Fungible token Reference hash type.
 /// Used for `FungibleTokenMetadata`
 #[derive(Debug, BorshDeserialize, BorshSerialize, Deserialize, Serialize, Clone, PartialEq, Eq)]

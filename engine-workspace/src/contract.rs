@@ -21,10 +21,9 @@ use crate::operation::{
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Proof};
+use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, PausedMask, Proof};
 use aurora_engine_types::parameters::engine::{
-    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, PausedMask, RelayerKeyArgs,
-    RelayerKeyManagerArgs,
+    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs, RelayerKeyManagerArgs,
 };
 use aurora_engine_types::parameters::silo::{
     FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,

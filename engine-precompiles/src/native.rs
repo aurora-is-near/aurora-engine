@@ -339,7 +339,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
-                            r#"{{"receiver_id":  "{}", "amount": "{}", "memo": null}}"#,
+                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
                             dest_account,
                             context.apparent_value.as_u128()
                         ),

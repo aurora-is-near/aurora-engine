@@ -1,7 +1,6 @@
 use crate::Storage;
 use aurora_engine::parameters;
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
-use aurora_engine_standalone_nep141_legacy::admin_controlled::PauseEthConnectorCallArgs;
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::silo;
@@ -116,7 +115,7 @@ pub enum TransactionKind {
     /// Admin only method; used to change upgrade delay blocks
     SetUpgradeDelayBlocks(parameters::SetUpgradeDelayBlocksArgs),
     /// Admin only method
-    SetPausedFlags(PauseEthConnectorCallArgs),
+    SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
     RegisterRelayer(Address),
     /// Called if exist precompiles fail
@@ -547,7 +546,7 @@ enum BorshableTransactionKind<'a> {
     StorageDeposit(Cow<'a, parameters::StorageDepositCallArgs>),
     StorageUnregister(Option<bool>),
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
-    SetPausedFlags(Cow<'a, PauseEthConnectorCallArgs>),
+    SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
     RegisterRelayer(Cow<'a, Address>),
     RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),

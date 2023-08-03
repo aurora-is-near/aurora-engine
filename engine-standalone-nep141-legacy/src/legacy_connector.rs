@@ -1,4 +1,4 @@
-use crate::admin_controlled::{AdminControlled, PauseEthConnectorCallArgs, PausedMask};
+use crate::admin_controlled::AdminControlled;
 use crate::fungible_token::{self, FungibleToken, FungibleTokenOps};
 use aurora_engine::connector::proof_key;
 use aurora_engine::{
@@ -23,6 +23,7 @@ use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::{
     account_id::AccountId,
     format,
+    parameters::connector::{PauseEthConnectorCallArgs, PausedMask},
     parameters::{
         PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs, WithdrawCallArgs,
     },

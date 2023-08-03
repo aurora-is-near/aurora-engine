@@ -1,13 +1,6 @@
-use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
-
-pub type PausedMask = u8;
+use aurora_engine_types::parameters::connector::PausedMask;
 
 pub const ERR_PAUSED: &str = "ERR_PAUSED";
-
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-pub struct PauseEthConnectorCallArgs {
-    pub paused_mask: PausedMask,
-}
 
 pub trait AdminControlled {
     /// Return the current mask representing all paused events.
