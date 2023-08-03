@@ -1,7 +1,6 @@
 //! A module containing tests which reproduce transactions sent to live networks.
 
-use crate::utils::{standalone, ORIGIN};
-use crate::utils::{AuroraRunner, ExecutionProfile};
+use crate::utils::{standalone, AuroraRunner, ExecutionProfile};
 use aurora_engine::parameters::SubmitResult;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use engine_standalone_storage::json_snapshot;
@@ -142,7 +141,10 @@ fn repro_common(context: &ReproContext) {
 
     let snapshot = json_snapshot::types::JsonSnapshot::load_from_file(snapshot_path).unwrap();
 
-    let mut runner = AuroraRunner::default();
+    let mut runner = AuroraRunner {
+        standalone_runner: None, // Turn off standalone here, validated separately below
+        ..Default::default()
+    };
     runner.wasm_config.limit_config.max_gas_burnt = 3_000_000_000_000_000;
     runner.context.storage_usage = 1_000_000_000;
     runner.consume_json_snapshot(snapshot.clone());
@@ -167,10 +169,6 @@ fn repro_common(context: &ReproContext) {
 
     // Also validate the SubmitResult in the standalone engine
     let mut standalone = standalone::StandaloneRunner::default();
-    standalone
-        .storage
-        .set_engine_account_id(&ORIGIN.parse().unwrap())
-        .unwrap();
     json_snapshot::initialize_engine_state(&mut standalone.storage, snapshot).unwrap();
     let standalone_result = standalone
         .submit_raw("submit", &runner.context, &[])

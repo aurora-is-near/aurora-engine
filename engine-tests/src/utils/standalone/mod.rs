@@ -1,13 +1,8 @@
 use aurora_engine::engine;
-use aurora_engine::parameters::{
-    CallArgs, DeployErc20TokenArgs, PausePrecompilesCallArgs, SetOwnerArgs,
-    SetUpgradeDelayBlocksArgs, SubmitArgs, SubmitResult, TransactionStatus,
-};
+use aurora_engine::parameters::{SubmitResult, TransactionStatus};
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
-use aurora_engine_types::borsh::BorshDeserialize;
-use aurora_engine_types::parameters::engine::RelayerKeyManagerArgs;
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
 use engine_standalone_storage::{
@@ -202,195 +197,46 @@ impl StandaloneRunner {
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
         env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
 
+        let promise_data: Vec<_> = promise_results
+            .iter()
+            .map(|r| match r {
+                PromiseResult::Successful(bytes) => Some(bytes.clone()),
+                PromiseResult::Failed | PromiseResult::NotReady => None,
+            })
+            .collect();
+        let transaction_kind = engine_standalone_storage::sync::parse_transaction_kind(
+            method_name,
+            ctx.input.clone(),
+            &promise_data,
+        )
+        .expect("All method names must be known by standalone");
+
+        let transaction_hash = if let TransactionKind::SubmitWithArgs(args) = &transaction_kind {
+            aurora_engine_sdk::keccak(&args.tx_data)
+        } else {
+            aurora_engine_sdk::keccak(&ctx.input)
+        };
+
         let storage = &mut self.storage;
-        if method_name == utils::SUBMIT {
-            let transaction_bytes = &ctx.input;
-            Self::internal_submit_transaction(
-                transaction_bytes,
-                0,
-                storage,
-                &mut env,
-                &mut self.cumulative_diff,
-                promise_results,
-            )
-        } else if method_name == utils::SUBMIT_WITH_ARGS {
-            let submit_args = SubmitArgs::try_from_slice(&ctx.input).unwrap();
-            let transaction_hash = aurora_engine_sdk::keccak(&submit_args.tx_data);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::SubmitWithArgs(submit_args);
+        let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+        tx_msg.transaction = transaction_kind;
 
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
+        let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+        self.cumulative_diff.append(outcome.diff.clone());
+        storage::commit(storage, &outcome);
 
-            unwrap_result(outcome)
-        } else if method_name == utils::CALL {
-            let call_args = CallArgs::try_from_slice(&ctx.input).unwrap();
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::Call(call_args);
-
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
-
-            unwrap_result(outcome)
-        } else if method_name == utils::DEPLOY_ERC20 {
-            let deploy_args = DeployErc20TokenArgs::try_from_slice(&ctx.input).unwrap();
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::DeployErc20(deploy_args);
-
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
-
-            let sync::TransactionExecutionResult::DeployErc20(address) = outcome.maybe_result.unwrap().unwrap() else { unreachable!() };
-
-            Ok(SubmitResult::new(
+        match outcome.maybe_result.unwrap() {
+            Some(sync::TransactionExecutionResult::Submit(result)) => result,
+            Some(sync::TransactionExecutionResult::DeployErc20(address)) => Ok(SubmitResult::new(
                 TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
                 0,
                 Vec::new(),
-            ))
-        } else if method_name == utils::RESUME_PRECOMPILES {
-            let input = &ctx.input[..];
-            let call_args = PausePrecompilesCallArgs::try_from_slice(input)
-                .expect("Unable to parse input as PausePrecompilesCallArgs");
-
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::ResumePrecompiles(call_args);
-
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
-
-            Ok(SubmitResult::new(
+            )),
+            _ => Ok(SubmitResult::new(
                 TransactionStatus::Succeed(Vec::new()),
                 0,
                 Vec::new(),
-            ))
-        } else if method_name == utils::PAUSE_PRECOMPILES {
-            let input = &ctx.input[..];
-            let call_args = PausePrecompilesCallArgs::try_from_slice(input)
-                .expect("Unable to parse input as PausePrecompilesCallArgs");
-
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::PausePrecompiles(call_args);
-
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
-
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else if method_name == utils::SET_OWNER {
-            let input = &ctx.input[..];
-            let call_args =
-                SetOwnerArgs::try_from_slice(input).expect("Unable to parse input as SetOwnerArgs");
-
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::SetOwner(call_args);
-
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
-
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else if method_name == utils::SET_UPGRADE_DELAY_BLOCKS {
-            let input = &ctx.input;
-            let call_args = SetUpgradeDelayBlocksArgs::try_from_slice(input)
-                .expect("Unable to parse input as SetUpgradeDelayBlocksArgs");
-
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::SetUpgradeDelayBlocks(call_args);
-
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
-
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else if method_name == utils::PAUSE_CONTRACT {
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::PauseContract;
-
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
-
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else if method_name == utils::RESUME_CONTRACT {
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::ResumeContract;
-
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
-
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else if method_name == utils::SET_KEY_MANAGER {
-            let transaction_hash = aurora_engine_sdk::keccak(&ctx.input);
-            let call_args: RelayerKeyManagerArgs = serde_json::from_slice(&ctx.input)
-                .expect("Unable to parse input as RelayerKeyManagerArgs");
-
-            let mut tx_msg =
-                Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
-            tx_msg.transaction = TransactionKind::SetKeyManager(call_args);
-
-            let outcome =
-                sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
-            self.cumulative_diff.append(outcome.diff.clone());
-            storage::commit(storage, &outcome);
-
-            Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            ))
-        } else {
-            panic!("Unsupported standalone method {method_name}");
+            )),
         }
     }
 
@@ -500,14 +346,16 @@ fn unwrap_result(
 
 impl Default for StandaloneRunner {
     fn default() -> Self {
-        let (storage_dir, storage) = storage::create_db();
+        let (storage_dir, mut storage) = storage::create_db();
         let env = mocks::default_env(0);
-        let chain_id = utils::AuroraRunner::default().chain_id;
+        storage
+            .set_engine_account_id(&env.current_account_id)
+            .unwrap();
         Self {
             storage_dir,
             storage,
             env,
-            chain_id,
+            chain_id: utils::DEFAULT_CHAIN_ID,
             cumulative_diff: Diff::default(),
         }
     }

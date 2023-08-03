@@ -44,8 +44,10 @@ fn test_total_supply_accounting() {
         constructor.deployed_at(contract_address)
     };
 
-    let get_total_supply = |runner: &mut utils::AuroraRunner| -> Wei {
-        let result = runner.call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
+    let get_total_supply = |runner: &utils::AuroraRunner| -> Wei {
+        let result = runner
+            .one_shot()
+            .call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
         let amount: u128 = String::from_utf8(result.unwrap().return_data.as_value().unwrap())
             .unwrap()
             .replace('"', "")
@@ -897,9 +899,10 @@ fn test_block_hash() {
 
 #[test]
 fn test_block_hash_api() {
-    let mut runner = utils::deploy_runner();
+    let runner = utils::deploy_runner();
     let block_height: u64 = 10;
     let outcome = runner
+        .one_shot()
         .call(
             "get_block_hash",
             "any.near",
@@ -941,9 +944,12 @@ fn test_block_hash_contract() {
 
 #[test]
 fn test_ft_metadata() {
-    let mut runner = utils::deploy_runner();
+    let runner = utils::deploy_runner();
     let account_id: String = runner.context.signer_account_id.clone().into();
-    let outcome = runner.call("ft_metadata", &account_id, Vec::new()).unwrap();
+    let outcome = runner
+        .one_shot()
+        .call("ft_metadata", &account_id, Vec::new())
+        .unwrap();
     let metadata =
         serde_json::from_slice::<FungibleTokenMetadata>(&outcome.return_data.as_value().unwrap())
             .unwrap();
@@ -1009,6 +1015,7 @@ fn test_set_owner() {
 
     // get owner to see if the owner_id property has changed
     let outcome = runner
+        .one_shot()
         .call("get_owner", &aurora_account_id, vec![])
         .unwrap();
 
@@ -1064,7 +1071,9 @@ fn test_set_upgrade_delay_blocks() {
     assert!(result.is_ok());
 
     // get upgrade_delay_blocks to see if the upgrade_delay_blocks property has changed
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+    let result = runner
+        .one_shot()
+        .call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
 
     // check if the query goes through the standalone runner
     assert!(result.is_ok());
