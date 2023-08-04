@@ -32,10 +32,7 @@ pub fn insert_block(storage: &mut Storage, block_height: u64) {
 }
 
 pub fn default_env(block_height: u64) -> aurora_engine_sdk::env::Fixed {
-    let aurora_id: AccountId = utils::AuroraRunner::default()
-        .aurora_account_id
-        .parse()
-        .unwrap();
+    let aurora_id: AccountId = utils::DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
     aurora_engine_sdk::env::Fixed {
         signer_account_id: aurora_id.clone(),
         current_account_id: aurora_id.clone(),

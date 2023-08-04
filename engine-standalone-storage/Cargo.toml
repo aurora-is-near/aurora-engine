@@ -26,6 +26,7 @@ rocksdb.workspace = true
 postgres.workspace = true
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true, features = ["std"] }
+strum.workspace = true
 
 [features]
 default = ["snappy", "lz4", "zstd", "zlib"]
