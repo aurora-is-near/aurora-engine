@@ -216,9 +216,8 @@ pub fn parse_transaction_kind(
             TransactionKind::SetFixedGasCost(args)
         }
         TransactionKindTag::SetSiloParams => {
-            let args = silo_params::SiloParamsArgs::try_from_slice(&bytes)
-                .map(Some)
-                .map_err(f)?;
+            let args: Option<silo_params::SiloParamsArgs> =
+                BorshDeserialize::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetSiloParams(args)
         }
         TransactionKindTag::SetWhitelistStatus => {
