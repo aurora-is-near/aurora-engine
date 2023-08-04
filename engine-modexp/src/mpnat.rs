@@ -27,9 +27,9 @@ impl MPNat {
         let end = a.iter().position(|&x| x != 0).unwrap_or(len);
 
         if end == len {
-            return (&[], true);
+            (&[], true)
         } else {
-            return (&a[end..], false);
+            (&a[end..], false)
         }
     }
 
@@ -165,9 +165,9 @@ impl MPNat {
         //
         // The case of modulus being 0 should have already been
         // handled in modexp().
-        debug_assert!( !(modulus.digits.len() == 1 && modulus.digits[0] == 0) );
+        debug_assert!(!(modulus.digits.len() == 1 && modulus.digits[0] == 0));
         if exp_is_zero {
-           if modulus.digits.len() == 1 && modulus.digits[0] == 1 {
+            if modulus.digits.len() == 1 && modulus.digits[0] == 1 {
                 return Self { digits: vec![0] };
             } else {
                 return Self { digits: vec![1] };
@@ -636,20 +636,14 @@ fn test_modpow_even() {
     let exponent = hex::decode("").unwrap();
     let modulus = hex::decode("02").unwrap();
     let result = crate::modexp(&base, &exponent, &modulus);
-    assert_eq!(
-        hex::encode(result),
-        "01"
-    );
+    assert_eq!(hex::encode(result), "01");
 
     // Test zero exp
     let base = hex::decode("00").unwrap();
     let exponent = hex::decode("00").unwrap();
     let modulus = hex::decode("02").unwrap();
     let result = crate::modexp(&base, &exponent, &modulus);
-    assert_eq!(
-        hex::encode(result),
-        "01"
-    );
+    assert_eq!(hex::encode(result), "01");
 
     fn check_modpow_even(base: u128, exp: u128, modulus: u128, expected: u128) {
         let mut x = MPNat::from_big_endian(&base.to_be_bytes());
