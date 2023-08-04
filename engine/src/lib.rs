@@ -584,6 +584,7 @@ mod contract {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
 
+        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
 
         let key_manager = read_json_args(&io)
@@ -603,6 +604,8 @@ mod contract {
     pub extern "C" fn add_relayer_key() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
+
+        require_running(&state);
         require_key_manager_only(&state, &io.predecessor_account_id());
 
         let public_key = read_json_args(&io)
@@ -639,6 +642,8 @@ mod contract {
     pub extern "C" fn remove_relayer_key() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
+
+        require_running(&state);
         require_key_manager_only(&state, &io.predecessor_account_id());
 
         let args: RelayerKeyArgs = read_json_args(&io).sdk_expect(errors::ERR_JSON_DESERIALIZE);

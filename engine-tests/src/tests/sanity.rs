@@ -880,9 +880,10 @@ fn test_block_hash() {
 
 #[test]
 fn test_block_hash_api() {
-    let mut runner = utils::deploy_runner();
+    let runner = utils::deploy_runner();
     let block_height: u64 = 10;
     let outcome = runner
+        .one_shot()
         .call(
             "get_block_hash",
             "any.near",
@@ -980,6 +981,7 @@ fn test_set_owner() {
 
     // get owner to see if the owner_id property has changed
     let outcome = runner
+        .one_shot()
         .call("get_owner", &aurora_account_id, vec![])
         .unwrap();
 
@@ -1032,7 +1034,9 @@ fn test_set_upgrade_delay_blocks() {
     assert!(result.is_ok());
 
     // get upgrade_delay_blocks to see if the upgrade_delay_blocks property has changed
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+    let result = runner
+        .one_shot()
+        .call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
 
     // check if the query goes through the standalone runner
     assert!(result.is_ok());

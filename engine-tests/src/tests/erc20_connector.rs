@@ -1,5 +1,5 @@
 use crate::prelude::{Address, Balance, Wei, WeiU256, U256};
-use crate::utils::{self, create_eth_transaction, AuroraRunner, ORIGIN};
+use crate::utils::{self, create_eth_transaction, AuroraRunner, DEFAULT_AURORA_ACCOUNT_ID};
 use aurora_engine::engine::EngineError;
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
 use aurora_engine::proof::Proof;
@@ -93,7 +93,11 @@ impl AuroraRunner {
 
     pub fn deploy_erc20_token(&mut self, nep141: &str) -> Address {
         let result = self
-            .make_call("deploy_erc20_token", ORIGIN, nep141.try_to_vec().unwrap())
+            .make_call(
+                "deploy_erc20_token",
+                DEFAULT_AURORA_ACCOUNT_ID,
+                nep141.try_to_vec().unwrap(),
+            )
             .unwrap();
 
         Vec::try_from_slice(&result.return_data.as_value().unwrap())
@@ -218,11 +222,11 @@ fn test_mint() {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token("tt.testnet");
     let address = runner.create_account().address;
-    let balance = runner.balance_of(token, address, ORIGIN);
+    let balance = runner.balance_of(token, address, DEFAULT_AURORA_ACCOUNT_ID);
     assert_eq!(balance, U256::from(0));
     let amount = 10;
-    let _result = runner.mint(token, address, amount, ORIGIN);
-    let balance = runner.balance_of(token, address, ORIGIN);
+    let _result = runner.mint(token, address, amount, DEFAULT_AURORA_ACCOUNT_ID);
+    let balance = runner.balance_of(token, address, DEFAULT_AURORA_ACCOUNT_ID);
     assert_eq!(balance, U256::from(amount));
 }
 
@@ -231,11 +235,11 @@ fn test_mint_not_admin() {
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token("tt.testnet");
     let address = runner.create_account().address;
-    let balance = runner.balance_of(token, address, ORIGIN);
+    let balance = runner.balance_of(token, address, DEFAULT_AURORA_ACCOUNT_ID);
     assert_eq!(balance, U256::from(0));
     let amount = 10;
     runner.mint(token, address, amount, "not_admin").unwrap();
-    let balance = runner.balance_of(token, address, ORIGIN);
+    let balance = runner.balance_of(token, address, DEFAULT_AURORA_ACCOUNT_ID);
     assert_eq!(balance, U256::from(0));
 }
 
@@ -250,14 +254,14 @@ fn test_ft_on_transfer() {
     let amount = Balance::new(10);
     let recipient = runner.create_account().address;
 
-    let balance = runner.balance_of(token, recipient, ORIGIN);
+    let balance = runner.balance_of(token, recipient, DEFAULT_AURORA_ACCOUNT_ID);
     assert_eq!(balance, U256::from(0));
 
     let res = runner.ft_on_transfer(nep141, alice, alice, amount, &recipient.encode());
     // Transaction should succeed so return amount is 0
     assert_eq!(res, "\"0\"");
 
-    let balance = runner.balance_of(token, recipient, ORIGIN);
+    let balance = runner.balance_of(token, recipient, DEFAULT_AURORA_ACCOUNT_ID);
     assert_eq!(balance, U256::from(amount.as_u128()));
 }
 
@@ -295,7 +299,7 @@ fn test_relayer_charge_fee() {
     let relayer_balance = runner.get_balance(relayer);
     assert_eq!(relayer_balance, Wei::zero());
 
-    let balance = runner.balance_of(token, recipient, ORIGIN);
+    let balance = runner.balance_of(token, recipient, DEFAULT_AURORA_ACCOUNT_ID);
     assert_eq!(balance, U256::from(0));
 
     let fee_encoded = &mut [0; 32];
@@ -317,7 +321,7 @@ fn test_relayer_charge_fee() {
     let relayer_balance = runner.get_balance(relayer);
     assert_eq!(relayer_balance, Wei::new_u64(fee));
 
-    let balance = runner.balance_of(token, recipient, ORIGIN);
+    let balance = runner.balance_of(token, recipient, DEFAULT_AURORA_ACCOUNT_ID);
     assert_eq!(balance, U256::from(amount.as_u128()));
 }
 
@@ -332,31 +336,39 @@ fn test_transfer_erc20_token() {
     let to_transfer = 43;
 
     assert_eq!(
-        runner.balance_of(token, peer0.address, ORIGIN),
+        runner.balance_of(token, peer0.address, DEFAULT_AURORA_ACCOUNT_ID),
         U256::zero()
     );
     assert_eq!(
-        runner.balance_of(token, peer1.address, ORIGIN),
+        runner.balance_of(token, peer1.address, DEFAULT_AURORA_ACCOUNT_ID),
         U256::zero()
     );
 
-    runner.mint(token, peer0.address, to_mint, ORIGIN).unwrap();
+    runner
+        .mint(token, peer0.address, to_mint, DEFAULT_AURORA_ACCOUNT_ID)
+        .unwrap();
 
     assert_eq!(
-        runner.balance_of(token, peer0.address, ORIGIN),
+        runner.balance_of(token, peer0.address, DEFAULT_AURORA_ACCOUNT_ID),
         U256::from(to_mint)
     );
 
     runner
-        .transfer_erc20(token, peer0.secret_key, peer1.address, to_transfer, ORIGIN)
+        .transfer_erc20(
+            token,
+            peer0.secret_key,
+            peer1.address,
+            to_transfer,
+            DEFAULT_AURORA_ACCOUNT_ID,
+        )
         .unwrap();
     assert_eq!(
-        runner.balance_of(token, peer0.address, ORIGIN),
+        runner.balance_of(token, peer0.address, DEFAULT_AURORA_ACCOUNT_ID),
         U256::from(to_mint - to_transfer)
     );
 
     assert_eq!(
-        runner.balance_of(token, peer1.address, ORIGIN),
+        runner.balance_of(token, peer1.address, DEFAULT_AURORA_ACCOUNT_ID),
         U256::from(to_transfer)
     );
 }

@@ -30,8 +30,6 @@ pub const GAS_FOR_WITHDRAW: NearGas = NearGas::new(20_000_000_000_000);
 pub const GAS_FOR_FT_TRANSFER: NearGas = NearGas::new(50_000_000_000_000);
 pub const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(100_000_000_000_000);
 pub const VIEW_CALL_GAS: NearGas = NearGas::new(15_000_000_000_000);
-/// NEAR Gas for calling `verify_log_entry` promise. Used in the `deposit` logic.
-// Note: Is 40 Tgas always enough?
 
 /// Eth-connector contract data. It's stored in the storage.
 /// Contains:
