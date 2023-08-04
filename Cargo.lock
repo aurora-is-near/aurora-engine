@@ -348,6 +348,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-hashchain"
+version = "1.0.0"
+dependencies = [
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "fixed-hash 0.8.0",
+ "impl-serde",
+]
+
+[[package]]
 name = "aurora-engine-modexp"
 version = "1.0.0"
 dependencies = [
