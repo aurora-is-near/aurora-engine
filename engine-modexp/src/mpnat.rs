@@ -22,6 +22,17 @@ pub struct MPNat {
 }
 
 impl MPNat {
+    fn strip_leading_zeroes(a: &[u8]) -> (&[u8], bool) {
+        let len = a.len();
+        let end = a.iter().position(|&x| x != 0).unwrap_or(len);
+
+        if end == len {
+            (&[], true)
+        } else {
+            (&a[end..], false)
+        }
+    }
+
     // Koç's algorithm for inversion mod 2^k
     // https://eprint.iacr.org/2017/411.pdf
     fn koc_2017_inverse(aa: &Self, k: usize) -> Self {
@@ -143,8 +154,24 @@ impl MPNat {
 
     /// Computes `self ^ exp mod modulus`. `exp` must be given as big-endian bytes.
     pub fn modpow(&mut self, exp: &[u8], modulus: &Self) -> Self {
-        if exp.iter().all(|x| x == &0) {
-            return Self { digits: vec![1] };
+        // exp must be stripped because it is iterated over in
+        // big_wrapping_pow and modpow_montgomery, and a large
+        // zero-padded exp leads to performance issues.
+        let (exp, exp_is_zero) = Self::strip_leading_zeroes(exp);
+
+        // base^0 is always 1, regardless of base.
+        // Hence the result is 0 for (base^0) % 1, and 1
+        // for every modulus larger than 1.
+        //
+        // The case of modulus being 0 should have already been
+        // handled in modexp().
+        debug_assert!(!(modulus.digits.len() == 1 && modulus.digits[0] == 0));
+        if exp_is_zero {
+            if modulus.digits.len() == 1 && modulus.digits[0] == 1 {
+                return Self { digits: vec![0] };
+            } else {
+                return Self { digits: vec![1] };
+            }
         }
 
         if exp.len() <= core::mem::size_of::<usize>() {
@@ -603,6 +630,20 @@ fn test_modpow_even() {
         hex::encode(result),
         "023f4f762936eb0973d46b6eadb59d68d06101"
     );
+
+    // Test empty exp
+    let base = hex::decode("00").unwrap();
+    let exponent = hex::decode("").unwrap();
+    let modulus = hex::decode("02").unwrap();
+    let result = crate::modexp(&base, &exponent, &modulus);
+    assert_eq!(hex::encode(result), "01");
+
+    // Test zero exp
+    let base = hex::decode("00").unwrap();
+    let exponent = hex::decode("00").unwrap();
+    let modulus = hex::decode("02").unwrap();
+    let result = crate::modexp(&base, &exponent, &modulus);
+    assert_eq!(hex::encode(result), "01");
 
     fn check_modpow_even(base: u128, exp: u128, modulus: u128, expected: u128) {
         let mut x = MPNat::from_big_endian(&base.to_be_bytes());
