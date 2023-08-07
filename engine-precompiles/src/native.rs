@@ -1,4 +1,5 @@
 use super::{EvmPrecompileResult, Precompile};
+use crate::prelude::types::EthGas;
 use crate::prelude::{
     format,
     parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
@@ -12,9 +13,8 @@ use crate::prelude::{
     parameters::{PromiseWithCallbackArgs, RefundCallArgs},
     types,
 };
-
-use crate::prelude::types::EthGas;
 use crate::PrecompileOutput;
+use aurora_engine_types::storage::EthConnectorStorageId;
 use aurora_engine_types::{account_id::AccountId, types::NEP141Wei};
 use evm::backend::Log;
 use evm::{Context, ExitError};
@@ -196,6 +196,7 @@ pub mod events {
 
 //TransferEthToNear
 pub struct ExitToNear<I> {
+    #[cfg(feature = "error_refund")]
     current_account_id: AccountId,
     io: I,
 }
@@ -211,6 +212,12 @@ pub mod exit_to_near {
 }
 
 impl<I> ExitToNear<I> {
+    #[cfg(not(feature = "error_refund"))]
+    pub const fn new(io: I) -> Self {
+        Self { io }
+    }
+
+    #[cfg(feature = "error_refund")]
     pub const fn new(current_account_id: AccountId, io: I) -> Self {
         Self {
             current_account_id,
@@ -233,6 +240,21 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
             .ok_or(ExitError::Other(Cow::Borrowed(ERR_TARGET_TOKEN_NOT_FOUND)))?,
     )
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
+}
+
+fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
+    io.read_storage(&construct_contract_key(
+        EthConnectorStorageId::EthConnectorAccount,
+    ))
+    .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
+    .and_then(|x| {
+        x.to_value()
+            .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
+    })
+}
+
+fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
+    bytes_to_key(KeyPrefix::EthConnector, &[u8::from(suffix)])
 }
 
 fn validate_amount(amount: U256) -> Result<(), ExitError> {
@@ -299,9 +321,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
         let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input)?;
-        let current_account_id = self.current_account_id.clone();
         #[cfg(feature = "error_refund")]
-        let refund_on_error_target = current_account_id.clone();
+        let refund_on_error_target = self.current_account_id.clone();
 
         let (nep141_address, args, exit_event) = match flag {
             0x0 => {
@@ -310,9 +331,11 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 // Input slice format:
                 //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
+                let eth_connector_contract_account = get_eth_connector_contract_account(&self.io)?;
+
                 if let Ok(dest_account) = AccountId::try_from(input) {
                     (
-                        current_account_id,
+                        eth_connector_contract_account,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
@@ -379,7 +402,9 @@ impl<I: IO> Precompile for ExitToNear<I> {
                     )));
                 }
             }
-            _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
+            _ => {
+                return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG")));
+            }
         };
 
         #[cfg(feature = "error_refund")]

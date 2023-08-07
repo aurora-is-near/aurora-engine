@@ -9,7 +9,7 @@ use borsh_compat::{self as borsh, maybestd::io, BorshDeserialize, BorshSerialize
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
-pub const ZERO_WEI: Wei = Wei::new_u64(0);
+pub const ZERO_WEI: Wei = Wei::zero();
 
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
 pub type WeiU256 = [u8; 32];

@@ -1,9 +1,10 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
-use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
+use aurora_engine::parameters::{SetEthConnectorContractAccountArgs, SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::parameters::engine::LegacyNewCallArgs;
 use aurora_engine_types::parameters::silo::FixedGasCostArgs;
-use aurora_engine_types::types::{NEP141Wei, PromiseResult};
+use aurora_engine_types::types::PromiseResult;
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
@@ -20,10 +21,7 @@ use near_vm_runner::MockCompiledContractCache;
 use rlp::RlpStream;
 use std::borrow::Cow;
 
-use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::prelude::parameters::{
-    InitCallArgs, LegacyNewCallArgs, SubmitResult, TransactionStatus,
-};
+use crate::prelude::parameters::{SubmitResult, TransactionStatus};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -290,51 +288,10 @@ impl AuroraRunner {
             trie.insert(code_key.to_vec(), code);
         }
 
-        let ft_key = crate::prelude::storage::bytes_to_key(
-            crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
-        );
-        let ft_value = {
-            let mut current_ft: FungibleToken = trie
-                .get(&ft_key)
-                .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
-                .unwrap_or_default();
-            current_ft.total_eth_supply_on_near =
-                current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
-            current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
-                + NEP141Wei::new(init_balance.raw().as_u128());
-            current_ft
-        };
-
-        let aurora_balance_key = [
-            ft_key.as_slice(),
-            self.context.current_account_id.as_ref().as_bytes(),
-        ]
-        .concat();
-        let aurora_balance_value = {
-            let mut current_balance: u128 = trie
-                .get(&aurora_balance_key)
-                .map(|bytes| u128::try_from_slice(bytes).unwrap())
-                .unwrap_or_default();
-            current_balance += init_balance.raw().as_u128();
-            current_balance
-        };
-
-        let proof_key = crate::prelude::storage::bytes_to_key(
-            crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
-        );
-
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         if !init_nonce.is_zero() {
             trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         }
-        trie.insert(ft_key, ft_value.try_to_vec().unwrap());
-        trie.insert(proof_key, vec![0]);
-        trie.insert(
-            aurora_balance_key,
-            aurora_balance_value.try_to_vec().unwrap(),
-        );
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.env.block_height = self.context.block_height;
@@ -660,13 +617,14 @@ pub fn deploy_runner() -> AuroraRunner {
 
     assert!(result.is_ok());
 
-    let args = InitCallArgs {
-        prover_account: str_to_account_id("prover.near"),
-        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
-        metadata: FungibleTokenMetadata::default(),
+    let args = SetEthConnectorContractAccountArgs {
+        account: AccountId::new("aurora_eth_connector.root").unwrap(),
     };
-    let result = runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
-
+    let result = runner.call(
+        "set_eth_connector_contract_account",
+        &account_id,
+        args.try_to_vec().unwrap(),
+    );
     assert!(result.is_ok());
 
     runner

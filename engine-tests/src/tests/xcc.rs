@@ -380,7 +380,7 @@ mod workspace {
     use crate::utils;
     use crate::utils::workspace::{
         create_sub_account, deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141,
-        nep_141_balance_of, transfer_nep_141_to_erc_20,
+        init_eth_connector, nep_141_balance_of, transfer_nep_141_to_erc_20,
     };
     use aurora_engine_precompiles::xcc::cross_contract_call;
     use aurora_engine_transactions::legacy::TransactionLegacy;
@@ -697,7 +697,11 @@ mod workspace {
             engine_balance_after_xcc.max(engine_balance_before_xcc)
                 - engine_balance_after_xcc.min(engine_balance_before_xcc)
                 < 10_000_000_000_000_000_000_000,
-            "Engine lost too much NEAR funding xcc: Before={engine_balance_before_xcc} After={engine_balance_after_xcc}",
+            "Engine lost too much NEAR funding xcc: Before={:?} After={:?} Eq={:?}",
+            engine_balance_before_xcc,
+            engine_balance_after_xcc,
+            engine_balance_after_xcc.max(engine_balance_before_xcc)
+                - engine_balance_after_xcc.min(engine_balance_before_xcc)
         );
 
         let router_balance = aurora.node.get_balance(&router_account_id).await.unwrap();
@@ -745,6 +749,8 @@ mod workspace {
     async fn init_xcc() -> anyhow::Result<XccTestContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();
+
+        init_eth_connector(&aurora).await.unwrap();
 
         let xcc_wasm_bytes = super::contract_bytes();
         let result = aurora.factory_update(xcc_wasm_bytes).transact().await?;
@@ -844,7 +850,7 @@ mod workspace {
     }
 
     async fn get_engine_near_balance(aurora: &EngineContract) -> u128 {
-        aurora.ft_balance_of(&aurora.id()).await.unwrap().result.0
+        nep_141_balance_of(aurora.as_raw_contract(), &aurora.id()).await
     }
 
     async fn deploy_wnear(aurora: &EngineContract) -> anyhow::Result<RawContract> {

@@ -2,12 +2,13 @@ use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
 };
 use aurora_engine::{
-    connector, engine,
+    engine,
     parameters::{self, SubmitResult},
     silo, state, xcc,
 };
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
+use aurora_engine_standalone_nep141_legacy::legacy_connector;
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::{
     account_id::AccountId,
@@ -237,6 +238,12 @@ pub fn parse_transaction_kind(
             let args = silo_params::WhitelistArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::RemoveEntryFromWhitelist(args)
         }
+        TransactionKindTag::SetEthConnectorContractAccount => {
+            let args = parameters::SetEthConnectorContractAccountArgs::try_from_slice(&bytes)
+                .map_err(f)?;
+            TransactionKind::SetEthConnectorContractAccount(args)
+        }
+        TransactionKindTag::DisableLegacyNEP141 => TransactionKind::DisableLegacyNEP141,
         TransactionKindTag::Unknown => {
             return Err(ParseTransactionKindError::UnknownMethodName {
                 name: method_name.into(),
@@ -437,6 +444,9 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
     relayer_address: Address,
     promise_data: &[Option<Vec<u8>>],
 ) -> Result<Option<TransactionExecutionResult>, error::Error> {
+    let is_disabled_legacy_nep141 =
+        aurora_engine::connector::EthConnectorContract::init_instance(io)?
+            .is_disabled_legacy_nep141();
     let result = match transaction {
         TransactionKind::Call(args) => {
             // We can ignore promises in the standalone engine (see above)
@@ -475,7 +485,7 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
                 engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
 
             if env.predecessor_account_id == env.current_account_id {
-                connector::EthConnectorContract::init_instance(io)?
+                legacy_connector::EthConnectorContract::init_instance(io)?
                     .ft_on_transfer(&engine, args)?;
             } else {
                 engine.receive_erc20_tokens(
@@ -489,8 +499,9 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             None
         }
 
+        TransactionKind::FtTransferCall(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::FtTransferCall(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             let promise_args = connector.ft_transfer_call(
                 env.predecessor_account_id.clone(),
                 env.current_account_id.clone(),
@@ -501,22 +512,25 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
+        TransactionKind::ResolveTransfer(_, _) if is_disabled_legacy_nep141 => None,
         TransactionKind::ResolveTransfer(args, promise_result) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.ft_resolve_transfer(args, promise_result.clone());
 
             None
         }
 
+        TransactionKind::FtTransfer(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::FtTransfer(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.ft_transfer(&env.predecessor_account_id, args)?;
 
             None
         }
 
+        TransactionKind::Withdraw(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::Withdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.withdraw_eth_from_near(
                 &env.current_account_id,
                 &env.predecessor_account_id,
@@ -526,8 +540,9 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             None
         }
 
+        TransactionKind::Deposit(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::Deposit(raw_proof) => {
-            let connector_contract = connector::EthConnectorContract::init_instance(io)?;
+            let connector_contract = legacy_connector::EthConnectorContract::init_instance(io)?;
             let promise_args = connector_contract.deposit(
                 raw_proof.clone(),
                 env.current_account_id(),
@@ -537,8 +552,9 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
+        TransactionKind::FinishDeposit(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::FinishDeposit(finish_args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             let maybe_promise_args = connector.finish_deposit(
                 env.predecessor_account_id(),
                 env.current_account_id(),
@@ -549,8 +565,9 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             maybe_promise_args.map(TransactionExecutionResult::Promise)
         }
 
+        TransactionKind::StorageDeposit(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::StorageDeposit(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             let _promise = connector.storage_deposit(
                 env.predecessor_account_id,
                 Yocto::new(env.attached_deposit),
@@ -560,22 +577,25 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             None
         }
 
+        TransactionKind::StorageUnregister(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::StorageUnregister(force) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             let _promise = connector.storage_unregister(env.predecessor_account_id, *force)?;
 
             None
         }
 
+        TransactionKind::StorageWithdraw(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::StorageWithdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.storage_withdraw(&env.predecessor_account_id, args)?;
 
             None
         }
 
+        TransactionKind::SetPausedFlags(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::SetPausedFlags(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
+            let mut connector = legacy_connector::EthConnectorContract::init_instance(io)?;
             connector.set_paused_flags(args);
 
             None
@@ -605,22 +625,41 @@ fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
             result?
         }
 
+        TransactionKind::SetConnectorData(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::SetConnectorData(args) => {
             let mut connector_io = io;
-            connector::set_contract_data(&mut connector_io, args.clone())?;
+            legacy_connector::set_contract_data(&mut connector_io, args.clone())?;
 
             None
         }
 
+        TransactionKind::NewConnector(_) if is_disabled_legacy_nep141 => None,
         TransactionKind::NewConnector(args) => {
-            connector::EthConnectorContract::create_contract(
+            legacy_connector::EthConnectorContract::create_contract(
                 io,
-                &env.current_account_id,
+                env.current_account_id,
                 args.clone(),
             )?;
 
             None
         }
+
+        TransactionKind::SetEthConnectorContractAccount(args) => {
+            use aurora_engine::admin_controlled::AdminControlled;
+
+            let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io)?;
+            connector.set_eth_connector_contract_account(&args.account);
+
+            None
+        }
+
+        TransactionKind::DisableLegacyNEP141 => {
+            let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io)?;
+            connector.disable_legacy_nep141();
+
+            None
+        }
+
         TransactionKind::NewEngine(args) => {
             state::set_state(&mut io, &args.clone().into())?;
 
@@ -769,22 +808,24 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine, fungible_token, state, xcc};
+    use aurora_engine::{engine, state, xcc};
+    use aurora_engine_standalone_nep141_legacy::{fungible_token, legacy_connector};
 
     #[derive(Debug)]
     pub enum Error {
         EngineState(state::EngineStateError),
         Engine(engine::EngineError),
         DeployErc20(engine::DeployErc20Error),
-        FtOnTransfer(connector::error::FtTransferCallError),
-        Deposit(connector::error::DepositError),
-        FinishDeposit(connector::error::FinishDepositError),
+        FtOnTransfer(legacy_connector::error::FtTransferCallError),
+        Deposit(legacy_connector::error::DepositError),
+        FinishDeposit(legacy_connector::error::FinishDepositError),
         FtTransfer(fungible_token::error::TransferError),
-        FtWithdraw(connector::error::WithdrawError),
+        FtWithdraw(legacy_connector::error::WithdrawError),
         FtStorageFunding(fungible_token::error::StorageFundingError),
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
-        ConnectorInit(connector::error::InitContractError),
-        ConnectorStorage(connector::error::StorageReadError),
+        ConnectorInit(legacy_connector::error::InitContractError),
+        LegacyConnectorStorage(legacy_connector::error::StorageReadError),
+        ConnectorStorage(aurora_engine::connector::error::StorageReadError),
         FundXccError(xcc::FundXccError),
     }
 
@@ -806,20 +847,20 @@ pub mod error {
         }
     }
 
-    impl From<connector::error::FtTransferCallError> for Error {
-        fn from(e: connector::error::FtTransferCallError) -> Self {
+    impl From<legacy_connector::error::FtTransferCallError> for Error {
+        fn from(e: legacy_connector::error::FtTransferCallError) -> Self {
             Self::FtOnTransfer(e)
         }
     }
 
-    impl From<connector::error::DepositError> for Error {
-        fn from(e: connector::error::DepositError) -> Self {
+    impl From<legacy_connector::error::DepositError> for Error {
+        fn from(e: legacy_connector::error::DepositError) -> Self {
             Self::Deposit(e)
         }
     }
 
-    impl From<connector::error::FinishDepositError> for Error {
-        fn from(e: connector::error::FinishDepositError) -> Self {
+    impl From<legacy_connector::error::FinishDepositError> for Error {
+        fn from(e: legacy_connector::error::FinishDepositError) -> Self {
             Self::FinishDeposit(e)
         }
     }
@@ -830,8 +871,8 @@ pub mod error {
         }
     }
 
-    impl From<connector::error::WithdrawError> for Error {
-        fn from(e: connector::error::WithdrawError) -> Self {
+    impl From<legacy_connector::error::WithdrawError> for Error {
+        fn from(e: legacy_connector::error::WithdrawError) -> Self {
             Self::FtWithdraw(e)
         }
     }
@@ -848,14 +889,20 @@ pub mod error {
         }
     }
 
-    impl From<connector::error::InitContractError> for Error {
-        fn from(e: connector::error::InitContractError) -> Self {
+    impl From<legacy_connector::error::InitContractError> for Error {
+        fn from(e: legacy_connector::error::InitContractError) -> Self {
             Self::ConnectorInit(e)
         }
     }
 
-    impl From<connector::error::StorageReadError> for Error {
-        fn from(e: connector::error::StorageReadError) -> Self {
+    impl From<legacy_connector::error::StorageReadError> for Error {
+        fn from(e: legacy_connector::error::StorageReadError) -> Self {
+            Self::LegacyConnectorStorage(e)
+        }
+    }
+
+    impl From<aurora_engine::connector::error::StorageReadError> for Error {
+        fn from(e: aurora_engine::connector::error::StorageReadError) -> Self {
             Self::ConnectorStorage(e)
         }
     }

@@ -125,6 +125,8 @@ pub enum TransactionKind {
     SetConnectorData(parameters::SetContractDataCallArgs),
     /// Initialize eth-connector
     NewConnector(parameters::InitCallArgs),
+    SetEthConnectorContractAccount(parameters::SetEthConnectorContractAccountArgs),
+    DisableLegacyNEP141,
     /// Initialize Engine
     NewEngine(parameters::NewCallArgs),
     /// Update xcc-router bytecode
@@ -361,6 +363,10 @@ impl TransactionKind {
             Self::RegisterRelayer(_) => Self::no_evm_execution("register_relayer"),
             Self::SetConnectorData(_) => Self::no_evm_execution("set_connector_data"),
             Self::NewConnector(_) => Self::no_evm_execution("new_connector"),
+            Self::SetEthConnectorContractAccount(_) => {
+                Self::no_evm_execution("set_eth_connector_contract_account")
+            }
+            Self::DisableLegacyNEP141 => Self::no_evm_execution("disable_legacy_nep141"),
             Self::NewEngine(_) => Self::no_evm_execution("new_engine"),
             Self::FactoryUpdate(_) => Self::no_evm_execution("factory_update"),
             Self::FactoryUpdateAddressVersion(_) => {
@@ -496,6 +502,10 @@ pub enum TransactionKindTag {
     AddRelayerKey,
     #[strum(serialize = "remove_relayer_key")]
     RemoveRelayerKey,
+    #[strum(serialize = "set_eth_connector_contract_account")]
+    SetEthConnectorContractAccount,
+    #[strum(serialize = "disable_legacy_nep141")]
+    DisableLegacyNEP141,
     #[strum(serialize = "set_fixed_gas_cost")]
     SetFixedGasCost,
     #[strum(serialize = "set_silo_params")]
@@ -549,6 +559,10 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::SetKeyManager(_) => Self::SetKeyManager,
             TransactionKind::AddRelayerKey(_) => Self::AddRelayerKey,
             TransactionKind::RemoveRelayerKey(_) => Self::RemoveRelayerKey,
+            TransactionKind::SetEthConnectorContractAccount(_) => {
+                Self::SetEthConnectorContractAccount
+            }
+            TransactionKind::DisableLegacyNEP141 => Self::DisableLegacyNEP141,
             TransactionKind::SetFixedGasCost(_) => Self::SetFixedGasCost,
             TransactionKind::SetSiloParams(_) => Self::SetSiloParams,
             TransactionKind::AddEntryToWhitelist(_) => Self::AddEntryToWhitelist,
@@ -687,6 +701,8 @@ enum BorshableTransactionKind<'a> {
     PausePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
+    SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
+    DisableLegacyNEP141,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccount(Cow<'a, FundXccArgs>),
@@ -743,6 +759,10 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
+            TransactionKind::SetEthConnectorContractAccount(x) => {
+                Self::SetEthConnectorContractAccount(Cow::Borrowed(x))
+            }
+            TransactionKind::DisableLegacyNEP141 => Self::DisableLegacyNEP141,
             TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
             TransactionKind::FundXccSubAccount(x) => Self::FundXccSubAccount(Cow::Borrowed(x)),
             TransactionKind::SetUpgradeDelayBlocks(x) => {
@@ -821,6 +841,10 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::ResumePrecompiles(x) => {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
             }
+            BorshableTransactionKind::SetEthConnectorContractAccount(x) => {
+                Ok(Self::SetEthConnectorContractAccount(x.into_owned()))
+            }
+            BorshableTransactionKind::DisableLegacyNEP141 => Ok(Self::DisableLegacyNEP141),
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
             BorshableTransactionKind::FundXccSubAccount(x) => {
                 Ok(Self::FundXccSubAccount(x.into_owned()))

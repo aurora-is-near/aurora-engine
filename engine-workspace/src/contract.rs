@@ -7,22 +7,23 @@ use crate::operation::{
     CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
     CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles, CallRefundOnError,
     CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey, CallResumeContract,
-    CallResumePrecompiles, CallSetEthConnectorContractData, CallSetFixedGasCost, CallSetKeyManager,
-    CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus, CallStageUpgrade,
-    CallStateMigration, CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit,
-    CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId,
-    ViewCode, ViewErc20FromNep141, ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth,
-    ViewFtMetadata, ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
-    ViewGetFixedGasCost, ViewGetSiloParams, ViewGetWhitelistStatus, ViewIsUsedProof,
-    ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags, ViewPausedPrecompiles,
-    ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion, ViewView,
+    CallResumePrecompiles, CallSetEthConnectorContractAccount, CallSetEthConnectorContractData,
+    CallSetFixedGasCost, CallSetKeyManager, CallSetPausedFlags, CallSetSiloParams,
+    CallSetWhitelistStatus, CallStageUpgrade, CallStateMigration, CallStorageDeposit,
+    CallStorageUnregister, CallStorageWithdraw, CallSubmit, CallWithdraw, ViewAccountsCounter,
+    ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141,
+    ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
+    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
+    ViewGetEthConnectorContractAccount, ViewGetFixedGasCost, ViewGetSiloParams,
+    ViewGetWhitelistStatus, ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner,
+    ViewPausedFlags, ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex,
+    ViewVersion, ViewView,
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Proof};
+use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, PausedMask, Proof};
 use aurora_engine_types::parameters::engine::{
-    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, PausedMask, RelayerKeyArgs,
-    RelayerKeyManagerArgs,
+    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs, RelayerKeyManagerArgs,
 };
 use aurora_engine_types::parameters::silo::{
     FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
@@ -162,6 +163,13 @@ impl EngineContract {
             eth_custodian_address,
             metadata,
         ))
+    }
+
+    pub fn set_eth_connector_contract_account(
+        &self,
+        account_id: AccountId,
+    ) -> CallSetEthConnectorContractAccount {
+        CallSetEthConnectorContractAccount::call(&self.contract).args_borsh(account_id)
     }
 
     pub fn factory_update_address_version(
@@ -433,6 +441,10 @@ impl EngineContract {
 
     pub fn get_accounts_counter(&self) -> ViewAccountsCounter {
         ViewAccountsCounter::view(&self.contract)
+    }
+
+    pub fn get_eth_connector_contract_account(&self) -> ViewGetEthConnectorContractAccount {
+        ViewGetEthConnectorContractAccount::view(&self.contract)
     }
 
     pub fn get_fixed_gas_cost(&self) -> ViewGetFixedGasCost {
