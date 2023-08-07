@@ -128,9 +128,12 @@ impl EngineErrorKind {
             Self::EvmError(ExitError::CallTooDeep) => errors::ERR_CALL_TOO_DEEP,
             Self::EvmError(ExitError::CreateCollision) => errors::ERR_CREATE_COLLISION,
             Self::EvmError(ExitError::CreateContractLimit) => errors::ERR_CREATE_CONTRACT_LIMIT,
+            Self::EvmError(ExitError::InvalidCode(_)) => errors::ERR_INVALID_OPCODE,
             Self::EvmError(ExitError::OutOfOffset) => errors::ERR_OUT_OF_OFFSET,
             Self::EvmError(ExitError::OutOfGas) => errors::ERR_OUT_OF_GAS,
             Self::EvmError(ExitError::OutOfFund) => errors::ERR_OUT_OF_FUND,
+            Self::EvmError(ExitError::CreateEmpty) => errors::ERR_CREATE_EMPTY,
+            Self::EvmError(ExitError::MaxNonce) => errors::ERR_MAX_NONCE,
             Self::EvmFatal(ExitFatal::NotSupported) => errors::ERR_NOT_SUPPORTED,
             Self::EvmFatal(ExitFatal::UnhandledInterrupt) => errors::ERR_UNHANDLED_INTERRUPT,
             Self::EvmError(ExitError::Other(m)) | Self::EvmFatal(ExitFatal::Other(m)) => {
