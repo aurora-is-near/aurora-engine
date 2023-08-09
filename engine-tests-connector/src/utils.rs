@@ -37,6 +37,59 @@ pub struct TestContract {
 }
 
 impl TestContract {
+    pub async fn deploy_silo_contract() -> anyhow::Result<(Contract, Contract, Account)> {
+        use workspaces::{
+            types::{KeyType, SecretKey},
+            AccessKey,
+        };
+        let worker = workspaces::sandbox()
+            .await
+            .map_err(|err| anyhow::anyhow!("Failed init sandbox: {:?}", err))?;
+        let testnet = workspaces::testnet()
+            .await
+            .map_err(|err| anyhow::anyhow!("Failed init testnet: {:?}", err))?;
+        let registrar: AccountId = "registrar".parse()?;
+        let sk = SecretKey::from_seed(KeyType::ED25519, registrar.as_str());
+        let registrar = worker
+            .import_contract(&registrar, &testnet)
+            .transact()
+            .await?;
+        Self::waiting_account_creation(&worker, registrar.id()).await?;
+
+        let root: AccountId = "root".parse()?;
+        registrar
+            .as_account()
+            .batch(&root)
+            .create_account()
+            .add_key(sk.public_key(), AccessKey::full_access())
+            .transfer(near_units::parse_near!("100 N"))
+            .transact()
+            .await?
+            .into_result()?;
+
+        let root_account = Account::from_secret_key(root, sk, &worker);
+        let silo_acc = root_account
+            .create_subaccount("silo")
+            .initial_balance(near_units::parse_near!("15 N"))
+            .transact()
+            .await?
+            .into_result()?;
+        let aurora_acc = root_account
+            .create_subaccount("aurora")
+            .initial_balance(near_units::parse_near!("15 N"))
+            .transact()
+            .await?
+            .into_result()?;
+
+        let engine_contract = aurora_acc
+            .deploy(&get_aurora_contract())
+            .await?
+            .into_result()?;
+        let silo_contract = silo_acc.deploy(&get_silo_contract()).await?.into_result()?;
+
+        Ok((engine_contract, silo_contract, root_account))
+    }
+
     pub async fn deploy_aurora_contract() -> anyhow::Result<(Contract, Contract, Account)> {
         use workspaces::{
             types::{KeyType, SecretKey},
@@ -168,6 +221,57 @@ impl TestContract {
         Ok(Self {
             engine_contract,
             eth_connector_contract,
+            root_account,
+        })
+    }
+
+    #[allow(dead_code)]
+    async fn new_silo_contract() -> anyhow::Result<TestContract> {
+        let eth_custodian_address = CUSTODIAN_ADDRESS;
+        let (aurora_contract, silo_contract, root_account) = Self::deploy_silo_contract().await?;
+
+        let prover_account: AccountId = aurora_contract.id().clone();
+        let chain_id = [0u8; 32];
+        let res = aurora_contract
+            .call("new")
+            .args_borsh((chain_id, aurora_contract.id(), aurora_contract.id(), 1_u64))
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?;
+        assert!(res.is_success());
+
+        let chain_id = [1u8; 32];
+        let res = silo_contract
+            .call("new")
+            .args_borsh((chain_id, silo_contract.id(), silo_contract.id(), 1_u64))
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?;
+        assert!(res.is_success());
+
+        let metadata = FungibleTokenMetadata::default();
+        let res = aurora_contract
+            .call("new_eth_connector")
+            .args_borsh((prover_account, eth_custodian_address, metadata))
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?;
+        assert!(res.is_success());
+
+        let acc = SetEthConnectorContractAccountArgs {
+            account: aurora_contract.id().parse().unwrap(),
+        };
+        let res = silo_contract
+            .call("set_eth_connector_contract_account")
+            .args_borsh(acc)
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?;
+        assert!(res.is_success());
+
+        Ok(Self {
+            engine_contract: silo_contract,
+            eth_connector_contract: aurora_contract,
             root_account,
         })
     }
@@ -334,6 +438,14 @@ pub fn print_logs(res: ExecutionFinalResult) {
 
 pub fn validate_eth_address(address: &str) -> Address {
     Address::decode(address).unwrap()
+}
+
+pub fn get_silo_contract() -> Vec<u8> {
+    std::fs::read("../bin/aurora-silo.wasm").unwrap()
+}
+
+pub fn get_aurora_contract() -> Vec<u8> {
+    std::fs::read("../bin/aurora-mainnet.wasm").unwrap()
 }
 
 pub fn get_eth_connector_contract() -> Vec<u8> {
