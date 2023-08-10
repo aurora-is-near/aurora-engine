@@ -11,12 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changes
 
-- Added a view transaction `factory_get_wnear_address` for returning address for the `wNEAR` ERC-20 contract [@aleksuss]. ([#807]) 
+- Added a view transaction `factory_get_wnear_address` for returning address for the `wNEAR` ERC-20 contract by [@aleksuss]. ([#807]) 
 
 ### Fixes
 
-- Fixed a bug where standalone engine can crash on tracing transactions with too large contract deployment [@birchmd]. ([#817])
-- Fixed a bug and performance improvements with unusual exponents in the `engine-modexp` crate [@guidovranken]. ([#814]) 
+- Fixed a bug where standalone engine can crash on tracing transactions with too large contract deployment by [@birchmd]. ([#817])
+- Fixed a bug and performance improvements with unusual exponents in the `engine-modexp` crate by [@guidovranken]. ([#814]) 
 
 [#817]: https://github.com/aurora-is-near/aurora-engine/pull/817
 [#814]: https://github.com/aurora-is-near/aurora-engine/pull/814
@@ -503,18 +503,18 @@ struct SubmitResult {
 [1.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/aurora-is-near/aurora-engine/tree/1.0.0
 
-[@guidovranken]: https://github.com/guidovranken
 [@0x3bfc]: https://github.com/0x3bfc
 [@aleksuss]: https://github.com/aleksuss
 [@andrcmdr]: https://github.com/andrcmdr
 [@birchmd]: https://github.com/birchmd
 [@Casuso]: https://github.com/Casuso
+[@guidovranken]: https://github.com/guidovranken
 [@hskang9]: https://github.com/hskang9
 [@joshuajbouw]: https://github.com/joshuajbouw
 [@mandreyel]: https://github.com/mandreyel
+[@matklad]: https://github.com/matklad
 [@mfornet]: https://github.com/mfornet
 [@mrLSD]: https://github.com/mrLSD
+[@olonho]: https://github.com/olonho
 [@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
-[@matklad]: https://github.com/matklad
-[@olonho]: https://github.com/olonho
