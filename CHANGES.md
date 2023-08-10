@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.2] 2023-08-10
+
+### Changes
+
+- Added a view transaction `factory_get_wnear_address` for returning address for the `wNEAR` ERC-20 contract by [@aleksuss]. ([#807]) 
+
+### Fixes
+
+- Fixed a bug where standalone engine can crash on tracing transactions with too large contract deployment by [@birchmd]. ([#817])
+- Fixed a bug and performance improvements with unusual exponents in the `engine-modexp` crate by [@guidovranken]. ([#814]) 
+
+[#817]: https://github.com/aurora-is-near/aurora-engine/pull/817
+[#814]: https://github.com/aurora-is-near/aurora-engine/pull/814
+[#807]: https://github.com/aurora-is-near/aurora-engine/pull/807
+
 ## [2.10.1] 2023-07-27
 
 ### Fixes
@@ -449,7 +464,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.1...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.2...develop
+[2.10.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.1...2.10.2
 [2.10.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.0...2.10.1
 [2.10.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.3...2.10.0
 [2.9.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.2...2.9.3 
@@ -492,12 +508,13 @@ struct SubmitResult {
 [@andrcmdr]: https://github.com/andrcmdr
 [@birchmd]: https://github.com/birchmd
 [@Casuso]: https://github.com/Casuso
+[@guidovranken]: https://github.com/guidovranken
 [@hskang9]: https://github.com/hskang9
 [@joshuajbouw]: https://github.com/joshuajbouw
 [@mandreyel]: https://github.com/mandreyel
+[@matklad]: https://github.com/matklad
 [@mfornet]: https://github.com/mfornet
 [@mrLSD]: https://github.com/mrLSD
+[@olonho]: https://github.com/olonho
 [@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
-[@matklad]: https://github.com/matklad
-[@olonho]: https://github.com/olonho
