@@ -128,18 +128,18 @@ fn bench_modexp_standalone() {
 
     // These contracts run the modexp precompile in an infinite loop using strategically selecting
     // input that can take a long time to run with some modexp implementations. It should be
-    // possible to  burn 30M EVM gas (the GAS_LIMIT for this transactions) within 1 second.
+    // possible to burn 30M EVM gas (the GAS_LIMIT for these transactions) within 1 second.
     // This test checks this is case for these specially chosen modexp inputs.
     do_bench(
         &mut standalone,
         &mut signer,
         "../etc/tests/modexp-bench/res/evm_contract_1.hex",
     );
-    /*do_bench( // TODO: re-enable this in the future
+    do_bench(
         &mut standalone,
         &mut signer,
         "../etc/tests/modexp-bench/res/evm_contract_2.hex",
-    );*/
+    );
 }
 
 #[test]
@@ -318,6 +318,8 @@ impl Default for ModExpBenchContext {
             std::fs::read(output_path).unwrap()
         };
 
+        // Standalone not relevant here because this is not an Aurora Engine instance
+        inner.standalone_runner = None;
         inner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
         inner.code = ContractCode::new(bench_contract_bytes, None);
 

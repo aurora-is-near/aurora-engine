@@ -327,7 +327,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "2.10.0"
+version = "2.10.1"
 dependencies = [
  "aurora-engine-modexp",
  "aurora-engine-precompiles",
@@ -1556,6 +1556,7 @@ dependencies = [
  "rocksdb",
  "serde",
  "serde_json",
+ "strum 0.25.0",
 ]
 
 [[package]]
@@ -3135,7 +3136,7 @@ dependencies = [
  "opentelemetry-semantic-conventions",
  "prometheus",
  "serde",
- "strum",
+ "strum 0.24.1",
  "thiserror",
  "tokio",
  "tracing",
@@ -3169,7 +3170,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smart-default",
- "strum",
+ "strum 0.24.1",
  "thiserror",
 ]
 
@@ -3199,7 +3200,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smart-default",
- "strum",
+ "strum 0.24.1",
  "thiserror",
 ]
 
@@ -3234,7 +3235,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "smart-default",
- "strum",
+ "strum 0.24.1",
  "thiserror",
  "time 0.3.23",
  "tracing",
@@ -3254,7 +3255,7 @@ dependencies = [
  "num-rational 0.3.2",
  "serde",
  "sha2 0.10.7",
- "strum",
+ "strum 0.24.1",
 ]
 
 [[package]]
@@ -3272,7 +3273,7 @@ dependencies = [
  "serde",
  "serde_repr",
  "sha2 0.10.7",
- "strum",
+ "strum 0.24.1",
 ]
 
 [[package]]
@@ -3293,7 +3294,7 @@ dependencies = [
  "serde_repr",
  "serde_with",
  "sha2 0.10.7",
- "strum",
+ "strum 0.24.1",
  "thiserror",
 ]
 
@@ -3486,7 +3487,7 @@ dependencies = [
  "near-account-id 0.15.0",
  "near-rpc-error-macro 0.15.0",
  "serde",
- "strum",
+ "strum 0.24.1",
 ]
 
 [[package]]
@@ -3499,7 +3500,7 @@ dependencies = [
  "near-account-id 0.17.0",
  "near-rpc-error-macro 0.17.0",
  "serde",
- "strum",
+ "strum 0.24.1",
  "thiserror",
 ]
 
@@ -5226,7 +5227,16 @@ version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
 dependencies = [
- "strum_macros",
+ "strum_macros 0.24.3",
+]
+
+[[package]]
+name = "strum"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
+dependencies = [
+ "strum_macros 0.25.1",
 ]
 
 [[package]]
@@ -5240,6 +5250,19 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6069ca09d878a33f883cc06aaa9718ede171841d3832450354410b718b097232"
+dependencies = [
+ "heck 0.4.1",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 2.0.26",
 ]
 
 [[package]]

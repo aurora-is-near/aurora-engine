@@ -1,8 +1,8 @@
 use crate::{
     arith::{
-        big_mod_inv, big_wrapping_mul, big_wrapping_pow, borrowing_sub, carrying_add,
-        compute_r_mod_n, in_place_add, in_place_mul_sub, in_place_shl, in_place_shr,
-        join_as_double, mod_inv, monpro, monsq,
+        big_wrapping_mul, big_wrapping_pow, borrowing_sub, carrying_add, compute_r_mod_n,
+        in_place_add, in_place_mul_sub, in_place_shl, in_place_shr, join_as_double, mod_inv,
+        monpro, monsq,
     },
     maybe_std::{vec, Vec},
 };
@@ -22,6 +22,72 @@ pub struct MPNat {
 }
 
 impl MPNat {
+    fn strip_leading_zeroes(a: &[u8]) -> (&[u8], bool) {
+        let len = a.len();
+        let end = a.iter().position(|&x| x != 0).unwrap_or(len);
+
+        if end == len {
+            (&[], true)
+        } else {
+            (&a[end..], false)
+        }
+    }
+
+    // Koç's algorithm for inversion mod 2^k
+    // https://eprint.iacr.org/2017/411.pdf
+    fn koc_2017_inverse(aa: &Self, k: usize) -> Self {
+        debug_assert!(aa.is_odd());
+
+        let length = k / WORD_BITS;
+        let mut b = MPNat {
+            digits: vec![0; length + 1],
+        };
+        b.digits[0] = 1;
+
+        let mut a = MPNat {
+            digits: aa.digits.clone(),
+        };
+        a.digits.resize(length + 1, 0);
+
+        let mut neg: bool = false;
+
+        let mut res = MPNat {
+            digits: vec![0; length + 1],
+        };
+
+        let (mut wordpos, mut bitpos) = (0, 0);
+
+        for _ in 0..k {
+            let x = b.digits[0] & 1;
+            if x != 0 {
+                if !neg {
+                    // b = a - b
+                    let mut tmp = MPNat {
+                        digits: a.digits.clone(),
+                    };
+                    in_place_mul_sub(&mut tmp.digits, &b.digits, 1);
+                    b = tmp;
+                    neg = true;
+                } else {
+                    // b = b - a
+                    in_place_add(&mut b.digits, &a.digits);
+                }
+            }
+
+            in_place_shr(&mut b.digits, 1);
+
+            res.digits[wordpos] |= x << bitpos;
+
+            bitpos += 1;
+            if bitpos == WORD_BITS {
+                bitpos = 0;
+                wordpos += 1;
+            }
+        }
+
+        res
+    }
+
     pub fn from_big_endian(bytes: &[u8]) -> Self {
         if bytes.is_empty() {
             return Self { digits: vec![0] };
@@ -88,8 +154,24 @@ impl MPNat {
 
     /// Computes `self ^ exp mod modulus`. `exp` must be given as big-endian bytes.
     pub fn modpow(&mut self, exp: &[u8], modulus: &Self) -> Self {
-        if exp.iter().all(|x| x == &0) {
-            return Self { digits: vec![1] };
+        // exp must be stripped because it is iterated over in
+        // big_wrapping_pow and modpow_montgomery, and a large
+        // zero-padded exp leads to performance issues.
+        let (exp, exp_is_zero) = Self::strip_leading_zeroes(exp);
+
+        // base^0 is always 1, regardless of base.
+        // Hence the result is 0 for (base^0) % 1, and 1
+        // for every modulus larger than 1.
+        //
+        // The case of modulus being 0 should have already been
+        // handled in modexp().
+        debug_assert!(!(modulus.digits.len() == 1 && modulus.digits[0] == 0));
+        if exp_is_zero {
+            if modulus.digits.len() == 1 && modulus.digits[0] == 1 {
+                return Self { digits: vec![0] };
+            } else {
+                return Self { digits: vec![1] };
+            }
         }
 
         if exp.len() <= core::mem::size_of::<usize>() {
@@ -174,14 +256,11 @@ impl MPNat {
         let x1 = base_copy.modpow_montgomery(exp, &odd);
         let x2 = self.modpow_with_power_of_two(exp, &power_of_two);
 
+        let odd_inv =
+            Self::koc_2017_inverse(&odd, trailing_zeros * WORD_BITS + additional_zero_bits);
+
         let s = power_of_two.digits.len();
         let mut scratch = vec![0; s];
-        let odd_inv = {
-            let mut tmp = MPNat { digits: vec![0; s] };
-            big_mod_inv(&odd, &mut tmp, &mut scratch);
-            *tmp.digits.last_mut().unwrap() &= power_of_two_mask;
-            tmp
-        };
         let diff = {
             scratch.fill(0);
             let mut b = false;
@@ -348,7 +427,7 @@ impl MPNat {
             return;
         }
 
-        let other_most_sig = *other.digits.last().unwrap();
+        let other_most_sig = *other.digits.last().unwrap() as DoubleWord;
 
         if self.digits.len() == 2 {
             // This is the smallest case since `n >= 1` and `m > 0`
@@ -357,7 +436,7 @@ impl MPNat {
             // to get the answer directly.
             let self_most_sig = self.digits.pop().unwrap();
             let a = join_as_double(self_most_sig, self.digits[0]);
-            let b = other_most_sig as DoubleWord;
+            let b = other_most_sig;
             self.digits[0] = (a % b) as Word;
             return;
         }
@@ -369,8 +448,7 @@ impl MPNat {
             for j in (0..k).rev() {
                 let self_most_sig = self.digits.pop().unwrap();
                 let self_second_sig = self.digits[j];
-                let r =
-                    join_as_double(self_most_sig, self_second_sig) % (other_most_sig as DoubleWord);
+                let r = join_as_double(self_most_sig, self_second_sig) % other_most_sig;
                 self.digits[j] = r as Word;
             }
             return;
@@ -385,7 +463,7 @@ impl MPNat {
         // both numerator and denominator by a common factor
         // and run the algorithm on those numbers.
         // See Knuth The Art of Computer Programming vol. 2 section 4.3 for details.
-        let shift = other_most_sig.leading_zeros();
+        let shift = (other_most_sig as Word).leading_zeros();
         if shift > 0 {
             // Normalize self
             let overflow = in_place_shl(&mut self.digits, shift);
@@ -410,34 +488,31 @@ impl MPNat {
             return;
         }
 
-        let other_second_sig = other.digits[n - 2];
+        let other_second_sig = other.digits[n - 2] as DoubleWord;
         let mut self_most_sig: Word = 0;
         for j in (0..=m).rev() {
             let self_second_sig = *self.digits.last().unwrap();
             let self_third_sig = self.digits[self.digits.len() - 2];
 
-            let (mut q_hat, mut r_hat) = {
-                let a = join_as_double(self_most_sig, self_second_sig);
-                let mut q_hat = a / (other_most_sig as DoubleWord);
-                let mut r_hat = a % (other_most_sig as DoubleWord);
+            let a = join_as_double(self_most_sig, self_second_sig);
+            let mut q_hat = a / other_most_sig;
+            let mut r_hat = a % other_most_sig;
 
-                if q_hat == BASE {
+            loop {
+                let a = q_hat * other_second_sig;
+                let b = join_as_double(r_hat as Word, self_third_sig);
+                if q_hat >= BASE || a > b {
                     q_hat -= 1;
-                    r_hat += other_most_sig as DoubleWord;
+                    r_hat += other_most_sig;
+                    if BASE <= r_hat {
+                        break;
+                    }
+                } else {
+                    break;
                 }
-
-                (q_hat as Word, r_hat)
-            };
-
-            while r_hat < BASE
-                && join_as_double(r_hat as Word, self_third_sig)
-                    < (q_hat as DoubleWord) * (other_second_sig as DoubleWord)
-            {
-                q_hat -= 1;
-                r_hat += other_most_sig as DoubleWord;
             }
 
-            let mut borrow = in_place_mul_sub(&mut self.digits[j..], &other.digits, q_hat);
+            let mut borrow = in_place_mul_sub(&mut self.digits[j..], &other.digits, q_hat as Word);
             if borrow > self_most_sig {
                 // q_hat was too large, add back one multiple of the modulus
                 let carry = in_place_add(&mut self.digits[j..], &other.digits);
@@ -556,6 +631,20 @@ fn test_modpow_even() {
         "023f4f762936eb0973d46b6eadb59d68d06101"
     );
 
+    // Test empty exp
+    let base = hex::decode("00").unwrap();
+    let exponent = hex::decode("").unwrap();
+    let modulus = hex::decode("02").unwrap();
+    let result = crate::modexp(&base, &exponent, &modulus);
+    assert_eq!(hex::encode(result), "01");
+
+    // Test zero exp
+    let base = hex::decode("00").unwrap();
+    let exponent = hex::decode("00").unwrap();
+    let modulus = hex::decode("02").unwrap();
+    let result = crate::modexp(&base, &exponent, &modulus);
+    assert_eq!(hex::encode(result), "01");
+
     fn check_modpow_even(base: u128, exp: u128, modulus: u128, expected: u128) {
         let mut x = MPNat::from_big_endian(&base.to_be_bytes());
         let m = MPNat::from_big_endian(&modulus.to_be_bytes());
@@ -659,6 +748,34 @@ fn test_sub_to_same_size() {
         assert!(x.digits.len() <= y.digits.len());
         let result = crate::arith::mp_nat_to_u128(&x);
         assert_eq!(result % n, a % n, "{a} % {n} failed sub_to_same_size check");
+    }
+
+    /* Test that borrow equals self_most_sig at end of sub_to_same_size */
+    {
+        let mut x = MPNat::from_big_endian(&[
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xae, 0x5f, 0xf0, 0x8b, 0xfc, 0x02,
+            0x71, 0xa4, 0xfe, 0xe0, 0x49, 0x02, 0xc9, 0xd9, 0x12, 0x61, 0x8e, 0xf5, 0x02, 0x2c,
+            0xa0, 0x00, 0x00, 0x00,
+        ]);
+        let y = MPNat::from_big_endian(&[
+            0xae, 0x5f, 0xf0, 0x8b, 0xfc, 0x02, 0x71, 0xa4, 0xfe, 0xe0, 0x49, 0x0f, 0x70, 0x00,
+            0x00, 0x00,
+        ]);
+        x.sub_to_same_size(&y);
+    }
+
+    /* Additional test for sub_to_same_size q_hat/r_hat adjustment logic */
+    {
+        let mut x = MPNat::from_big_endian(&[
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff,
+            0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ]);
+        let y = MPNat::from_big_endian(&[
+            0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00,
+            0x00, 0x00,
+        ]);
+        x.sub_to_same_size(&y);
     }
 }
 

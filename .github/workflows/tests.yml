@@ -18,7 +18,7 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v3
       - name: Restore cache
-        run: cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
+        run: cache-util restore cargo_git cargo_registry yarn_cache
       - name: Build contracts
         run: cargo make build-contracts
       - name: Test contracts

@@ -40,8 +40,6 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
-      - name: Update udeps
-        run: cargo install --force cargo-udeps
       - name: Run udeps
         run: cargo make udeps
   contracts:
