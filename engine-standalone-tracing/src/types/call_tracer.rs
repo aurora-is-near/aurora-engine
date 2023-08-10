@@ -46,7 +46,7 @@ impl CallTracer {
                 error: Some("Tracing bug: Exit before Enter".into()),
                 calls: Vec::new(),
             });
-            self.call_stack.push(frame)
+            self.call_stack.push(frame);
         }
 
         // unwrap is safe because we push a new frame if the
@@ -188,6 +188,7 @@ impl evm_runtime::tracing::EventListener for CallTracer {
 }
 
 impl evm::tracing::EventListener for CallTracer {
+    #[allow(clippy::too_many_lines)]
     fn event(&mut self, event: evm::tracing::Event) {
         match event {
             evm::tracing::Event::Call {
