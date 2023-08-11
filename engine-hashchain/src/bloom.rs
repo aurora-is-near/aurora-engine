@@ -42,8 +42,7 @@ impl Bloom {
         let hash = keccak(input);
         let mut ptr = 0;
 
-        for i in 0..BLOOM_BITS {
-            let _ = i;
+        for _ in 0..BLOOM_BITS {
             let mut index = 0;
             for _ in 0..bloom_bytes {
                 index = (index << 8) | hash[ptr] as usize;
