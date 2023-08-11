@@ -56,8 +56,8 @@ impl StreamCompactMerkleTree {
                 };
 
                 self.subtrees.pop();
-                self.subtrees.pop();
-                self.subtrees.push(father_subtree);
+                // Unwrap is stafe since `index >= 1`
+                *(self.subtrees.last_mut().unwrap()) = father_subtree;
 
                 index -= 1;
             }
