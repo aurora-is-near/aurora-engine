@@ -234,15 +234,13 @@ impl BlockHashchainComputer {
     }
 
     /// Adds a transaction.
-    #[allow(clippy::as_conversions)]
-    #[allow(clippy::cast_possible_truncation)]
     pub fn add_tx(&mut self, method_name: &str, input: &[u8], output: &[u8], log_bloom: &Bloom) {
         let data = [
-            &(method_name.len() as u32).to_be_bytes(),
+            &saturating_cast(method_name.len()).to_be_bytes(),
             method_name.as_bytes(),
-            &(input.len() as u32).to_be_bytes(),
+            &saturating_cast(input.len()).to_be_bytes(),
             input,
-            &(output.len() as u32).to_be_bytes(),
+            &saturating_cast(output.len()).to_be_bytes(),
             output,
         ]
         .concat();
@@ -286,4 +284,8 @@ impl BlockHashchainComputer {
     pub fn is_empty(&self) -> bool {
         self.txs_merkle_tree.is_empty()
     }
+}
+
+fn saturating_cast(x: usize) -> u32 {
+    x.try_into().unwrap_or(u32::MAX)
 }
