@@ -56,7 +56,7 @@ impl StreamCompactMerkleTree {
                 };
 
                 self.subtrees.pop();
-                // Unwrap is stafe since `index >= 1`
+                // Unwrap is safe since `index >= 1`
                 *(self.subtrees.last_mut().unwrap()) = father_subtree;
 
                 index -= 1;
