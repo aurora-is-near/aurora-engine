@@ -499,6 +499,15 @@ mod contract {
         crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
     }
 
+    /// Returns the address for the `wNEAR` ERC-20 contract in borsh format.
+    #[no_mangle]
+    pub extern "C" fn factory_get_wnear_address() {
+        let mut io = Runtime;
+        let address = aurora_engine_precompiles::xcc::state::get_wnear_address(&io);
+        let bytes = address.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
+        io.return_output(&bytes);
+    }
+
     /// Create and/or fund an XCC sub-account directly (as opposed to having one be automatically
     /// created via the XCC precompile in the EVM). The purpose of this method is to enable
     /// XCC on engine instances where wrapped NEAR (WNEAR) is not bridged.
@@ -623,6 +632,7 @@ mod contract {
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
 
+        require_running(&state);
         require_owner_only(&state, &io.predecessor_account_id());
 
         let key_manager =
@@ -643,6 +653,8 @@ mod contract {
     pub extern "C" fn add_relayer_key() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
+
+        require_running(&state);
         require_key_manager_only(&state, &io.predecessor_account_id());
 
         let public_key = serde_json::from_slice::<RelayerKeyArgs>(&io.read_input().to_vec())
@@ -679,6 +691,8 @@ mod contract {
     pub extern "C" fn remove_relayer_key() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
+
+        require_running(&state);
         require_key_manager_only(&state, &io.predecessor_account_id());
 
         let args: RelayerKeyArgs = serde_json::from_slice(&io.read_input().to_vec())

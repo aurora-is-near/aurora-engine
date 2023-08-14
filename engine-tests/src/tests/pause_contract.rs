@@ -73,7 +73,9 @@ fn test_pause_contract() {
     .unwrap();
 
     // contract is running by default, gets and sets should work
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+    let result = runner
+        .one_shot()
+        .call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
     assert!(result.is_ok());
 
     let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set.clone());
@@ -84,7 +86,9 @@ fn test_pause_contract() {
     assert!(result.is_ok());
 
     // contract is paused, gets should still work but sets should fail
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+    let result = runner
+        .one_shot()
+        .call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
     assert!(result.is_ok());
 
     let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set);
@@ -110,7 +114,9 @@ fn test_resume_contract() {
     assert!(result.is_ok());
 
     // contract is running again, gets and sets should work
-    let result = runner.call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
+    let result = runner
+        .one_shot()
+        .call("get_upgrade_delay_blocks", &aurora_account_id, vec![]);
     assert!(result.is_ok());
 
     let result = runner.call("set_upgrade_delay_blocks", &aurora_account_id, set);

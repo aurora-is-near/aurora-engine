@@ -20,10 +20,37 @@ pub struct CallFrame {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CallTracer {
     pub call_stack: Vec<CallFrame>,
+    pub top_level_transact: Option<CallFrame>,
 }
 
 impl CallTracer {
     fn end(&mut self, output: Vec<u8>, error: Option<&evm::ExitReason>) {
+        if self.call_stack.is_empty() {
+            debug_assert!(
+                error.is_some(),
+                "Empty stack can only occur if there is an early error"
+            );
+            debug_assert!(
+                self.top_level_transact.is_some(),
+                "Top level transact events always come before any exit event"
+            );
+            let frame = self.top_level_transact.take().unwrap_or_else(|| CallFrame {
+                call_type: CallType::Call,
+                from: Address::default(),
+                to: None,
+                value: U256::zero(),
+                gas: 0,
+                gas_used: 0,
+                input: Vec::new(),
+                output: Vec::new(),
+                error: Some("Tracing bug: Exit before Enter".into()),
+                calls: Vec::new(),
+            });
+            self.call_stack.push(frame);
+        }
+
+        // unwrap is safe because we push a new frame if the
+        // stack was empty at the start of this method.
         let frame = self.call_stack.first_mut().unwrap();
         match error {
             None => {
@@ -161,6 +188,7 @@ impl evm_runtime::tracing::EventListener for CallTracer {
 }
 
 impl evm::tracing::EventListener for CallTracer {
+    #[allow(clippy::too_many_lines)]
     fn event(&mut self, event: evm::tracing::Event) {
         match event {
             evm::tracing::Event::Call {
@@ -255,11 +283,75 @@ impl evm::tracing::EventListener for CallTracer {
                 self.exit(return_value.to_vec(), error);
             }
 
+            evm::tracing::Event::TransactCall {
+                caller,
+                address,
+                value,
+                data,
+                gas_limit,
+            } => {
+                let frame = CallFrame {
+                    call_type: CallType::Call,
+                    from: Address::new(caller),
+                    to: Some(Address::new(address)),
+                    value,
+                    gas: gas_limit,
+                    gas_used: 0,
+                    input: data.to_vec(),
+                    output: Vec::new(),
+                    error: None,
+                    calls: Vec::new(),
+                };
+                self.top_level_transact = Some(frame);
+            }
+
+            evm::tracing::Event::TransactCreate {
+                caller,
+                value,
+                init_code,
+                gas_limit,
+                address,
+            } => {
+                let frame = CallFrame {
+                    call_type: CallType::Create,
+                    from: Address::new(caller),
+                    to: Some(Address::new(address)),
+                    value,
+                    gas: gas_limit,
+                    gas_used: 0,
+                    input: init_code.to_vec(),
+                    output: Vec::new(),
+                    error: None,
+                    calls: Vec::new(),
+                };
+                self.top_level_transact = Some(frame);
+            }
+
+            evm::tracing::Event::TransactCreate2 {
+                caller,
+                value,
+                init_code,
+                gas_limit,
+                address,
+                ..
+            } => {
+                let frame = CallFrame {
+                    call_type: CallType::Create2,
+                    from: Address::new(caller),
+                    to: Some(Address::new(address)),
+                    value,
+                    gas: gas_limit,
+                    gas_used: 0,
+                    input: init_code.to_vec(),
+                    output: Vec::new(),
+                    error: None,
+                    calls: Vec::new(),
+                };
+                self.top_level_transact = Some(frame);
+            }
+
             // not useful
-            evm::tracing::Event::PrecompileSubcall { .. }
-            | evm::tracing::Event::TransactCall { .. }
-            | evm::tracing::Event::TransactCreate { .. }
-            | evm::tracing::Event::TransactCreate2 { .. } => (),
+            evm::tracing::Event::PrecompileSubcall { .. } => (),
         }
     }
 }

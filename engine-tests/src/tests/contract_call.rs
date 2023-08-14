@@ -2,7 +2,7 @@ use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
 use crate::utils::solidity::exit_precompile::{
     Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS,
 };
-use crate::utils::{self, AuroraRunner, Signer, ORIGIN};
+use crate::utils::{self, AuroraRunner, Signer, DEFAULT_AURORA_ACCOUNT_ID};
 
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
@@ -30,7 +30,12 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
         .into();
 
     runner
-        .mint(token, tester.contract.address, 1_000_000_000, ORIGIN)
+        .mint(
+            token,
+            tester.contract.address,
+            1_000_000_000,
+            DEFAULT_AURORA_ACCOUNT_ID,
+        )
         .unwrap();
 
     (runner, signer, token, tester)

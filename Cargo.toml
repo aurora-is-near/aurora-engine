@@ -35,9 +35,11 @@ evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-aurora", default-features = false, features = ["std"] }
 evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-aurora", default-features = false, features = ["std", "tracing"] }
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.0-aurora", default-features = false, features = ["std", "tracing"] }
+fixed-hash = { version = "0.8.0", default-features = false}
 git2 = "0.17"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
+impl-serde = { version = "0.4.0", default-features = false}
 lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
 near-crypto = "0.17"
@@ -59,6 +61,7 @@ serde = { version = "1", default-features = false, features = ["alloc", "derive"
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
 sha3 = { version = "0.10", default-features = false }
+strum = { version = "0.25", features = ["derive"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
@@ -70,6 +73,7 @@ workspaces = "0.7"
 resolver = "2"
 members = [
     "engine",
+    "engine-hashchain",
     "engine-test-doubles",
     "engine-modexp",
     "engine-precompiles",
