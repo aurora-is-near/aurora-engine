@@ -8,7 +8,10 @@ use aurora_engine::{
     state, xcc,
 };
 use aurora_engine_modexp::ModExpAlgorithm;
-use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
+use aurora_engine_sdk::{
+    env::{self, Env, DEFAULT_PREPAID_GAS},
+    io::IO,
+};
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::{
     account_id::AccountId,
@@ -21,7 +24,6 @@ use std::{io, str::FromStr};
 
 pub mod types;
 
-use crate::engine_state::EngineStateAccess;
 use crate::{error::ParseTransactionKindError, BlockMetadata, Diff, Storage};
 use types::{Message, TransactionKind, TransactionKindTag, TransactionMessage};
 
@@ -226,6 +228,9 @@ pub fn parse_transaction_kind(
     Ok(tx_kind)
 }
 
+/// Note: this function does not automatically commit transaction messages to the storage.
+/// If you want the transaction diff committed then you must call the `commit` method on
+/// the outcome of this function.
 pub fn consume_message<M: ModExpAlgorithm + 'static>(
     storage: &mut Storage,
     message: Message,
@@ -255,19 +260,16 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
 
             let (tx_hash, diff, result) = storage
                 .with_engine_access(block_height, transaction_position, &[], |io| {
-                    execute_transaction::<M>(
+                    execute_transaction::<_, M, _>(
                         transaction_message.as_ref(),
                         block_height,
                         &block_metadata,
                         engine_account_id,
                         io,
+                        |x| x.get_transaction_diff(),
                     )
                 })
                 .result;
-            match result.as_ref() {
-                Err(_) | Ok(Some(TransactionExecutionResult::Submit(Err(_)))) => (), // do not persist if Engine encounters an error
-                _ => storage.set_transaction_included(tx_hash, &transaction_message, &diff)?,
-            }
             let outcome = TransactionIncludedOutcome {
                 hash: tx_hash,
                 info: *transaction_message,
@@ -291,12 +293,13 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     let block_metadata = storage.get_block_metadata(block_hash)?;
     let engine_account_id = storage.get_engine_account_id()?;
     let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
-        execute_transaction::<M>(
+        execute_transaction::<_, M, _>(
             &transaction_message,
             block_height,
             &block_metadata,
             engine_account_id,
             io,
+            |x| x.get_transaction_diff(),
         )
     });
     let (tx_hash, diff, maybe_result) = result.result;
@@ -309,17 +312,23 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     Ok(outcome)
 }
 
-fn execute_transaction<'db, M: ModExpAlgorithm + 'static>(
+pub fn execute_transaction<I, M, F>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
-    io: EngineStateAccess<'db, 'db, 'db>,
+    io: I,
+    get_diff: F,
 ) -> (
     H256,
     Diff,
     Result<Option<TransactionExecutionResult>, error::Error>,
-) {
+)
+where
+    I: IO + Copy,
+    M: ModExpAlgorithm + 'static,
+    F: FnOnce(&I) -> Diff,
+{
     let signer_account_id = transaction_message.signer.clone();
     let predecessor_account_id = transaction_message.caller.clone();
     let relayer_address =
@@ -390,7 +399,7 @@ fn execute_transaction<'db, M: ModExpAlgorithm + 'static>(
             (tx_hash, result)
         }
         other => {
-            let result = non_submit_execute::<M>(
+            let result = non_submit_execute::<I, M>(
                 other,
                 io,
                 env,
@@ -401,7 +410,7 @@ fn execute_transaction<'db, M: ModExpAlgorithm + 'static>(
         }
     };
 
-    let diff = io.get_transaction_diff();
+    let diff = get_diff(&io);
 
     (tx_hash, diff, result)
 }
@@ -410,9 +419,9 @@ fn execute_transaction<'db, M: ModExpAlgorithm + 'static>(
 /// The `submit` transaction kind is special because it is the only one where the transaction hash
 /// differs from the NEAR receipt hash.
 #[allow(clippy::too_many_lines)]
-fn non_submit_execute<'db, M: ModExpAlgorithm + 'static>(
+fn non_submit_execute<I: IO + Copy, M: ModExpAlgorithm + 'static>(
     transaction: &TransactionKind,
-    mut io: EngineStateAccess<'db, 'db, 'db>,
+    mut io: I,
     env: env::Fixed,
     relayer_address: Address,
     promise_data: &[Option<Vec<u8>>],
@@ -709,12 +718,31 @@ pub enum ConsumeMessageOutcome {
     TransactionIncluded(Box<TransactionIncludedOutcome>),
 }
 
+impl ConsumeMessageOutcome {
+    pub fn commit(&self, storage: &mut Storage) -> Result<(), crate::error::Error> {
+        if let Self::TransactionIncluded(x) = self {
+            x.commit(storage)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct TransactionIncludedOutcome {
     pub hash: aurora_engine_types::H256,
     pub info: TransactionMessage,
     pub diff: crate::Diff,
     pub maybe_result: Result<Option<TransactionExecutionResult>, error::Error>,
+}
+
+impl TransactionIncludedOutcome {
+    pub fn commit(&self, storage: &mut Storage) -> Result<(), crate::error::Error> {
+        match self.maybe_result.as_ref() {
+            Err(_) | Ok(Some(TransactionExecutionResult::Submit(Err(_)))) => (), // do not persist if Engine encounters an error
+            _ => storage.set_transaction_included(self.hash, &self.info, &self.diff)?,
+        };
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
