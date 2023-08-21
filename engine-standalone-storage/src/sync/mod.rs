@@ -1,3 +1,4 @@
+use crate::engine_state::EngineStateAccess;
 use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::pausables::{
     EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
@@ -266,7 +267,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                         &block_metadata,
                         engine_account_id,
                         io,
-                        |x| x.get_transaction_diff(),
+                        EngineStateAccess::get_transaction_diff,
                     )
                 })
                 .result;
@@ -299,7 +300,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
             &block_metadata,
             engine_account_id,
             io,
-            |x| x.get_transaction_diff(),
+            EngineStateAccess::get_transaction_diff,
         )
     });
     let (tx_hash, diff, maybe_result) = result.result;
