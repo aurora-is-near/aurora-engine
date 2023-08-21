@@ -18,6 +18,56 @@ const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
 #[test]
+fn test_returndatacopy() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let deploy_contract = |runner: &mut utils::AuroraRunner,
+                           signer: &mut utils::Signer,
+                           contract_bytes: Vec<u8>|
+     -> Address {
+        let deploy = utils::create_deploy_transaction(contract_bytes, signer.use_nonce().into());
+        let result = runner
+            .submit_transaction(&signer.secret_key, deploy)
+            .unwrap();
+        Address::try_from_slice(&utils::unwrap_success(result)).unwrap()
+    };
+
+    let call_contract =
+        |runner: &mut utils::AuroraRunner, signer: &mut utils::Signer, address: Address| {
+            runner
+                .submit_with_signer(signer, |nonce| {
+                    aurora_engine_transactions::legacy::TransactionLegacy {
+                        nonce,
+                        gas_price: U256::zero(),
+                        gas_limit: u64::MAX.into(),
+                        to: Some(address),
+                        value: Wei::zero(),
+                        data: Vec::new(),
+                    }
+                })
+                .unwrap()
+        };
+
+    // Call returndatacopy with len=0 and large memory offset (> u32::MAX)
+    let contract_bytes = vec![0x60, 0x00, 0x3d, 0x33, 0x3e];
+    let address = deploy_contract(&mut runner, &mut signer, contract_bytes);
+    let result = call_contract(&mut runner, &mut signer, address);
+    assert!(
+        result.status.is_ok(),
+        "EVM must handle returndatacopy with len=0"
+    );
+
+    // Call returndatacopy with len=1 and large memory offset (> u32::MAX)
+    let contract_bytes = vec![0x60, 0x01, 0x3d, 0x33, 0x3e];
+    let address = deploy_contract(&mut runner, &mut signer, contract_bytes);
+    let result = call_contract(&mut runner, &mut signer, address);
+    assert!(
+        matches!(result.status, TransactionStatus::OutOfGas),
+        "EVM must run out of gas if len > 0 with large memory offset"
+    );
+}
+
+#[test]
 fn test_total_supply_accounting() {
     let (mut runner, mut signer, benefactor) = initialize_transfer();
 
