@@ -18,6 +18,50 @@ const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
 #[test]
+fn test_memory_get_performance() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    // This EVM program is an infinite loop which causes a large amount of memory to be
+    // copied onto the EVM stack.
+    let contract_bytes = vec![
+        0x5b, 0x3a, 0x33, 0x43, 0x03, 0x59, 0x52, 0x59, 0x42, 0x59, 0x3a, 0x60, 0x05, 0x34, 0xf4,
+        0x60, 0x33, 0x43, 0x05, 0x52, 0x56,
+    ];
+    let result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            utils::create_deploy_transaction(contract_bytes, nonce)
+        })
+        .unwrap();
+    let address = Address::try_from_slice(&utils::unwrap_success(result)).unwrap();
+
+    runner.standalone_runner.as_mut().unwrap().env.block_height += 100;
+    let tx = aurora_engine_transactions::legacy::TransactionLegacy {
+        nonce: signer.use_nonce().into(),
+        gas_price: U256::zero(),
+        gas_limit: 10_000_000_u64.into(),
+        to: Some(address),
+        value: Wei::zero(),
+        data: Vec::new(),
+    };
+
+    let start = std::time::Instant::now();
+    let result = runner
+        .standalone_runner
+        .unwrap()
+        .submit_transaction(&signer.secret_key, tx)
+        .unwrap();
+    let duration = start.elapsed().as_secs();
+    assert!(
+        matches!(result.status, TransactionStatus::OutOfGas),
+        "Infinite loops in the EVM run out of gas"
+    );
+    assert!(
+        duration < 5,
+        "Must complete this task in under 5s (even in debug build)"
+    );
+}
+
+#[test]
 fn test_returndatacopy() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
