@@ -342,7 +342,7 @@ args = [
     "--release",
     "--features",
     "${CARGO_FEATURES_TEST}",
-    "bench_modexp_standalone",
+    "bench_m",
     "--",
     "--ignored",
 ]
