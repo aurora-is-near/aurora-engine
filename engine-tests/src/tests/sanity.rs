@@ -17,8 +17,9 @@ const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
+#[ignore]
 #[test]
-fn test_memory_get_performance() {
+fn bench_memory_get_standalone() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
     // This EVM program is an infinite loop which causes a large amount of memory to be
@@ -50,14 +51,14 @@ fn test_memory_get_performance() {
         .unwrap()
         .submit_transaction(&signer.secret_key, tx)
         .unwrap();
-    let duration = start.elapsed().as_secs();
+    let duration = start.elapsed().as_secs_f32();
     assert!(
         matches!(result.status, TransactionStatus::OutOfGas),
         "Infinite loops in the EVM run out of gas"
     );
     assert!(
-        duration < 5,
-        "Must complete this task in under 5s (even in debug build)"
+        duration < 2.0,
+        "Must complete this task in under 2s (in release build). Time taken: {duration} s",
     );
 }
 
