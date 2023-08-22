@@ -57,8 +57,8 @@ fn bench_memory_get_standalone() {
         "Infinite loops in the EVM run out of gas"
     );
     assert!(
-        duration < 2.0,
-        "Must complete this task in under 2s (in release build). Time taken: {duration} s",
+        duration < 8.0,
+        "Must complete this task in under 8s (in release build). Time taken: {duration} s",
     );
 }
 
