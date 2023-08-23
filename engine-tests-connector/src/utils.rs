@@ -1,13 +1,19 @@
+use aurora_engine::deposit_event::{DepositedEvent, TokenMessageData, DEPOSITED_EVENT};
 use aurora_engine::parameters::{FungibleTokenMetadata, SetEthConnectorContractAccountArgs};
 use aurora_engine::proof::Proof;
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::parameters::connector::LogEntry;
+use aurora_engine_types::parameters::silo::SiloParamsArgs;
 use aurora_engine_types::types::{Address, Wei};
 use near_sdk::serde_json::json;
 use near_sdk::{json_types::U128, serde_json};
 use std::path::Path;
+use std::process::Command;
 use workspaces::network::NetworkClient;
 use workspaces::{result::ExecutionFinalResult, Account, AccountId, Contract, Worker};
 
+const AURORA_ENGINE_CONTRACT: &str =
+    "https://github.com/aurora-is-near/aurora-engine/releases/download/2.10.1/aurora-mainnet.wasm";
 pub const PROOF_DATA_NEAR: &str = r#"{"log_index":0,"log_entry_data":[248,251,148,9,109,233,194,184,165,184,194,44,238,50,137,177,1,246,150,13,104,229,30,248,66,160,209,66,67,156,39,142,37,218,217,165,7,102,241,83,208,227,210,215,191,43,209,111,194,120,28,75,212,148,178,177,90,157,160,0,0,0,0,0,0,0,0,0,0,0,0,121,24,63,219,216,14,45,138,234,26,202,162,246,123,251,138,54,212,10,141,184,160,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,96,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12,54,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,101,116,104,95,114,101,99,105,112,105,101,110,116,46,114,111,111,116,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"receipt_index":0,"receipt_data":[249,2,6,1,130,107,17,185,1,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,248,253,248,251,148,9,109,233,194,184,165,184,194,44,238,50,137,177,1,246,150,13,104,229,30,248,66,160,209,66,67,156,39,142,37,218,217,165,7,102,241,83,208,227,210,215,191,43,209,111,194,120,28,75,212,148,178,177,90,157,160,0,0,0,0,0,0,0,0,0,0,0,0,121,24,63,219,216,14,45,138,234,26,202,162,246,123,251,138,54,212,10,141,184,160,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,96,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12,54,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,101,116,104,95,114,101,99,105,112,105,101,110,116,46,114,111,111,116,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"header_data":[249,2,10,160,177,33,112,26,26,176,12,12,163,2,249,133,245,12,51,201,55,50,148,156,122,67,27,26,101,178,36,153,54,100,53,137,160,29,204,77,232,222,199,93,122,171,133,181,103,182,204,212,26,211,18,69,27,148,138,116,19,240,161,66,253,64,212,147,71,148,124,28,230,160,8,239,64,193,62,78,177,68,166,204,116,240,224,174,172,126,160,197,65,5,202,188,134,5,164,246,19,133,35,57,28,114,241,186,81,123,163,166,161,24,32,157,168,170,13,108,58,61,46,160,6,199,163,13,91,119,225,39,168,255,213,10,107,252,143,246,138,241,108,139,59,35,187,185,162,223,53,108,222,73,181,109,160,27,154,49,63,26,170,15,177,97,255,6,204,84,221,234,197,159,172,114,47,148,126,32,199,241,127,101,120,182,51,52,100,185,1,0,0,0,8,0,0,0,0,0,0,0,32,0,0,0,0,0,2,0,8,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,8,32,0,32,0,0,128,0,2,0,0,0,1,0,32,0,0,0,2,0,0,0,0,32,0,0,0,0,0,4,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,128,64,0,0,0,0,1,32,0,0,0,0,0,0,96,32,0,64,0,0,0,128,1,0,0,0,0,1,0,0,0,8,0,0,0,18,32,0,0,64,145,1,8,0,4,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,32,33,16,0,128,0,0,0,0,0,0,128,0,2,0,0,0,0,0,0,0,0,0,0,2,0,80,0,0,0,0,0,0,0,0,1,128,0,8,0,0,0,0,4,0,0,0,128,2,0,32,0,128,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,16,0,8,0,0,0,0,0,0,0,0,0,0,128,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,132,25,1,227,23,131,157,85,14,131,122,18,0,131,75,91,132,132,96,174,58,224,140,115,112,105,100,101,114,49,48,1,2,8,230,160,188,212,199,183,154,22,223,85,103,215,24,122,240,235,79,129,44,93,184,88,161,218,79,5,44,226,106,100,50,40,163,97,136,155,158,202,3,149,91,200,78],"proof":[[248,113,160,46,156,31,85,241,226,241,13,5,56,73,146,176,67,195,109,6,189,172,104,44,103,44,88,32,15,181,152,136,29,121,252,160,191,48,87,174,71,151,208,114,164,150,51,200,171,90,90,106,46,200,79,77,222,145,95,89,141,137,138,149,67,73,8,87,128,128,128,128,128,128,160,175,9,219,77,174,13,247,133,55,172,92,185,202,7,160,10,204,112,44,133,36,96,30,234,235,134,30,209,205,166,212,255,128,128,128,128,128,128,128,128],[249,2,13,48,185,2,9,249,2,6,1,130,107,17,185,1,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,248,253,248,251,148,9,109,233,194,184,165,184,194,44,238,50,137,177,1,246,150,13,104,229,30,248,66,160,209,66,67,156,39,142,37,218,217,165,7,102,241,83,208,227,210,215,191,43,209,111,194,120,28,75,212,148,178,177,90,157,160,0,0,0,0,0,0,0,0,0,0,0,0,121,24,63,219,216,14,45,138,234,26,202,162,246,123,251,138,54,212,10,141,184,160,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,96,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12,54,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,101,116,104,95,114,101,99,105,112,105,101,110,116,46,114,111,111,116,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}"#;
 pub const DEPOSITED_RECIPIENT: &str = "eth_recipient.root";
 pub const DEPOSITED_RECIPIENT_NAME: &str = "eth_recipient";
@@ -85,7 +91,10 @@ impl TestContract {
             .deploy(&get_aurora_contract())
             .await?
             .into_result()?;
-        let silo_contract = silo_acc.deploy(&get_silo_contract()).await?.into_result()?;
+        let silo_contract = silo_acc
+            .deploy(&get_engine_contract())
+            .await?
+            .into_result()?;
 
         Ok((engine_contract, silo_contract, root_account))
     }
@@ -225,12 +234,11 @@ impl TestContract {
         })
     }
 
-    #[allow(dead_code)]
-    async fn new_silo_contract() -> anyhow::Result<TestContract> {
+    pub async fn new_silo_contract() -> anyhow::Result<TestContract> {
         let eth_custodian_address = CUSTODIAN_ADDRESS;
         let (aurora_contract, silo_contract, root_account) = Self::deploy_silo_contract().await?;
 
-        let prover_account: AccountId = aurora_contract.id().clone();
+        let prover_account: AccountId = silo_contract.id().clone();
         let chain_id = [0u8; 32];
         let res = aurora_contract
             .call("new")
@@ -240,7 +248,6 @@ impl TestContract {
             .await?;
         assert!(res.is_success());
 
-        let chain_id = [1u8; 32];
         let res = silo_contract
             .call("new")
             .args_borsh((chain_id, silo_contract.id(), silo_contract.id(), 1_u64))
@@ -268,6 +275,28 @@ impl TestContract {
             .transact()
             .await?;
         assert!(res.is_success());
+
+        let silo_params = Some(SiloParamsArgs {
+            fixed_gas_cost: Wei::new_u64(10u64.pow(18)),
+            erc20_fallback_address: Address::zero(),
+        });
+        let res = silo_contract
+            .call("set_silo_params")
+            .args_borsh(silo_params)
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?;
+        assert!(res.is_success());
+        // add_entry_to_whitelist
+        // let args = WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
+        //     kind: WhitelistKind::Account,
+        //     account_id,
+        // });
+        // let args = WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
+        //     kind: WhitelistKind::Address,
+        //     address,
+        // });
+        // call_function(runner, "add_entry_to_whitelist", args);
 
         Ok(Self {
             engine_contract: silo_contract,
@@ -440,12 +469,17 @@ pub fn validate_eth_address(address: &str) -> Address {
     Address::decode(address).unwrap()
 }
 
-pub fn get_silo_contract() -> Vec<u8> {
-    std::fs::read("../bin/aurora-silo.wasm").unwrap()
-}
-
 pub fn get_aurora_contract() -> Vec<u8> {
-    std::fs::read("../bin/aurora-mainnet.wasm").unwrap()
+    let file = "../bin/aurora-engine-mainnet.wasm";
+    if !Path::new(file).exists() {
+        // Download wasm file
+        let status = Command::new("curl")
+            .args(["-L", AURORA_ENGINE_CONTRACT, "-o", file])
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+    std::fs::read(file).unwrap()
 }
 
 pub fn get_eth_connector_contract() -> Vec<u8> {
@@ -460,5 +494,59 @@ fn get_engine_contract() -> Vec<u8> {
         std::fs::read("../bin/aurora-testnet-test.wasm").unwrap()
     } else {
         panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
+    }
+}
+
+#[must_use]
+pub fn str_to_address(address: &str) -> Address {
+    Address::decode(address).unwrap()
+}
+
+#[must_use]
+pub fn mock_proof(recipient_id: &AccountId, deposit_amount: u128, proof_index: u64) -> Proof {
+    use aurora_engine_types::{
+        types::{Fee, NEP141Wei},
+        H160, H256, U256,
+    };
+
+    let eth_custodian_address = str_to_address(CUSTODIAN_ADDRESS);
+    let fee = Fee::new(NEP141Wei::new(0));
+    let message = recipient_id.to_string();
+    let token_message_data: TokenMessageData =
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
+            .unwrap();
+
+    let deposit_event = DepositedEvent {
+        eth_custodian_address,
+        sender: Address::new(H160([0u8; 20])),
+        token_message_data,
+        amount: NEP141Wei::new(deposit_amount),
+        fee: fee.clone(),
+    };
+
+    let event_schema = ethabi::Event {
+        name: DEPOSITED_EVENT.into(),
+        inputs: DepositedEvent::event_params(),
+        anonymous: false,
+    };
+    let log_entry = LogEntry {
+        address: eth_custodian_address.raw(),
+        topics: vec![
+            event_schema.signature(),
+            // the sender is not important
+            H256::zero(),
+        ],
+        data: ethabi::encode(&[
+            ethabi::Token::String(message),
+            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(U256::from(fee.as_u128())),
+        ]),
+    };
+    Proof {
+        log_index: proof_index,
+        // Only this field matters for the purpose of this test
+        log_entry_data: rlp::encode(&log_entry).to_vec(),
+        receipt_index: 1,
+        ..Default::default()
     }
 }
