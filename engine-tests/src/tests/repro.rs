@@ -26,7 +26,7 @@ fn repro_GdASJ3KESs() {
         block_timestamp: 1_645_717_564_644_206_730,
         input_path: "src/tests/res/input_GdASJ3KESs.hex",
         evm_gas_used: 706_713,
-        near_gas_used: 120,
+        near_gas_used: 121,
     });
 }
 
@@ -125,7 +125,7 @@ fn repro_Emufid2() {
         block_timestamp: 1_662_118_048_636_713_538,
         input_path: "src/tests/res/input_Emufid2.hex",
         evm_gas_used: 1_156_364,
-        near_gas_used: 283,
+        near_gas_used: 282,
     });
 }
 
