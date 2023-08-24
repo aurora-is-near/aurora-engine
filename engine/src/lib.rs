@@ -114,7 +114,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn new() {
         let io = Runtime;
-        contract_methods::new(io)
+        contract_methods::admin::new(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -123,7 +123,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_version() {
         let io = Runtime;
-        contract_methods::get_version(io)
+        contract_methods::admin::get_version(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -132,7 +132,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_owner() {
         let io = Runtime;
-        contract_methods::get_owner(io)
+        contract_methods::admin::get_owner(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -142,7 +142,7 @@ mod contract {
     pub extern "C" fn set_owner() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::set_owner(io, &env)
+        contract_methods::admin::set_owner(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -151,7 +151,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
         let io = Runtime;
-        contract_methods::get_bridge_prover(io)
+        contract_methods::admin::get_bridge_prover(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -160,7 +160,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
         let io = Runtime;
-        contract_methods::get_chain_id(io)
+        contract_methods::admin::get_chain_id(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -168,7 +168,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_delay_blocks() {
         let io = Runtime;
-        contract_methods::get_upgrade_delay_blocks(io)
+        contract_methods::admin::get_upgrade_delay_blocks(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -177,7 +177,7 @@ mod contract {
     pub extern "C" fn set_upgrade_delay_blocks() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::set_upgrade_delay_blocks(io, &env)
+        contract_methods::admin::set_upgrade_delay_blocks(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -185,7 +185,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
         let io = Runtime;
-        contract_methods::get_upgrade_index(io)
+        contract_methods::admin::get_upgrade_index(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -195,7 +195,7 @@ mod contract {
     pub extern "C" fn stage_upgrade() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::stage_upgrade(io, &env)
+        contract_methods::admin::stage_upgrade(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -232,7 +232,7 @@ mod contract {
     pub extern "C" fn resume_precompiles() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::resume_precompiles(io, &env)
+        contract_methods::admin::resume_precompiles(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -242,7 +242,7 @@ mod contract {
     pub extern "C" fn pause_precompiles() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::pause_precompiles(io, &env)
+        contract_methods::admin::pause_precompiles(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -252,7 +252,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn paused_precompiles() {
         let io = Runtime;
-        contract_methods::paused_precompiles(io)
+        contract_methods::admin::paused_precompiles(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -262,7 +262,7 @@ mod contract {
     pub extern "C" fn pause_contract() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::pause_contract(io, &env)
+        contract_methods::admin::pause_contract(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -272,7 +272,7 @@ mod contract {
     pub extern "C" fn resume_contract() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::resume_contract(io, &env)
+        contract_methods::admin::resume_contract(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -287,7 +287,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::deploy_code(io, &env, &mut handler)
+        contract_methods::evm_transactions::deploy_code(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -298,7 +298,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::call(io, &env, &mut handler)
+        contract_methods::evm_transactions::call(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -310,7 +310,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::submit(io, &env, &mut handler)
+        contract_methods::evm_transactions::submit(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -322,7 +322,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::submit_with_args(io, &env, &mut handler)
+        contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -331,7 +331,7 @@ mod contract {
     pub extern "C" fn register_relayer() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::register_relayer(io, &env)
+        contract_methods::admin::register_relayer(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -343,7 +343,7 @@ mod contract {
     pub extern "C" fn factory_update() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::factory_update(io, &env)
+        contract_methods::xcc::factory_update(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -355,7 +355,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let handler = Runtime;
-        contract_methods::factory_update_address_version(io, &env, &handler)
+        contract_methods::xcc::factory_update_address_version(io, &env, &handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -366,7 +366,7 @@ mod contract {
     pub extern "C" fn factory_set_wnear_address() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::factory_set_wnear_address(io, &env)
+        contract_methods::xcc::factory_set_wnear_address(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -375,7 +375,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn factory_get_wnear_address() {
         let io = Runtime;
-        contract_methods::factory_get_wnear_address(io)
+        contract_methods::xcc::factory_get_wnear_address(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -388,7 +388,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::fund_xcc_sub_account(&io, &env, &mut handler)
+        contract_methods::xcc::fund_xcc_sub_account(&io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -403,7 +403,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::ft_on_transfer(io, &env, &mut handler)
+        contract_methods::connector::ft_on_transfer(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -414,7 +414,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::deploy_erc20_token(io, &env, &mut handler)
+        contract_methods::connector::deploy_erc20_token(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -426,7 +426,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::refund_on_error(io, &env, &mut handler)
+        contract_methods::connector::refund_on_error(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -436,7 +436,7 @@ mod contract {
     pub extern "C" fn set_key_manager() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::set_key_manager(io, &env)
+        contract_methods::admin::set_key_manager(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -447,7 +447,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::add_relayer_key(io, &env, &mut handler)
+        contract_methods::admin::add_relayer_key(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -458,7 +458,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::remove_relayer_key(io, &env, &mut handler)
+        contract_methods::admin::remove_relayer_key(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -564,7 +564,7 @@ mod contract {
     pub extern "C" fn new_eth_connector() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::new_eth_connector(io, &env)
+        contract_methods::connector::new_eth_connector(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -573,7 +573,7 @@ mod contract {
     pub extern "C" fn set_eth_connector_contract_data() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::set_eth_connector_contract_data(io, &env)
+        contract_methods::connector::set_eth_connector_contract_data(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -582,7 +582,7 @@ mod contract {
     pub extern "C" fn withdraw() {
         let io = Runtime;
         let env = Runtime;
-        let result_bytes = contract_methods::withdraw(io, &env)
+        let result_bytes = contract_methods::connector::withdraw(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
         // We intentionally do not go through the `io` struct here because we must bypass
@@ -601,7 +601,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::deposit(io, &env, &mut handler)
+        contract_methods::connector::deposit(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -611,7 +611,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::finish_deposit(io, &env, &mut handler)
+        contract_methods::connector::finish_deposit(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -677,7 +677,7 @@ mod contract {
     pub extern "C" fn ft_transfer() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::ft_transfer(io, &env)
+        contract_methods::connector::ft_transfer(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -687,7 +687,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let handler = Runtime;
-        contract_methods::ft_resolve_transfer(io, &env, &handler)
+        contract_methods::connector::ft_resolve_transfer(io, &env, &handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -697,7 +697,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::ft_transfer_call(io, &env, &mut handler)
+        contract_methods::connector::ft_transfer_call(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -707,7 +707,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::storage_deposit(io, &env, &mut handler)
+        contract_methods::connector::storage_deposit(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -717,7 +717,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::storage_unregister(io, &env, &mut handler)
+        contract_methods::connector::storage_unregister(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -726,7 +726,7 @@ mod contract {
     pub extern "C" fn storage_withdraw() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::storage_withdraw(io, &env)
+        contract_methods::connector::storage_withdraw(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -757,7 +757,7 @@ mod contract {
     pub extern "C" fn set_paused_flags() {
         let io = Runtime;
         let env = Runtime;
-        contract_methods::set_paused_flags(io, &env)
+        contract_methods::connector::set_paused_flags(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
