@@ -31,6 +31,7 @@ pub mod accounting;
 pub mod admin_controlled;
 #[cfg_attr(feature = "contract", allow(dead_code))]
 pub mod connector;
+pub mod contract_methods;
 pub mod deposit_event;
 pub mod engine;
 pub mod errors;
@@ -77,42 +78,26 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs};
-
     use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
     use crate::parameters::{
-        self, CallArgs, DeployErc20TokenArgs, FungibleTokenMetadata, GetErc20FromNep141CallArgs,
-        GetStorageAtArgs, InitCallArgs, IsUsedProofCallArgs, NEP141FtOnTransferArgs, NewCallArgs,
-        PauseEthConnectorCallArgs, PausePrecompilesCallArgs, ResolveTransferCallArgs,
-        SetContractDataCallArgs, StorageDepositCallArgs, StorageWithdrawCallArgs, SubmitArgs,
-        TransferCallCallArgs, ViewCallArgs,
+        self, FungibleTokenMetadata, GetErc20FromNep141CallArgs, GetStorageAtArgs,
+        IsUsedProofCallArgs, ViewCallArgs,
     };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
-    use crate::pausables::{
-        Authorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PausedPrecompilesManager,
-        PrecompileFlags,
-    };
-    use crate::prelude::account_id::AccountId;
-    use crate::prelude::parameters::RefundCallArgs;
-    use crate::prelude::sdk::types::{
-        near_account_to_evm_address, SdkExpect, SdkProcess, SdkUnwrap,
-    };
+    use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{
-        sdk, u256_to_arr, vec, Address, PromiseResult, ToString, Yocto, ERR_FAILED_PARSE, H256,
+    use crate::prelude::{sdk, u256_to_arr, Address, ERR_FAILED_PARSE, H256};
+    use crate::{
+        contract_methods::{self, ContractError},
+        errors, state,
     };
-    use crate::{errors, pausables, state};
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
-    use aurora_engine_sdk::promise::PromiseHandler;
-    use aurora_engine_sdk::types::ExpectUtf8;
-    use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+    use aurora_engine_types::borsh::BorshSerialize;
     use aurora_engine_types::parameters::engine::errors::ParseTypeFromJsonError;
-    use aurora_engine_types::parameters::engine::{RelayerKeyArgs, RelayerKeyManagerArgs};
-    use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction};
 
     #[cfg(feature = "integration-test")]
     use crate::prelude::NearGas;
@@ -128,108 +113,98 @@ mod contract {
     /// Should be called on deployment.
     #[no_mangle]
     pub extern "C" fn new() {
-        let mut io = Runtime;
-
-        if state::get_state(&io).is_ok() {
-            sdk::panic_utf8(b"ERR_ALREADY_INITIALIZED");
-        }
-
-        let bytes = io.read_input().to_vec();
-        let args = NewCallArgs::deserialize(&bytes).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
-        state::set_state(&mut io, &args.into()).sdk_unwrap();
+        let io = Runtime;
+        contract_methods::admin::new(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Get version of the contract.
     #[no_mangle]
     pub extern "C" fn get_version() {
-        let mut io = Runtime;
-        let version = option_env!("NEAR_EVM_VERSION")
-            .map_or(&include_bytes!("../../VERSION")[..], str::as_bytes);
-        io.return_output(version);
+        let io = Runtime;
+        contract_methods::admin::get_version(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Get owner account id for this contract.
     #[no_mangle]
     pub extern "C" fn get_owner() {
-        let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        io.return_output(state.owner_id.as_bytes());
+        let io = Runtime;
+        contract_methods::admin::get_owner(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Set owner account id for this contract.
     #[no_mangle]
     pub extern "C" fn set_owner() {
-        let mut io = Runtime;
-        let mut state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        require_owner_only(&state, &io.predecessor_account_id());
-        let args: SetOwnerArgs = io.read_input_borsh().sdk_unwrap();
-        if state.owner_id == args.new_owner {
-            sdk::panic_utf8(errors::ERR_SAME_OWNER);
-        } else {
-            state.owner_id = args.new_owner;
-            state::set_state(&mut io, &state).sdk_unwrap();
-        }
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::admin::set_owner(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Get bridge prover id for this contract.
     #[no_mangle]
     pub extern "C" fn get_bridge_prover() {
-        let mut io = Runtime;
-        let connector = EthConnectorContract::init_instance(io).sdk_unwrap();
-        io.return_output(connector.get_bridge_prover().as_bytes());
+        let io = Runtime;
+        contract_methods::admin::get_bridge_prover(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Get chain id for this contract.
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
-        let mut io = Runtime;
-        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
+        let io = Runtime;
+        contract_methods::admin::get_chain_id(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn get_upgrade_delay_blocks() {
-        let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        io.return_output(&state.upgrade_delay_blocks.to_le_bytes());
+        let io = Runtime;
+        contract_methods::admin::get_upgrade_delay_blocks(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn set_upgrade_delay_blocks() {
-        let mut io = Runtime;
-        let mut state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        require_owner_only(&state, &io.predecessor_account_id());
-        let args: SetUpgradeDelayBlocksArgs = io.read_input_borsh().sdk_unwrap();
-        state.upgrade_delay_blocks = args.upgrade_delay_blocks;
-        state::set_state(&mut io, &state).sdk_unwrap();
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::admin::set_upgrade_delay_blocks(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn get_upgrade_index() {
-        let mut io = Runtime;
-        let index = internal_get_upgrade_index();
-        io.return_output(&index.to_le_bytes());
+        let io = Runtime;
+        contract_methods::admin::get_upgrade_index(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Stage new code for deployment.
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
-        let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        let delay_block_height = io.block_height() + state.upgrade_delay_blocks;
-        require_owner_only(&state, &io.predecessor_account_id());
-        io.read_input_and_store(&bytes_to_key(KeyPrefix::Config, CODE_KEY));
-        io.write_storage(
-            &bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY),
-            &delay_block_height.to_le_bytes(),
-        );
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::admin::stage_upgrade(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Deploy staged upgrade.
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
+        // This function is intentionally not implemented in `contract_methods`
+        // because it only make sense in the context of the Near runtime.
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         require_running(&state);
@@ -256,69 +231,50 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn resume_precompiles() {
         let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        let predecessor_account_id = io.predecessor_account_id();
-
-        require_owner_only(&state, &predecessor_account_id);
-
-        let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
-        let flags = PrecompileFlags::from_bits_truncate(args.paused_mask);
-        let mut pauser = EnginePrecompilesPauser::from_io(io);
-        pauser.resume_precompiles(flags);
+        let env = Runtime;
+        contract_methods::admin::resume_precompiles(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Pauses a precompile.
     #[no_mangle]
     pub extern "C" fn pause_precompiles() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        let authorizer: pausables::EngineAuthorizer = engine::get_authorizer(&io);
-
-        if !authorizer.is_authorized(&io.predecessor_account_id()) {
-            sdk::panic_utf8(b"ERR_UNAUTHORIZED");
-        }
-
-        let args: PausePrecompilesCallArgs = io.read_input_borsh().sdk_unwrap();
-        let flags = PrecompileFlags::from_bits_truncate(args.paused_mask);
-        let mut pauser = EnginePrecompilesPauser::from_io(io);
-        pauser.pause_precompiles(flags);
+        let env = Runtime;
+        contract_methods::admin::pause_precompiles(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
     /// 0-bit means not paused.
     #[no_mangle]
     pub extern "C" fn paused_precompiles() {
-        let mut io = Runtime;
-        let pauser = EnginePrecompilesPauser::from_io(io);
-        let data = pauser.paused().bits().to_le_bytes();
-        io.return_output(&data[..]);
+        let io = Runtime;
+        contract_methods::admin::paused_precompiles(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Sets the flag to pause the contract.
     #[no_mangle]
     pub extern "C" fn pause_contract() {
-        let mut io = Runtime;
-        let mut state = state::get_state(&io).sdk_unwrap();
-        require_owner_only(&state, &io.predecessor_account_id());
-        if state.is_paused {
-            sdk::panic_utf8(errors::ERR_PAUSED);
-        }
-        state.is_paused = true;
-        state::set_state(&mut io, &state).sdk_unwrap();
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::admin::pause_contract(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Sets the flag to resume the contract.
     #[no_mangle]
     pub extern "C" fn resume_contract() {
-        let mut io = Runtime;
-        let mut state = state::get_state(&io).sdk_unwrap();
-        require_owner_only(&state, &io.predecessor_account_id());
-        if !state.is_paused {
-            sdk::panic_utf8(errors::ERR_RUNNING);
-        }
-        state.is_paused = false;
-        state::set_state(&mut io, &state).sdk_unwrap();
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::admin::resume_contract(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     ///
@@ -329,54 +285,22 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_code() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        let input = io.read_input().to_vec();
-        let current_account_id = io.current_account_id();
-        let mut engine: Engine<_, _> = Engine::new(
-            predecessor_address(&io.predecessor_account_id()),
-            current_account_id,
-            io,
-            &io,
-        )
-        .sdk_unwrap();
-        Engine::deploy_code_with_input(&mut engine, input, &mut Runtime)
-            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
-            .sdk_process();
-        // TODO: charge for storage
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::evm_transactions::deploy_code(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Call method on the EVM contract.
     #[no_mangle]
     pub extern "C" fn call() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        let bytes = io.read_input().to_vec();
-        let args = CallArgs::deserialize(&bytes).sdk_expect(errors::ERR_BORSH_DESERIALIZE);
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-
-        // During the XCC flow the Engine will call itself to move wNEAR
-        // to the user's sub-account. We do not want this move to happen
-        // if prior promises in the flow have failed.
-        if current_account_id == predecessor_account_id {
-            let check_promise: Result<(), &[u8]> = match io.promise_result_check() {
-                Some(true) | None => Ok(()),
-                Some(false) => Err(b"ERR_CALLBACK_OF_FAILED_PROMISE"),
-            };
-            check_promise.sdk_unwrap();
-        }
-
-        let mut engine: Engine<_, _> = Engine::new(
-            predecessor_address(&predecessor_account_id),
-            current_account_id,
-            io,
-            &io,
-        )
-        .sdk_unwrap();
-        Engine::call_with_args(&mut engine, args, &mut Runtime)
-            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
-            .sdk_process();
-        // TODO: charge for storage
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::evm_transactions::call(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Process signed Ethereum transaction.
@@ -384,28 +308,11 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn submit() {
         let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        let tx_data = io.read_input().to_vec();
-        let current_account_id = io.current_account_id();
-        let relayer_address = predecessor_address(&io.predecessor_account_id());
-        let args = SubmitArgs {
-            tx_data,
-            ..Default::default()
-        };
-        let result = engine::submit(
-            io,
-            &io,
-            &args,
-            state,
-            current_account_id,
-            relayer_address,
-            &mut Runtime,
-        );
-
-        result
-            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
-            .sdk_process();
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::evm_transactions::submit(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Analog of the `submit` function, but waits for the `SubmitArgs` structure rather than
@@ -413,45 +320,20 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn submit_with_args() {
         let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        let args: SubmitArgs = io.read_input_borsh().sdk_unwrap();
-        let current_account_id = io.current_account_id();
-        let relayer_address = predecessor_address(&io.predecessor_account_id());
-        let result = engine::submit(
-            io,
-            &io,
-            &args,
-            state,
-            current_account_id,
-            relayer_address,
-            &mut Runtime,
-        );
-
-        result
-            .map(|res| res.try_to_vec().sdk_expect(errors::ERR_SERIALIZE))
-            .sdk_process();
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn register_relayer() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        let relayer_address = io.read_input_arr20().sdk_unwrap();
-
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let mut engine: Engine<_, _> = Engine::new(
-            predecessor_address(&predecessor_account_id),
-            current_account_id,
-            io,
-            &io,
-        )
-        .sdk_unwrap();
-        engine.register_relayer(
-            predecessor_account_id.as_bytes(),
-            Address::from_array(relayer_address),
-        );
+        let env = Runtime;
+        contract_methods::admin::register_relayer(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Updates the bytecode for user's router contracts created by the engine.
@@ -459,52 +341,43 @@ mod contract {
     /// will be sent from.
     #[no_mangle]
     pub extern "C" fn factory_update() {
-        let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        require_owner_only(&state, &io.predecessor_account_id());
-        let bytes = io.read_input().to_vec();
-        let router_bytecode = crate::xcc::RouterCode::new(bytes);
-        crate::xcc::update_router_code(&mut io, &router_bytecode);
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::xcc::factory_update(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Updates the bytecode version for the given account. This is only called as a callback
     /// when a new version of the router contract is deployed to an account.
     #[no_mangle]
     pub extern "C" fn factory_update_address_version() {
-        let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        // The function is only set to be private, otherwise callback error will happen.
-        io.assert_private_call().sdk_unwrap();
-        let check_deploy: Result<(), &[u8]> = match io.promise_result_check() {
-            Some(true) => Ok(()),
-            Some(false) => Err(b"ERR_ROUTER_DEPLOY_FAILED"),
-            None => Err(b"ERR_ROUTER_UPDATE_NOT_CALLBACK"),
-        };
-        check_deploy.sdk_unwrap();
-        let args: crate::xcc::AddressVersionUpdateArgs = io.read_input_borsh().sdk_unwrap();
-        crate::xcc::set_code_version_of_address(&mut io, &args.address, args.version);
+        let io = Runtime;
+        let env = Runtime;
+        let handler = Runtime;
+        contract_methods::xcc::factory_update_address_version(io, &env, &handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Sets the address for the `wNEAR` ERC-20 contract. This contract will be used by the
     /// cross-contract calls feature to have users pay for their NEAR transactions.
     #[no_mangle]
     pub extern "C" fn factory_set_wnear_address() {
-        let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        require_owner_only(&state, &io.predecessor_account_id());
-        let address = io.read_input_arr20().sdk_unwrap();
-        crate::xcc::set_wnear_address(&mut io, &Address::from_array(address));
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::xcc::factory_set_wnear_address(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Returns the address for the `wNEAR` ERC-20 contract in borsh format.
     #[no_mangle]
     pub extern "C" fn factory_get_wnear_address() {
-        let mut io = Runtime;
-        let address = aurora_engine_precompiles::xcc::state::get_wnear_address(&io);
-        let bytes = address.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
-        io.return_output(&bytes);
+        let io = Runtime;
+        contract_methods::xcc::factory_get_wnear_address(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Create and/or fund an XCC sub-account directly (as opposed to having one be automatically
@@ -513,15 +386,11 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn fund_xcc_sub_account() {
         let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        // This method can only be called by the owner because it allows specifying the
-        // account ID of the wNEAR account. This information must be accurate for the
-        // sub-account to work properly, therefore this method can only be called by
-        // a trusted user.
-        require_owner_only(&state, &io.predecessor_account_id());
-        let args: crate::xcc::FundXccArgs = io.read_input_borsh().sdk_unwrap();
-        crate::xcc::fund_xcc_sub_account(&io, &mut Runtime, &io, args).sdk_unwrap();
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::xcc::fund_xcc_sub_account(&io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Allow receiving NEP141 tokens to the EVM contract.
@@ -532,54 +401,22 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let mut engine: Engine<_, _> = Engine::new(
-            predecessor_address(&predecessor_account_id),
-            current_account_id.clone(),
-            io,
-            &io,
-        )
-        .sdk_unwrap();
-
-        let args: NEP141FtOnTransferArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::ft_on_transfer(io, &env, &mut handler)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
-
-        if predecessor_account_id == current_account_id {
-            EthConnectorContract::init_instance(io)
-                .sdk_unwrap()
-                .ft_on_transfer(&engine, &args)
-                .sdk_unwrap();
-        } else {
-            engine.receive_erc20_tokens(
-                &predecessor_account_id,
-                &args,
-                &current_account_id,
-                &mut Runtime,
-            );
-        }
     }
 
     /// Deploy ERC20 token mapped to a NEP141
     #[no_mangle]
     pub extern "C" fn deploy_erc20_token() {
-        let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        // Id of the NEP141 token in Near
-        let args: DeployErc20TokenArgs = io.read_input_borsh().sdk_unwrap();
-
-        let address = engine::deploy_erc20_token(args, io, &io, &mut Runtime).sdk_unwrap();
-
-        io.return_output(
-            &address
-                .as_bytes()
-                .try_to_vec()
-                .sdk_expect(errors::ERR_SERIALIZE),
-        );
-
-        // TODO: charge for storage
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::deploy_erc20_token(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Callback invoked by exit to NEAR precompile to handle potential
@@ -587,114 +424,43 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn refund_on_error() {
         let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        io.assert_private_call().sdk_unwrap();
-
-        // This function should only be called as the callback of
-        // exactly one promise.
-        if io.promise_results_count() != 1 {
-            sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
-        }
-
-        if let Some(PromiseResult::Successful(_)) = io.promise_result(0) {
-            // Promise succeeded -- nothing to do
-        } else {
-            // Exit call failed; need to refund tokens
-            let args: RefundCallArgs = io.read_input_borsh().sdk_unwrap();
-            let refund_result =
-                engine::refund_on_error(io, &io, state, &args, &mut Runtime).sdk_unwrap();
-
-            if !refund_result.status.is_ok() {
-                sdk::panic_utf8(errors::ERR_REFUND_FAILURE);
-            }
-        }
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::refund_on_error(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Sets relayer key manager.
     #[no_mangle]
     pub extern "C" fn set_key_manager() {
-        let mut io = Runtime;
-        let mut state = state::get_state(&io).sdk_unwrap();
-
-        require_running(&state);
-        require_owner_only(&state, &io.predecessor_account_id());
-
-        let key_manager =
-            serde_json::from_slice::<RelayerKeyManagerArgs>(&io.read_input().to_vec())
-                .map(|args| args.key_manager)
-                .sdk_expect(errors::ERR_JSON_DESERIALIZE);
-
-        if state.key_manager == key_manager {
-            sdk::panic_utf8(errors::ERR_SAME_KEY_MANAGER)
-        } else {
-            state.key_manager = key_manager;
-            state::set_state(&mut io, &state).sdk_unwrap();
-        }
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::admin::set_key_manager(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Adds a relayer function call key.
     #[no_mangle]
     pub extern "C" fn add_relayer_key() {
-        let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-
-        require_running(&state);
-        require_key_manager_only(&state, &io.predecessor_account_id());
-
-        let public_key = serde_json::from_slice::<RelayerKeyArgs>(&io.read_input().to_vec())
-            .map(|args| args.public_key)
-            .sdk_expect(errors::ERR_JSON_DESERIALIZE);
-        let allowance = Yocto::new(io.attached_deposit());
-        sdk::log!("attached key allowance: {allowance}");
-
-        if allowance.as_u128() < 100 {
-            // TODO: Clarify the minimum amount if check is needed then change error type
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
-        }
-
-        engine::add_function_call_key(&mut io, &public_key);
-
-        let action = PromiseAction::AddFunctionCallKey {
-            public_key,
-            allowance,
-            nonce: 0, // not actually used - depends on block height
-            receiver_id: io.current_account_id(),
-            function_names: "call,submit,submit_with_args".to_string(),
-        };
-        let promise = PromiseBatchAction {
-            target_account_id: io.current_account_id(),
-            actions: vec![action],
-        };
-
-        let promise_id = unsafe { io.promise_create_batch(&promise) };
-        io.promise_return(promise_id);
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::admin::add_relayer_key(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Removes a relayer function call key.
     #[no_mangle]
     pub extern "C" fn remove_relayer_key() {
-        let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-
-        require_running(&state);
-        require_key_manager_only(&state, &io.predecessor_account_id());
-
-        let args: RelayerKeyArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .sdk_expect(errors::ERR_JSON_DESERIALIZE);
-
-        engine::remove_function_call_key(&mut io, &args.public_key).sdk_unwrap();
-
-        let action = PromiseAction::DeleteKey {
-            public_key: args.public_key,
-        };
-        let promise = PromiseBatchAction {
-            target_account_id: io.current_account_id(),
-            actions: vec![action],
-        };
-
-        let promise_id = unsafe { io.promise_create_batch(&promise) };
-        io.promise_return(promise_id);
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::admin::remove_relayer_key(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     ///
@@ -797,48 +563,28 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn new_eth_connector() {
         let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        // Only the owner can initialize the EthConnector
-        let is_private = io.assert_private_call();
-        if is_private.is_err() {
-            require_owner_only(&state, &io.predecessor_account_id());
-        }
-
-        let args: InitCallArgs = io.read_input_borsh().sdk_unwrap();
-        let owner_id = io.current_account_id();
-
-        EthConnectorContract::create_contract(io, &owner_id, args).sdk_unwrap();
+        let env = Runtime;
+        contract_methods::connector::new_eth_connector(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn set_eth_connector_contract_data() {
-        let mut io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        // Only the owner can set the EthConnector contract data
-        let is_private = io.assert_private_call();
-        if is_private.is_err() {
-            require_owner_only(&state, &io.predecessor_account_id());
-        }
-
-        let args: SetContractDataCallArgs = io.read_input_borsh().sdk_unwrap();
-        connector::set_contract_data(&mut io, args).sdk_unwrap();
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::connector::set_eth_connector_contract_data(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn withdraw() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        io.assert_one_yocto().sdk_unwrap();
-        let args = io.read_input_borsh().sdk_unwrap();
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let result = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .withdraw_eth_from_near(&current_account_id, &predecessor_account_id, &args)
+        let env = Runtime;
+        let result_bytes = contract_methods::connector::withdraw(io, &env)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
-        let result_bytes = result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE);
         // We intentionally do not go through the `io` struct here because we must bypass
         // the check that prevents output that is accepted by the eth_custodian
         #[allow(clippy::as_conversions)]
@@ -852,62 +598,22 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn deposit() {
-        let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        let raw_proof = io.read_input().to_vec();
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let promise_args = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .deposit(raw_proof, current_account_id, predecessor_account_id)
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::deposit(io, &env, &mut handler)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
-        // Safety: this call is safe because it comes from the eth-connector, not users.
-        // The call is to verify the user-supplied proof for the deposit, with `finish_deposit`
-        // as a callback.
-        let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
-        io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn finish_deposit() {
-        let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        io.assert_private_call().sdk_unwrap();
-
-        // Check result from proof verification call
-        if io.promise_results_count() != 1 {
-            sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
-        }
-        let promise_result = match io.promise_result(0) {
-            Some(PromiseResult::Successful(bytes)) => {
-                bool::try_from_slice(&bytes).sdk_expect(errors::ERR_PROMISE_ENCODING)
-            }
-            _ => sdk::panic_utf8(errors::ERR_PROMISE_FAILED),
-        };
-        if !promise_result {
-            sdk::panic_utf8(errors::ERR_VERIFY_PROOF);
-        }
-
-        let data = io.read_input_borsh().sdk_unwrap();
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let maybe_promise_args = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .finish_deposit(
-                predecessor_account_id,
-                current_account_id,
-                data,
-                io.prepaid_gas(),
-            )
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::finish_deposit(io, &env, &mut handler)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
-
-        if let Some(promise_args) = maybe_promise_args {
-            // Safety: this call is safe because it comes from the eth-connector, not users.
-            // The call will be to the Engine's ft_transfer_call`, which is needed as part
-            // of the bridge flow (if depositing ETH to an Aurora address).
-            let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
-            io.promise_return(promise_id);
-        }
     }
 
     #[no_mangle]
@@ -970,114 +676,58 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_transfer() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        io.assert_one_yocto().sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
-        let args: parameters::TransferCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
-            .sdk_unwrap();
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_transfer(&predecessor_account_id, &args)
+        let env = Runtime;
+        contract_methods::connector::ft_transfer(io, &env)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_resolve_transfer() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-
-        io.assert_private_call().sdk_unwrap();
-        if io.promise_results_count() != 1 {
-            sdk::panic_utf8(errors::ERR_PROMISE_COUNT);
-        }
-
-        let args: ResolveTransferCallArgs = io.read_input().to_value().sdk_unwrap();
-        let promise_result = io.promise_result(0).sdk_unwrap();
-
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_resolve_transfer(&args, promise_result);
+        let env = Runtime;
+        let handler = Runtime;
+        contract_methods::connector::ft_resolve_transfer(io, &env, &handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
-        let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        // Check is payable
-        io.assert_one_yocto().sdk_unwrap();
-
-        let args: TransferCallCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::ft_transfer_call(io, &env, &mut handler)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
-        let current_account_id = io.current_account_id();
-        let predecessor_account_id = io.predecessor_account_id();
-        let promise_args = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_transfer_call(
-                predecessor_account_id,
-                current_account_id,
-                args,
-                io.prepaid_gas(),
-            )
-            .sdk_unwrap();
-        // Safety: this call is safe. It is required by the NEP-141 spec that `ft_transfer_call`
-        // creates a call to another contract's `ft_on_transfer` method.
-        let promise_id = unsafe { io.promise_create_with_callback(&promise_args) };
-        io.promise_return(promise_id);
     }
 
     #[no_mangle]
     pub extern "C" fn storage_deposit() {
-        let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        let args: StorageDepositCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::storage_deposit(io, &env, &mut handler)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
-        let amount = Yocto::new(io.attached_deposit());
-        let maybe_promise = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .storage_deposit(predecessor_account_id, amount, args)
-            .sdk_unwrap();
-        if let Some(promise) = maybe_promise {
-            // Safety: This call is safe. It is only a transfer back to the user in the case
-            // that they over paid for their deposit.
-            unsafe { io.promise_create_batch(&promise) };
-        }
     }
 
     #[no_mangle]
     pub extern "C" fn storage_unregister() {
-        let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        io.assert_one_yocto().sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
-        let force = serde_json::from_slice::<serde_json::Value>(&io.read_input().to_vec())
-            .ok()
-            .and_then(|args| args["force"].as_bool());
-        let maybe_promise = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .storage_unregister(predecessor_account_id, force)
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::storage_unregister(io, &env, &mut handler)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
-        if let Some(promise) = maybe_promise {
-            // Safety: This call is safe. It is only a transfer back to the user for their deposit.
-            unsafe { io.promise_create_batch(&promise) };
-        }
     }
 
     #[no_mangle]
     pub extern "C" fn storage_withdraw() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        io.assert_one_yocto().sdk_unwrap();
-        let args: StorageWithdrawCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
-            .sdk_unwrap();
-        let predecessor_account_id = io.predecessor_account_id();
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .storage_withdraw(&predecessor_account_id, &args)
+        let env = Runtime;
+        contract_methods::connector::storage_withdraw(io, &env)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
     }
 
@@ -1106,16 +756,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_paused_flags() {
         let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
-        let is_private = io.assert_private_call();
-        if is_private.is_err() {
-            require_owner_only(&state, &io.predecessor_account_id());
-        }
-        let args: PauseEthConnectorCallArgs = io.read_input_borsh().sdk_unwrap();
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .set_paused_flags(&args);
+        let env = Runtime;
+        contract_methods::connector::set_paused_flags(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
@@ -1224,6 +868,7 @@ mod contract {
         };
         // Safety: this call is safe because it is only used in integration tests.
         unsafe {
+            use aurora_engine_sdk::promise::PromiseHandler;
             io.promise_create_with_callback(
                 &aurora_engine_types::parameters::PromiseWithCallbackArgs {
                     base: verify_call,
@@ -1248,30 +893,10 @@ mod contract {
         }
     }
 
-    fn require_owner_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
-        if &state.owner_id != predecessor_account_id {
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
-        }
-    }
-
     fn require_running(state: &state::EngineState) {
         if state.is_paused {
             sdk::panic_utf8(errors::ERR_PAUSED);
         }
-    }
-
-    fn require_key_manager_only(state: &state::EngineState, predecessor_account_id: &AccountId) {
-        let key_manager = state
-            .key_manager
-            .as_ref()
-            .expect_utf8(errors::ERR_KEY_MANAGER_IS_NOT_SET);
-        if key_manager != predecessor_account_id {
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
-        }
-    }
-
-    fn predecessor_address(predecessor_account_id: &AccountId) -> Address {
-        near_account_to_evm_address(predecessor_account_id.as_bytes())
     }
 
     mod exports {
