@@ -13,7 +13,10 @@ autobenches = false
 [dev-dependencies]
 aurora-engine = { workspace = true, features = ["std", "tracing", "impl-serde", "borsh-compat"] }
 aurora-engine-types = { workspace = true, features = ["std", "impl-serde", "borsh-compat"] }
-
+aurora-engine-sdk = { workspace = true, features = ["std"] }
+aurora-engine-transactions = { workspace = true, features = ["std", "impl-serde"] }
+rand.workspace = true
+libsecp256k1.workspace = true
 anyhow.workspace = true
 byte-slice-cast.workspace = true
 near-sdk.workspace = true

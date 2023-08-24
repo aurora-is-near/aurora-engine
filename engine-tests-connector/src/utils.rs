@@ -3,7 +3,9 @@ use aurora_engine::parameters::{FungibleTokenMetadata, SetEthConnectorContractAc
 use aurora_engine::proof::Proof;
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::connector::LogEntry;
-use aurora_engine_types::parameters::silo::SiloParamsArgs;
+use aurora_engine_types::parameters::silo::{
+    SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind,
+};
 use aurora_engine_types::types::{Address, Wei};
 use near_sdk::serde_json::json;
 use near_sdk::{json_types::U128, serde_json};
@@ -198,10 +200,9 @@ impl TestContract {
             .await?;
         assert!(res.is_success());
 
-        let chain_id = [0u8; 32];
         let res = engine_contract
             .call("new")
-            .args_borsh((chain_id, engine_contract.id(), engine_contract.id(), 1_u64))
+            .args_borsh(([0u8; 32], engine_contract.id(), engine_contract.id(), 1_u64))
             .gas(DEFAULT_GAS)
             .transact()
             .await?;
@@ -239,10 +240,9 @@ impl TestContract {
         let (aurora_contract, silo_contract, root_account) = Self::deploy_silo_contract().await?;
 
         let prover_account: AccountId = silo_contract.id().clone();
-        let chain_id = [0u8; 32];
         let res = aurora_contract
             .call("new")
-            .args_borsh((chain_id, aurora_contract.id(), aurora_contract.id(), 1_u64))
+            .args_borsh(([0u8; 32], aurora_contract.id(), aurora_contract.id(), 1_u64))
             .gas(DEFAULT_GAS)
             .transact()
             .await?;
@@ -250,7 +250,7 @@ impl TestContract {
 
         let res = silo_contract
             .call("new")
-            .args_borsh((chain_id, silo_contract.id(), silo_contract.id(), 1_u64))
+            .args_borsh(([0u8; 32], silo_contract.id(), silo_contract.id(), 1_u64))
             .gas(DEFAULT_GAS)
             .transact()
             .await?;
@@ -287,16 +287,22 @@ impl TestContract {
             .transact()
             .await?;
         assert!(res.is_success());
+
         // add_entry_to_whitelist
-        // let args = WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
-        //     kind: WhitelistKind::Account,
-        //     account_id,
-        // });
-        // let args = WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
-        //     kind: WhitelistKind::Address,
-        //     address,
-        // });
-        // call_function(runner, "add_entry_to_whitelist", args);
+        let account_id =
+            aurora_engine_types::account_id::AccountId::try_from(silo_contract.id().as_bytes())
+                .unwrap();
+        let args = WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
+            kind: WhitelistKind::Account,
+            account_id,
+        });
+        let res = silo_contract
+            .call("add_entry_to_whitelist")
+            .args_borsh(args)
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?;
+        assert!(res.is_success());
 
         Ok(Self {
             engine_contract: silo_contract,
@@ -346,6 +352,23 @@ impl TestContract {
             .engine_contract
             .call("deposit")
             .args_borsh(proof)
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?)
+    }
+
+    pub async fn add_addr_to_white_list(
+        &self,
+        address: Address,
+    ) -> anyhow::Result<ExecutionFinalResult> {
+        let args = WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
+            kind: WhitelistKind::Address,
+            address,
+        });
+        Ok(self
+            .engine_contract
+            .call("add_entry_to_whitelist")
+            .args_borsh(args)
             .gas(DEFAULT_GAS)
             .transact()
             .await?)
@@ -503,7 +526,12 @@ pub fn str_to_address(address: &str) -> Address {
 }
 
 #[must_use]
-pub fn mock_proof(recipient_id: &AccountId, deposit_amount: u128, proof_index: u64) -> Proof {
+pub fn mock_proof(
+    recipient_id: &AccountId,
+    deposit_amount: u128,
+    proof_index: u64,
+    addr: Option<Address>,
+) -> Proof {
     use aurora_engine_types::{
         types::{Fee, NEP141Wei},
         H160, H256, U256,
@@ -511,7 +539,12 @@ pub fn mock_proof(recipient_id: &AccountId, deposit_amount: u128, proof_index: u
 
     let eth_custodian_address = str_to_address(CUSTODIAN_ADDRESS);
     let fee = Fee::new(NEP141Wei::new(0));
-    let message = recipient_id.to_string();
+    let message = if let Some(addr) = addr {
+        let v = vec![recipient_id.to_string(), addr.encode()];
+        v.join(":")
+    } else {
+        recipient_id.to_string()
+    };
     let token_message_data: TokenMessageData =
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
             .unwrap();
@@ -548,5 +581,92 @@ pub fn mock_proof(recipient_id: &AccountId, deposit_amount: u128, proof_index: u
         log_entry_data: rlp::encode(&log_entry).to_vec(),
         receipt_index: 1,
         ..Default::default()
+    }
+}
+
+pub mod eth {
+    use crate::utils::{Address, TestContract, Wei, DEFAULT_GAS};
+    use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
+    use aurora_engine_types::U256;
+    use libsecp256k1::{Message, PublicKey, SecretKey};
+
+    pub fn create_eth_acc() -> (Address, SecretKey) {
+        let mut rng = rand::thread_rng();
+        let sk = SecretKey::random(&mut rng);
+        let address = address_from_secret_key(&sk);
+        (address, sk)
+    }
+
+    pub fn address_from_secret_key(sk: &SecretKey) -> Address {
+        let pk = PublicKey::from_secret_key(sk);
+        let hash = aurora_engine_sdk::keccak(&pk.serialize()[1..]);
+        Address::try_from_slice(&hash[12..]).unwrap()
+    }
+
+    pub fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
+        TransactionLegacy {
+            nonce,
+            gas_price: U256::default(),
+            gas_limit: u64::MAX.into(),
+            to: Some(to),
+            value: amount,
+            data: Vec::new(),
+        }
+    }
+
+    pub fn sign_transaction(
+        tx: TransactionLegacy,
+        secret_key: &SecretKey,
+        chain_id: Option<u64>,
+    ) -> LegacyEthSignedTransaction {
+        let mut rlp_stream = rlp::RlpStream::new();
+        tx.rlp_append_unsigned(&mut rlp_stream, chain_id);
+        let message_hash = aurora_engine_sdk::keccak(rlp_stream.as_raw());
+        let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
+
+        let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
+        let v: u64 = chain_id.map_or_else(
+            || u64::from(recovery_id.serialize()) + 27,
+            |chain_id| u64::from(recovery_id.serialize()) + 2 * chain_id + 35,
+        );
+        let r = U256::from_big_endian(&signature.r.b32());
+        let s = U256::from_big_endian(&signature.s.b32());
+        LegacyEthSignedTransaction {
+            transaction: tx,
+            v,
+            r,
+            s,
+        }
+    }
+
+    pub fn set_submit_tx(nonce: u64, to: Address, amount: u128) -> TransactionLegacy {
+        TransactionLegacy {
+            nonce: nonce.into(),
+            gas_price: U256::default(),
+            gas_limit: u64::MAX.into(),
+            to: Some(to),
+            value: Wei::new_u128(amount),
+            data: vec![],
+        }
+    }
+
+    pub async fn submit_transaction(
+        contract: TestContract,
+        sk: &SecretKey,
+        transaction: TransactionLegacy,
+    ) {
+        let chain_id = 0;
+        let signed_tx = sign_transaction(transaction, sk, Some(chain_id));
+        let tx = rlp::encode(&signed_tx).to_vec();
+
+        let res = contract
+            .engine_contract
+            .call("submit")
+            .args(tx)
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await
+            .unwrap();
+        println!("{res:#?}");
     }
 }
