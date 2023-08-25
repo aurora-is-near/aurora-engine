@@ -322,13 +322,20 @@ fn test_trace_precompiles_with_subcalls() {
         let storage = &mut runner.storage;
         let env = &runner.env;
 
-        let mut tx =
-            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
-        tx.transaction = sync::types::TransactionKind::DeployErc20(
+        let tx_kind = sync::types::TransactionKind::DeployErc20(
             aurora_engine::parameters::DeployErc20TokenArgs {
                 nep141: "wrap.near".parse().unwrap(),
             },
         );
+        let mut tx = standalone::StandaloneRunner::template_tx_msg(
+            storage,
+            env,
+            0,
+            H256::default(),
+            &[],
+            tx_kind.raw_bytes(),
+        );
+        tx.transaction = tx_kind;
         let mut outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx).unwrap();
         let key = storage::bytes_to_key(storage::KeyPrefix::Nep141Erc20Map, b"wrap.near");
         outcome.diff.modify(key, wnear_address.as_bytes().to_vec());
@@ -347,9 +354,16 @@ fn test_trace_precompiles_with_subcalls() {
         let storage = &mut runner.storage;
         let env = &runner.env;
 
-        let mut tx =
-            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
-        tx.transaction = sync::types::TransactionKind::FactoryUpdate(xcc_router_bytes);
+        let tx_kind = sync::types::TransactionKind::FactoryUpdate(xcc_router_bytes);
+        let mut tx = standalone::StandaloneRunner::template_tx_msg(
+            storage,
+            env,
+            0,
+            H256::default(),
+            &[],
+            tx_kind.raw_bytes(),
+        );
+        tx.transaction = tx_kind;
         tx
     };
     let outcome =
@@ -360,9 +374,16 @@ fn test_trace_precompiles_with_subcalls() {
         let storage = &mut runner.storage;
         let env = &runner.env;
 
-        let mut tx =
-            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
-        tx.transaction = sync::types::TransactionKind::FactorySetWNearAddress(wnear_address);
+        let tx_kind = sync::types::TransactionKind::FactorySetWNearAddress(wnear_address);
+        let mut tx = standalone::StandaloneRunner::template_tx_msg(
+            storage,
+            env,
+            0,
+            H256::default(),
+            &[],
+            tx_kind.raw_bytes(),
+        );
+        tx.transaction = tx_kind;
         tx
     };
     let outcome =

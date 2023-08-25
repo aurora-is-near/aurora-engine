@@ -49,6 +49,8 @@ pub struct TransactionMessage {
     /// Results from previous NEAR receipts
     /// (only present when this transaction is a callback of another transaction).
     pub promise_data: Vec<Option<Vec<u8>>>,
+    /// Raw bytes passed as input when executed in the Near Runtime.
+    pub raw_input: Vec<u8>,
 }
 
 impl TransactionMessage {
@@ -481,6 +483,54 @@ pub enum TransactionKindTag {
     Unknown,
 }
 
+impl TransactionKind {
+    #[must_use]
+    pub fn raw_bytes(&self) -> Vec<u8> {
+        match self {
+            Self::Submit(tx) => tx.into(),
+            Self::SubmitWithArgs(args) => args.try_to_vec().unwrap_or_default(),
+            Self::Call(args) => args.try_to_vec().unwrap_or_default(),
+            Self::PausePrecompiles(args) | Self::ResumePrecompiles(args) => {
+                args.try_to_vec().unwrap_or_default()
+            }
+            Self::Deploy(bytes) | Self::Deposit(bytes) | Self::FactoryUpdate(bytes) => {
+                bytes.clone()
+            }
+            Self::DeployErc20(args) => args.try_to_vec().unwrap_or_default(),
+            Self::FtOnTransfer(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::FtTransferCall(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::FinishDeposit(args) => args.try_to_vec().unwrap_or_default(),
+            Self::ResolveTransfer(args, _) => args.try_to_vec().unwrap_or_default(),
+            Self::FtTransfer(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::Withdraw(args) => args.try_to_vec().unwrap_or_default(),
+            Self::StorageDeposit(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::StorageUnregister(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::StorageWithdraw(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::SetOwner(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetUpgradeDelayBlocks(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetPausedFlags(args) => args.try_to_vec().unwrap_or_default(),
+            Self::RegisterRelayer(address) | Self::FactorySetWNearAddress(address) => {
+                address.as_bytes().to_vec()
+            }
+            Self::RefundOnError(maybe_args) => maybe_args
+                .as_ref()
+                .and_then(|args| args.try_to_vec().ok())
+                .unwrap_or_default(),
+            Self::NewConnector(args) | Self::SetConnectorData(args) => {
+                args.try_to_vec().unwrap_or_default()
+            }
+            Self::NewEngine(args) => args.try_to_vec().unwrap_or_default(),
+            Self::FactoryUpdateAddressVersion(args) => args.try_to_vec().unwrap_or_default(),
+            Self::FundXccSubAccound(args) => args.try_to_vec().unwrap_or_default(),
+            Self::PauseContract | Self::ResumeContract | Self::Unknown => Vec::new(),
+            Self::SetKeyManager(args) => args.try_to_vec().unwrap_or_default(),
+            Self::AddRelayerKey(args) | Self::RemoveRelayerKey(args) => {
+                args.try_to_vec().unwrap_or_default()
+            }
+        }
+    }
+}
+
 /// Used to make sure `TransactionKindTag` is kept in sync with `TransactionKind`
 impl From<&TransactionKind> for TransactionKindTag {
     fn from(tx: &TransactionKind) -> Self {
@@ -543,6 +593,7 @@ impl From<&TransactionKind> for TransactionKindTag {
 enum BorshableTransactionMessage<'a> {
     V1(BorshableTransactionMessageV1<'a>),
     V2(BorshableTransactionMessageV2<'a>),
+    V3(BorshableTransactionMessageV3<'a>),
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -570,9 +621,23 @@ struct BorshableTransactionMessageV2<'a> {
     pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
 }
 
+#[derive(BorshDeserialize, BorshSerialize)]
+struct BorshableTransactionMessageV3<'a> {
+    pub block_hash: [u8; 32],
+    pub near_receipt_id: [u8; 32],
+    pub position: u16,
+    pub succeeded: bool,
+    pub signer: Cow<'a, AccountId>,
+    pub caller: Cow<'a, AccountId>,
+    pub attached_near: u128,
+    pub transaction: BorshableTransactionKind<'a>,
+    pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
+    pub raw_input: Cow<'a, Vec<u8>>,
+}
+
 impl<'a> From<&'a TransactionMessage> for BorshableTransactionMessage<'a> {
     fn from(t: &'a TransactionMessage) -> Self {
-        Self::V2(BorshableTransactionMessageV2 {
+        Self::V3(BorshableTransactionMessageV3 {
             block_hash: t.block_hash.0,
             near_receipt_id: t.near_receipt_id.0,
             position: t.position,
@@ -582,6 +647,7 @@ impl<'a> From<&'a TransactionMessage> for BorshableTransactionMessage<'a> {
             attached_near: t.attached_near,
             transaction: (&t.transaction).into(),
             promise_data: Cow::Borrowed(&t.promise_data),
+            raw_input: Cow::Borrowed(&t.raw_input),
         })
     }
 }
@@ -591,18 +657,39 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
 
     fn try_from(t: BorshableTransactionMessage<'a>) -> Result<Self, Self::Error> {
         match t {
-            BorshableTransactionMessage::V1(t) => Ok(Self {
-                block_hash: H256(t.block_hash),
-                near_receipt_id: H256(t.near_receipt_id),
-                position: t.position,
-                succeeded: t.succeeded,
-                signer: t.signer.into_owned(),
-                caller: t.caller.into_owned(),
-                attached_near: t.attached_near,
-                transaction: t.transaction.try_into()?,
-                promise_data: Vec::new(),
-            }),
-            BorshableTransactionMessage::V2(t) => Ok(Self {
+            BorshableTransactionMessage::V1(t) => {
+                let transaction: TransactionKind = t.transaction.try_into()?;
+                let raw_input = transaction.raw_bytes();
+                Ok(Self {
+                    block_hash: H256(t.block_hash),
+                    near_receipt_id: H256(t.near_receipt_id),
+                    position: t.position,
+                    succeeded: t.succeeded,
+                    signer: t.signer.into_owned(),
+                    caller: t.caller.into_owned(),
+                    attached_near: t.attached_near,
+                    transaction,
+                    promise_data: Vec::new(),
+                    raw_input,
+                })
+            }
+            BorshableTransactionMessage::V2(t) => {
+                let transaction: TransactionKind = t.transaction.try_into()?;
+                let raw_input = transaction.raw_bytes();
+                Ok(Self {
+                    block_hash: H256(t.block_hash),
+                    near_receipt_id: H256(t.near_receipt_id),
+                    position: t.position,
+                    succeeded: t.succeeded,
+                    signer: t.signer.into_owned(),
+                    caller: t.caller.into_owned(),
+                    attached_near: t.attached_near,
+                    transaction,
+                    promise_data: t.promise_data.into_owned(),
+                    raw_input,
+                })
+            }
+            BorshableTransactionMessage::V3(t) => Ok(Self {
                 block_hash: H256(t.block_hash),
                 near_receipt_id: H256(t.near_receipt_id),
                 position: t.position,
@@ -612,6 +699,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
                 attached_near: t.attached_near,
                 transaction: t.transaction.try_into()?,
                 promise_data: t.promise_data.into_owned(),
+                raw_input: t.raw_input.into_owned(),
             }),
         }
     }
