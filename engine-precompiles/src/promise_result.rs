@@ -15,7 +15,7 @@ pub mod costs {
     use crate::prelude::types::EthGas;
 
     /// This cost is always charged for calling this precompile.
-    pub const PROMISE_RESULT_BASE_COST: EthGas = EthGas::new(105);
+    pub const PROMISE_RESULT_BASE_COST: EthGas = EthGas::new(111);
     /// This is the cost per byte of promise result data.
     pub const PROMISE_RESULT_BYTE_COST: EthGas = EthGas::new(1);
 }

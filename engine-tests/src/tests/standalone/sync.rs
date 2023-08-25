@@ -67,6 +67,7 @@ fn test_consume_deposit_message() {
         sync::ConsumeMessageOutcome::TransactionIncluded(outcome) => outcome,
         other => panic!("Unexpected outcome {other:?}"),
     };
+    outcome.commit(&mut runner.storage).unwrap();
 
     let finish_deposit_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
@@ -99,6 +100,7 @@ fn test_consume_deposit_message() {
         sync::ConsumeMessageOutcome::TransactionIncluded(outcome) => outcome,
         other => panic!("Unexpected outcome {other:?}"),
     };
+    outcome.commit(&mut runner.storage).unwrap();
 
     let ft_on_transfer_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
@@ -120,11 +122,12 @@ fn test_consume_deposit_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     assert_eq!(runner.get_balance(&recipient_address), deposit_amount);
 
@@ -150,11 +153,12 @@ fn test_consume_deploy_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     let diff = runner
         .storage
@@ -203,11 +207,12 @@ fn test_consume_deploy_erc20_message() {
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     let erc20_address = runner
         .storage
@@ -241,11 +246,12 @@ fn test_consume_deploy_erc20_message() {
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     // Check balance is correct
     let deployed_token = ERC20(
@@ -297,11 +303,12 @@ fn test_consume_ft_on_transfer_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     assert_eq!(
         runner.get_balance(&dest_address).raw().low_u128(),
@@ -341,11 +348,12 @@ fn test_consume_call_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     assert_eq!(runner.get_balance(&recipient_address), transfer_amount);
     assert_eq!(
@@ -391,11 +399,12 @@ fn test_consume_submit_message() {
         promise_data: Vec::new(),
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     assert_eq!(runner.get_balance(&recipient_address), transfer_amount);
     assert_eq!(
