@@ -247,6 +247,43 @@ fn test_trace_contract_with_precompile_sub_call() {
     runner.close();
 }
 
+#[test]
+fn test_contract_create_too_large() {
+    let mut runner = standalone::StandaloneRunner::default();
+    let signer = Signer::random();
+
+    runner.init_evm();
+
+    let tx_data = {
+        let tx_data_hex =
+            std::fs::read_to_string("src/tests/res/contract_data_too_large.hex").unwrap();
+        hex::decode(
+            tx_data_hex
+                .strip_prefix("0x")
+                .unwrap_or(&tx_data_hex)
+                .trim(),
+        )
+        .unwrap()
+    };
+    let tx = aurora_engine_transactions::legacy::TransactionLegacy {
+        nonce: U256::zero(),
+        gas_price: U256::zero(),
+        gas_limit: u64::MAX.into(),
+        to: None,
+        value: Wei::zero(),
+        data: tx_data,
+    };
+
+    let mut listener = CallTracer::default();
+    let standalone_result = sputnik::traced_call(&mut listener, || {
+        runner.submit_transaction(&signer.secret_key, tx)
+    });
+    assert!(
+        standalone_result.is_err(),
+        "Expected contract too large error"
+    );
+}
+
 #[allow(clippy::too_many_lines)]
 #[test]
 fn test_trace_precompiles_with_subcalls() {
