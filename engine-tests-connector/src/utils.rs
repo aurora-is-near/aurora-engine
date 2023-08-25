@@ -357,6 +357,16 @@ impl TestContract {
             .await?)
     }
 
+    pub async fn submit(&self, tx: Vec<u8>) -> anyhow::Result<ExecutionFinalResult> {
+        Ok(self
+            .engine_contract
+            .call("submit")
+            .args(tx)
+            .gas(DEFAULT_GAS)
+            .transact()
+            .await?)
+    }
+
     pub async fn add_addr_to_white_list(
         &self,
         address: Address,
@@ -554,7 +564,7 @@ pub fn mock_proof(
         sender: Address::new(H160([0u8; 20])),
         token_message_data,
         amount: NEP141Wei::new(deposit_amount),
-        fee: fee.clone(),
+        fee,
     };
 
     let event_schema = ethabi::Event {
@@ -585,7 +595,7 @@ pub fn mock_proof(
 }
 
 pub mod eth {
-    use crate::utils::{Address, TestContract, Wei, DEFAULT_GAS};
+    use crate::utils::{Address, Wei};
     use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
     use aurora_engine_types::U256;
     use libsecp256k1::{Message, PublicKey, SecretKey};
@@ -650,23 +660,9 @@ pub mod eth {
         }
     }
 
-    pub async fn submit_transaction(
-        contract: TestContract,
-        sk: &SecretKey,
-        transaction: TransactionLegacy,
-    ) {
+    pub async fn prepare_submit_transaction(sk: &SecretKey, tx_args: TransactionLegacy) -> Vec<u8> {
         let chain_id = 0;
-        let signed_tx = sign_transaction(transaction, sk, Some(chain_id));
-        let tx = rlp::encode(&signed_tx).to_vec();
-
-        let res = contract
-            .engine_contract
-            .call("submit")
-            .args(tx)
-            .gas(DEFAULT_GAS)
-            .transact()
-            .await
-            .unwrap();
-        println!("{res:#?}");
+        let signed_tx = sign_transaction(tx_args, sk, Some(chain_id));
+        rlp::encode(&signed_tx).to_vec()
     }
 }

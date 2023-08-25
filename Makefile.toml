@@ -329,11 +329,8 @@ category = "Test"
 command = "${CARGO}"
 args = [
     "test",
-    "test_silo_connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
-    "--",
-    "--nocapture"
 ]
 
 [tasks.bench-modexp-test]
