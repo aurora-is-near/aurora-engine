@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] 2023-08-28
+
+### Fixes
+
+- Updated [SputnikVM](https://github.com/aurora-is-near/sputnikvm) dependency with bugfix in the `returndatacopy`
+  implementation and a performance improvement in accessing EVM memory by [@birchmd]. ([#826])
+
+### Changes
+
+- BREAKING: `engine-standalone-storage` no longer automatically writes to the DB when `consume_message` is called. 
+  It is up to downstream users of the library to commit the diff (after doing any validation for correctness) by [@birchmd]. ([#825])
+
+### Additions
+
+- New crate for the so-called "hashchain" implementation. It will enable verification of Aurora blocks by light clients 
+  in the future by [@birchmd]. ([#816])
+
+[#816]: https://github.com/aurora-is-near/aurora-engine/pull/816
+[#825]: https://github.com/aurora-is-near/aurora-engine/pull/825
+[#826]: https://github.com/aurora-is-near/aurora-engine/pull/826
+
 ## [2.10.2] 2023-08-10
 
 ### Changes
