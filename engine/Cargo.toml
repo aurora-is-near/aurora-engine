@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "2.10.2"
+version = "3.0.0"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
