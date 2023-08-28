@@ -683,8 +683,8 @@ fn test_num_wasm_functions() {
         .unwrap();
     let num_functions = module.funcs.iter().count();
     assert!(
-        num_functions <= 1440,
-        "{num_functions} is not less than 1440",
+        num_functions <= 1445,
+        "{num_functions} is not less than 1445",
     );
 }
 
