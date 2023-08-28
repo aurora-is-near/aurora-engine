@@ -11,14 +11,14 @@ use aurora_engine_sdk::{
 };
 use aurora_engine_types::{
     borsh::BorshSerialize,
-    parameters::engine::{CallArgs, SubmitArgs},
+    parameters::engine::{CallArgs, SubmitArgs, SubmitResult},
 };
 
 pub fn deploy_code<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     mut io: I,
     env: &'env E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<SubmitResult, ContractError> {
     let state = state::get_state(&io)?;
     require_running(&state)?;
     let input = io.read_input().to_vec();
@@ -33,14 +33,14 @@ pub fn deploy_code<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     let result = engine.deploy_code_with_input(input, handler)?;
     let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
     io.return_output(&result_bytes);
-    Ok(())
+    Ok(result)
 }
 
 pub fn call<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     mut io: I,
     env: &'env E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<SubmitResult, ContractError> {
     let state = state::get_state(&io)?;
     require_running(&state)?;
     let bytes = io.read_input().to_vec();
@@ -69,14 +69,14 @@ pub fn call<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     let result = engine.call_with_args(args, handler)?;
     let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
     io.return_output(&result_bytes);
-    Ok(())
+    Ok(result)
 }
 
 pub fn submit<I: IO + Copy, E: Env, H: PromiseHandler>(
     mut io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<SubmitResult, ContractError> {
     let state = state::get_state(&io)?;
     require_running(&state)?;
     let tx_data = io.read_input().to_vec();
@@ -98,14 +98,14 @@ pub fn submit<I: IO + Copy, E: Env, H: PromiseHandler>(
     let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
     io.return_output(&result_bytes);
 
-    Ok(())
+    Ok(result)
 }
 
 pub fn submit_with_args<I: IO + Copy, E: Env, H: PromiseHandler>(
     mut io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<SubmitResult, ContractError> {
     let state = state::get_state(&io)?;
     require_running(&state)?;
     let args: SubmitArgs = io.read_input_borsh()?;
@@ -123,5 +123,5 @@ pub fn submit_with_args<I: IO + Copy, E: Env, H: PromiseHandler>(
     let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
     io.return_output(&result_bytes);
 
-    Ok(())
+    Ok(result)
 }

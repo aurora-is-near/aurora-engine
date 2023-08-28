@@ -1,25 +1,17 @@
 use crate::engine_state::EngineStateAccess;
-use aurora_engine::parameters::SubmitArgs;
-use aurora_engine::pausables::{
-    EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
-};
 use aurora_engine::{
-    connector, engine,
+    contract_methods, engine,
     parameters::{self, SubmitResult},
-    state, xcc,
 };
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::{
-    env::{self, Env, DEFAULT_PREPAID_GAS},
+    env::{self, DEFAULT_PREPAID_GAS},
     io::IO,
 };
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::{
-    account_id::AccountId,
-    borsh::BorshDeserialize,
-    parameters::PromiseWithCallbackArgs,
-    types::{Address, Yocto},
-    H256,
+    account_id::AccountId, borsh::BorshDeserialize, parameters::PromiseWithCallbackArgs,
+    types::Address, H256,
 };
 use std::{io, str::FromStr};
 
@@ -260,16 +252,21 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
             let engine_account_id = storage.get_engine_account_id()?;
 
             let (tx_hash, diff, result) = storage
-                .with_engine_access(block_height, transaction_position, &[], |io| {
-                    execute_transaction::<_, M, _>(
-                        transaction_message.as_ref(),
-                        block_height,
-                        &block_metadata,
-                        engine_account_id,
-                        io,
-                        EngineStateAccess::get_transaction_diff,
-                    )
-                })
+                .with_engine_access(
+                    block_height,
+                    transaction_position,
+                    &transaction_message.raw_input,
+                    |io| {
+                        execute_transaction::<_, M, _>(
+                            transaction_message.as_ref(),
+                            block_height,
+                            &block_metadata,
+                            engine_account_id,
+                            io,
+                            EngineStateAccess::get_transaction_diff,
+                        )
+                    },
+                )
                 .result;
             let outcome = TransactionIncludedOutcome {
                 hash: tx_hash,
@@ -293,16 +290,21 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     let block_height = storage.get_block_height_by_hash(block_hash)?;
     let block_metadata = storage.get_block_metadata(block_hash)?;
     let engine_account_id = storage.get_engine_account_id()?;
-    let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
-        execute_transaction::<_, M, _>(
-            &transaction_message,
-            block_height,
-            &block_metadata,
-            engine_account_id,
-            io,
-            EngineStateAccess::get_transaction_diff,
-        )
-    });
+    let result = storage.with_engine_access(
+        block_height,
+        transaction_position,
+        &transaction_message.raw_input,
+        |io| {
+            execute_transaction::<_, M, _>(
+                &transaction_message,
+                block_height,
+                &block_metadata,
+                engine_account_id,
+                io,
+                EngineStateAccess::get_transaction_diff,
+            )
+        },
+    );
     let (tx_hash, diff, maybe_result) = result.result;
     let outcome = TransactionIncludedOutcome {
         hash: tx_hash,
@@ -332,8 +334,6 @@ where
 {
     let signer_account_id = transaction_message.signer.clone();
     let predecessor_account_id = transaction_message.caller.clone();
-    let relayer_address =
-        aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes());
     let near_receipt_id = transaction_message.near_receipt_id;
     let current_account_id = engine_account_id;
     let env = env::Fixed {
@@ -356,23 +356,8 @@ where
             };
             let tx_data: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&tx_data);
-            let args = SubmitArgs {
-                tx_data,
-                ..Default::default()
-            };
-            let result = state::get_state(&io)
-                .map(|engine_state| {
-                    let submit_result = engine::submit_with_alt_modexp::<_, _, _, M>(
-                        io,
-                        &env,
-                        &args,
-                        engine_state,
-                        env.current_account_id(),
-                        relayer_address,
-                        &mut handler,
-                    );
-                    Some(TransactionExecutionResult::Submit(submit_result))
-                })
+            let result = contract_methods::evm_transactions::submit(io, &env, &mut handler)
+                .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
                 .map_err(Into::into);
 
             (tx_hash, result)
@@ -382,31 +367,17 @@ where
                 promise_data: &transaction_message.promise_data,
             };
             let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
-            let result = state::get_state(&io)
-                .map(|engine_state| {
-                    let submit_result = engine::submit_with_alt_modexp::<_, _, _, M>(
-                        io,
-                        &env,
-                        args,
-                        engine_state,
-                        env.current_account_id(),
-                        relayer_address,
-                        &mut handler,
-                    );
-                    Some(TransactionExecutionResult::Submit(submit_result))
-                })
-                .map_err(Into::into);
+            let result =
+                contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
+                    .map(|submit_result| {
+                        Some(TransactionExecutionResult::Submit(Ok(submit_result)))
+                    })
+                    .map_err(Into::into);
 
             (tx_hash, result)
         }
         other => {
-            let result = non_submit_execute::<I, M>(
-                other,
-                io,
-                env,
-                relayer_address,
-                &transaction_message.promise_data,
-            );
+            let result = non_submit_execute(other, io, &env, &transaction_message.promise_data);
             (near_receipt_id, result)
         }
     };
@@ -420,290 +391,211 @@ where
 /// The `submit` transaction kind is special because it is the only one where the transaction hash
 /// differs from the NEAR receipt hash.
 #[allow(clippy::too_many_lines)]
-fn non_submit_execute<I: IO + Copy, M: ModExpAlgorithm + 'static>(
+fn non_submit_execute<I: IO + Copy>(
     transaction: &TransactionKind,
-    mut io: I,
-    env: env::Fixed,
-    relayer_address: Address,
+    io: I,
+    env: &env::Fixed,
     promise_data: &[Option<Vec<u8>>],
 ) -> Result<Option<TransactionExecutionResult>, error::Error> {
     let result = match transaction {
-        TransactionKind::Call(args) => {
+        TransactionKind::Call(_) => {
             // We can ignore promises in the standalone engine (see above)
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine: engine::Engine<_, _, M> =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
+            let result = contract_methods::evm_transactions::call(io, env, &mut handler)?;
 
-            let result = engine.call_with_args(args.clone(), &mut handler);
-
-            Some(TransactionExecutionResult::Submit(result))
+            Some(TransactionExecutionResult::Submit(Ok(result)))
         }
 
-        TransactionKind::Deploy(input) => {
+        TransactionKind::Deploy(_) => {
             // We can ignore promises in the standalone engine (see above)
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine: engine::Engine<_, _, M> =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
+            let result = contract_methods::evm_transactions::deploy_code(io, env, &mut handler)?;
 
-            let result = engine.deploy_code_with_input(input.clone(), &mut handler);
-
-            Some(TransactionExecutionResult::Submit(result))
+            Some(TransactionExecutionResult::Submit(Ok(result)))
         }
 
-        TransactionKind::DeployErc20(args) => {
+        TransactionKind::DeployErc20(_) => {
             // No promises can be created by `deploy_erc20_token`
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = engine::deploy_erc20_token(args.clone(), io, &env, &mut handler)?;
+            let result = contract_methods::connector::deploy_erc20_token(io, env, &mut handler)?;
 
             Some(TransactionExecutionResult::DeployErc20(result))
         }
 
-        TransactionKind::FtOnTransfer(args) => {
+        TransactionKind::FtOnTransfer(_) => {
             // No promises can be created by `ft_on_transfer`
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine: engine::Engine<_, _, M> =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
-
-            if env.predecessor_account_id == env.current_account_id {
-                connector::EthConnectorContract::init_instance(io)?
-                    .ft_on_transfer(&engine, args)?;
-            } else {
-                engine.receive_erc20_tokens(
-                    &env.predecessor_account_id,
-                    args,
-                    &env.current_account_id,
-                    &mut handler,
-                );
-            }
+            contract_methods::connector::ft_on_transfer(io, env, &mut handler)?;
 
             None
         }
 
-        TransactionKind::FtTransferCall(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector.ft_transfer_call(
-                env.predecessor_account_id.clone(),
-                env.current_account_id.clone(),
-                args.clone(),
-                env.prepaid_gas,
-            )?;
+        TransactionKind::FtTransferCall(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let promise_args =
+                contract_methods::connector::ft_transfer_call(io, env, &mut handler)?;
 
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
-        TransactionKind::ResolveTransfer(args, promise_result) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_resolve_transfer(args, promise_result.clone());
+        TransactionKind::ResolveTransfer(_, _) => {
+            let handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::connector::ft_resolve_transfer(io, env, &handler)?;
 
             None
         }
 
-        TransactionKind::FtTransfer(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_transfer(&env.predecessor_account_id, args)?;
+        TransactionKind::FtTransfer(_) => {
+            contract_methods::connector::ft_transfer(io, env)?;
 
             None
         }
 
-        TransactionKind::Withdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.withdraw_eth_from_near(
-                &env.current_account_id,
-                &env.predecessor_account_id,
-                args,
-            )?;
+        TransactionKind::Withdraw(_) => {
+            contract_methods::connector::withdraw(io, env)?;
 
             None
         }
 
-        TransactionKind::Deposit(raw_proof) => {
-            let connector_contract = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector_contract.deposit(
-                raw_proof.clone(),
-                env.current_account_id(),
-                env.predecessor_account_id(),
-            )?;
+        TransactionKind::Deposit(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let promise_args = contract_methods::connector::deposit(io, env, &mut handler)?;
 
             Some(TransactionExecutionResult::Promise(promise_args))
         }
 
-        TransactionKind::FinishDeposit(finish_args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let maybe_promise_args = connector.finish_deposit(
-                env.predecessor_account_id(),
-                env.current_account_id(),
-                finish_args.clone(),
-                env.prepaid_gas,
-            )?;
+        TransactionKind::FinishDeposit(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let maybe_promise_args =
+                contract_methods::connector::finish_deposit(io, env, &mut handler)?;
 
             maybe_promise_args.map(TransactionExecutionResult::Promise)
         }
 
-        TransactionKind::StorageDeposit(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _promise = connector.storage_deposit(
-                env.predecessor_account_id,
-                Yocto::new(env.attached_deposit),
-                args.clone(),
-            )?;
-
-            None
-        }
-
-        TransactionKind::StorageUnregister(force) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _promise = connector.storage_unregister(env.predecessor_account_id, *force)?;
-
-            None
-        }
-
-        TransactionKind::StorageWithdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.storage_withdraw(&env.predecessor_account_id, args)?;
-
-            None
-        }
-
-        TransactionKind::SetPausedFlags(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.set_paused_flags(args);
-
-            None
-        }
-
-        TransactionKind::RegisterRelayer(evm_address) => {
-            let mut engine: engine::Engine<_, _, M> =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
-            engine.register_relayer(env.predecessor_account_id.as_bytes(), *evm_address);
-
-            None
-        }
-
-        TransactionKind::RefundOnError(maybe_args) => {
-            let result: Result<Option<TransactionExecutionResult>, state::EngineStateError> =
-                maybe_args
-                    .clone()
-                    .map(|args| {
-                        let mut handler = crate::promise::NoScheduler { promise_data };
-                        let engine_state = state::get_state(&io)?;
-                        let result =
-                            engine::refund_on_error(io, &env, engine_state, &args, &mut handler);
-                        Ok(TransactionExecutionResult::Submit(result))
-                    })
-                    .transpose();
-
-            result?
-        }
-
-        TransactionKind::SetConnectorData(args) => {
-            let mut connector_io = io;
-            connector::set_contract_data(&mut connector_io, args.clone())?;
-
-            None
-        }
-
-        TransactionKind::NewConnector(args) => {
-            connector::EthConnectorContract::create_contract(
-                io,
-                &env.current_account_id,
-                args.clone(),
-            )?;
-
-            None
-        }
-        TransactionKind::NewEngine(args) => {
-            state::set_state(&mut io, &args.clone().into())?;
-
-            None
-        }
-        TransactionKind::FactoryUpdate(bytecode) => {
-            let router_bytecode = xcc::RouterCode::borrowed(bytecode);
-            xcc::update_router_code(&mut io, &router_bytecode);
-
-            None
-        }
-        TransactionKind::FactoryUpdateAddressVersion(args) => {
-            xcc::set_code_version_of_address(&mut io, &args.address, args.version);
-
-            None
-        }
-        TransactionKind::FactorySetWNearAddress(address) => {
-            xcc::set_wnear_address(&mut io, address);
-
-            None
-        }
-        TransactionKind::FundXccSubAccound(args) => {
+        TransactionKind::StorageDeposit(_) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
-            xcc::fund_xcc_sub_account(&io, &mut handler, &env, args.clone())?;
+            contract_methods::connector::storage_deposit(io, env, &mut handler)?;
+
+            None
+        }
+
+        TransactionKind::StorageUnregister(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::connector::storage_unregister(io, env, &mut handler)?;
+
+            None
+        }
+
+        TransactionKind::StorageWithdraw(_) => {
+            contract_methods::connector::storage_withdraw(io, env)?;
+
+            None
+        }
+
+        TransactionKind::SetPausedFlags(_) => {
+            contract_methods::connector::set_paused_flags(io, env)?;
+
+            None
+        }
+
+        TransactionKind::RegisterRelayer(_) => {
+            contract_methods::admin::register_relayer(io, env)?;
+
+            None
+        }
+
+        TransactionKind::RefundOnError(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let maybe_result = contract_methods::connector::refund_on_error(io, env, &mut handler)?;
+
+            maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
+        }
+
+        TransactionKind::SetConnectorData(_) => {
+            contract_methods::connector::set_eth_connector_contract_data(io, env)?;
+
+            None
+        }
+
+        TransactionKind::NewConnector(_) => {
+            contract_methods::connector::new_eth_connector(io, env)?;
+
+            None
+        }
+        TransactionKind::NewEngine(_) => {
+            contract_methods::admin::new(io)?;
+
+            None
+        }
+        TransactionKind::FactoryUpdate(_) => {
+            contract_methods::xcc::factory_update(io, env)?;
+
+            None
+        }
+        TransactionKind::FactoryUpdateAddressVersion(_) => {
+            let handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::xcc::factory_update_address_version(io, env, &handler)?;
+
+            None
+        }
+        TransactionKind::FactorySetWNearAddress(_) => {
+            contract_methods::xcc::factory_set_wnear_address(io, env)?;
+
+            None
+        }
+        TransactionKind::FundXccSubAccound(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::xcc::fund_xcc_sub_account(&io, env, &mut handler)?;
 
             None
         }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
         TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
-        TransactionKind::PausePrecompiles(args) => {
-            let precompiles_to_pause = PrecompileFlags::from_bits_truncate(args.paused_mask);
-
-            let mut pauser = EnginePrecompilesPauser::from_io(io);
-            pauser.pause_precompiles(precompiles_to_pause);
+        TransactionKind::PausePrecompiles(_) => {
+            contract_methods::admin::pause_precompiles(io, env)?;
 
             None
         }
-        TransactionKind::ResumePrecompiles(args) => {
-            let precompiles_to_resume = PrecompileFlags::from_bits_truncate(args.paused_mask);
-
-            let mut pauser = EnginePrecompilesPauser::from_io(io);
-            pauser.resume_precompiles(precompiles_to_resume);
+        TransactionKind::ResumePrecompiles(_) => {
+            contract_methods::admin::resume_precompiles(io, env)?;
 
             None
         }
-        TransactionKind::SetOwner(args) => {
-            let mut prev = state::get_state(&io)?;
-
-            prev.owner_id = args.clone().new_owner;
-            state::set_state(&mut io, &prev)?;
+        TransactionKind::SetOwner(_) => {
+            contract_methods::admin::set_owner(io, env)?;
 
             None
         }
-        TransactionKind::SetUpgradeDelayBlocks(args) => {
-            let mut prev = state::get_state(&io)?;
-
-            prev.upgrade_delay_blocks = args.upgrade_delay_blocks;
-            state::set_state(&mut io, &prev)?;
+        TransactionKind::SetUpgradeDelayBlocks(_) => {
+            contract_methods::admin::set_upgrade_delay_blocks(io, env)?;
 
             None
         }
         TransactionKind::PauseContract => {
-            let mut prev = state::get_state(&io)?;
-
-            prev.is_paused = true;
-            state::set_state(&mut io, &prev)?;
+            contract_methods::admin::pause_contract(io, env)?;
 
             None
         }
         TransactionKind::ResumeContract => {
-            let mut prev = state::get_state(&io)?;
-
-            prev.is_paused = false;
-            state::set_state(&mut io, &prev)?;
+            contract_methods::admin::resume_contract(io, env)?;
 
             None
         }
-        TransactionKind::SetKeyManager(args) => {
-            let mut prev = state::get_state(&io)?;
-
-            prev.key_manager = args.key_manager.clone();
-            state::set_state(&mut io, &prev)?;
+        TransactionKind::SetKeyManager(_) => {
+            contract_methods::admin::set_key_manager(io, env)?;
 
             None
         }
-        TransactionKind::AddRelayerKey(args) => {
-            engine::add_function_call_key(&mut io, &args.public_key);
+        TransactionKind::AddRelayerKey(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::admin::add_relayer_key(io, env, &mut handler)?;
 
             None
         }
-        TransactionKind::RemoveRelayerKey(args) => {
-            engine::remove_function_call_key(&mut io, &args.public_key)?;
+        TransactionKind::RemoveRelayerKey(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::admin::remove_relayer_key(io, env, &mut handler)?;
 
             None
         }
@@ -754,7 +646,7 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine, fungible_token, state, xcc};
+    use aurora_engine::{connector, contract_methods, engine, fungible_token, state, xcc};
 
     #[derive(Debug)]
     pub enum Error {
@@ -771,6 +663,7 @@ pub mod error {
         ConnectorInit(connector::error::InitContractError),
         ConnectorStorage(connector::error::StorageReadError),
         FundXccError(xcc::FundXccError),
+        ContractError(contract_methods::ContractError),
     }
 
     impl From<state::EngineStateError> for Error {
@@ -848,6 +741,12 @@ pub mod error {
     impl From<xcc::FundXccError> for Error {
         fn from(e: xcc::FundXccError) -> Self {
             Self::FundXccError(e)
+        }
+    }
+
+    impl From<contract_methods::ContractError> for Error {
+        fn from(e: contract_methods::ContractError) -> Self {
+            Self::ContractError(e)
         }
     }
 }
