@@ -18,10 +18,13 @@ use aurora_engine_types::{
             StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallArgs,
             TransferCallCallArgs,
         },
-        engine::{errors::ParseTypeFromJsonError, DeployErc20TokenArgs, PauseEthConnectorCallArgs},
-        RefundCallArgs,
+        engine::{
+            errors::ParseTypeFromJsonError, DeployErc20TokenArgs, PauseEthConnectorCallArgs,
+            SubmitResult,
+        },
+        PromiseWithCallbackArgs, RefundCallArgs,
     },
-    types::{PromiseResult, Yocto},
+    types::{Address, PromiseResult, Yocto},
     Vec,
 };
 
@@ -57,7 +60,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, H: PromiseHandler>(
     mut io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<Address, ContractError> {
     require_running(&state::get_state(&io)?)?;
     // Id of the NEP141 token in Near
     let args: DeployErc20TokenArgs = io.read_input_borsh()?;
@@ -70,14 +73,14 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, H: PromiseHandler>(
             .try_to_vec()
             .map_err(|_| errors::ERR_SERIALIZE)?,
     );
-    Ok(())
+    Ok(address)
 }
 
 pub fn refund_on_error<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     let state = state::get_state(&io)?;
     require_running(&state)?;
     env.assert_private_call()?;
@@ -88,8 +91,9 @@ pub fn refund_on_error<I: IO + Copy, E: Env, H: PromiseHandler>(
         return Err(errors::ERR_PROMISE_COUNT.into());
     }
 
-    if let Some(PromiseResult::Successful(_)) = handler.promise_result(0) {
+    let maybe_result = if let Some(PromiseResult::Successful(_)) = handler.promise_result(0) {
         // Promise succeeded -- nothing to do
+        None
     } else {
         // Exit call failed; need to refund tokens
         let args: RefundCallArgs = io.read_input_borsh()?;
@@ -98,8 +102,9 @@ pub fn refund_on_error<I: IO + Copy, E: Env, H: PromiseHandler>(
         if !refund_result.status.is_ok() {
             return Err(errors::ERR_REFUND_FAILURE.into());
         }
-    }
-    Ok(())
+        Some(refund_result)
+    };
+    Ok(maybe_result)
 }
 
 pub fn new_eth_connector<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
@@ -163,7 +168,7 @@ pub fn deposit<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<PromiseWithCallbackArgs, ContractError> {
     require_running(&state::get_state(&io)?)?;
     let raw_proof = io.read_input().to_vec();
     let current_account_id = env.current_account_id();
@@ -178,14 +183,14 @@ pub fn deposit<I: IO + Copy, E: Env, H: PromiseHandler>(
     // as a callback.
     let promise_id = unsafe { handler.promise_create_with_callback(&promise_args) };
     handler.promise_return(promise_id);
-    Ok(())
+    Ok(promise_args)
 }
 
 pub fn finish_deposit<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<Option<PromiseWithCallbackArgs>, ContractError> {
     require_running(&state::get_state(&io)?)?;
     env.assert_private_call()?;
 
@@ -213,15 +218,15 @@ pub fn finish_deposit<I: IO + Copy, E: Env, H: PromiseHandler>(
         env.prepaid_gas(),
     )?;
 
-    if let Some(promise_args) = maybe_promise_args {
+    if let Some(promise_args) = maybe_promise_args.as_ref() {
         // Safety: this call is safe because it comes from the eth-connector, not users.
         // The call will be to the Engine's ft_transfer_call`, which is needed as part
         // of the bridge flow (if depositing ETH to an Aurora address).
-        let promise_id = unsafe { handler.promise_create_with_callback(&promise_args) };
+        let promise_id = unsafe { handler.promise_create_with_callback(promise_args) };
         handler.promise_return(promise_id);
     }
 
-    Ok(())
+    Ok(maybe_promise_args)
 }
 
 pub fn ft_transfer<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
@@ -259,7 +264,7 @@ pub fn ft_transfer_call<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<PromiseWithCallbackArgs, ContractError> {
     require_running(&state::get_state(&io)?)?;
     // Check is payable
     env.assert_one_yocto()?;
@@ -278,7 +283,7 @@ pub fn ft_transfer_call<I: IO + Copy, E: Env, H: PromiseHandler>(
     // creates a call to another contract's `ft_on_transfer` method.
     let promise_id = unsafe { handler.promise_create_with_callback(&promise_args) };
     handler.promise_return(promise_id);
-    Ok(())
+    Ok(promise_args)
 }
 
 pub fn storage_deposit<I: IO + Copy, E: Env, H: PromiseHandler>(

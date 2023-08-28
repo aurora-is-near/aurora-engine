@@ -72,6 +72,7 @@ fn test_evm_tracing_with_storage() {
             attached_near: 0,
             transaction: engine_standalone_storage::sync::types::TransactionKind::Unknown,
             promise_data: Vec::new(),
+            raw_input: Vec::new(),
         },
         diff,
         maybe_result: Ok(None),
