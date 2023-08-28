@@ -601,7 +601,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::connector::deposit(io, &env, &mut handler)
+        let _ = contract_methods::connector::deposit(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -697,7 +697,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::connector::ft_transfer_call(io, &env, &mut handler)
+        let _ = contract_methods::connector::ft_transfer_call(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }

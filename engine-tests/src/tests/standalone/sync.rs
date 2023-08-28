@@ -93,7 +93,9 @@ fn test_consume_deposit_message() {
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
         transaction: tx_kind,
-        promise_data: Vec::new(),
+        // Need to pass the result of calling the proof verifier
+        // (which is `true` because the proof is valid in this case).
+        promise_data: vec![Some(true.try_to_vec().unwrap())],
         raw_input,
     };
 

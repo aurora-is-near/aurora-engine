@@ -7,7 +7,7 @@
 //! the smart contract and the standalone.
 
 use crate::{errors, state};
-use aurora_engine_types::{account_id::AccountId, types::Address, Box};
+use aurora_engine_types::{account_id::AccountId, fmt, types::Address, Box};
 
 pub mod admin;
 pub mod connector;
@@ -24,6 +24,16 @@ impl ContractError {
         ErrorMessage {
             message: self.message,
         }
+    }
+}
+
+impl fmt::Debug for ContractError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = aurora_engine_types::str::from_utf8(self.message.as_ref().as_ref())
+            .unwrap_or("NON_PRINTABLE_ERROR");
+        f.debug_struct("ContractError")
+            .field("message", &message)
+            .finish()
     }
 }
 

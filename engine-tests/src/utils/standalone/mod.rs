@@ -97,7 +97,7 @@ impl StandaloneRunner {
         signer: &mut utils::Signer,
         amount: Wei,
         dest: Address,
-    ) -> Result<SubmitResult, engine::EngineError> {
+    ) -> Result<SubmitResult, sync::error::Error> {
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: U256::zero(),
@@ -113,7 +113,7 @@ impl StandaloneRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<SubmitResult, engine::EngineError> {
+    ) -> Result<SubmitResult, sync::error::Error> {
         let storage = &mut self.storage;
         let env = &mut self.env;
         env.block_height += 1;
@@ -133,7 +133,7 @@ impl StandaloneRunner {
     pub fn submit_raw_transaction_bytes(
         &mut self,
         transaction_bytes: &[u8],
-    ) -> Result<SubmitResult, engine::EngineError> {
+    ) -> Result<SubmitResult, sync::error::Error> {
         self.env.predecessor_account_id = "some-account.near".parse().unwrap();
         let storage = &mut self.storage;
         let env = &mut self.env;
@@ -331,7 +331,7 @@ impl StandaloneRunner {
         env: &mut env::Fixed,
         cumulative_diff: &mut Diff,
         promise_results: &[PromiseResult],
-    ) -> Result<SubmitResult, engine::EngineError> {
+    ) -> Result<SubmitResult, sync::error::Error> {
         let transaction_hash = aurora_engine_sdk::keccak(transaction_bytes);
         let mut tx_msg = Self::template_tx_msg(
             storage,
@@ -353,9 +353,9 @@ impl StandaloneRunner {
 
 fn unwrap_result(
     outcome: sync::TransactionIncludedOutcome,
-) -> Result<SubmitResult, engine::EngineError> {
-    match outcome.maybe_result.unwrap().unwrap() {
-        sync::TransactionExecutionResult::Submit(result) => result,
+) -> Result<SubmitResult, sync::error::Error> {
+    match outcome.maybe_result?.unwrap() {
+        sync::TransactionExecutionResult::Submit(result) => result.map_err(Into::into),
         sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
         sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
     }
