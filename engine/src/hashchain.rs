@@ -85,18 +85,23 @@ where
 }
 
 fn load_hashchain<I: IO>(io: &I, block_height: u64) -> Result<Option<Hashchain>, ContractError> {
-    let key = storage::bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_STATE);
-    let mut maybe_hashchain = io.read_storage(&key).map_or(Ok(None), |value| {
-        let bytes = value.to_vec();
-        Hashchain::try_deserialize(&bytes)
-            .map(Some)
-            .map_err(|_| BlockchainHashchainError::DeserializationFailed)
-    })?;
+    let mut maybe_hashchain = read_current_hashchain(io)?;
     if let Some(hashchain) = maybe_hashchain.as_mut() {
         if block_height > hashchain.get_current_block_height() {
             hashchain.move_to_block(block_height)?;
         }
     }
+    Ok(maybe_hashchain)
+}
+
+pub fn read_current_hashchain<I: IO>(io: &I) -> Result<Option<Hashchain>, ContractError> {
+    let key = storage::bytes_to_key(KeyPrefix::Hashchain, HASHCHAIN_STATE);
+    let maybe_hashchain = io.read_storage(&key).map_or(Ok(None), |value| {
+        let bytes = value.to_vec();
+        Hashchain::try_deserialize(&bytes)
+            .map(Some)
+            .map_err(|_| BlockchainHashchainError::DeserializationFailed)
+    })?;
     Ok(maybe_hashchain)
 }
 

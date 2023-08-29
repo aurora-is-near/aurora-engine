@@ -537,6 +537,14 @@ mod contract {
         io.return_output(&value.0);
     }
 
+    #[no_mangle]
+    pub extern "C" fn get_latest_hashchain() {
+        let mut io = Runtime;
+        contract_methods::admin::get_latest_hashchain(&mut io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     ///
     /// BENCHMARKING METHODS
     ///

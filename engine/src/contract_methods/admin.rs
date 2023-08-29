@@ -378,6 +378,23 @@ pub fn start_hashchain<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), C
     Ok(())
 }
 
+pub fn get_latest_hashchain<I: IO>(io: &mut I) -> Result<(), ContractError> {
+    let result = crate::hashchain::read_current_hashchain(io)?.map(|hc| {
+        let block_height = hc.get_current_block_height() - 1;
+        let hashchain = hex::encode(hc.get_previous_block_hashchain());
+        serde_json::json!({
+            "block_height": block_height,
+            "hashchain": hashchain,
+        })
+    });
+
+    let bytes = serde_json::to_vec(&serde_json::json!({ "result": result }))
+        .map_err(|_| errors::ERR_SERIALIZE)?;
+    io.return_output(&bytes);
+
+    Ok(())
+}
+
 fn internal_get_upgrade_index<I: IO>(io: &I) -> Result<u64, ContractError> {
     match io.read_u64(&storage::bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)) {
         Ok(index) => Ok(index),
