@@ -10,7 +10,7 @@ pub mod fee;
 pub mod gas;
 pub mod wei;
 
-pub use address::*;
+pub use address::{make_address, Address};
 pub use balance::*;
 pub use fee::*;
 pub use gas::*;

@@ -423,7 +423,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             account_info_cache: RefCell::new(FullCache::default()),
             contract_code_cache: RefCell::new(FullCache::default()),
             contract_storage_cache: RefCell::new(FullCache::default()),
-            modexp_algorithm: PhantomData::default(),
+            modexp_algorithm: PhantomData,
         }
     }
 
@@ -591,9 +591,9 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let contract = &args.address;
         let value = U256::from_big_endian(&args.amount);
         // View calls cannot interact with promises
-        let mut handler = aurora_engine_sdk::promise::Noop;
+        let handler = aurora_engine_sdk::promise::Noop;
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-        let precompiles = self.create_precompiles(pause_flags, &mut handler);
+        let precompiles = self.create_precompiles(pause_flags, &handler);
 
         let executor_params = StackExecutorParams::new(u64::MAX, precompiles);
         self.view(
@@ -787,7 +787,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     fn create_precompiles<P: PromiseHandler>(
         &self,
         pause_flags: PrecompileFlags,
-        handler: &mut P,
+        handler: &P,
     ) -> Precompiles<'env, I, E, P::ReadOnly> {
         let current_account_id = self.current_account_id.clone();
         let random_seed = self.env.random_seed();
@@ -998,7 +998,7 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
         let erc20_admin_address = current_address(&current_account_id);
         let mut engine: Engine<_, _> =
             Engine::new_with_state(state, erc20_admin_address, current_account_id, io, env);
-        let erc20_address = erc20_address;
+
         let refund_address = args.recipient_address;
         let amount = U256::from_big_endian(&args.amount);
         let input = setup_refund_on_error_input(amount, refund_address);

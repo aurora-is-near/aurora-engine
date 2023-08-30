@@ -189,8 +189,8 @@ impl<HF: HardFork> Bn256Add<HF> {
     pub const ADDRESS: Address = make_address(0, 6);
 
     #[must_use]
-    pub fn new() -> Self {
-        Self(PhantomData::default())
+    pub const fn new() -> Self {
+        Self(PhantomData)
     }
 }
 
@@ -294,8 +294,8 @@ impl<HF: HardFork> Bn256Mul<HF> {
     pub const ADDRESS: Address = make_address(0, 7);
 
     #[must_use]
-    pub fn new() -> Self {
-        Self(PhantomData::default())
+    pub const fn new() -> Self {
+        Self(PhantomData)
     }
 }
 
@@ -402,8 +402,8 @@ impl<HF: HardFork> Bn256Pair<HF> {
     pub const ADDRESS: Address = make_address(0, 8);
 
     #[must_use]
-    pub fn new() -> Self {
-        Self(PhantomData::default())
+    pub const fn new() -> Self {
+        Self(PhantomData)
     }
 }
 

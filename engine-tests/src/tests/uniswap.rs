@@ -282,7 +282,7 @@ impl UniswapTestContext {
         token_path: &[ERC20],
         amount_in: U256,
     ) -> (U256, u64, ExecutionProfile) {
-        for token in token_path.iter() {
+        for token in token_path {
             self.approve_erc20(token, self.swap_router.0.address, U256::MAX);
         }
         let params = Self::exact_input_params(amount_in, token_path);

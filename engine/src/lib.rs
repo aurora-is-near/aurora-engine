@@ -105,6 +105,7 @@ mod contract {
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 
+    #[allow(clippy::empty_line_after_doc_comments)]
     ///
     /// ADMINISTRATIVE METHODS
     ///
@@ -277,6 +278,7 @@ mod contract {
             .sdk_unwrap();
     }
 
+    #[allow(clippy::empty_line_after_doc_comments)]
     ///
     /// MUTATIVE METHODS
     ///
@@ -878,6 +880,7 @@ mod contract {
         };
     }
 
+    #[allow(clippy::empty_line_after_doc_comments)]
     ///
     /// Utility methods.
     ///

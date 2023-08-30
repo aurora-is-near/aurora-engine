@@ -328,7 +328,7 @@ impl StandaloneRunner {
         transaction_bytes: &[u8],
         transaction_position: u16,
         storage: &mut Storage,
-        env: &mut env::Fixed,
+        env: &env::Fixed,
         cumulative_diff: &mut Diff,
         promise_results: &[PromiseResult],
     ) -> Result<SubmitResult, sync::error::Error> {

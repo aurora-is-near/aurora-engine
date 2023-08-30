@@ -668,7 +668,7 @@ pub fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> Transa
     let data = hex::decode(init_code)
         .unwrap()
         .into_iter()
-        .chain(contract_bytes.into_iter())
+        .chain(contract_bytes)
         .collect();
 
     TransactionLegacy {

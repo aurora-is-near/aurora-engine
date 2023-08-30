@@ -22,7 +22,7 @@ fn erc20_mint() {
     // Validate pre-state
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, dest_address, &contract)
     );
 
     // Do mint transaction
@@ -35,7 +35,7 @@ fn erc20_mint() {
     // Validate post-state
     assert_eq!(
         U256::from(mint_amount),
-        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, dest_address, &contract)
     );
 }
 
@@ -49,7 +49,7 @@ fn erc20_mint_out_of_gas() {
     // Validate pre-state
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, dest_address, &contract)
     );
 
     // Try mint transaction
@@ -131,11 +131,11 @@ fn erc20_transfer_success() {
     // Validate pre-state
     assert_eq!(
         U256::from(INITIAL_BALANCE),
-        get_address_erc20_balance(&mut runner, &source_account, source_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, source_address, &contract)
     );
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, dest_address, &contract)
     );
 
     // Do transfer
@@ -149,11 +149,11 @@ fn erc20_transfer_success() {
     // Validate post-state
     assert_eq!(
         U256::from(INITIAL_BALANCE - TRANSFER_AMOUNT),
-        get_address_erc20_balance(&mut runner, &source_account, source_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, source_address, &contract)
     );
     assert_eq!(
         U256::from(TRANSFER_AMOUNT),
-        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, dest_address, &contract)
     );
 }
 
@@ -170,11 +170,11 @@ fn erc20_transfer_insufficient_balance() {
     // Validate pre-state
     assert_eq!(
         U256::from(INITIAL_BALANCE),
-        get_address_erc20_balance(&mut runner, &source_account, source_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, source_address, &contract)
     );
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, dest_address, &contract)
     );
 
     // Do transfer
@@ -189,11 +189,11 @@ fn erc20_transfer_insufficient_balance() {
     // Validate post-state
     assert_eq!(
         U256::from(INITIAL_BALANCE),
-        get_address_erc20_balance(&mut runner, &source_account, source_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, source_address, &contract)
     );
     assert_eq!(
         U256::zero(),
-        get_address_erc20_balance(&mut runner, &source_account, dest_address, &contract)
+        get_address_erc20_balance(&runner, &source_account, dest_address, &contract)
     );
 }
 
@@ -238,7 +238,7 @@ fn deploy_erc_20_out_of_gas() {
 }
 
 fn get_address_erc20_balance(
-    runner: &mut utils::AuroraRunner,
+    runner: &utils::AuroraRunner,
     signer: &Signer,
     address: Address,
     contract: &ERC20,
