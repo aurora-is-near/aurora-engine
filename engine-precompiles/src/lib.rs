@@ -166,7 +166,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
 
 fn process_precompile(
     p: &dyn Precompile,
-    handle: &mut impl PrecompileHandle,
+    handle: &impl PrecompileHandle,
 ) -> Result<PrecompileOutput, PrecompileFailure> {
     let input = handle.input();
     let gas_limit = handle.gas_limit();

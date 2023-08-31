@@ -15,7 +15,7 @@ fn test_consume_snapshot() {
     )
     .unwrap();
     let mut runner = standalone::StandaloneRunner::default();
-    json_snapshot::initialize_engine_state(&mut runner.storage, snapshot.clone()).unwrap();
+    json_snapshot::initialize_engine_state(&runner.storage, snapshot.clone()).unwrap();
 
     // check accounts to see they were written properly
     runner.env.block_height = snapshot.result.block_height + 1;
@@ -53,7 +53,7 @@ fn test_produce_snapshot() {
         .storage
         .set_engine_account_id(&"aurora".parse().unwrap())
         .unwrap();
-    json_snapshot::initialize_engine_state(&mut runner.storage, snapshot.clone()).unwrap();
+    json_snapshot::initialize_engine_state(&runner.storage, snapshot.clone()).unwrap();
 
     // add a couple more transactions that write some extra keys
     runner.env.block_height = snapshot.result.block_height + 1;
