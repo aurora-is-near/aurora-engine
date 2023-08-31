@@ -5,7 +5,7 @@ pub mod types;
 /// Write engine state directly into the Storage from a
 /// JSON snapshot (which can be extracted from a NEAR RPC node).
 pub fn initialize_engine_state(
-    storage: &mut Storage,
+    storage: &Storage,
     snapshot: types::JsonSnapshot,
 ) -> Result<(), error::Error> {
     // The snapshot is giving us a post-state, so we insert it right at the end of its block height.
@@ -64,7 +64,7 @@ mod test {
             "contract.aurora.block51077328.json",
         )
         .unwrap();
-        let mut storage = crate::Storage::open("rocks_tmp/").unwrap();
-        super::initialize_engine_state(&mut storage, snapshot).unwrap();
+        let storage = crate::Storage::open("rocks_tmp/").unwrap();
+        super::initialize_engine_state(&storage, snapshot).unwrap();
     }
 }
