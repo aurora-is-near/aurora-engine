@@ -12,6 +12,7 @@ autobenches = false
 
 [dev-dependencies]
 aurora-engine = { workspace = true, features = ["std", "tracing", "impl-serde"] }
+aurora-engine-hashchain = { workspace = true, features = ["std"] }
 aurora-engine-modexp = { workspace = true, features = ["std"] }
 aurora-engine-precompiles = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }

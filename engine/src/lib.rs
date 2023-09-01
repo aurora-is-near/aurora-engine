@@ -36,6 +36,7 @@ pub mod deposit_event;
 pub mod engine;
 pub mod errors;
 pub mod fungible_token;
+pub mod hashchain;
 pub mod pausables;
 mod prelude;
 pub mod state;
@@ -115,7 +116,8 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn new() {
         let io = Runtime;
-        contract_methods::admin::new(io)
+        let env = Runtime;
+        contract_methods::admin::new(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -390,7 +392,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::xcc::fund_xcc_sub_account(&io, &env, &mut handler)
+        contract_methods::xcc::fund_xcc_sub_account(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -465,6 +467,16 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Initialize the hashchain.
+    #[no_mangle]
+    pub extern "C" fn start_hashchain() {
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::admin::start_hashchain(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     ///
     /// NONMUTATIVE METHODS
     ///
@@ -525,6 +537,14 @@ mod contract {
         let generation = engine::get_generation(&io, &address);
         let value = engine::get_storage(&io, &args.address, &H256(args.key), generation);
         io.return_output(&value.0);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_latest_hashchain() {
+        let mut io = Runtime;
+        contract_methods::admin::get_latest_hashchain(&mut io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     ///

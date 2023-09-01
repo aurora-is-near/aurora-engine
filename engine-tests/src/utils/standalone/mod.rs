@@ -203,6 +203,9 @@ impl StandaloneRunner {
         env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
         env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
+        if ctx.random_seed.len() == 32 {
+            env.random_seed = H256::from_slice(&ctx.random_seed);
+        }
 
         let promise_data: Vec<_> = promise_results
             .iter()

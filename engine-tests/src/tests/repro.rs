@@ -26,7 +26,7 @@ fn repro_GdASJ3KESs() {
         block_timestamp: 1_645_717_564_644_206_730,
         input_path: "src/tests/res/input_GdASJ3KESs.hex",
         evm_gas_used: 706_713,
-        near_gas_used: 120,
+        near_gas_used: 121,
     });
 }
 

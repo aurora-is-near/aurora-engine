@@ -67,6 +67,13 @@ fn require_running(state: &crate::state::EngineState) -> Result<(), ContractErro
     Ok(())
 }
 
+fn require_paused(state: &crate::state::EngineState) -> Result<(), ContractError> {
+    if !state.is_paused {
+        return Err(errors::ERR_RUNNING.into());
+    }
+    Ok(())
+}
+
 fn require_owner_only(
     state: &crate::state::EngineState,
     predecessor_account_id: &AccountId,

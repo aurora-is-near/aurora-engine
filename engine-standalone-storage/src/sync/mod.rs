@@ -198,8 +198,10 @@ pub fn parse_transaction_kind(
         TransactionKindTag::PauseContract => TransactionKind::PauseContract,
         TransactionKindTag::ResumeContract => TransactionKind::ResumeContract,
         TransactionKindTag::SetKeyManager => {
-            let args = aurora_engine::parameters::RelayerKeyManagerArgs::try_from_slice(&bytes)
-                .map_err(f)?;
+            let args: parameters::RelayerKeyManagerArgs = serde_json::from_slice(bytes.as_slice())
+                .map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
             TransactionKind::SetKeyManager(args)
         }
         TransactionKindTag::AddRelayerKey => {
@@ -211,6 +213,11 @@ pub fn parse_transaction_kind(
             let args =
                 aurora_engine::parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::RemoveRelayerKey(args)
+        }
+        TransactionKindTag::StartHashchain => {
+            let args =
+                aurora_engine::parameters::StartHashchainArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::StartHashchain(args)
         }
         TransactionKindTag::Unknown => {
             return Err(ParseTransactionKindError::UnknownMethodName {
@@ -523,7 +530,7 @@ fn non_submit_execute<I: IO + Copy>(
             None
         }
         TransactionKind::NewEngine(_) => {
-            contract_methods::admin::new(io)?;
+            contract_methods::admin::new(io, env)?;
 
             None
         }
@@ -545,7 +552,7 @@ fn non_submit_execute<I: IO + Copy>(
         }
         TransactionKind::FundXccSubAccound(_) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::xcc::fund_xcc_sub_account(&io, env, &mut handler)?;
+            contract_methods::xcc::fund_xcc_sub_account(io, env, &mut handler)?;
 
             None
         }
@@ -596,6 +603,11 @@ fn non_submit_execute<I: IO + Copy>(
         TransactionKind::RemoveRelayerKey(_) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
             contract_methods::admin::remove_relayer_key(io, env, &mut handler)?;
+
+            None
+        }
+        TransactionKind::StartHashchain(_) => {
+            contract_methods::admin::start_hashchain(io, env)?;
 
             None
         }

@@ -27,7 +27,14 @@ fn test_xcc_eth_gas_cost() {
     let _res = runner.call("factory_update", DEFAULT_AURORA_ACCOUNT_ID, xcc_wasm_bytes);
     let mut signer = utils::Signer::random();
     let mut baseline_signer = utils::Signer::random();
-    runner.context.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    // Skip to later block height and re-init hashchain
+    let account_id = runner.aurora_account_id.clone();
+    utils::init_hashchain(
+        &mut runner,
+        &account_id,
+        Some(aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1),
+    );
+
     // Need to use for engine's deployment!
     let wnear_erc20 = deploy_erc20(&mut runner, &signer);
     approve_erc20(

@@ -21,7 +21,8 @@ use std::borrow::Cow;
 
 use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
 use crate::prelude::parameters::{
-    InitCallArgs, LegacyNewCallArgs, SubmitResult, TransactionStatus,
+    InitCallArgs, LegacyNewCallArgs, RelayerKeyManagerArgs, StartHashchainArgs, SubmitResult,
+    TransactionStatus,
 };
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
@@ -619,9 +620,10 @@ impl ExecutionProfile {
 
 pub fn deploy_runner() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
+    let aurora_account_id = str_to_account_id(runner.aurora_account_id.as_str());
     let args = LegacyNewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
-        owner_id: str_to_account_id(runner.aurora_account_id.as_str()),
+        owner_id: aurora_account_id.clone(),
         bridge_prover_id: str_to_account_id("bridge_prover.near"),
         upgrade_delay_blocks: 1,
     };
@@ -637,10 +639,50 @@ pub fn deploy_runner() -> AuroraRunner {
         metadata: FungibleTokenMetadata::default(),
     };
     let result = runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
-
     assert!(result.is_ok());
 
+    // Need to set a key manager because that is the only account that can initialize the hashchain
+    let args = RelayerKeyManagerArgs {
+        key_manager: Some(aurora_account_id),
+    };
+    let result: Result<VMOutcome, EngineError> = runner.call(
+        "set_key_manager",
+        &account_id,
+        serde_json::to_vec(&args).unwrap(),
+    );
+    assert!(result.is_ok());
+    init_hashchain(&mut runner, &account_id, None);
+
     runner
+}
+
+pub fn init_hashchain(
+    runner: &mut AuroraRunner,
+    caller_account_id: &str,
+    block_height: Option<u64>,
+) {
+    // Set up hashchain:
+    //   1. Pause contract (hashchain can only be started if contract is paused first)
+    //   2. Start hashchain
+
+    let result: Result<VMOutcome, EngineError> =
+        runner.call("pause_contract", caller_account_id, Vec::new());
+    assert!(result.is_ok());
+
+    if let Some(h) = block_height {
+        runner.context.block_height = h;
+    }
+
+    let args = StartHashchainArgs {
+        block_height: runner.context.block_height,
+        block_hashchain: [0u8; 32],
+    };
+    let result = runner.call(
+        "start_hashchain",
+        caller_account_id,
+        args.try_to_vec().unwrap(),
+    );
+    assert!(result.is_ok());
 }
 
 pub fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
