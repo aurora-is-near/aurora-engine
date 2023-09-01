@@ -33,6 +33,7 @@ pub enum KeyPrefix {
     Erc20Nep141Map = 0x9,
     CrossContractCall = 0xa,
     RelayerFunctionCallKey = 0xb,
+    Hashchain = 0xc,
 }
 
 impl From<KeyPrefix> for u8 {
@@ -50,6 +51,7 @@ impl From<KeyPrefix> for u8 {
             KeyPrefix::Erc20Nep141Map => 0x9,
             KeyPrefix::CrossContractCall => 0xa,
             KeyPrefix::RelayerFunctionCallKey => 0xb,
+            KeyPrefix::Hashchain => 0xc,
         }
     }
 }

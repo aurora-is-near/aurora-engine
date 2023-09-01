@@ -329,6 +329,7 @@ dependencies = [
 name = "aurora-engine"
 version = "2.10.1"
 dependencies = [
+ "aurora-engine-hashchain",
  "aurora-engine-modexp",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
@@ -339,6 +340,7 @@ dependencies = [
  "digest 0.10.7",
  "ethabi",
  "evm",
+ "function_name",
  "hex 0.4.3",
  "rlp",
  "serde",
@@ -415,6 +417,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aurora-engine",
+ "aurora-engine-hashchain",
  "aurora-engine-modexp",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
@@ -1932,6 +1935,21 @@ dependencies = [
  "libc",
  "winapi",
 ]
+
+[[package]]
+name = "function_name"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1ab577a896d09940b5fe12ec5ae71f9d8211fff62c919c03a3750a9901e98a7"
+dependencies = [
+ "function_name-proc-macro",
+]
+
+[[package]]
+name = "function_name-proc-macro"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "673464e1e314dd67a0fd9544abc99e8eb28d0c7e3b69b033bcff9b2d00b87333"
 
 [[package]]
 name = "funty"

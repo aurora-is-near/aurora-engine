@@ -99,6 +99,13 @@ pub struct SubmitArgs {
     pub gas_token_address: Option<Address>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StartHashchainArgs {
+    pub block_height: u64,
+    pub block_hashchain: RawH256,
+}
+
 /// Borsh-encoded parameters for the `begin_chain` function.
 #[cfg(feature = "evm_bully")]
 #[derive(BorshSerialize, BorshDeserialize)]
