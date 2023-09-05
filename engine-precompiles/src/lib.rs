@@ -362,7 +362,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
         #[cfg(not(feature = "error_refund"))]
         let near_exit = ExitToNear::new(ctx.io);
-        let ethereum_exit = ExitToEthereum::new(ctx.current_account_id.clone(), ctx.io);
+        let ethereum_exit = ExitToEthereum::new(ctx.io);
         let cross_contract_call = CrossContractCall::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);

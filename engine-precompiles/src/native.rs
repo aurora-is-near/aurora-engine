@@ -6,7 +6,7 @@ use crate::prelude::{
     sdk::io::{StorageIntermediate, IO},
     storage::{bytes_to_key, KeyPrefix},
     types::{Address, Yocto},
-    vec, BorshSerialize, Cow, String, ToString, Vec, U256,
+    vec, BorshSerialize, Cow, ToString, Vec, U256,
 };
 #[cfg(feature = "error_refund")]
 use crate::prelude::{
@@ -70,7 +70,7 @@ pub mod events {
     ///    uint amount
     /// )
     /// Note: in the ERC-20 exit case `sender` == `erc20_address` because it is
-    /// the ERC-20 contract which calls the exit precompile. However in the case
+    /// the ERC-20 contract which calls the exit precompile. However, in the case
     /// of ETH exit the sender will give the true sender (and the `erc20_address`
     /// will not be meaningful because ETH is not an ERC-20 token).
     pub struct ExitToNear {
@@ -464,7 +464,6 @@ impl<I: IO> Precompile for ExitToNear<I> {
 }
 
 pub struct ExitToEthereum<I> {
-    current_account_id: AccountId,
     io: I,
 }
 
@@ -479,11 +478,8 @@ pub mod exit_to_ethereum {
 }
 
 impl<I> ExitToEthereum<I> {
-    pub const fn new(current_account_id: AccountId, io: I) -> Self {
-        Self {
-            current_account_id,
-            io,
-        }
+    pub const fn new(io: I) -> Self {
+        Self { io }
     }
 }
 
@@ -537,7 +533,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
                 (
-                    self.current_account_id.clone(),
+                    get_eth_connector_contract_account(&self.io)?,
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     WithdrawCallArgs {
@@ -580,7 +576,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
-                    let eth_recipient: String = hex::encode(input);
+                    let eth_recipient = hex::encode(input);
                     // unwrap cannot fail since we checked the length already
                     let recipient_address = Address::try_from_slice(input).map_err(|_| {
                         ExitError::Other(crate::prelude::Cow::from("ERR_WRONG_ADDRESS"))
