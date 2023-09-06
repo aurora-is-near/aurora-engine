@@ -1,6 +1,7 @@
 use aurora_engine::parameters::{FungibleTokenMetadata, SetEthConnectorContractAccountArgs};
 use aurora_engine::proof::Proof;
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::parameters::connector::WithdrawSerializeType;
 use aurora_engine_types::types::{Address, Wei};
 use near_sdk::serde_json::json;
 use near_sdk::{json_types::U128, serde_json};
@@ -156,6 +157,7 @@ impl TestContract {
 
         let acc = SetEthConnectorContractAccountArgs {
             account: eth_connector_contract.id().parse().unwrap(),
+            withdraw_serialize_type: WithdrawSerializeType::Borsh,
         };
         let res = engine_contract
             .call("set_eth_connector_contract_account")

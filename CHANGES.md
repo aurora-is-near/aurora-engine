@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changes
+
+- Changed structure `SetEthConnectorContractAccountArgs` for setting eth connector account. It was extended with
+ additional field: `withdraw_serialize_type` for defining serialization type for withdraw arguments by [@aleksuss]. ([#834]) 
+
+[#834]: https://github.com/aurora-is-near/aurora-engine/pull/834
+
 ## [3.0.0] 2023-08-28
 
 ### Fixes

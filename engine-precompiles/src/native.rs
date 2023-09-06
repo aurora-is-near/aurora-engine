@@ -6,7 +6,7 @@ use crate::prelude::{
     sdk::io::{StorageIntermediate, IO},
     storage::{bytes_to_key, KeyPrefix},
     types::{Address, Yocto},
-    vec, BorshSerialize, Cow, ToString, Vec, U256,
+    vec, BorshDeserialize, BorshSerialize, Cow, ToString, Vec, U256,
 };
 #[cfg(feature = "error_refund")]
 use crate::prelude::{
@@ -15,7 +15,10 @@ use crate::prelude::{
 };
 use crate::PrecompileOutput;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::connector::WithdrawSerializeType;
+use aurora_engine_types::parameters::WithdrawCallArgs;
 use aurora_engine_types::storage::EthConnectorStorageId;
+use aurora_engine_types::types::NEP141Wei;
 use evm::backend::Log;
 use evm::{Context, ExitError};
 
@@ -243,14 +246,23 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
 }
 
 fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
-    io.read_storage(&construct_contract_key(
-        EthConnectorStorageId::EthConnectorAccount,
-    ))
-    .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
-    .and_then(|x| {
-        x.to_value()
-            .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
-    })
+    get_eth_connector_value_by_suffix(io, EthConnectorStorageId::EthConnectorAccount)
+}
+
+fn get_withdraw_serialize_type<I: IO>(io: &I) -> Result<WithdrawSerializeType, ExitError> {
+    get_eth_connector_value_by_suffix(io, EthConnectorStorageId::WithdrawSerializationType)
+}
+
+fn get_eth_connector_value_by_suffix<I: IO, T: BorshDeserialize>(
+    io: &I,
+    suffix: EthConnectorStorageId,
+) -> Result<T, ExitError> {
+    io.read_storage(&construct_contract_key(suffix))
+        .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
+        .and_then(|x| {
+            x.to_value()
+                .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
+        })
 }
 
 fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
@@ -532,16 +544,15 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                 let recipient_address: Address = input
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
+                let serialize_fn = match get_withdraw_serialize_type(&self.io)? {
+                    WithdrawSerializeType::Json => json_args,
+                    WithdrawSerializeType::Borsh => borsh_args,
+                };
                 (
                     get_eth_connector_contract_account(&self.io)?,
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
-                    format!(
-                        r#"{{"amount": "{}", "recipient": "{}"}}"#,
-                        context.apparent_value.as_u128(),
-                        recipient_address.encode(),
-                    )
-                    .into_bytes(),
+                    serialize_fn(recipient_address, context.apparent_value)?,
                     events::ExitToEth {
                         sender: Address::new(context.caller),
                         erc20_address: events::ETH_ADDRESS,
@@ -637,6 +648,25 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
             output: Vec::new(),
         })
     }
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn json_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
+    Ok(format!(
+        r#"{{"amount": "{}", "recipient": "{}"}}"#,
+        amount.as_u128(),
+        address.encode(),
+    )
+    .into_bytes())
+}
+
+fn borsh_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
+    WithdrawCallArgs {
+        recipient_address: address,
+        amount: NEP141Wei::new(amount.as_u128()),
+    }
+    .try_to_vec()
+    .map_err(|_| ExitError::Other(Cow::from("ERR_BORSH_SERIALIZE")))
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ use aurora_engine::parameters::InitCallArgs;
 use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
+use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawSerializeType};
 use aurora_engine_types::parameters::engine::NewCallArgsV2;
 use aurora_engine_types::types::{make_address, Address, Wei};
 use aurora_engine_types::{account_id::AccountId, H256, U256};
@@ -56,6 +56,7 @@ pub fn init_evm<I: IO + Copy, E: Env>(mut io: I, env: &E, chain_id: u64) {
 
     let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io).unwrap();
     connector.set_eth_connector_contract_account(&"aurora_eth_connector.root".parse().unwrap());
+    connector.set_withdraw_serialize_type(&WithdrawSerializeType::Borsh);
 }
 
 pub fn init_legacy_connector<I: IO + Copy, E: Env>(io: I, env: &E) {

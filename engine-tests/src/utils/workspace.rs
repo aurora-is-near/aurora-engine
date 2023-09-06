@@ -5,7 +5,7 @@ use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 /// it does not execute promises; but `aurora-workspaces` does.
 use crate::utils::AuroraRunner;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
+use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawSerializeType};
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
@@ -58,7 +58,7 @@ pub async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
     assert!(result.is_success());
 
     let result = aurora
-        .set_eth_connector_contract_account(contract_account.id())
+        .set_eth_connector_contract_account(contract_account.id(), WithdrawSerializeType::Borsh)
         .transact()
         .await?;
     assert!(result.is_success());
