@@ -2,7 +2,7 @@ use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::EthGas;
 use crate::prelude::{
     format,
-    parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
+    parameters::{PromiseArgs, PromiseCreateArgs},
     sdk::io::{StorageIntermediate, IO},
     storage::{bytes_to_key, KeyPrefix},
     types::{Address, Yocto},
@@ -14,8 +14,8 @@ use crate::prelude::{
     types,
 };
 use crate::PrecompileOutput;
+use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::storage::EthConnectorStorageId;
-use aurora_engine_types::{account_id::AccountId, types::NEP141Wei};
 use evm::backend::Log;
 use evm::{Context, ExitError};
 
@@ -536,12 +536,12 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                     get_eth_connector_contract_account(&self.io)?,
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
-                    WithdrawCallArgs {
-                        recipient_address,
-                        amount: NEP141Wei::new(context.apparent_value.as_u128()),
-                    }
-                    .try_to_vec()
-                    .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
+                    format!(
+                        r#"{{"amount": "{}", "recipient": "{}"}}"#,
+                        context.apparent_value.as_u128(),
+                        recipient_address.encode(),
+                    )
+                    .into_bytes(),
                     events::ExitToEth {
                         sender: Address::new(context.caller),
                         erc20_address: events::ETH_ADDRESS,
