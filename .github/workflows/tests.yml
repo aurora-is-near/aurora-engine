@@ -33,16 +33,12 @@ jobs:
         run: cargo make test-contracts
       - name: Build mainnet test WASM
         run: cargo make --profile mainnet build-test
-      - name: WASM opt mainnet
-        run: cargo make --profile mainnet wasm-opt-test
       - name: List mainnet WASM directory and root directory
         run: ls -la target/wasm32-unknown-unknown/release && ls -la
       - name: Test mainnet
         run: cargo make --profile mainnet test-workspace
       - name: Build testnet test WASM
         run: cargo make --profile testnet build-test
-      - name: WASM opt testnet
-        run: cargo make --profile testnet wasm-opt-test
       - name: List testnet WASM directory and root directory
         run: ls -la target/wasm32-unknown-unknown/release && ls -la
       - name: Test testnet
