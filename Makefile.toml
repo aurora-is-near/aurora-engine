@@ -291,7 +291,7 @@ category = "Build"
 script = '''
   filesize_before=$(wc -c bin/${WASM_FILE_TEST} | awk '{print $1}')
   wasm-opt -O4 bin/${WASM_FILE_TEST} -o bin/${WASM_FILE_TEST} --strip-debug --vacuum
-  filesize_after=$(wc -c bin/${WASM_FILE_TEST±±±±} | awk '{print $1}')
+  filesize_after=$(wc -c bin/${WASM_FILE_TEST} | awk '{print $1}')
   echo "File size before: [$filesize_before] and after: [$filesize_after]"
 '''
 
