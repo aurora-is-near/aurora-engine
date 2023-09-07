@@ -285,6 +285,15 @@ env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATUR
 category = "Build"
 run_task = "build-engine-flow"
 
+[tasks.wasm-opt-test]
+category = "Build"
+script = '''
+  filesize_before=$(wc -c bin/aurora-mainnet-test.wasm | awk '{print $1}')
+  wasm-opt -O4 bin/aurora-mainnet-test.wasm -o bin/aurora-mainnet-test.wasm --strip-debug --vacuum
+  filesize_after=$(wc -c bin/aurora-mainnet-test.wasm | awk '{print $1}')
+  echo "File size before: [$filesize_before] and after: [$filesize_after]"
+'''
+
 [tasks.build]
 condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
@@ -351,6 +360,7 @@ args = [
 category = "Test"
 dependencies = [
     "build-test",
+    "wasm-opt-test",
     "test-contracts",
     "test-workspace",
     "bench-modexp",
