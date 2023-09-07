@@ -6,7 +6,7 @@ use crate::prelude::{
     sdk::io::{StorageIntermediate, IO},
     storage::{bytes_to_key, KeyPrefix},
     types::{Address, Yocto},
-    vec, BorshDeserialize, BorshSerialize, Cow, ToString, Vec, U256,
+    vec, BorshSerialize, Cow, ToString, Vec, U256,
 };
 #[cfg(feature = "error_refund")]
 use crate::prelude::{
@@ -246,23 +246,25 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
 }
 
 fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
-    get_eth_connector_value_by_suffix(io, EthConnectorStorageId::EthConnectorAccount)
+    io.read_storage(&construct_contract_key(
+        EthConnectorStorageId::EthConnectorAccount,
+    ))
+    .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
+    .and_then(|x| {
+        x.to_value()
+            .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
+    })
 }
 
 fn get_withdraw_serialize_type<I: IO>(io: &I) -> Result<WithdrawSerializeType, ExitError> {
-    get_eth_connector_value_by_suffix(io, EthConnectorStorageId::WithdrawSerializationType)
-}
-
-fn get_eth_connector_value_by_suffix<I: IO, T: BorshDeserialize>(
-    io: &I,
-    suffix: EthConnectorStorageId,
-) -> Result<T, ExitError> {
-    io.read_storage(&construct_contract_key(suffix))
-        .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
-        .and_then(|x| {
-            x.to_value()
-                .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
-        })
+    io.read_storage(&construct_contract_key(
+        EthConnectorStorageId::WithdrawSerializationType,
+    ))
+    .map_or(Ok(WithdrawSerializeType::Borsh), |value| {
+        value
+            .to_value()
+            .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
+    })
 }
 
 fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
