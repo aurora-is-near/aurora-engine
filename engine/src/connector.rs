@@ -15,7 +15,7 @@ use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
-use aurora_engine_types::parameters::connector::Proof;
+use aurora_engine_types::parameters::connector::{Proof, WithdrawSerializeType};
 use aurora_engine_types::parameters::engine::errors::ParseArgsError;
 use aurora_engine_types::types::ZERO_WEI;
 use error::DepositError;
@@ -308,13 +308,26 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
 impl<I: IO + Copy> AdminControlled for EthConnectorContract<I> {
     fn get_eth_connector_contract_account(&self) -> AccountId {
-        get_contract_data(&self.io, EthConnectorStorageId::EthConnectorAccount).unwrap()
+        get_contract_data(&self.io, EthConnectorStorageId::EthConnectorAccount)
+            .expect("ERROR GETTING ETH CONNECTOR ACCOUNT ID")
     }
 
     fn set_eth_connector_contract_account(&mut self, account: &AccountId) {
         self.io.write_borsh(
             &construct_contract_key(EthConnectorStorageId::EthConnectorAccount),
             account,
+        );
+    }
+
+    fn get_withdraw_serialize_type(&self) -> WithdrawSerializeType {
+        get_contract_data(&self.io, EthConnectorStorageId::WithdrawSerializationType)
+            .expect("ERROR GETTING WITHDRAW SERIALIZE TYPE")
+    }
+
+    fn set_withdraw_serialize_type(&mut self, serialize_type: &WithdrawSerializeType) {
+        self.io.write_borsh(
+            &construct_contract_key(EthConnectorStorageId::WithdrawSerializationType),
+            serialize_type,
         );
     }
 }

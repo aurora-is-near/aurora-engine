@@ -2,6 +2,7 @@ use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SetEthConnectorContractAccountArgs, SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::parameters::connector::WithdrawSerializeType;
 use aurora_engine_types::parameters::engine::LegacyNewCallArgs;
 use aurora_engine_types::parameters::silo::FixedGasCostArgs;
 use aurora_engine_types::types::PromiseResult;
@@ -619,6 +620,7 @@ pub fn deploy_runner() -> AuroraRunner {
 
     let args = SetEthConnectorContractAccountArgs {
         account: AccountId::new("aurora_eth_connector.root").unwrap(),
+        withdraw_serialize_type: WithdrawSerializeType::Borsh,
     };
     let result = runner.call(
         "set_eth_connector_contract_account",

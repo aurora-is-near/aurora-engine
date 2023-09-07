@@ -1058,10 +1058,10 @@ mod contract {
         }
 
         let args: SetEthConnectorContractAccountArgs = io.read_input_borsh().sdk_unwrap();
+        let mut connector = EthConnectorContract::init_instance(io).sdk_unwrap();
 
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .set_eth_connector_contract_account(&args.account);
+        connector.set_eth_connector_contract_account(&args.account);
+        connector.set_withdraw_serialize_type(&args.withdraw_serialize_type);
     }
 
     #[no_mangle]

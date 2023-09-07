@@ -165,6 +165,13 @@ pub struct StorageUnregisterCallArgs {
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct SetEthConnectorContractAccountArgs {
     pub account: AccountId,
+    pub withdraw_serialize_type: WithdrawSerializeType,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub enum WithdrawSerializeType {
+    Json,
+    Borsh,
 }
 
 pub type PausedMask = u8;

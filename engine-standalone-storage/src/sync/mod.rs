@@ -659,6 +659,7 @@ fn non_submit_execute<I: IO + Copy, M: ModExpAlgorithm + 'static>(
 
             let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io)?;
             connector.set_eth_connector_contract_account(&args.account);
+            connector.set_withdraw_serialize_type(&args.withdraw_serialize_type);
 
             None
         }

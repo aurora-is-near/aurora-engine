@@ -21,7 +21,10 @@ use crate::operation::{
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, PausedMask, Proof};
+use aurora_engine_types::parameters::connector::{
+    FungibleTokenMetadata, PausedMask, Proof, SetEthConnectorContractAccountArgs,
+    WithdrawSerializeType,
+};
 use aurora_engine_types::parameters::engine::{
     CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs, RelayerKeyManagerArgs,
 };
@@ -168,8 +171,14 @@ impl EngineContract {
     pub fn set_eth_connector_contract_account(
         &self,
         account_id: AccountId,
+        withdraw_serialize_type: WithdrawSerializeType,
     ) -> CallSetEthConnectorContractAccount {
-        CallSetEthConnectorContractAccount::call(&self.contract).args_borsh(account_id)
+        CallSetEthConnectorContractAccount::call(&self.contract).args_borsh(
+            SetEthConnectorContractAccountArgs {
+                account: account_id,
+                withdraw_serialize_type,
+            },
+        )
     }
 
     pub fn factory_update_address_version(
