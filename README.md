@@ -27,6 +27,7 @@ documentation.
 
 - Node.js (v14+)
 - cargo-make
+- wasm-opt (<= v110)
 
 ```sh
 cargo install --force cargo-make
@@ -37,6 +38,27 @@ cargo install --force cargo-make
 - Node.js (v14+)
 - Docker
 - cargo-make
+- wasm-opt (<= v110)
+
+### Prerequisite wasm-opt
+
+For WebAssembly optimization we use `wasm-opt`.
+The supported version of [Binaryen toolchain for WebAssembly](https://github.com/WebAssembly/binaryen)
+is `<= v110`. A higher version is not supported.
+
+We recommend installing the release:
+https://github.com/WebAssembly/binaryen/releases/tag/version_110
+
+`wasm-opt` command should be available for the build process.
+
+Verify version:
+
+```bash
+$ wasm-opt --version
+wasm-opt version 110 (version_110)
+```
+
+Please keep in mind, that `wasm-opt` runs automatically when you run `cargo make build-*` and `cargo make test` commands.
 
 ## Development
 
@@ -123,6 +145,20 @@ For example the following command will run the checks. `profile` is not required
 here:
 ```
 cargo make check
+```
+
+#### Running WebAssembly optimization
+
+In common cases, you don't need to run `wasm-opt` manually, because
+it's part of builds and tests.
+
+But for development reasons only you can run:
+- `wasm-opt` , runs WebAssembly optimization for pre-build wasm files for specific profile. Requires a
+  `--profile` argument.
+
+For example, the following will run wasm-opt for pre-build mainnet binary:
+```sh
+cargo make --profile mainnet wasm-opt 
 ```
 
 #### Cleanup

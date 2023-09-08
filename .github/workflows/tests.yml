@@ -22,11 +22,7 @@ jobs:
       - name: Preparing rocksdb library
         run: scripts/ci/build_rocksdb.sh
       - name: Install wasm-opt
-        run: |
-          mkdir binaryen
-          curl -L https://github.com/WebAssembly/binaryen/releases/download/version_110/binaryen-version_110-x86_64-linux.tar.gz | tar -xz -C binaryen
-          cp binaryen/binaryen-version_110/bin/* /usr/local/bin
-          rm -rf binaryen
+        run: scripts/ci/install-wasm-opt.sh
       - name: Build contracts
         run: cargo make build-contracts
       - name: Test contracts
@@ -61,6 +57,8 @@ jobs:
           cache-util restore aurora-engine-target@modexp@${{ hashFiles('**/Cargo.lock') }}:target
       - name: Preparing rocksdb library
         run: scripts/ci/build_rocksdb.sh
+      - name: Install wasm-opt
+        run: scripts/ci/install-wasm-opt.sh
       - name: Test mainnet bench-modexp
         run: cargo make --profile mainnet bench-modexp
       - name: Test testnet bench-modexp
