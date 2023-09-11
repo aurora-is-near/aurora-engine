@@ -15,7 +15,7 @@ pub mod evm_transactions;
 pub mod xcc;
 
 pub struct ContractError {
-    pub message: Box<dyn AsRef<[u8]>>,
+    pub message: Box<dyn AsRef<[u8]> + Send + Sync>,
 }
 
 impl ContractError {
@@ -37,7 +37,7 @@ impl fmt::Debug for ContractError {
     }
 }
 
-impl<T: AsRef<[u8]> + 'static> From<T> for ContractError {
+impl<T: AsRef<[u8]> + Send + Sync + 'static> From<T> for ContractError {
     fn from(value: T) -> Self {
         Self {
             message: Box::new(value),
