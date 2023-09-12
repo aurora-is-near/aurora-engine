@@ -205,19 +205,20 @@ pub fn parse_transaction_kind(
             TransactionKind::SetKeyManager(args)
         }
         TransactionKindTag::AddRelayerKey => {
-            let args =
-                aurora_engine::parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::AddRelayerKey(args)
         }
         TransactionKindTag::RemoveRelayerKey => {
-            let args =
-                aurora_engine::parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::RemoveRelayerKey(args)
         }
         TransactionKindTag::StartHashchain => {
-            let args =
-                aurora_engine::parameters::StartHashchainArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = parameters::StartHashchainArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::StartHashchain(args)
+        }
+        TransactionKindTag::SetErc20Metadata => {
+            let args = parameters::SetErc20MetadataArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetErc20Metadata(args)
         }
         TransactionKindTag::Unknown => {
             return Err(ParseTransactionKindError::UnknownMethodName {
@@ -608,6 +609,12 @@ fn non_submit_execute<I: IO + Copy>(
         }
         TransactionKind::StartHashchain(_) => {
             contract_methods::admin::start_hashchain(io, env)?;
+
+            None
+        }
+        TransactionKind::SetErc20Metadata(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::connector::set_erc20_metadata(io, env, &mut handler)?;
 
             None
         }

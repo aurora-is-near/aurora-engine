@@ -47,7 +47,7 @@ impl<T: AsRef<[u8]> + Send + Sync + 'static> From<T> for ContractError {
 
 /// This type is structurally the same as `ContractError`, but
 /// importantly `ContractError` implements `From<T: AsRef<[u8]>>`
-/// for easy usage in the this module's function implementations, while
+/// for easy usage in this module's function implementations, while
 /// `ErrorMessage` implements `AsRef<[u8]>` for compatibility with
 /// `sdk_unwrap`.
 pub struct ErrorMessage {
@@ -60,14 +60,14 @@ impl AsRef<[u8]> for ErrorMessage {
     }
 }
 
-fn require_running(state: &crate::state::EngineState) -> Result<(), ContractError> {
+fn require_running(state: &state::EngineState) -> Result<(), ContractError> {
     if state.is_paused {
         return Err(errors::ERR_PAUSED.into());
     }
     Ok(())
 }
 
-fn require_paused(state: &crate::state::EngineState) -> Result<(), ContractError> {
+fn require_paused(state: &state::EngineState) -> Result<(), ContractError> {
     if !state.is_paused {
         return Err(errors::ERR_RUNNING.into());
     }
@@ -75,7 +75,7 @@ fn require_paused(state: &crate::state::EngineState) -> Result<(), ContractError
 }
 
 fn require_owner_only(
-    state: &crate::state::EngineState,
+    state: &state::EngineState,
     predecessor_account_id: &AccountId,
 ) -> Result<(), ContractError> {
     if &state.owner_id != predecessor_account_id {

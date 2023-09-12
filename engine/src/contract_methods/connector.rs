@@ -17,8 +17,8 @@ use aurora_engine_types::{
     parameters::{
         connector::{
             InitCallArgs, NEP141FtOnTransferArgs, ResolveTransferCallArgs, SetContractDataCallArgs,
-            StorageDepositCallArgs, StorageWithdrawCallArgs, TransferCallArgs,
-            TransferCallCallArgs,
+            SetErc20MetadataArgs, StorageDepositCallArgs, StorageWithdrawCallArgs,
+            TransferCallArgs, TransferCallCallArgs,
         },
         engine::{
             errors::ParseTypeFromJsonError, DeployErc20TokenArgs, PauseEthConnectorCallArgs,
@@ -403,4 +403,56 @@ pub fn set_paused_flags<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), Cont
         EthConnectorContract::init_instance(io)?.set_paused_flags(&args);
         Ok(())
     })
+}
+
+#[named]
+pub fn set_erc20_metadata<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<SubmitResult, ContractError> {
+    with_hashchain(io, env, function_name!(), |io| {
+        let state = state::get_state(&io)?;
+        require_running(&state)?;
+        // TODO: Define special role for this transaction. Potentially via multisig?
+        let is_private = env.assert_private_call();
+        if is_private.is_err() {
+            require_owner_only(&state, &env.predecessor_account_id())?;
+        }
+
+        let args: SetErc20MetadataArgs = io.read_input_borsh()?;
+        let current_account_id = env.current_account_id();
+        let mut engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
+            state,
+            predecessor_address(&env.predecessor_account_id()),
+            current_account_id,
+            io,
+            env,
+        );
+        let result = engine.set_erc20_metadata(args.erc20_address, args.erc20_metadata, handler)?;
+
+        Ok(result)
+    })
+}
+
+pub fn get_erc20_metadata<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), ContractError> {
+    let erc20_address = io.read_input_arr20().map(Address::from_array)?;
+    let state = state::get_state(&io)?;
+    let current_account_id = env.current_account_id();
+    let engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
+        state,
+        predecessor_address(&env.predecessor_account_id()),
+        current_account_id,
+        io,
+        env,
+    );
+    let metadata = engine.get_erc20_metadata(erc20_address)?;
+
+    io.return_output(
+        metadata
+            .try_to_vec()
+            .map_err(|_| errors::ERR_SERIALIZE)?
+            .as_slice(),
+    );
+    Ok(())
 }

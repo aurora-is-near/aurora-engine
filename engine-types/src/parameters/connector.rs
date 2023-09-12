@@ -220,6 +220,36 @@ impl rlp::Encodable for LogEntry {
     }
 }
 
+/// Borsh-encoded parameters for `set_erc20_metadata` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+pub struct SetErc20MetadataArgs {
+    /// Address of the ERC-20 contract.
+    pub erc20_address: Address,
+    /// Metadata of the ERC-20 contract.
+    pub erc20_metadata: Erc20Metadata,
+}
+
+/// Metadata of ERC-20 contract.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+pub struct Erc20Metadata {
+    /// Name of the token.
+    pub name: String,
+    /// Symbol of the token.
+    pub symbol: String,
+    /// Number of decimals.
+    pub decimals: u8,
+}
+
+impl Default for Erc20Metadata {
+    fn default() -> Self {
+        Self {
+            name: "Token".to_string(),
+            symbol: "TKN".to_string(),
+            decimals: 18, // To be compatible with MetaMask.
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
