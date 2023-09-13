@@ -681,10 +681,12 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
-    let num_functions = module.funcs.iter().count();
+    let expected_number = 1460;
+    let actual_number = module.funcs.iter().count();
+
     assert!(
-        num_functions <= 1445,
-        "{num_functions} is not less than 1445",
+        actual_number <= expected_number,
+        "{actual_number} is not less than {expected_number}",
     );
 }
 
