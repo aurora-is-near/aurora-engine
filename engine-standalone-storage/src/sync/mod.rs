@@ -217,7 +217,10 @@ pub fn parse_transaction_kind(
             TransactionKind::StartHashchain(args)
         }
         TransactionKindTag::SetErc20Metadata => {
-            let args = parameters::SetErc20MetadataArgs::try_from_slice(&bytes).map_err(f)?;
+            let args: parameters::SetErc20MetadataArgs =
+                serde_json::from_slice(&bytes).map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
             TransactionKind::SetErc20Metadata(args)
         }
         TransactionKindTag::Unknown => {

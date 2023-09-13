@@ -420,7 +420,8 @@ pub fn set_erc20_metadata<I: IO + Copy, E: Env, H: PromiseHandler>(
             require_owner_only(&state, &env.predecessor_account_id())?;
         }
 
-        let args: SetErc20MetadataArgs = io.read_input_borsh()?;
+        let args: SetErc20MetadataArgs = serde_json::from_slice(&io.read_input().to_vec())
+            .map_err(Into::<ParseTypeFromJsonError>::into)?;
         let current_account_id = env.current_account_id();
         let mut engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
             state,
@@ -448,11 +449,6 @@ pub fn get_erc20_metadata<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<()
     );
     let metadata = engine.get_erc20_metadata(erc20_address)?;
 
-    io.return_output(
-        metadata
-            .try_to_vec()
-            .map_err(|_| errors::ERR_SERIALIZE)?
-            .as_slice(),
-    );
+    io.return_output(&serde_json::to_vec(&metadata).map_err(|_| errors::ERR_SERIALIZE)?);
     Ok(())
 }

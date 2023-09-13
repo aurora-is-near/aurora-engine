@@ -537,7 +537,7 @@ impl TransactionKind {
                 args.try_to_vec().unwrap_or_default()
             }
             Self::StartHashchain(args) => args.try_to_vec().unwrap_or_default(),
-            Self::SetErc20Metadata(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetErc20Metadata(args) => serde_json::to_vec(args).unwrap_or_default(),
         }
     }
 }

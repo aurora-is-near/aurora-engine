@@ -220,8 +220,8 @@ impl rlp::Encodable for LogEntry {
     }
 }
 
-/// Borsh-encoded parameters for `set_erc20_metadata` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+/// Parameters for `set_erc20_metadata` function.
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SetErc20MetadataArgs {
     /// Address of the ERC-20 contract.
     pub erc20_address: Address,
@@ -230,7 +230,7 @@ pub struct SetErc20MetadataArgs {
 }
 
 /// Metadata of ERC-20 contract.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Erc20Metadata {
     /// Name of the token.
     pub name: String,
@@ -243,9 +243,9 @@ pub struct Erc20Metadata {
 impl Default for Erc20Metadata {
     fn default() -> Self {
         Self {
-            name: "Token".to_string(),
-            symbol: "TKN".to_string(),
-            decimals: 18, // To be compatible with MetaMask.
+            name: "Empty".to_string(),
+            symbol: "EMPTY".to_string(),
+            decimals: 0,
         }
     }
 }

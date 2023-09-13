@@ -8,7 +8,6 @@ use crate::utils::{
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::parameters::TransactionStatus;
 use aurora_engine_sdk as sdk;
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::connector::{Erc20Metadata, SetErc20MetadataArgs};
 use bstr::ByteSlice;
 use libsecp256k1::SecretKey;
@@ -252,9 +251,8 @@ fn test_erc20_get_and_set_metadata() {
 
     assert!(result.is_ok());
 
-    let metadata =
-        Erc20Metadata::try_from_slice(result.unwrap().return_data.as_value().unwrap().as_slice())
-            .unwrap();
+    let metadata: Erc20Metadata =
+        serde_json::from_slice(&result.unwrap().return_data.as_value().unwrap()).unwrap();
     assert_eq!(metadata, Erc20Metadata::default());
 
     let new_metadata = Erc20Metadata {
@@ -266,11 +264,10 @@ fn test_erc20_get_and_set_metadata() {
     let result = runner.call(
         "set_erc20_metadata",
         &caller,
-        SetErc20MetadataArgs {
+        serde_json::to_vec(&SetErc20MetadataArgs {
             erc20_address,
             erc20_metadata: new_metadata.clone(),
-        }
-        .try_to_vec()
+        })
         .unwrap(),
     );
     assert!(result.is_ok());
@@ -282,9 +279,8 @@ fn test_erc20_get_and_set_metadata() {
     );
     assert!(result.is_ok());
 
-    let metadata =
-        Erc20Metadata::try_from_slice(result.unwrap().return_data.as_value().unwrap().as_slice())
-            .unwrap();
+    let metadata: Erc20Metadata =
+        serde_json::from_slice(&result.unwrap().return_data.as_value().unwrap()).unwrap();
     assert_eq!(metadata, new_metadata);
 }
 
