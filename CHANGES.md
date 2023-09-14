@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added functions for setting and getting metadata of ERC-20 contracts deployed with `deploy_erc20_token` transaction
+  by [@aleksuss]. ([#837])
+
+[#837]: https://github.com/aurora-is-near/aurora-engine/pull/837
+
 ## [3.0.0] 2023-08-28
 
 ### Fixes
