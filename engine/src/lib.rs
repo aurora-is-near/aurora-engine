@@ -423,6 +423,17 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Set metadata of ERC-20 contract.
+    #[no_mangle]
+    pub extern "C" fn set_erc20_metadata() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::set_erc20_metadata(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     /// Callback invoked by exit to NEAR precompile to handle potential
     /// errors in the exit call.
     #[no_mangle]
@@ -547,6 +558,16 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Return metadata of the ERC-20 contract.
+    #[no_mangle]
+    pub extern "C" fn get_erc20_metadata() {
+        let io = Runtime;
+        let env = ViewEnv;
+        contract_methods::connector::get_erc20_metadata(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     ///
     /// BENCHMARKING METHODS
     ///
@@ -556,7 +577,9 @@ mod contract {
         use crate::prelude::U256;
         let mut io = Runtime;
         let mut state = state::get_state(&io).sdk_unwrap();
-        require_owner_only(&state, &io.predecessor_account_id());
+        if state.owner_id != io.predecessor_account_id() {
+            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
+        }
         let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
         state.chain_id = args.chain_id;
         state::set_state(&mut io, &state).sdk_unwrap();
@@ -577,7 +600,9 @@ mod contract {
     pub extern "C" fn begin_block() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        require_owner_only(&state, &io.predecessor_account_id());
+        if state.owner_id != io.predecessor_account_id() {
+            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
+        }
         let _args: BeginBlockArgs = io.read_input_borsh().sdk_unwrap();
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }

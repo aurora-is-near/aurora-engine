@@ -145,6 +145,8 @@ pub enum TransactionKind {
     /// Remove the relayer public function call access key
     RemoveRelayerKey(parameters::RelayerKeyArgs),
     StartHashchain(parameters::StartHashchainArgs),
+    /// Set metadata of ERC-20 contract.
+    SetErc20Metadata(parameters::SetErc20MetadataArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -374,6 +376,7 @@ impl TransactionKind {
             Self::AddRelayerKey(_) => Self::no_evm_execution("add_relayer_key"),
             Self::RemoveRelayerKey(_) => Self::no_evm_execution("remove_relayer_key"),
             Self::StartHashchain(_) => Self::no_evm_execution("start_hashchain"),
+            Self::SetErc20Metadata(_) => Self::no_evm_execution("set_erc20_metadata"),
         }
     }
 
@@ -484,6 +487,8 @@ pub enum TransactionKindTag {
     RemoveRelayerKey,
     #[strum(serialize = "start_hashchain")]
     StartHashchain,
+    #[strum(serialize = "set_erc20_metadata")]
+    SetErc20Metadata,
     Unknown,
 }
 
@@ -532,6 +537,7 @@ impl TransactionKind {
                 args.try_to_vec().unwrap_or_default()
             }
             Self::StartHashchain(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetErc20Metadata(args) => serde_json::to_vec(args).unwrap_or_default(),
         }
     }
 }
@@ -575,6 +581,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::AddRelayerKey(_) => Self::AddRelayerKey,
             TransactionKind::RemoveRelayerKey(_) => Self::RemoveRelayerKey,
             TransactionKind::StartHashchain(_) => Self::StartHashchain,
+            TransactionKind::SetErc20Metadata(_) => Self::SetErc20Metadata,
             TransactionKind::Unknown => Self::Unknown,
         }
     }
@@ -755,6 +762,7 @@ enum BorshableTransactionKind<'a> {
     AddRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
     RemoveRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
     StartHashchain(Cow<'a, parameters::StartHashchainArgs>),
+    SetErc20Metadata(Cow<'a, parameters::SetErc20MetadataArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -807,6 +815,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::AddRelayerKey(x) => Self::AddRelayerKey(Cow::Borrowed(x)),
             TransactionKind::RemoveRelayerKey(x) => Self::RemoveRelayerKey(Cow::Borrowed(x)),
             TransactionKind::StartHashchain(x) => Self::StartHashchain(Cow::Borrowed(x)),
+            TransactionKind::SetErc20Metadata(x) => Self::SetErc20Metadata(Cow::Borrowed(x)),
         }
     }
 }
@@ -880,6 +889,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::RemoveRelayerKey(x.into_owned()))
             }
             BorshableTransactionKind::StartHashchain(x) => Ok(Self::StartHashchain(x.into_owned())),
+            BorshableTransactionKind::SetErc20Metadata(x) => {
+                Ok(Self::SetErc20Metadata(x.into_owned()))
+            }
         }
     }
 }
