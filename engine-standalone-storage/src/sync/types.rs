@@ -784,6 +784,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
 /// Same as `TransactionKind`, but with `Submit` variant replaced with raw bytes
 /// so that it can derive the Borsh traits. All non-copy elements are `Cow` also
 /// so that this type can be cheaply created from a `TransactionKind` reference.
+/// !!!!! New types of transactions must be added in the end of the enum. !!!!!!
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
 enum BorshableTransactionKind<'a> {
     Submit(Cow<'a, Vec<u8>>),
@@ -817,7 +818,6 @@ enum BorshableTransactionKind<'a> {
     PausePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
-    SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccount(Cow<'a, FundXccArgs>),
@@ -835,6 +835,7 @@ enum BorshableTransactionKind<'a> {
     AddEntryToWhitelistBatch(Cow<'a, Vec<silo::WhitelistArgs>>),
     RemoveEntryFromWhitelist(Cow<'a, silo::WhitelistArgs>),
     SetWhitelistStatus(Cow<'a, silo::WhitelistStatusArgs>),
+    SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {

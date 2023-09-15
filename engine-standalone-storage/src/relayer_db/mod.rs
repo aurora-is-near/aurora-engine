@@ -124,7 +124,7 @@ where
                 if tx_succeeded {
                     println!(
                         "WARN: Transaction with NEAR hash {near_tx_hash:?} expected to succeed, but failed with error message {e:?}",
-					);
+                    );
                 }
                 continue;
             }
@@ -133,7 +133,7 @@ where
                     println!(
                         "WARN: Transaction with NEAR hash {near_tx_hash:?} expected to succeed, but failed with error message {:?}",
                         result.status
-					);
+                    );
                     continue;
                 }
                 // if result.status.is_fail() && !tx_succeeded then this is consistent; we
