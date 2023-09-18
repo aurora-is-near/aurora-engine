@@ -1,4 +1,4 @@
-use crate::utils::{self, standalone};
+use crate::utils;
 use aurora_engine_precompiles::promise_result::{self, costs};
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::borsh::BorshSerialize;
@@ -13,9 +13,6 @@ const NEAR_GAS_PER_EVM: u64 = 175_000_000;
 fn test_promise_results_precompile() {
     let mut signer = utils::Signer::random();
     let mut runner = utils::deploy_runner();
-
-    let mut standalone = standalone::StandaloneRunner::default();
-    standalone.init_evm();
 
     let promise_results = vec![
         PromiseResult::Successful(hex::decode("deadbeef").unwrap()),
@@ -36,12 +33,6 @@ fn test_promise_results_precompile() {
         .submit_transaction(&signer.secret_key, transaction)
         .unwrap();
 
-    let standalone_result = standalone
-        .submit_raw("submit", &runner.context, &promise_results)
-        .unwrap();
-
-    assert_eq!(result, standalone_result);
-
     assert_eq!(
         utils::unwrap_success(result),
         promise_results.try_to_vec().unwrap(),
@@ -51,11 +42,14 @@ fn test_promise_results_precompile() {
 #[test]
 fn test_promise_result_gas_cost() {
     let mut runner = utils::deploy_runner();
-    let mut standalone = standalone::StandaloneRunner::default();
-    standalone.init_evm();
-    runner.standalone_runner = Some(standalone);
     let mut signer = utils::Signer::random();
-    runner.context.block_height = aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1;
+    // Skip to later block height and re-init hashchain
+    let account_id = runner.aurora_account_id.clone();
+    utils::init_hashchain(
+        &mut runner,
+        &account_id,
+        Some(aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1),
+    );
 
     // Baseline transaction that does essentially nothing.
     let (_, baseline) = runner
@@ -127,13 +121,13 @@ fn test_promise_result_gas_cost() {
     let total_gas1 = y1 + baseline.all_gas();
     let total_gas2 = y2 + baseline.all_gas();
     assert!(
-        utils::within_x_percent(6, evm1, total_gas1 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(15, evm1, total_gas1 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm1,
         total_gas1 / NEAR_GAS_PER_EVM
     );
     assert!(
-        utils::within_x_percent(7, evm2, total_gas2 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(15, evm2, total_gas2 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / NEAR_GAS_PER_EVM

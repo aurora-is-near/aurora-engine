@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changes
 
+- Added functions for setting and getting metadata of ERC-20 contracts deployed with `deploy_erc20_token` transaction
+  by [@aleksuss]. ([#837])
+
 - Changed structure `SetEthConnectorContractAccountArgs` for setting eth connector account. It was extended with
  additional field: `withdraw_serialize_type` for defining serialization type for withdraw arguments by [@aleksuss]. ([#834]) 
 
+[#837]: https://github.com/aurora-is-near/aurora-engine/pull/837
 [#834]: https://github.com/aurora-is-near/aurora-engine/pull/834
 
 ## [3.0.0] 2023-08-28
@@ -537,12 +541,13 @@ struct SubmitResult {
 [@andrcmdr]: https://github.com/andrcmdr
 [@birchmd]: https://github.com/birchmd
 [@Casuso]: https://github.com/Casuso
+[@guidovranken]: https://github.com/guidovranken
 [@hskang9]: https://github.com/hskang9
 [@joshuajbouw]: https://github.com/joshuajbouw
 [@mandreyel]: https://github.com/mandreyel
+[@matklad]: https://github.com/matklad
 [@mfornet]: https://github.com/mfornet
 [@mrLSD]: https://github.com/mrLSD
+[@olonho]: https://github.com/olonho
 [@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
-[@matklad]: https://github.com/matklad
-[@olonho]: https://github.com/olonho

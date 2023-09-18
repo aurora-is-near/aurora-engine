@@ -169,7 +169,7 @@ fn repro_common(context: &ReproContext) {
 
     // Also validate the SubmitResult in the standalone engine
     let mut standalone = standalone::StandaloneRunner::default();
-    json_snapshot::initialize_engine_state(&mut standalone.storage, snapshot).unwrap();
+    json_snapshot::initialize_engine_state(&standalone.storage, snapshot).unwrap();
     let standalone_result = standalone
         .submit_raw("submit", &runner.context, &[])
         .unwrap();

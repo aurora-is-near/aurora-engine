@@ -50,6 +50,8 @@ pub struct TransactionMessage {
     /// Results from previous NEAR receipts
     /// (only present when this transaction is a callback of another transaction).
     pub promise_data: Vec<Option<Vec<u8>>>,
+    /// Raw bytes passed as input when executed in the Near Runtime.
+    pub raw_input: Vec<u8>,
 }
 
 impl TransactionMessage {
@@ -145,6 +147,9 @@ pub enum TransactionKind {
     AddRelayerKey(parameters::RelayerKeyArgs),
     /// Remove the relayer public function call access key
     RemoveRelayerKey(parameters::RelayerKeyArgs),
+    StartHashchain(parameters::StartHashchainArgs),
+    /// Set metadata of ERC-20 contract.
+    SetErc20Metadata(parameters::SetErc20MetadataArgs),
     /// Silo operations
     SetFixedGasCost(silo::FixedGasCostArgs),
     SetSiloParams(Option<silo::SiloParamsArgs>),
@@ -384,6 +389,8 @@ impl TransactionKind {
             Self::SetKeyManager(_) => Self::no_evm_execution("set_key_manager"),
             Self::AddRelayerKey(_) => Self::no_evm_execution("add_relayer_key"),
             Self::RemoveRelayerKey(_) => Self::no_evm_execution("remove_relayer_key"),
+            Self::StartHashchain(_) => Self::no_evm_execution("start_hashchain"),
+            Self::SetErc20Metadata(_) => Self::no_evm_execution("set_erc20_metadata"),
             Self::SetFixedGasCost(_) => Self::no_evm_execution("set_fixed_gas_cost"),
             Self::SetSiloParams(_) => Self::no_evm_execution("set_silo_params"),
             Self::AddEntryToWhitelist(_) => Self::no_evm_execution("add_entry_to_whitelist"),
@@ -502,6 +509,10 @@ pub enum TransactionKindTag {
     AddRelayerKey,
     #[strum(serialize = "remove_relayer_key")]
     RemoveRelayerKey,
+    #[strum(serialize = "start_hashchain")]
+    StartHashchain,
+    #[strum(serialize = "set_erc20_metadata")]
+    SetErc20Metadata,
     #[strum(serialize = "set_eth_connector_contract_account")]
     SetEthConnectorContractAccount,
     #[strum(serialize = "disable_legacy_nep141")]
@@ -519,6 +530,58 @@ pub enum TransactionKindTag {
     #[strum(serialize = "remove_entry_from_whitelist")]
     RemoveEntryFromWhitelist,
     Unknown,
+}
+
+impl TransactionKind {
+    #[must_use]
+    pub fn raw_bytes(&self) -> Vec<u8> {
+        match self {
+            Self::Submit(tx) => tx.into(),
+            Self::SubmitWithArgs(args) => args.try_to_vec().unwrap_or_default(),
+            Self::Call(args) => args.try_to_vec().unwrap_or_default(),
+            Self::PausePrecompiles(args) | Self::ResumePrecompiles(args) => {
+                args.try_to_vec().unwrap_or_default()
+            }
+            Self::Deploy(bytes) | Self::Deposit(bytes) | Self::FactoryUpdate(bytes) => {
+                bytes.clone()
+            }
+            Self::DeployErc20(args) => args.try_to_vec().unwrap_or_default(),
+            Self::FtOnTransfer(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::FtTransferCall(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::FinishDeposit(args) => args.try_to_vec().unwrap_or_default(),
+            Self::ResolveTransfer(args, _) => args.try_to_vec().unwrap_or_default(),
+            Self::FtTransfer(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::Withdraw(args) => args.try_to_vec().unwrap_or_default(),
+            Self::StorageDeposit(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::StorageUnregister(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::StorageWithdraw(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::SetOwner(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetUpgradeDelayBlocks(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetPausedFlags(args) => args.try_to_vec().unwrap_or_default(),
+            Self::RegisterRelayer(address) | Self::FactorySetWNearAddress(address) => {
+                address.as_bytes().to_vec()
+            }
+            Self::RefundOnError(maybe_args) => maybe_args
+                .as_ref()
+                .and_then(|args| args.try_to_vec().ok())
+                .unwrap_or_default(),
+            Self::NewConnector(args) | Self::SetConnectorData(args) => {
+                args.try_to_vec().unwrap_or_default()
+            }
+            Self::NewEngine(args) => args.try_to_vec().unwrap_or_default(),
+            Self::FactoryUpdateAddressVersion(args) => args.try_to_vec().unwrap_or_default(),
+            Self::FundXccSubAccound(args) => args.try_to_vec().unwrap_or_default(),
+            Self::PauseContract | Self::ResumeContract | Self::Unknown => Vec::new(),
+            Self::SetKeyManager(args) => args.try_to_vec().unwrap_or_default(),
+            Self::AddRelayerKey(args) | Self::RemoveRelayerKey(args) => {
+                args.try_to_vec().unwrap_or_default()
+            }
+            Self::StartHashchain(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetErc20Metadata(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::SetFixedGasCost(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::SetSiloParams(args) => serde_json::to_vec(args).unwrap_or_default(),
+        }
+    }
 }
 
 /// Used to make sure `TransactionKindTag` is kept in sync with `TransactionKind`
@@ -559,6 +622,8 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::SetKeyManager(_) => Self::SetKeyManager,
             TransactionKind::AddRelayerKey(_) => Self::AddRelayerKey,
             TransactionKind::RemoveRelayerKey(_) => Self::RemoveRelayerKey,
+            TransactionKind::StartHashchain(_) => Self::StartHashchain,
+            TransactionKind::SetErc20Metadata(_) => Self::SetErc20Metadata,
             TransactionKind::SetEthConnectorContractAccount(_) => {
                 Self::SetEthConnectorContractAccount
             }
@@ -593,6 +658,7 @@ impl From<&TransactionKind> for TransactionKindTag {
 enum BorshableTransactionMessage<'a> {
     V1(BorshableTransactionMessageV1<'a>),
     V2(BorshableTransactionMessageV2<'a>),
+    V3(BorshableTransactionMessageV3<'a>),
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -620,9 +686,23 @@ struct BorshableTransactionMessageV2<'a> {
     pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
 }
 
+#[derive(BorshDeserialize, BorshSerialize)]
+struct BorshableTransactionMessageV3<'a> {
+    pub block_hash: [u8; 32],
+    pub near_receipt_id: [u8; 32],
+    pub position: u16,
+    pub succeeded: bool,
+    pub signer: Cow<'a, AccountId>,
+    pub caller: Cow<'a, AccountId>,
+    pub attached_near: u128,
+    pub transaction: BorshableTransactionKind<'a>,
+    pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
+    pub raw_input: Cow<'a, Vec<u8>>,
+}
+
 impl<'a> From<&'a TransactionMessage> for BorshableTransactionMessage<'a> {
     fn from(t: &'a TransactionMessage) -> Self {
-        Self::V2(BorshableTransactionMessageV2 {
+        Self::V3(BorshableTransactionMessageV3 {
             block_hash: t.block_hash.0,
             near_receipt_id: t.near_receipt_id.0,
             position: t.position,
@@ -632,6 +712,7 @@ impl<'a> From<&'a TransactionMessage> for BorshableTransactionMessage<'a> {
             attached_near: t.attached_near,
             transaction: (&t.transaction).into(),
             promise_data: Cow::Borrowed(&t.promise_data),
+            raw_input: Cow::Borrowed(&t.raw_input),
         })
     }
 }
@@ -641,18 +722,39 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
 
     fn try_from(t: BorshableTransactionMessage<'a>) -> Result<Self, Self::Error> {
         match t {
-            BorshableTransactionMessage::V1(t) => Ok(Self {
-                block_hash: H256(t.block_hash),
-                near_receipt_id: H256(t.near_receipt_id),
-                position: t.position,
-                succeeded: t.succeeded,
-                signer: t.signer.into_owned(),
-                caller: t.caller.into_owned(),
-                attached_near: t.attached_near,
-                transaction: t.transaction.try_into()?,
-                promise_data: Vec::new(),
-            }),
-            BorshableTransactionMessage::V2(t) => Ok(Self {
+            BorshableTransactionMessage::V1(t) => {
+                let transaction: TransactionKind = t.transaction.try_into()?;
+                let raw_input = transaction.raw_bytes();
+                Ok(Self {
+                    block_hash: H256(t.block_hash),
+                    near_receipt_id: H256(t.near_receipt_id),
+                    position: t.position,
+                    succeeded: t.succeeded,
+                    signer: t.signer.into_owned(),
+                    caller: t.caller.into_owned(),
+                    attached_near: t.attached_near,
+                    transaction,
+                    promise_data: Vec::new(),
+                    raw_input,
+                })
+            }
+            BorshableTransactionMessage::V2(t) => {
+                let transaction: TransactionKind = t.transaction.try_into()?;
+                let raw_input = transaction.raw_bytes();
+                Ok(Self {
+                    block_hash: H256(t.block_hash),
+                    near_receipt_id: H256(t.near_receipt_id),
+                    position: t.position,
+                    succeeded: t.succeeded,
+                    signer: t.signer.into_owned(),
+                    caller: t.caller.into_owned(),
+                    attached_near: t.attached_near,
+                    transaction,
+                    promise_data: t.promise_data.into_owned(),
+                    raw_input,
+                })
+            }
+            BorshableTransactionMessage::V3(t) => Ok(Self {
                 block_hash: H256(t.block_hash),
                 near_receipt_id: H256(t.near_receipt_id),
                 position: t.position,
@@ -662,6 +764,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
                 attached_near: t.attached_near,
                 transaction: t.transaction.try_into()?,
                 promise_data: t.promise_data.into_owned(),
+                raw_input: t.raw_input.into_owned(),
             }),
         }
     }
@@ -712,6 +815,8 @@ enum BorshableTransactionKind<'a> {
     SetKeyManager(Cow<'a, parameters::RelayerKeyManagerArgs>),
     AddRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
     RemoveRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
+    StartHashchain(Cow<'a, parameters::StartHashchainArgs>),
+    SetErc20Metadata(Cow<'a, parameters::SetErc20MetadataArgs>),
     SetFixedGasCost(Cow<'a, silo::FixedGasCostArgs>),
     SetSiloParams(Cow<'a, Option<silo::SiloParamsArgs>>),
     AddEntryToWhitelist(Cow<'a, silo::WhitelistArgs>),
@@ -773,6 +878,8 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetKeyManager(x) => Self::SetKeyManager(Cow::Borrowed(x)),
             TransactionKind::AddRelayerKey(x) => Self::AddRelayerKey(Cow::Borrowed(x)),
             TransactionKind::RemoveRelayerKey(x) => Self::RemoveRelayerKey(Cow::Borrowed(x)),
+            TransactionKind::StartHashchain(x) => Self::StartHashchain(Cow::Borrowed(x)),
+            TransactionKind::SetErc20Metadata(x) => Self::SetErc20Metadata(Cow::Borrowed(x)),
             TransactionKind::SetFixedGasCost(x) => Self::SetFixedGasCost(Cow::Borrowed(x)),
             TransactionKind::SetSiloParams(x) => Self::SetSiloParams(Cow::Borrowed(x)),
             TransactionKind::AddEntryToWhitelist(x) => Self::AddEntryToWhitelist(Cow::Borrowed(x)),
@@ -858,6 +965,10 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::AddRelayerKey(x) => Ok(Self::AddRelayerKey(x.into_owned())),
             BorshableTransactionKind::RemoveRelayerKey(x) => {
                 Ok(Self::RemoveRelayerKey(x.into_owned()))
+            }
+            BorshableTransactionKind::StartHashchain(x) => Ok(Self::StartHashchain(x.into_owned())),
+            BorshableTransactionKind::SetErc20Metadata(x) => {
+                Ok(Self::SetErc20Metadata(x.into_owned()))
             }
             BorshableTransactionKind::SetFixedGasCost(x) => {
                 Ok(Self::SetFixedGasCost(x.into_owned()))

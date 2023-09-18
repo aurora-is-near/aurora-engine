@@ -9,6 +9,7 @@ publish = false
 
 [workspace.dependencies]
 aurora-engine = { path = "engine", default-features = false }
+aurora-engine-hashchain = { path = "engine-hashchain", default-features = false }
 aurora-engine-precompiles = { path = "engine-precompiles", default-features = false }
 aurora-engine-sdk = { path = "engine-sdk", default-features = false }
 aurora-engine-transactions = { path = "engine-transactions", default-features = false }
@@ -37,6 +38,7 @@ evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.
 evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.3-aurora", default-features = false, features = ["std", "tracing"] }
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.3-aurora", default-features = false, features = ["std", "tracing"] }
 fixed-hash = { version = "0.8.0", default-features = false}
+function_name = "0.3.0"
 git2 = "0.17"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }

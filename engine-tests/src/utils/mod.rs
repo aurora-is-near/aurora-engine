@@ -22,7 +22,11 @@ use near_vm_runner::MockCompiledContractCache;
 use rlp::RlpStream;
 use std::borrow::Cow;
 
-use crate::prelude::parameters::{SubmitResult, TransactionStatus};
+use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
+use crate::prelude::parameters::{
+    InitCallArgs, LegacyNewCallArgs, RelayerKeyManagerArgs, StartHashchainArgs, SubmitResult,
+    TransactionStatus,
+};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -289,11 +293,54 @@ impl AuroraRunner {
             trie.insert(code_key.to_vec(), code);
         }
 
+        /* #[cfg(not(feature = "silo"))]
+        let ft_key = crate::prelude::storage::bytes_to_key(
+            crate::prelude::storage::KeyPrefix::EthConnector,
+            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
+        );
+        let ft_value = {
+            let mut current_ft: FungibleToken = trie
+                .get(&ft_key)
+                .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
+                .unwrap_or_default();
+            current_ft.total_eth_supply_on_near =
+                current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
+            current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
+                + NEP141Wei::new(init_balance.raw().as_u128());
+            current_ft
+        };
+
+        let aurora_balance_key = [
+            ft_key.as_slice(),
+            self.context.current_account_id.as_ref().as_bytes(),
+        ]
+        .concat();
+        let aurora_balance_value = {
+            let mut current_balance: u128 = trie
+                .get(&aurora_balance_key)
+                .map(|bytes| u128::try_from_slice(bytes).unwrap())
+                .unwrap_or_default();
+            current_balance += init_balance.raw().as_u128();
+            current_balance
+        };
+
+        let proof_key = crate::prelude::storage::bytes_to_key(
+            crate::prelude::storage::KeyPrefix::EthConnector,
+            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
+        );
+        */
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         if !init_nonce.is_zero() {
             trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         }
-
+        /* #[cfg(not(feature = "silo"))]
+        trie.insert(ft_key, ft_value.try_to_vec().unwrap());
+        trie.insert(proof_key, vec![0]);
+        trie.insert(
+            aurora_balance_key,
+            aurora_balance_value.try_to_vec().unwrap(),
+        );
+        */
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.env.block_height = self.context.block_height;
             standalone_runner.mint_account(address, init_balance, init_nonce, code);
@@ -606,9 +653,10 @@ impl ExecutionProfile {
 
 pub fn deploy_runner() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
+    let aurora_account_id = str_to_account_id(runner.aurora_account_id.as_str());
     let args = LegacyNewCallArgs {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
-        owner_id: str_to_account_id(runner.aurora_account_id.as_str()),
+        owner_id: aurora_account_id.clone(),
         bridge_prover_id: str_to_account_id("bridge_prover.near"),
         upgrade_delay_blocks: 1,
     };
@@ -618,6 +666,15 @@ pub fn deploy_runner() -> AuroraRunner {
 
     assert!(result.is_ok());
 
+    let args = InitCallArgs {
+        prover_account: str_to_account_id("prover.near"),
+        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+        metadata: FungibleTokenMetadata::default(),
+    };
+
+    let result = runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
+
+    /* Silo mode
     let args = SetEthConnectorContractAccountArgs {
         account: AccountId::new("aurora_eth_connector.root").unwrap(),
         withdraw_serialize_type: WithdrawSerializeType::Borsh,
@@ -627,9 +684,53 @@ pub fn deploy_runner() -> AuroraRunner {
         &account_id,
         args.try_to_vec().unwrap(),
     );
+    */
+
     assert!(result.is_ok());
 
+    // Need to set a key manager because that is the only account that can initialize the hashchain
+    let args = RelayerKeyManagerArgs {
+        key_manager: Some(aurora_account_id),
+    };
+    let result: Result<VMOutcome, EngineError> = runner.call(
+        "set_key_manager",
+        &account_id,
+        serde_json::to_vec(&args).unwrap(),
+    );
+    assert!(result.is_ok());
+
+    init_hashchain(&mut runner, &account_id, None);
+
     runner
+}
+
+pub fn init_hashchain(
+    runner: &mut AuroraRunner,
+    caller_account_id: &str,
+    block_height: Option<u64>,
+) {
+    // Set up hashchain:
+    //   1. Pause contract (hashchain can only be started if contract is paused first)
+    //   2. Start hashchain
+
+    let result: Result<VMOutcome, EngineError> =
+        runner.call("pause_contract", caller_account_id, Vec::new());
+    assert!(result.is_ok());
+
+    if let Some(h) = block_height {
+        runner.context.block_height = h;
+    }
+
+    let args = StartHashchainArgs {
+        block_height: runner.context.block_height,
+        block_hashchain: [0u8; 32],
+    };
+    let result = runner.call(
+        "start_hashchain",
+        caller_account_id,
+        args.try_to_vec().unwrap(),
+    );
+    assert!(result.is_ok());
 }
 
 pub fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
@@ -657,7 +758,7 @@ pub fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> Transa
     let data = hex::decode(init_code)
         .unwrap()
         .into_iter()
-        .chain(contract_bytes.into_iter())
+        .chain(contract_bytes)
         .collect();
 
     TransactionLegacy {
