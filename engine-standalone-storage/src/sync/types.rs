@@ -458,9 +458,9 @@ pub enum TransactionKindTag {
     SetPausedFlags,
     #[strum(serialize = "register_relayer")]
     RegisterRelayer,
-    #[strum(serialize = "refund_on_error")]
-    ExitToNear,
     #[strum(serialize = "exit_to_near_precompile_callback")]
+    ExitToNear,
+    #[strum(serialize = "set_eth_connector_contract_data")]
     SetConnectorData,
     #[strum(serialize = "new_eth_connector")]
     NewConnector,
