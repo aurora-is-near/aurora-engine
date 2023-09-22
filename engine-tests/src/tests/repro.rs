@@ -51,7 +51,7 @@ fn repro_8ru7VEA() {
         block_timestamp: 1_648_829_935_343_349_589,
         input_path: "src/tests/res/input_8ru7VEA.hex",
         evm_gas_used: 1_732_181,
-        near_gas_used: 220,
+        near_gas_used: 219,
     });
 }
 
@@ -71,7 +71,7 @@ fn repro_FRcorNv() {
         block_timestamp: 1_650_960_438_774_745_116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1_239_721,
-        near_gas_used: 179,
+        near_gas_used: 177,
     });
 }
 
@@ -88,7 +88,7 @@ fn repro_5bEgfRQ() {
         block_timestamp: 1_651_073_772_931_594_646,
         input_path: "src/tests/res/input_5bEgfRQ.hex",
         evm_gas_used: 6_414_105,
-        near_gas_used: 654,
+        near_gas_used: 648,
     });
 }
 
@@ -106,7 +106,7 @@ fn repro_D98vwmi() {
         block_timestamp: 1_651_753_443_421_003_245,
         input_path: "src/tests/res/input_D98vwmi.hex",
         evm_gas_used: 1_035_348,
-        near_gas_used: 180,
+        near_gas_used: 179,
     });
 }
 
@@ -169,7 +169,7 @@ fn repro_common(context: &ReproContext) {
 
     // Also validate the SubmitResult in the standalone engine
     let mut standalone = standalone::StandaloneRunner::default();
-    json_snapshot::initialize_engine_state(&mut standalone.storage, snapshot).unwrap();
+    json_snapshot::initialize_engine_state(&standalone.storage, snapshot).unwrap();
     let standalone_result = standalone
         .submit_raw("submit", &runner.context, &[])
         .unwrap();

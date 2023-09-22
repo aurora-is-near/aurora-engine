@@ -318,7 +318,7 @@ pub struct ExitToNearPrecompileCallbackCallArgs {
     pub transfer_near: Option<TransferNearCallArgs>,
 }
 
-/// Args passed to the the cross contract call precompile.
+/// Args passed to the cross contract call precompile.
 /// That precompile is used by Aurora contracts to make calls to the broader NEAR ecosystem.
 /// See `https://github.com/aurora-is-near/AIPs/pull/2` for design details.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]

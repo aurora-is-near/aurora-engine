@@ -28,12 +28,15 @@ use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, Vec, Wei,
-    Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
+    BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei, Yocto,
+    ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR,
+    ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use aurora_engine_precompiles::PrecompileConstructorContext;
+use aurora_engine_types::parameters::connector::Erc20Metadata;
+use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
 use core::cell::RefCell;
 use core::iter::once;
 
@@ -342,6 +345,25 @@ impl AsRef<[u8]> for RegisterTokenError {
     }
 }
 
+#[derive(Debug)]
+pub enum ReadMetadataError {
+    DecodeError,
+    WrongType,
+    NoValue,
+    EngineError(EngineErrorKind),
+}
+
+impl AsRef<[u8]> for ReadMetadataError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::DecodeError => errors::ERR_DECODING_TOKEN,
+            Self::WrongType => errors::ERR_WRONG_TOKEN_TYPE,
+            Self::NoValue => errors::ERR_TOKEN_NO_VALUE,
+            Self::EngineError(e) => e.as_ref(),
+        }
+    }
+}
+
 pub struct StackExecutorParams<'a, I, E, H> {
     precompiles: Precompiles<'a, I, E, H>,
     gas_limit: u64,
@@ -423,7 +445,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             account_info_cache: RefCell::new(FullCache::default()),
             contract_code_cache: RefCell::new(FullCache::default()),
             contract_storage_cache: RefCell::new(FullCache::default()),
-            modexp_algorithm: PhantomData::default(),
+            modexp_algorithm: PhantomData,
         }
     }
 
@@ -591,9 +613,9 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let contract = &args.address;
         let value = U256::from_big_endian(&args.amount);
         // View calls cannot interact with promises
-        let mut handler = aurora_engine_sdk::promise::Noop;
+        let handler = aurora_engine_sdk::promise::Noop;
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-        let precompiles = self.create_precompiles(pause_flags, &mut handler);
+        let precompiles = self.create_precompiles(pause_flags, &handler);
 
         let executor_params = StackExecutorParams::new(u64::MAX, precompiles);
         self.view(
@@ -784,10 +806,73 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         self.io.return_output(b"\"0\"");
     }
 
+    /// Read metadata of ERC-20 contract.
+    pub fn get_erc20_metadata(
+        &self,
+        erc20_address: Address,
+    ) -> Result<Erc20Metadata, ReadMetadataError> {
+        let name = self
+            .view_with_selector(
+                erc20_address,
+                ERC20_NAME_SELECTOR,
+                &[ethabi::ParamType::String],
+            )?
+            .into_string()
+            .ok_or(ReadMetadataError::WrongType)?;
+        let symbol = self
+            .view_with_selector(
+                erc20_address,
+                ERC20_SYMBOL_SELECTOR,
+                &[ethabi::ParamType::String],
+            )?
+            .into_string()
+            .ok_or(ReadMetadataError::WrongType)?;
+        let decimals = self
+            .view_with_selector(
+                erc20_address,
+                ERC20_DIGITS_SELECTOR,
+                &[ethabi::ParamType::Uint(8)],
+            )?
+            .into_uint()
+            .ok_or(ReadMetadataError::WrongType)?
+            .try_into()
+            .map_err(|_| ReadMetadataError::WrongType)?;
+
+        Ok(Erc20Metadata {
+            name,
+            symbol,
+            decimals,
+        })
+    }
+
+    /// Set metadata of ERC-20 contract.
+    pub fn set_erc20_metadata<P: PromiseHandler>(
+        &mut self,
+        erc20_address: Address,
+        erc20_metadata: Erc20Metadata,
+        handler: &mut P,
+    ) -> EngineResult<SubmitResult> {
+        let args = ethabi::encode(&[
+            ethabi::Token::String(erc20_metadata.name),
+            ethabi::Token::String(erc20_metadata.symbol),
+            ethabi::Token::Uint(erc20_metadata.decimals.into()),
+        ]);
+        let input = [ERC20_SET_METADATA_SELECTOR, &args].concat();
+
+        self.call_with_args(
+            CallArgs::V2(FunctionCallArgsV2 {
+                contract: erc20_address,
+                value: [0; 32],
+                input,
+            }),
+            handler,
+        )
+    }
+
     fn create_precompiles<P: PromiseHandler>(
         &self,
         pause_flags: PrecompileFlags,
-        handler: &mut P,
+        handler: &P,
     ) -> Precompiles<'env, I, E, P::ReadOnly> {
         let current_account_id = self.current_account_id.clone();
         let random_seed = self.env.random_seed();
@@ -820,6 +905,30 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 .collect(),
             all_precompiles: precompiles.all_precompiles,
         }
+    }
+
+    fn view_with_selector(
+        &self,
+        contract_address: Address,
+        selector: &[u8],
+        output_types: &[ethabi::ParamType],
+    ) -> Result<ethabi::Token, ReadMetadataError> {
+        let result = self.view_with_args(ViewCallArgs {
+            sender: self.origin,
+            address: contract_address,
+            amount: [0; 32],
+            input: selector.to_vec(),
+        });
+
+        let output = match result.map_err(ReadMetadataError::EngineError)? {
+            TransactionStatus::Succeed(bytes) => bytes,
+            _ => Vec::new(),
+        };
+
+        ethabi::decode(output_types, &output)
+            .map_err(|_| ReadMetadataError::DecodeError)?
+            .pop()
+            .ok_or(ReadMetadataError::NoValue)
     }
 }
 
@@ -998,7 +1107,7 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
         let erc20_admin_address = current_address(&current_account_id);
         let mut engine: Engine<_, _> =
             Engine::new_with_state(state, erc20_admin_address, current_account_id, io, env);
-        let erc20_address = erc20_address;
+
         let refund_address = args.recipient_address;
         let amount = U256::from_big_endian(&args.amount);
         let input = setup_refund_on_error_input(amount, refund_address);
@@ -1123,11 +1232,12 @@ pub fn setup_deploy_erc20_input(current_account_id: &AccountId) -> Vec<u8> {
     let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
 
     let erc20_admin_address = current_address(current_account_id);
+    let erc20_metadata = Erc20Metadata::default();
 
     let deploy_args = ethabi::encode(&[
-        ethabi::Token::String("Empty".to_string()),
-        ethabi::Token::String("EMPTY".to_string()),
-        ethabi::Token::Uint(ethabi::Uint::from(0)),
+        ethabi::Token::String(erc20_metadata.name),
+        ethabi::Token::String(erc20_metadata.symbol),
+        ethabi::Token::Uint(erc20_metadata.decimals.into()),
         ethabi::Token::Address(erc20_admin_address.raw()),
     ]);
 
@@ -2026,6 +2136,30 @@ mod tests {
         let actual_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
 
         assert_eq!(expected_address, actual_address);
+    }
+
+    #[test]
+    fn test_get_erc20_metadata() {
+        let env = Fixed::default();
+        let origin = aurora_engine_sdk::types::near_account_to_evm_address(
+            env.predecessor_account_id().as_bytes(),
+        );
+        let current_account_id = AccountId::default();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let state = EngineState::default();
+        state::set_state(&mut io, &state).unwrap();
+
+        let engine: Engine<_, _> =
+            Engine::new_with_state(state, origin, current_account_id, io, &env);
+        let nep141 = AccountId::new("testcoin").unwrap();
+        let mut handler = Noop;
+        let args = DeployErc20TokenArgs { nep141 };
+        let erc20_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
+        let metadata = engine.get_erc20_metadata(erc20_address).unwrap();
+
+        assert_eq!(metadata, Erc20Metadata::default());
     }
 
     #[test]

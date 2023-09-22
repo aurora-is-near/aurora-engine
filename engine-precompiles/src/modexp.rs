@@ -14,8 +14,8 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
     pub const ADDRESS: Address = make_address(0, 5);
 
     #[must_use]
-    pub fn new() -> Self {
-        Self(PhantomData::default(), PhantomData::default())
+    pub const fn new() -> Self {
+        Self(PhantomData, PhantomData)
     }
 }
 

@@ -38,7 +38,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    assert_eq!(112, profile.all_gas() / 1_000_000_000_000);
+    assert_eq!(115, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
@@ -282,7 +282,7 @@ impl UniswapTestContext {
         token_path: &[ERC20],
         amount_in: U256,
     ) -> (U256, u64, ExecutionProfile) {
-        for token in token_path.iter() {
+        for token in token_path {
             self.approve_erc20(token, self.swap_router.0.address, U256::MAX);
         }
         let params = Self::exact_input_params(amount_in, token_path);

@@ -327,8 +327,9 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "2.10.2"
+version = "3.0.0"
 dependencies = [
+ "aurora-engine-hashchain",
  "aurora-engine-modexp",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
@@ -339,6 +340,7 @@ dependencies = [
  "digest 0.10.7",
  "ethabi",
  "evm",
+ "function_name",
  "hex 0.4.3",
  "rlp",
  "serde",
@@ -415,6 +417,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aurora-engine",
+ "aurora-engine-hashchain",
  "aurora-engine-modexp",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
@@ -1731,7 +1734,7 @@ checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 [[package]]
 name = "evm"
 version = "0.39.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#c5cdf0c9bf8da9f6baeb1e5b4a52a2a3405e123f"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.3-aurora#4e2d27d8ff8e5a50a43ed49d86282decce9d39f9"
 dependencies = [
  "auto_impl",
  "environmental",
@@ -1751,7 +1754,7 @@ dependencies = [
 [[package]]
 name = "evm-core"
 version = "0.39.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#c5cdf0c9bf8da9f6baeb1e5b4a52a2a3405e123f"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.3-aurora#4e2d27d8ff8e5a50a43ed49d86282decce9d39f9"
 dependencies = [
  "parity-scale-codec 3.6.3",
  "primitive-types 0.12.1",
@@ -1762,7 +1765,7 @@ dependencies = [
 [[package]]
 name = "evm-gasometer"
 version = "0.39.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#c5cdf0c9bf8da9f6baeb1e5b4a52a2a3405e123f"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.3-aurora#4e2d27d8ff8e5a50a43ed49d86282decce9d39f9"
 dependencies = [
  "environmental",
  "evm-core",
@@ -1773,7 +1776,7 @@ dependencies = [
 [[package]]
 name = "evm-runtime"
 version = "0.39.0"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.0-aurora#c5cdf0c9bf8da9f6baeb1e5b4a52a2a3405e123f"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.38.3-aurora#4e2d27d8ff8e5a50a43ed49d86282decce9d39f9"
 dependencies = [
  "auto_impl",
  "environmental",
@@ -1926,6 +1929,21 @@ dependencies = [
  "libc",
  "winapi",
 ]
+
+[[package]]
+name = "function_name"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1ab577a896d09940b5fe12ec5ae71f9d8211fff62c919c03a3750a9901e98a7"
+dependencies = [
+ "function_name-proc-macro",
+]
+
+[[package]]
+name = "function_name-proc-macro"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "673464e1e314dd67a0fd9544abc99e8eb28d0c7e3b69b033bcff9b2d00b87333"
 
 [[package]]
 name = "funty"
