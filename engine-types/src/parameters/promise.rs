@@ -304,7 +304,21 @@ pub struct RefundCallArgs {
     pub amount: RawU256,
 }
 
-/// Args passed to the the cross contract call precompile.
+// Transfer near tokens call args
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct TransferNearCallArgs {
+    pub target_account_id: AccountId,
+    pub amount: u128,
+}
+
+/// Exit to near precompile callback call args
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq, Default)]
+pub struct ExitToNearPrecompileCallbackCallArgs {
+    pub refund: Option<RefundCallArgs>,
+    pub transfer_near: Option<TransferNearCallArgs>,
+}
+
+/// Args passed to the cross contract call precompile.
 /// That precompile is used by Aurora contracts to make calls to the broader NEAR ecosystem.
 /// See `https://github.com/aurora-is-near/AIPs/pull/2` for design details.
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
