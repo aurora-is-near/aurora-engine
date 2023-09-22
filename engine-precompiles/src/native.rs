@@ -1,25 +1,33 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::{
-    format,
-    parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
-    sdk::io::{StorageIntermediate, IO},
-    storage::{bytes_to_key, KeyPrefix},
-    types::{Address, Yocto},
-    vec, BorshSerialize, Cow, String, ToString, Vec, U256,
-};
 #[cfg(feature = "error_refund")]
-use crate::prelude::{
-    parameters::{PromiseWithCallbackArgs, RefundCallArgs},
-    types,
+use crate::prelude::{parameters::RefundCallArgs, types};
+use crate::{
+    prelude::{
+        format,
+        parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
+        sdk::io::{StorageIntermediate, IO},
+        storage::{bytes_to_key, KeyPrefix},
+        str,
+        types::{Address, Yocto},
+        vec, BorshSerialize, Cow, String, ToString, Vec, U256,
+    },
+    xcc::state::get_wnear_address,
 };
 
 use crate::prelude::types::EthGas;
 use crate::PrecompileOutput;
-use aurora_engine_types::{account_id::AccountId, types::NEP141Wei};
+use aurora_engine_types::{
+    account_id::AccountId,
+    parameters::{
+        ExitToNearPrecompileCallbackCallArgs, PromiseWithCallbackArgs, TransferNearCallArgs,
+    },
+    types::NEP141Wei,
+};
 use evm::backend::Log;
 use evm::{Context, ExitError};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
+const UNWRAP_WNEAR_MSG: &str = "unwrap";
 
 mod costs {
     use crate::prelude::types::{EthGas, NearGas};
@@ -35,9 +43,7 @@ mod costs {
     pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
     /// Value determined experimentally based on tests.
-    /// (No mainnet data available since this feature is not enabled)
-    #[cfg(feature = "error_refund")]
-    pub(super) const REFUND_ON_ERROR_GAS: NearGas = NearGas::new(5_000_000_000_000);
+    pub(super) const EXIT_TO_NEAR_CALLBACK_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
     // TODO(#332): Determine the correct amount of gas
     pub(super) const WITHDRAWAL_GAS: NearGas = NearGas::new(100_000_000_000_000);
@@ -242,6 +248,28 @@ fn validate_amount(amount: U256) -> Result<(), ExitError> {
     Ok(())
 }
 
+#[derive(Debug, PartialEq)]
+struct Recipient<'a> {
+    receiver_account_id: AccountId,
+    message: Option<&'a str>,
+}
+
+fn parse_recipient(recipient: &[u8]) -> Result<Recipient<'_>, ExitError> {
+    let recipient = str::from_utf8(recipient)
+        .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECEIVER_ACCOUNT_ID")))?;
+    let (receiver_account_id, message) = recipient.split_once(':').map_or_else(
+        || (recipient, None),
+        |(recipient, msg)| (recipient, Some(msg)),
+    );
+
+    Ok(Recipient {
+        receiver_account_id: receiver_account_id
+            .parse()
+            .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECEIVER_ACCOUNT_ID")))?,
+        message,
+    })
+}
+
 impl<I: IO> Precompile for ExitToNear<I> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::EXIT_TO_NEAR_GAS)
@@ -300,10 +328,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input)?;
         let current_account_id = self.current_account_id.clone();
-        #[cfg(feature = "error_refund")]
-        let refund_on_error_target = current_account_id.clone();
 
-        let (nep141_address, args, exit_event) = match flag {
+        let (nep141_address, args, exit_event, method, transfer_near_args) = match flag {
             0x0 => {
                 // ETH transfer
                 //
@@ -326,6 +352,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
                             dest: dest_account.to_string(),
                             amount: context.apparent_value,
                         },
+                        "ft_transfer",
+                        None,
                     )
                 } else {
                     return Err(ExitError::Other(Cow::from(
@@ -355,29 +383,46 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 input = &input[32..];
 
                 validate_amount(amount)?;
+                let recipient = parse_recipient(input)?;
 
-                if let Ok(receiver_account_id) = AccountId::try_from(input) {
+                let (args, method, transfer_near_args) = if recipient.message
+                    == Some(UNWRAP_WNEAR_MSG)
+                    && erc20_address == get_wnear_address(&self.io).raw()
+                {
                     (
-                        nep141_address,
-                        // There is no way to inject json, given the encoding of both arguments
-                        // as decimal and valid account id respectively.
-                        format!(
-                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            receiver_account_id,
-                            amount.as_u128()
-                        ),
-                        events::ExitToNear {
-                            sender: Address::new(erc20_address),
-                            erc20_address: Address::new(erc20_address),
-                            dest: receiver_account_id.to_string(),
-                            amount,
-                        },
+                        format!(r#"{{"amount": "{}"}}"#, amount.as_u128()),
+                        "near_withdraw",
+                        Some(TransferNearCallArgs {
+                            target_account_id: recipient.receiver_account_id.clone(),
+                            amount: amount.as_u128(),
+                        }),
                     )
                 } else {
-                    return Err(ExitError::Other(Cow::from(
-                        "ERR_INVALID_RECEIVER_ACCOUNT_ID",
-                    )));
-                }
+                    // There is no way to inject json, given the encoding of both arguments
+                    // as decimal and valid account id respectively.
+                    (
+                        format!(
+                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
+                            recipient.receiver_account_id,
+                            amount.as_u128()
+                        ),
+                        "ft_transfer",
+                        None,
+                    )
+                };
+
+                (
+                    nep141_address,
+                    args,
+                    events::ExitToNear {
+                        sender: Address::new(erc20_address),
+                        erc20_address: Address::new(erc20_address),
+                        dest: recipient.receiver_account_id.to_string(),
+                        amount,
+                    },
+                    method,
+                    transfer_near_args,
+                )
             }
             _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
         };
@@ -394,30 +439,37 @@ impl<I: IO> Precompile for ExitToNear<I> {
             erc20_address,
             amount: types::u256_to_arr(&exit_event.amount),
         };
-        #[cfg(feature = "error_refund")]
-        let refund_promise = PromiseCreateArgs {
-            target_account_id: refund_on_error_target,
-            method: "refund_on_error".to_string(),
-            args: refund_args.try_to_vec().unwrap(),
-            attached_balance: Yocto::new(0),
-            attached_gas: costs::REFUND_ON_ERROR_GAS,
+
+        let callback_args = ExitToNearPrecompileCallbackCallArgs {
+            #[cfg(feature = "error_refund")]
+            refund: Some(refund_args),
+            #[cfg(not(feature = "error_refund"))]
+            refund: None,
+            transfer_near: transfer_near_args,
         };
+
         let transfer_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
-            method: "ft_transfer".to_string(),
+            method: method.to_string(),
             args: args.as_bytes().to_vec(),
             attached_balance: Yocto::new(1),
             attached_gas: costs::FT_TRANSFER_GAS,
         };
 
-        #[cfg(feature = "error_refund")]
-        let promise = PromiseArgs::Callback(PromiseWithCallbackArgs {
-            base: transfer_promise,
-            callback: refund_promise,
-        });
-        #[cfg(not(feature = "error_refund"))]
-        let promise = PromiseArgs::Create(transfer_promise);
-
+        let promise = if callback_args == ExitToNearPrecompileCallbackCallArgs::default() {
+            PromiseArgs::Create(transfer_promise)
+        } else {
+            PromiseArgs::Callback(PromiseWithCallbackArgs {
+                base: transfer_promise,
+                callback: PromiseCreateArgs {
+                    target_account_id: self.current_account_id.clone(),
+                    method: "exit_to_near_precompile_callback".to_string(),
+                    args: callback_args.try_to_vec().unwrap(),
+                    attached_balance: Yocto::new(0),
+                    attached_gas: costs::EXIT_TO_NEAR_CALLBACK_GAS,
+                },
+            })
+        };
         let promise_log = Log {
             address: exit_to_near::ADDRESS.raw(),
             topics: Vec::new(),
@@ -620,8 +672,10 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
 #[cfg(test)]
 mod tests {
-    use super::{exit_to_ethereum, exit_to_near, validate_amount, validate_input_size};
-    use crate::prelude::sdk::types::near_account_to_evm_address;
+    use super::{
+        exit_to_ethereum, exit_to_near, parse_recipient, validate_amount, validate_input_size,
+    };
+    use crate::{native::Recipient, prelude::sdk::types::near_account_to_evm_address};
     use aurora_engine_types::U256;
 
     #[test]
@@ -686,5 +740,47 @@ mod tests {
     #[test]
     fn test_exit_with_valid_amount() {
         validate_amount(U256::from(u128::MAX)).unwrap();
+    }
+
+    #[test]
+    fn test_parse_recipient() {
+        assert_eq!(
+            parse_recipient(b"test.near").unwrap(),
+            Recipient {
+                receiver_account_id: "test.near".parse().unwrap(),
+                message: None
+            }
+        );
+
+        assert_eq!(
+            parse_recipient(b"test.near:unwrap").unwrap(),
+            Recipient {
+                receiver_account_id: "test.near".parse().unwrap(),
+                message: Some("unwrap")
+            }
+        );
+
+        assert_eq!(
+            parse_recipient(b"test.near:some_msg:with_extra_colon").unwrap(),
+            Recipient {
+                receiver_account_id: "test.near".parse().unwrap(),
+                message: Some("some_msg:with_extra_colon")
+            }
+        );
+
+        assert_eq!(
+            parse_recipient(b"test.near:").unwrap(),
+            Recipient {
+                receiver_account_id: "test.near".parse().unwrap(),
+                message: Some("")
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_invalid_recipient() {
+        assert!(parse_recipient(b"test@.near").is_err());
+        assert!(parse_recipient(b"test@.near:msg").is_err());
+        assert!(parse_recipient(&[0xc2]).is_err());
     }
 }

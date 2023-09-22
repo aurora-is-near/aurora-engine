@@ -17,7 +17,7 @@ pub mod result;
 pub mod transaction;
 
 pub mod types {
-    pub use workspaces::result::ExecutionOutcome;
+    pub use workspaces::result::{ExecutionFinalResult, ExecutionOutcome};
     pub use workspaces::types::{KeyType, SecretKey};
 }
 

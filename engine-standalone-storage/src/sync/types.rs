@@ -120,8 +120,8 @@ pub enum TransactionKind {
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
     RegisterRelayer(Address),
-    /// Called if exist precompiles fail
-    RefundOnError(Option<aurora_engine_types::parameters::RefundCallArgs>),
+    /// Callback called by ExitToNear precompile, also can refund on fail
+    ExitToNear(Option<aurora_engine_types::parameters::ExitToNearPrecompileCallbackCallArgs>),
     /// Update eth-connector config
     SetConnectorData(parameters::SetContractDataCallArgs),
     /// Initialize eth-connector
@@ -286,12 +286,15 @@ impl TransactionKind {
                     }
                 }
             }
-            Self::RefundOnError(maybe_args) => {
+            Self::ExitToNear(maybe_args) => {
+                let method_name = "exit_to_near_precompile_callback";
                 maybe_args.map_or_else(
-                    || Self::no_evm_execution("refund_on_error"),
+                    || Self::no_evm_execution(method_name),
                     |args| {
-                        args.erc20_address.map_or_else(
-                            || {
+                        args.refund.map_or_else(
+                            || Self::no_evm_execution(method_name),
+                            |args| {
+                                args.erc20_address.map_or_else(|| {
                                 // ETH refund
                                 let value = Wei::new(U256::from_big_endian(&args.amount));
                                 let from = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
@@ -340,6 +343,8 @@ impl TransactionKind {
                                     data,
                                     access_list: Vec::new(),
                                 }
+                            },
+                        )
                             },
                         )
                     },
@@ -453,8 +458,8 @@ pub enum TransactionKindTag {
     SetPausedFlags,
     #[strum(serialize = "register_relayer")]
     RegisterRelayer,
-    #[strum(serialize = "refund_on_error")]
-    RefundOnError,
+    #[strum(serialize = "exit_to_near_precompile_callback")]
+    ExitToNear,
     #[strum(serialize = "set_eth_connector_contract_data")]
     SetConnectorData,
     #[strum(serialize = "new_eth_connector")]
@@ -521,7 +526,7 @@ impl TransactionKind {
             Self::RegisterRelayer(address) | Self::FactorySetWNearAddress(address) => {
                 address.as_bytes().to_vec()
             }
-            Self::RefundOnError(maybe_args) => maybe_args
+            Self::ExitToNear(maybe_args) => maybe_args
                 .as_ref()
                 .and_then(|args| args.try_to_vec().ok())
                 .unwrap_or_default(),
@@ -564,7 +569,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::StorageWithdraw(_) => Self::StorageWithdraw,
             TransactionKind::SetPausedFlags(_) => Self::SetPausedFlags,
             TransactionKind::RegisterRelayer(_) => Self::RegisterRelayer,
-            TransactionKind::RefundOnError(_) => Self::RefundOnError,
+            TransactionKind::ExitToNear(_) => Self::ExitToNear,
             TransactionKind::SetConnectorData(_) => Self::SetConnectorData,
             TransactionKind::NewConnector(_) => Self::NewConnector,
             TransactionKind::NewEngine(_) => Self::NewEngine,
@@ -742,7 +747,9 @@ enum BorshableTransactionKind<'a> {
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
     SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
     RegisterRelayer(Cow<'a, Address>),
-    RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
+    ExitToNear(
+        Cow<'a, Option<aurora_engine_types::parameters::ExitToNearPrecompileCallbackCallArgs>>,
+    ),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
     NewConnector(Cow<'a, parameters::InitCallArgs>),
     NewEngine(Cow<'a, parameters::NewCallArgs>),
@@ -790,7 +797,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::StorageWithdraw(x) => Self::StorageWithdraw(Cow::Borrowed(x)),
             TransactionKind::SetPausedFlags(x) => Self::SetPausedFlags(Cow::Borrowed(x)),
             TransactionKind::RegisterRelayer(x) => Self::RegisterRelayer(Cow::Borrowed(x)),
-            TransactionKind::RefundOnError(x) => Self::RefundOnError(Cow::Borrowed(x)),
+            TransactionKind::ExitToNear(x) => Self::ExitToNear(Cow::Borrowed(x)),
             TransactionKind::SetConnectorData(x) => Self::SetConnectorData(Cow::Borrowed(x)),
             TransactionKind::NewConnector(x) => Self::NewConnector(Cow::Borrowed(x)),
             TransactionKind::NewEngine(x) => Self::NewEngine(Cow::Borrowed(x)),
@@ -854,7 +861,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::RegisterRelayer(x) => {
                 Ok(Self::RegisterRelayer(x.into_owned()))
             }
-            BorshableTransactionKind::RefundOnError(x) => Ok(Self::RefundOnError(x.into_owned())),
+            BorshableTransactionKind::ExitToNear(x) => Ok(Self::ExitToNear(x.into_owned())),
             BorshableTransactionKind::SetConnectorData(x) => {
                 Ok(Self::SetConnectorData(x.into_owned()))
             }
