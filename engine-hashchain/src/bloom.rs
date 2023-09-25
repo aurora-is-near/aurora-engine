@@ -2,7 +2,10 @@
 //! Link: <https://github.com/paritytech/parity-common/blob/master/ethbloom/src/lib.rs>
 //!
 //! Reimplemented here since there is a large mismatch in types and dependencies.
-#![allow(clippy::expl_impl_clone_on_copy)]
+#![allow(
+    clippy::expl_impl_clone_on_copy,
+// TODO: rust-2023-08-24 clippy::incorrect_clone_impl_on_copy_type
+)]
 
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};

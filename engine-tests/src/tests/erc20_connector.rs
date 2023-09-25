@@ -208,6 +208,17 @@ impl AuroraRunner {
             relayer_address.try_to_vec().unwrap(),
         )
     }
+
+    pub fn factory_set_wnear_address(
+        &mut self,
+        wnear_address: Address,
+    ) -> Result<VMOutcome, EngineError> {
+        self.make_call(
+            "factory_set_wnear_address",
+            DEFAULT_AURORA_ACCOUNT_ID,
+            wnear_address.try_to_vec().unwrap(),
+        )
+    }
 }
 
 #[test]
@@ -380,11 +391,12 @@ mod workspace {
     use crate::utils::solidity::exit_precompile::TesterConstructor;
     use crate::utils::workspace::{
         create_sub_account, deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141,
-        nep_141_balance_of, transfer_nep_141_to_erc_20,
+        nep_141_balance_of, transfer_nep_141, transfer_nep_141_to_erc_20,
     };
     use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
     use aurora_engine_types::parameters::engine::TransactionStatus;
     use aurora_engine_workspace::account::Account;
+    use aurora_engine_workspace::types::ExecutionFinalResult;
     use aurora_engine_workspace::{parse_near, EngineContract, RawContract};
 
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;
@@ -467,6 +479,7 @@ mod workspace {
             nep_141,
             erc20,
             aurora,
+            ..
         } = test_exit_to_near_common().await.unwrap();
 
         // Call exit function on ERC-20; observe ERC-20 burned + NEP-141 transferred
@@ -477,7 +490,8 @@ mod workspace {
             &erc20,
             &aurora,
         )
-        .await;
+        .await
+        .unwrap();
 
         assert_eq!(
             nep_141_balance_of(&nep_141, &ft_owner.id()).await,
@@ -494,6 +508,98 @@ mod workspace {
     }
 
     #[tokio::test]
+    async fn test_exit_to_near_wnear_unwrapped() {
+        // Deploy Aurora; deploy wnear; bridge wnear to ERC-20 on Aurora
+        let TestExitToNearContext {
+            ft_owner,
+            ft_owner_address,
+            aurora,
+            wnear,
+            wnear_erc20,
+            ..
+        } = test_exit_to_near_common().await.unwrap();
+
+        let ft_owner_balance = aurora.node.get_balance(&ft_owner.id()).await.unwrap();
+
+        // Call exit function on ERC-20; observe ERC-20 burned + near tokens transferred
+        let result = exit_to_near(
+            &ft_owner,
+            &format!("{}:unwrap", ft_owner.id().as_ref()),
+            FT_EXIT_AMOUNT,
+            &wnear_erc20,
+            &aurora,
+        )
+        .await;
+        let total_tokens_burnt: u128 = result.outcomes().iter().map(|o| o.tokens_burnt).sum();
+
+        // Check that the wnear tokens are properly unwrapped and transferred to `ft_owner`
+        assert_eq!(
+            aurora.node.get_balance(&ft_owner.id()).await.unwrap(),
+            ft_owner_balance - total_tokens_burnt + FT_EXIT_AMOUNT
+        );
+
+        // Check wnear balances
+        assert_eq!(
+            nep_141_balance_of(&wnear, &ft_owner.id()).await,
+            FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT
+        );
+        assert_eq!(
+            nep_141_balance_of(&wnear, &aurora.id()).await,
+            FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT
+        );
+        assert_eq!(
+            erc20_balance(&wnear_erc20, ft_owner_address, &aurora).await,
+            (FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT).into()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_exit_to_near_wnear() {
+        // Deploy Aurora; deploy wnear; bridge wnear to ERC-20 on Aurora
+        let TestExitToNearContext {
+            ft_owner,
+            ft_owner_address,
+            aurora,
+            wnear,
+            wnear_erc20,
+            ..
+        } = test_exit_to_near_common().await.unwrap();
+
+        let ft_owner_balance = aurora.node.get_balance(&ft_owner.id()).await.unwrap();
+
+        // Call exit function on ERC-20; observe ERC-20 burned + wnear tokens transferred
+        let result = exit_to_near(
+            &ft_owner,
+            ft_owner.id().as_ref(),
+            FT_EXIT_AMOUNT,
+            &wnear_erc20,
+            &aurora,
+        )
+        .await;
+        let total_tokens_burnt: u128 = result.outcomes().iter().map(|o| o.tokens_burnt).sum();
+
+        // Check that there were no near tokens transferred to `ft_owner`
+        assert_eq!(
+            aurora.node.get_balance(&ft_owner.id()).await.unwrap(),
+            ft_owner_balance - total_tokens_burnt
+        );
+
+        // Check wnear balances
+        assert_eq!(
+            nep_141_balance_of(&wnear, &ft_owner.id()).await,
+            FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT + FT_EXIT_AMOUNT
+        );
+        assert_eq!(
+            nep_141_balance_of(&wnear, &aurora.id()).await,
+            FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT
+        );
+        assert_eq!(
+            erc20_balance(&wnear_erc20, ft_owner_address, &aurora).await,
+            (FT_TRANSFER_AMOUNT - FT_EXIT_AMOUNT).into()
+        );
+    }
+
+    #[tokio::test]
     async fn test_exit_to_near_refund() {
         // Deploy Aurora; deploy NEP-141; bridge NEP-141 to ERC-20 on Aurora
         let TestExitToNearContext {
@@ -502,6 +608,7 @@ mod workspace {
             nep_141,
             erc20,
             aurora,
+            ..
         } = test_exit_to_near_common().await.unwrap();
 
         // Call exit on ERC-20; ft_transfer promise fails; expect refund on Aurora;
@@ -513,7 +620,8 @@ mod workspace {
             &erc20,
             &aurora,
         )
-        .await;
+        .await
+        .unwrap();
 
         assert_eq!(
             nep_141_balance_of(&nep_141, &ft_owner.id()).await,
@@ -692,6 +800,7 @@ mod workspace {
         })
     }
 
+    #[allow(clippy::cognitive_complexity)]
     async fn test_exit_to_near_common() -> anyhow::Result<TestExitToNearContext> {
         // 1. deploy Aurora
         let aurora = deploy_engine().await;
@@ -707,9 +816,51 @@ mod workspace {
             .await?;
         assert!(result.is_success());
 
+        // 3. Deploy wnear and set wnear address
+
+        let wnear = crate::tests::xcc::workspace::deploy_wnear(&aurora).await?;
+        let wnear_erc20 = deploy_erc20_from_nep_141(wnear.id().as_ref(), &aurora).await?;
+        aurora
+            .factory_set_wnear_address(wnear_erc20.0.address)
+            .transact()
+            .await?;
+
+        // 4. Transfer wnear to `ft_owner` and bridge it to aurora
+        transfer_nep_141(
+            &wnear.id(),
+            &aurora.root(),
+            ft_owner.id().as_ref(),
+            FT_TOTAL_SUPPLY,
+        )
+        .await?;
+
+        transfer_nep_141_to_erc_20(
+            &wnear,
+            &wnear_erc20,
+            &ft_owner,
+            ft_owner_address,
+            FT_TRANSFER_AMOUNT,
+            &aurora,
+        )
+        .await?;
+
+        assert_eq!(
+            nep_141_balance_of(&wnear, &ft_owner.id()).await,
+            FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT
+        );
+        assert_eq!(
+            nep_141_balance_of(&wnear, &aurora.id()).await,
+            FT_TRANSFER_AMOUNT
+        );
+        assert_eq!(
+            erc20_balance(&wnear_erc20, ft_owner_address, &aurora).await,
+            FT_TRANSFER_AMOUNT.into()
+        );
+
+        // 5. Deploy NEP-141
         let nep_141_account =
             create_sub_account(&aurora.root(), FT_ACCOUNT, parse_near!("50 N")).await?;
-        // 3. Deploy NEP-141
+
         let nep_141 = deploy_nep_141(&nep_141_account, &ft_owner, FT_TOTAL_SUPPLY, &aurora)
             .await
             .map_err(|e| anyhow::anyhow!("Couldn't deploy NEP-141: {e}"))?;
@@ -719,7 +870,7 @@ mod workspace {
             FT_TOTAL_SUPPLY
         );
 
-        // 4. Deploy ERC-20 from NEP-141 and bridge value to Aurora
+        // 6. Deploy ERC-20 from NEP-141 and bridge value to Aurora
         let erc20 = deploy_erc20_from_nep_141(nep_141.id().as_ref(), &aurora)
             .await
             .map_err(|e| anyhow::anyhow!("Couldn't deploy ERC-20 from NEP-141: {e}"))?;
@@ -754,6 +905,8 @@ mod workspace {
             nep_141,
             erc20,
             aurora,
+            wnear,
+            wnear_erc20,
         })
     }
 
@@ -763,7 +916,7 @@ mod workspace {
         amount: u128,
         erc20: &ERC20,
         aurora: &EngineContract,
-    ) {
+    ) -> ExecutionFinalResult {
         let input = build_input(
             "withdrawToNear(bytes,uint256)",
             &[
@@ -784,6 +937,7 @@ mod workspace {
             .await
             .unwrap();
         assert!(result.is_success());
+        result
     }
 
     async fn eth_balance_of(address: Address, aurora: &EngineContract) -> Wei {
@@ -812,6 +966,8 @@ mod workspace {
         nep_141: RawContract,
         erc20: ERC20,
         aurora: EngineContract,
+        wnear: RawContract,
+        wnear_erc20: ERC20,
     }
 
     struct TestExitToNearEthContext {

@@ -6,6 +6,10 @@ use crate::utils::{self, AuroraRunner, Signer, DEFAULT_AURORA_ACCOUNT_ID};
 
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
+    let wnear_token_address = runner.deploy_erc20_token("wrap.testnet");
+    runner
+        .factory_set_wnear_address(wnear_token_address)
+        .unwrap();
     let token = runner.deploy_erc20_token("tt.testnet");
     let mut signer = Signer::random();
     runner.create_address(

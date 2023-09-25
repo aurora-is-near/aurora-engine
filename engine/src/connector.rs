@@ -58,7 +58,7 @@ pub struct EthConnector {
     /// The account id of the Prover NEAR smart contract. It used in the Deposit flow for verifying
     /// a log entry from incoming proof.
     pub prover_account: AccountId,
-    /// It is Ethereum address used in the Deposit and Withdraw logic.  
+    /// It is Ethereum address used in the Deposit and Withdraw logic.
     pub eth_custodian_address: Address,
 }
 

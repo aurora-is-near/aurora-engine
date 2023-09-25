@@ -166,7 +166,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
 
 fn process_precompile(
     p: &dyn Precompile,
-    handle: &mut impl PrecompileHandle,
+    handle: &impl PrecompileHandle,
 ) -> Result<PrecompileOutput, PrecompileFailure> {
     let input = handle.input();
     let gas_limit = handle.gas_limit();
@@ -521,6 +521,19 @@ mod tests {
             }
 
             fn record_cost(&mut self, _cost: u64) -> Result<(), ExitError> {
+                unimplemented!()
+            }
+
+            fn record_external_cost(
+                &mut self,
+                _ref_time: Option<u64>,
+                _proof_size: Option<u64>,
+                _storage_growth: Option<u64>,
+            ) -> Result<(), ExitError> {
+                unimplemented!()
+            }
+
+            fn refund_external_cost(&mut self, _ref_time: Option<u64>, _proof_size: Option<u64>) {
                 unimplemented!()
             }
 

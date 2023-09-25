@@ -141,7 +141,7 @@ fn test_access_list_tx_encoding_decoding() {
 
     let signed_tx = utils::sign_access_list_transaction(transaction, &secret_key);
     let bytes: Vec<u8> = iter::once(eip_2930::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx).into_iter())
+        .chain(rlp::encode(&signed_tx))
         .collect();
     let expected_bytes = hex::decode("01f8f901800a83061a8094095e7baea6a6c7c4c2dfeb977efac326af552d87830186a000f893f85994095e7baea6a6c7c4c2dfeb977efac326af552d87f842a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000001f794195e7baea6a6c7c4c2dfeb977efac326af552d87e1a0000000000000000000000000000000000000000000000000000000000000000080a011c97e0bb8a356fe4f49b37863d059c6fe8cd3214a6ac06a8387a2f6f0b75f60a0212368a1097da30806edfd13d9c35662e1baee939235eb25de867980bd0eda26").unwrap();
 
@@ -163,7 +163,7 @@ fn test_access_list_tx_encoding_decoding() {
 
 fn encode_tx(signed_tx: &SignedTransaction1559) -> Vec<u8> {
     iter::once(eip_1559::TYPE_BYTE)
-        .chain(rlp::encode(signed_tx).into_iter())
+        .chain(rlp::encode(signed_tx))
         .collect()
 }
 
