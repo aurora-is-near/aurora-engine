@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] 2023-09-25
+
+- Added the possibility to use native NEAR instead of wNEAR on Aurora by [@karim-en]. ([#750])
+
+- Added hashchain integration by [@birchmd]. ([#831])
+
 - Added functions for setting and getting metadata of ERC-20 contracts deployed with `deploy_erc20_token` transaction
   by [@aleksuss]. ([#837])
 
+[#750]: https://github.com/aurora-is-near/aurora-engine/pull/750
+[#831]: https://github.com/aurora-is-near/aurora-engine/pull/831
 [#837]: https://github.com/aurora-is-near/aurora-engine/pull/837
 
 ## [3.0.0] 2023-08-28
@@ -535,6 +543,7 @@ struct SubmitResult {
 [@guidovranken]: https://github.com/guidovranken
 [@hskang9]: https://github.com/hskang9
 [@joshuajbouw]: https://github.com/joshuajbouw
+[@karim-en]: https://github.com/karim-en
 [@mandreyel]: https://github.com/mandreyel
 [@matklad]: https://github.com/matklad
 [@mfornet]: https://github.com/mfornet
