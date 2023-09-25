@@ -382,7 +382,7 @@ fn make_fib_promise(n: usize, account_id: &AccountId) -> NearPromise {
     }
 }
 
-mod workspace {
+pub mod workspace {
     use crate::tests::xcc::{check_fib_result, WNEAR_AMOUNT};
     use crate::utils;
     use crate::utils::workspace::{
@@ -860,7 +860,7 @@ mod workspace {
         nep_141_balance_of(aurora.as_raw_contract(), &aurora.id()).await
     }
 
-    async fn deploy_wnear(aurora: &EngineContract) -> anyhow::Result<RawContract> {
+    pub async fn deploy_wnear(aurora: &EngineContract) -> anyhow::Result<RawContract> {
         let contract_bytes = std::fs::read("src/tests/res/w_near.wasm").unwrap();
         let wrap_account = create_sub_account(&aurora.root(), "wrap", STORAGE_AMOUNT).await?;
         let contract = wrap_account.deploy(&contract_bytes).await?;

@@ -465,13 +465,13 @@ mod contract {
     }
 
     /// Callback invoked by exit to NEAR precompile to handle potential
-    /// errors in the exit call.
+    /// errors in the exit call or to perform the near tokens transfer.
     #[no_mangle]
-    pub extern "C" fn refund_on_error() {
+    pub extern "C" fn exit_to_near_precompile_callback() {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::connector::refund_on_error(io, &env, &mut handler)
+        contract_methods::connector::exit_to_near_precompile_callback(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }

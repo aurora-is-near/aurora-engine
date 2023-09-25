@@ -12,6 +12,9 @@ use aurora_engine_sdk::{
     io::{StorageIntermediate, IO},
     promise::PromiseHandler,
 };
+use aurora_engine_types::parameters::{
+    ExitToNearPrecompileCallbackCallArgs, PromiseAction, PromiseBatchAction,
+};
 use aurora_engine_types::{
     borsh::{BorshDeserialize, BorshSerialize},
     parameters::{
@@ -24,10 +27,10 @@ use aurora_engine_types::{
             errors::ParseTypeFromJsonError, DeployErc20TokenArgs, PauseEthConnectorCallArgs,
             SubmitResult,
         },
-        PromiseWithCallbackArgs, RefundCallArgs,
+        PromiseWithCallbackArgs,
     },
     types::{Address, PromiseResult, Yocto},
-    Vec,
+    vec, Vec,
 };
 use function_name::named;
 
@@ -91,7 +94,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, H: PromiseHandler>(
 }
 
 #[named]
-pub fn refund_on_error<I: IO + Copy, E: Env, H: PromiseHandler>(
+pub fn exit_to_near_precompile_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
@@ -107,19 +110,38 @@ pub fn refund_on_error<I: IO + Copy, E: Env, H: PromiseHandler>(
             return Err(errors::ERR_PROMISE_COUNT.into());
         }
 
+        let args: ExitToNearPrecompileCallbackCallArgs = io.read_input_borsh()?;
+
         let maybe_result = if let Some(PromiseResult::Successful(_)) = handler.promise_result(0) {
-            // Promise succeeded -- nothing to do
+            if let Some(args) = args.transfer_near {
+                let action = PromiseAction::Transfer {
+                    amount: Yocto::new(args.amount),
+                };
+                let promise = PromiseBatchAction {
+                    target_account_id: args.target_account_id,
+                    actions: vec![action],
+                };
+
+                // Safety: this call is safe because it comes from the exit to near precompile, not users.
+                // The call is to transfer the unwrapped wNEAR tokens.
+                let promise_id = unsafe { handler.promise_create_batch(&promise) };
+                handler.promise_return(promise_id);
+            }
+
             None
-        } else {
+        } else if let Some(args) = args.refund {
             // Exit call failed; need to refund tokens
-            let args: RefundCallArgs = io.read_input_borsh()?;
             let refund_result = engine::refund_on_error(io, env, state, &args, handler)?;
 
             if !refund_result.status.is_ok() {
                 return Err(errors::ERR_REFUND_FAILURE.into());
             }
+
             Some(refund_result)
+        } else {
+            None
         };
+
         Ok(maybe_result)
     })
 }
