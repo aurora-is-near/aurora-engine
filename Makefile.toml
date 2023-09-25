@@ -300,7 +300,7 @@ run_task = "build-engine-flow-docker"
 [tasks.build-docker]
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-de975ed75e0f6a840c7aeb57e3414959cb59bc00-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
+docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-f033430c4fc619aaf8b88eb2fcb976bb8d24d65d-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
 '''
 
 [tasks.build-xcc-router-docker-inner]
@@ -312,7 +312,7 @@ run_task = "build-xcc-router-flow-docker"
 [tasks.build-xcc-docker]
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-de975ed75e0f6a840c7aeb57e3414959cb59bc00-amd64 ./scripts/docker-xcc-router-entrypoint.sh ${PROFILE}
+docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-f033430c4fc619aaf8b88eb2fcb976bb8d24d65d-amd64 ./scripts/docker-xcc-router-entrypoint.sh ${PROFILE}
 '''
 
 [tasks.test-contracts]
