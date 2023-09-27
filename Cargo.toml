@@ -58,7 +58,7 @@ primitive-types = { version = "0.12", default-features = false, features = ["rlp
 rand = "0.8"
 ripemd = { version = "0.1", default-features = false }
 rlp = { version = "0.5", default-features = false }
-rocksdb = { version = "0.19", default-features = false }
+rocksdb = { version = "0.21", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
