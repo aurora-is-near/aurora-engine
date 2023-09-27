@@ -28,3 +28,4 @@ workspaces = "0.7.0"
 [features]
 mainnet-test = []
 testnet-test = []
+ext-connector = []

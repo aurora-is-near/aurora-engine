@@ -1,4 +1,5 @@
 use crate::Storage;
+use aurora_engine::contract_methods::connector::deposit_event;
 use aurora_engine::parameters;
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
@@ -117,7 +118,7 @@ pub enum TransactionKind {
     SetOwner(parameters::SetOwnerArgs),
     /// Admin only method; used to change upgrade delay blocks
     SetUpgradeDelayBlocks(parameters::SetUpgradeDelayBlocksArgs),
-    /// Admin only method
+    /// Set pause flags to eth-connector
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
     RegisterRelayer(Address),
@@ -127,8 +128,8 @@ pub enum TransactionKind {
     SetConnectorData(parameters::SetContractDataCallArgs),
     /// Initialize eth-connector
     NewConnector(parameters::InitCallArgs),
+    /// Set account id of the external eth-connector.
     SetEthConnectorContractAccount(parameters::SetEthConnectorContractAccountArgs),
-    DisableLegacyNEP141,
     /// Initialize Engine
     NewEngine(parameters::NewCallArgs),
     /// Update xcc-router bytecode
@@ -243,11 +244,14 @@ impl TransactionKind {
             }
             Self::FtOnTransfer(args) => {
                 if engine_account == caller {
-                    let recipient = aurora_engine::deposit_event::FtTransferMessageData::parse_on_transfer_message(&args.msg).map(|data| data.recipient).unwrap_or_default();
+                    let recipient =
+                        deposit_event::FtTransferMessageData::parse_on_transfer_message(&args.msg)
+                            .map(|data| data.recipient)
+                            .unwrap_or_default();
                     let value = Wei::new(U256::from(args.amount.as_u128()));
                     // This transaction mints new ETH, so we'll say it comes from the zero address.
                     NormalizedEthTransaction {
-                        address: types::Address::default(),
+                        address: Address::default(),
                         chain_id: None,
                         nonce: U256::zero(),
                         gas_limit: U256::from(u64::MAX),
@@ -272,11 +276,11 @@ impl TransactionKind {
                         })
                         .result
                         .ok()
-                        .and_then(|bytes| types::Address::try_from_slice(&bytes).ok())
+                        .and_then(|bytes| Address::try_from_slice(&bytes).ok())
                         .unwrap_or_default();
                     let erc20_recipient = hex::decode(&args.msg.as_bytes()[0..40])
                         .ok()
-                        .and_then(|bytes| types::Address::try_from_slice(&bytes).ok())
+                        .and_then(|bytes| Address::try_from_slice(&bytes).ok())
                         .unwrap_or_default();
                     let data = aurora_engine::engine::setup_receive_erc20_tokens_input(
                         &args,
@@ -305,56 +309,56 @@ impl TransactionKind {
                             || Self::no_evm_execution(method_name),
                             |args| {
                                 args.erc20_address.map_or_else(|| {
-                                // ETH refund
-                                let value = Wei::new(U256::from_big_endian(&args.amount));
-                                let from = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
-                                let nonce = Self::get_implicit_nonce(
-                                    &from,
-                                    block_height,
-                                    transaction_position,
-                                    storage,
-                                );
-                                NormalizedEthTransaction {
-                                    address: from,
-                                    chain_id: None,
-                                    nonce,
-                                    gas_limit: U256::from(u64::MAX),
-                                    max_priority_fee_per_gas: U256::zero(),
-                                    max_fee_per_gas: U256::zero(),
-                                    to: Some(args.recipient_address),
-                                    value,
-                                    data: Vec::new(),
-                                    access_list: Vec::new(),
-                                }
-                            },
-                            |erc20_address| {
-                                // ERC-20 refund
-                                let from = Self::get_implicit_address(engine_account);
-                                let nonce = Self::get_implicit_nonce(
-                                    &from,
-                                    block_height,
-                                    transaction_position,
-                                    storage,
-                                );
-                                let to = erc20_address;
-                                let data = aurora_engine::engine::setup_refund_on_error_input(
-                                    U256::from_big_endian(&args.amount),
-                                    args.recipient_address,
-                                );
-                                NormalizedEthTransaction {
-                                    address: from,
-                                    chain_id: None,
-                                    nonce,
-                                    gas_limit: U256::from(u64::MAX),
-                                    max_priority_fee_per_gas: U256::zero(),
-                                    max_fee_per_gas: U256::zero(),
-                                    to: Some(to),
-                                    value: Wei::zero(),
-                                    data,
-                                    access_list: Vec::new(),
-                                }
-                            },
-                        )
+                                    // ETH refund
+                                    let value = Wei::new(U256::from_big_endian(&args.amount));
+                                    let from = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
+                                    let nonce = Self::get_implicit_nonce(
+                                        &from,
+                                        block_height,
+                                        transaction_position,
+                                        storage,
+                                    );
+                                    NormalizedEthTransaction {
+                                        address: from,
+                                        chain_id: None,
+                                        nonce,
+                                        gas_limit: U256::from(u64::MAX),
+                                        max_priority_fee_per_gas: U256::zero(),
+                                        max_fee_per_gas: U256::zero(),
+                                        to: Some(args.recipient_address),
+                                        value,
+                                        data: Vec::new(),
+                                        access_list: Vec::new(),
+                                    }
+                                },
+                                   |erc20_address| {
+                                       // ERC-20 refund
+                                       let from = Self::get_implicit_address(engine_account);
+                                       let nonce = Self::get_implicit_nonce(
+                                           &from,
+                                           block_height,
+                                           transaction_position,
+                                           storage,
+                                       );
+                                       let to = erc20_address;
+                                       let data = aurora_engine::engine::setup_refund_on_error_input(
+                                           U256::from_big_endian(&args.amount),
+                                           args.recipient_address,
+                                       );
+                                       NormalizedEthTransaction {
+                                           address: from,
+                                           chain_id: None,
+                                           nonce,
+                                           gas_limit: U256::from(u64::MAX),
+                                           max_priority_fee_per_gas: U256::zero(),
+                                           max_fee_per_gas: U256::zero(),
+                                           to: Some(to),
+                                           value: Wei::zero(),
+                                           data,
+                                           access_list: Vec::new(),
+                                       }
+                                   },
+                                )
                             },
                         )
                     },
@@ -376,7 +380,6 @@ impl TransactionKind {
             Self::SetEthConnectorContractAccount(_) => {
                 Self::no_evm_execution("set_eth_connector_contract_account")
             }
-            Self::DisableLegacyNEP141 => Self::no_evm_execution("disable_legacy_nep141"),
             Self::NewEngine(_) => Self::no_evm_execution("new_engine"),
             Self::FactoryUpdate(_) => Self::no_evm_execution("factory_update"),
             Self::FactoryUpdateAddressVersion(_) => {
@@ -520,8 +523,6 @@ pub enum TransactionKindTag {
     SetErc20Metadata,
     #[strum(serialize = "set_eth_connector_contract_account")]
     SetEthConnectorContractAccount,
-    #[strum(serialize = "disable_legacy_nep141")]
-    DisableLegacyNEP141,
     #[strum(serialize = "set_fixed_gas_cost")]
     SetFixedGasCost,
     #[strum(serialize = "set_silo_params")]
@@ -575,7 +576,7 @@ impl TransactionKind {
             }
             Self::NewEngine(args) => args.try_to_vec().unwrap_or_default(),
             Self::FactoryUpdateAddressVersion(args) => args.try_to_vec().unwrap_or_default(),
-            Self::FundXccSubAccound(args) => args.try_to_vec().unwrap_or_default(),
+            Self::FundXccSubAccount(args) => args.try_to_vec().unwrap_or_default(),
             Self::PauseContract | Self::ResumeContract | Self::Unknown => Vec::new(),
             Self::SetKeyManager(args) => args.try_to_vec().unwrap_or_default(),
             Self::AddRelayerKey(args) | Self::RemoveRelayerKey(args) => {
@@ -583,8 +584,14 @@ impl TransactionKind {
             }
             Self::StartHashchain(args) => args.try_to_vec().unwrap_or_default(),
             Self::SetErc20Metadata(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::SetFixedGasCost(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::SetSiloParams(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::SetFixedGasCost(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetSiloParams(args) => args.try_to_vec().unwrap_or_default(),
+            Self::AddEntryToWhitelist(args) | Self::RemoveEntryFromWhitelist(args) => {
+                args.try_to_vec().unwrap_or_default()
+            }
+            Self::AddEntryToWhitelistBatch(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetWhitelistStatus(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetEthConnectorContractAccount(args) => args.try_to_vec().unwrap_or_default(),
         }
     }
 }
@@ -632,7 +639,6 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::SetEthConnectorContractAccount(_) => {
                 Self::SetEthConnectorContractAccount
             }
-            TransactionKind::DisableLegacyNEP141 => Self::DisableLegacyNEP141,
             TransactionKind::SetFixedGasCost(_) => Self::SetFixedGasCost,
             TransactionKind::SetSiloParams(_) => Self::SetSiloParams,
             TransactionKind::AddEntryToWhitelist(_) => Self::AddEntryToWhitelist,
@@ -812,7 +818,6 @@ enum BorshableTransactionKind<'a> {
     ResumePrecompiles(Cow<'a, parameters::PausePrecompilesCallArgs>),
     Unknown,
     SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
-    DisableLegacyNEP141,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
     FundXccSubAccount(Cow<'a, FundXccArgs>),
@@ -874,7 +879,6 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetEthConnectorContractAccount(x) => {
                 Self::SetEthConnectorContractAccount(Cow::Borrowed(x))
             }
-            TransactionKind::DisableLegacyNEP141 => Self::DisableLegacyNEP141,
             TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
             TransactionKind::FundXccSubAccount(x) => Self::FundXccSubAccount(Cow::Borrowed(x)),
             TransactionKind::SetUpgradeDelayBlocks(x) => {
@@ -958,7 +962,6 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::SetEthConnectorContractAccount(x) => {
                 Ok(Self::SetEthConnectorContractAccount(x.into_owned()))
             }
-            BorshableTransactionKind::DisableLegacyNEP141 => Ok(Self::DisableLegacyNEP141),
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
             BorshableTransactionKind::FundXccSubAccount(x) => {
                 Ok(Self::FundXccSubAccount(x.into_owned()))

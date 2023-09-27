@@ -16,6 +16,9 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
 
 use crate::accounting;
+#[cfg(not(feature = "ext-connector"))]
+use crate::contract_methods::connector;
+use crate::contract_methods::silo;
 use crate::parameters::{DeployErc20TokenArgs, TransactionStatus};
 use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
@@ -31,7 +34,6 @@ use crate::prelude::{
     ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR,
     ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
-use crate::silo;
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use aurora_engine_precompiles::PrecompileConstructorContext;
@@ -696,7 +698,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     }
 
     /// Transfers an amount from a given sender to a receiver, provided that
-    /// the have enough in their balance.
+    /// they have enough in their balance.
     ///
     /// If the sender can send, and the receiver can receive, then the transfer
     /// will execute successfully.
@@ -719,7 +721,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         )
     }
 
-    /// Mint tokens for recipient on a particular ERC20 token
+    /// Mint tokens for recipient on a particular ERC-20 token
     /// This function should return the amount of tokens unused,
     /// which will be always all (<amount>) if there is any problem
     /// with the input, or 0 if tokens were minted successfully.
@@ -1923,11 +1925,22 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
             accounting::Net::Lost(amount) => {
                 let _ = amount;
                 sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
+                // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
+                // if we cannot read the storage then there is nothing to remove.
+                #[cfg(not(feature = "ext-connector"))]
+                connector::EthConnectorContract::init(self.io)
+                    .map(|mut connector| {
+                        // The `unwrap` is safe here because (a) if the connector
+                        // is implemented correctly then the total supply will never underflow and (b) we are passing
+                        // in the balance directly so there will always be enough balance.
+                        connector.internal_remove_eth(Wei::new(amount)).unwrap();
+                    })
+                    .ok();
             }
             accounting::Net::Zero => (),
             accounting::Net::Gained(_) => {
                 // It should be impossible to gain ETH using normal EVM operations in production.
-                // In tests we have convenience functions that can poof addresses with ETH out of nowhere.
+                // In tests, we have convenience functions that can poof addresses with ETH out of nowhere.
                 #[cfg(all(not(feature = "integration-test"), feature = "contract"))]
                 {
                     panic!("ERR_INVALID_ETH_SUPPLY_INCREASE");
@@ -1935,7 +1948,7 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
             }
         }
         // These variable are only used if logging feature is enabled.
-        // In production logging is always enabled so we can ignore the warnings.
+        // In production logging is always enabled, so we can ignore the warnings.
         #[allow(unused_variables)]
         let total_bytes = 32 * writes_counter + code_bytes_written;
         #[allow(unused_assignments)]

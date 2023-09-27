@@ -5,6 +5,8 @@ use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_H
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
 use rand::RngCore;
@@ -137,6 +139,19 @@ fn test_total_supply_accounting() {
         constructor.deployed_at(contract_address)
     };
 
+    #[cfg(not(feature = "ext-connector"))]
+    let get_total_supply = |runner: &utils::AuroraRunner| -> Wei {
+        let result = runner
+            .one_shot()
+            .call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
+        let amount: u128 = String::from_utf8(result.unwrap().return_data.as_value().unwrap())
+            .unwrap()
+            .replace('"', "")
+            .parse()
+            .unwrap();
+        Wei::new(U256::from(amount))
+    };
+
     // Self-destruct with some benefactor does not reduce the total supply
     let contract = deploy_contract(&mut runner, &mut signer);
     let _submit_result = runner
@@ -149,6 +164,8 @@ fn test_total_supply_accounting() {
         })
         .unwrap();
     assert_eq!(runner.get_balance(benefactor), TRANSFER_AMOUNT);
+    #[cfg(not(feature = "ext-connector"))]
+    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 
     // Self-destruct with self benefactor burns any ETH in the destroyed contract
     let contract = deploy_contract(&mut runner, &mut signer);
@@ -161,6 +178,11 @@ fn test_total_supply_accounting() {
             )
         })
         .unwrap();
+    #[cfg(not(feature = "ext-connector"))]
+    assert_eq!(
+        get_total_supply(&mut runner),
+        INITIAL_BALANCE - TRANSFER_AMOUNT
+    );
 }
 
 #[test]
@@ -662,7 +684,7 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
-    let expected_number = 1463;
+    let expected_number = 1494;
     let actual_number = module.funcs.iter().count();
 
     assert!(
@@ -1018,6 +1040,22 @@ fn test_block_hash_contract() {
         .unwrap();
 
     utils::panic_on_fail(result.status);
+}
+
+#[cfg(not(feature = "ext-connector"))]
+#[test]
+fn test_ft_metadata() {
+    let runner = utils::deploy_runner();
+    let account_id: String = runner.context.signer_account_id.clone().into();
+    let outcome = runner
+        .one_shot()
+        .call("ft_metadata", &account_id, Vec::new())
+        .unwrap();
+    let metadata =
+        serde_json::from_slice::<FungibleTokenMetadata>(&outcome.return_data.as_value().unwrap())
+            .unwrap();
+
+    assert_eq!(metadata, FungibleTokenMetadata::default());
 }
 
 /// Tests transfer Eth from one account to another with custom argument `max_gas_price`.

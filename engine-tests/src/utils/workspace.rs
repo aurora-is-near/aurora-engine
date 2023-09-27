@@ -5,6 +5,7 @@ use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 /// it does not execute promises; but `aurora-workspaces` does.
 use crate::utils::AuroraRunner;
 use aurora_engine_types::account_id::AccountId;
+#[cfg(feature = "ext-connector")]
 use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawSerializeType};
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
@@ -14,11 +15,13 @@ use serde_json::json;
 
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
 const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
+#[cfg(feature = "ext-connector")]
 const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector";
 
+#[allow(clippy::let_and_return)]
 pub async fn deploy_engine() -> EngineContract {
     let aurora_runner = AuroraRunner::default();
-    aurora_engine_workspace::EngineContractBuilder::new()
+    let contract = aurora_engine_workspace::EngineContractBuilder::new()
         .unwrap()
         .with_chain_id(aurora_runner.chain_id)
         .with_code(aurora_runner.code.code().to_vec())
@@ -28,11 +31,17 @@ pub async fn deploy_engine() -> EngineContract {
         .with_contract_balance(parse_near!("1000 N"))
         .deploy_and_init()
         .await
-        .unwrap()
+        .unwrap();
+
+    #[cfg(feature = "ext-connector")]
+    init_eth_connector(&contract).await.unwrap();
+
+    contract
 }
 
 /// Deploy and init external eth connector
-pub async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
+#[cfg(feature = "ext-connector")]
+async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
     let contract_bytes = get_aurora_eth_connector_contract();
     let contract_account = aurora
         .root()
@@ -200,6 +209,7 @@ pub async fn transfer_nep_141(
     Ok(())
 }
 
+#[cfg(feature = "ext-connector")]
 fn get_aurora_eth_connector_contract() -> Vec<u8> {
     use std::path::Path;
     let contract_path = Path::new("../engine-tests-connector/etc/aurora-eth-connector");

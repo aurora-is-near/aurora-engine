@@ -1,8 +1,13 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
-use aurora_engine::parameters::{SetEthConnectorContractAccountArgs, SubmitArgs, ViewCallArgs};
+use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
-use aurora_engine_types::parameters::connector::WithdrawSerializeType;
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
+#[cfg(feature = "ext-connector")]
+use aurora_engine_types::parameters::connector::{
+    SetEthConnectorContractAccountArgs, WithdrawSerializeType,
+};
 use aurora_engine_types::parameters::engine::LegacyNewCallArgs;
 use aurora_engine_types::parameters::silo::FixedGasCostArgs;
 use aurora_engine_types::types::PromiseResult;
@@ -22,10 +27,10 @@ use near_vm_runner::MockCompiledContractCache;
 use rlp::RlpStream;
 use std::borrow::Cow;
 
-use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
+#[cfg(not(feature = "ext-connector"))]
+use crate::prelude::parameters::InitCallArgs;
 use crate::prelude::parameters::{
-    InitCallArgs, LegacyNewCallArgs, RelayerKeyManagerArgs, StartHashchainArgs, SubmitResult,
-    TransactionStatus,
+    RelayerKeyManagerArgs, StartHashchainArgs, SubmitResult, TransactionStatus,
 };
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
@@ -293,54 +298,57 @@ impl AuroraRunner {
             trie.insert(code_key.to_vec(), code);
         }
 
-        /* #[cfg(not(feature = "silo"))]
-        let ft_key = crate::prelude::storage::bytes_to_key(
-            crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
-        );
-        let ft_value = {
-            let mut current_ft: FungibleToken = trie
-                .get(&ft_key)
-                .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
-                .unwrap_or_default();
-            current_ft.total_eth_supply_on_near =
-                current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
-            current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
-                + NEP141Wei::new(init_balance.raw().as_u128());
-            current_ft
-        };
-
-        let aurora_balance_key = [
-            ft_key.as_slice(),
-            self.context.current_account_id.as_ref().as_bytes(),
-        ]
-        .concat();
-        let aurora_balance_value = {
-            let mut current_balance: u128 = trie
-                .get(&aurora_balance_key)
-                .map(|bytes| u128::try_from_slice(bytes).unwrap())
-                .unwrap_or_default();
-            current_balance += init_balance.raw().as_u128();
-            current_balance
-        };
-
-        let proof_key = crate::prelude::storage::bytes_to_key(
-            crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
-        );
-        */
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         if !init_nonce.is_zero() {
             trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         }
-        /* #[cfg(not(feature = "silo"))]
-        trie.insert(ft_key, ft_value.try_to_vec().unwrap());
-        trie.insert(proof_key, vec![0]);
-        trie.insert(
-            aurora_balance_key,
-            aurora_balance_value.try_to_vec().unwrap(),
-        );
-        */
+
+        #[cfg(not(feature = "ext-connector"))]
+        {
+            use aurora_engine::contract_methods::connector::fungible_token::FungibleToken;
+            let ft_key = crate::prelude::storage::bytes_to_key(
+                crate::prelude::storage::KeyPrefix::EthConnector,
+                &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
+            );
+            let ft_value = {
+                let mut current_ft: FungibleToken = trie
+                    .get(&ft_key)
+                    .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
+                    .unwrap_or_default();
+                current_ft.total_eth_supply_on_near = current_ft.total_eth_supply_on_near
+                    + aurora_engine_types::types::NEP141Wei::new(init_balance.raw().as_u128());
+                current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
+                    + aurora_engine_types::types::NEP141Wei::new(init_balance.raw().as_u128());
+                current_ft
+            };
+
+            let aurora_balance_key = [
+                ft_key.as_slice(),
+                self.context.current_account_id.as_ref().as_bytes(),
+            ]
+            .concat();
+            let aurora_balance_value = {
+                let mut current_balance: u128 = trie
+                    .get(&aurora_balance_key)
+                    .map(|bytes| u128::try_from_slice(bytes).unwrap())
+                    .unwrap_or_default();
+                current_balance += init_balance.raw().as_u128();
+                current_balance
+            };
+
+            let proof_key = crate::prelude::storage::bytes_to_key(
+                crate::prelude::storage::KeyPrefix::EthConnector,
+                &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
+            );
+
+            trie.insert(ft_key, ft_value.try_to_vec().unwrap());
+            trie.insert(proof_key, vec![0]);
+            trie.insert(
+                aurora_balance_key,
+                aurora_balance_value.try_to_vec().unwrap(),
+            );
+        }
+
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.env.block_height = self.context.block_height;
             standalone_runner.mint_account(address, init_balance, init_nonce, code);
@@ -573,18 +581,31 @@ impl AuroraRunner {
             }
         }
     }
-}
 
-impl Default for AuroraRunner {
-    fn default() -> Self {
-        let evm_wasm_bytes = if cfg!(feature = "mainnet-test") {
-            std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap()
+    fn get_engine_code() -> Vec<u8> {
+        let path = if cfg!(feature = "mainnet-test") {
+            if cfg!(feature = "ext-connector") {
+                "../bin/aurora-mainnet-silo-test.wasm"
+            } else {
+                "../bin/aurora-mainnet-test.wasm"
+            }
         } else if cfg!(feature = "testnet-test") {
-            std::fs::read("../bin/aurora-testnet-test.wasm").unwrap()
+            if cfg!(feature = "ext-connector") {
+                "../bin/aurora-testnet-silo-test.wasm"
+            } else {
+                "../bin/aurora-testnet-test.wasm"
+            }
         } else {
             panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
         };
 
+        std::fs::read(path).unwrap()
+    }
+}
+
+impl Default for AuroraRunner {
+    fn default() -> Self {
+        let evm_wasm_bytes = Self::get_engine_code();
         // Fetch config (mainly costs) for the latest protocol version.
         let runtime_config_store = RuntimeConfigStore::new(None);
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
@@ -666,25 +687,29 @@ pub fn deploy_runner() -> AuroraRunner {
 
     assert!(result.is_ok());
 
-    let args = InitCallArgs {
-        prover_account: str_to_account_id("prover.near"),
-        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
-        metadata: FungibleTokenMetadata::default(),
+    #[cfg(not(feature = "ext-connector"))]
+    let result = {
+        let args = InitCallArgs {
+            prover_account: str_to_account_id("prover.near"),
+            eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+            metadata: FungibleTokenMetadata::default(),
+        };
+        runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap())
     };
 
-    let result = runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
+    #[cfg(feature = "ext-connector")]
+    let result = {
+        let args = SetEthConnectorContractAccountArgs {
+            account: AccountId::new("aurora_eth_connector.root").unwrap(),
+            withdraw_serialize_type: WithdrawSerializeType::Borsh,
+        };
 
-    /* Silo mode
-    let args = SetEthConnectorContractAccountArgs {
-        account: AccountId::new("aurora_eth_connector.root").unwrap(),
-        withdraw_serialize_type: WithdrawSerializeType::Borsh,
+        runner.call(
+            "set_eth_connector_contract_account",
+            &account_id,
+            args.try_to_vec().unwrap(),
+        )
     };
-    let result = runner.call(
-        "set_eth_connector_contract_account",
-        &account_id,
-        args.try_to_vec().unwrap(),
-    );
-    */
 
     assert!(result.is_ok());
 

@@ -1,4 +1,4 @@
-use crate::deposit_event::error::ParseEventMessageError;
+use crate::contract_methods::connector::errors;
 use crate::prelude::account_id::AccountId;
 use crate::prelude::{
     format, vec, Address, BorshDeserialize, BorshSerialize, Fee, NEP141Wei, String, ToString, Vec,
@@ -28,26 +28,26 @@ impl FtTransferMessageData {
     /// Used for `ft_transfer_call` and `ft_on_transfer`
     pub fn parse_on_transfer_message(
         message: &str,
-    ) -> Result<Self, error::ParseOnTransferMessageError> {
+    ) -> Result<Self, errors::ParseOnTransferMessageError> {
         // Split message by separator
         let (account, msg) = message
             .split_once(':')
-            .ok_or(error::ParseOnTransferMessageError::TooManyParts)?;
+            .ok_or(errors::ParseOnTransferMessageError::TooManyParts)?;
 
         // Check relayer account id from 1-th data element
         let account_id = account
             .parse()
-            .map_err(|_| error::ParseOnTransferMessageError::InvalidAccount)?;
+            .map_err(|_| errors::ParseOnTransferMessageError::InvalidAccount)?;
 
         // Decode message array from 2-th element of data array
         // Length = fee[32] + eth_address[20] bytes
         let mut data = [0; 52];
         hex::decode_to_slice(msg, &mut data).map_err(|e| match e {
             hex::FromHexError::InvalidHexCharacter { .. } | hex::FromHexError::OddLength => {
-                error::ParseOnTransferMessageError::InvalidHexData
+                errors::ParseOnTransferMessageError::InvalidHexData
             }
             hex::FromHexError::InvalidStringLength => {
-                error::ParseOnTransferMessageError::WrongMessageFormat
+                errors::ParseOnTransferMessageError::WrongMessageFormat
             }
         })?;
 
@@ -56,7 +56,7 @@ impl FtTransferMessageData {
         // This logic is for compatibility.
         let fee_u128: u128 = U256::from_little_endian(&data[..32])
             .try_into()
-            .map_err(|_| error::ParseOnTransferMessageError::OverflowNumber)?;
+            .map_err(|_| errors::ParseOnTransferMessageError::OverflowNumber)?;
         let fee: Fee = fee_u128.into();
 
         // Get recipient Eth address from message slice
@@ -88,11 +88,11 @@ impl FtTransferMessageData {
         relayer_account_id: &AccountId,
         fee: Fee,
         recipient: String,
-    ) -> Result<Self, ParseEventMessageError> {
+    ) -> Result<Self, errors::ParseEventMessageError> {
         let address = if recipient.len() == 42 {
             recipient
                 .strip_prefix("0x")
-                .ok_or(ParseEventMessageError::EthAddressValidationError(
+                .ok_or(errors::ParseEventMessageError::EthAddressValidationError(
                     AddressError::FailedDecodeHex,
                 ))?
                 .to_string()
@@ -100,8 +100,8 @@ impl FtTransferMessageData {
             recipient
         };
 
-        let recipient_address =
-            Address::decode(&address).map_err(ParseEventMessageError::EthAddressValidationError)?;
+        let recipient_address = Address::decode(&address)
+            .map_err(errors::ParseEventMessageError::EthAddressValidationError)?;
 
         Ok(Self {
             relayer: relayer_account_id.clone(),
@@ -131,19 +131,19 @@ impl TokenMessageData {
     /// Parse event message data for tokens. Data parsed form event `recipient` field.
     /// Used for Deposit flow.
     /// For Eth logic flow message validated and prepared for  `ft_on_transfer` logic.
-    /// It mean validating Eth address correctness and preparing message for
+    /// It means validating Eth address correctness and preparing message for
     /// parsing for `ft_on_transfer` message parsing with correct and validated data.
     pub fn parse_event_message_and_prepare_token_message_data(
         message: &str,
         fee: Fee,
-    ) -> Result<Self, ParseEventMessageError> {
+    ) -> Result<Self, errors::ParseEventMessageError> {
         let data: Vec<_> = message.split(':').collect();
         // Data array can contain 1 or 2 elements
         if data.len() >= 3 {
-            return Err(ParseEventMessageError::TooManyParts);
+            return Err(errors::ParseEventMessageError::TooManyParts);
         }
         let account_id = AccountId::try_from(data[0].as_bytes())
-            .map_err(|_| ParseEventMessageError::InvalidAccount)?;
+            .map_err(|_| errors::ParseEventMessageError::InvalidAccount)?;
 
         // If data array contain only one element it should return NEAR account id
         if data.len() == 1 {
@@ -189,13 +189,13 @@ impl EthEvent {
         name: &str,
         params: EventParams,
         data: &[u8],
-    ) -> Result<Self, error::DecodeError> {
+    ) -> Result<Self, errors::DecodeError> {
         let event = Event {
             name: name.to_string(),
             inputs: params,
             anonymous: false,
         };
-        let log_entry: LogEntry = rlp::decode(data).map_err(|_| error::DecodeError::RlpFailed)?;
+        let log_entry: LogEntry = rlp::decode(data).map_err(|_| errors::DecodeError::RlpFailed)?;
         let eth_custodian_address = Address::new(log_entry.address);
         let topics = log_entry.topics.iter().map(|h| Hash::from(h.0)).collect();
 
@@ -205,7 +205,7 @@ impl EthEvent {
         };
         let log = event
             .parse_log(raw_log)
-            .map_err(|_| error::DecodeError::SchemaMismatch)?;
+            .map_err(|_| errors::DecodeError::SchemaMismatch)?;
 
         Ok(Self {
             eth_custodian_address,
@@ -253,14 +253,14 @@ impl DepositedEvent {
     }
 
     /// Parses raw Ethereum logs proof's entry data
-    pub fn from_log_entry_data(data: &[u8]) -> Result<Self, error::ParseError> {
+    pub fn from_log_entry_data(data: &[u8]) -> Result<Self, errors::ParseError> {
         let event = EthEvent::fetch_log_entry_data(DEPOSITED_EVENT, Self::event_params(), data)
-            .map_err(error::ParseError::LogParseFailed)?;
+            .map_err(errors::ParseError::LogParseFailed)?;
         let raw_sender = event.log.params[0]
             .value
             .clone()
             .into_address()
-            .ok_or(error::ParseError::InvalidSender)?
+            .ok_or(errors::ParseError::InvalidSender)?
             .0;
         let sender = Address::from_array(raw_sender);
 
@@ -271,18 +271,18 @@ impl DepositedEvent {
             .value
             .clone()
             .into_uint()
-            .ok_or(error::ParseError::InvalidAmount)?
+            .ok_or(errors::ParseError::InvalidAmount)?
             .try_into()
             .map(NEP141Wei::new)
-            .map_err(|_| error::ParseError::OverflowNumber)?;
+            .map_err(|_| errors::ParseError::OverflowNumber)?;
         let fee = event.log.params[3]
             .value
             .clone()
             .into_uint()
-            .ok_or(error::ParseError::InvalidFee)?
+            .ok_or(errors::ParseError::InvalidFee)?
             .try_into()
             .map(|v| Fee::new(NEP141Wei::new(v)))
-            .map_err(|_| error::ParseError::OverflowNumber)?;
+            .map_err(|_| errors::ParseError::OverflowNumber)?;
 
         let token_message_data =
             TokenMessageData::parse_event_message_and_prepare_token_message_data(
@@ -297,92 +297,6 @@ impl DepositedEvent {
             amount,
             fee,
         })
-    }
-}
-
-pub mod error {
-    use super::AddressError;
-    use crate::errors;
-
-    #[derive(Debug)]
-    pub enum DecodeError {
-        RlpFailed,
-        SchemaMismatch,
-    }
-    impl AsRef<[u8]> for DecodeError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::RlpFailed => errors::ERR_RLP_FAILED,
-                Self::SchemaMismatch => errors::ERR_PARSE_DEPOSIT_EVENT,
-            }
-        }
-    }
-
-    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
-    pub enum ParseEventMessageError {
-        TooManyParts,
-        InvalidAccount,
-        EthAddressValidationError(AddressError),
-    }
-
-    impl AsRef<[u8]> for ParseEventMessageError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::TooManyParts => errors::ERR_INVALID_EVENT_MESSAGE_FORMAT,
-                Self::InvalidAccount => errors::ERR_INVALID_ACCOUNT_ID,
-                Self::EthAddressValidationError(e) => e.as_ref(),
-            }
-        }
-    }
-
-    impl From<ParseEventMessageError> for ParseError {
-        fn from(e: ParseEventMessageError) -> Self {
-            Self::MessageParseFailed(e)
-        }
-    }
-
-    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
-    pub enum ParseError {
-        LogParseFailed(DecodeError),
-        InvalidSender,
-        InvalidAmount,
-        InvalidFee,
-        MessageParseFailed(ParseEventMessageError),
-        OverflowNumber,
-    }
-
-    impl AsRef<[u8]> for ParseError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::LogParseFailed(e) => e.as_ref(),
-                Self::InvalidSender => errors::ERR_INVALID_SENDER,
-                Self::InvalidAmount => errors::ERR_INVALID_AMOUNT,
-                Self::InvalidFee => errors::ERR_INVALID_FEE,
-                Self::MessageParseFailed(e) => e.as_ref(),
-                Self::OverflowNumber => errors::ERR_OVERFLOW_NUMBER,
-            }
-        }
-    }
-
-    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
-    pub enum ParseOnTransferMessageError {
-        TooManyParts,
-        InvalidHexData,
-        WrongMessageFormat,
-        InvalidAccount,
-        OverflowNumber,
-    }
-
-    impl AsRef<[u8]> for ParseOnTransferMessageError {
-        fn as_ref(&self) -> &[u8] {
-            match self {
-                Self::TooManyParts => errors::ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT,
-                Self::InvalidHexData => errors::ERR_INVALID_ON_TRANSFER_MESSAGE_HEX,
-                Self::WrongMessageFormat => errors::ERR_INVALID_ON_TRANSFER_MESSAGE_DATA,
-                Self::InvalidAccount => errors::ERR_INVALID_ACCOUNT_ID,
-                Self::OverflowNumber => errors::ERR_OVERFLOW_NUMBER,
-            }
-        }
     }
 }
 

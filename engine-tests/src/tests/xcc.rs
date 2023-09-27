@@ -387,7 +387,7 @@ pub mod workspace {
     use crate::utils;
     use crate::utils::workspace::{
         create_sub_account, deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141,
-        init_eth_connector, nep_141_balance_of, transfer_nep_141_to_erc_20,
+        nep_141_balance_of, transfer_nep_141_to_erc_20,
     };
     use aurora_engine_precompiles::xcc::cross_contract_call;
     use aurora_engine_transactions::legacy::TransactionLegacy;
@@ -756,9 +756,6 @@ pub mod workspace {
     async fn init_xcc() -> anyhow::Result<XccTestContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();
-
-        init_eth_connector(&aurora).await.unwrap();
-
         let xcc_wasm_bytes = super::contract_bytes();
         let result = aurora.factory_update(xcc_wasm_bytes).transact().await?;
         assert!(result.is_success());

@@ -70,8 +70,7 @@ pub enum EthConnectorStorageId {
     StatisticsAuroraAccountsCounter = 0x4,
     FungibleTokenMetadata = 0x5,
     EthConnectorAccount = 0x6,
-    DisableLegacyNEP141 = 0x7,
-    WithdrawSerializationType = 0x8,
+    WithdrawSerializationType = 0x7,
 }
 
 impl From<EthConnectorStorageId> for u8 {
@@ -84,8 +83,7 @@ impl From<EthConnectorStorageId> for u8 {
             EthConnectorStorageId::StatisticsAuroraAccountsCounter => 0x4,
             EthConnectorStorageId::FungibleTokenMetadata => 0x5,
             EthConnectorStorageId::EthConnectorAccount => 0x6,
-            EthConnectorStorageId::DisableLegacyNEP141 => 0x7,
-            EthConnectorStorageId::WithdrawSerializationType => 0x8,
+            EthConnectorStorageId::WithdrawSerializationType => 0x7,
         }
     }
 }

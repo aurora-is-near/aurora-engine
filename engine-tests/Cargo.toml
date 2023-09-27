@@ -16,7 +16,6 @@ aurora-engine-hashchain = { workspace = true, features = ["std"] }
 aurora-engine-modexp = { workspace = true, features = ["std"] }
 aurora-engine-precompiles = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }
-aurora-engine-standalone-nep141-legacy.workspace = true
 aurora-engine-test-doubles.workspace = true
 aurora-engine-transactions = { workspace = true, features = ["std", "impl-serde"] }
 aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
@@ -56,3 +55,4 @@ walrus.workspace = true
 mainnet-test = []
 testnet-test = []
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
+ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector", "engine-standalone-storage/ext-connector"]

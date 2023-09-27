@@ -5,20 +5,17 @@ use crate::prelude::{
     parameters::{PromiseArgs, PromiseCreateArgs},
     sdk::io::{StorageIntermediate, IO},
     storage::{bytes_to_key, KeyPrefix},
+    str,
     types::{Address, Yocto},
     vec, BorshSerialize, Cow, ToString, Vec, U256,
 };
 #[cfg(feature = "error_refund")]
-use crate::prelude::{
-    parameters::{PromiseWithCallbackArgs, RefundCallArgs},
-    types,
-};
+use crate::prelude::{parameters::RefundCallArgs, types};
+use crate::xcc::state::get_wnear_address;
 use crate::PrecompileOutput;
-use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::WithdrawSerializeType;
 use aurora_engine_types::parameters::WithdrawCallArgs;
 use aurora_engine_types::storage::EthConnectorStorageId;
-use aurora_engine_types::types::NEP141Wei;
 use aurora_engine_types::{
     account_id::AccountId,
     parameters::{
@@ -244,6 +241,7 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
 }
 
+#[cfg(feature = "ext-connector")]
 fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
     io.read_storage(&construct_contract_key(
         EthConnectorStorageId::EthConnectorAccount,
@@ -356,21 +354,21 @@ impl<I: IO> Precompile for ExitToNear<I> {
         let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input)?;
-        #[cfg(feature = "error_refund")]
-        let refund_on_error_target = self.current_account_id.clone();
+        #[cfg(not(feature = "ext-connector"))]
+        let eth_connector_account_id = self.current_account_id.clone();
+        #[cfg(feature = "ext-connector")]
+        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
 
         let (nep141_address, args, exit_event, method, transfer_near_args) = match flag {
             0x0 => {
                 // ETH transfer
                 //
                 // Input slice format:
-                //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
-
-                let eth_connector_contract_account = get_eth_connector_contract_account(&self.io)?;
+                // recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
                 if let Ok(dest_account) = AccountId::try_from(input) {
                     (
-                        eth_connector_contract_account,
+                        eth_connector_account_id,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
@@ -394,7 +392,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 }
             }
             0x1 => {
-                // ERC20 transfer
+                // ERC-20 transfer
                 //
                 // This precompile branch is expected to be called from the ERC20 burn function.
                 //
@@ -456,9 +454,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                     transfer_near_args,
                 )
             }
-            _ => {
-                return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG")));
-            }
+            _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
         };
 
         #[cfg(feature = "error_refund")]
@@ -526,6 +522,8 @@ impl<I: IO> Precompile for ExitToNear<I> {
 
 pub struct ExitToEthereum<I> {
     io: I,
+    #[cfg(not(feature = "ext-connector"))]
+    current_account_id: AccountId,
 }
 
 pub mod exit_to_ethereum {
@@ -539,6 +537,15 @@ pub mod exit_to_ethereum {
 }
 
 impl<I> ExitToEthereum<I> {
+    #[cfg(not(feature = "ext-connector"))]
+    pub const fn new(current_account_id: AccountId, io: I) -> Self {
+        Self {
+            io,
+            current_account_id,
+        }
+    }
+
+    #[cfg(feature = "ext-connector")]
     pub const fn new(io: I) -> Self {
         Self { io }
     }
@@ -549,6 +556,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn run(
         &self,
         input: &[u8],
@@ -583,6 +591,10 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         let mut input = input;
         let flag = input[0];
         input = &input[1..];
+        #[cfg(not(feature = "ext-connector"))]
+        let eth_connector_account_id = self.current_account_id.clone();
+        #[cfg(feature = "ext-connector")]
+        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
 
         let (nep141_address, serialized_args, exit_event) = match flag {
             0x0 => {
@@ -598,7 +610,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                     WithdrawSerializeType::Borsh => borsh_args,
                 };
                 (
-                    get_eth_connector_contract_account(&self.io)?,
+                    eth_connector_account_id,
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
                     serialize_fn(recipient_address, context.apparent_value)?,

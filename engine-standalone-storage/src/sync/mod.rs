@@ -1,4 +1,5 @@
 use crate::engine_state::EngineStateAccess;
+use aurora_engine::contract_methods::silo;
 use aurora_engine::{
     contract_methods, engine,
     parameters::{self, SubmitResult},
@@ -10,8 +11,11 @@ use aurora_engine_sdk::{
 };
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::{
-    account_id::AccountId, borsh::BorshDeserialize, parameters::{silo as silo_params, PromiseWithCallbackArgs},
-    types::Address, H256,
+    account_id::AccountId,
+    borsh::BorshDeserialize,
+    parameters::{silo as silo_params, xcc, PromiseWithCallbackArgs},
+    types::Address,
+    H256,
 };
 use std::{io, str::FromStr};
 
@@ -252,7 +256,6 @@ pub fn parse_transaction_kind(
                 .map_err(f)?;
             TransactionKind::SetEthConnectorContractAccount(args)
         }
-        TransactionKindTag::DisableLegacyNEP141 => TransactionKind::DisableLegacyNEP141,
         TransactionKindTag::Unknown => {
             return Err(ParseTransactionKindError::UnknownMethodName {
                 name: method_name.into(),
@@ -431,16 +434,13 @@ where
 /// Handles all transaction kinds other than `submit`.
 /// The `submit` transaction kind is special because it is the only one where the transaction hash
 /// differs from the NEAR receipt hash.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::match_same_arms)]
 fn non_submit_execute<I: IO + Copy>(
     transaction: &TransactionKind,
-    io: I,
+    mut io: I,
     env: &env::Fixed,
     promise_data: &[Option<Vec<u8>>],
 ) -> Result<Option<TransactionExecutionResult>, error::Error> {
-    let is_disabled_legacy_nep141 =
-        aurora_engine::connector::EthConnectorContract::init_instance(io)?
-            .is_disabled_legacy_nep141();
     let result = match transaction {
         TransactionKind::Call(_) => {
             // We can ignore promises in the standalone engine (see above)
@@ -457,7 +457,6 @@ fn non_submit_execute<I: IO + Copy>(
 
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
-
         TransactionKind::DeployErc20(_) => {
             // No promises can be created by `deploy_erc20_token`
             let mut handler = crate::promise::NoScheduler { promise_data };
@@ -465,7 +464,6 @@ fn non_submit_execute<I: IO + Copy>(
 
             Some(TransactionExecutionResult::DeployErc20(result))
         }
-
         TransactionKind::FtOnTransfer(_) => {
             // No promises can be created by `ft_on_transfer`
             let mut handler = crate::promise::NoScheduler { promise_data };
@@ -473,81 +471,102 @@ fn non_submit_execute<I: IO + Copy>(
 
             None
         }
-
         TransactionKind::FtTransferCall(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let promise_args =
-                contract_methods::connector::ft_transfer_call(io, env, &mut handler)?;
+            #[cfg(feature = "ext-connector")]
+            return Ok(None);
 
-            Some(TransactionExecutionResult::Promise(promise_args))
+            #[cfg(not(feature = "ext-connector"))]
+            {
+                let mut handler = crate::promise::NoScheduler { promise_data };
+                let maybe_promise_args =
+                    contract_methods::connector::ft_transfer_call(io, env, &mut handler)?;
+
+                maybe_promise_args.map(TransactionExecutionResult::Promise)
+            }
         }
-
         TransactionKind::ResolveTransfer(_, _) => {
-            let handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::connector::ft_resolve_transfer(io, env, &handler)?;
+            #[cfg(not(feature = "ext-connector"))]
+            {
+                let handler = crate::promise::NoScheduler { promise_data };
+                contract_methods::connector::ft_resolve_transfer(io, env, &handler)?;
+            }
 
             None
         }
-
         TransactionKind::FtTransfer(_) => {
+            #[cfg(not(feature = "ext-connector"))]
             contract_methods::connector::ft_transfer(io, env)?;
 
             None
         }
-
         TransactionKind::Withdraw(_) => {
+            #[cfg(not(feature = "ext-connector"))]
             contract_methods::connector::withdraw(io, env)?;
 
             None
         }
-
         TransactionKind::Deposit(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let promise_args = contract_methods::connector::deposit(io, env, &mut handler)?;
+            #[cfg(feature = "ext-connector")]
+            return Ok(None);
 
-            Some(TransactionExecutionResult::Promise(promise_args))
+            #[cfg(not(feature = "ext-connector"))]
+            {
+                let mut handler = crate::promise::NoScheduler { promise_data };
+                let maybe_promise_args =
+                    contract_methods::connector::deposit(io, env, &mut handler)?;
+                maybe_promise_args.map(TransactionExecutionResult::Promise)
+            }
         }
 
         TransactionKind::FinishDeposit(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let maybe_promise_args =
-                contract_methods::connector::finish_deposit(io, env, &mut handler)?;
+            #[cfg(feature = "ext-connector")]
+            return Ok(None);
 
-            maybe_promise_args.map(TransactionExecutionResult::Promise)
+            #[cfg(not(feature = "ext-connector"))]
+            {
+                let mut handler = crate::promise::NoScheduler { promise_data };
+                let maybe_promise_args =
+                    contract_methods::connector::finish_deposit(io, env, &mut handler)?;
+
+                maybe_promise_args.map(TransactionExecutionResult::Promise)
+            }
         }
 
         TransactionKind::StorageDeposit(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::connector::storage_deposit(io, env, &mut handler)?;
+            #[cfg(not(feature = "ext-connector"))]
+            {
+                let mut handler = crate::promise::NoScheduler { promise_data };
+                contract_methods::connector::storage_deposit(io, env, &mut handler)?;
+            }
 
             None
         }
-
         TransactionKind::StorageUnregister(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::connector::storage_unregister(io, env, &mut handler)?;
+            #[cfg(not(feature = "ext-connector"))]
+            {
+                let mut handler = crate::promise::NoScheduler { promise_data };
+                contract_methods::connector::storage_unregister(io, env, &mut handler)?;
+            }
 
             None
         }
-
         TransactionKind::StorageWithdraw(_) => {
+            #[cfg(not(feature = "ext-connector"))]
             contract_methods::connector::storage_withdraw(io, env)?;
 
             None
         }
-
         TransactionKind::SetPausedFlags(_) => {
+            #[cfg(not(feature = "ext-connector"))]
             contract_methods::connector::set_paused_flags(io, env)?;
 
             None
         }
-
         TransactionKind::RegisterRelayer(_) => {
             contract_methods::admin::register_relayer(io, env)?;
 
             None
         }
-
         TransactionKind::ExitToNear(_) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
             let maybe_result = contract_methods::connector::exit_to_near_precompile_callback(
@@ -558,14 +577,14 @@ fn non_submit_execute<I: IO + Copy>(
 
             maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
         }
-
         TransactionKind::SetConnectorData(_) => {
+            #[cfg(not(feature = "ext-connector"))]
             contract_methods::connector::set_eth_connector_contract_data(io, env)?;
 
             None
         }
-
         TransactionKind::NewConnector(_) => {
+            #[cfg(not(feature = "ext-connector"))]
             contract_methods::connector::new_eth_connector(io, env)?;
 
             None
@@ -573,25 +592,19 @@ fn non_submit_execute<I: IO + Copy>(
         TransactionKind::NewEngine(_) => {
             contract_methods::admin::new(io, env)?;
 
+            None
+        }
         TransactionKind::SetEthConnectorContractAccount(args) => {
-            use aurora_engine::admin_controlled::AdminControlled;
-
-            let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io)?;
-            connector.set_eth_connector_contract_account(&args.account);
-            connector.set_withdraw_serialize_type(&args.withdraw_serialize_type);
-
-            None
-        }
-
-        TransactionKind::DisableLegacyNEP141 => {
-            let mut connector = aurora_engine::connector::EthConnectorContract::init_instance(io)?;
-            connector.disable_legacy_nep141();
-
-            None
-        }
-
-        TransactionKind::NewEngine(args) => {
-            state::set_state(&mut io, &args.clone().into())?;
+            #[cfg(feature = "ext-connector")]
+            {
+                use aurora_engine::contract_methods::connector::external::AdminControlled;
+                let mut connector =
+                    contract_methods::connector::external::EthConnectorContract::init(io)?;
+                connector.set_eth_connector_contract_account(&args.account);
+                connector.set_withdraw_serialize_type(&args.withdraw_serialize_type);
+            }
+            #[cfg(not(feature = "ext-connector"))]
+            let _ = args;
 
             None
         }
@@ -725,9 +738,9 @@ impl ConsumeMessageOutcome {
 
 #[derive(Debug)]
 pub struct TransactionIncludedOutcome {
-    pub hash: aurora_engine_types::H256,
+    pub hash: H256,
     pub info: TransactionMessage,
-    pub diff: crate::Diff,
+    pub diff: Diff,
     pub maybe_result: Result<Option<TransactionExecutionResult>, error::Error>,
 }
 
@@ -749,24 +762,23 @@ pub enum TransactionExecutionResult {
 }
 
 pub mod error {
-    use aurora_engine::{engine, state, xcc, connector, contract_methods};
-    use aurora_engine_standalone_nep141_legacy::{fungible_token, legacy_connector};
+    use aurora_engine::contract_methods::connector::errors;
+    use aurora_engine::{contract_methods, engine, state, xcc};
 
     #[derive(Debug)]
     pub enum Error {
         EngineState(state::EngineStateError),
         Engine(engine::EngineError),
         DeployErc20(engine::DeployErc20Error),
-        FtOnTransfer(legacy_connector::error::FtTransferCallError),
-        Deposit(legacy_connector::error::DepositError),
-        FinishDeposit(legacy_connector::error::FinishDepositError),
-        FtTransfer(fungible_token::error::TransferError),
-        FtWithdraw(legacy_connector::error::WithdrawError),
-        FtStorageFunding(fungible_token::error::StorageFundingError),
+        FtOnTransfer(errors::FtTransferCallError),
+        Deposit(errors::DepositError),
+        FinishDeposit(errors::FinishDepositError),
+        FtTransfer(errors::TransferError),
+        FtWithdraw(errors::WithdrawError),
+        FtStorageFunding(errors::StorageFundingError),
         InvalidAddress(aurora_engine_types::types::address::error::AddressError),
-        ConnectorInit(legacy_connector::error::InitContractError),
-        LegacyConnectorStorage(legacy_connector::error::StorageReadError),
-        ConnectorStorage(connector::error::StorageReadError),
+        ConnectorInit(errors::InitContractError),
+        ConnectorStorage(errors::StorageReadError),
         FundXccError(xcc::FundXccError),
         ContractError(contract_methods::ContractError),
     }
@@ -789,38 +801,38 @@ pub mod error {
         }
     }
 
-    impl From<legacy_connector::error::FtTransferCallError> for Error {
-        fn from(e: legacy_connector::error::FtTransferCallError) -> Self {
+    impl From<errors::FtTransferCallError> for Error {
+        fn from(e: errors::FtTransferCallError) -> Self {
             Self::FtOnTransfer(e)
         }
     }
 
-    impl From<legacy_connector::error::DepositError> for Error {
-        fn from(e: legacy_connector::error::DepositError) -> Self {
+    impl From<errors::DepositError> for Error {
+        fn from(e: errors::DepositError) -> Self {
             Self::Deposit(e)
         }
     }
 
-    impl From<legacy_connector::error::FinishDepositError> for Error {
-        fn from(e: legacy_connector::error::FinishDepositError) -> Self {
+    impl From<errors::FinishDepositError> for Error {
+        fn from(e: errors::FinishDepositError) -> Self {
             Self::FinishDeposit(e)
         }
     }
 
-    impl From<fungible_token::error::TransferError> for Error {
-        fn from(e: fungible_token::error::TransferError) -> Self {
+    impl From<errors::TransferError> for Error {
+        fn from(e: errors::TransferError) -> Self {
             Self::FtTransfer(e)
         }
     }
 
-    impl From<legacy_connector::error::WithdrawError> for Error {
-        fn from(e: legacy_connector::error::WithdrawError) -> Self {
+    impl From<errors::WithdrawError> for Error {
+        fn from(e: errors::WithdrawError) -> Self {
             Self::FtWithdraw(e)
         }
     }
 
-    impl From<fungible_token::error::StorageFundingError> for Error {
-        fn from(e: fungible_token::error::StorageFundingError) -> Self {
+    impl From<errors::StorageFundingError> for Error {
+        fn from(e: errors::StorageFundingError) -> Self {
             Self::FtStorageFunding(e)
         }
     }
@@ -831,20 +843,14 @@ pub mod error {
         }
     }
 
-    impl From<legacy_connector::error::InitContractError> for Error {
-        fn from(e: legacy_connector::error::InitContractError) -> Self {
+    impl From<errors::InitContractError> for Error {
+        fn from(e: errors::InitContractError) -> Self {
             Self::ConnectorInit(e)
         }
     }
 
-    impl From<legacy_connector::error::StorageReadError> for Error {
-        fn from(e: legacy_connector::error::StorageReadError) -> Self {
-            Self::LegacyConnectorStorage(e)
-        }
-    }
-
-    impl From<aurora_engine::connector::error::StorageReadError> for Error {
-        fn from(e: aurora_engine::connector::error::StorageReadError) -> Self {
+    impl From<errors::StorageReadError> for Error {
+        fn from(e: errors::StorageReadError) -> Self {
             Self::ConnectorStorage(e)
         }
     }

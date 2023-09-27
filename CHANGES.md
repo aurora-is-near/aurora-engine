@@ -9,14 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changes
 
-- Added functions for setting and getting metadata of ERC-20 contracts deployed with `deploy_erc20_token` transaction
-  by [@aleksuss]. ([#837])
-
 - Changed structure `SetEthConnectorContractAccountArgs` for setting eth connector account. It was extended with
  additional field: `withdraw_serialize_type` for defining serialization type for withdraw arguments by [@aleksuss]. ([#834]) 
 
-[#837]: https://github.com/aurora-is-near/aurora-engine/pull/837
+## [3.1.0] 2023-09-25
+
+### Additions
+
+- Added the possibility to use native NEAR instead of wNEAR on Aurora by [@karim-en]. ([#750])
+
+- Added hashchain integration by [@birchmd]. ([#831])
+
+- Added functions for setting and getting metadata of ERC-20 contracts deployed with `deploy_erc20_token` transaction
+  by [@aleksuss]. ([#837])
+
+[#750]: https://github.com/aurora-is-near/aurora-engine/pull/750
+[#831]: https://github.com/aurora-is-near/aurora-engine/pull/831
 [#834]: https://github.com/aurora-is-near/aurora-engine/pull/834
+[#837]: https://github.com/aurora-is-near/aurora-engine/pull/837
 
 ## [3.0.0] 2023-08-28
 
@@ -496,7 +506,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.0.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.1.0...develop
+[3.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.0.0...3.1.0
 [3.0.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.0.0...2.10.2
 [2.10.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.1...2.10.2
 [2.10.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.0...2.10.1
@@ -544,6 +555,7 @@ struct SubmitResult {
 [@guidovranken]: https://github.com/guidovranken
 [@hskang9]: https://github.com/hskang9
 [@joshuajbouw]: https://github.com/joshuajbouw
+[@karim-en]: https://github.com/karim-en
 [@mandreyel]: https://github.com/mandreyel
 [@matklad]: https://github.com/matklad
 [@mfornet]: https://github.com/mfornet
