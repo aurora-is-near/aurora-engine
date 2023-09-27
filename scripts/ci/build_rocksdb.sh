@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ROCKSDB_VER=v7.4.4
+ROCKSDB_VER=v8.1.1
 INSTALL_PATH=/root/rocksdb
 LIB_PATH=$INSTALL_PATH/lib/librocksdb.a
 
