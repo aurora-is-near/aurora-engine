@@ -62,7 +62,7 @@ In some circumstances, you may require a custom environment. This can
 be created in the `.env` folder as `custom.env` following the structure of the
 other `.env` files. See `bin/local-custom.env` for more details.
 
-Every `make` invocation most follow the following pattern, though `--profile` is
+Every `make` invocation must follow the following pattern, though `--profile` is
 not required in all cases (such as cleanup):
 
 ```sh

@@ -152,12 +152,12 @@ pub fn parse_transaction_kind(
             })?;
             TransactionKind::RegisterRelayer(address)
         }
-        TransactionKindTag::RefundOnError => match promise_data.first().and_then(Option::as_ref) {
-            None => TransactionKind::RefundOnError(None),
+        TransactionKindTag::ExitToNear => match promise_data.first().and_then(Option::as_ref) {
+            None => TransactionKind::ExitToNear(None),
             Some(_) => {
-                let args = aurora_engine_types::parameters::RefundCallArgs::try_from_slice(&bytes)
+                let args = aurora_engine_types::parameters::ExitToNearPrecompileCallbackCallArgs::try_from_slice(&bytes)
                     .map_err(f)?;
-                TransactionKind::RefundOnError(Some(args))
+                TransactionKind::ExitToNear(Some(args))
             }
         },
         TransactionKindTag::SetConnectorData => {
@@ -515,9 +515,13 @@ fn non_submit_execute<I: IO + Copy>(
             None
         }
 
-        TransactionKind::RefundOnError(_) => {
+        TransactionKind::ExitToNear(_) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let maybe_result = contract_methods::connector::refund_on_error(io, env, &mut handler)?;
+            let maybe_result = contract_methods::connector::exit_to_near_precompile_callback(
+                io,
+                env,
+                &mut handler,
+            )?;
 
             maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
         }

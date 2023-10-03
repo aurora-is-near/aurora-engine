@@ -129,3 +129,34 @@ pub async fn deploy_nep_141(
 
     Ok(nep141)
 }
+
+pub async fn transfer_nep_141(
+    nep_141: &AccountId,
+    source: &Account,
+    dest: &str,
+    amount: u128,
+) -> anyhow::Result<()> {
+    let result = source
+        .call(nep_141, "storage_deposit")
+        .args_json(json!({
+            "account_id": dest,
+        }))
+        .deposit(STORAGE_AMOUNT)
+        .transact()
+        .await?;
+    assert!(result.is_success());
+
+    let result = source
+        .call(nep_141, "ft_transfer")
+        .args_json(json!({
+            "receiver_id": dest,
+            "amount": amount.to_string(),
+            "memo": "null",
+        }))
+        .deposit(1)
+        .transact()
+        .await?;
+    assert!(result.is_success());
+
+    Ok(())
+}
