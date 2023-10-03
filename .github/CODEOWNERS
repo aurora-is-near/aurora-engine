@@ -1,9 +1,1 @@
-* @joshuajbouw
-/engine/ @aleksuss
-/engine-precompiles/ @aleksuss
-/engine-sdk/ @aleksuss
-/engine-standalone-storage/ @RomanHodulak
-/engine-standalone-tracing/ @RomanHodulak
-/engine-test-doubles/ @joshuajbouw
-/engine-tests/ @joshuajbouw
-/engine-transactions/ @aleksuss
+* @aleksuss
