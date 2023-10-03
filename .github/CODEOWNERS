@@ -1,1 +1,12 @@
 * @aleksuss
+/engine/ @birchmd
+/engine-hashchain/ @birchmd
+/engine-modexp/ @birchmd
+/engine-precompiles/ @birchmd
+/engine-sdk/ @mrLSD
+/engine-standalone-storage/ @birchmd
+/engine-standalone-tracing/ @birchmd
+/engine-tests-connector/ @mrLSD
+/engine-test-doubles/ @mrLSD
+/engine-tests/ @mrLSD
+/engine-workspace/ @mrLSD
