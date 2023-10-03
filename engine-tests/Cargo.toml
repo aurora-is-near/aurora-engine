@@ -52,7 +52,7 @@ tokio.workspace = true
 walrus.workspace = true
 
 [features]
-mainnet-test = []
-testnet-test = []
+mainnet-test = ["aurora-engine-workspace/mainnet-test"]
+testnet-test = ["aurora-engine-workspace/testnet-test"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
-ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector", "engine-standalone-storage/ext-connector"]
+ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector", "engine-standalone-storage/ext-connector", "aurora-engine-workspace/ext-connector"]
