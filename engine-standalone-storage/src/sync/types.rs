@@ -158,6 +158,8 @@ pub enum TransactionKind {
     AddEntryToWhitelistBatch(Vec<silo::WhitelistArgs>),
     RemoveEntryFromWhitelist(silo::WhitelistArgs),
     SetWhitelistStatus(silo::WhitelistStatusArgs),
+    /// Callback which mirrors existed ERC-20 contract deployed on the main contract.
+    MirrorErc20TokenCallback(parameters::MirrorErc20TokenArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -228,7 +230,7 @@ impl TransactionKind {
                 let from = Self::get_implicit_address(caller);
                 let nonce =
                     Self::get_implicit_nonce(&from, block_height, transaction_position, storage);
-                let data = aurora_engine::engine::setup_deploy_erc20_input(engine_account);
+                let data = aurora_engine::engine::setup_deploy_erc20_input(engine_account, None);
                 NormalizedEthTransaction {
                     address: from,
                     chain_id: None,
@@ -409,6 +411,9 @@ impl TransactionKind {
                 Self::no_evm_execution("remove_entry_from_whitelist")
             }
             Self::SetWhitelistStatus(_) => Self::no_evm_execution("set_whitelist_status"),
+            Self::MirrorErc20TokenCallback(_) => {
+                Self::no_evm_execution("mirror_erc20_token_callback")
+            }
         }
     }
 
@@ -535,6 +540,8 @@ pub enum TransactionKindTag {
     AddEntryToWhitelistBatch,
     #[strum(serialize = "remove_entry_from_whitelist")]
     RemoveEntryFromWhitelist,
+    #[strum(serialize = "mirror_erc20_token_callback")]
+    MirrorErc20TokenCallback,
     Unknown,
 }
 
@@ -592,6 +599,7 @@ impl TransactionKind {
             Self::AddEntryToWhitelistBatch(args) => args.try_to_vec().unwrap_or_default(),
             Self::SetWhitelistStatus(args) => args.try_to_vec().unwrap_or_default(),
             Self::SetEthConnectorContractAccount(args) => args.try_to_vec().unwrap_or_default(),
+            Self::MirrorErc20TokenCallback(args) => args.try_to_vec().unwrap_or_default(),
         }
     }
 }
@@ -646,6 +654,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::RemoveEntryFromWhitelist(_) => Self::RemoveEntryFromWhitelist,
             TransactionKind::SetWhitelistStatus(_) => Self::SetWhitelistStatus,
             TransactionKind::Unknown => Self::Unknown,
+            TransactionKind::MirrorErc20TokenCallback(_) => Self::MirrorErc20TokenCallback,
         }
     }
 }
@@ -784,7 +793,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
 /// Same as `TransactionKind`, but with `Submit` variant replaced with raw bytes
 /// so that it can derive the Borsh traits. All non-copy elements are `Cow` also
 /// so that this type can be cheaply created from a `TransactionKind` reference.
-/// !!!!! New types of transactions must be added in the end of the enum. !!!!!!
+/// !!!!! New types of transactions must be added at the end of the enum. !!!!!!
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
 enum BorshableTransactionKind<'a> {
     Submit(Cow<'a, Vec<u8>>),
@@ -836,6 +845,7 @@ enum BorshableTransactionKind<'a> {
     RemoveEntryFromWhitelist(Cow<'a, silo::WhitelistArgs>),
     SetWhitelistStatus(Cow<'a, silo::WhitelistStatusArgs>),
     SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
+    MirrorErc20TokenCallback(Cow<'a, parameters::MirrorErc20TokenArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -902,6 +912,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
                 Self::RemoveEntryFromWhitelist(Cow::Borrowed(x))
             }
             TransactionKind::SetWhitelistStatus(x) => Self::SetWhitelistStatus(Cow::Borrowed(x)),
+            TransactionKind::MirrorErc20TokenCallback(x) => {
+                Self::MirrorErc20TokenCallback(Cow::Borrowed(x))
+            }
         }
     }
 }
@@ -996,6 +1009,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::SetWhitelistStatus(x) => {
                 Ok(Self::SetWhitelistStatus(x.into_owned()))
+            }
+            BorshableTransactionKind::MirrorErc20TokenCallback(x) => {
+                Ok(Self::MirrorErc20TokenCallback(x.into_owned()))
             }
         }
     }

@@ -43,6 +43,7 @@ near-vm-errors.workspace = true
 near-vm-logic.workspace = true
 near-vm-runner.workspace = true
 rand.workspace = true
+reqwest.workspace = true
 rlp.workspace = true
 serde.workspace = true
 serde_json.workspace = true

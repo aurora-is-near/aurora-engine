@@ -37,7 +37,7 @@ use crate::prelude::{
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use aurora_engine_precompiles::PrecompileConstructorContext;
-use aurora_engine_types::parameters::connector::Erc20Metadata;
+use aurora_engine_types::parameters::connector::{Erc20Metadata, MirrorErc20TokenArgs};
 use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
 use core::cell::RefCell;
 use core::iter::once;
@@ -506,18 +506,21 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn deploy_code_with_input<P: PromiseHandler>(
         &mut self,
         input: Vec<u8>,
+        address: Option<Address>,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let origin = Address::new(self.origin());
         let value = Wei::zero();
-        self.deploy_code(origin, value, input, u64::MAX, Vec::new(), handler)
+        self.deploy_code(origin, value, input, address, u64::MAX, Vec::new(), handler)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn deploy_code<P: PromiseHandler>(
         &mut self,
         origin: Address,
         value: Wei,
         input: Vec<u8>,
+        address: Option<Address>,
         gas_limit: u64,
         access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
@@ -527,11 +530,27 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
 
         let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
-        let address = executor.create_address(CreateScheme::Legacy {
-            caller: origin.raw(),
-        });
-        let (exit_reason, return_value) =
-            executor.transact_create(origin.raw(), value.raw(), input, gas_limit, access_list);
+        let scheme = address.map_or_else(
+            || CreateScheme::Legacy {
+                caller: origin.raw(),
+            },
+            |address| CreateScheme::Fixed(address.raw()),
+        );
+        let address = executor.create_address(scheme);
+        let (exit_reason, return_value) = match scheme {
+            CreateScheme::Legacy { caller } => {
+                executor.transact_create(caller, value.raw(), input, gas_limit, access_list)
+            }
+            CreateScheme::Fixed(address) => executor.transact_create_fixed(
+                origin.raw(),
+                address,
+                value.raw(),
+                input,
+                gas_limit,
+                access_list,
+            ),
+            CreateScheme::Create2 { .. } => unreachable!(),
+        };
         let result = if exit_reason.is_succeed() {
             address.0.to_vec()
         } else {
@@ -1096,6 +1115,7 @@ pub fn submit_with_alt_modexp<
             sender,
             transaction.value,
             transaction.data,
+            None,
             gas_limit,
             access_list,
             handler,
@@ -1280,14 +1300,17 @@ pub fn setup_receive_erc20_tokens_input(
 }
 
 #[must_use]
-pub fn setup_deploy_erc20_input(current_account_id: &AccountId) -> Vec<u8> {
+pub fn setup_deploy_erc20_input(
+    current_account_id: &AccountId,
+    erc20_metadata: Option<Erc20Metadata>,
+) -> Vec<u8> {
     #[cfg(feature = "error_refund")]
     let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20V2.bin");
     #[cfg(not(feature = "error_refund"))]
     let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
 
     let erc20_admin_address = current_address(current_account_id);
-    let erc20_metadata = Erc20Metadata::default();
+    let erc20_metadata = erc20_metadata.unwrap_or_default();
 
     let deploy_args = ethabi::encode(&[
         ethabi::Token::String(erc20_metadata.name),
@@ -1307,7 +1330,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     handler: &mut P,
 ) -> Result<Address, DeployErc20Error> {
     let current_account_id = env.current_account_id();
-    let input = setup_deploy_erc20_input(&current_account_id);
+    let input = setup_deploy_erc20_input(&current_account_id, None);
     let mut engine: Engine<_, _> = Engine::new(
         aurora_engine_sdk::types::near_account_to_evm_address(
             env.predecessor_account_id().as_bytes(),
@@ -1318,7 +1341,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     )
     .map_err(DeployErc20Error::State)?;
 
-    let address = match Engine::deploy_code_with_input(&mut engine, input, handler) {
+    let address = match engine.deploy_code_with_input(input, None, handler) {
         Ok(result) => match result.status {
             TransactionStatus::Succeed(ret) => {
                 Address::new(H160(ret.as_slice().try_into().unwrap()))
@@ -1329,6 +1352,50 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     };
 
     sdk::log!("Deployed ERC-20 in Aurora at: {:#?}", address);
+    engine
+        .register_token(address, args.nep141)
+        .map_err(DeployErc20Error::Register)?;
+
+    Ok(address)
+}
+
+/// Used to mirror deployed ERC-20 contract on main contract to silo.
+pub fn mirror_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
+    args: MirrorErc20TokenArgs,
+    erc20_address: Address,
+    io: I,
+    env: &E,
+    handler: &mut P,
+) -> Result<Address, DeployErc20Error> {
+    let current_account_id = env.current_account_id();
+    let input = setup_deploy_erc20_input(&current_account_id, args.erc20_metadata);
+    let mut engine: Engine<_, _> = Engine::new(
+        aurora_engine_sdk::types::near_account_to_evm_address(
+            env.predecessor_account_id().as_bytes(),
+        ),
+        current_account_id,
+        io,
+        env,
+    )
+    .map_err(DeployErc20Error::State)?;
+
+    let address = match engine.deploy_code_with_input(input, Some(erc20_address), handler) {
+        Ok(result) => match result.status {
+            TransactionStatus::Succeed(ret) => {
+                Address::new(H160(ret.as_slice().try_into().unwrap()))
+            }
+            other => return Err(DeployErc20Error::Failed(other)),
+        },
+        Err(e) => return Err(DeployErc20Error::Engine(e)),
+    };
+
+    assert_eq!(address, erc20_address);
+
+    sdk::log!(
+        "ERC-20 on: {} at address: {} has been mirrored",
+        args.contract_id.as_ref(),
+        address.encode()
+    );
     engine
         .register_token(address, args.nep141)
         .map_err(DeployErc20Error::Register)?;
@@ -2014,11 +2081,39 @@ mod tests {
         let input = vec![];
         let mut handler = Noop;
 
-        let actual_result = engine.deploy_code_with_input(input, &mut handler).unwrap();
+        let actual_result = engine
+            .deploy_code_with_input(input, None, &mut handler)
+            .unwrap();
 
         let nonce = U256::zero();
         let expected_address = create_legacy_address(&origin, &nonce).as_bytes().to_vec();
         let expected_status = TransactionStatus::Succeed(expected_address);
+        let expected_gas_used = 53000;
+        let expected_logs = Vec::new();
+        let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_deploying_code_with_address_succeeds() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let io = StoragePointer(&storage);
+        let mut engine: Engine<_, _> =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        let input = vec![];
+        let mut handler = Noop;
+
+        let address = Address::from_array([1; 20]);
+        let actual_result = engine
+            .deploy_code_with_input(input, Some(address), &mut handler)
+            .unwrap();
+
+        let expected_status = TransactionStatus::Succeed(address.as_bytes().to_vec());
         let expected_gas_used = 53000;
         let expected_logs = Vec::new();
         let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);

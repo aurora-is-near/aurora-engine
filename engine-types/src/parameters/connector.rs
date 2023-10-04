@@ -252,6 +252,17 @@ impl rlp::Encodable for LogEntry {
     }
 }
 
+/// Borsh-encoded parameters for `mirror_erc20_token` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+pub struct MirrorErc20TokenArgs {
+    /// AccountId of the main Aurora contract which has previously deployed ERC-20.
+    pub contract_id: AccountId,
+    /// AccountId of the bridged NEP-141 token.
+    pub nep141: AccountId,
+    /// Metadata of the ERC-20 token.
+    pub erc20_metadata: Option<Erc20Metadata>,
+}
+
 /// Parameters for `set_erc20_metadata` function.
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SetErc20MetadataArgs {

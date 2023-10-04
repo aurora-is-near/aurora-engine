@@ -35,7 +35,7 @@ pub fn deploy_code<I: IO + Copy, E: Env, H: PromiseHandler>(
             io,
             env,
         );
-        let result = engine.deploy_code_with_input(input, handler)?;
+        let result = engine.deploy_code_with_input(input, None, handler)?;
         let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
         Ok(result)

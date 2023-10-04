@@ -256,6 +256,10 @@ pub fn parse_transaction_kind(
                 .map_err(f)?;
             TransactionKind::SetEthConnectorContractAccount(args)
         }
+        TransactionKindTag::MirrorErc20TokenCallback => {
+            let args = parameters::MirrorErc20TokenArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::MirrorErc20TokenCallback(args)
+        }
         TransactionKindTag::Unknown => {
             return Err(ParseTransactionKindError::UnknownMethodName {
                 name: method_name.into(),
@@ -434,7 +438,11 @@ where
 /// Handles all transaction kinds other than `submit`.
 /// The `submit` transaction kind is special because it is the only one where the transaction hash
 /// differs from the NEAR receipt hash.
-#[allow(clippy::too_many_lines, clippy::match_same_arms)]
+#[allow(
+    clippy::too_many_lines,
+    clippy::match_same_arms,
+    clippy::cognitive_complexity
+)]
 fn non_submit_execute<I: IO + Copy>(
     transaction: &TransactionKind,
     mut io: I,
@@ -713,6 +721,12 @@ fn non_submit_execute<I: IO + Copy>(
         }
         TransactionKind::SetWhitelistStatus(args) => {
             silo::set_whitelist_status(&io, args);
+            None
+        }
+        TransactionKind::MirrorErc20TokenCallback(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::connector::mirror_erc20_token_callback(io, env, &mut handler)?;
+
             None
         }
     };

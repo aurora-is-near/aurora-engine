@@ -5,15 +5,15 @@ use crate::operation::{
     CallDeployCode, CallDeployErc20Token, CallDeployUpgrade, CallDeposit,
     CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
     CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
-    CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles, CallRefundOnError,
-    CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey, CallResumeContract,
-    CallResumePrecompiles, CallSetEthConnectorContractAccount, CallSetEthConnectorContractData,
-    CallSetFixedGasCost, CallSetKeyManager, CallSetPausedFlags, CallSetSiloParams,
-    CallSetWhitelistStatus, CallStageUpgrade, CallStateMigration, CallStorageDeposit,
-    CallStorageUnregister, CallStorageWithdraw, CallSubmit, CallWithdraw, ViewAccountsCounter,
-    ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141,
-    ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
-    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
+    CallMirrorErc20Token, CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles,
+    CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey,
+    CallResumeContract, CallResumePrecompiles, CallSetEthConnectorContractAccount,
+    CallSetEthConnectorContractData, CallSetFixedGasCost, CallSetKeyManager, CallSetPausedFlags,
+    CallSetSiloParams, CallSetWhitelistStatus, CallStageUpgrade, CallStateMigration,
+    CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit, CallWithdraw,
+    ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode,
+    ViewErc20FromNep141, ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth,
+    ViewFtMetadata, ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
     ViewGetEthConnectorContractAccount, ViewGetFixedGasCost, ViewGetSiloParams,
     ViewGetWhitelistStatus, ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner,
     ViewPausedFlags, ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex,
@@ -22,8 +22,8 @@ use crate::operation::{
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{
-    FungibleTokenMetadata, PausedMask, Proof, SetEthConnectorContractAccountArgs,
-    WithdrawSerializeType,
+    FungibleTokenMetadata, MirrorErc20TokenArgs, PausedMask, Proof,
+    SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::engine::{
     CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs, RelayerKeyManagerArgs,
@@ -208,6 +208,10 @@ impl EngineContract {
 
     pub fn deploy_erc20_token(&self, account_id: AccountId) -> CallDeployErc20Token {
         CallDeployErc20Token::call(&self.contract).args_borsh(account_id)
+    }
+
+    pub fn mirror_erc20_token(&self, args: MirrorErc20TokenArgs) -> CallMirrorErc20Token {
+        CallMirrorErc20Token::call(&self.contract).args_borsh(args)
     }
 
     pub fn call(&self, contract: Address, amount: U256, input: Vec<u8>) -> CallCall {

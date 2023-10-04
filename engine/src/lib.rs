@@ -388,6 +388,28 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Mirror existing ERC-20 token on the main Aurora contract.
+    /// Notice: It works if the SILO mode is on.
+    #[no_mangle]
+    pub extern "C" fn mirror_erc20_token() {
+        let io = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::mirror_erc20_token(io, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    /// Callback used by the `mirror_erc20_token` function.
+    #[no_mangle]
+    pub extern "C" fn mirror_erc20_token_callback() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::mirror_erc20_token_callback(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     /// Sets relayer key manager.
     #[no_mangle]
     pub extern "C" fn set_key_manager() {

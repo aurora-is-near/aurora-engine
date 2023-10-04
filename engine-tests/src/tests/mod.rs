@@ -3,6 +3,7 @@ mod contract_call;
 mod ecrecover;
 mod erc20;
 mod erc20_connector;
+mod erc20_mirror;
 mod ghsa_3p69_m8gg_fwmf;
 mod hashchain;
 #[cfg(feature = "meta-call")]
