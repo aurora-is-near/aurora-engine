@@ -453,13 +453,15 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
         return Err(crate::errors::ERR_ALLOWED_IN_SILO_MODE_ONLY.into());
     }
 
-    let args: MirrorErc20TokenArgs = io.read_input_borsh()?;
+    let input = io.read_input().to_vec();
+    let args = MirrorErc20TokenArgs::try_from_slice(&input)
+        .map_err(|_| crate::errors::ERR_BORSH_DESERIALIZE)?;
 
     let base = PromiseCreateArgs {
-        target_account_id: args.contract_id.clone(),
+        target_account_id: args.contract_id,
         method: "get_erc20_from_nep141".to_string(),
         args: GetErc20FromNep141CallArgs {
-            nep141: args.nep141.clone(),
+            nep141: args.nep141,
         }
         .try_to_vec()
         .map_err(|_| crate::errors::ERR_SERIALIZE)?,
@@ -469,9 +471,7 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
     let callback = PromiseCreateArgs {
         target_account_id: io.current_account_id(),
         method: "mirror_erc20_token_callback".to_string(),
-        args: args
-            .try_to_vec()
-            .map_err(|_| crate::errors::ERR_SERIALIZE)?,
+        args: input,
         attached_balance: Yocto::new(0),
         attached_gas: NearGas::new(5_000_000_000_000),
     };
