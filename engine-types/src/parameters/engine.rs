@@ -16,6 +16,7 @@ pub enum NewCallArgs {
     V1(LegacyNewCallArgs),
     V2(NewCallArgsV2),
     V3(NewCallArgsV3),
+    V4(NewCallArgsV4),
 }
 
 impl NewCallArgs {
@@ -24,6 +25,14 @@ impl NewCallArgs {
             |_| LegacyNewCallArgs::try_from_slice(bytes).map(Self::V1),
             Ok,
         )
+    }
+
+    #[must_use]
+    pub const fn initial_hashchain(&self) -> Option<RawH256> {
+        match self {
+            Self::V4(args) => args.initial_hashchain,
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+        }
     }
 }
 
@@ -64,6 +73,22 @@ pub struct NewCallArgsV3 {
     pub upgrade_delay_blocks: u64,
     /// Relayer keys manager.
     pub key_manager: AccountId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct NewCallArgsV4 {
+    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    pub chain_id: RawU256,
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
+    /// Relayer keys manager.
+    pub key_manager: AccountId,
+    /// Initial value of the hashchain.
+    /// If none is provided then the hashchain will start disabled.
+    pub initial_hashchain: Option<RawH256>,
 }
 
 /// Borsh-encoded parameters for the `set_owner` function.
