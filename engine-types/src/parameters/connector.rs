@@ -259,17 +259,34 @@ pub struct MirrorErc20TokenArgs {
     pub contract_id: AccountId,
     /// AccountId of the bridged NEP-141 token.
     pub nep141: AccountId,
-    /// Metadata of the ERC-20 token.
-    pub erc20_metadata: Option<Erc20Metadata>,
 }
 
 /// Parameters for `set_erc20_metadata` function.
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SetErc20MetadataArgs {
-    /// Address of the ERC-20 contract.
-    pub erc20_address: Address,
+    /// Address or corresponding NEP-141 account id of the ERC-20 contract.
+    pub erc20_identifier: Erc20Identifier,
     /// Metadata of the ERC-20 contract.
-    pub erc20_metadata: Erc20Metadata,
+    pub metadata: Erc20Metadata,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Erc20Identifier {
+    Erc20 { address: Address },
+    Nep141 { account_id: AccountId },
+}
+
+impl From<Address> for Erc20Identifier {
+    fn from(address: Address) -> Self {
+        Self::Erc20 { address }
+    }
+}
+
+impl From<AccountId> for Erc20Identifier {
+    fn from(account_id: AccountId) -> Self {
+        Self::Nep141 { account_id }
+    }
 }
 
 /// Metadata of ERC-20 contract.

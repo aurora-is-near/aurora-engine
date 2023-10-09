@@ -12,7 +12,9 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
-use aurora_engine_types::parameters::connector::{MirrorErc20TokenArgs, SetErc20MetadataArgs};
+use aurora_engine_types::parameters::connector::{
+    Erc20Identifier, MirrorErc20TokenArgs, SetErc20MetadataArgs,
+};
 use aurora_engine_types::parameters::engine::errors::ParseArgsError;
 use aurora_engine_types::parameters::engine::{
     DeployErc20TokenArgs, GetErc20FromNep141CallArgs, SubmitResult,
@@ -382,14 +384,15 @@ pub fn set_erc20_metadata<I: IO + Copy, E: Env, H: PromiseHandler>(
             io,
             env,
         );
-        let result = engine.set_erc20_metadata(args.erc20_address, args.erc20_metadata, handler)?;
+        let result = engine.set_erc20_metadata(&args.erc20_identifier, args.metadata, handler)?;
 
         Ok(result)
     })
 }
 
 pub fn get_erc20_metadata<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), ContractError> {
-    let erc20_address = io.read_input_arr20().map(Address::from_array)?;
+    let erc20_identifier =
+        serde_json::from_slice(&io.read_input().to_vec()).map_err(Into::<ParseArgsError>::into)?;
     let state = state::get_state(&io)?;
     let current_account_id = env.current_account_id();
     let engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
@@ -399,7 +402,7 @@ pub fn get_erc20_metadata<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<()
         io,
         env,
     );
-    let metadata = engine.get_erc20_metadata(erc20_address)?;
+    let metadata = engine.get_erc20_metadata(&erc20_identifier)?;
 
     io.return_output(&serde_json::to_vec(&metadata).map_err(|_| crate::errors::ERR_SERIALIZE)?);
     Ok(())
@@ -457,17 +460,28 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
     let args = MirrorErc20TokenArgs::try_from_slice(&input)
         .map_err(|_| crate::errors::ERR_BORSH_DESERIALIZE)?;
 
-    let base = PromiseCreateArgs {
-        target_account_id: args.contract_id,
-        method: "get_erc20_from_nep141".to_string(),
-        args: GetErc20FromNep141CallArgs {
-            nep141: args.nep141,
-        }
-        .try_to_vec()
-        .map_err(|_| crate::errors::ERR_SERIALIZE)?,
-        attached_balance: Yocto::new(0),
-        attached_gas: NearGas::new(5_000_000_000_000),
-    };
+    let promise = vec![
+        PromiseCreateArgs {
+            target_account_id: args.contract_id.clone(),
+            method: "get_erc20_from_nep141".to_string(),
+            args: GetErc20FromNep141CallArgs {
+                nep141: args.nep141.clone(),
+            }
+            .try_to_vec()
+            .map_err(|_| crate::errors::ERR_SERIALIZE)?,
+            attached_balance: Yocto::new(0),
+            attached_gas: NearGas::new(5_000_000_000_000),
+        },
+        PromiseCreateArgs {
+            target_account_id: args.contract_id,
+            method: "get_erc20_metadata".into(),
+            args: serde_json::to_vec(&Erc20Identifier::from(args.nep141))
+                .map_err(|_| crate::errors::ERR_SERIALIZE)?,
+            attached_balance: Yocto::new(0),
+            attached_gas: NearGas::new(5_000_000_000_000),
+        },
+    ];
+
     let callback = PromiseCreateArgs {
         target_account_id: io.current_account_id(),
         method: "mirror_erc20_token_callback".to_string(),
@@ -476,7 +490,8 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
         attached_gas: NearGas::new(5_000_000_000_000),
     };
     let promise_id = unsafe {
-        handler.promise_create_with_callback(&PromiseWithCallbackArgs { base, callback })
+        let promise_id = handler.promise_create_and_combine(&promise);
+        handler.promise_attach_callback(promise_id, &callback)
     };
 
     handler.promise_return(promise_id);
@@ -496,7 +511,7 @@ pub fn mirror_erc20_token_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
         require_running(&state)?;
         env.assert_private_call()?;
 
-        if handler.promise_results_count() > 1 {
+        if handler.promise_results_count() != 2 {
             return Err(crate::errors::ERR_PROMISE_COUNT.into());
         }
 
@@ -508,7 +523,15 @@ pub fn mirror_erc20_token_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
                 return Err(crate::errors::ERR_GETTING_ERC20_FROM_NEP141.into());
             };
 
-        let address = engine::mirror_erc20_token(args, erc20_address, io, env, handler)?;
+        let erc20_metadata =
+            if let Some(PromiseResult::Successful(bytes)) = handler.promise_result(1) {
+                serde_json::from_slice(&bytes).map_err(Into::<ParseArgsError>::into)?
+            } else {
+                return Err(crate::errors::ERR_GETTING_ERC20_FROM_NEP141.into());
+            };
+
+        let address =
+            engine::mirror_erc20_token(args, erc20_address, erc20_metadata, io, env, handler)?;
 
         io.return_output(
             &address

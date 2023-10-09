@@ -6,7 +6,10 @@ use crate::utils::workspace::{
 };
 use crate::utils::AuroraRunner;
 use aurora_engine_precompiles::xcc::state::STORAGE_AMOUNT;
-use aurora_engine_types::parameters::connector::{MirrorErc20TokenArgs, WithdrawSerializeType};
+use aurora_engine_types::parameters::connector::{
+    Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs, SetErc20MetadataArgs,
+    WithdrawSerializeType,
+};
 use aurora_engine_types::parameters::silo::SiloParamsArgs;
 use aurora_engine_types::types::RawU256;
 use aurora_engine_workspace::account::Account;
@@ -24,13 +27,31 @@ async fn test_mirroring_erc20_token() {
     let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract)
         .await
         .unwrap();
+    let erc20_metadata = Erc20Metadata {
+        name: "USD Tether".to_string(),
+        symbol: "USDT".to_string(),
+        decimals: 18,
+    };
+
+    // Set ERC-20 metadata.
+    let result = main_contract
+        .set_erc20_metadata(SetErc20MetadataArgs {
+            erc20_identifier: Erc20Identifier::Erc20 {
+                address: erc20.0.address,
+            },
+            metadata: erc20_metadata.clone(),
+        })
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    assert!(result.is_success());
 
     // Try to mirror ERC-20 with silo mode off.
     let result = silo_contract
         .mirror_erc20_token(MirrorErc20TokenArgs {
             contract_id: main_contract.id(),
             nep141: nep141.id(),
-            erc20_metadata: None,
         })
         .max_gas()
         .transact()
@@ -47,19 +68,25 @@ async fn test_mirroring_erc20_token() {
     assert!(result.is_success());
 
     // Should get ERC-20 address of mirrored contract.
-    let erc20_address = silo_contract
+    let result = silo_contract
         .mirror_erc20_token(MirrorErc20TokenArgs {
             contract_id: main_contract.id(),
             nep141: nep141.id(),
-            erc20_metadata: None,
         })
         .max_gas()
         .transact()
-        .await
-        .unwrap()
-        .into_value();
+        .await;
+    let erc20_address = result.unwrap().into_value();
 
     assert_eq!(erc20_address, erc20.0.address);
+    let silo_erc20_metadata = silo_contract
+        .get_erc20_metadata(Erc20Identifier::Erc20 {
+            address: erc20_address,
+        })
+        .await
+        .unwrap()
+        .result;
+    assert_eq!(silo_erc20_metadata, erc20_metadata);
 
     // We need to storage_deposit to register account id of the silo contract in the nep-141.
     let result = silo_contract
@@ -143,7 +170,7 @@ async fn test_mirroring_erc20_token() {
 }
 
 async fn deploy_main_contract() -> EngineContract {
-    let code = download_main_contract_code().await.unwrap();
+    let code = get_main_contract_code().await.unwrap();
     deploy_engine_with_code(code).await
 }
 
@@ -217,4 +244,19 @@ async fn download_main_contract_code() -> anyhow::Result<Vec<u8>> {
         .await
         .map(|b| b.to_vec())
         .map_err(Into::into)
+}
+
+async fn get_main_contract_code() -> anyhow::Result<Vec<u8>> {
+    let path = if cfg!(feature = "mainnet-test") {
+        "../bin/aurora-mainnet-test.wasm"
+    } else if cfg!(feature = "testnet-test") {
+        "../bin/aurora-testnet-test.wasm"
+    } else {
+        panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
+    };
+
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(bytes),
+        Err(_) => download_main_contract_code().await,
+    }
 }

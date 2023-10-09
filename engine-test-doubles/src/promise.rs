@@ -52,6 +52,13 @@ impl PromiseHandler for PromiseTracker {
         PromiseId::new(id)
     }
 
+    unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
+        args.iter()
+            .map(|arg| self.promise_create_call(arg))
+            .last()
+            .unwrap_or_else(|| PromiseId::new(0))
+    }
+
     unsafe fn promise_attach_callback(
         &mut self,
         base: PromiseId,

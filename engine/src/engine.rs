@@ -37,7 +37,9 @@ use crate::prelude::{
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use aurora_engine_precompiles::PrecompileConstructorContext;
-use aurora_engine_types::parameters::connector::{Erc20Metadata, MirrorErc20TokenArgs};
+use aurora_engine_types::parameters::connector::{
+    Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
+};
 use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
 use core::cell::RefCell;
 use core::iter::once;
@@ -122,6 +124,7 @@ pub enum EngineErrorKind {
     SameOwner,
     NotOwner,
     NonExistedKey,
+    Erc20FromNep141,
 }
 
 impl EngineErrorKind {
@@ -159,6 +162,7 @@ impl EngineErrorKind {
             Self::SameOwner => errors::ERR_SAME_OWNER,
             Self::NotOwner => errors::ERR_NOT_OWNER,
             Self::NonExistedKey => errors::ERR_FUNCTION_CALL_KEY_NOT_FOUND,
+            Self::Erc20FromNep141 => errors::ERR_GETTING_ERC20_FROM_NEP141,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
@@ -307,27 +311,20 @@ impl TryFrom<Vec<u8>> for NEP141Account {
     }
 }
 
-pub const ERR_INVALID_NEP141_ACCOUNT_ID: &str = "ERR_INVALID_NEP141_ACCOUNT_ID";
-
 #[derive(Debug)]
 pub enum GetErc20FromNep141Error {
     InvalidNep141AccountId,
     Nep141NotFound,
-}
-
-impl GetErc20FromNep141Error {
-    #[must_use]
-    pub const fn to_str(&self) -> &str {
-        match self {
-            Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
-            Self::Nep141NotFound => "ERR_NEP141_NOT_FOUND",
-        }
-    }
+    InvalidAddress,
 }
 
 impl AsRef<[u8]> for GetErc20FromNep141Error {
     fn as_ref(&self) -> &[u8] {
-        self.to_str().as_bytes()
+        match self {
+            Self::InvalidNep141AccountId => errors::ERR_INVALID_NEP141_ACCOUNT_ID,
+            Self::Nep141NotFound => errors::ERR_NEP141_NOT_FOUND,
+            Self::InvalidAddress => errors::ERR_PARSE_ADDRESS,
+        }
     }
 }
 
@@ -335,21 +332,16 @@ impl AsRef<[u8]> for GetErc20FromNep141Error {
 pub enum RegisterTokenError {
     InvalidNep141AccountId,
     TokenAlreadyRegistered,
-}
-
-impl RegisterTokenError {
-    #[must_use]
-    pub const fn to_str(&self) -> &str {
-        match self {
-            Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
-            Self::TokenAlreadyRegistered => "ERR_NEP141_TOKEN_ALREADY_REGISTERED",
-        }
-    }
+    InvalidAddress,
 }
 
 impl AsRef<[u8]> for RegisterTokenError {
     fn as_ref(&self) -> &[u8] {
-        self.to_str().as_bytes()
+        match self {
+            Self::InvalidNep141AccountId => errors::ERR_INVALID_NEP141_ACCOUNT_ID,
+            Self::TokenAlreadyRegistered => errors::ERR_NEP141_TOKEN_ALREADY_REGISTERED,
+            Self::InvalidAddress => errors::ERR_PARSE_ADDRESS,
+        }
     }
 }
 
@@ -358,6 +350,7 @@ pub enum ReadMetadataError {
     DecodeError,
     WrongType,
     NoValue,
+    Nep141NotFound,
     EngineError(EngineErrorKind),
 }
 
@@ -367,6 +360,7 @@ impl AsRef<[u8]> for ReadMetadataError {
             Self::DecodeError => errors::ERR_DECODING_TOKEN,
             Self::WrongType => errors::ERR_WRONG_TOKEN_TYPE,
             Self::NoValue => errors::ERR_TOKEN_NO_VALUE,
+            Self::Nep141NotFound => errors::ERR_NEP141_NOT_FOUND,
             Self::EngineError(e) => e.as_ref(),
         }
     }
@@ -707,6 +701,9 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             Err(GetErc20FromNep141Error::InvalidNep141AccountId) => {
                 return Err(RegisterTokenError::InvalidNep141AccountId);
             }
+            Err(GetErc20FromNep141Error::InvalidAddress) => {
+                return Err(RegisterTokenError::InvalidAddress);
+            }
             Ok(_) => return Err(RegisterTokenError::TokenAlreadyRegistered),
         }
 
@@ -850,8 +847,11 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     /// Read metadata of ERC-20 contract.
     pub fn get_erc20_metadata(
         &self,
-        erc20_address: Address,
+        erc20_identifier: &Erc20Identifier,
     ) -> Result<Erc20Metadata, ReadMetadataError> {
+        let erc20_address = self
+            .identifier_to_address(erc20_identifier)
+            .map_err(|_| ReadMetadataError::Nep141NotFound)?;
         let name = self
             .view_with_selector(
                 erc20_address,
@@ -889,10 +889,13 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     /// Set metadata of ERC-20 contract.
     pub fn set_erc20_metadata<P: PromiseHandler>(
         &mut self,
-        erc20_address: Address,
+        erc20_identifier: &Erc20Identifier,
         erc20_metadata: Erc20Metadata,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
+        let erc20_address = self
+            .identifier_to_address(erc20_identifier)
+            .map_err(|_| EngineErrorKind::Erc20FromNep141)?;
         let args = ethabi::encode(&[
             ethabi::Token::String(erc20_metadata.name),
             ethabi::Token::String(erc20_metadata.symbol),
@@ -970,6 +973,20 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             .map_err(|_| ReadMetadataError::DecodeError)?
             .pop()
             .ok_or(ReadMetadataError::NoValue)
+    }
+
+    fn identifier_to_address(
+        &self,
+        identifier: &Erc20Identifier,
+    ) -> Result<Address, GetErc20FromNep141Error> {
+        match identifier {
+            Erc20Identifier::Erc20 { address } => Ok(*address),
+            Erc20Identifier::Nep141 { account_id } => get_erc20_from_nep141(&self.io, account_id)
+                .and_then(|bytes| {
+                    Address::try_from_slice(&bytes)
+                        .map_err(|_| GetErc20FromNep141Error::InvalidAddress)
+                }),
+        }
     }
 }
 
@@ -1363,12 +1380,13 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
 pub fn mirror_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     args: MirrorErc20TokenArgs,
     erc20_address: Address,
+    erc20_metadata: Erc20Metadata,
     io: I,
     env: &E,
     handler: &mut P,
 ) -> Result<Address, DeployErc20Error> {
     let current_account_id = env.current_account_id();
-    let input = setup_deploy_erc20_input(&current_account_id, args.erc20_metadata);
+    let input = setup_deploy_erc20_input(&current_account_id, Some(erc20_metadata));
     let mut engine: Engine<_, _> = Engine::new(
         aurora_engine_sdk::types::near_account_to_evm_address(
             env.predecessor_account_id().as_bytes(),
@@ -2333,7 +2351,11 @@ mod tests {
         let mut handler = Noop;
         let args = DeployErc20TokenArgs { nep141 };
         let erc20_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
-        let metadata = engine.get_erc20_metadata(erc20_address).unwrap();
+        let metadata = engine
+            .get_erc20_metadata(&Erc20Identifier::Erc20 {
+                address: erc20_address,
+            })
+            .unwrap();
 
         assert_eq!(metadata, Erc20Metadata::default());
     }
