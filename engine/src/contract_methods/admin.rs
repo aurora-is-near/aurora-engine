@@ -19,7 +19,7 @@ use crate::{
         Authorizer, EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker,
         PausedPrecompilesManager, PrecompileFlags,
     },
-    state,
+    state::{self, EngineState},
 };
 use aurora_engine_hashchain::{bloom::Bloom, hashchain::Hashchain};
 use aurora_engine_modexp::AuroraModExp;
@@ -48,17 +48,38 @@ const CODE_KEY: &[u8; 4] = b"CODE";
 const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 
 #[named]
-pub fn new<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
-    with_hashchain(io, env, function_name!(), |mut io| {
-        if state::get_state(&io).is_ok() {
-            return Err(b"ERR_ALREADY_INITIALIZED".into());
-        }
+pub fn new<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), ContractError> {
+    if state::get_state(&io).is_ok() {
+        return Err(b"ERR_ALREADY_INITIALIZED".into());
+    }
 
-        let bytes = io.read_input().to_vec();
-        let args = NewCallArgs::deserialize(&bytes).map_err(|_| errors::ERR_BORSH_DESERIALIZE)?;
-        state::set_state(&mut io, &args.into())?;
-        Ok(())
-    })
+    let input = io.read_input().to_vec();
+    let args = NewCallArgs::deserialize(&input).map_err(|_| errors::ERR_BORSH_DESERIALIZE)?;
+
+    let initial_hashchain = args.initial_hashchain();
+    let state: EngineState = args.into();
+
+    if let Some(block_hashchain) = initial_hashchain {
+        let block_height = env.block_height();
+        let mut hashchain = Hashchain::new(
+            state.chain_id,
+            env.current_account_id(),
+            block_height,
+            block_hashchain,
+        );
+
+        hashchain.add_block_tx(
+            block_height,
+            function_name!(),
+            &input,
+            &[],
+            &Bloom::default(),
+        )?;
+        crate::hashchain::save_hashchain(&mut io, &hashchain)?;
+    }
+
+    state::set_state(&mut io, &state)?;
+    Ok(())
 }
 
 pub fn get_version<I: IO>(mut io: I) -> Result<(), ContractError> {

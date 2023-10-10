@@ -62,7 +62,7 @@ A custom environment may be required depending on the circumstances. This can
 be created in the `.env` folder as `custom.env` following the structure of the
 other `.env` files. See `bin/local-custom.env` for more details.
 
-Every make most follow the following pattern, though `--profile` is not required
+Every make must follow the following pattern, though `--profile` is not required
 for all such as cleanup:
 ```sh
 cargo make [--profile <profile>] <task>
