@@ -8,7 +8,7 @@ use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::parameters::connector::{
     SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
-use aurora_engine_types::parameters::engine::LegacyNewCallArgs;
+use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
 use aurora_engine_types::parameters::silo::FixedGasCostArgs;
 use aurora_engine_types::types::PromiseResult;
 use evm::ExitFatal;
@@ -29,9 +29,7 @@ use std::borrow::Cow;
 
 #[cfg(not(feature = "ext-connector"))]
 use crate::prelude::parameters::InitCallArgs;
-use crate::prelude::parameters::{
-    RelayerKeyManagerArgs, StartHashchainArgs, SubmitResult, TransactionStatus,
-};
+use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -679,12 +677,13 @@ impl ExecutionProfile {
 pub fn deploy_runner() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     let aurora_account_id = str_to_account_id(runner.aurora_account_id.as_str());
-    let args = LegacyNewCallArgs {
+    let args = NewCallArgs::V4(NewCallArgsV4 {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: aurora_account_id.clone(),
-        bridge_prover_id: str_to_account_id("bridge_prover.near"),
         upgrade_delay_blocks: 1,
-    };
+        key_manager: aurora_account_id,
+        initial_hashchain: Some([0u8; 32]),
+    });
 
     let account_id = runner.aurora_account_id.clone();
     let result = runner.call("new", &account_id, args.try_to_vec().unwrap());
@@ -716,19 +715,6 @@ pub fn deploy_runner() -> AuroraRunner {
     };
 
     assert!(result.is_ok());
-
-    // Need to set a key manager because that is the only account that can initialize the hashchain
-    let args = RelayerKeyManagerArgs {
-        key_manager: Some(aurora_account_id),
-    };
-    let result: Result<VMOutcome, EngineError> = runner.call(
-        "set_key_manager",
-        &account_id,
-        serde_json::to_vec(&args).unwrap(),
-    );
-    assert!(result.is_ok());
-
-    init_hashchain(&mut runner, &account_id, None);
 
     runner
 }
