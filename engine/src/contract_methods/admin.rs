@@ -29,6 +29,7 @@ use aurora_engine_sdk::{
     io::{StorageIntermediate, IO},
     promise::PromiseHandler,
 };
+use aurora_engine_types::parameters::engine::FullAccessKeyArgs;
 use aurora_engine_types::{
     borsh::BorshDeserialize,
     parameters::{
@@ -422,6 +423,35 @@ pub fn get_latest_hashchain<I: IO>(io: &mut I) -> Result<(), ContractError> {
     let bytes = serde_json::to_vec(&serde_json::json!({ "result": result }))
         .map_err(|_| errors::ERR_SERIALIZE)?;
     io.return_output(&bytes);
+
+    Ok(())
+}
+
+pub fn attach_full_access_key<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<(), ContractError> {
+    let state = state::get_state(&io)?;
+
+    require_running(&state)?;
+    require_owner_only(&state, &env.predecessor_account_id())?;
+
+    let public_key = serde_json::from_slice::<FullAccessKeyArgs>(&io.read_input().to_vec())
+        .map(|args| args.public_key)
+        .map_err(|_| errors::ERR_JSON_DESERIALIZE)?;
+    let current_account_id = env.current_account_id();
+    let action = PromiseAction::AddFullAccessKey {
+        public_key,
+        nonce: 0, // not actually used - depends on block height
+    };
+    let promise = PromiseBatchAction {
+        target_account_id: current_account_id,
+        actions: vec![action],
+    };
+    let promise_id = unsafe { handler.promise_create_batch(&promise) };
+
+    handler.promise_return(promise_id);
 
     Ok(())
 }

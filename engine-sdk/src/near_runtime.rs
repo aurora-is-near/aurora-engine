@@ -409,16 +409,14 @@ impl crate::promise::PromiseHandler for Runtime {
                     });
                 }
                 PromiseAction::AddFullAccessKey { public_key, nonce } => {
-                    feature_gated!("all-promise-actions", {
-                        let pk: RawPublicKey = public_key.into();
-                        let pk_bytes = pk.as_bytes();
-                        exports::promise_batch_action_add_key_with_full_access(
-                            id,
-                            pk_bytes.len() as _,
-                            pk_bytes.as_ptr() as _,
-                            *nonce,
-                        );
-                    });
+                    let pk: RawPublicKey = public_key.into();
+                    let pk_bytes = pk.as_bytes();
+                    exports::promise_batch_action_add_key_with_full_access(
+                        id,
+                        pk_bytes.len() as _,
+                        pk_bytes.as_ptr() as _,
+                        *nonce,
+                    );
                 }
                 PromiseAction::AddFunctionCallKey {
                     public_key,
