@@ -42,9 +42,13 @@ jobs:
       - name: Preparing rocksdb library
         run: scripts/ci/build_rocksdb.sh
       - name: Test mainnet
-        run: cargo make --profile mainnet-silo test-flow
+        run: |
+          cargo make --profile mainnet build-test
+          cargo make --profile mainnet-silo test-flow
       - name: Test testnet
-        run: cargo make --profile testnet-silo test-flow
+        run: |
+          cargo make --profile testnet build-test
+          cargo make --profile testnet-silo test-flow
       - name: Save cache
         run: cache-util save cargo_git cargo_registry yarn_cache
 

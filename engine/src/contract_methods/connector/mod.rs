@@ -5,22 +5,26 @@ use crate::contract_methods::{
 };
 use crate::engine::Engine;
 use crate::hashchain::with_hashchain;
-use crate::prelude::{sdk, vec, String, ToString, Vec};
+use crate::prelude::{vec, ToString, Vec};
 use crate::{engine, state};
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
-use aurora_engine_types::parameters::connector::{Proof, SetErc20MetadataArgs};
+use aurora_engine_types::parameters::connector::{
+    Erc20Identifier, MirrorErc20TokenArgs, SetErc20MetadataArgs,
+};
 use aurora_engine_types::parameters::engine::errors::ParseArgsError;
-use aurora_engine_types::parameters::engine::{DeployErc20TokenArgs, SubmitResult};
-use aurora_engine_types::parameters::PromiseWithCallbackArgs;
+use aurora_engine_types::parameters::engine::{
+    DeployErc20TokenArgs, GetErc20FromNep141CallArgs, SubmitResult,
+};
 use aurora_engine_types::parameters::{
     ExitToNearPrecompileCallbackCallArgs, PromiseAction, PromiseBatchAction,
 };
+use aurora_engine_types::parameters::{PromiseCreateArgs, PromiseWithCallbackArgs};
 use aurora_engine_types::storage::{EthConnectorStorageId, KeyPrefix};
-use aurora_engine_types::types::{Address, PromiseResult, Yocto};
+use aurora_engine_types::types::{Address, NearGas, PromiseResult, Yocto};
 use function_name::named;
 
 #[cfg(feature = "ext-connector")]
@@ -40,6 +44,8 @@ pub mod internal;
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
 pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
+/// Amount of attached gas for read-only promises.
+const READ_PROMISE_ATTACHED_GAS: NearGas = NearGas::new(5_000_000_000_000);
 
 /// Create new eth-connector;
 pub fn new_eth_connector<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
@@ -380,14 +386,15 @@ pub fn set_erc20_metadata<I: IO + Copy, E: Env, H: PromiseHandler>(
             io,
             env,
         );
-        let result = engine.set_erc20_metadata(args.erc20_address, args.erc20_metadata, handler)?;
+        let result = engine.set_erc20_metadata(&args.erc20_identifier, args.metadata, handler)?;
 
         Ok(result)
     })
 }
 
 pub fn get_erc20_metadata<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), ContractError> {
-    let erc20_address = io.read_input_arr20().map(Address::from_array)?;
+    let erc20_identifier =
+        serde_json::from_slice(&io.read_input().to_vec()).map_err(Into::<ParseArgsError>::into)?;
     let state = state::get_state(&io)?;
     let current_account_id = env.current_account_id();
     let engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
@@ -397,7 +404,7 @@ pub fn get_erc20_metadata<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<()
         io,
         env,
     );
-    let metadata = engine.get_erc20_metadata(erc20_address)?;
+    let metadata = engine.get_erc20_metadata(&erc20_identifier)?;
 
     io.return_output(&serde_json::to_vec(&metadata).map_err(|_| crate::errors::ERR_SERIALIZE)?);
     Ok(())
@@ -438,6 +445,109 @@ pub fn ft_metadata<
     Ok(())
 }
 
+pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
+    io: I,
+    handler: &mut H,
+) -> Result<(), ContractError> {
+    let state = state::get_state(&io)?;
+    require_running(&state)?;
+    // TODO: Add an admin access list of accounts allowed to do it.
+    require_owner_only(&state, &io.predecessor_account_id())?;
+
+    if !crate::contract_methods::silo::is_silo_mode_on(&io) {
+        return Err(crate::errors::ERR_ALLOWED_IN_SILO_MODE_ONLY.into());
+    }
+
+    let input = io.read_input().to_vec();
+    let args = MirrorErc20TokenArgs::try_from_slice(&input)
+        .map_err(|_| crate::errors::ERR_BORSH_DESERIALIZE)?;
+
+    let promise = vec![
+        PromiseCreateArgs {
+            target_account_id: args.contract_id.clone(),
+            method: "get_erc20_from_nep141".to_string(),
+            args: GetErc20FromNep141CallArgs {
+                nep141: args.nep141.clone(),
+            }
+            .try_to_vec()
+            .map_err(|_| crate::errors::ERR_SERIALIZE)?,
+            attached_balance: Yocto::new(0),
+            attached_gas: READ_PROMISE_ATTACHED_GAS,
+        },
+        PromiseCreateArgs {
+            target_account_id: args.contract_id,
+            method: "get_erc20_metadata".into(),
+            args: serde_json::to_vec(&Erc20Identifier::from(args.nep141))
+                .map_err(|_| crate::errors::ERR_SERIALIZE)?,
+            attached_balance: Yocto::new(0),
+            attached_gas: READ_PROMISE_ATTACHED_GAS,
+        },
+    ];
+
+    let callback = PromiseCreateArgs {
+        target_account_id: io.current_account_id(),
+        method: "mirror_erc20_token_callback".to_string(),
+        args: input,
+        attached_balance: Yocto::new(0),
+        attached_gas: READ_PROMISE_ATTACHED_GAS,
+    };
+    // Safe because these promises are read-only calls to the main engine contract
+    // and this transaction could be executed by the owner of the contract only.
+    let promise_id = unsafe {
+        let promise_id = handler.promise_create_and_combine(&promise);
+        handler.promise_attach_callback(promise_id, &callback)
+    };
+
+    handler.promise_return(promise_id);
+
+    Ok(())
+}
+
+#[named]
+pub fn mirror_erc20_token_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<(), ContractError> {
+    with_hashchain(io, env, function_name!(), |mut io| {
+        let state = state::get_state(&io)?;
+
+        require_running(&state)?;
+        env.assert_private_call()?;
+
+        if handler.promise_results_count() != 2 {
+            return Err(crate::errors::ERR_PROMISE_COUNT.into());
+        }
+
+        let args: MirrorErc20TokenArgs = io.read_input_borsh()?;
+        let erc20_address =
+            if let Some(PromiseResult::Successful(bytes)) = handler.promise_result(0) {
+                Address::try_from_slice(&bytes)?
+            } else {
+                return Err(crate::errors::ERR_GETTING_ERC20_FROM_NEP141.into());
+            };
+
+        let erc20_metadata =
+            if let Some(PromiseResult::Successful(bytes)) = handler.promise_result(1) {
+                serde_json::from_slice(&bytes).map_err(Into::<ParseArgsError>::into)?
+            } else {
+                return Err(crate::errors::ERR_GETTING_ERC20_FROM_NEP141.into());
+            };
+
+        let address =
+            engine::mirror_erc20_token(args, erc20_address, erc20_metadata, io, env, handler)?;
+
+        io.return_output(
+            &address
+                .as_bytes()
+                .try_to_vec()
+                .map_err(|_| crate::errors::ERR_SERIALIZE)?,
+        );
+
+        Ok(())
+    })
+}
+
 fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
     crate::prelude::bytes_to_key(KeyPrefix::EthConnector, &[u8::from(suffix)])
 }
@@ -454,12 +564,13 @@ fn get_contract_data<T: BorshDeserialize, I: IO>(
         })
 }
 
+#[cfg(any(not(feature = "ext-connector"), test))]
 #[must_use]
-pub fn proof_key(proof: &Proof) -> String {
+fn proof_key(proof: &aurora_engine_types::parameters::connector::Proof) -> crate::prelude::String {
     let mut data = proof.log_index.try_to_vec().unwrap();
     data.extend(proof.receipt_index.try_to_vec().unwrap());
     data.extend(proof.header_data.clone());
-    sdk::sha256(&data)
+    aurora_engine_sdk::sha256(&data)
         .0
         .iter()
         .map(ToString::to_string)
@@ -468,11 +579,11 @@ pub fn proof_key(proof: &Proof) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{proof_key, Proof};
+    use super::proof_key;
     use crate::contract_methods::connector::deposit_event::{
         DepositedEvent, TokenMessageData, DEPOSITED_EVENT,
     };
-    use aurora_engine_types::parameters::connector::LogEntry;
+    use aurora_engine_types::parameters::connector::{LogEntry, Proof};
     use aurora_engine_types::types::{make_address, Address, Fee, NEP141Wei, Wei};
     use aurora_engine_types::{H160, U256};
 

@@ -44,6 +44,11 @@ pub fn set_silo_params<I: IO>(io: &mut I, args: Option<SiloParamsArgs>) {
     set_erc20_fallback_address(io, address);
 }
 
+/// Return true if the Silo mode is on (`fixed_gas_cost` is set).
+pub fn is_silo_mode_on<I: IO>(io: &I) -> bool {
+    get_fixed_gas_cost(io).is_some()
+}
+
 /// Return fixed gas cost.
 pub fn get_fixed_gas_cost<I: IO>(io: &I) -> Option<Wei> {
     let key = fixed_gas_cost_key();

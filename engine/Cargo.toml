@@ -22,7 +22,7 @@ aurora-engine-types.workspace = true
 aurora-engine-sdk.workspace = true
 bitflags.workspace = true
 ethabi.workspace = true
-evm.workspace = true
+evm = { workspace = true, features = [ "create-fixed" ] }
 function_name.workspace = true
 hex.workspace = true
 rlp.workspace = true

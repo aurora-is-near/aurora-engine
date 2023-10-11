@@ -18,20 +18,26 @@ const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
 #[cfg(feature = "ext-connector")]
 const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector";
 
-#[allow(clippy::let_and_return)]
-pub async fn deploy_engine() -> EngineContract {
-    let aurora_runner = AuroraRunner::default();
-    let contract = aurora_engine_workspace::EngineContractBuilder::new()
+/// Deploy Aurora smart contract WITHOUT init external eth-connector.
+pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
+    let chain_id = AuroraRunner::get_default_chain_id();
+    aurora_engine_workspace::EngineContractBuilder::new()
         .unwrap()
-        .with_chain_id(aurora_runner.chain_id)
-        .with_code(aurora_runner.code.code().to_vec())
+        .with_chain_id(chain_id)
+        .with_code(code)
         .with_custodian_address("d045f7e19B2488924B97F9c145b5E51D0D895A65")
         .unwrap()
         .with_root_balance(parse_near!("10000 N"))
         .with_contract_balance(parse_near!("1000 N"))
         .deploy_and_init()
         .await
-        .unwrap();
+        .unwrap()
+}
+
+#[allow(clippy::let_and_return)]
+pub async fn deploy_engine() -> EngineContract {
+    let code = AuroraRunner::get_engine_code();
+    let contract = deploy_engine_with_code(code).await;
 
     #[cfg(feature = "ext-connector")]
     init_eth_connector(&contract).await.unwrap();

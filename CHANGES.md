@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed structure `SetEthConnectorContractAccountArgs` for setting eth connector account. It was extended with
  additional field: `withdraw_serialize_type` for defining serialization type for withdraw arguments by [@aleksuss]. ([#834]) 
 
+### Additions
+
+- Added a possibility of mirroring deployed ERC-20 contracts in the main Aurora contract in Silo mode by [@aleksuss]. ([#844])
+
+[#834]: https://github.com/aurora-is-near/aurora-engine/pull/834
+[#844]: https://github.com/aurora-is-near/aurora-engine/pull/844
+
 ## [3.1.0] 2023-09-25
 
 ### Additions
@@ -25,7 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [#750]: https://github.com/aurora-is-near/aurora-engine/pull/750
 [#831]: https://github.com/aurora-is-near/aurora-engine/pull/831
-[#834]: https://github.com/aurora-is-near/aurora-engine/pull/834
 [#837]: https://github.com/aurora-is-near/aurora-engine/pull/837
 
 ## [3.0.0] 2023-08-28

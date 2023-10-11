@@ -252,13 +252,41 @@ impl rlp::Encodable for LogEntry {
     }
 }
 
+/// Borsh-encoded parameters for `mirror_erc20_token` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+pub struct MirrorErc20TokenArgs {
+    /// AccountId of the main Aurora contract which has previously deployed ERC-20.
+    pub contract_id: AccountId,
+    /// AccountId of the bridged NEP-141 token.
+    pub nep141: AccountId,
+}
+
 /// Parameters for `set_erc20_metadata` function.
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SetErc20MetadataArgs {
-    /// Address of the ERC-20 contract.
-    pub erc20_address: Address,
+    /// Address or corresponding NEP-141 account id of the ERC-20 contract.
+    pub erc20_identifier: Erc20Identifier,
     /// Metadata of the ERC-20 contract.
-    pub erc20_metadata: Erc20Metadata,
+    pub metadata: Erc20Metadata,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Erc20Identifier {
+    Erc20 { address: Address },
+    Nep141 { account_id: AccountId },
+}
+
+impl From<Address> for Erc20Identifier {
+    fn from(address: Address) -> Self {
+        Self::Erc20 { address }
+    }
+}
+
+impl From<AccountId> for Erc20Identifier {
+    fn from(account_id: AccountId) -> Self {
+        Self::Nep141 { account_id }
+    }
 }
 
 /// Metadata of ERC-20 contract.

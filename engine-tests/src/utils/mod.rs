@@ -582,7 +582,7 @@ impl AuroraRunner {
         }
     }
 
-    fn get_engine_code() -> Vec<u8> {
+    pub fn get_engine_code() -> Vec<u8> {
         let path = if cfg!(feature = "mainnet-test") {
             if cfg!(feature = "ext-connector") {
                 "../bin/aurora-mainnet-silo-test.wasm"
@@ -600,6 +600,10 @@ impl AuroraRunner {
         };
 
         std::fs::read(path).unwrap()
+    }
+
+    pub const fn get_default_chain_id() -> u64 {
+        DEFAULT_CHAIN_ID
     }
 }
 

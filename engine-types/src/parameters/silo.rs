@@ -7,7 +7,7 @@ pub struct FixedGasCostArgs {
     pub cost: Option<Wei>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SiloParamsArgs {
     pub fixed_gas_cost: Wei,
     pub erc20_fallback_address: Address,

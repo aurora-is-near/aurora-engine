@@ -1,5 +1,7 @@
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawResult};
+use aurora_engine_types::parameters::connector::{
+    Erc20Metadata, FungibleTokenMetadata, WithdrawResult,
+};
 use aurora_engine_types::parameters::engine::{StorageBalance, SubmitResult, TransactionStatus};
 use aurora_engine_types::parameters::silo::{
     FixedGasCostArgs, SiloParamsArgs, WhitelistStatusArgs,
@@ -53,7 +55,8 @@ impl_call_return![
     (CallSetWhitelistStatus, Call::SetWhitelistStatus),
     (CallAddEntryToWhitelist, Call::AddEntryToWhitelist),
     (CallAddEntryToWhitelistBatch, Call::AddEntryToWhitelistBatch),
-    (CallRemoveEntryFromWhitelist, Call::RemoveEntryFromWhitelist)
+    (CallRemoveEntryFromWhitelist, Call::RemoveEntryFromWhitelist),
+    (CallSetErc20Metadata, Call::SetErc20Metadata)
 ];
 
 impl_call_return![
@@ -64,6 +67,7 @@ impl_call_return![
     (CallWithdraw => WithdrawResult, Call::Withdraw, borsh),
     (CallDeployCode => SubmitResult, Call::DeployCode, borsh),
     (CallDeployErc20Token => Address, Call::DeployErc20Token, borsh_address),
+    (CallMirrorErc20Token => Address, Call::MirrorErc20Token, borsh_address),
     (CallCall => SubmitResult, Call::Call, borsh),
     (CallSubmit => SubmitResult, Call::Submit, borsh),
     (CallFtOnTransfer => U128, Call::FtOnTransfer, json),
@@ -98,7 +102,8 @@ impl_view_return![
     (ViewGetFixedGasCost => FixedGasCostArgs, View::GetFixedGasCost, borsh),
     (ViewGetSiloParams => SiloParamsArgs, View::GetSiloParams, borsh),
     (ViewGetWhitelistStatus => WhitelistStatusArgs, View::GetWhitelistStatus, borsh),
-    (ViewFactoryWnearAddress => Address, View::FactoryWnearAddress, borsh)
+    (ViewFactoryWnearAddress => Address, View::FactoryWnearAddress, borsh),
+    (ViewGetErc20Metadata => Erc20Metadata, View::GetErc20Metadata, json)
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -108,6 +113,7 @@ pub(crate) enum Call {
     NewEthConnector,
     DeployCode,
     DeployErc20Token,
+    MirrorErc20Token,
     Call,
     Submit,
     RegisterRelayer,
@@ -144,6 +150,7 @@ pub(crate) enum Call {
     AddEntryToWhitelist,
     AddEntryToWhitelistBatch,
     RemoveEntryFromWhitelist,
+    SetErc20Metadata,
 }
 
 impl AsRef<str> for Call {
@@ -153,6 +160,7 @@ impl AsRef<str> for Call {
             Call::NewEthConnector => "new_eth_connector",
             Call::DeployCode => "deploy_code",
             Call::DeployErc20Token => "deploy_erc20_token",
+            Call::MirrorErc20Token => "mirror_erc20_token",
             Call::Call => "call",
             Call::Submit => "submit",
             Call::RegisterRelayer => "register_relayer",
@@ -189,6 +197,7 @@ impl AsRef<str> for Call {
             Call::AddEntryToWhitelist => "add_entry_to_whitelist",
             Call::AddEntryToWhitelistBatch => "add_entry_to_whitelist_batch",
             Call::RemoveEntryFromWhitelist => "remove_entry_from_whitelist",
+            Call::SetErc20Metadata => "set_erc20_metadata",
         }
     }
 }
@@ -224,6 +233,7 @@ pub enum View {
     GetSiloParams,
     GetWhitelistStatus,
     FactoryWnearAddress,
+    GetErc20Metadata,
 }
 
 impl AsRef<str> for View {
@@ -258,6 +268,7 @@ impl AsRef<str> for View {
             View::GetSiloParams => "get_silo_params",
             View::GetWhitelistStatus => "get_whitelist_status",
             View::FactoryWnearAddress => "factory_get_wnear_address",
+            View::GetErc20Metadata => "get_erc20_metadata",
         }
     }
 }

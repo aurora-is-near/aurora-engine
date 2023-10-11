@@ -32,6 +32,11 @@ pub trait PromiseHandler {
     /// arbitrary calls using the Engine.
     unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId;
 
+    /// Combine more than one promise into one.
+    /// # Safety
+    /// Safe because of use `promise_create_call` function under the hood.
+    unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId;
+
     /// # Safety
     /// See note on `promise_create_call`.
     unsafe fn promise_attach_callback(
@@ -108,6 +113,10 @@ impl PromiseHandler for Noop {
     }
 
     unsafe fn promise_create_call(&mut self, _args: &PromiseCreateArgs) -> PromiseId {
+        PromiseId::new(0)
+    }
+
+    unsafe fn promise_create_and_combine(&mut self, _args: &[PromiseCreateArgs]) -> PromiseId {
         PromiseId::new(0)
     }
 
