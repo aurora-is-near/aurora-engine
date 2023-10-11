@@ -2,7 +2,7 @@ use aurora_engine::deposit_event::{DepositedEvent, TokenMessageData, DEPOSITED_E
 use aurora_engine::parameters::{FungibleTokenMetadata, SetEthConnectorContractAccountArgs};
 use aurora_engine::proof::Proof;
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
-use aurora_engine_types::parameters::connector::LogEntry;
+use aurora_engine_types::parameters::connector::{LogEntry, WithdrawSerializeType};
 use aurora_engine_types::parameters::silo::{
     SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind,
 };
@@ -219,6 +219,7 @@ impl TestContract {
 
         let acc = SetEthConnectorContractAccountArgs {
             account: eth_connector_contract.id().parse().unwrap(),
+            withdraw_serialize_type: WithdrawSerializeType::Borsh,
         };
         let res = engine_contract
             .call("set_eth_connector_contract_account")
@@ -267,6 +268,7 @@ impl TestContract {
 
         let acc = SetEthConnectorContractAccountArgs {
             account: aurora_contract.id().parse().unwrap(),
+            withdraw_serialize_type: WithdrawSerializeType::Borsh,
         };
         let res = silo_contract
             .call("set_eth_connector_contract_account")
@@ -522,9 +524,9 @@ pub fn get_eth_connector_contract() -> Vec<u8> {
 
 fn get_engine_contract() -> Vec<u8> {
     if cfg!(feature = "mainnet-test") {
-        std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap()
+        std::fs::read("../bin/aurora-mainnet-silo-test.wasm").unwrap()
     } else if cfg!(feature = "testnet-test") {
-        std::fs::read("../bin/aurora-testnet-test.wasm").unwrap()
+        std::fs::read("../bin/aurora-testnet-silo-test.wasm").unwrap()
     } else {
         panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
     }

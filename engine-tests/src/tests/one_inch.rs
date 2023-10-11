@@ -39,7 +39,7 @@ fn test_1inch_liquidity_protocol() {
     let (result, profile, pool) =
         helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
     assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
-    assert_gas_bound(profile.all_gas(), 20);
+    assert_gas_bound(profile.all_gas(), 18);
 
     // Approve giving ERC-20 tokens to the pool
     helper.approve_erc20_tokens(&token_a, pool.address());
@@ -58,7 +58,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
-    assert_gas_bound(profile.all_gas(), 22);
+    assert_gas_bound(profile.all_gas(), 23);
 
     // Same here
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
@@ -84,7 +84,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
-    assert_gas_bound(profile.all_gas(), 19);
+    assert_gas_bound(profile.all_gas(), 20);
 }
 
 #[test]
@@ -105,8 +105,8 @@ fn test_1_inch_limit_order_deploy() {
     // at least 45% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (50..=60).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 50% and 60%",
+        (45..=55).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 45% and 55%",
     );
 }
 

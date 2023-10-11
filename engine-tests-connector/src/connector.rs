@@ -1,5 +1,7 @@
 use crate::utils::*;
-use aurora_engine::deposit_event::{DepositedEvent, TokenMessageData, DEPOSITED_EVENT};
+use aurora_engine::contract_methods::connector::deposit_event::{
+    DepositedEvent, TokenMessageData, DEPOSITED_EVENT,
+};
 use aurora_engine_types::parameters::connector::{Proof, WithdrawResult};
 use aurora_engine_types::{
     types::{Address, Fee, NEP141Wei},

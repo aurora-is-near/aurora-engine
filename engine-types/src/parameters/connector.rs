@@ -165,6 +165,13 @@ pub struct StorageUnregisterCallArgs {
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct SetEthConnectorContractAccountArgs {
     pub account: AccountId,
+    pub withdraw_serialize_type: WithdrawSerializeType,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub enum WithdrawSerializeType {
+    Json,
+    Borsh,
 }
 
 pub type PausedMask = u8;
@@ -242,6 +249,36 @@ impl rlp::Encodable for LogEntry {
         stream.append(&self.address);
         stream.append_list::<H256, _>(&self.topics);
         stream.append(&self.data);
+    }
+}
+
+/// Parameters for `set_erc20_metadata` function.
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SetErc20MetadataArgs {
+    /// Address of the ERC-20 contract.
+    pub erc20_address: Address,
+    /// Metadata of the ERC-20 contract.
+    pub erc20_metadata: Erc20Metadata,
+}
+
+/// Metadata of ERC-20 contract.
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Erc20Metadata {
+    /// Name of the token.
+    pub name: String,
+    /// Symbol of the token.
+    pub symbol: String,
+    /// Number of decimals.
+    pub decimals: u8,
+}
+
+impl Default for Erc20Metadata {
+    fn default() -> Self {
+        Self {
+            name: "Empty".to_string(),
+            symbol: "EMPTY".to_string(),
+            decimals: 0,
+        }
     }
 }
 

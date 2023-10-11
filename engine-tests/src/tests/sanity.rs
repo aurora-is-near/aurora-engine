@@ -5,6 +5,8 @@ use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_H
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
 use rand::RngCore;
@@ -14,6 +16,101 @@ const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
+
+#[ignore]
+#[test]
+fn bench_memory_get_standalone() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    // This EVM program is an infinite loop which causes a large amount of memory to be
+    // copied onto the EVM stack.
+    let contract_bytes = vec![
+        0x5b, 0x3a, 0x33, 0x43, 0x03, 0x59, 0x52, 0x59, 0x42, 0x59, 0x3a, 0x60, 0x05, 0x34, 0xf4,
+        0x60, 0x33, 0x43, 0x05, 0x52, 0x56,
+    ];
+    let result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            utils::create_deploy_transaction(contract_bytes, nonce)
+        })
+        .unwrap();
+    let address = Address::try_from_slice(&utils::unwrap_success(result)).unwrap();
+
+    runner.standalone_runner.as_mut().unwrap().env.block_height += 100;
+    let tx = aurora_engine_transactions::legacy::TransactionLegacy {
+        nonce: signer.use_nonce().into(),
+        gas_price: U256::zero(),
+        gas_limit: 10_000_000_u64.into(),
+        to: Some(address),
+        value: Wei::zero(),
+        data: Vec::new(),
+    };
+
+    let start = std::time::Instant::now();
+    let result = runner
+        .standalone_runner
+        .unwrap()
+        .submit_transaction(&signer.secret_key, tx)
+        .unwrap();
+    let duration = start.elapsed().as_secs_f32();
+    assert!(
+        matches!(result.status, TransactionStatus::OutOfGas),
+        "Infinite loops in the EVM run out of gas"
+    );
+    assert!(
+        duration < 8.0,
+        "Must complete this task in under 8s (in release build). Time taken: {duration} s",
+    );
+}
+
+#[test]
+fn test_returndatacopy() {
+    let (mut runner, mut signer, _) = initialize_transfer();
+
+    let deploy_contract = |runner: &mut utils::AuroraRunner,
+                           signer: &mut utils::Signer,
+                           contract_bytes: Vec<u8>|
+     -> Address {
+        let deploy = utils::create_deploy_transaction(contract_bytes, signer.use_nonce().into());
+        let result = runner
+            .submit_transaction(&signer.secret_key, deploy)
+            .unwrap();
+        Address::try_from_slice(&utils::unwrap_success(result)).unwrap()
+    };
+
+    let call_contract =
+        |runner: &mut utils::AuroraRunner, signer: &mut utils::Signer, address: Address| {
+            runner
+                .submit_with_signer(signer, |nonce| {
+                    aurora_engine_transactions::legacy::TransactionLegacy {
+                        nonce,
+                        gas_price: U256::zero(),
+                        gas_limit: u64::MAX.into(),
+                        to: Some(address),
+                        value: Wei::zero(),
+                        data: Vec::new(),
+                    }
+                })
+                .unwrap()
+        };
+
+    // Call returndatacopy with len=0 and large memory offset (> u32::MAX)
+    let contract_bytes = vec![0x60, 0x00, 0x3d, 0x33, 0x3e];
+    let address = deploy_contract(&mut runner, &mut signer, contract_bytes);
+    let result = call_contract(&mut runner, &mut signer, address);
+    assert!(
+        result.status.is_ok(),
+        "EVM must handle returndatacopy with len=0"
+    );
+
+    // Call returndatacopy with len=1 and large memory offset (> u32::MAX)
+    let contract_bytes = vec![0x60, 0x01, 0x3d, 0x33, 0x3e];
+    let address = deploy_contract(&mut runner, &mut signer, contract_bytes);
+    let result = call_contract(&mut runner, &mut signer, address);
+    assert!(
+        matches!(result.status, TransactionStatus::OutOfGas),
+        "EVM must run out of gas if len > 0 with large memory offset"
+    );
+}
 
 #[test]
 fn test_total_supply_accounting() {
@@ -42,6 +139,19 @@ fn test_total_supply_accounting() {
         constructor.deployed_at(contract_address)
     };
 
+    #[cfg(not(feature = "ext-connector"))]
+    let get_total_supply = |runner: &utils::AuroraRunner| -> Wei {
+        let result = runner
+            .one_shot()
+            .call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
+        let amount: u128 = String::from_utf8(result.unwrap().return_data.as_value().unwrap())
+            .unwrap()
+            .replace('"', "")
+            .parse()
+            .unwrap();
+        Wei::new(U256::from(amount))
+    };
+
     // Self-destruct with some benefactor does not reduce the total supply
     let contract = deploy_contract(&mut runner, &mut signer);
     let _submit_result = runner
@@ -54,6 +164,8 @@ fn test_total_supply_accounting() {
         })
         .unwrap();
     assert_eq!(runner.get_balance(benefactor), TRANSFER_AMOUNT);
+    #[cfg(not(feature = "ext-connector"))]
+    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 
     // Self-destruct with self benefactor burns any ETH in the destroyed contract
     let contract = deploy_contract(&mut runner, &mut signer);
@@ -66,6 +178,11 @@ fn test_total_supply_accounting() {
             )
         })
         .unwrap();
+    #[cfg(not(feature = "ext-connector"))]
+    assert_eq!(
+        get_total_supply(&mut runner),
+        INITIAL_BALANCE - TRANSFER_AMOUNT
+    );
 }
 
 #[test]
@@ -567,10 +684,12 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
-    let num_functions = module.funcs.iter().count();
+    let expected_number = 1494;
+    let actual_number = module.funcs.iter().count();
+
     assert!(
-        num_functions <= 1440,
-        "{num_functions} is not less than 1440",
+        actual_number <= expected_number,
+        "{actual_number} is not less than {expected_number}",
     );
 }
 
@@ -921,6 +1040,22 @@ fn test_block_hash_contract() {
         .unwrap();
 
     utils::panic_on_fail(result.status);
+}
+
+#[cfg(not(feature = "ext-connector"))]
+#[test]
+fn test_ft_metadata() {
+    let runner = utils::deploy_runner();
+    let account_id: String = runner.context.signer_account_id.clone().into();
+    let outcome = runner
+        .one_shot()
+        .call("ft_metadata", &account_id, Vec::new())
+        .unwrap();
+    let metadata =
+        serde_json::from_slice::<FungibleTokenMetadata>(&outcome.return_data.as_value().unwrap())
+            .unwrap();
+
+    assert_eq!(metadata, FungibleTokenMetadata::default());
 }
 
 /// Tests transfer Eth from one account to another with custom argument `max_gas_price`.

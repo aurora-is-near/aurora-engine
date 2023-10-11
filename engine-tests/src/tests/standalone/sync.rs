@@ -1,8 +1,12 @@
-use aurora_engine::deposit_event::TokenMessageData;
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine::contract_methods::connector::deposit_event::TokenMessageData;
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
+#[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
-use aurora_engine_types::types::{Address, Balance, Fee, NEP141Wei, Wei};
+use aurora_engine_types::types::{Address, Balance, Wei};
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_types::types::{Fee, NEP141Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use engine_standalone_storage::sync;
 
@@ -38,6 +42,7 @@ fn test_consume_block_message() {
     runner.close();
 }
 
+#[cfg(not(feature = "ext-connector"))]
 #[test]
 fn test_consume_deposit_message() {
     let (mut runner, block_message) = initialize();
@@ -45,6 +50,8 @@ fn test_consume_deposit_message() {
     let recipient_address = Address::new(H160([22u8; 20]));
     let deposit_amount = Wei::new_u64(123_456_789);
     let proof = mock_proof(recipient_address, deposit_amount);
+    let tx_kind = sync::types::TransactionKind::Deposit(proof.try_to_vec().unwrap());
+    let raw_input = tx_kind.raw_bytes();
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
@@ -54,8 +61,9 @@ fn test_consume_deposit_message() {
         signer: runner.env.signer_account_id(),
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
-        transaction: sync::types::TransactionKind::Deposit(proof.try_to_vec().unwrap()),
+        transaction: tx_kind,
         promise_data: Vec::new(),
+        raw_input,
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -67,6 +75,7 @@ fn test_consume_deposit_message() {
         sync::ConsumeMessageOutcome::TransactionIncluded(outcome) => outcome,
         other => panic!("Unexpected outcome {other:?}"),
     };
+    outcome.commit(&mut runner.storage).unwrap();
 
     let finish_deposit_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
@@ -75,6 +84,8 @@ fn test_consume_deposit_message() {
         }
         other => panic!("Unexpected result {other:?}"),
     };
+    let tx_kind = sync::types::TransactionKind::FinishDeposit(finish_deposit_args);
+    let raw_input = tx_kind.raw_bytes();
     // Now executing aurora callbacks, so predecessor_account_id = current_account_id
     runner.env.predecessor_account_id = runner.env.current_account_id.clone();
 
@@ -86,8 +97,11 @@ fn test_consume_deposit_message() {
         signer: runner.env.signer_account_id(),
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
-        transaction: sync::types::TransactionKind::FinishDeposit(finish_deposit_args),
-        promise_data: Vec::new(),
+        transaction: tx_kind,
+        // Need to pass the result of calling the proof verifier
+        // (which is `true` because the proof is valid in this case).
+        promise_data: vec![Some(true.try_to_vec().unwrap())],
+        raw_input,
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -99,6 +113,7 @@ fn test_consume_deposit_message() {
         sync::ConsumeMessageOutcome::TransactionIncluded(outcome) => outcome,
         other => panic!("Unexpected outcome {other:?}"),
     };
+    outcome.commit(&mut runner.storage).unwrap();
 
     let ft_on_transfer_args = match outcome.maybe_result.unwrap().unwrap() {
         sync::TransactionExecutionResult::Promise(promise_args) => {
@@ -107,6 +122,8 @@ fn test_consume_deposit_message() {
         }
         other => panic!("Unexpected result {other:?}"),
     };
+    let tx_kind = sync::types::TransactionKind::FtOnTransfer(ft_on_transfer_args);
+    let raw_input = tx_kind.raw_bytes();
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
@@ -116,15 +133,17 @@ fn test_consume_deposit_message() {
         signer: runner.env.signer_account_id(),
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
-        transaction: sync::types::TransactionKind::FtOnTransfer(ft_on_transfer_args),
+        transaction: tx_kind,
         promise_data: Vec::new(),
+        raw_input,
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     assert_eq!(runner.get_balance(&recipient_address), deposit_amount);
 
@@ -137,6 +156,8 @@ fn test_consume_deploy_message() {
 
     let code = b"hello_world!".to_vec();
     let input = utils::create_deploy_transaction(code.clone(), U256::zero()).data;
+    let tx_kind = sync::types::TransactionKind::Deploy(input);
+    let raw_input = tx_kind.raw_bytes();
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
@@ -146,15 +167,17 @@ fn test_consume_deploy_message() {
         signer: runner.env.signer_account_id(),
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
-        transaction: sync::types::TransactionKind::Deploy(input),
+        transaction: tx_kind,
         promise_data: Vec::new(),
+        raw_input,
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     let diff = runner
         .storage
@@ -190,6 +213,8 @@ fn test_consume_deploy_erc20_message() {
     let args = aurora_engine::parameters::DeployErc20TokenArgs {
         nep141: token.clone(),
     };
+    let tx_kind = sync::types::TransactionKind::DeployErc20(args);
+    let raw_input = tx_kind.raw_bytes();
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
         near_receipt_id: H256([8u8; 32]),
@@ -198,16 +223,18 @@ fn test_consume_deploy_erc20_message() {
         signer: runner.env.signer_account_id(),
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
-        transaction: sync::types::TransactionKind::DeployErc20(args),
+        transaction: tx_kind,
         promise_data: Vec::new(),
+        raw_input,
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     let erc20_address = runner
         .storage
@@ -228,6 +255,8 @@ fn test_consume_deploy_erc20_message() {
         amount: Balance::new(mint_amount),
         msg: hex::encode(dest_address.as_bytes()),
     };
+    let tx_kind = sync::types::TransactionKind::FtOnTransfer(args);
+    let raw_input = tx_kind.raw_bytes();
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
         near_receipt_id: H256([8u8; 32]),
@@ -236,16 +265,18 @@ fn test_consume_deploy_erc20_message() {
         signer: runner.env.signer_account_id(),
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
-        transaction: sync::types::TransactionKind::FtOnTransfer(args),
+        transaction: tx_kind,
         promise_data: Vec::new(),
+        raw_input,
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     // Check balance is correct
     let deployed_token = ERC20(
@@ -266,7 +297,6 @@ fn test_consume_deploy_erc20_message() {
 fn test_consume_ft_on_transfer_message() {
     // Only need to check the case of aurora calling `ft_on_transfer` on itself, the other case
     // is handled in the `test_consume_deploy_erc20_message` above.
-
     let (mut runner, block_message) = initialize();
 
     let mint_amount = 8_675_309;
@@ -285,23 +315,33 @@ fn test_consume_ft_on_transfer_message() {
         ]
         .concat(),
     };
+    let tx_kind = sync::types::TransactionKind::FtOnTransfer(args);
+    let raw_input = tx_kind.raw_bytes();
+    #[cfg(not(feature = "ext-connector"))]
+    let caller = runner.env.predecessor_account_id();
+    #[cfg(feature = "ext-connector")]
+    let caller = crate::utils::standalone::mocks::EXT_ETH_CONNECTOR
+        .parse()
+        .unwrap();
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
         near_receipt_id: H256([8u8; 32]),
         position: 0,
         succeeded: true,
         signer: runner.env.signer_account_id(),
-        caller: runner.env.predecessor_account_id(),
+        caller,
         attached_near: 0,
-        transaction: sync::types::TransactionKind::FtOnTransfer(args),
+        transaction: tx_kind,
         promise_data: Vec::new(),
+        raw_input,
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     assert_eq!(
         runner.get_balance(&dest_address).raw().low_u128(),
@@ -326,6 +366,11 @@ fn test_consume_call_message() {
     utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
     let block_hash = utils::standalone::mocks::compute_block_hash(runner.env.block_height);
 
+    let tx_kind = sync::types::TransactionKind::Call(simple_transfer_args(
+        recipient_address,
+        transfer_amount,
+    ));
+    let raw_input = tx_kind.raw_bytes();
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
         near_receipt_id: H256([8u8; 32]),
@@ -334,18 +379,17 @@ fn test_consume_call_message() {
         signer: runner.env.signer_account_id(),
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
-        transaction: sync::types::TransactionKind::Call(simple_transfer_args(
-            recipient_address,
-            transfer_amount,
-        )),
+        transaction: tx_kind,
         promise_data: Vec::new(),
+        raw_input,
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     assert_eq!(runner.get_balance(&recipient_address), transfer_amount);
     assert_eq!(
@@ -378,6 +422,8 @@ fn test_consume_submit_message() {
         utils::sign_transaction(transaction, Some(runner.chain_id), &signer.secret_key);
     let eth_transaction =
         crate::prelude::transactions::EthTransactionKind::Legacy(signed_transaction);
+    let tx_kind = sync::types::TransactionKind::Submit(eth_transaction);
+    let raw_input = tx_kind.raw_bytes();
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
@@ -387,15 +433,17 @@ fn test_consume_submit_message() {
         signer: runner.env.signer_account_id(),
         caller: runner.env.predecessor_account_id(),
         attached_near: 0,
-        transaction: sync::types::TransactionKind::Submit(eth_transaction),
+        transaction: tx_kind,
         promise_data: Vec::new(),
+        raw_input,
     };
 
-    sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
+    outcome.commit(&mut runner.storage).unwrap();
 
     assert_eq!(runner.get_balance(&recipient_address), transfer_amount);
     assert_eq!(
@@ -405,7 +453,11 @@ fn test_consume_submit_message() {
     assert_eq!(runner.get_nonce(&signer_address), U256::one());
 }
 
+#[cfg(not(feature = "ext-connector"))]
 fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine::proof::Proof {
+    use aurora_engine::contract_methods::connector::deposit_event::{
+        DepositedEvent, DEPOSITED_EVENT,
+    };
     let eth_custodian_address = utils::standalone::mocks::ETH_CUSTODIAN_ADDRESS;
 
     let fee = Fee::new(NEP141Wei::new(0));
@@ -414,7 +466,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
             .unwrap();
 
-    let deposit_event = aurora_engine::deposit_event::DepositedEvent {
+    let deposit_event = DepositedEvent {
         eth_custodian_address,
         sender: Address::new(H160([0u8; 20])),
         token_message_data,
@@ -423,8 +475,8 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
     };
 
     let event_schema = ethabi::Event {
-        name: aurora_engine::deposit_event::DEPOSITED_EVENT.into(),
-        inputs: aurora_engine::deposit_event::DepositedEvent::event_params(),
+        name: DEPOSITED_EVENT.into(),
+        inputs: DepositedEvent::event_params(),
         anonymous: false,
     };
     let log_entry = aurora_engine_types::parameters::connector::LogEntry {
@@ -477,10 +529,7 @@ fn sample_block() -> sync::types::BlockMessage {
 }
 
 fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
-    let mut runner = StandaloneRunner {
-        init_legacy_connector: true,
-        ..Default::default()
-    };
+    let mut runner = StandaloneRunner::default();
     runner.init_evm();
 
     let block_message = sample_block();

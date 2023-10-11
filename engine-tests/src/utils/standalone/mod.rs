@@ -27,7 +27,6 @@ pub struct StandaloneRunner {
     pub chain_id: u64,
     // Cumulative diff from all transactions (ie full state representation)
     pub cumulative_diff: Diff,
-    pub init_legacy_connector: bool,
 }
 
 impl StandaloneRunner {
@@ -44,13 +43,13 @@ impl StandaloneRunner {
             .unwrap();
         env.block_height += 1;
         let transaction_hash = H256::zero();
-        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
-        let init_legacy_connector = self.init_legacy_connector;
+        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::init_evm(io, env, chain_id);
-            if init_legacy_connector {
-                mocks::init_legacy_connector(io, env);
-            }
+            #[cfg(feature = "ext-connector")]
+            mocks::init_connector(io);
+            #[cfg(not(feature = "ext-connector"))]
+            mocks::init_connector(io, env);
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
@@ -82,7 +81,7 @@ impl StandaloneRunner {
         };
 
         env.block_height += 1;
-        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
+        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
 
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::mint_evm_account(address, balance, nonce, code, io, env);
@@ -102,7 +101,7 @@ impl StandaloneRunner {
         signer: &mut utils::Signer,
         amount: Wei,
         dest: Address,
-    ) -> Result<SubmitResult, engine::EngineError> {
+    ) -> Result<SubmitResult, sync::error::Error> {
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: U256::zero(),
@@ -118,7 +117,7 @@ impl StandaloneRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<SubmitResult, engine::EngineError> {
+    ) -> Result<SubmitResult, sync::error::Error> {
         let storage = &mut self.storage;
         let env = &mut self.env;
         env.block_height += 1;
@@ -138,7 +137,7 @@ impl StandaloneRunner {
     pub fn submit_raw_transaction_bytes(
         &mut self,
         transaction_bytes: &[u8],
-    ) -> Result<SubmitResult, engine::EngineError> {
+    ) -> Result<SubmitResult, sync::error::Error> {
         self.env.predecessor_account_id = "some-account.near".parse().unwrap();
         let storage = &mut self.storage;
         let env = &mut self.env;
@@ -168,7 +167,14 @@ impl StandaloneRunner {
         let transaction_bytes = rlp::encode(signed_tx).to_vec();
         let transaction_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
-        let mut tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
+        let mut tx_msg = Self::template_tx_msg(
+            storage,
+            env,
+            0,
+            transaction_hash,
+            &[],
+            transaction_bytes.clone(),
+        );
         tx_msg.position = transaction_position;
         tx_msg.transaction =
             TransactionKind::Submit(transaction_bytes.as_slice().try_into().unwrap());
@@ -201,6 +207,9 @@ impl StandaloneRunner {
         env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
         env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
+        if ctx.random_seed.len() == 32 {
+            env.random_seed = H256::from_slice(&ctx.random_seed);
+        }
 
         let promise_data: Vec<_> = promise_results
             .iter()
@@ -223,7 +232,14 @@ impl StandaloneRunner {
         };
 
         let storage = &mut self.storage;
-        let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
+        let mut tx_msg = Self::template_tx_msg(
+            storage,
+            &env,
+            0,
+            transaction_hash,
+            promise_results,
+            ctx.input.clone(),
+        );
         tx_msg.transaction = transaction_kind;
 
         let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
@@ -284,6 +300,7 @@ impl StandaloneRunner {
         transaction_position: u16,
         transaction_hash: H256,
         promise_results: &[PromiseResult],
+        raw_input: Vec<u8>,
     ) -> TransactionMessage {
         let block_hash = mocks::compute_block_hash(env.block_height);
         let block_metadata = BlockMetadata {
@@ -310,6 +327,7 @@ impl StandaloneRunner {
             attached_near: env.attached_deposit,
             transaction: TransactionKind::Unknown,
             promise_data,
+            raw_input,
         }
     }
 
@@ -317,10 +335,10 @@ impl StandaloneRunner {
         transaction_bytes: &[u8],
         transaction_position: u16,
         storage: &mut Storage,
-        env: &mut env::Fixed,
+        env: &env::Fixed,
         cumulative_diff: &mut Diff,
         promise_results: &[PromiseResult],
-    ) -> Result<SubmitResult, engine::EngineError> {
+    ) -> Result<SubmitResult, sync::error::Error> {
         let transaction_hash = aurora_engine_sdk::keccak(transaction_bytes);
         let mut tx_msg = Self::template_tx_msg(
             storage,
@@ -328,6 +346,7 @@ impl StandaloneRunner {
             transaction_position,
             transaction_hash,
             promise_results,
+            transaction_bytes.to_vec(),
         );
         tx_msg.transaction = TransactionKind::Submit(transaction_bytes.try_into().unwrap());
 
@@ -341,9 +360,9 @@ impl StandaloneRunner {
 
 fn unwrap_result(
     outcome: sync::TransactionIncludedOutcome,
-) -> Result<SubmitResult, engine::EngineError> {
-    match outcome.maybe_result.unwrap().unwrap() {
-        sync::TransactionExecutionResult::Submit(result) => result,
+) -> Result<SubmitResult, sync::error::Error> {
+    match outcome.maybe_result?.unwrap() {
+        sync::TransactionExecutionResult::Submit(result) => result.map_err(Into::into),
         sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
         sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
     }
@@ -362,7 +381,6 @@ impl Default for StandaloneRunner {
             env,
             chain_id: utils::DEFAULT_CHAIN_ID,
             cumulative_diff: Diff::default(),
-            init_legacy_connector: false,
         }
     }
 }

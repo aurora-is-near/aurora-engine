@@ -1,5 +1,4 @@
 mod v0 {
-    pub use aurora_engine::connector;
     #[cfg(feature = "meta-call")]
     pub use aurora_engine::meta_parsing;
     pub use aurora_engine::parameters;

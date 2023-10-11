@@ -10,7 +10,7 @@ pub mod fee;
 pub mod gas;
 pub mod wei;
 
-pub use address::*;
+pub use address::{make_address, Address};
 pub use balance::*;
 pub use fee::*;
 pub use gas::*;
@@ -22,11 +22,21 @@ pub type RawH256 = [u8; 32]; // Unformatted binary data of fixed length.
 
 pub type StorageUsage = u64;
 
-/// Selector to call mint function in ERC 20 contract
-///
-/// `keccak("mint(address,uint256)".as_bytes())[..4];`
-#[allow(dead_code)]
+/// Selector to call `mint` function in ERC 20 contract.
+/// `keccak(b"mint(address,uint256)")[..4];`
 pub const ERC20_MINT_SELECTOR: &[u8] = &[64, 193, 15, 25];
+/// Selector to call `setMetadata` function in ERC-20 contact.
+/// `keccak(b"setMetadata(string,string,uint8)")[..4];`
+pub const ERC20_SET_METADATA_SELECTOR: &[u8] = &[55, 210, 194, 244];
+/// Selector to call `name` function in ERC-20 contact.
+/// `keccak(b"name()")[..4];`
+pub const ERC20_NAME_SELECTOR: &[u8] = &[6, 253, 222, 3];
+/// Selector to call `symbol` function in ERC-20 contact.
+/// `keccak(b"symbol()")[..4];`
+pub const ERC20_SYMBOL_SELECTOR: &[u8] = &[149, 216, 155, 65];
+/// Selector to call `digits` function in ERC-20 contact.
+/// `keccak(b"digits()")[..4];`
+pub const ERC20_DIGITS_SELECTOR: &[u8] = &[49, 60, 229, 103];
 
 #[derive(Debug)]
 pub enum AddressValidationError {

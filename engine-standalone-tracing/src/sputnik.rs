@@ -132,7 +132,7 @@ impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
                 return_value,
             } => {
                 match result {
-                    Ok(_) => {
+                    Ok(()) => {
                         // Step completed, push current log into the record
                         self.logs.push(self.current.clone());
                     }

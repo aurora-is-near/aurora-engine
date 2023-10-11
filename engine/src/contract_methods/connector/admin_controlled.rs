@@ -1,6 +1,4 @@
-use aurora_engine_types::parameters::connector::PausedMask;
-
-pub const ERR_PAUSED: &str = "ERR_PAUSED";
+pub type PausedMask = u8;
 
 pub trait AdminControlled {
     /// Return the current mask representing all paused events.
@@ -30,7 +28,7 @@ pub struct PausedError;
 
 impl AsRef<[u8]> for PausedError {
     fn as_ref(&self) -> &[u8] {
-        ERR_PAUSED.as_bytes()
+        crate::errors::ERR_PAUSED
     }
 }
 
@@ -43,7 +41,7 @@ mod tests {
     }
 
     impl MockAdminControlled {
-        pub fn new() -> Self {
+        pub const fn new() -> Self {
             Self { mask: 0 }
         }
     }
@@ -54,7 +52,7 @@ mod tests {
         }
 
         fn set_paused(&mut self, paused: PausedMask) {
-            self.mask = paused
+            self.mask = paused;
         }
     }
 

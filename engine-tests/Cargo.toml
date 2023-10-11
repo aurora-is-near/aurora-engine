@@ -12,10 +12,10 @@ autobenches = false
 
 [dev-dependencies]
 aurora-engine = { workspace = true, features = ["std", "tracing", "impl-serde"] }
+aurora-engine-hashchain = { workspace = true, features = ["std"] }
 aurora-engine-modexp = { workspace = true, features = ["std"] }
 aurora-engine-precompiles = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }
-aurora-engine-standalone-nep141-legacy.workspace = true
 aurora-engine-test-doubles.workspace = true
 aurora-engine-transactions = { workspace = true, features = ["std", "impl-serde"] }
 aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
@@ -52,6 +52,7 @@ tokio.workspace = true
 walrus.workspace = true
 
 [features]
-mainnet-test = []
-testnet-test = []
+mainnet-test = ["aurora-engine-workspace/mainnet-test"]
+testnet-test = ["aurora-engine-workspace/testnet-test"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
+ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector", "engine-standalone-storage/ext-connector", "aurora-engine-workspace/ext-connector"]

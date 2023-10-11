@@ -32,9 +32,10 @@ pub enum KeyPrefix {
     Nep141Erc20Map = 0x8,
     Erc20Nep141Map = 0x9,
     CrossContractCall = 0xa,
-    Silo = 0xb,
-    Whitelist = 0xc,
-    RelayerFunctionCallKey = 0xd,
+    RelayerFunctionCallKey = 0xb,
+    Hashchain = 0xc,
+    Silo = 0xd,
+    Whitelist = 0xe,
 }
 
 impl From<KeyPrefix> for u8 {
@@ -51,9 +52,10 @@ impl From<KeyPrefix> for u8 {
             KeyPrefix::Nep141Erc20Map => 0x8,
             KeyPrefix::Erc20Nep141Map => 0x9,
             KeyPrefix::CrossContractCall => 0xa,
-            KeyPrefix::Silo => 0xb,
-            KeyPrefix::Whitelist => 0xc,
-            KeyPrefix::RelayerFunctionCallKey => 0xd,
+            KeyPrefix::RelayerFunctionCallKey => 0xb,
+            KeyPrefix::Hashchain => 0xc,
+            KeyPrefix::Silo => 0xd,
+            KeyPrefix::Whitelist => 0xe,
         }
     }
 }
@@ -68,7 +70,7 @@ pub enum EthConnectorStorageId {
     StatisticsAuroraAccountsCounter = 0x4,
     FungibleTokenMetadata = 0x5,
     EthConnectorAccount = 0x6,
-    DisableLegacyNEP141 = 0x7,
+    WithdrawSerializationType = 0x7,
 }
 
 impl From<EthConnectorStorageId> for u8 {
@@ -81,7 +83,7 @@ impl From<EthConnectorStorageId> for u8 {
             EthConnectorStorageId::StatisticsAuroraAccountsCounter => 0x4,
             EthConnectorStorageId::FungibleTokenMetadata => 0x5,
             EthConnectorStorageId::EthConnectorAccount => 0x6,
-            EthConnectorStorageId::DisableLegacyNEP141 => 0x7,
+            EthConnectorStorageId::WithdrawSerializationType => 0x7,
         }
     }
 }
@@ -104,9 +106,10 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0x8 => Self::Nep141Erc20Map,
             0x9 => Self::Erc20Nep141Map,
             0xa => Self::CrossContractCall,
-            0xb => Self::Silo,
-            0xc => Self::Whitelist,
-            0xd => Self::RelayerFunctionCallKey,
+            0xb => Self::RelayerFunctionCallKey,
+            0xc => Self::Hashchain,
+            0xd => Self::Silo,
+            0xe => Self::Whitelist,
             _ => unreachable!("Unknown key prefix"),
         }
     }

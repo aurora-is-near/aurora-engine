@@ -18,7 +18,6 @@ aurora-engine = { workspace = true, features = ["std"] }
 aurora-engine-modexp = { workspace = true, features = ["std"] }
 aurora-engine-precompiles = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }
-aurora-engine-standalone-nep141-legacy.workspace = true
 aurora-engine-transactions = { workspace = true, features = ["std"] }
 aurora-engine-types = { workspace = true, features = ["std"] }
 evm-core.workspace = true
@@ -34,6 +33,7 @@ default = ["snappy", "lz4", "zstd", "zlib"]
 borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-sdk/borsh-compat", "aurora-engine-precompiles/borsh-compat", "aurora-engine/borsh-compat"]
 mainnet = []
 testnet = []
+ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector"]
 snappy = ["rocksdb/snappy"]
 lz4 = ["rocksdb/lz4"]
 zstd = ["rocksdb/zstd"]

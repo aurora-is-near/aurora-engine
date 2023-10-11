@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changes
+
+- Changed structure `SetEthConnectorContractAccountArgs` for setting eth connector account. It was extended with
+ additional field: `withdraw_serialize_type` for defining serialization type for withdraw arguments by [@aleksuss]. ([#834]) 
+
+## [3.1.0] 2023-09-25
+
+### Additions
+
+- Added the possibility to use native NEAR instead of wNEAR on Aurora by [@karim-en]. ([#750])
+
+- Added hashchain integration by [@birchmd]. ([#831])
+
+- Added functions for setting and getting metadata of ERC-20 contracts deployed with `deploy_erc20_token` transaction
+  by [@aleksuss]. ([#837])
+
+[#750]: https://github.com/aurora-is-near/aurora-engine/pull/750
+[#831]: https://github.com/aurora-is-near/aurora-engine/pull/831
+[#834]: https://github.com/aurora-is-near/aurora-engine/pull/834
+[#837]: https://github.com/aurora-is-near/aurora-engine/pull/837
+
+## [3.0.0] 2023-08-28
+
+### Fixes
+
+- Updated [SputnikVM](https://github.com/aurora-is-near/sputnikvm) dependency with bugfix in the `returndatacopy`
+  implementation and a performance improvement in accessing EVM memory by [@birchmd]. ([#826])
+
+### Changes
+
+- BREAKING: `engine-standalone-storage` no longer automatically writes to the DB when `consume_message` is called. 
+  It is up to downstream users of the library to commit the diff (after doing any validation for correctness) by [@birchmd]. ([#825])
+
+### Additions
+
+- New crate for the so-called "hashchain" implementation. It will enable verification of Aurora blocks by light clients 
+  in the future by [@birchmd]. ([#816])
+
+[#816]: https://github.com/aurora-is-near/aurora-engine/pull/816
+[#825]: https://github.com/aurora-is-near/aurora-engine/pull/825
+[#826]: https://github.com/aurora-is-near/aurora-engine/pull/826
+
+## [2.10.2] 2023-08-10
+
+### Changes
+
+- Added a view transaction `factory_get_wnear_address` for returning address for the `wNEAR` ERC-20 contract by [@aleksuss]. ([#807]) 
+
+### Fixes
+
+- Fixed a bug where standalone engine can crash on tracing transactions with too large contract deployment by [@birchmd]. ([#817])
+- Fixed a bug and performance improvements with unusual exponents in the `engine-modexp` crate by [@guidovranken]. ([#814]) 
+
+[#817]: https://github.com/aurora-is-near/aurora-engine/pull/817
+[#814]: https://github.com/aurora-is-near/aurora-engine/pull/814
+[#807]: https://github.com/aurora-is-near/aurora-engine/pull/807
+
 ## [2.10.1] 2023-07-27
 
 ### Fixes
@@ -449,7 +506,10 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.1...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.1.0...develop
+[3.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.0.0...3.1.0
+[3.0.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.0.0...2.10.2
+[2.10.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.1...2.10.2
 [2.10.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.0...2.10.1
 [2.10.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.3...2.10.0
 [2.9.3]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.2...2.9.3 
@@ -492,12 +552,14 @@ struct SubmitResult {
 [@andrcmdr]: https://github.com/andrcmdr
 [@birchmd]: https://github.com/birchmd
 [@Casuso]: https://github.com/Casuso
+[@guidovranken]: https://github.com/guidovranken
 [@hskang9]: https://github.com/hskang9
 [@joshuajbouw]: https://github.com/joshuajbouw
+[@karim-en]: https://github.com/karim-en
 [@mandreyel]: https://github.com/mandreyel
+[@matklad]: https://github.com/matklad
 [@mfornet]: https://github.com/mfornet
 [@mrLSD]: https://github.com/mrLSD
+[@olonho]: https://github.com/olonho
 [@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
-[@matklad]: https://github.com/matklad
-[@olonho]: https://github.com/olonho
