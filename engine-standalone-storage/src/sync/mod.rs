@@ -602,17 +602,9 @@ fn non_submit_execute<I: IO + Copy>(
 
             None
         }
-        TransactionKind::SetEthConnectorContractAccount(args) => {
+        TransactionKind::SetEthConnectorContractAccount(_) => {
             #[cfg(feature = "ext-connector")]
-            {
-                use aurora_engine::contract_methods::connector::external::AdminControlled;
-                let mut connector =
-                    contract_methods::connector::external::EthConnectorContract::init(io)?;
-                connector.set_eth_connector_contract_account(&args.account);
-                connector.set_withdraw_serialize_type(&args.withdraw_serialize_type);
-            }
-            #[cfg(not(feature = "ext-connector"))]
-            let _ = args;
+            contract_methods::connector::set_eth_connector_contract_account(io, env)?;
 
             None
         }
